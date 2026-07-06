@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xena Agency Privilege Tracker</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 100%); color: #fff; padding: 20px; min-height: 100vh; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #ffd700; margin-bottom: 10px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
+        .subtitle { text-align: center; color: #ff69b4; margin-bottom: 30px; }
+        .card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 25px; margin-bottom: 25px; backdrop-filter: blur(10px); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #e0e0e0; font-weight: 600; }
+        input, select { width: 100%; padding: 12px 15px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 10px; background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 1em; transition: all 0.3s; }
+        input:focus, select:focus { outline: none; border-color: #ff69b4; box-shadow: 0 0 10px rgba(255, 105, 180, 0.2); }
+        .btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #ff69b4, #ffd700); border: none; border-radius: 10px; color: #1a0a2e; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(255, 105, 180, 0.4); }
+        
+        #resultsContainer { display: none; }
+        .target-banner { background: rgba(0, 255, 136, 0.1); border: 2px solid rgba(0, 255, 136, 0.3); border-radius: 10px; padding: 25px; text-align: center; margin-bottom: 25px; }
+        .target-banner h2 { margin: 0; color: #00ff88; font-size: 2.5em; }
+        .target-banner p { margin: 10px 0 0 0; color: #ccc; font-size: 1.1em; }
+        
+        .privilege-section { background: rgba(0, 0, 0, 0.2); border-radius: 10px; padding: 20px; border: 1px solid rgba(255, 105, 180, 0.3); }
+        .privilege-header { color: #ff69b4; margin-top: 0; border-bottom: 1px solid rgba(255,105,180,0.3); padding-bottom: 10px; text-align: center; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .stat-box { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 15px; text-align: center; }
+        .stat-label { color: #ccc; font-size: 0.9em; margin-bottom: 5px; }
+        .stat-value { color: #ffd700; font-size: 1.5em; font-weight: bold; }
+        
+        .loading { text-align: center; color: #ff69b4; display: none; margin-top: 20px; font-weight: bold; }
+        .error { color: #ff6b6b; text-align: center; margin-top: 20px; display: none; background: rgba(255,0,0,0.1); padding: 15px; border-radius: 8px;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚀 Xena Live Data Portal</h1>
+    <div class="subtitle">Agency Privilege & Targets Tracker</div>
+
+    <div class="card">
+        <div class="form-group">
+            <label>Select Inquiry Type</label>
+            <select id="queryType">
+                <option value="target">Agency Target Privilege</option>
+                <option value="points">Agency Points System</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Enter Agency Code</label>
+            <input type="text" id="agencyCode" placeholder="e.g., 40775">
+        </div>
+        <button class="btn" onclick="fetchAgencyData()">Search Current Month Data</button>
+    </div>
+
+    <div id="loading" class="loading">Fetching secure live data from Lark...</div>
+    <div id="error" class="error"></div>
+
+    <div id="resultsContainer">
+        <div class="target-banner">
+            <h2 id="displayTargetCoins">0 Coins</h2>
+            <p>Current Month Agency Target</p>
+        </div>
+        
+        <div id="privilegeArea" class="privilege-section">
+            <h3 class="privilege-header">Check Specific Available Privilege</h3>
+            <div class="form-group">
+                <select id="specificPrivilege" onchange="updatePrivilegeGrid()">
+                    <option value="Dynamic Avatar">Dynamic Avatar</option>
+                    <option value="30 Mics">30 Mics</option>
+                    <option value="20 Mics">20 Mics</option>
+                    <option value="New User Welcome Room">New User Welcome Room</option>
+                    <option value="Game room">Game room</option>
+                </select>
+            </div>
+            
+            <div class="grid">
+                <div class="stat-box">
+                    <div class="stat-label">Total Allowed</div>
+                    <div class="stat-value" id="valTotal" style="color: #00ff88;">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Claimed</div>
+                    <div class="stat-value" id="valClaimed" style="color: #fff;">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Remaining</div>
+                    <div class="stat-value" id="valRemaining" style="color: #ffd700;">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Pending Approval</div>
+                    <div class="stat-value" id="valPending" style="color: #ffaa00;">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Rejected</div>
+                    <div class="stat-value" id="valRejected" style="color: #ff6b6b;">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentAgencyData = null;
+
+    function extractText(field) {
+        if (field === null || field === undefined) return "";
+        if (typeof field === 'string' || typeof field === 'number') return String(field);
+        if (Array.isArray(field)) {
+            return field.map(item => {
+                if (typeof item === 'string' || typeof item === 'number') return String(item);
+                if (typeof item === 'object' && item !== null) return String(item.text || item.value || item.name || ""); 
+                return "";
+            }).join('');
+        }
+        if (typeof field === 'object') return String(field.text || field.value || field.name || "");
+        return String(field);
+    }
+
+    async function fetchAgencyData() {
+        const queryType = document.getElementById('queryType').value;
+        const agencyCode = document.getElementById('agencyCode').value.trim();
+        const resultsContainer = document.getElementById('resultsContainer');
+        const privilegeArea = document.getElementById('privilegeArea');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+
+        if (!agencyCode) {
+            error.style.display = 'block';
+            error.innerText = 'Please enter an Agency Code.';
+            return;
+        }
+
+        resultsContainer.style.display = 'none';
+        error.style.display = 'none';
+        loading.style.display = 'block';
+
+        try {
+            // Change this line around line 175:
+const response = await fetch(`/api/search?code=${agencyCode}`);
+            
+            if (!response.ok) {
+                let errorText = `Server returned status ${response.status}`;
+                try {
+                    const errData = await response.json();
+                    if (errData.error) errorText = errData.error;
+                } catch(e) {}
+                throw new Error(errorText);
+            }
+            currentAgencyData = await response.json();
+        } catch (netErr) {
+            loading.style.display = 'none';
+            error.style.display = 'block';
+            error.innerHTML = `<strong>API System Error:</strong> ${netErr.message} <br><br><small>(If this says 'Failed to fetch', your Vercel vercel.json file or API folder is missing!)</small>`;
+            return;
+        }
+
+        loading.style.display = 'none';
+
+        const basePoints = currentAgencyData.base_points || 0;
+        const targetCoins = (basePoints * 100000).toLocaleString('en-US');
+        document.getElementById('displayTargetCoins').innerText = `${targetCoins} Coins`;
+
+        if (queryType === 'target') {
+            privilegeArea.style.display = 'block';
+            updatePrivilegeGrid();
+        } else {
+            privilegeArea.style.display = 'none';
+        }
+
+        resultsContainer.style.display = 'block';
+    }
+
+    function updatePrivilegeGrid() {
+        if (!currentAgencyData) return;
+        const selectedPriv = document.getElementById('specificPrivilege').value;
+        const basePoints = currentAgencyData.base_points || 0;
+
+        let totalEarned = 0;
+        if (selectedPriv === "Dynamic Avatar") totalEarned = Math.floor(basePoints / 100);
+        else if (selectedPriv === "30 Mics") {
+            if (basePoints >= 1000) totalEarned = 4;
+            else if (basePoints >= 500) totalEarned = 2;
+            else if (basePoints >= 300) totalEarned = 1;
+            else totalEarned = 0;
+        } 
+        else if (selectedPriv === "20 Mics") totalEarned = basePoints >= 150 ? 1 : 0;
+        else if (selectedPriv === "New User Welcome Room" || selectedPriv === "Game room") totalEarned = basePoints >= 20 ? 1 : 0;
+
+        let claimed = 0, pending = 0, rejected = 0;
+
+        if (currentAgencyData.requests && currentAgencyData.requests.length > 0) {
+            currentAgencyData.requests.forEach(req => {
+                const reqPrivilege = extractText(req['Privilege']);
+                if (reqPrivilege.includes(selectedPriv)) {
+                    const status = extractText(req['Status']).trim();
+                    const counterRaw = extractText(req['# Counter']) || extractText(req['Counter']);
+                    let count = parseInt(counterRaw, 10);
+                    if (isNaN(count)) count = 1;
+
+                    if (status === "Done") claimed += count;
+                    else if (status === "Rejected") rejected += count;
+                    else pending += count;
+                }
+            });
+        }
+
+        const remaining = totalEarned - claimed;
+        document.getElementById('valTotal').innerText = totalEarned;
+        document.getElementById('valClaimed').innerText = claimed;
+        document.getElementById('valRemaining').innerText = remaining;
+        document.getElementById('valPending').innerText = pending;
+        document.getElementById('valRejected').innerText = rejected;
+    }
+</script>
+</body>
+</html>
