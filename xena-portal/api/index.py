@@ -15,7 +15,7 @@ REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
 BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
-ROLES_TABLE_ID = "tblpgMD1AfAXQYZd" # Your Group Webhooks Table
+ROLES_TABLE_ID = "tblpgMD1AfAXQYZd"
 
 cache = {}
 CACHE_EXPIRY = 600 
@@ -26,24 +26,37 @@ def get_tenant_access_token():
     response = requests.post(url, json=payload).json()
     return response.get("tenant_access_token")
 
-# Secure session generator
 def generate_secure_token(name):
     raw = f"{name}-{APP_SECRET}"
     return hashlib.sha256(raw.encode()).hexdigest()
+
+# --- THE UNIVERSAL TEXT EXTRACTOR ---
+# This forces Feishu's complicated Person/Option fields into plain readable text
+def extract_field_text(field_data):
+    if not field_data: 
+        return ""
+    if isinstance(field_data, (str, int, float)): 
+        return str(field_data)
+    if isinstance(field_data, dict):
+        if 'text' in field_data: return str(field_data['text'])
+        if 'name' in field_data: return str(field_data['name'])
+        if 'en_name' in field_data: return str(field_data['en_name'])
+        return str(field_data)
+    if isinstance(field_data, list):
+        return " ".join([extract_field_text(item) for item in field_data])
+    return str(field_data)
 
 @app.route('/', methods=['GET'])
 def home():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_file(os.path.join(root_dir, 'index.html'))
 
-# --- SSO STEP 1: LOGIN ---
 @app.route('/api/login', methods=['GET'])
 def login():
     safe_redirect = urllib.parse.quote(REDIRECT_URI)
     feishu_url = f"https://open.feishu.cn/open-apis/authen/v1/index?app_id={APP_ID}&redirect_uri={safe_redirect}"
     return redirect(feishu_url)
 
-# --- SSO STEP 2: CALLBACK ---
 @app.route('/api/callback', methods=['GET'])
 def callback():
     code = request.args.get('code')
@@ -62,23 +75,19 @@ def callback():
     info_headers = {"Authorization": f"Bearer {user_access_token}"}
     info_resp = requests.get(info_url, headers=info_headers).json()
     
-    # Extract authentic Feishu Name
     lark_name = info_resp.get("data", {}).get("name", "Unknown User")
     
-    # Create secure session
     secure_token = generate_secure_token(lark_name)
     safe_name = urllib.parse.quote(lark_name)
     return redirect(f"/?user={safe_name}&token={secure_token}")
 
-# --- SECURE VERIFIED SEARCH ---
 @app.route('/api/search', methods=['GET'])
 def search_agency():
     agency_code = request.args.get('code')
-    raw_username = request.args.get('user', '') # Exact casing from Feishu
-    username = raw_username.lower() # Lowercase version for sheet searching
+    raw_username = request.args.get('user', '') 
+    username = raw_username.lower().strip() 
     token = request.args.get('token', '') 
     
-    # 1. Verify SSO session using the EXACT raw username
     if not raw_username or token != generate_secure_token(raw_username):
         return jsonify({"error": "Unauthorized session. Please Log In via Feishu."}), 401
     if not agency_code:
@@ -92,35 +101,30 @@ def search_agency():
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     # ----------------------------------------------------
-    # 2. FETCH USER ROLE & MAPPING FROM BITABLE
+    # 1. FETCH USER ROLE & MAPPING FROM BITABLE (Max 500 rows to ensure we don't miss you)
     # ----------------------------------------------------
     roles_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ROLES_TABLE_ID}/records/search?automatic_fields=true"
-    roles_resp = requests.post(roles_url, headers=headers, json={}).json()
+    roles_payload = {"page_size": 500}
+    roles_resp = requests.post(roles_url, headers=headers, json=roles_payload).json()
     
-    user_role = "ACM" # Default
+    user_role = "ACM" # Default fallback
     acm_value = ""
     
     if 'data' in roles_resp and 'items' in roles_resp['data']:
         for item in roles_resp['data']['items']:
             fields = item.get('fields', {})
-            agents1 = str(fields.get('Agent Name', '')).lower()
-            agents2 = str(fields.get('Agent name 2', '')).lower()
+            
+            # Using the new Extractor to guarantee we get plain text!
+            agents1 = extract_field_text(fields.get('Agent Name')).lower()
+            agents2 = extract_field_text(fields.get('Agent name 2')).lower()
             
             if username in agents1 or username in agents2:
-                raw_role = fields.get('Role', '')
-                if isinstance(raw_role, dict): raw_role = raw_role.get('text', '')
-                elif isinstance(raw_role, list) and len(raw_role) > 0: raw_role = raw_role[0].get('text', '')
-                user_role = str(raw_role).upper().strip()
-                
-                raw_acm_val = fields.get('Acm Value', '')
-                if isinstance(raw_acm_val, dict): acm_value = raw_acm_val.get('text', '')
-                elif isinstance(raw_acm_val, list) and len(raw_acm_val) > 0: acm_value = raw_acm_val[0].get('text', '')
-                else: acm_value = str(raw_acm_val)
-                acm_value = acm_value.strip().lower()
+                user_role = extract_field_text(fields.get('Role')).upper().strip()
+                acm_value = extract_field_text(fields.get('Acm Value')).lower().strip()
                 break
 
     # ----------------------------------------------------
-    # 3. FETCH AGENCY DATA
+    # 2. FETCH AGENCY DATA
     # ----------------------------------------------------
     points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
@@ -132,29 +136,25 @@ def search_agency():
     if 'data' in points_response and 'items' in points_response['data'] and len(points_response['data']['items']) > 0:
         fields = points_response['data']['items'][0].get('fields', {})
         
-        raw_acm = fields.get('Acm', '')
-        if isinstance(raw_acm, list) and len(raw_acm) > 0: sheet_acm_name = raw_acm[0].get('text', '')
-        elif isinstance(raw_acm, dict): sheet_acm_name = raw_acm.get('text', '')
-        else: sheet_acm_name = str(raw_acm)
-        sheet_acm_clean = sheet_acm_name.lower().strip()
+        sheet_acm_name = extract_field_text(fields.get('Acm')).strip()
+        sheet_acm_clean = sheet_acm_name.lower()
 
-        # --- SECURITY CHECK ENGINE ---
+        # --- BULLETPROOF SECURITY CHECK ENGINE ---
         is_super_user = ("ADMIN" in user_role or "CS" in user_role)
         is_authorized_owner = (acm_value != "" and acm_value in sheet_acm_clean)
         
+        # New requested error message!
         if not is_super_user and not is_authorized_owner:
-            return jsonify({"error": f"Access Denied: Agency {agency_code} is assigned to {sheet_acm_name.title()}, not you."}), 403
+            return jsonify({"error": f"Access Denied: Agency {agency_code} is not related to your team"}), 403
 
-        raw_bp = fields.get('Base Points', 0)
-        if isinstance(raw_bp, list): raw_bp = raw_bp[0].get('text', 0) if len(raw_bp) > 0 else 0
-        elif isinstance(raw_bp, dict): raw_bp = raw_bp.get('text', 0)
-        try: base_points = float(str(raw_bp).replace(',', '').strip())
+        raw_bp = extract_field_text(fields.get('Base Points')).replace(',', '').strip()
+        try: base_points = float(raw_bp)
         except ValueError: base_points = 0
     else:
         return jsonify({"error": f"Agency code '{agency_code}' does not exist in the database."}), 404
 
     # ----------------------------------------------------
-    # 4. FETCH REQUESTS
+    # 3. FETCH REQUESTS
     # ----------------------------------------------------
     req_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}, {"field_name": "Request Type", "operator": "is", "value": ["Agency Target Privilege"]}]}}
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
