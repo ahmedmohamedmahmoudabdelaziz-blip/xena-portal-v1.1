@@ -7,7 +7,17 @@
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 100%); color: #fff; padding: 20px; min-height: 100vh; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; }
+        .container { max-width: 900px; margin: 0 auto; position: relative; }
+        
+        /* LOGIN OVERLAY */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a0a2e; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .login-box { background: rgba(255,255,255,0.05); padding: 40px; border-radius: 15px; border: 1px solid rgba(255,105,180,0.3); text-align: center; width: 350px; }
+        
+        /* HEADER BAR */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 10px 20px; background: rgba(0,0,0,0.3); border-radius: 10px; }
+        .logout-btn { background: transparent; border: 1px solid #ff6b6b; color: #ff6b6b; padding: 5px 15px; border-radius: 5px; cursor: pointer; }
+        .logout-btn:hover { background: rgba(255,107,107,0.2); }
+
         h1 { text-align: center; color: #ffd700; margin-bottom: 10px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
         .subtitle { text-align: center; color: #ff69b4; margin-bottom: 30px; }
         .card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 25px; margin-bottom: 25px; backdrop-filter: blur(10px); }
@@ -15,11 +25,19 @@
         label { display: block; margin-bottom: 8px; color: #e0e0e0; font-weight: 600; }
         input, select { width: 100%; padding: 12px 15px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 10px; background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 1em; transition: all 0.3s; }
         input:focus, select:focus { outline: none; border-color: #ff69b4; box-shadow: 0 0 10px rgba(255, 105, 180, 0.2); }
-        .btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #ff69b4, #ffd700); border: none; border-radius: 10px; color: #1a0a2e; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(255, 105, 180, 0.4); }
-        
+        .btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #00d2ff, #3a7bd5); border: none; border-radius: 10px; color: #fff; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 210, 255, 0.4); }
+        .btn-search { background: linear-gradient(135deg, #ff69b4, #ffd700); color: #1a0a2e; }
+        .btn-search:hover { box-shadow: 0 5px 20px rgba(255, 105, 180, 0.4); }
+
+        /* SEARCH HISTORY */
+        .history-container { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .history-tag { background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.5); color: #ffd700; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; cursor: pointer; }
+        .history-tag:hover { background: rgba(255,215,0,0.3); }
+
         #resultsContainer { display: none; }
-        .target-banner { background: rgba(0, 255, 136, 0.1); border: 2px solid rgba(0, 255, 136, 0.3); border-radius: 10px; padding: 25px; text-align: center; margin-bottom: 25px; }
+        .target-banner { background: rgba(0, 255, 136, 0.1); border: 2px solid rgba(0, 255, 136, 0.3); border-radius: 10px; padding: 25px; text-align: center; margin-bottom: 25px; position: relative;}
+        .acm-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-size: 0.8em; color: #ccc;}
         .target-banner h2 { margin: 0; color: #00ff88; font-size: 2.5em; }
         .target-banner p { margin: 10px 0 0 0; color: #ccc; font-size: 1.1em; }
         
@@ -32,12 +50,26 @@
         .stat-value { color: #ffd700; font-size: 1.5em; font-weight: bold; }
         
         .loading { text-align: center; color: #ff69b4; display: none; margin-top: 20px; font-weight: bold; }
-        .error { color: #ff6b6b; text-align: center; margin-top: 20px; display: none; background: rgba(255,0,0,0.1); padding: 15px; border-radius: 8px;}
+        .error { color: #fff; text-align: center; margin-top: 20px; display: none; background: rgba(255,0,0,0.3); border: 1px solid #ff6b6b; padding: 15px; border-radius: 8px;}
     </style>
 </head>
 <body>
 
-<div class="container">
+<div id="loginOverlay">
+    <h1>🚀 Xena Portal</h1>
+    <div class="login-box">
+        <h3 style="color: #00ff88; margin-bottom: 25px;">Secure Team Login</h3>
+        <p style="color: #ccc; font-size: 0.9em; margin-bottom: 20px;">Please authenticate via Lark to access agency data.</p>
+        <button class="btn" onclick="window.location.href='/api/login'">Login with Lark</button>
+    </div>
+</div>
+
+<div class="container" id="mainApp" style="display: none;">
+    <div class="top-bar">
+        <span id="welcomeText" style="color: #00ff88; font-weight: bold;"></span>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
     <h1>🚀 Xena Live Data Portal</h1>
     <div class="subtitle">Agency Privilege & Targets Tracker</div>
 
@@ -53,7 +85,9 @@
             <label>Enter Agency Code</label>
             <input type="text" id="agencyCode" placeholder="e.g., 40775">
         </div>
-        <button class="btn" onclick="fetchAgencyData()">Search Current Month Data</button>
+        <button class="btn btn-search" onclick="fetchAgencyData()">Search Current Month Data</button>
+        
+        <div class="history-container" id="searchHistory"></div>
     </div>
 
     <div id="loading" class="loading">Fetching secure live data from Lark...</div>
@@ -61,6 +95,7 @@
 
     <div id="resultsContainer">
         <div class="target-banner">
+            <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
             <p>Current Month Agency Target</p>
         </div>
@@ -105,21 +140,77 @@
 
 <script>
     let currentAgencyData = null;
+    let loggedUser = localStorage.getItem('xenaUser');
+    let loggedToken = localStorage.getItem('xenaToken');
+
+    // --- SSO URL CATCHER ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlUser = urlParams.get('user');
+    const urlToken = urlParams.get('token');
+
+    if (urlUser && urlToken) {
+        // Save Lark credentials
+        localStorage.setItem('xenaUser', urlUser);
+        localStorage.setItem('xenaToken', urlToken);
+        loggedUser = urlUser;
+        loggedToken = urlToken;
+        // Clean up URL so it looks nice
+        window.history.replaceState({}, document.title, "/");
+    }
+
+    // --- INIT APP ---
+    if (loggedUser && loggedToken) {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
+        renderHistory();
+    }
+
+    function logout() {
+        localStorage.removeItem('xenaUser');
+        localStorage.removeItem('xenaToken');
+        location.reload();
+    }
+
+    // --- FORMATTERS ---
+    function formatCoins(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M Coins';
+        if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K Coins';
+        return num.toLocaleString() + ' Coins';
+    }
 
     function extractText(field) {
-        if (field === null || field === undefined) return "";
+        if (!field) return "";
         if (typeof field === 'string' || typeof field === 'number') return String(field);
-        if (Array.isArray(field)) {
-            return field.map(item => {
-                if (typeof item === 'string' || typeof item === 'number') return String(item);
-                if (typeof item === 'object' && item !== null) return String(item.text || item.value || item.name || ""); 
-                return "";
-            }).join('');
-        }
-        if (typeof field === 'object') return String(field.text || field.value || field.name || "");
+        if (Array.isArray(field)) return field.map(item => item.text || item.value || "").join('');
+        if (typeof field === 'object') return String(field.text || field.value || "");
         return String(field);
     }
 
+    // --- SEARCH HISTORY ---
+    function saveHistory(code) {
+        let history = JSON.parse(localStorage.getItem('xenaHistory')) || [];
+        if (!history.includes(code)) history.unshift(code);
+        history = history.slice(0, 5); 
+        localStorage.setItem('xenaHistory', JSON.stringify(history));
+        renderHistory();
+    }
+
+    function renderHistory() {
+        const container = document.getElementById('searchHistory');
+        let history = JSON.parse(localStorage.getItem('xenaHistory')) || [];
+        container.innerHTML = history.length > 0 ? `<span style="color:#ccc; font-size:0.9em; margin-top:5px;">Recent:</span>` : '';
+        history.forEach(code => {
+            container.innerHTML += `<div class="history-tag" onclick="quickSearch('${code}')">${code}</div>`;
+        });
+    }
+
+    function quickSearch(code) {
+        document.getElementById('agencyCode').value = code;
+        fetchAgencyData();
+    }
+
+    // --- API LOGIC ---
     async function fetchAgencyData() {
         const queryType = document.getElementById('queryType').value;
         const agencyCode = document.getElementById('agencyCode').value.trim();
@@ -128,41 +219,39 @@
         const loading = document.getElementById('loading');
         const error = document.getElementById('error');
 
-        if (!agencyCode) {
-            error.style.display = 'block';
-            error.innerText = 'Please enter an Agency Code.';
-            return;
-        }
+        if (!agencyCode) return;
 
         resultsContainer.style.display = 'none';
         error.style.display = 'none';
         loading.style.display = 'block';
 
         try {
-            // Change this line around line 175:
-const response = await fetch(`/api/search?code=${agencyCode}`);
+            // Sends the Secure Lark Token with the request
+            const response = await fetch(`/api/search?code=${agencyCode}&user=${encodeURIComponent(loggedUser)}&token=${loggedToken}`);
+            const data = await response.json();
             
             if (!response.ok) {
-                let errorText = `Server returned status ${response.status}`;
-                try {
-                    const errData = await response.json();
-                    if (errData.error) errorText = errData.error;
-                } catch(e) {}
-                throw new Error(errorText);
+                if(response.status === 401) logout(); // Boot them out if token is fake/expired
+                throw new Error(data.error || "Unknown Error");
             }
-            currentAgencyData = await response.json();
+            
+            currentAgencyData = data;
+            saveHistory(agencyCode); 
+
         } catch (netErr) {
             loading.style.display = 'none';
             error.style.display = 'block';
-            error.innerHTML = `<strong>API System Error:</strong> ${netErr.message} <br><br><small>(If this says 'Failed to fetch', your Vercel vercel.json file or API folder is missing!)</small>`;
+            error.innerHTML = `<strong>⚠️ Notice:</strong> ${netErr.message}`;
             return;
         }
 
         loading.style.display = 'none';
 
         const basePoints = currentAgencyData.base_points || 0;
-        const targetCoins = (basePoints * 100000).toLocaleString('en-US');
-        document.getElementById('displayTargetCoins').innerText = `${targetCoins} Coins`;
+        const totalCoinsValue = basePoints * 100000;
+        
+        document.getElementById('displayTargetCoins').innerText = formatCoins(totalCoinsValue);
+        document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
 
         if (queryType === 'target') {
             privilegeArea.style.display = 'block';
