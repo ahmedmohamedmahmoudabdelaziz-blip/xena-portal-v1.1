@@ -74,11 +74,12 @@ def callback():
 @app.route('/api/search', methods=['GET'])
 def search_agency():
     agency_code = request.args.get('code')
-    username = request.args.get('user', '').lower()
+    raw_username = request.args.get('user', '') # Exact casing from Feishu
+    username = raw_username.lower() # Lowercase version for sheet searching
     token = request.args.get('token', '') 
     
-    # 1. Verify SSO session
-    if not username or token != generate_secure_token(username):
+    # 1. Verify SSO session using the EXACT raw username
+    if not raw_username or token != generate_secure_token(raw_username):
         return jsonify({"error": "Unauthorized session. Please Log In via Feishu."}), 401
     if not agency_code:
         return jsonify({"error": "No agency code provided"}), 400
