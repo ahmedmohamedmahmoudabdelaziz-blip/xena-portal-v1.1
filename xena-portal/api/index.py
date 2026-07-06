@@ -18,7 +18,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 # --- MASTER ADMINS (Can see all agencies) ---
 # Type your exact Lark name here in lowercase
-ADMIN_USERS = ["ahmed samurai", "xena admin"] 
+ADMIN_USERS = ["Ahmed Samurai", "xena admin"] 
 
 # --- SMART CACHE (Lightning Fast Searches) ---
 cache = {}
