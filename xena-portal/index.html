@@ -138,30 +138,26 @@
 <script>
     let currentAgencyData = null;
     let loggedUser = localStorage.getItem('xenaUser');
-    let loggedToken = localStorage.getItem('xenaToken');
+    let loggedUat = localStorage.getItem('xenaUat'); // The magic User Token
 
     // --- SSO CATCHER ---
     const urlParams = new URLSearchParams(window.location.search);
     const urlUser = urlParams.get('user');
-    const urlToken = urlParams.get('token');
+    const urlUat = urlParams.get('uat');
 
-    if (urlUser && urlToken) {
+    if (urlUser && urlUat) {
         localStorage.setItem('xenaUser', urlUser);
-        localStorage.setItem('xenaToken', urlToken);
+        localStorage.setItem('xenaUat', urlUat);
         loggedUser = urlUser;
-        loggedToken = urlToken;
+        loggedUat = urlUat;
         window.history.replaceState({}, document.title, "/");
     }
 
-    if (loggedUser && loggedToken) {
+    if (loggedUser && loggedUat) {
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
-        updateWelcomeText(loggedUser, "Session Active");
+        document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
         renderHistory();
-    }
-
-    function updateWelcomeText(user, role) {
-        document.getElementById('welcomeText').innerHTML = `Logged in as: ${user} <span style="background: rgba(255,105,180,0.2); border: 1px solid #ff69b4; color: #ff69b4; padding: 2px 8px; border-radius: 12px; margin-left: 10px; font-size: 0.85em;">[${role}]</span>`;
     }
 
     function logout() {
@@ -224,8 +220,8 @@
         loading.style.display = 'block';
 
         try {
-            // Sends the SSO Token securely to Python
-            const response = await fetch(`/api/search?code=${agencyCode}&user=${encodeURIComponent(loggedUser)}&token=${loggedToken}`);
+            // WE NOW PASS THE `uat` TOKEN DIRECTLY TO PYTHON
+            const response = await fetch(`/api/search?code=${agencyCode}&uat=${loggedUat}`);
             const data = await response.json();
             
             if (!response.ok) {
@@ -238,14 +234,11 @@
             
             currentAgencyData = data;
             saveHistory(agencyCode); 
-            
-            // Updates their cool badge with their Bitable Role!
-            updateWelcomeText(loggedUser, data.role);
 
         } catch (netErr) {
             loading.style.display = 'none';
             error.style.display = 'block';
-            error.innerHTML = `<strong>⚠️ Notice:</strong> ${netErr.message}`;
+            error.innerHTML = `<strong>⚠️ Notice:</strong> ${netErr.message.replace('⚠️ Notice: ', '')}`;
             return;
         }
 
