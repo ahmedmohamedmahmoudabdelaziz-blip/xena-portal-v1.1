@@ -20,7 +20,7 @@
         .subtitle { text-align: center; color: #ff69b4; margin-bottom: 30px; }
         .card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 25px; margin-bottom: 25px; backdrop-filter: blur(10px); }
         .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: #e0e0e0; font-weight: 600; }
+        label { display: block; margin-bottom: 8px; color: #e0e0e0; font-weight: 600; text-align: left;}
         input, select { width: 100%; padding: 12px 15px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 10px; background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 1em; transition: all 0.3s; }
         input:focus, select:focus { outline: none; border-color: #ff69b4; box-shadow: 0 0 10px rgba(255, 105, 180, 0.2); }
         .btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #00d2ff, #3a7bd5); border: none; border-radius: 10px; color: #fff; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
@@ -138,30 +138,34 @@
 <script>
     let currentAgencyData = null;
     let loggedUser = localStorage.getItem('xenaUser');
-    let loggedUat = localStorage.getItem('xenaUat');
+    let loggedToken = localStorage.getItem('xenaToken');
 
+    // --- SSO CATCHER ---
     const urlParams = new URLSearchParams(window.location.search);
     const urlUser = urlParams.get('user');
-    const urlUat = urlParams.get('uat');
+    const urlToken = urlParams.get('token');
 
-    if (urlUser && urlUat) {
+    if (urlUser && urlToken) {
         localStorage.setItem('xenaUser', urlUser);
-        localStorage.setItem('xenaUat', urlUat);
+        localStorage.setItem('xenaToken', urlToken);
         loggedUser = urlUser;
-        loggedUat = urlUat;
+        loggedToken = urlToken;
         window.history.replaceState({}, document.title, "/");
     }
 
-    if (loggedUser && loggedUat) {
+    if (loggedUser && loggedToken) {
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
-        document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
+        updateWelcomeText(loggedUser, "Session Active");
         renderHistory();
     }
 
+    function updateWelcomeText(user, role) {
+        document.getElementById('welcomeText').innerHTML = `Logged in as: ${user} <span style="background: rgba(255,105,180,0.2); border: 1px solid #ff69b4; color: #ff69b4; padding: 2px 8px; border-radius: 12px; margin-left: 10px; font-size: 0.85em;">[${role}]</span>`;
+    }
+
     function logout() {
-        localStorage.removeItem('xenaUser');
-        localStorage.removeItem('xenaUat');
+        localStorage.clear();
         location.reload();
     }
 
@@ -186,6 +190,10 @@
         localStorage.setItem('xenaHistory', JSON.stringify(history));
         renderHistory();
     }
+
+    document.getElementById('agencyCode').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') fetchAgencyData();
+    });
 
     function renderHistory() {
         const container = document.getElementById('searchHistory');
@@ -216,12 +224,13 @@
         loading.style.display = 'block';
 
         try {
-            const response = await fetch(`/api/search?code=${agencyCode}&user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}`);
+            // Sends the SSO Token securely to Python
+            const response = await fetch(`/api/search?code=${agencyCode}&user=${encodeURIComponent(loggedUser)}&token=${loggedToken}`);
             const data = await response.json();
             
             if (!response.ok) {
-                if(response.status === 401 && !data.error.includes("Unauthorized")) {
-                    alert("Your session has expired or been revoked. Please log in again.");
+                if(response.status === 401) {
+                    alert("Your session has expired. Please log in again.");
                     logout();
                 }
                 throw new Error(data.error || "Unknown Error");
@@ -230,8 +239,8 @@
             currentAgencyData = data;
             saveHistory(agencyCode); 
             
-            // Update Welcome Text with their newly fetched Role!
-            document.getElementById('welcomeText').innerHTML = `Logged in as: ${loggedUser} <span style="background: rgba(255,105,180,0.2); border: 1px solid #ff69b4; color: #ff69b4; padding: 2px 8px; border-radius: 12px; margin-left: 10px; font-size: 0.85em;">[${data.role}]</span>`;
+            // Updates their cool badge with their Bitable Role!
+            updateWelcomeText(loggedUser, data.role);
 
         } catch (netErr) {
             loading.style.display = 'none';
