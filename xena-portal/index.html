@@ -107,12 +107,12 @@
                 <div class="filter-item">
                     <label>Date Filter</label>
                     <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
-                        <option value="all" selected>All Time</option>
-                        <option value="this_month">Current Month</option>
+                        <option value="this_month" selected>Current Month</option>
                         <option value="last_month">Last Month</option>
                         <option value="this_week">Current Week</option>
                         <option value="last_week">Last Week</option>
                         <option value="specific">Specific Date</option>
+                        <option value="all">All Time</option>
                     </select>
                 </div>
                 
@@ -122,8 +122,7 @@
                 <div class="filter-item">
                     <label>Region</label>
                     <select id="anaRegion" onchange="updateAcmDropdown()">
-                        <option value="All" selected>All Regions</option>
-                        <option value="PK">PK</option>
+                        <option value="PK" selected>PK</option>
                         <option value="IN">IN</option>
                     </select>
                 </div>
@@ -135,10 +134,10 @@
                     <label>Agency Type</label>
                     <select id="anaType">
                         <option value="All">All Types</option>
-                        <option value="acm hunting">ACM Hunting</option>
-                        <option value="bd hunting">BD Hunting</option>
-                        <option value="walkin">Walk-in</option>
-                        <option value="new bd hunting">New BD Hunting</option>
+                        <option value="Acm hunting">ACM Hunting</option>
+                        <option value="BD hunting">BD Hunting</option>
+                        <option value="Walkin">Walk-in</option>
+                        <option value="New BD Hunting">New BD Hunting</option>
                     </select>
                 </div>
             </div>
@@ -216,7 +215,9 @@
     let charts = {}; 
 
     const adminUsers = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano'];
-    const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
+    
+    // Strict lowercase/uppercase schema replication matching database metric indexes
+    const pkAcms = ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
     const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
     Chart.defaults.color = '#a1a1b5';
@@ -311,13 +312,10 @@
         const region = document.getElementById('anaRegion').value;
         const acmSelect = document.getElementById('anaAcm');
         acmSelect.innerHTML = '<option value="All">All ACMs</option>';
-        let targetList = [];
-        if (region === 'IN') targetList = inAcms;
-        else if (region === 'PK') targetList = pkAcms;
-        else targetList = [...pkAcms, ...inAcms].sort();
+        const targetList = region === 'IN' ? inAcms : pkAcms; 
 
         targetList.forEach(name => {
-            acmSelect.innerHTML += `<option value="${name}">${name}</option>`;
+            acmSelect.innerHTML += `<option value="${name.toLowerCase()}">${name}</option>`;
         });
     }
 
