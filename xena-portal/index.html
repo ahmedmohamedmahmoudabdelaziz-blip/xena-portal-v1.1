@@ -44,7 +44,7 @@
         .stat-label { color: #a1a1b5; font-size: 0.9em; margin-bottom: 5px; }
         .stat-value { font-size: 1.5em; font-weight: bold; }
 
-        /* ANALYTICS DASHBOARD CSS (MATCHING FEISHU EXACTLY) */
+        /* ANALYTICS DASHBOARD CSS */
         #analyticsContainer { display: none; }
         .filter-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
         .filter-item { flex: 1; min-width: 150px; }
@@ -54,7 +54,6 @@
         .kpi-card h3 { margin: 0; color: #a1a1b5; font-size: 1.1em; font-weight: 500; }
         .kpi-card h2 { margin: 15px 0 0 0; font-size: 3.5em; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
 
-        /* Exact Grid System for Video Layout */
         .chart-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
         .chart-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
         .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px; }
@@ -214,7 +213,6 @@
     const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
     const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
-    // Feishu Dark Mode Graph Colors
     Chart.defaults.color = '#a1a1b5';
     Chart.defaults.font.family = "'Segoe UI', Tahoma, sans-serif";
     const F_COLORS = ['#3370ff', '#f54a45', '#ffb000', '#2196f3', '#8854ff', '#00d2ff', '#ff8a65', '#4db6ac']; 
@@ -259,7 +257,6 @@
         }
     }
 
-    // --- DATE LOGIC ---
     function updateCustomDateVisibility() {
         const preset = document.getElementById('anaDatePreset').value;
         const fromDiv = document.getElementById('customFromDiv');
@@ -300,7 +297,6 @@
             to = new Date(from.setDate(from.getDate() + 6));
         }
 
-        // Must extract YYYY-MM-DD for backend
         fromInput.value = from.toISOString().split('T')[0];
         toInput.value = to.toISOString().split('T')[0];
     }
@@ -316,9 +312,8 @@
         });
     }
 
-    // --- FETCH & DRAW CHARTS ---
     async function generateAnalytics() {
-        setDatePresets(); // Apply selected date formula
+        setDatePresets(); 
         document.getElementById('error').style.display = 'none';
         document.getElementById('loading').style.display = 'block';
         document.getElementById('analyticsContainer').style.display = 'none';
@@ -350,7 +345,7 @@
     }
 
     function drawCharts(data) {
-        Object.values(charts).forEach(c => c.destroy()); // Reset canvases
+        Object.values(charts).forEach(c => c.destroy()); 
         
         const buildPie = (id, dataset) => {
             if(!dataset || Object.keys(dataset).length === 0) return;
@@ -361,16 +356,14 @@
             });
         };
 
-        // Row 2
         buildPie('cCreation', data.creation_status);
         buildPie('cBd', data.bd_status);
         buildPie('cClosing', data.closing_status);
-
-        // Row 3 (Pies)
         buildPie('cReject', data.reject_reasons);
         buildPie('cClosePie', data.closing_reasons_pie);
+        buildPie('cCreationType', data.creation_types);
+        buildPie('cType', data.agency_types);
 
-        // Row 3 (Grouped Bar)
         const acmsWithClosings = Object.keys(data.acm_closing_reasons);
         if(acmsWithClosings.length > 0) {
             const userReqData = acmsWithClosings.map(acm => data.acm_closing_reasons[acm]["User Request"] || 0);
@@ -389,7 +382,6 @@
             });
         }
 
-        // Row 4 (Horizontal Bar)
         if(Object.keys(data.acm_performance).length > 0) {
             charts['cAcm'] = new Chart(document.getElementById('cAcm'), {
                 type: 'bar',
@@ -398,11 +390,6 @@
             });
         }
 
-        // Row 5
-        buildPie('cCreationType', data.creation_types);
-        buildPie('cType', data.agency_types);
-
-        // Row 6 (Vertical Bar)
         if(Object.keys(data.other_apps).length > 0) {
             charts['cOtherApp'] = new Chart(document.getElementById('cOtherApp'), {
                 type: 'bar',
@@ -411,7 +398,6 @@
             });
         }
 
-        // Row 7 (Area Line)
         if(Object.keys(data.daily_trend).length > 0) {
             const ctxTrend = document.getElementById('cTrend').getContext('2d');
             let gradient = ctxTrend.createLinearGradient(0, 0, 0, 300);
@@ -429,7 +415,6 @@
         }
     }
 
-    // --- STANDARD SEARCH ENGINE ---
     async function fetchAgencyData() {
         const agencyCode = document.getElementById('agencyCode').value.trim();
         if (!agencyCode) return;
