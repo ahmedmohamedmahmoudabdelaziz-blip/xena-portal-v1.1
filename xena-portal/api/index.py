@@ -6,8 +6,6 @@ import requests
 from datetime import datetime
 
 app = Flask(__name__)
-
-# Configure logging to catch any future Feishu API errors
 logging.basicConfig(level=logging.INFO)
 
 # --- SECURE CONFIGURATION ---
@@ -26,7 +24,6 @@ def get_tenant_access_token():
 
 # --- AGGRESSIVE DATA EXTRACTOR ---
 def extract_field_text(field_data):
-    """Safely extracts text regardless of how Feishu formats the column data."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
@@ -48,7 +45,6 @@ def extract_field_text(field_data):
 
 # --- SAFE DATE PARSER ---
 def parse_feishu_date(date_val):
-    """Safely parses Feishu timestamps into Python datetime objects."""
     if not date_val: return None
     if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
     if isinstance(date_val, list) and len(date_val) > 0:
@@ -131,7 +127,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 MASTERPIECE ANALYTICS ENGINE ---
+# --- 📊 MASTERPIECE ANALYTICS ENGINE WITH TRACKING ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -140,16 +136,14 @@ def get_analytics():
     if not uat:
         return jsonify({"error": "Unauthorized session. Please log in again."}), 401
 
-    # 1. ADMIN VERIFICATION
     admin_users = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
     if not any(admin in username for admin in admin_users):
         return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
-    # 2. CRITICAL FIX: Use User Access Token (uat) instead of Tenant Token
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
 
     # Extract Filters from UI
-    region_filter = request.args.get('region', 'PK').strip().upper()
+    region_filter = request.args.get('region', 'ALL').strip().upper()
     acm_filter = request.args.get('acm', 'All').strip().lower()
     type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '')
@@ -167,19 +161,13 @@ def get_analytics():
         if page_token: payload["page_token"] = page_token
         try:
             res = requests.post(req_url, headers=headers, json=payload, timeout=10).json()
-            
-            # LOUD FAILURE: If Feishu blocks this, immediately tell the UI instead of silently giving zeroes
             if res.get("code") != 0: 
                 return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
-                
             all_items.extend(res.get('data', {}).get('items', []))
             page_token = res.get('data', {}).get('page_token')
             if not res.get('data', {}).get('has_more'): break
         except Exception as e:
-            logging.error(f"Feishu API error: {e}")
             return jsonify({"error": f"Server Error: {str(e)}"}), 500
-
-    logging.info(f"Successfully fetched {len(all_items)} records from Feishu.")
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -197,14 +185,25 @@ def get_analytics():
         "scanned_rows": len(all_items)
     }
 
+    # Tracking Variables to see exactly what gets dropped
+    dropped_by_date = 0
+    dropped_by_region = 0
+    dropped_by_acm = 0
+    dropped_by_type = 0
+    processed_rows = 0
+
     for item in all_items:
         fields = item.get('fields', {})
         
         # 1. Date Parsing & Filtering
         record_dt = parse_feishu_date(fields.get("Submitted on"))
         if record_dt:
-            if from_dt and record_dt.date() < from_dt.date(): continue
-            if to_dt and record_dt.date() > to_dt.date(): continue
+            if from_dt and record_dt.date() < from_dt.date(): 
+                dropped_by_date += 1
+                continue
+            if to_dt and record_dt.date() > to_dt.date(): 
+                dropped_by_date += 1
+                continue
 
         # 2. Aggressive Field Extraction
         req_type = extract_field_text(fields.get('Request Type')).strip()
@@ -218,9 +217,17 @@ def get_analytics():
         other_app = extract_field_text(fields.get('Otherapp Name')).strip()
 
         # 3. Apply UI Filters safely
-        if region_filter not in ['ALL', ''] and region_filter not in region: continue
-        if acm_filter not in ['all', 'all acms', ''] and acm_filter not in acm.lower(): continue
-        if type_filter not in ['all', 'all types', ''] and type_filter not in agency_type.lower(): continue
+        if region_filter not in ['ALL', ''] and region_filter not in region: 
+            dropped_by_region += 1
+            continue
+        if acm_filter not in ['all', 'all acms', ''] and acm_filter not in acm.lower(): 
+            dropped_by_acm += 1
+            continue
+        if type_filter not in ['all', 'all types', ''] and type_filter not in agency_type.lower(): 
+            dropped_by_type += 1
+            continue
+
+        processed_rows += 1
 
         # 4. Populate Data Arrays
         if record_dt:
@@ -265,6 +272,9 @@ def get_analytics():
 
         if "Rejected" in status and reject_reason:
             stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
+
+    # Log the exact outcome to Vercel
+    logging.info(f"Total Fetched: {len(all_items)} | Dropped by Date: {dropped_by_date} | Dropped by Region: {dropped_by_region} | Processed: {processed_rows}")
 
     # Clean Sorting for beautiful graphs
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
