@@ -6,6 +6,8 @@ import requests
 from datetime import datetime
 
 app = Flask(__name__)
+
+# Configure logging to catch any future Feishu API errors
 logging.basicConfig(level=logging.INFO)
 
 # --- SECURE CONFIGURATION ---
@@ -19,10 +21,12 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
-    return requests.post(url, json=payload).json().get("tenant_access_token")
+    response = requests.post(url, json=payload).json()
+    return response.get("tenant_access_token")
 
 # --- AGGRESSIVE DATA EXTRACTOR ---
 def extract_field_text(field_data):
+    """Safely extracts text regardless of how Feishu formats the column data."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
@@ -44,6 +48,7 @@ def extract_field_text(field_data):
 
 # --- SAFE DATE PARSER ---
 def parse_feishu_date(date_val):
+    """Safely parses Feishu timestamps into Python datetime objects."""
     if not date_val: return None
     if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
     if isinstance(date_val, list) and len(date_val) > 0:
@@ -101,7 +106,7 @@ def search_agency():
     
     points_response = requests.post(points_url, headers=headers, json=points_payload).json()
     if points_response.get("code") != 0:
-        return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
+        return jsonify({"error": f"Feishu API Blocked: Waiting for IT Admin to approve the app release."}), 403
 
     items = points_response.get('data', {}).get('items', [])
     if not items:
@@ -129,17 +134,18 @@ def search_agency():
 # --- 📊 MASTERPIECE ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
-    uat = request.args.get('uat', '')
     username = request.args.get('user', '').lower()
+    uat = request.args.get('uat', '')
     
-    if not uat: 
+    if not uat:
         return jsonify({"error": "Unauthorized session. Please log in again."}), 401
-    
+
+    # 1. ADMIN VERIFICATION
     admin_users = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
     if not any(admin in username for admin in admin_users):
         return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
-    # CRITICAL FIX: We are using the USER TOKEN (uat) which you successfully unlocked!
+    # 2. CRITICAL FIX: Use User Access Token (uat) instead of Tenant Token
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
 
     # Extract Filters from UI
@@ -156,22 +162,24 @@ def get_analytics():
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     all_items = []
     page_token = ""
-    
     for _ in range(4): 
         payload = {"page_size": 500}
         if page_token: payload["page_token"] = page_token
         try:
             res = requests.post(req_url, headers=headers, json=payload, timeout=10).json()
             
-            # IF BLOCKED, SEND ERROR TO FRONTEND INSTEAD OF FAILING SILENTLY
+            # LOUD FAILURE: If Feishu blocks this, immediately tell the UI instead of silently giving zeroes
             if res.get("code") != 0: 
-                return jsonify({"error": f"Feishu Error: {res.get('msg')} (Code {res.get('code')})"}), 400
+                return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
                 
             all_items.extend(res.get('data', {}).get('items', []))
             page_token = res.get('data', {}).get('page_token')
             if not res.get('data', {}).get('has_more'): break
         except Exception as e:
+            logging.error(f"Feishu API error: {e}")
             return jsonify({"error": f"Server Error: {str(e)}"}), 500
+
+    logging.info(f"Successfully fetched {len(all_items)} records from Feishu.")
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
