@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xena Agency Privilege Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 100%); color: #fff; padding: 20px; min-height: 100vh; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; position: relative; }
+        .container { max-width: 1000px; margin: 0 auto; position: relative; }
         
         #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a0a2e; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .login-box { background: rgba(255,255,255,0.05); padding: 40px; border-radius: 15px; border: 1px solid rgba(255,105,180,0.3); text-align: center; width: 350px; }
@@ -25,27 +26,34 @@
         input:focus, select:focus { outline: none; border-color: #ff69b4; box-shadow: 0 0 10px rgba(255, 105, 180, 0.2); }
         .btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #00d2ff, #3a7bd5); border: none; border-radius: 10px; color: #fff; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 210, 255, 0.4); }
-        .btn-search { background: linear-gradient(135deg, #ff69b4, #ffd700); color: #1a0a2e; }
+        .btn-search { background: linear-gradient(135deg, #ff69b4, #ffd700); color: #1a0a2e; margin-bottom: 15px; }
         .btn-search:hover { box-shadow: 0 5px 20px rgba(255, 105, 180, 0.4); }
 
         .history-container { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
         .history-tag { background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.5); color: #ffd700; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; cursor: pointer; }
         .history-tag:hover { background: rgba(255,215,0,0.3); }
 
+        /* Standard Results CSS */
         #resultsContainer { display: none; }
         .target-banner { background: rgba(0, 255, 136, 0.1); border: 2px solid rgba(0, 255, 136, 0.3); border-radius: 10px; padding: 25px; text-align: center; margin-bottom: 25px; position: relative;}
         .acm-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-size: 0.8em; color: #ccc;}
         .target-banner h2 { margin: 0; color: #00ff88; font-size: 2.5em; }
         .target-banner p { margin: 10px 0 0 0; color: #ccc; font-size: 1.1em; }
-        
         .privilege-section { background: rgba(0, 0, 0, 0.2); border-radius: 10px; padding: 20px; border: 1px solid rgba(255, 105, 180, 0.3); }
         .privilege-header { color: #ff69b4; margin-top: 0; border-bottom: 1px solid rgba(255,105,180,0.3); padding-bottom: 10px; text-align: center; }
-        
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
         .stat-box { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 15px; text-align: center; }
         .stat-label { color: #ccc; font-size: 0.9em; margin-bottom: 5px; }
         .stat-value { color: #ffd700; font-size: 1.5em; font-weight: bold; }
         
+        /* Analytics CSS */
+        #analyticsContainer { display: none; }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .chart-box { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; }
+        .chart-box h3 { text-align: center; color: #00d2ff; margin-top: 0; }
+        @media(max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+
         .loading { text-align: center; color: #ff69b4; display: none; margin-top: 20px; font-weight: bold; }
         .error { color: #fff; text-align: center; margin-top: 20px; display: none; background: rgba(255,0,0,0.3); border: 1px solid #ff6b6b; padding: 15px; border-radius: 8px;}
     </style>
@@ -73,21 +81,64 @@
     <div class="card">
         <div class="form-group">
             <label>Select Inquiry Type</label>
-            <select id="queryType">
+            <select id="queryType" onchange="toggleViewModes()">
                 <option value="target">Agency Target Privilege</option>
                 <option value="points">Agency Points System</option>
+                <option value="analytics" id="optAnalytics" style="display:none; color:#00ff88; font-weight:bold;">📊 Agency Data Analyses</option>
             </select>
         </div>
-        <div class="form-group">
-            <label>Enter Agency Code</label>
-            <input type="text" id="agencyCode" placeholder="e.g., 40775">
-        </div>
-        <button class="btn btn-search" onclick="fetchAgencyData()">Search Current Month Data</button>
         
-        <div class="history-container" id="searchHistory"></div>
+        <div id="standardSearchParams">
+            <div class="form-group">
+                <label>Enter Agency Code</label>
+                <input type="text" id="agencyCode" placeholder="e.g., 40775">
+            </div>
+            <button class="btn btn-search" onclick="fetchAgencyData()">Search Current Month Data</button>
+            <div class="history-container" id="searchHistory"></div>
+        </div>
+
+        <div id="analyticsParams" style="display:none;">
+            <div class="filter-grid">
+                <div class="form-group">
+                    <label>Date Range</label>
+                    <select id="anaDate">
+                        <option value="current_month">Current Month</option>
+                        <option value="last_month">Last Month</option>
+                        <option value="current_week">Current Week</option>
+                        <option value="last_week">Last Week</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Region</label>
+                    <select id="anaRegion" onchange="updateAcmDropdown()">
+                        <option value="All">All Regions</option>
+                        <option value="PK">PK</option>
+                        <option value="IN">IN</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Assigned ACM</label>
+                    <select id="anaAcm">
+                        <option value="All">All ACMs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Agency Type</label>
+                    <select id="anaType">
+                        <option value="All">All Types</option>
+                        <option value="acm hunting">ACM Hunting</option>
+                        <option value="bd hunting">BD Hunting</option>
+                        <option value="walkin">Walk-in</option>
+                        <option value="new bd hunting">New BD Hunting</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" style="background: linear-gradient(135deg, #00ff88, #00d2ff); color:#1a0a2e;" onclick="generateAnalytics()">Generate Analytics Report</button>
+        </div>
     </div>
 
-    <div id="loading" class="loading">Fetching secure live data from Feishu...</div>
+    <div id="loading" class="loading">Loading secure live data...</div>
     <div id="error" class="error"></div>
 
     <div id="resultsContainer">
@@ -110,27 +161,29 @@
             </div>
             
             <div class="grid">
-                <div class="stat-box">
-                    <div class="stat-label">Total Allowed</div>
-                    <div class="stat-value" id="valTotal" style="color: #00ff88;">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Claimed</div>
-                    <div class="stat-value" id="valClaimed" style="color: #fff;">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Remaining</div>
-                    <div class="stat-value" id="valRemaining" style="color: #ffd700;">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Pending Approval</div>
-                    <div class="stat-value" id="valPending" style="color: #ffaa00;">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Rejected</div>
-                    <div class="stat-value" id="valRejected" style="color: #ff6b6b;">0</div>
-                </div>
+                <div class="stat-box"><div class="stat-label">Total Allowed</div><div class="stat-value" id="valTotal" style="color: #00ff88;">0</div></div>
+                <div class="stat-box"><div class="stat-label">Claimed</div><div class="stat-value" id="valClaimed" style="color: #fff;">0</div></div>
+                <div class="stat-box"><div class="stat-label">Remaining</div><div class="stat-value" id="valRemaining" style="color: #ffd700;">0</div></div>
+                <div class="stat-box"><div class="stat-label">Pending</div><div class="stat-value" id="valPending" style="color: #ffaa00;">0</div></div>
+                <div class="stat-box"><div class="stat-label">Rejected</div><div class="stat-value" id="valRejected" style="color: #ff6b6b;">0</div></div>
             </div>
+        </div>
+    </div>
+
+    <div id="analyticsContainer">
+        <div class="chart-grid">
+            <div class="chart-box">
+                <h3>Agency Creation Requests</h3>
+                <canvas id="creationChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Closing Agency Requests</h3>
+                <canvas id="closingChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-box" style="margin-top:20px;">
+            <h3>Number of ACM's Onboarding Agencies</h3>
+            <canvas id="acmBarChart"></canvas>
         </div>
     </div>
 </div>
@@ -138,9 +191,15 @@
 <script>
     let currentAgencyData = null;
     let loggedUser = localStorage.getItem('xenaUser');
-    let loggedUat = localStorage.getItem('xenaUat'); // The magic User Token
+    let loggedUat = localStorage.getItem('xenaUat');
+    
+    // Store global chart instances so we can destroy and redraw them cleanly
+    let chartCreation, chartClosing, chartBar; 
 
-    // --- SSO CATCHER ---
+    // --- ADMIN SECURITY CHECK ---
+    // List of known admins/owners who should see the Analytics tab
+    const adminUsers = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano'];
+
     const urlParams = new URLSearchParams(window.location.search);
     const urlUser = urlParams.get('user');
     const urlUat = urlParams.get('uat');
@@ -148,7 +207,7 @@
     if (urlUser && urlUat) {
         localStorage.setItem('xenaUser', urlUser);
         localStorage.setItem('xenaUat', urlUat);
-        loggedUser = urlUser;
+        loggedUser = decodeURIComponent(urlUser);
         loggedUat = urlUat;
         window.history.replaceState({}, document.title, "/");
     }
@@ -157,20 +216,155 @@
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
+        
+        // Unhide Analytics Option if Admin
+        const isUserAdmin = adminUsers.some(admin => loggedUser.toLowerCase().includes(admin));
+        if (isUserAdmin) {
+            document.getElementById('optAnalytics').style.display = 'block';
+        }
+        
         renderHistory();
+        updateAcmDropdown(); // Initialize dropdowns
     }
 
-    function logout() {
-        localStorage.clear();
-        location.reload();
+    function logout() { localStorage.clear(); location.reload(); }
+
+    function toggleViewModes() {
+        const type = document.getElementById('queryType').value;
+        if (type === 'analytics') {
+            document.getElementById('standardSearchParams').style.display = 'none';
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('analyticsParams').style.display = 'block';
+        } else {
+            document.getElementById('analyticsParams').style.display = 'none';
+            document.getElementById('analyticsContainer').style.display = 'none';
+            document.getElementById('standardSearchParams').style.display = 'block';
+        }
     }
 
+    // --- ACM DROPDOWN LOGIC ---
+    const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
+    const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
+
+    function updateAcmDropdown() {
+        const region = document.getElementById('anaRegion').value;
+        const acmSelect = document.getElementById('anaAcm');
+        acmSelect.innerHTML = '<option value="All">All ACMs</option>'; // Reset
+
+        let targetList = [];
+        if (region === 'PK') targetList = pkAcms;
+        else if (region === 'IN') targetList = inAcms;
+        else targetList = [...pkAcms, ...inAcms].sort(); // All
+
+        targetList.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.innerText = name;
+            acmSelect.appendChild(opt);
+        });
+    }
+
+    // --- FETCH ANALYTICS ---
+    async function generateAnalytics() {
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('analyticsContainer').style.display = 'none';
+
+        const region = document.getElementById('anaRegion').value;
+        const acm = document.getElementById('anaAcm').value;
+        const type = document.getElementById('anaType').value;
+        const date = document.getElementById('anaDate').value;
+
+        try {
+            const url = `/api/analytics?uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&date=${date}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (!response.ok) throw new Error(data.error || "Unknown Error");
+            
+            drawCharts(data);
+            document.getElementById('analyticsContainer').style.display = 'block';
+
+        } catch (err) {
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').innerText = err.message;
+        }
+        document.getElementById('loading').style.display = 'none';
+    }
+
+    // --- DRAW CHART.JS CHARTS ---
+    function drawCharts(data) {
+        // Destroy old charts if they exist so they don't overlap
+        if (chartCreation) chartCreation.destroy();
+        if (chartClosing) chartClosing.destroy();
+        if (chartBar) chartBar.destroy();
+
+        // Standard colors matching your Feishu UI
+        const pieColors = ['#1a73e8', '#ea4335', '#fbbc04']; // Done (Blue), Rejected (Red), Under Inv (Yellow)
+
+        // 1. Creation Chart
+        const ctxCreation = document.getElementById('creationChart').getContext('2d');
+        chartCreation = new Chart(ctxCreation, {
+            type: 'pie',
+            data: {
+                labels: ['Done', 'Rejected', 'Under Investigation'],
+                datasets: [{
+                    data: [data.creations.Done, data.creations.Rejected, data.creations["Under Investigation"]],
+                    backgroundColor: pieColors,
+                    borderWidth: 0
+                }]
+            },
+            options: { plugins: { legend: { labels: { color: '#fff' } } } }
+        });
+
+        // 2. Closing Chart
+        const ctxClosing = document.getElementById('closingChart').getContext('2d');
+        chartClosing = new Chart(ctxClosing, {
+            type: 'pie',
+            data: {
+                labels: ['Done', 'Rejected', 'Under Investigation'],
+                datasets: [{
+                    data: [data.closings.Done, data.closings.Rejected, data.closings["Under Investigation"]],
+                    backgroundColor: pieColors,
+                    borderWidth: 0
+                }]
+            },
+            options: { plugins: { legend: { labels: { color: '#fff' } } } }
+        });
+
+        // 3. ACM Performance Bar Chart
+        const ctxBar = document.getElementById('acmBarChart').getContext('2d');
+        const acmLabels = Object.keys(data.acm_performance);
+        const acmValues = Object.values(data.acm_performance);
+
+        chartBar = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: acmLabels,
+                datasets: [{
+                    label: 'Onboarding Agencies',
+                    data: acmValues,
+                    backgroundColor: '#ffd700',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Makes it horizontal like Feishu
+                scales: {
+                    x: { ticks: { color: '#ccc' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                    y: { ticks: { color: '#fff', font: {weight: 'bold'} }, grid: { display: false } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // --- STANDARD SEARCH FUNCTIONS (Unchanged) ---
     function formatCoins(num) {
         if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M Coins';
         if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K Coins';
         return num.toLocaleString() + ' Coins';
     }
-
     function extractText(field) {
         if (!field) return "";
         if (typeof field === 'string' || typeof field === 'number') return String(field);
@@ -178,7 +372,6 @@
         if (typeof field === 'object') return String(field.text || field.value || "");
         return String(field);
     }
-
     function saveHistory(code) {
         let history = JSON.parse(localStorage.getItem('xenaHistory')) || [];
         if (!history.includes(code)) history.unshift(code);
@@ -186,11 +379,6 @@
         localStorage.setItem('xenaHistory', JSON.stringify(history));
         renderHistory();
     }
-
-    document.getElementById('agencyCode').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') fetchAgencyData();
-    });
-
     function renderHistory() {
         const container = document.getElementById('searchHistory');
         let history = JSON.parse(localStorage.getItem('xenaHistory')) || [];
@@ -199,7 +387,6 @@
             container.innerHTML += `<div class="history-tag" onclick="quickSearch('${code}')">${code}</div>`;
         });
     }
-
     function quickSearch(code) {
         document.getElementById('agencyCode').value = code;
         fetchAgencyData();
@@ -210,44 +397,32 @@
         const agencyCode = document.getElementById('agencyCode').value.trim();
         const resultsContainer = document.getElementById('resultsContainer');
         const privilegeArea = document.getElementById('privilegeArea');
-        const loading = document.getElementById('loading');
-        const error = document.getElementById('error');
-
+        
         if (!agencyCode) return;
-
         resultsContainer.style.display = 'none';
-        error.style.display = 'none';
-        loading.style.display = 'block';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
 
         try {
-            // WE NOW PASS THE `uat` TOKEN DIRECTLY TO PYTHON
             const response = await fetch(`/api/search?code=${agencyCode}&uat=${loggedUat}`);
             const data = await response.json();
             
             if (!response.ok) {
-                if(response.status === 401) {
-                    alert("Your session has expired. Please log in again.");
-                    logout();
-                }
+                if(response.status === 401) { alert("Your session has expired. Please log in again."); logout(); }
                 throw new Error(data.error || "Unknown Error");
             }
-            
             currentAgencyData = data;
             saveHistory(agencyCode); 
-
         } catch (netErr) {
-            loading.style.display = 'none';
-            error.style.display = 'block';
-            error.innerHTML = `<strong>⚠️ Notice:</strong> ${netErr.message.replace('⚠️ Notice: ', '')}`;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').innerHTML = `<strong>⚠️ Notice:</strong> ${netErr.message.replace('⚠️ Notice: ', '')}`;
             return;
         }
 
-        loading.style.display = 'none';
-
+        document.getElementById('loading').style.display = 'none';
         const basePoints = currentAgencyData.base_points || 0;
-        const totalCoinsValue = basePoints * 100000;
-        
-        document.getElementById('displayTargetCoins').innerText = formatCoins(totalCoinsValue);
+        document.getElementById('displayTargetCoins').innerText = formatCoins(basePoints * 100000);
         document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
 
         if (queryType === 'target') {
@@ -256,7 +431,6 @@
         } else {
             privilegeArea.style.display = 'none';
         }
-
         resultsContainer.style.display = 'block';
     }
 
@@ -264,7 +438,6 @@
         if (!currentAgencyData) return;
         const selectedPriv = document.getElementById('specificPrivilege').value;
         const basePoints = currentAgencyData.base_points || 0;
-
         let totalEarned = 0;
         if (selectedPriv === "Dynamic Avatar") totalEarned = Math.floor(basePoints / 100);
         else if (selectedPriv === "30 Mics") {
@@ -277,27 +450,22 @@
         else if (selectedPriv === "New User Welcome Room" || selectedPriv === "Game room") totalEarned = basePoints >= 20 ? 1 : 0;
 
         let claimed = 0, pending = 0, rejected = 0;
-
         if (currentAgencyData.requests && currentAgencyData.requests.length > 0) {
             currentAgencyData.requests.forEach(req => {
                 const reqPrivilege = extractText(req['Privilege']);
                 if (reqPrivilege.includes(selectedPriv)) {
                     const status = extractText(req['Status']).trim();
                     const counterRaw = extractText(req['# Counter']) || extractText(req['Counter']);
-                    let count = parseInt(counterRaw, 10);
-                    if (isNaN(count)) count = 1;
-
+                    let count = parseInt(counterRaw, 10) || 1;
                     if (status === "Done") claimed += count;
                     else if (status === "Rejected") rejected += count;
                     else pending += count;
                 }
             });
         }
-
-        const remaining = totalEarned - claimed;
         document.getElementById('valTotal').innerText = totalEarned;
         document.getElementById('valClaimed').innerText = claimed;
-        document.getElementById('valRemaining').innerText = remaining;
+        document.getElementById('valRemaining').innerText = totalEarned - claimed;
         document.getElementById('valPending').innerText = pending;
         document.getElementById('valRejected').innerText = rejected;
     }
