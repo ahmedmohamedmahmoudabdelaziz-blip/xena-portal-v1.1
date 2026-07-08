@@ -44,7 +44,7 @@
         .stat-label { color: #a1a1b5; font-size: 0.9em; margin-bottom: 5px; }
         .stat-value { font-size: 1.5em; font-weight: bold; }
 
-        /* ANALYTICS DASHBOARD CSS (MATCHING FEISHU EXACTLY) */
+        /* ANALYTICS DASHBOARD CSS */
         #analyticsContainer { display: none; }
         .filter-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
         .filter-item { flex: 1; min-width: 150px; }
@@ -325,9 +325,12 @@
         const toDate = document.getElementById('anaTo').value;
 
         try {
-            const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
+            // CRITICAL FIX: Passing the UAT Token successfully here!
+            const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const response = await fetch(url);
             const data = await response.json();
+            
+            // Show custom error if Feishu blocks the API call
             if (!response.ok) throw new Error(data.error);
             
             document.getElementById('kpiCreations').innerText = data.kpis.creations;
