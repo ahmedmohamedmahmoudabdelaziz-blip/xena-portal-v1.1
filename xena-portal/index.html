@@ -7,27 +7,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #181824; color: #fff; padding: 20px; min-height: 100vh; margin: 0; }
-        .container { max-width: 1200px; margin: 0 auto; position: relative; }
+        body { background: #12121a; color: #fff; padding: 20px; min-height: 100vh; margin: 0; }
+        .container { max-width: 1300px; margin: 0 auto; position: relative; }
         
-        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #181824; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .login-box { background: #222230; padding: 40px; border-radius: 15px; border: 1px solid #3d3d5c; text-align: center; width: 350px; }
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #12121a; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .login-box { background: #1c1c28; padding: 40px; border-radius: 15px; border: 1px solid #33334d; text-align: center; width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 10px 20px; background: #222230; border-radius: 10px; border: 1px solid #3d3d5c;}
-        .logout-btn { background: transparent; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 5px 15px; border-radius: 5px; cursor: pointer; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 10px 20px; background: #1c1c28; border-radius: 10px; border: 1px solid #33334d;}
+        .logout-btn { background: transparent; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 5px 15px; border-radius: 5px; cursor: pointer; transition: 0.3s; }
+        .logout-btn:hover { background: rgba(255,77,79,0.1); }
         
         h1 { text-align: center; color: #ffd700; margin-bottom: 10px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
-        .subtitle { text-align: center; color: #00d2ff; margin-bottom: 30px; }
-        .card { background: #222230; border: 1px solid #3d3d5c; border-radius: 15px; padding: 25px; margin-bottom: 25px; }
+        .subtitle { text-align: center; color: #00d2ff; margin-bottom: 30px; letter-spacing: 1px; }
+        .card { background: #1c1c28; border: 1px solid #33334d; border-radius: 15px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: #a1a1b5; font-size: 0.9em; font-weight: 600; text-align: left;}
-        input, select { width: 100%; padding: 10px; border: 1px solid #4a4a68; border-radius: 8px; background: #1a1a24; color: #fff; font-size: 1em; }
-        input:focus, select:focus { outline: none; border-color: #00d2ff; }
+        .form-group { margin-bottom: 20px; width: 100%; }
+        label { display: block; margin-bottom: 8px; color: #a1a1b5; font-size: 0.85em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        input, select { width: 100%; padding: 12px; border: 1px solid #33334d; border-radius: 8px; background: #12121a; color: #fff; font-size: 1em; transition: 0.3s;}
+        input:focus, select:focus { outline: none; border-color: #00d2ff; box-shadow: 0 0 8px rgba(0,210,255,0.2); }
         
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; color: #fff; font-size: 1.1em; font-weight: bold; cursor: pointer; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; color: #fff; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn-search { background: linear-gradient(135deg, #00d2ff, #3a7bd5); margin-bottom: 15px; }
-        .btn-generate { background: linear-gradient(135deg, #00e676, #00b0ff); color: #181824;}
+        .btn-search:hover { box-shadow: 0 5px 15px rgba(0,210,255,0.3); transform: translateY(-1px); }
+        .btn-generate { background: linear-gradient(135deg, #00e676, #00b0ff); color: #12121a;}
+        .btn-generate:hover { box-shadow: 0 5px 15px rgba(0,230,118,0.3); transform: translateY(-1px); }
 
         /* STANDARD SEARCH CSS */
         #resultsContainer { display: none; }
@@ -35,26 +38,30 @@
         .acm-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-size: 0.8em; color: #ccc;}
         .target-banner h2 { margin: 0; color: #00ff88; font-size: 2.5em; }
         .target-banner p { margin: 10px 0 0 0; color: #ccc; font-size: 1.1em; }
-        .privilege-section { background: rgba(0, 0, 0, 0.2); border-radius: 10px; padding: 20px; border: 1px solid #3d3d5c; }
+        .privilege-section { background: rgba(0, 0, 0, 0.2); border-radius: 10px; padding: 20px; border: 1px solid #33334d; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
-        .stat-box { background: #1a1a24; border: 1px solid #3d3d5c; border-radius: 10px; padding: 15px; text-align: center; }
+        .stat-box { background: #12121a; border: 1px solid #33334d; border-radius: 10px; padding: 15px; text-align: center; }
         .stat-label { color: #a1a1b5; font-size: 0.9em; margin-bottom: 5px; }
         .stat-value { font-size: 1.5em; font-weight: bold; }
 
         /* ANALYTICS DASHBOARD CSS */
         #analyticsContainer { display: none; }
-        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .filter-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+        .filter-item { flex: 1; min-width: 150px; }
         
-        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .kpi-card { background: #222230; border: 1px solid #3d3d5c; border-radius: 10px; padding: 20px; text-align: center; }
-        .kpi-card h3 { margin: 0; color: #a1a1b5; font-size: 1em; font-weight: normal; }
-        .kpi-card h2 { margin: 10px 0 0 0; font-size: 2.5em; color: #fff; }
+        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi-card { background: #1c1c28; border: 1px solid #33334d; border-radius: 10px; padding: 25px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .kpi-card h3 { margin: 0; color: #a1a1b5; font-size: 1.1em; font-weight: 500; }
+        .kpi-card h2 { margin: 15px 0 0 0; font-size: 3em; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
 
-        .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
-        .chart-box { background: #222230; border: 1px solid #3d3d5c; border-radius: 10px; padding: 20px; }
-        .chart-box h3 { text-align: center; color: #fff; font-size: 1em; margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid #3d3d5c; padding-bottom: 10px; }
+        .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .chart-box { background: #1c1c28; border: 1px solid #33334d; border-radius: 10px; padding: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .chart-box h3 { text-align: center; color: #fff; font-size: 1.1em; margin-top: 0; margin-bottom: 25px; font-weight: 500; }
         
-        .loading { text-align: center; color: #00d2ff; display: none; margin-top: 20px; font-weight: bold; }
+        .chart-wrapper-pie { position: relative; height: 250px; width: 100%; }
+        .chart-wrapper-bar { position: relative; height: 350px; width: 100%; }
+
+        .loading { text-align: center; color: #00d2ff; display: none; margin-top: 20px; font-weight: bold; font-size: 1.1em; }
         .error { color: #ff4d4f; text-align: center; margin-top: 20px; display: none; background: rgba(255,77,79,0.1); border: 1px solid #ff4d4f; padding: 15px; border-radius: 8px;}
     </style>
 </head>
@@ -88,30 +95,38 @@
         </div>
         
         <div id="standardSearchParams">
-            <div class="form-group">
-                <label>Enter Agency Code</label>
-                <input type="text" id="agencyCode" placeholder="e.g., 40775">
-            </div>
+            <div class="form-group"><label>Enter Agency Code</label><input type="text" id="agencyCode" placeholder="e.g., 40775"></div>
             <button class="btn btn-search" onclick="fetchAgencyData()">Search Current Month Data</button>
         </div>
 
         <div id="analyticsParams" style="display:none;">
-            <div class="filter-grid">
-                <div class="form-group"><label>From Date</label><input type="date" id="anaFrom"></div>
-                <div class="form-group"><label>To Date</label><input type="date" id="anaTo"></div>
-                <div class="form-group">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <label>Date Filter</label>
+                    <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
+                        <option value="this_month">This Month</option>
+                        <option value="last_month">Last Month</option>
+                        <option value="this_week">This Week</option>
+                        <option value="last_week">Last Week</option>
+                        <option value="specific">Specific Date</option>
+                    </select>
+                </div>
+                
+                <div class="filter-item" id="customFromDiv" style="display:none;"><label>From Date</label><input type="date" id="anaFrom"></div>
+                <div class="filter-item" id="customToDiv" style="display:none;"><label>To Date</label><input type="date" id="anaTo"></div>
+
+                <div class="filter-item">
                     <label>Region</label>
                     <select id="anaRegion" onchange="updateAcmDropdown()">
-                        <option value="All">All Regions</option>
-                        <option value="PK">PK</option>
+                        <option value="PK" selected>PK</option>
                         <option value="IN">IN</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="filter-item">
                     <label>Assigned ACM</label>
                     <select id="anaAcm"><option value="All">All ACMs</option></select>
                 </div>
-                <div class="form-group">
+                <div class="filter-item">
                     <label>Agency Type</label>
                     <select id="anaType">
                         <option value="All">All Types</option>
@@ -130,11 +145,7 @@
     <div id="error" class="error"></div>
 
     <div id="resultsContainer">
-        <div class="target-banner">
-            <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
-            <h2 id="displayTargetCoins">0 Coins</h2>
-            <p>Current Month Agency Target</p>
-        </div>
+        <div class="target-banner"><div class="acm-badge" id="displayAcm">ACM: Unknown</div><h2 id="displayTargetCoins">0 Coins</h2><p>Current Month Agency Target</p></div>
         <div id="privilegeArea" class="privilege-section">
             <h3 style="color: #00d2ff; text-align:center;">Available Privilege</h3>
             <div class="form-group">
@@ -164,24 +175,29 @@
         </div>
 
         <div class="chart-row">
-            <div class="chart-box"><h3>Agency Creation Status</h3><canvas id="cCreation"></canvas></div>
-            <div class="chart-box"><h3>BD Creation Status</h3><canvas id="cBd"></canvas></div>
-            <div class="chart-box"><h3>Closing Agency Status</h3><canvas id="cClosing"></canvas></div>
+            <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
+            <div class="chart-box"><h3>BD Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
+            <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-box"><h3>Agencies Rejection Reason</h3><div class="chart-wrapper-pie"><canvas id="cReject"></canvas></div></div>
+            <div class="chart-box"><h3>Agencies Type Breakdown</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
+        </div>
+
+        <div class="chart-box" style="margin-bottom:20px;">
+            <h3>Numbers of ACM's Closing Agencies</h3>
+            <div class="chart-wrapper-bar"><canvas id="cCloseReason"></canvas></div>
         </div>
 
         <div class="chart-box" style="margin-bottom:20px;">
             <h3>Number of ACM's Onboarding Agencies</h3>
-            <canvas id="cAcm"></canvas>
-        </div>
-
-        <div class="chart-row">
-            <div class="chart-box"><h3>Rejection Reasons</h3><canvas id="cReject"></canvas></div>
-            <div class="chart-box"><h3>Closing Reasons</h3><canvas id="cCloseReason"></canvas></div>
+            <div class="chart-wrapper-bar" style="height: 400px;"><canvas id="cAcm"></canvas></div>
         </div>
         
         <div class="chart-row">
-            <div class="chart-box"><h3>Other App Names Hosted</h3><canvas id="cOtherApp"></canvas></div>
-            <div class="chart-box"><h3>Daily Requests Trend</h3><canvas id="cTrend"></canvas></div>
+            <div class="chart-box"><h3>Other App Names Hosted</h3><div class="chart-wrapper-bar"><canvas id="cOtherApp"></canvas></div></div>
+            <div class="chart-box"><h3>Daily Requests Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrend"></canvas></div></div>
         </div>
     </div>
 </div>
@@ -190,18 +206,17 @@
     let currentAgencyData = null;
     let loggedUser = localStorage.getItem('xenaUser');
     let loggedUat = localStorage.getItem('xenaUat');
-    
-    let charts = {}; // Store all chart instances
+    let charts = {}; 
 
-    // Admin array - allows Analytics tab
     const adminUsers = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano'];
+    const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
+    const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
-    // Setup Date defaults (First of month to today)
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    document.getElementById('anaFrom').value = firstDay.toISOString().split('T')[0];
-    document.getElementById('anaTo').value = today.toISOString().split('T')[0];
+    // Set Default Colors for ChartJS globally to match Feishu Dark Mode
+    Chart.defaults.color = '#a1a1b5';
+    Chart.defaults.font.family = "'Segoe UI', Tahoma, sans-serif";
 
+    // --- INITIALIZATION ---
     const urlParams = new URLSearchParams(window.location.search);
     const urlUser = urlParams.get('user');
     const urlUat = urlParams.get('uat');
@@ -219,10 +234,12 @@
         document.getElementById('mainApp').style.display = 'block';
         document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
         
-        const isUserAdmin = adminUsers.some(admin => loggedUser.toLowerCase().includes(admin));
-        if (isUserAdmin) document.getElementById('optAnalytics').style.display = 'block';
+        if (adminUsers.some(admin => loggedUser.toLowerCase().includes(admin))) {
+            document.getElementById('optAnalytics').style.display = 'block';
+        }
         
         updateAcmDropdown();
+        setDatePresets(); // Initialize dates silently
     }
 
     function logout() { localStorage.clear(); location.reload(); }
@@ -240,26 +257,64 @@
         }
     }
 
-    // --- ACM DROPDOWN ---
-    const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
-    const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
+    // --- DATE LOGIC ---
+    function updateCustomDateVisibility() {
+        const preset = document.getElementById('anaDatePreset').value;
+        const fromDiv = document.getElementById('customFromDiv');
+        const toDiv = document.getElementById('customToDiv');
+        
+        if (preset === 'specific') {
+            fromDiv.style.display = 'block';
+            toDiv.style.display = 'block';
+        } else {
+            fromDiv.style.display = 'none';
+            toDiv.style.display = 'none';
+        }
+    }
+
+    function setDatePresets() {
+        const preset = document.getElementById('anaDatePreset').value;
+        const fromInput = document.getElementById('anaFrom');
+        const toInput = document.getElementById('anaTo');
+        
+        if (preset === 'specific') return; // User inputs manually
+
+        let from = new Date(), to = new Date();
+        const day = from.getDay();
+        const diff = from.getDate() - day + (day === 0 ? -6 : 1);
+
+        if (preset === 'this_month') {
+            from = new Date(from.getFullYear(), from.getMonth(), 1);
+        } else if (preset === 'last_month') {
+            from = new Date(from.getFullYear(), from.getMonth() - 1, 1);
+            to = new Date(from.getFullYear(), from.getMonth(), 0);
+        } else if (preset === 'this_week') {
+            from = new Date(from.setDate(diff));
+        } else if (preset === 'last_week') {
+            from = new Date(from.setDate(diff - 7));
+            to = new Date(from.setDate(from.getDate() + 6));
+        }
+
+        // Format to YYYY-MM-DD
+        fromInput.value = from.toISOString().split('T')[0];
+        toInput.value = to.toISOString().split('T')[0];
+    }
 
     function updateAcmDropdown() {
         const region = document.getElementById('anaRegion').value;
         const acmSelect = document.getElementById('anaAcm');
         acmSelect.innerHTML = '<option value="All">All ACMs</option>';
-        let targetList = [];
-        if (region === 'PK') targetList = pkAcms;
-        else if (region === 'IN') targetList = inAcms;
-        else targetList = [...pkAcms, ...inAcms].sort();
+        const targetList = region === 'IN' ? inAcms : pkAcms; // Default to PK
 
         targetList.forEach(name => {
             acmSelect.innerHTML += `<option value="${name}">${name}</option>`;
         });
     }
 
-    // --- FETCH & RENDER ANALYTICS ---
+    // --- FETCH & DRAW MASTERPIECE CHARTS ---
     async function generateAnalytics() {
+        setDatePresets(); // Lock in dates based on preset
+
         document.getElementById('error').style.display = 'none';
         document.getElementById('loading').style.display = 'block';
         document.getElementById('analyticsContainer').style.display = 'none';
@@ -271,12 +326,11 @@
         const toDate = document.getElementById('anaTo').value;
 
         try {
-            const url = `/api/analytics?uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
+            const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const response = await fetch(url);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error);
             
-            // Set KPIs
             document.getElementById('kpiCreations').innerText = data.kpis.creations;
             document.getElementById('kpiBds').innerText = data.kpis.bds;
             document.getElementById('kpiClosings').innerText = data.kpis.closings;
@@ -292,60 +346,86 @@
     }
 
     function drawCharts(data) {
-        Object.values(charts).forEach(c => c.destroy()); // Clear old charts
-        
-        Chart.defaults.color = '#a1a1b5';
-        const pieColors = ['#1a73e8', '#ea4335', '#fbbc04']; // Done/Blue, Rejected/Red, UnderInv/Yellow
+        Object.values(charts).forEach(c => c.destroy()); // Clear old canvas memory
+        const pieColors = ['#1a73e8', '#ea4335', '#fbbc04', '#00e676', '#b388ff', '#00d2ff']; 
 
-        const buildPie = (id, labelData) => {
+        // 1. Helper for Standard Pies
+        const buildPie = (id, dataset) => {
             charts[id] = new Chart(document.getElementById(id), {
                 type: 'pie',
                 data: {
-                    labels: ['Done', 'Rejected', 'Under Investigation'],
-                    datasets: [{ data: [labelData.Done, labelData.Rejected, labelData["Under Investigation"]], backgroundColor: pieColors, borderWidth: 0 }]
+                    labels: Object.keys(dataset),
+                    datasets: [{ data: Object.values(dataset), backgroundColor: pieColors, borderWidth: 0 }]
                 },
-                options: { plugins: { legend: { position: 'bottom' } } }
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: {color:'#fff', padding: 15} } } }
             });
         };
 
         buildPie('cCreation', data.creation_status);
         buildPie('cBd', data.bd_status);
         buildPie('cClosing', data.closing_status);
+        buildPie('cReject', data.reject_reasons);
+        buildPie('cType', data.agency_types);
 
-        // ACM Bar Chart (Horizontal)
+        // 2. Grouped Bar Chart (Closing Reasons: User Request vs Duplicated)
+        const acmsWithClosings = Object.keys(data.closing_reasons_by_acm);
+        const userReqData = acmsWithClosings.map(acm => data.closing_reasons_by_acm[acm]["User Request"]);
+        const dupData = acmsWithClosings.map(acm => data.closing_reasons_by_acm[acm]["Duplicated Hosting"]);
+
+        charts['cCloseReason'] = new Chart(document.getElementById('cCloseReason'), {
+            type: 'bar',
+            data: {
+                labels: acmsWithClosings,
+                datasets: [
+                    { label: 'User Request', data: userReqData, backgroundColor: '#1a73e8', borderRadius: 4 },
+                    { label: 'Duplicated Hosting', data: dupData, backgroundColor: '#fbbc04', borderRadius: 4 }
+                ]
+            },
+            options: { maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { grid: { color: '#33334d' } } }, plugins: { legend: { position: 'top', labels: {color:'#fff'} } } }
+        });
+
+        // 3. Horizontal Bar Chart (ACM Onboarding)
         charts['cAcm'] = new Chart(document.getElementById('cAcm'), {
             type: 'bar',
             data: {
                 labels: Object.keys(data.acm_performance),
-                datasets: [{ label: 'Agencies Onboarded', data: Object.values(data.acm_performance), backgroundColor: '#ffd700', borderRadius: 4 }]
+                datasets: [{ label: 'Count', data: Object.values(data.acm_performance), backgroundColor: '#ffd700', borderRadius: 4 }]
             },
-            options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#3d3d5c' } }, y: { grid: { display: false } } } }
+            options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#33334d' } }, y: { grid: { display: false }, ticks: {color:'#fff', font:{weight:'bold'}} } } }
         });
 
-        const buildBar = (id, dataset, color) => {
-            charts[id] = new Chart(document.getElementById(id), {
-                type: 'bar',
-                data: { labels: Object.keys(dataset), datasets: [{ label: 'Count', data: Object.values(dataset), backgroundColor: color, borderRadius: 4 }] },
-                options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#3d3d5c' } } } }
-            });
-        };
+        // 4. Standard Column Bar (Other Apps)
+        charts['cOtherApp'] = new Chart(document.getElementById('cOtherApp'), {
+            type: 'bar',
+            data: { labels: Object.keys(data.other_apps), datasets: [{ data: Object.values(data.other_apps), backgroundColor: '#b388ff', borderRadius: 4 }] },
+            options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#33334d' } } } }
+        });
 
-        buildBar('cReject', data.reject_reasons, '#ea4335');
-        buildBar('cCloseReason', data.closing_reasons, '#00d2ff');
-        buildBar('cOtherApp', data.other_apps, '#b388ff');
+        // 5. Area Chart (Daily Trend) - Smooth curve
+        const ctxTrend = document.getElementById('cTrend').getContext('2d');
+        let gradient = ctxTrend.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 230, 118, 0.4)');
+        gradient.addColorStop(1, 'rgba(0, 230, 118, 0.0)');
 
-        // Daily Trend Line Chart
-        charts['cTrend'] = new Chart(document.getElementById('cTrend'), {
+        charts['cTrend'] = new Chart(ctxTrend, {
             type: 'line',
             data: {
                 labels: Object.keys(data.daily_trend),
-                datasets: [{ label: 'Requests per Day', data: Object.values(data.daily_trend), borderColor: '#00e676', backgroundColor: 'rgba(0, 230, 118, 0.2)', fill: true, tension: 0.4 }]
+                datasets: [{ 
+                    data: Object.values(data.daily_trend), 
+                    borderColor: '#00e676', 
+                    backgroundColor: gradient, 
+                    fill: true, 
+                    tension: 0.4, // Makes it curved!
+                    borderWidth: 2,
+                    pointBackgroundColor: '#00e676'
+                }]
             },
-            options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#3d3d5c' } } } }
+            options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: {maxTicksLimit: 7} }, y: { grid: { color: '#33334d' }, beginAtZero: true } } }
         });
     }
 
-    // --- STANDARD SEARCH ENGINE (Unchanged) ---
+    // --- STANDARD SEARCH ENGINE (Kept strictly intact) ---
     async function fetchAgencyData() {
         const agencyCode = document.getElementById('agencyCode').value.trim();
         if (!agencyCode) return;
@@ -366,8 +446,10 @@
         }
 
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('displayTargetCoins').innerText = (currentAgencyData.base_points * 100000).toLocaleString() + ' Coins';
+        const basePoints = currentAgencyData.base_points || 0;
+        document.getElementById('displayTargetCoins').innerText = (basePoints * 100000).toLocaleString() + ' Coins';
         document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
+        
         if (document.getElementById('queryType').value === 'target') {
             document.getElementById('privilegeArea').style.display = 'block';
             updatePrivilegeGrid();
@@ -395,8 +477,7 @@
                 if (String(priv).includes(selectedPriv)) {
                     let status = req['Status'];
                     if(typeof status === 'object' && status !== null) status = status.text || status.name || "";
-                    status = String(status).trim();
-                    let count = 1;
+                    let count = parseInt(req['# Counter'] || req['Counter'] || 1);
                     if (status === "Done") claimed += count;
                     else if (status === "Rejected") rejected += count;
                     else pending += count;
