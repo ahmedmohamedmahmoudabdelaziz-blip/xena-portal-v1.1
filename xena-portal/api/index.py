@@ -129,3 +129,78 @@ def search_agency():
         "role": "Verified by Feishu"
     }
     return jsonify(final_data)
+# --- NEW ROUTE: DATA ANALYSES & CHARTS ---
+@app.route('/api/analytics', methods=['GET'])
+def get_analytics():
+    uat = request.args.get('uat', '')
+    if not uat:
+        return jsonify({"error": "Unauthorized session."}), 401
+
+    # Filters passed from the frontend
+    region_filter = request.args.get('region', 'All')
+    acm_filter = request.args.get('acm', 'All').lower()
+    type_filter = request.args.get('type', 'All').lower()
+    # Note: For strict Date filtering, you can expand Python datetime logic here. 
+    # For now, we pull the recent dataset to aggregate.
+
+    headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
+    
+    # We pull from the Requests Table to analyze Creations, Closings, etc.
+    req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    
+    # Fetching a larger batch for analytics (max 500 per request)
+    req_payload = {"page_size": 500}
+    req_response = requests.post(req_url, headers=headers, json=req_payload).json()
+
+    if req_response.get("code") != 0:
+        return jsonify({"error": "Analytics blocked. Waiting for Admin Approval."}), 403
+
+    # Aggregation Dictionaries
+    stats = {
+        "creations": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
+        "closings": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
+        "acm_performance": {}
+    }
+
+    if 'data' in req_response and 'items' in req_response['data']:
+        for item in req_response['data']['items']:
+            fields = item.get('fields', {})
+            
+            # Extract fields
+            req_type = extract_field_text(fields.get('Request Type')).strip()
+            status = extract_field_text(fields.get('Status')).strip()
+            acm = extract_field_text(fields.get('Acm')).strip()
+            agency_type = extract_field_text(fields.get('Agency Type')).strip().lower()
+            region = extract_field_text(fields.get('Region')).strip()
+
+            # Apply UI Filters
+            if region_filter != 'All' and region_filter not in region:
+                continue
+            if acm_filter != 'all' and acm_filter not in acm.lower():
+                continue
+            if type_filter != 'all' and type_filter not in agency_type:
+                continue
+
+            # 1. Count by Request Type & Status
+            if "Agency Creation" in req_type:
+                if "Done" in status: stats["creations"]["Done"] += 1
+                elif "Rejected" in status: stats["creations"]["Rejected"] += 1
+                else: stats["creations"]["Under Investigation"] += 1
+            
+            elif "Closing Agency" in req_type:
+                if "Done" in status: stats["closings"]["Done"] += 1
+                elif "Rejected" in status: stats["closings"]["Rejected"] += 1
+                else: stats["closings"]["Under Investigation"] += 1
+
+            # 2. Count by ACM (Only count successful or active requests for performance)
+            if acm:
+                clean_acm = acm.title()
+                if clean_acm not in stats["acm_performance"]:
+                    stats["acm_performance"][clean_acm] = 0
+                stats["acm_performance"][clean_acm] += 1
+
+    # Sort ACM performance (highest to lowest)
+    sorted_acm = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
+    stats["acm_performance"] = sorted_acm
+
+    return jsonify(stats)
