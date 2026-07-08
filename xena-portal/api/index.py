@@ -7,7 +7,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Configure logging so you can see exactly what Vercel/Python is doing
+# Configure logging to catch any future Feishu API errors
 logging.basicConfig(level=logging.INFO)
 
 # --- SECURE CONFIGURATION ---
@@ -21,15 +21,14 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
-    return requests.post(url, json=payload).json().get("tenant_access_token")
+    response = requests.post(url, json=payload).json()
+    return response.get("tenant_access_token")
 
 # --- AGGRESSIVE DATA EXTRACTOR ---
 def extract_field_text(field_data):
-    """Extract human-readable text no matter how Feishu formats the column."""
-    if not field_data:
-        return ""
-    if isinstance(field_data, (str, int, float)):
-        return str(field_data)
+    """Safely extracts text regardless of how Feishu formats the column data."""
+    if not field_data: return ""
+    if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label']:
             if key in field_data: return str(field_data[key])
@@ -42,16 +41,14 @@ def extract_field_text(field_data):
                     if key in item:
                         texts.append(str(item[key]))
                         break
-                else:
-                    texts.append(str(item))
-            else:
-                texts.append(str(item))
+                else: texts.append(str(item))
+            else: texts.append(str(item))
         return " ".join(texts).strip()
     return str(field_data)
 
-# --- AGGRESSIVE DATE PARSER ---
+# --- SAFE DATE PARSER ---
 def parse_feishu_date(date_val):
-    """Convert Feishu date field to datetime without crashing."""
+    """Safely parses Feishu timestamps into Python datetime objects."""
     if not date_val: return None
     if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
     if isinstance(date_val, list) and len(date_val) > 0:
@@ -128,12 +125,9 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = r_fields.get('Submitted on') 
-            if ts:
-                try:
-                    rd = datetime.fromtimestamp(int(ts) / 1000.0)
-                    if rd.month == cm and rd.year == cy: valid_requests.append(r_fields)
-                except Exception: pass
+            ts = parse_feishu_date(r_fields.get('Submitted on'))
+            if ts and ts.month == cm and ts.year == cy:
+                valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
@@ -141,12 +135,15 @@ def search_agency():
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
+    
+    # 1. ADMIN VERIFICATION
     admin_users = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
     if not any(admin in username for admin in admin_users):
         return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
+    # 2. Use Tenant Token to ensure data loads unconditionally
     tat = get_tenant_access_token()
-    if not tat: return jsonify({"error": "Auth Failed"}), 500
+    if not tat: return jsonify({"error": "Authentication failed"}), 500
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     # Extract Filters from UI
@@ -160,7 +157,7 @@ def get_analytics():
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
     # Fetch Data from Feishu (Up to 2000 rows)
-    req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search"
+    req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     all_items = []
     page_token = ""
     for _ in range(4): 
@@ -173,7 +170,7 @@ def get_analytics():
             page_token = res.get('data', {}).get('page_token')
             if not res.get('data', {}).get('has_more'): break
         except Exception as e:
-            logging.error(f"Feishu API Error: {e}")
+            logging.error(f"Feishu API error: {e}")
             break
 
     logging.info(f"Successfully fetched {len(all_items)} records from Feishu.")
@@ -191,7 +188,7 @@ def get_analytics():
         "closing_reasons_pie": {},
         "acm_closing_reasons": {}, 
         "daily_trend": {},
-        "scanned_rows": len(all_items) # Debug check
+        "scanned_rows": len(all_items)
     }
 
     for item in all_items:
@@ -214,14 +211,12 @@ def get_analytics():
         closing_reason = extract_field_text(fields.get('Closing Reason', fields.get('Closing Agencies Reason', ''))).strip()
         other_app = extract_field_text(fields.get('Otherapp Name')).strip()
 
-        # 3. Apply UI Filters (SAFELY check Region)
-        if region_filter not in ['ALL', '']:
-            if region_filter not in region: continue
-            
+        # 3. Apply UI Filters (Safely matching exact values)
+        if region_filter not in ['ALL', ''] and region_filter not in region: continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter not in acm.lower(): continue
         if type_filter not in ['all', 'all types', ''] and type_filter not in agency_type.lower(): continue
 
-        # 4. Populate Data
+        # 4. Populate Data Arrays
         if record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
@@ -229,7 +224,6 @@ def get_analytics():
         if agency_type: stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
         if creation_type: stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
 
-        # Request Types Logic
         if "Agency Creation" in req_type:
             stats["kpis"]["creations"] += 1
             if "Done" in status: stats["creation_status"]["Done"] += 1
@@ -265,5 +259,12 @@ def get_analytics():
 
         if "Rejected" in status and reject_reason:
             stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
+
+    # Clean Sorting for beautiful graphs
+    stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
+    stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
+    stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
+    stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
+    stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
 
     return jsonify(stats)
