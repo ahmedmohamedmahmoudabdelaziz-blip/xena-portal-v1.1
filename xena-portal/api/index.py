@@ -11,7 +11,7 @@ APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
 BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
-REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
+REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"  # The Grand Table
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 def get_tenant_access_token():
@@ -19,7 +19,6 @@ def get_tenant_access_token():
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
     return requests.post(url, json=payload).json().get("tenant_access_token")
 
-# Extracts data cleanly
 def extract_field_text(field_data):
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
@@ -60,53 +59,35 @@ def callback():
     
     lark_name = info_resp.get("data", {}).get("name", "Unknown User")
     safe_name = urllib.parse.quote(lark_name)
-    
-    # We now exclusively use the Feishu User Access Token (uat)
     return redirect(f"/?user={safe_name}&uat={user_access_token}")
 
-# --- SEARCH: CONTROLLED 100% BY FEISHU ADVANCED PERMISSIONS ---
+# --- SEARCH AGENCY ---
 @app.route('/api/search', methods=['GET'])
 def search_agency():
     agency_code = request.args.get('code')
     uat = request.args.get('uat', '')
     
-    if not uat:
-        return jsonify({"error": "Unauthorized session. Please log in via Feishu again."}), 401
-    if not agency_code:
-        return jsonify({"error": "No agency code provided"}), 400
+    if not uat: return jsonify({"error": "Unauthorized session."}), 401
+    if not agency_code: return jsonify({"error": "No agency code provided"}), 400
 
-    # We use the USER'S token. Feishu acts as the supreme judge of who sees what!
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
 
-    # 1. FETCH AGENCY DATA
     points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
-    
     points_response = requests.post(points_url, headers=headers, json=points_payload).json()
     
-    # 🚨 DIAGNOSTIC CHECK: Did you add the permissions in Step 1?
-    code = points_response.get("code")
-    if code != 0:
-        msg = points_response.get("msg", "Unknown error")
-        return jsonify({"error": f"FEISHU API BLOCKED YOU! Code {code}: {msg}. You MUST add 'Bitable' permissions in the Feishu Developer Console and publish a new version!"}), 403
+    if points_response.get("code") != 0:
+        return jsonify({"error": f"Feishu API Blocked: Waiting for IT Admin to approve the app release."}), 403
 
     items = points_response.get('data', {}).get('items', [])
-    
-    # 🎯 ADVANCED PERMISSIONS SUCCESS: 
-    # If the API succeeds (code 0) but returns 0 items, it means Feishu's 
-    # Advanced Permissions successfully hid the row from this user!
     if not items:
         return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
 
-    # If Feishu allows them to see it, extract the data normally
     fields = items[0].get('fields', {})
     sheet_acm_name = extract_field_text(fields.get('Acm')).strip()
-    
-    raw_bp = extract_field_text(fields.get('Base Points')).replace(',', '').strip()
-    try: base_points = float(raw_bp)
+    try: base_points = float(extract_field_text(fields.get('Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
 
-    # 2. FETCH REQUESTS (Also strictly using the User's Token)
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     req_response = requests.post(req_url, headers=headers, json=points_payload).json() 
     
@@ -122,85 +103,120 @@ def search_agency():
                     if rd.month == cm and rd.year == cy: valid_requests.append(r_fields)
                 except Exception: pass
 
-    final_data = {
-        "base_points": base_points, 
-        "requests": valid_requests, 
-        "acm": sheet_acm_name.title(), 
-        "role": "Verified by Feishu"
-    }
-    return jsonify(final_data)
-# --- NEW ROUTE: DATA ANALYSES & CHARTS ---
+    return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
+
+# --- 📊 GRAND TABLE ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     uat = request.args.get('uat', '')
-    if not uat:
-        return jsonify({"error": "Unauthorized session."}), 401
+    if not uat: return jsonify({"error": "Unauthorized session."}), 401
 
-    # Filters passed from the frontend
     region_filter = request.args.get('region', 'All')
     acm_filter = request.args.get('acm', 'All').lower()
     type_filter = request.args.get('type', 'All').lower()
-    # Note: For strict Date filtering, you can expand Python datetime logic here. 
-    # For now, we pull the recent dataset to aggregate.
+    
+    # Custom Date Parsing
+    date_from = request.args.get('from', '')
+    date_to = request.args.get('to', '')
+    from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
-    
-    # We pull from the Requests Table to analyze Creations, Closings, etc.
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # Fetching a larger batch for analytics (max 500 per request)
-    req_payload = {"page_size": 500}
-    req_response = requests.post(req_url, headers=headers, json=req_payload).json()
+    # Fetch up to 2000 records to ensure accuracy
+    all_items = []
+    page_token = ""
+    for _ in range(4): 
+        payload = {"page_size": 500}
+        if page_token: payload["page_token"] = page_token
+        res = requests.post(req_url, headers=headers, json=payload).json()
+        if res.get("code") != 0: break
+        all_items.extend(res.get('data', {}).get('items', []))
+        page_token = res.get('data', {}).get('page_token')
+        if not res.get('data', {}).get('has_more'): break
 
-    if req_response.get("code") != 0:
-        return jsonify({"error": "Analytics blocked. Waiting for Admin Approval."}), 403
-
-    # Aggregation Dictionaries
+    # Data Aggregation
     stats = {
-        "creations": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "closings": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "acm_performance": {}
+        "kpis": {"creations": 0, "bds": 0, "closings": 0},
+        "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
+        "bd_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
+        "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
+        "acm_performance": {},
+        "reject_reasons": {},
+        "closing_reasons": {},
+        "other_apps": {},
+        "daily_trend": {}
     }
 
-    if 'data' in req_response and 'items' in req_response['data']:
-        for item in req_response['data']['items']:
-            fields = item.get('fields', {})
+    for item in all_items:
+        fields = item.get('fields', {})
+        
+        # 1. Strict Date Check
+        ts = fields.get('Submitted on')
+        if not ts: continue
+        try:
+            record_dt = datetime.fromtimestamp(int(ts) / 1000.0)
+            if from_dt and record_dt.date() < from_dt.date(): continue
+            if to_dt and record_dt.date() > to_dt.date(): continue
+        except: continue
+
+        # 2. Extract Fields safely using your exact column names
+        req_type = extract_field_text(fields.get('Request Type')).strip()
+        status = extract_field_text(fields.get('Status')).strip()
+        acm = extract_field_text(fields.get('Acm')).strip()
+        agency_type = extract_field_text(fields.get('Agency Type')).strip().lower()
+        region = extract_field_text(fields.get('Region')).strip()
+        reject_reason = extract_field_text(fields.get('Reject Reason')).strip()
+        closing_reason = extract_field_text(fields.get('Closing Reason')).strip()
+        other_app = extract_field_text(fields.get('Otherapp Name')).strip()
+
+        # 3. Apply Custom Filters
+        if region_filter != 'All' and region_filter not in region: continue
+        if acm_filter != 'all' and acm_filter not in acm.lower(): continue
+        if type_filter != 'all' and type_filter not in agency_type: continue
+
+        # Daily Trend Mapping
+        date_str = record_dt.strftime("%Y-%m-%d")
+        stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
+
+        # Logic Routing
+        if "Agency Creation" in req_type:
+            stats["kpis"]["creations"] += 1
+            if "Done" in status: stats["creation_status"]["Done"] += 1
+            elif "Rejected" in status: stats["creation_status"]["Rejected"] += 1
+            else: stats["creation_status"]["Under Investigation"] += 1
             
-            # Extract fields
-            req_type = extract_field_text(fields.get('Request Type')).strip()
-            status = extract_field_text(fields.get('Status')).strip()
-            acm = extract_field_text(fields.get('Acm')).strip()
-            agency_type = extract_field_text(fields.get('Agency Type')).strip().lower()
-            region = extract_field_text(fields.get('Region')).strip()
-
-            # Apply UI Filters
-            if region_filter != 'All' and region_filter not in region:
-                continue
-            if acm_filter != 'all' and acm_filter not in acm.lower():
-                continue
-            if type_filter != 'all' and type_filter not in agency_type:
-                continue
-
-            # 1. Count by Request Type & Status
-            if "Agency Creation" in req_type:
-                if "Done" in status: stats["creations"]["Done"] += 1
-                elif "Rejected" in status: stats["creations"]["Rejected"] += 1
-                else: stats["creations"]["Under Investigation"] += 1
-            
-            elif "Closing Agency" in req_type:
-                if "Done" in status: stats["closings"]["Done"] += 1
-                elif "Rejected" in status: stats["closings"]["Rejected"] += 1
-                else: stats["closings"]["Under Investigation"] += 1
-
-            # 2. Count by ACM (Only count successful or active requests for performance)
-            if acm:
+            if "Done" in status and acm:
                 clean_acm = acm.title()
-                if clean_acm not in stats["acm_performance"]:
-                    stats["acm_performance"][clean_acm] = 0
-                stats["acm_performance"][clean_acm] += 1
+                stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
+            if other_app:
+                stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
 
-    # Sort ACM performance (highest to lowest)
-    sorted_acm = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
-    stats["acm_performance"] = sorted_acm
+        elif "BD Creation" in req_type:
+            stats["kpis"]["bds"] += 1
+            if "Done" in status: stats["bd_status"]["Done"] += 1
+            elif "Rejected" in status: stats["bd_status"]["Rejected"] += 1
+            else: stats["bd_status"]["Under Investigation"] += 1
+
+        elif "Closing Agency" in req_type:
+            stats["kpis"]["closings"] += 1
+            if "Done" in status: stats["closing_status"]["Done"] += 1
+            elif "Rejected" in status: stats["closing_status"]["Rejected"] += 1
+            else: stats["closing_status"]["Under Investigation"] += 1
+            
+            if closing_reason:
+                stats["closing_reasons"][closing_reason] = stats["closing_reasons"].get(closing_reason, 0) + 1
+
+        # Rejection Reasons (Global for all request types)
+        if "Rejected" in status and reject_reason:
+            stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
+
+    # Sorting
+    stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
+    stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
+    stats["closing_reasons"] = dict(sorted(stats["closing_reasons"].items(), key=lambda x: x[1], reverse=True))
+    stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
+    stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
 
     return jsonify(stats)
