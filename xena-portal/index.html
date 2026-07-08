@@ -32,7 +32,6 @@
         .btn-generate { background: linear-gradient(135deg, #00e676, #00b0ff); color: #12121a;}
         .btn-generate:hover { box-shadow: 0 5px 15px rgba(0,230,118,0.3); transform: translateY(-1px); }
 
-        /* STANDARD SEARCH CSS */
         #resultsContainer { display: none; }
         .target-banner { background: rgba(0, 255, 136, 0.1); border: 2px solid rgba(0, 255, 136, 0.3); border-radius: 10px; padding: 25px; text-align: center; margin-bottom: 25px; position: relative;}
         .acm-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-size: 0.8em; color: #ccc;}
@@ -44,7 +43,6 @@
         .stat-label { color: #a1a1b5; font-size: 0.9em; margin-bottom: 5px; }
         .stat-value { font-size: 1.5em; font-weight: bold; }
 
-        /* ANALYTICS DASHBOARD CSS */
         #analyticsContainer { display: none; }
         .filter-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
         .filter-item { flex: 1; min-width: 150px; }
@@ -109,12 +107,12 @@
                 <div class="filter-item">
                     <label>Date Filter</label>
                     <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
+                        <option value="all" selected>All Time</option>
                         <option value="this_month">Current Month</option>
                         <option value="last_month">Last Month</option>
                         <option value="this_week">Current Week</option>
                         <option value="last_week">Last Week</option>
                         <option value="specific">Specific Date</option>
-                        <option value="all">All Time</option>
                     </select>
                 </div>
                 
@@ -124,7 +122,8 @@
                 <div class="filter-item">
                     <label>Region</label>
                     <select id="anaRegion" onchange="updateAcmDropdown()">
-                        <option value="PK" selected>PK</option>
+                        <option value="All" selected>All Regions</option>
+                        <option value="PK">PK</option>
                         <option value="IN">IN</option>
                     </select>
                 </div>
@@ -166,37 +165,44 @@
     </div>
 
     <div id="analyticsContainer">
+        <!-- ROW 1: KPIs -->
         <div class="kpi-row">
             <div class="kpi-card"><h3>Total Agency Creations</h3><h2 id="kpiCreations" style="color:#00d2ff;">0</h2></div>
             <div class="kpi-card"><h3>Total BD Creations</h3><h2 id="kpiBds" style="color:#00e676;">0</h2></div>
             <div class="kpi-card"><h3>Total Closings</h3><h2 id="kpiClosings" style="color:#ff4d4f;">0</h2></div>
         </div>
 
+        <!-- ROW 2: STATUS PIES -->
         <div class="chart-grid-3">
             <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
             <div class="chart-box"><h3>BD Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
             <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
         </div>
 
+        <!-- ROW 3: REASONS -->
         <div class="chart-grid-3">
             <div class="chart-box"><h3>Agencies Rejection Reason</h3><div class="chart-wrapper-pie"><canvas id="cReject"></canvas></div></div>
             <div class="chart-box"><h3>Closing Agencies Reason</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
             <div class="chart-box"><h3>Numbers of ACM's Closing Agencies</h3><div class="chart-wrapper-pie"><canvas id="cCloseBar"></canvas></div></div>
         </div>
 
+        <!-- ROW 4: ACM ONBOARDING -->
         <div class="chart-grid-1">
             <div class="chart-box"><h3>Number of ACM's Onboarding Agencies</h3><div class="chart-wrapper-bar" style="height: 400px;"><canvas id="cAcm"></canvas></div></div>
         </div>
         
+        <!-- ROW 5: CREATION & AGENCY TYPES -->
         <div class="chart-grid-2">
             <div class="chart-box"><h3>Agencies Creation Type</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
             <div class="chart-box"><h3>Agencies Type</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
         </div>
 
+        <!-- ROW 6: OTHER APPS -->
         <div class="chart-grid-1">
             <div class="chart-box"><h3>Other App Names Hosted</h3><div class="chart-wrapper-bar" style="height:300px;"><canvas id="cOtherApp"></canvas></div></div>
         </div>
 
+        <!-- ROW 7: DAILY TREND -->
         <div class="chart-grid-1">
             <div class="chart-box"><h3>Daily Requests Numbers</h3><div class="chart-wrapper-bar" style="height:300px;"><canvas id="cTrend"></canvas></div></div>
         </div>
@@ -305,7 +311,10 @@
         const region = document.getElementById('anaRegion').value;
         const acmSelect = document.getElementById('anaAcm');
         acmSelect.innerHTML = '<option value="All">All ACMs</option>';
-        const targetList = region === 'IN' ? inAcms : pkAcms; 
+        let targetList = [];
+        if (region === 'IN') targetList = inAcms;
+        else if (region === 'PK') targetList = pkAcms;
+        else targetList = [...pkAcms, ...inAcms].sort();
 
         targetList.forEach(name => {
             acmSelect.innerHTML += `<option value="${name}">${name}</option>`;
@@ -325,12 +334,9 @@
         const toDate = document.getElementById('anaTo').value;
 
         try {
-            // CRITICAL FIX: Passing the UAT Token successfully here!
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const response = await fetch(url);
             const data = await response.json();
-            
-            // Show custom error if Feishu blocks the API call
             if (!response.ok) throw new Error(data.error);
             
             document.getElementById('kpiCreations').innerText = data.kpis.creations;
