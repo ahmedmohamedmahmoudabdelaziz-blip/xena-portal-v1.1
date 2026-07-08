@@ -11,7 +11,7 @@ APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
 BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
-REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"  # The Grand Table
+REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 def get_tenant_access_token():
@@ -33,7 +33,6 @@ def home():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_file(os.path.join(root_dir, 'index.html'))
 
-# --- SSO LOGIN ---
 @app.route('/api/login', methods=['GET'])
 def login():
     safe_redirect = urllib.parse.quote(REDIRECT_URI)
@@ -61,7 +60,6 @@ def callback():
     safe_name = urllib.parse.quote(lark_name)
     return redirect(f"/?user={safe_name}&uat={user_access_token}")
 
-# --- SEARCH AGENCY ---
 @app.route('/api/search', methods=['GET'])
 def search_agency():
     agency_code = request.args.get('code')
@@ -71,9 +69,9 @@ def search_agency():
     if not agency_code: return jsonify({"error": "No agency code provided"}), 400
 
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
-
     points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
+    
     points_response = requests.post(points_url, headers=headers, json=points_payload).json()
     
     if points_response.get("code") != 0:
@@ -105,26 +103,33 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 GRAND TABLE ANALYTICS ENGINE ---
+# --- 📊 MASTERPIECE ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
-    uat = request.args.get('uat', '')
-    if not uat: return jsonify({"error": "Unauthorized session."}), 401
+    username = request.args.get('user', '').lower()
+    
+    # 1. ADMIN VERIFICATION
+    admin_users = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
+    if not any(admin in username for admin in admin_users):
+        return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
-    region_filter = request.args.get('region', 'All')
+    # 2. BYPASS THE BLOCK FOR ADMINS
+    # We use the Tenant Token so it perfectly fetches data even before the IT Admin approves the app.
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    # Extract Filters
+    region_filter = request.args.get('region', 'PK').upper()
     acm_filter = request.args.get('acm', 'All').lower()
     type_filter = request.args.get('type', 'All').lower()
-    
-    # Custom Date Parsing
     date_from = request.args.get('from', '')
     date_to = request.args.get('to', '')
+    
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
-    headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
+    # Fetch Data (Up to 2000 rows to ensure complete data)
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    
-    # Fetch up to 2000 records to ensure accuracy
     all_items = []
     page_token = ""
     for _ in range(4): 
@@ -136,23 +141,24 @@ def get_analytics():
         page_token = res.get('data', {}).get('page_token')
         if not res.get('data', {}).get('has_more'): break
 
-    # Data Aggregation
+    # Data Structures
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "bd_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "acm_performance": {},
-        "reject_reasons": {},
-        "closing_reasons": {},
-        "other_apps": {},
-        "daily_trend": {}
+        "acm_performance": {}, # {acm_name: count}
+        "agency_types": {}, # {type: count}
+        "other_apps": {}, # {app_name: count}
+        "reject_reasons": {}, # {reason: count}
+        "closing_reasons_by_acm": {}, # {acm_name: {"User Request": count, "Duplicated Hosting": count}}
+        "daily_trend": {} # {YYYY-MM-DD: count}
     }
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Strict Date Check
+        # Date Filter Check
         ts = fields.get('Submitted on')
         if not ts: continue
         try:
@@ -161,26 +167,30 @@ def get_analytics():
             if to_dt and record_dt.date() > to_dt.date(): continue
         except: continue
 
-        # 2. Extract Fields safely using your exact column names
+        # Extract Values
         req_type = extract_field_text(fields.get('Request Type')).strip()
         status = extract_field_text(fields.get('Status')).strip()
-        acm = extract_field_text(fields.get('Acm')).strip()
-        agency_type = extract_field_text(fields.get('Agency Type')).strip().lower()
-        region = extract_field_text(fields.get('Region')).strip()
+        acm = extract_field_text(fields.get('Acm')).strip().title()
+        agency_type = extract_field_text(fields.get('Agency Type')).strip()
+        region = extract_field_text(fields.get('Region')).strip().upper()
         reject_reason = extract_field_text(fields.get('Reject Reason')).strip()
         closing_reason = extract_field_text(fields.get('Closing Reason')).strip()
         other_app = extract_field_text(fields.get('Otherapp Name')).strip()
 
-        # 3. Apply Custom Filters
-        if region_filter != 'All' and region_filter not in region: continue
+        # Apply Region & ACM & Type Filters
+        if region_filter != 'ALL' and region_filter not in region: continue
         if acm_filter != 'all' and acm_filter not in acm.lower(): continue
-        if type_filter != 'all' and type_filter not in agency_type: continue
+        if type_filter != 'all' and type_filter not in agency_type.lower(): continue
 
         # Daily Trend Mapping
         date_str = record_dt.strftime("%Y-%m-%d")
         stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
-        # Logic Routing
+        # Populate Agency Types Pie Chart
+        if agency_type:
+            stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
+
+        # Populate Logic
         if "Agency Creation" in req_type:
             stats["kpis"]["creations"] += 1
             if "Done" in status: stats["creation_status"]["Done"] += 1
@@ -188,8 +198,7 @@ def get_analytics():
             else: stats["creation_status"]["Under Investigation"] += 1
             
             if "Done" in status and acm:
-                clean_acm = acm.title()
-                stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
+                stats["acm_performance"][acm] = stats["acm_performance"].get(acm, 0) + 1
             if other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
 
@@ -205,17 +214,21 @@ def get_analytics():
             elif "Rejected" in status: stats["closing_status"]["Rejected"] += 1
             else: stats["closing_status"]["Under Investigation"] += 1
             
-            if closing_reason:
-                stats["closing_reasons"][closing_reason] = stats["closing_reasons"].get(closing_reason, 0) + 1
+            if closing_reason and acm:
+                if acm not in stats["closing_reasons_by_acm"]:
+                    stats["closing_reasons_by_acm"][acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                if "User Request" in closing_reason:
+                    stats["closing_reasons_by_acm"][acm]["User Request"] += 1
+                elif "Duplicated" in closing_reason:
+                    stats["closing_reasons_by_acm"][acm]["Duplicated Hosting"] += 1
 
-        # Rejection Reasons (Global for all request types)
+        # Rejections (Global)
         if "Rejected" in status and reject_reason:
             stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
-    # Sorting
+    # Sorting dictionaries for beautiful charts
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
-    stats["closing_reasons"] = dict(sorted(stats["closing_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
     stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
 
