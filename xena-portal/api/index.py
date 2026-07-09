@@ -17,7 +17,6 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
-# 🔒 SECURE ADMIN VAULT
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
@@ -61,17 +60,15 @@ def extract_field_text(field_data):
 def parse_feishu_date(date_val):
     """Bulletproof date parser handling nested data and slashes (2026/04/30)."""
     if not date_val: return None
-    if isinstance(date_val, dict): date_val = date_val.get('text', date_val.get('value', ''))
-    if isinstance(date_val, list) and len(date_val) > 0:
-        if isinstance(date_val[0], dict): date_val = date_val[0].get('text', date_val[0].get('value', ''))
-        else: date_val = str(date_val[0])
+    if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
+    if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
         
     if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
     if isinstance(date_val, str):
         if date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
         try:
-            # FIX: Safely convert '2026/04/30' to '2026-04-30'
-            clean_str = date_val[:10].replace('/', '-')
+            # Safely convert '2026/04/30' to '2026-04-30'
+            clean_str = date_val[:10].replace('/', '-').replace('.', '-')
             return datetime.strptime(clean_str, "%Y-%m-%d")
         except Exception: pass
     return None
@@ -145,13 +142,13 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy', 'Submitted on'))
+            ts = parse_feishu_date(get_field(r_fields, 'Submitted on', 'Submitted on Copy'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 BLAZING FAST ANALYTICS ENGINE WITH SERVER-SIDE FILTERING ---
+# --- 📊 BLAZING FAST ANALYTICS ENGINE WITH REVERSE TIME SORTING ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -172,47 +169,38 @@ def get_analytics():
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
-    # 🚀 SERVER-SIDE OPTIMIZATION: Push filters directly to Feishu
-    payload = {"page_size": 500}
-    if region_filter not in ['ALL', '']:
-        payload["filter"] = {
-            "conjunction": "and",
-            "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter]}]
-        }
-    
-    # 🚀 REVERSE TIME SORT: Fetch Newest Data First!
-    payload["sort"] = [{"field_name": "Submitted on Copy", "desc": True}]
-
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    
+    # 🚀 PRE-FLIGHT SCANNER: Find the exact date column name to sort Newest-First safely
+    valid_sort = None
+    for sort_col in ["Submitted on", "Submitted on Copy"]:
+        test_res = requests.post(req_url, headers=headers, json={"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}).json()
+        if test_res.get("code") == 0:
+            valid_sort = [{"field_name": sort_col, "desc": True}]
+            break
+
     all_items = []
     page_token = ""
     start_time = time.time()
     
-    for _ in range(40): # Can handle up to 20,000 rows
+    for _ in range(40): # Loops to fetch up to 20,000 rows
+        payload = {"page_size": 500}
+        if valid_sort: payload["sort"] = valid_sort
         if page_token: payload["page_token"] = page_token
+        
         try:
             res = requests.post(req_url, headers=headers, json=payload, timeout=8).json()
-            
-            # Auto-Fallback: If the sort field doesn't perfectly match, delete sort and retry safely
-            if res.get("code") != 0 and "sort" in payload:
-                del payload["sort"]
-                res = requests.post(req_url, headers=headers, json=payload, timeout=8).json()
-
-            if res.get("code") != 0: 
-                return jsonify({"error": f"Feishu API Error: {res.get('msg')}"}), 400
+            if res.get("code") != 0: break
                 
-            all_items.extend(res.get('data', {}).get('items', []))
+            fetched_items = res.get('data', {}).get('items', [])
+            all_items.extend(fetched_items)
             page_token = res.get('data', {}).get('page_token')
             
-            # Stop if no more data OR if we approach the Vercel 10s Crash Limit
+            # Anti-Crash safety net: Stop fetching if we approach Vercel's 10-second limit
             if not page_token or not res.get('data', {}).get('has_more'): break
-            if time.time() - start_time > 8.5: break 
-        except requests.exceptions.Timeout:
-            if all_items: break
-            return jsonify({"error": "Feishu Server took too long. Try setting Region to PK to load faster."}), 504
-        except Exception as e:
-            if all_items: break
-            return jsonify({"error": f"Server processing error: {str(e)}"}), 500
+            if time.time() - start_time > 8.0: break 
+        except Exception:
+            break
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -224,7 +212,6 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {}, "scanned_rows": len(all_items)
     }
 
-    # Tracking Variables
     dropped_date = 0
     dropped_region = 0
     dropped_acm = 0
@@ -234,8 +221,8 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Filtering (CRITICAL FIX: Checks both "Submitted on Copy" and "Submitted on")
-        record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
+        # 1. Date Filtering
+        record_dt = parse_feishu_date(get_field(fields, 'Submitted on', 'Submitted on Copy'))
         if from_dt or to_dt:
             if not record_dt: 
                 dropped_date += 1
