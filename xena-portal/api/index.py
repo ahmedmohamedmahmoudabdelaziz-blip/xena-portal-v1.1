@@ -152,6 +152,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
+# --- 📊 MASTERPIECE ANALYTICS ENGINE WITH FLOODGATES OPEN ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -160,7 +161,6 @@ def get_analytics():
     if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
     if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
-    # NOW USING TENANT TOKEN SINCE APP IS APPROVED
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
@@ -176,16 +176,28 @@ def get_analytics():
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     all_items = []
     page_token = ""
-    for _ in range(4): 
+    
+    # CRITICAL FIX: Increased capacity from 2,000 rows to 20,000 rows (40 pages of 500)
+    for _ in range(40): 
         payload = {"page_size": 500}
         if page_token: payload["page_token"] = page_token
         try:
-            res = requests.post(req_url, headers=headers, json=payload, timeout=10).json()
-            if res.get("code") != 0: return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
-            all_items.extend(res.get('data', {}).get('items', []))
+            # Added a timeout handler so it grabs as much data as it can without crashing
+            res = requests.post(req_url, headers=headers, json=payload, timeout=8).json()
+            if res.get("code") != 0: 
+                return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
+            
+            fetched_items = res.get('data', {}).get('items', [])
+            all_items.extend(fetched_items)
             page_token = res.get('data', {}).get('page_token')
+            
             if not res.get('data', {}).get('has_more'): break
+        except requests.exceptions.Timeout:
+            # If the server runs out of time pulling 10,000 rows, stop looping and process what we have!
+            if len(all_items) > 0: break
+            return jsonify({"error": "Server timed out connecting to Feishu. Try again."}), 500
         except Exception as e:
+            if len(all_items) > 0: break
             return jsonify({"error": f"Server processing error: {str(e)}"}), 500
 
     stats = {
@@ -193,12 +205,18 @@ def get_analytics():
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "bd_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "reject_reasons": {}, "closing_reasons_pie": {}, "acm_closing_reasons": {}, 
-        "acm_performance": {}, "creation_types": {}, "agency_types": {}, 
-        "other_apps": {}, "daily_trend": {}
+        "acm_performance": {}, 
+        "creation_types": {},
+        "agency_types": {}, 
+        "other_apps": {}, 
+        "reject_reasons": {}, 
+        "closing_reasons_pie": {},
+        "acm_closing_reasons": {}, 
+        "daily_trend": {},
+        "scanned_rows": len(all_items)
     }
 
-    # THE X-RAY TRACKER
+    # Tracking Variables
     dropped_date = 0
     dropped_region = 0
     dropped_acm = 0
@@ -288,8 +306,11 @@ def get_analytics():
                 stats["closing_reasons_pie"][closing_reason] = stats["closing_reasons_pie"].get(closing_reason, 0) + 1
                 if acm:
                     if acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][acm] = {}
-                    stats["acm_closing_reasons"][acm][closing_reason] = stats["acm_closing_reasons"][acm].get(closing_reason, 0) + 1
+                        stats["acm_closing_reasons"][acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    if "User Request" in closing_reason:
+                        stats["acm_closing_reasons"][acm]["User Request"] += 1
+                    elif "Duplicated" in closing_reason:
+                        stats["acm_closing_reasons"][acm]["Duplicated Hosting"] += 1
 
     # Attach the diagnostic debug data
     stats["debug"] = {
