@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
@@ -20,6 +21,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
+    """Case-insensitive and space-insensitive column lookup."""
     if not fields: return None
     for name in names:
         name_clean = name.strip().lower()
@@ -57,20 +59,18 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Bulletproof date parser for all Feishu formats."""
+    """Bulletproof date parser handling nested data and slashes (2026/04/30)."""
     if not date_val: return None
-    
-    if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
-    if isinstance(date_val, str) and date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
-    
-    if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('text', date_val.get('value', ''))
-    
+    if isinstance(date_val, list) and len(date_val) > 0:
+        if isinstance(date_val[0], dict): date_val = date_val[0].get('text', date_val[0].get('value', ''))
+        else: date_val = str(date_val[0])
+        
     if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
     if isinstance(date_val, str):
         if date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
         try:
-            # Replaces slashes with dashes universally
+            # FIX: Safely convert '2026/04/30' to '2026-04-30'
             clean_str = date_val[:10].replace('/', '-')
             return datetime.strptime(clean_str, "%Y-%m-%d")
         except Exception: pass
@@ -121,7 +121,6 @@ def search_agency():
     if not uat: return jsonify({"error": "Unauthorized session."}), 401
     if not agency_code: return jsonify({"error": "No agency code provided"}), 400
 
-    # NOW USING TENANT TOKEN SINCE APP IS APPROVED
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
@@ -146,13 +145,13 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(get_field(r_fields, 'Submitted on'))
+            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy', 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 MASTERPIECE ANALYTICS ENGINE WITH FLOODGATES OPEN ---
+# --- 📊 BLAZING FAST ANALYTICS ENGINE WITH SERVER-SIDE FILTERING ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -173,31 +172,46 @@ def get_analytics():
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
+    # 🚀 SERVER-SIDE OPTIMIZATION: Push filters directly to Feishu
+    payload = {"page_size": 500}
+    if region_filter not in ['ALL', '']:
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter]}]
+        }
+    
+    # 🚀 REVERSE TIME SORT: Fetch Newest Data First!
+    payload["sort"] = [{"field_name": "Submitted on Copy", "desc": True}]
+
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     all_items = []
     page_token = ""
+    start_time = time.time()
     
-    # CRITICAL FIX: Increased capacity from 2,000 rows to 20,000 rows (40 pages of 500)
-    for _ in range(40): 
-        payload = {"page_size": 500}
+    for _ in range(40): # Can handle up to 20,000 rows
         if page_token: payload["page_token"] = page_token
         try:
-            # Added a timeout handler so it grabs as much data as it can without crashing
             res = requests.post(req_url, headers=headers, json=payload, timeout=8).json()
-            if res.get("code") != 0: 
-                return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
             
-            fetched_items = res.get('data', {}).get('items', [])
-            all_items.extend(fetched_items)
+            # Auto-Fallback: If the sort field doesn't perfectly match, delete sort and retry safely
+            if res.get("code") != 0 and "sort" in payload:
+                del payload["sort"]
+                res = requests.post(req_url, headers=headers, json=payload, timeout=8).json()
+
+            if res.get("code") != 0: 
+                return jsonify({"error": f"Feishu API Error: {res.get('msg')}"}), 400
+                
+            all_items.extend(res.get('data', {}).get('items', []))
             page_token = res.get('data', {}).get('page_token')
             
-            if not res.get('data', {}).get('has_more'): break
+            # Stop if no more data OR if we approach the Vercel 10s Crash Limit
+            if not page_token or not res.get('data', {}).get('has_more'): break
+            if time.time() - start_time > 8.5: break 
         except requests.exceptions.Timeout:
-            # If the server runs out of time pulling 10,000 rows, stop looping and process what we have!
-            if len(all_items) > 0: break
-            return jsonify({"error": "Server timed out connecting to Feishu. Try again."}), 500
+            if all_items: break
+            return jsonify({"error": "Feishu Server took too long. Try setting Region to PK to load faster."}), 504
         except Exception as e:
-            if len(all_items) > 0: break
+            if all_items: break
             return jsonify({"error": f"Server processing error: {str(e)}"}), 500
 
     stats = {
@@ -205,15 +219,9 @@ def get_analytics():
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "bd_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "acm_performance": {}, 
-        "creation_types": {},
-        "agency_types": {}, 
-        "other_apps": {}, 
-        "reject_reasons": {}, 
-        "closing_reasons_pie": {},
-        "acm_closing_reasons": {}, 
-        "daily_trend": {},
-        "scanned_rows": len(all_items)
+        "acm_performance": {}, "creation_types": {}, "agency_types": {}, 
+        "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
+        "acm_closing_reasons": {}, "daily_trend": {}, "scanned_rows": len(all_items)
     }
 
     # Tracking Variables
@@ -226,8 +234,8 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Filtering
-        record_dt = parse_feishu_date(get_field(fields, 'Submitted on'))
+        # 1. Date Filtering (CRITICAL FIX: Checks both "Submitted on Copy" and "Submitted on")
+        record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
         if from_dt or to_dt:
             if not record_dt: 
                 dropped_date += 1
@@ -312,14 +320,9 @@ def get_analytics():
                     elif "Duplicated" in closing_reason:
                         stats["acm_closing_reasons"][acm]["Duplicated Hosting"] += 1
 
-    # Attach the diagnostic debug data
     stats["debug"] = {
-        "total_fetched": len(all_items),
-        "dropped_date": dropped_date,
-        "dropped_region": dropped_region,
-        "dropped_acm": dropped_acm,
-        "dropped_type": dropped_type,
-        "processed": processed
+        "total_fetched": len(all_items), "dropped_date": dropped_date, "dropped_region": dropped_region,
+        "dropped_acm": dropped_acm, "dropped_type": dropped_type, "processed": processed
     }
 
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
