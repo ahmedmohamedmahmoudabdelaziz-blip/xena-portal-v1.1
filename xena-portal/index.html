@@ -107,12 +107,12 @@
                 <div class="filter-item">
                     <label>Date Filter</label>
                     <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
-                        <option value="all" selected>All Time</option>
-                        <option value="this_month">Current Month</option>
+                        <option value="this_month" selected>Current Month</option>
                         <option value="last_month">Last Month</option>
                         <option value="this_week">Current Week</option>
                         <option value="last_week">Last Week</option>
                         <option value="specific">Specific Date</option>
+                        <option value="all">All Time</option>
                     </select>
                 </div>
                 
@@ -122,9 +122,9 @@
                 <div class="filter-item">
                     <label>Region</label>
                     <select id="anaRegion" onchange="updateAcmDropdown()">
-                        <option value="All" selected>All Regions</option>
-                        <option value="PK">PK</option>
+                        <option value="PK" selected>PK</option>
                         <option value="IN">IN</option>
+                        <option value="All">All Regions</option>
                     </select>
                 </div>
                 <div class="filter-item">
@@ -139,6 +139,7 @@
                         <option value="BD hunting">BD Hunting</option>
                         <option value="Walkin">Walk-in</option>
                         <option value="New BD Hunting">New BD Hunting</option>
+                        <option value="Walkin sub-agency">Walkin sub-agency</option>
                     </select>
                 </div>
             </div>
@@ -232,7 +233,6 @@
         document.getElementById('mainApp').style.display = 'block';
         document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
         
-        // 🔒 FAST SECURITY CHECK TO SHOW/HIDE ANALYTICS TAB
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}`)
             .then(res => res.json())
             .then(data => {
@@ -240,7 +240,7 @@
                     document.getElementById('optAnalytics').style.display = 'block';
                 }
             })
-            .catch(e => console.log("Auth verification failed or not an admin."));
+            .catch(e => console.log("Not an admin."));
         
         updateAcmDropdown();
         setDatePresets(); 
@@ -337,7 +337,6 @@
             const data = await response.json();
             
             if (!response.ok) {
-                // EXPOSE EXACT ERROR (e.g., mismatched column names)
                 const errorMsg = data.sample_fields 
                     ? `Data mismatch. Expected specific columns but Feishu returned: ${data.sample_fields.join(", ")}` 
                     : data.error;
