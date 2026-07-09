@@ -93,7 +93,7 @@
             <select id="queryType" onchange="toggleViewModes()">
                 <option value="target">Agency Target Privilege</option>
                 <option value="points">Agency Points System</option>
-                <option value="analytics" id="optAnalytics" style="display:none; color:#00e676; font-weight:bold;">📊 Agency Data Analyses</option>
+                <option value="analytics" id="optAnalytics" style="color:#00e676; font-weight:bold;">📊 Agency Data Analyses</option>
             </select>
         </div>
         
@@ -107,12 +107,12 @@
                 <div class="filter-item">
                     <label>Date Filter</label>
                     <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
-                        <option value="this_month" selected>Current Month</option>
+                        <option value="all" selected>All Time</option>
+                        <option value="this_month">Current Month</option>
                         <option value="last_month">Last Month</option>
                         <option value="this_week">Current Week</option>
                         <option value="last_week">Last Week</option>
                         <option value="specific">Specific Date</option>
-                        <option value="all">All Time</option>
                     </select>
                 </div>
                 
@@ -122,7 +122,8 @@
                 <div class="filter-item">
                     <label>Region</label>
                     <select id="anaRegion" onchange="updateAcmDropdown()">
-                        <option value="PK" selected>PK</option>
+                        <option value="All" selected>All Regions</option>
+                        <option value="PK">PK</option>
                         <option value="IN">IN</option>
                     </select>
                 </div>
@@ -164,44 +165,37 @@
     </div>
 
     <div id="analyticsContainer">
-        <!-- ROW 1: KPIs -->
         <div class="kpi-row">
             <div class="kpi-card"><h3>Total Agency Creations</h3><h2 id="kpiCreations" style="color:#00d2ff;">0</h2></div>
             <div class="kpi-card"><h3>Total BD Creations</h3><h2 id="kpiBds" style="color:#00e676;">0</h2></div>
             <div class="kpi-card"><h3>Total Closings</h3><h2 id="kpiClosings" style="color:#ff4d4f;">0</h2></div>
         </div>
 
-        <!-- ROW 2: STATUS PIES -->
         <div class="chart-grid-3">
             <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
             <div class="chart-box"><h3>BD Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
             <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
         </div>
 
-        <!-- ROW 3: REASONS -->
         <div class="chart-grid-3">
             <div class="chart-box"><h3>Agencies Rejection Reason</h3><div class="chart-wrapper-pie"><canvas id="cReject"></canvas></div></div>
             <div class="chart-box"><h3>Closing Agencies Reason</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
             <div class="chart-box"><h3>Numbers of ACM's Closing Agencies</h3><div class="chart-wrapper-pie"><canvas id="cCloseBar"></canvas></div></div>
         </div>
 
-        <!-- ROW 4: ACM ONBOARDING -->
         <div class="chart-grid-1">
             <div class="chart-box"><h3>Number of ACM's Onboarding Agencies</h3><div class="chart-wrapper-bar" style="height: 400px;"><canvas id="cAcm"></canvas></div></div>
         </div>
         
-        <!-- ROW 5: CREATION & AGENCY TYPES -->
         <div class="chart-grid-2">
             <div class="chart-box"><h3>Agencies Creation Type</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
             <div class="chart-box"><h3>Agencies Type</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
         </div>
 
-        <!-- ROW 6: OTHER APPS -->
         <div class="chart-grid-1">
             <div class="chart-box"><h3>Other App Names Hosted</h3><div class="chart-wrapper-bar" style="height:300px;"><canvas id="cOtherApp"></canvas></div></div>
         </div>
 
-        <!-- ROW 7: DAILY TREND -->
         <div class="chart-grid-1">
             <div class="chart-box"><h3>Daily Requests Numbers</h3><div class="chart-wrapper-bar" style="height:300px;"><canvas id="cTrend"></canvas></div></div>
         </div>
@@ -214,9 +208,7 @@
     let loggedUat = localStorage.getItem('xenaUat');
     let charts = {}; 
 
-    const adminUsers = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano'];
-    
-    // Strict lowercase/uppercase schema replication matching database metric indexes
+    // Exact spellings from the video frames
     const pkAcms = ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
     const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
@@ -240,10 +232,6 @@
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
-        
-        if (adminUsers.some(admin => loggedUser.toLowerCase().includes(admin))) {
-            document.getElementById('optAnalytics').style.display = 'block';
-        }
         
         updateAcmDropdown();
         setDatePresets(); 
@@ -312,7 +300,10 @@
         const region = document.getElementById('anaRegion').value;
         const acmSelect = document.getElementById('anaAcm');
         acmSelect.innerHTML = '<option value="All">All ACMs</option>';
-        const targetList = region === 'IN' ? inAcms : pkAcms; 
+        let targetList = [];
+        if (region === 'IN') targetList = inAcms;
+        else if (region === 'PK') targetList = pkAcms;
+        else targetList = [...pkAcms, ...inAcms].sort();
 
         targetList.forEach(name => {
             acmSelect.innerHTML += `<option value="${name.toLowerCase()}">${name}</option>`;
@@ -332,7 +323,7 @@
         const toDate = document.getElementById('anaTo').value;
 
         try {
-            const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
+            const url = `/api/analytics?uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const response = await fetch(url);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error);
@@ -371,20 +362,22 @@
         buildPie('cCreationType', data.creation_types);
         buildPie('cType', data.agency_types);
 
+        // Dynamic Grouped Bar Chart (Finds all distinct reasons automatically)
         const acmsWithClosings = Object.keys(data.acm_closing_reasons);
         if(acmsWithClosings.length > 0) {
-            const userReqData = acmsWithClosings.map(acm => data.acm_closing_reasons[acm]["User Request"] || 0);
-            const dupData = acmsWithClosings.map(acm => data.acm_closing_reasons[acm]["Duplicated Hosting"] || 0);
+            const allReasons = Object.keys(data.closing_reasons_pie);
+            const dynamicDatasets = allReasons.map((reason, index) => {
+                return {
+                    label: reason,
+                    data: acmsWithClosings.map(acm => data.acm_closing_reasons[acm][reason] || 0),
+                    backgroundColor: F_COLORS[index % F_COLORS.length],
+                    borderRadius: 4
+                };
+            });
 
             charts['cCloseBar'] = new Chart(document.getElementById('cCloseBar'), {
                 type: 'bar',
-                data: {
-                    labels: acmsWithClosings,
-                    datasets: [
-                        { label: 'User Request', data: userReqData, backgroundColor: F_COLORS[0], borderRadius: 4 },
-                        { label: 'Duplicated Hosting', data: dupData, backgroundColor: F_COLORS[2], borderRadius: 4 }
-                    ]
-                },
+                data: { labels: acmsWithClosings, datasets: dynamicDatasets },
                 options: { maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { grid: { color: '#33334d' } } }, plugins: { legend: { position: 'top', labels: {color:'#fff'} } } }
             });
         }
@@ -422,6 +415,7 @@
         }
     }
 
+    // --- STANDARD SEARCH ENGINE ---
     async function fetchAgencyData() {
         const agencyCode = document.getElementById('agencyCode').value.trim();
         if (!agencyCode) return;
