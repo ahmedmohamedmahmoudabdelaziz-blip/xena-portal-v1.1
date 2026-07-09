@@ -16,9 +16,18 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
-# 🔒 SECURE ADMIN VAULT: Only these users will see the Analytics option.
-# You can add or remove names here at any time.
+# 🔒 SECURE ADMIN VAULT
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
+
+# --- ADVANCED HELPER: Case & Space Insensitive Field Lookup ---
+def get_field(fields, name):
+    """Return field value ignoring case and invisible trailing spaces."""
+    if not fields: return None
+    name_clean = name.strip().lower()
+    for key in fields:
+        if key.strip().lower() == name_clean:
+            return fields[key]
+    return None
 
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -92,7 +101,7 @@ def callback():
     safe_name = urllib.parse.quote(lark_name)
     return redirect(f"/?user={safe_name}&uat={user_access_token}")
 
-# --- NEW: SECURE ADMIN CHECKER FOR UI ---
+# --- FAST ADMIN CHECKER ---
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
     username = request.args.get('user', '').lower()
@@ -119,8 +128,8 @@ def search_agency():
         return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
 
     fields = items[0].get('fields', {})
-    sheet_acm_name = extract_field_text(fields.get('Acm')).strip()
-    try: base_points = float(extract_field_text(fields.get('Base Points')).replace(',', '').strip())
+    sheet_acm_name = extract_field_text(get_field(fields, 'Acm')).strip()
+    try: base_points = float(extract_field_text(get_field(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
@@ -131,7 +140,7 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(r_fields.get('Submitted on'))
+            ts = parse_feishu_date(get_field(r_fields, 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
@@ -150,7 +159,6 @@ def get_analytics():
 
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
 
-    # Extract UI Filters safely
     region_filter = request.args.get('region', 'ALL').strip().upper()
     acm_filter = request.args.get('acm', 'All').strip().lower()
     type_filter = request.args.get('type', 'All').strip().lower()
@@ -160,7 +168,6 @@ def get_analytics():
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
-    # Fetch Data from Feishu (Up to 2000 rows)
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     all_items = []
     page_token = ""
@@ -184,33 +191,39 @@ def get_analytics():
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "reject_reasons": {}, "closing_reasons_pie": {}, "acm_closing_reasons": {}, 
         "acm_performance": {}, "creation_types": {}, "agency_types": {}, 
-        "other_apps": {}, "daily_trend": {}
+        "other_apps": {}, "daily_trend": {},
+        "scanned_rows": len(all_items),
+        # DEBUG FALLBACK: Returns exact column names from your first row
+        "debug_keys": list(all_items[0].get('fields', {}).keys()) if all_items else []
     }
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Checks
-        record_dt = parse_feishu_date(fields.get("Submitted on"))
+        # 1. Date Filtering
+        record_dt = parse_feishu_date(get_field(fields, 'Submitted on'))
         if record_dt:
             if from_dt and record_dt.date() < from_dt.date(): continue
             if to_dt and record_dt.date() > to_dt.date(): continue
 
-        # 2. Extract values and convert to lowercase for foolproof matching!
-        req_type = extract_field_text(fields.get('Request Type')).strip().lower()
-        status = extract_field_text(fields.get('Status', fields.get('Request Status', ''))).strip()
+        # 2. Extract values with case-insensitive robust lookups
+        req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
+        status = extract_field_text(get_field(fields, 'Status') or get_field(fields, 'Request Status')).strip()
         status_low = status.lower()
-        agency_type = extract_field_text(fields.get('Agency Type')).strip()
-        creation_type = extract_field_text(fields.get('Create Way')).strip()
-        region = extract_field_text(fields.get('Region')).strip().upper()
-        reject_reason = extract_field_text(fields.get('Reject Reason')).strip()
-        closing_reason = extract_field_text(fields.get('Closing Reason')).strip()
-        other_app = extract_field_text(fields.get('Otherapp Name')).strip()
+        
+        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
+        creation_type = extract_field_text(get_field(fields, 'Create Way') or get_field(fields, 'Creation Type')).strip()
+        region = extract_field_text(get_field(fields, 'Region')).strip().upper()
+        reject_reason = extract_field_text(get_field(fields, 'Reject Reason') or get_field(fields, 'Rejection Reason')).strip()
+        closing_reason = extract_field_text(get_field(fields, 'Closing Reason') or get_field(fields, 'Closing Agencies Reason')).strip()
+        other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
         # Dynamic cross-regional check for proper ACM allocation
-        acm_pk = extract_field_text(fields.get('Acm Name (PK)')).strip()
-        acm_in = extract_field_text(fields.get('Acm Name (IN)')).strip()
+        acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
+        acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
         acm = acm_in if region == "IN" else acm_pk
+        if not acm: acm = extract_field_text(get_field(fields, 'Acm') or get_field(fields, 'Assigned Member')).strip()
+        acm = acm.title()
 
         # 3. Dynamic Global Filter Validation
         if region_filter not in ['ALL', ''] and region != region_filter: continue
@@ -258,7 +271,7 @@ def get_analytics():
                         stats["acm_closing_reasons"][acm] = {}
                     stats["acm_closing_reasons"][acm][closing_reason] = stats["acm_closing_reasons"][acm].get(closing_reason, 0) + 1
 
-    # Sorting Operations for Top-Performance Metrics
+    # Sorting Operations
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
