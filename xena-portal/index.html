@@ -232,11 +232,15 @@
         document.getElementById('mainApp').style.display = 'block';
         document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
         
-        // 🔒 SECURITY CHECK TO SHOW TAB
-        fetch(`/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}`)
-            .then(res => {
-                if(res.ok) document.getElementById('optAnalytics').style.display = 'block';
-            }).catch(e => console.log("Not an admin. Analytics hidden."));
+        // 🔒 FAST SECURITY CHECK TO SHOW/HIDE ANALYTICS TAB
+        fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.isAdmin) {
+                    document.getElementById('optAnalytics').style.display = 'block';
+                }
+            })
+            .catch(e => console.log("Auth verification failed or not an admin."));
         
         updateAcmDropdown();
         setDatePresets(); 
@@ -331,7 +335,14 @@
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const response = await fetch(url);
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error);
+            
+            if (!response.ok) {
+                // EXPOSE EXACT ERROR (e.g., mismatched column names)
+                const errorMsg = data.sample_fields 
+                    ? `Data mismatch. Expected specific columns but Feishu returned: ${data.sample_fields.join(", ")}` 
+                    : data.error;
+                throw new Error(errorMsg);
+            }
             
             document.getElementById('kpiCreations').innerText = data.kpis.creations;
             document.getElementById('kpiBds').innerText = data.kpis.bds;
