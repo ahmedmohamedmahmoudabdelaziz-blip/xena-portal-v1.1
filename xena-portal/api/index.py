@@ -8,7 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# --- CONFIGURATION ---
+# --- SECURE CONFIGURATION ---
 APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
@@ -19,10 +19,11 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
-    return requests.post(url, json=payload).json().get("tenant_access_token")
+    response = requests.post(url, json=payload).json()
+    return response.get("tenant_access_token")
 
+# --- AGGRESSIVE DATA EXTRACTOR ---
 def extract_field_text(field_data):
-    """Robust extractor designed to handle single-select, person arrays, and text objects."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
@@ -42,6 +43,7 @@ def extract_field_text(field_data):
         return " ".join(texts).strip()
     return str(field_data)
 
+# --- SAFE DATE PARSER ---
 def parse_feishu_date(date_val):
     if not date_val: return None
     if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
@@ -100,7 +102,7 @@ def search_agency():
     
     points_response = requests.post(points_url, headers=headers, json=points_payload).json()
     if points_response.get("code") != 0:
-        return jsonify({"error": "Feishu API error or unauthorized access configuration."}), 403
+        return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
 
     items = points_response.get('data', {}).get('items', [])
     if not items:
@@ -125,22 +127,17 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 MASTERPIECE ANALYTICS DASHBOARD ENGINE ---
+# --- 📊 SECURITY-BACKED ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
-    username = request.args.get('user', '').lower()
     uat = request.args.get('uat', '')
-    
     if not uat:
         return jsonify({"error": "Unauthorized session. Please log in again."}), 401
 
-    admin_users = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
-    if not any(admin in username for admin in admin_users):
-        return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
-
+    # SECURE USER TOKEN: This forces Feishu to naturally restrict the data!
     headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
 
-    # Capture incoming dynamic filter states
+    # Extract UI Filters
     region_filter = request.args.get('region', 'ALL').strip().upper()
     acm_filter = request.args.get('acm', 'All').strip().lower()
     type_filter = request.args.get('type', 'All').strip().lower()
@@ -150,7 +147,7 @@ def get_analytics():
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
-    # Pagination data processing engine
+    # Fetch Data from Feishu (Up to 2000 rows)
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     all_items = []
     page_token = ""
@@ -161,58 +158,64 @@ def get_analytics():
             res = requests.post(req_url, headers=headers, json=payload, timeout=10).json()
             if res.get("code") != 0: 
                 return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
+                
             all_items.extend(res.get('data', {}).get('items', []))
             page_token = res.get('data', {}).get('page_token')
             if not res.get('data', {}).get('has_more'): break
         except Exception as e:
-            return jsonify({"error": f"Server processing bottleneck: {str(e)}"}), 500
+            return jsonify({"error": f"Server Error: {str(e)}"}), 500
 
-    # Initialization of precise chart structures observed in metrics configurations
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "bd_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "reject_reasons": {},
-        "closing_reasons_pie": {},
-        "acm_closing_reasons": {}, 
         "acm_performance": {}, 
         "creation_types": {},
         "agency_types": {}, 
         "other_apps": {}, 
-        "daily_trend": {}
+        "reject_reasons": {}, 
+        "closing_reasons_pie": {},
+        "acm_closing_reasons": {}, 
+        "daily_trend": {},
+        "scanned_rows": len(all_items)
     }
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Execution of Date Constraint Checks
+        # 1. Date Filtering
         record_dt = parse_feishu_date(fields.get("Submitted on"))
         if record_dt:
             if from_dt and record_dt.date() < from_dt.date(): continue
             if to_dt and record_dt.date() > to_dt.date(): continue
 
-        # 2. Variable Extraction via Explicit Column Schemas
+        # 2. Extract EXACT column names from the Video
         req_type = extract_field_text(fields.get('Request Type')).strip()
-        status = extract_field_text(fields.get('Status', fields.get('Request Status', ''))).strip()
+        status = extract_field_text(fields.get('Status')).strip()
+        region = extract_field_text(fields.get('Region')).strip().upper()
+        
+        # Cross-Regional ACM Mapping
+        acm_pk = extract_field_text(fields.get('Acm Name (PK)')).strip()
+        acm_in = extract_field_text(fields.get('Acm Name (IN)')).strip()
+        acm = acm_in if region == "IN" else acm_pk
+        
         agency_type = extract_field_text(fields.get('Agency Type')).strip()
         creation_type = extract_field_text(fields.get('Create Way')).strip()
-        region = extract_field_text(fields.get('Region')).strip().upper()
         reject_reason = extract_field_text(fields.get('Reject Reason')).strip()
         closing_reason = extract_field_text(fields.get('Closing Reason')).strip()
         other_app = extract_field_text(fields.get('Otherapp Name')).strip()
 
-        # Dynamic cross-regional check for proper ACM allocation arrays
-        acm_pk = extract_field_text(fields.get('Acm Name (PK)')).strip()
-        acm_in = extract_field_text(fields.get('Acm Name (IN)')).strip()
-        acm = acm_in if region == "IN" else acm_pk
-
-        # 3. Dynamic Global Filter Validation Engine
-        if region_filter not in ['ALL', ''] and region != region_filter: continue
+        # 3. Apply Dropdown Filters
+        if region_filter not in ['ALL', ''] and region_filter != region: continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
         if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
 
-        # 4. Metric Routing and Aggregation Pipeline
+        # 4. Populate Charts
+        if "Done" in status and record_dt:
+            date_str = record_dt.strftime("%Y-%m-%d")
+            stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
+
         if "Agency Creation" in req_type:
             stats["kpis"]["creations"] += 1
             if "Done" in status: stats["creation_status"]["Done"] += 1
@@ -225,7 +228,7 @@ def get_analytics():
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
-            if "Done" in status and agency_type:
+            if agency_type:
                 stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
             if "Rejected" in status and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
@@ -246,18 +249,10 @@ def get_analytics():
                 stats["closing_reasons_pie"][closing_reason] = stats["closing_reasons_pie"].get(closing_reason, 0) + 1
                 if acm:
                     if acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][acm] = {"User Request": 0, "Duplicated Hosting": 0}
-                    if "User Request" in closing_reason:
-                        stats["acm_closing_reasons"][acm]["User Request"] += 1
-                    elif "Duplicated" in closing_reason:
-                        stats["acm_closing_reasons"][acm]["Duplicated Hosting"] += 1
+                        stats["acm_closing_reasons"][acm] = {}
+                    stats["acm_closing_reasons"][acm][closing_reason] = stats["acm_closing_reasons"][acm].get(closing_reason, 0) + 1
 
-        # Real-time parsing for curved graph trend tracking
-        if "Done" in status and record_dt:
-            date_str = record_dt.strftime("%Y-%m-%d")
-            stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
-
-    # Sorting Operations for Top-Performance Metrics
+    # Clean Sorting for beautiful graphs
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
