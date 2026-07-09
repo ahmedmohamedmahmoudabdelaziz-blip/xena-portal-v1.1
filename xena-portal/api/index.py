@@ -8,7 +8,6 @@ from datetime import datetime
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# --- SECURE CONFIGURATION ---
 APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
@@ -16,11 +15,9 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
-# 🔒 SECURE ADMIN VAULT
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
-    """Return field value by case-insensitive and space-insensitive key."""
     if not fields: return None
     for name in names:
         name_clean = name.strip().lower()
@@ -58,7 +55,6 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Safely parse Feishu dates, handling BOTH dashes and slashes."""
     if not date_val: return None
     if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
     if isinstance(date_val, list) and len(date_val) > 0:
@@ -67,7 +63,6 @@ def parse_feishu_date(date_val):
     if isinstance(date_val, str):
         if date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
         try: 
-            # FIX: Convert Feishu "2026/07/09" to standard "2026-07-09"
             clean_str = date_val[:10].replace('/', '-')
             return datetime.strptime(clean_str, "%Y-%m-%d")
         except ValueError: pass
@@ -186,14 +181,7 @@ def get_analytics():
         except Exception as e:
             return jsonify({"error": f"Server processing error: {str(e)}"}), 500
 
-    if not all_items:
-        # Debug fallback to see what columns Feishu is returning if empty
-        list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records?page_size=1"
-        list_resp = requests.get(list_url, headers=headers).json()
-        if list_resp.get("code") == 0 and list_resp.get("data", {}).get("items"):
-            sample_fields = list_resp["data"]["items"][0].get("fields", {})
-            return jsonify({"error": "No records found.", "sample_fields": list(sample_fields.keys())}), 404
-        return jsonify({"error": "No records found in the table."}), 404
+    print(f"--- VERCEL DIAGNOSTICS: FETCHED {len(all_items)} ROWS ---")
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -205,15 +193,27 @@ def get_analytics():
         "other_apps": {}, "daily_trend": {}
     }
 
+    dropped_date = 0
+    dropped_region = 0
+    dropped_acm = 0
+    dropped_type = 0
+    processed = 0
+
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Filtering (Fixed to prevent dropping records)
+        # 1. Date Filtering
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on'))
         if from_dt or to_dt:
-            if not record_dt: continue
-            if from_dt and record_dt.date() < from_dt.date(): continue
-            if to_dt and record_dt.date() > to_dt.date(): continue
+            if not record_dt: 
+                dropped_date += 1
+                continue
+            if from_dt and record_dt.date() < from_dt.date(): 
+                dropped_date += 1
+                continue
+            if to_dt and record_dt.date() > to_dt.date(): 
+                dropped_date += 1
+                continue
 
         # 2. Field Extraction 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
@@ -232,9 +232,17 @@ def get_analytics():
         acm = acm.title()
 
         # 3. Dynamic Filtering
-        if region_filter not in ['ALL', ''] and region != region_filter: continue
-        if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
-        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
+        if region_filter not in ['ALL', ''] and region != region_filter: 
+            dropped_region += 1
+            continue
+        if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): 
+            dropped_acm += 1
+            continue
+        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): 
+            dropped_type += 1
+            continue
+
+        processed += 1
 
         # 4. Routing
         if "done" in status and record_dt:
@@ -277,7 +285,8 @@ def get_analytics():
                         stats["acm_closing_reasons"][acm] = {}
                     stats["acm_closing_reasons"][acm][closing_reason] = stats["acm_closing_reasons"][acm].get(closing_reason, 0) + 1
 
-    # Sorting
+    print(f"--- VERCEL RESULTS: Dropped Date: {dropped_date}, Region: {dropped_region}, ACM: {dropped_acm}, Type: {dropped_type}. PROCESSED: {processed} ---")
+
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
