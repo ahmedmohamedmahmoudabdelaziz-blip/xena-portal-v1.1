@@ -93,7 +93,7 @@
             <select id="queryType" onchange="toggleViewModes()">
                 <option value="target">Agency Target Privilege</option>
                 <option value="points">Agency Points System</option>
-                <option value="analytics" id="optAnalytics" style="color:#00e676; font-weight:bold;">📊 Agency Data Analyses</option>
+                <option value="analytics" id="optAnalytics" style="display:none; color:#00e676; font-weight:bold;">📊 Agency Data Analyses</option>
             </select>
         </div>
         
@@ -208,7 +208,6 @@
     let loggedUat = localStorage.getItem('xenaUat');
     let charts = {}; 
 
-    // Exact spellings from the video frames
     const pkAcms = ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
     const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
@@ -232,6 +231,12 @@
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         document.getElementById('welcomeText').innerText = `Logged in as: ${loggedUser}`;
+        
+        // 🔒 SECURITY CHECK TO SHOW TAB
+        fetch(`/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}`)
+            .then(res => {
+                if(res.ok) document.getElementById('optAnalytics').style.display = 'block';
+            }).catch(e => console.log("Not an admin. Analytics hidden."));
         
         updateAcmDropdown();
         setDatePresets(); 
@@ -323,7 +328,7 @@
         const toDate = document.getElementById('anaTo').value;
 
         try {
-            const url = `/api/analytics?uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
+            const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const response = await fetch(url);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error);
@@ -362,7 +367,6 @@
         buildPie('cCreationType', data.creation_types);
         buildPie('cType', data.agency_types);
 
-        // Dynamic Grouped Bar Chart (Finds all distinct reasons automatically)
         const acmsWithClosings = Object.keys(data.acm_closing_reasons);
         if(acmsWithClosings.length > 0) {
             const allReasons = Object.keys(data.closing_reasons_pie);
@@ -415,7 +419,6 @@
         }
     }
 
-    // --- STANDARD SEARCH ENGINE ---
     async function fetchAgencyData() {
         const agencyCode = document.getElementById('agencyCode').value.trim();
         if (!agencyCode) return;
