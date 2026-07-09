@@ -19,14 +19,14 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 # 🔒 SECURE ADMIN VAULT
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# --- ADVANCED HELPER: Case & Space Insensitive Field Lookup ---
-def get_field(fields, name):
-    """Return field value ignoring case and invisible trailing spaces."""
+def get_field(fields, *names):
+    """Return field value by case-insensitive and space-insensitive key."""
     if not fields: return None
-    name_clean = name.strip().lower()
-    for key in fields:
-        if key.strip().lower() == name_clean:
-            return fields[key]
+    for name in names:
+        name_clean = name.strip().lower()
+        for key in fields:
+            if key.strip().lower() == name_clean:
+                return fields[key]
     return None
 
 def get_tenant_access_token():
@@ -58,6 +58,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
+    """Safely parse Feishu dates, handling BOTH dashes and slashes."""
     if not date_val: return None
     if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
     if isinstance(date_val, list) and len(date_val) > 0:
@@ -65,7 +66,10 @@ def parse_feishu_date(date_val):
     if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
     if isinstance(date_val, str):
         if date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
-        try: return datetime.strptime(date_val[:10], "%Y-%m-%d")
+        try: 
+            # FIX: Convert Feishu "2026/07/09" to standard "2026-07-09"
+            clean_str = date_val[:10].replace('/', '-')
+            return datetime.strptime(clean_str, "%Y-%m-%d")
         except ValueError: pass
     return None
 
@@ -101,7 +105,6 @@ def callback():
     safe_name = urllib.parse.quote(lark_name)
     return redirect(f"/?user={safe_name}&uat={user_access_token}")
 
-# --- FAST ADMIN CHECKER ---
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
     username = request.args.get('user', '').lower()
@@ -146,7 +149,6 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 MASTERPIECE ANALYTICS DASHBOARD ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -176,13 +178,22 @@ def get_analytics():
         if page_token: payload["page_token"] = page_token
         try:
             res = requests.post(req_url, headers=headers, json=payload, timeout=10).json()
-            if res.get("code") != 0: 
+            if res.get("code") != 0:
                 return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
             all_items.extend(res.get('data', {}).get('items', []))
             page_token = res.get('data', {}).get('page_token')
             if not res.get('data', {}).get('has_more'): break
         except Exception as e:
             return jsonify({"error": f"Server processing error: {str(e)}"}), 500
+
+    if not all_items:
+        # Debug fallback to see what columns Feishu is returning if empty
+        list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records?page_size=1"
+        list_resp = requests.get(list_url, headers=headers).json()
+        if list_resp.get("code") == 0 and list_resp.get("data", {}).get("items"):
+            sample_fields = list_resp["data"]["items"][0].get("fields", {})
+            return jsonify({"error": "No records found.", "sample_fields": list(sample_fields.keys())}), 404
+        return jsonify({"error": "No records found in the table."}), 404
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -191,77 +202,72 @@ def get_analytics():
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "reject_reasons": {}, "closing_reasons_pie": {}, "acm_closing_reasons": {}, 
         "acm_performance": {}, "creation_types": {}, "agency_types": {}, 
-        "other_apps": {}, "daily_trend": {},
-        "scanned_rows": len(all_items),
-        # DEBUG FALLBACK: Returns exact column names from your first row
-        "debug_keys": list(all_items[0].get('fields', {}).keys()) if all_items else []
+        "other_apps": {}, "daily_trend": {}
     }
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Filtering
+        # 1. Date Filtering (Fixed to prevent dropping records)
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on'))
-        if record_dt:
+        if from_dt or to_dt:
+            if not record_dt: continue
             if from_dt and record_dt.date() < from_dt.date(): continue
             if to_dt and record_dt.date() > to_dt.date(): continue
 
-        # 2. Extract values with case-insensitive robust lookups
+        # 2. Field Extraction 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
-        status = extract_field_text(get_field(fields, 'Status') or get_field(fields, 'Request Status')).strip()
-        status_low = status.lower()
-        
+        status = extract_field_text(get_field(fields, 'Status', 'Request Status')).strip().lower()
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
-        creation_type = extract_field_text(get_field(fields, 'Create Way') or get_field(fields, 'Creation Type')).strip()
+        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Creation Type')).strip()
         region = extract_field_text(get_field(fields, 'Region')).strip().upper()
-        reject_reason = extract_field_text(get_field(fields, 'Reject Reason') or get_field(fields, 'Rejection Reason')).strip()
-        closing_reason = extract_field_text(get_field(fields, 'Closing Reason') or get_field(fields, 'Closing Agencies Reason')).strip()
+        reject_reason = extract_field_text(get_field(fields, 'Reject Reason', 'Rejection Reason')).strip()
+        closing_reason = extract_field_text(get_field(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
-        # Dynamic cross-regional check for proper ACM allocation
         acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
         acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
         acm = acm_in if region == "IN" else acm_pk
-        if not acm: acm = extract_field_text(get_field(fields, 'Acm') or get_field(fields, 'Assigned Member')).strip()
+        if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
         acm = acm.title()
 
-        # 3. Dynamic Global Filter Validation
+        # 3. Dynamic Filtering
         if region_filter not in ['ALL', ''] and region != region_filter: continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
         if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
 
-        # 4. Metric Routing and Aggregation Pipeline
-        if "done" in status_low and record_dt:
+        # 4. Routing
+        if "done" in status and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
         if "agency creation" in req_type:
             stats["kpis"]["creations"] += 1
-            if "done" in status_low: stats["creation_status"]["Done"] += 1
-            elif "rejected" in status_low: stats["creation_status"]["Rejected"] += 1
+            if "done" in status: stats["creation_status"]["Done"] += 1
+            elif "rejected" in status: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
             
-            if "done" in status_low and acm:
+            if "done" in status and acm:
                 stats["acm_performance"][acm] = stats["acm_performance"].get(acm, 0) + 1
-            if "done" in status_low and other_app:
+            if "done" in status and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
-            if "done" in status_low and agency_type:
+            if agency_type:
                 stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
-            if "rejected" in status_low and reject_reason:
+            if "rejected" in status and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
         elif "bd creation" in req_type:
             stats["kpis"]["bds"] += 1
-            if "done" in status_low: stats["bd_status"]["Done"] += 1
-            elif "rejected" in status_low: stats["bd_status"]["Rejected"] += 1
+            if "done" in status: stats["bd_status"]["Done"] += 1
+            elif "rejected" in status: stats["bd_status"]["Rejected"] += 1
             else: stats["bd_status"]["Under Investigation"] += 1
 
         elif "closing agency" in req_type:
             stats["kpis"]["closings"] += 1
-            if "done" in status_low: stats["closing_status"]["Done"] += 1
-            elif "rejected" in status_low: stats["closing_status"]["Rejected"] += 1
+            if "done" in status: stats["closing_status"]["Done"] += 1
+            elif "rejected" in status: stats["closing_status"]["Rejected"] += 1
             else: stats["closing_status"]["Under Investigation"] += 1
             
             if closing_reason:
@@ -271,7 +277,7 @@ def get_analytics():
                         stats["acm_closing_reasons"][acm] = {}
                     stats["acm_closing_reasons"][acm][closing_reason] = stats["acm_closing_reasons"][acm].get(closing_reason, 0) + 1
 
-    # Sorting Operations
+    # Sorting
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
