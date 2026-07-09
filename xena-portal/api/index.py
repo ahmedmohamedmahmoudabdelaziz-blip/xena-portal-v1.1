@@ -8,6 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# --- SECURE CONFIGURATION ---
 APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
@@ -15,6 +16,7 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
+# 🔒 SECURE ADMIN VAULT
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
@@ -55,17 +57,23 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
+    """Bulletproof date parser for all Feishu formats."""
     if not date_val: return None
-    if isinstance(date_val, dict) and 'value' in date_val: date_val = date_val['value']
-    if isinstance(date_val, list) and len(date_val) > 0:
-        if isinstance(date_val[0], dict) and 'text' in date_val[0]: date_val = date_val[0]['text']
+    
+    if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
+    if isinstance(date_val, str) and date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
+    
+    if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
+    if isinstance(date_val, dict): date_val = date_val.get('text', date_val.get('value', ''))
+    
     if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
     if isinstance(date_val, str):
         if date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
-        try: 
+        try:
+            # Replaces slashes with dashes universally
             clean_str = date_val[:10].replace('/', '-')
             return datetime.strptime(clean_str, "%Y-%m-%d")
-        except ValueError: pass
+        except Exception: pass
     return None
 
 @app.route('/', methods=['GET'])
@@ -113,17 +121,17 @@ def search_agency():
     if not uat: return jsonify({"error": "Unauthorized session."}), 401
     if not agency_code: return jsonify({"error": "No agency code provided"}), 400
 
-    headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
+    # NOW USING TENANT TOKEN SINCE APP IS APPROVED
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
     
     points_response = requests.post(points_url, headers=headers, json=points_payload).json()
-    if points_response.get("code") != 0:
-        return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
+    if points_response.get("code") != 0: return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
 
     items = points_response.get('data', {}).get('items', [])
-    if not items:
-        return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
+    if not items: return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
 
     fields = items[0].get('fields', {})
     sheet_acm_name = extract_field_text(get_field(fields, 'Acm')).strip()
@@ -149,12 +157,12 @@ def get_analytics():
     username = request.args.get('user', '').lower()
     uat = request.args.get('uat', '')
     
-    if not uat:
-        return jsonify({"error": "Unauthorized session. Please log in again."}), 401
-    if not any(admin in username for admin in ADMIN_USERS):
-        return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
+    if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
+    if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
-    headers = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
+    # NOW USING TENANT TOKEN SINCE APP IS APPROVED
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     region_filter = request.args.get('region', 'ALL').strip().upper()
     acm_filter = request.args.get('acm', 'All').strip().lower()
@@ -173,15 +181,12 @@ def get_analytics():
         if page_token: payload["page_token"] = page_token
         try:
             res = requests.post(req_url, headers=headers, json=payload, timeout=10).json()
-            if res.get("code") != 0:
-                return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
+            if res.get("code") != 0: return jsonify({"error": f"Feishu API Error: {res.get('msg')} (Code {res.get('code')})"}), 400
             all_items.extend(res.get('data', {}).get('items', []))
             page_token = res.get('data', {}).get('page_token')
             if not res.get('data', {}).get('has_more'): break
         except Exception as e:
             return jsonify({"error": f"Server processing error: {str(e)}"}), 500
-
-    print(f"--- VERCEL DIAGNOSTICS: FETCHED {len(all_items)} ROWS ---")
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -193,6 +198,7 @@ def get_analytics():
         "other_apps": {}, "daily_trend": {}
     }
 
+    # THE X-RAY TRACKER
     dropped_date = 0
     dropped_region = 0
     dropped_acm = 0
@@ -215,7 +221,7 @@ def get_analytics():
                 dropped_date += 1
                 continue
 
-        # 2. Field Extraction 
+        # 2. Extract Values 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         status = extract_field_text(get_field(fields, 'Status', 'Request Status')).strip().lower()
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
@@ -231,7 +237,7 @@ def get_analytics():
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
         acm = acm.title()
 
-        # 3. Dynamic Filtering
+        # 3. Dynamic Filter Tracking
         if region_filter not in ['ALL', ''] and region != region_filter: 
             dropped_region += 1
             continue
@@ -285,7 +291,15 @@ def get_analytics():
                         stats["acm_closing_reasons"][acm] = {}
                     stats["acm_closing_reasons"][acm][closing_reason] = stats["acm_closing_reasons"][acm].get(closing_reason, 0) + 1
 
-    print(f"--- VERCEL RESULTS: Dropped Date: {dropped_date}, Region: {dropped_region}, ACM: {dropped_acm}, Type: {dropped_type}. PROCESSED: {processed} ---")
+    # Attach the diagnostic debug data
+    stats["debug"] = {
+        "total_fetched": len(all_items),
+        "dropped_date": dropped_date,
+        "dropped_region": dropped_region,
+        "dropped_acm": dropped_acm,
+        "dropped_type": dropped_type,
+        "processed": processed
+    }
 
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
