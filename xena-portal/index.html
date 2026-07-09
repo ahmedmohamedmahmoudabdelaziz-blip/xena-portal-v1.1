@@ -336,12 +336,20 @@
             const response = await fetch(url);
             const data = await response.json();
             
-            if (!response.ok) {
-                const errorMsg = data.sample_fields 
-                    ? `Data mismatch. Expected specific columns but Feishu returned: ${data.sample_fields.join(", ")}` 
-                    : data.error;
-                throw new Error(errorMsg);
+            // X-RAY DIAGNOSTICS HANDLER
+            if (data.debug && data.debug.processed === 0) {
+                throw new Error(`
+                    <strong>⚠️ ZERO DATA FOUND MATCHING FILTERS</strong><br><br>
+                    <strong>The X-Ray Scan Results:</strong><br>
+                    Total Rows Fetched from Feishu: <strong>${data.debug.total_fetched}</strong><br>
+                    ❌ Dropped because of Date Filter: ${data.debug.dropped_date}<br>
+                    ❌ Dropped because of Region Filter: ${data.debug.dropped_region}<br>
+                    ❌ Dropped because of ACM Filter: ${data.debug.dropped_acm}<br>
+                    ❌ Dropped because of Type Filter: ${data.debug.dropped_type}<br><br>
+                    <em>Tip: In the CSV you provided, the data was mostly from April. Try setting the Date Filter to "All Time"!</em>
+                `);
             }
+            if (!response.ok) throw new Error(data.error);
             
             document.getElementById('kpiCreations').innerText = data.kpis.creations;
             document.getElementById('kpiBds').innerText = data.kpis.bds;
@@ -351,8 +359,9 @@
             document.getElementById('analyticsContainer').style.display = 'block';
 
         } catch (err) {
+            document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
-            document.getElementById('error').innerText = err.message;
+            document.getElementById('error').innerHTML = err.message; // Safe HTML inject for the X-Ray message
         }
         document.getElementById('loading').style.display = 'none';
     }
