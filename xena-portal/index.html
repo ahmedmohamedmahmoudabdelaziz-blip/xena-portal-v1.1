@@ -336,7 +336,6 @@
             const response = await fetch(url);
             const data = await response.json();
             
-            // X-RAY DIAGNOSTICS HANDLER
             if (data.debug && data.debug.processed === 0) {
                 throw new Error(`
                     <strong>⚠️ ZERO DATA FOUND MATCHING FILTERS</strong><br><br>
@@ -345,8 +344,7 @@
                     ❌ Dropped because of Date Filter: ${data.debug.dropped_date}<br>
                     ❌ Dropped because of Region Filter: ${data.debug.dropped_region}<br>
                     ❌ Dropped because of ACM Filter: ${data.debug.dropped_acm}<br>
-                    ❌ Dropped because of Type Filter: ${data.debug.dropped_type}<br><br>
-                    <em>Tip: In the CSV you provided, the data was mostly from April. Try setting the Date Filter to "All Time"!</em>
+                    ❌ Dropped because of Type Filter: ${data.debug.dropped_type}
                 `);
             }
             if (!response.ok) throw new Error(data.error);
@@ -361,7 +359,7 @@
         } catch (err) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
-            document.getElementById('error').innerHTML = err.message; // Safe HTML inject for the X-Ray message
+            document.getElementById('error').innerHTML = err.message;
         }
         document.getElementById('loading').style.display = 'none';
     }
