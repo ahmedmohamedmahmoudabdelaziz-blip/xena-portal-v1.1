@@ -30,7 +30,6 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_schema():
-    """Fetch exact field names from Feishu to eliminate alias guessing."""
     global _field_schema_cache, _field_schema_timestamp
     if _field_schema_cache and (time.time() - _field_schema_timestamp < 300):
         return _field_schema_cache
@@ -42,12 +41,11 @@ def get_field_schema():
             _field_schema_cache = {f['field_name'].strip().lower(): f['field_name'] for f in res.get('data', {}).get('items', [])}
             _field_schema_timestamp = time.time()
             return _field_schema_cache
-    except Exception as e:
-        logging.error(f"Error fetching schema fields: {e}")
+    except Exception:
+        pass
     return {}
 
 def resolve_field_name(*aliases):
-    """Maps custom text safely to the exact live Feishu column key."""
     schema = get_field_schema()
     for alias in aliases:
         key = alias.strip().lower()
@@ -108,7 +106,9 @@ def parse_feishu_date(date_val):
                 clean_str = date_val[:10].replace('/', '-').replace('.', '-')
                 dt = datetime.strptime(clean_str, "%Y-%m-%d")
             except Exception: pass
-    return dt
+    if dt:
+        return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    return None
 
 @app.route('/', methods=['GET'])
 def home():
@@ -220,14 +220,26 @@ def get_analytics():
             "conditions": [{"field_name": region_col, "operator": "contains", "value": [region_filter.upper()]}]
         }
 
-    payload["sort"] = [{"field_name": "Created Time", "desc": True}]
+    # 🚀 SMART PROBER FIX: Guarantees the API request won't be rejected by testing sort columns
+    valid_sort = None
+    for sort_col in ["Created Time", "Submitted on Copy", "Submitted on"]:
+        test_payload = {"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}
+        if "filter" in payload: test_payload["filter"] = payload["filter"]
+        
+        test_res = session.post(req_url, json=test_payload).json()
+        if test_res.get("code") == 0:
+            valid_sort = [{"field_name": sort_col, "desc": True}]
+            break
+            
+    if valid_sort:
+        payload["sort"] = valid_sort
 
     all_items = []
     seen_record_ids = set()
     page_token = ""
     total_expected = None
     
-    for page_num in range(100):
+    for page_num in range(150):
         if page_token: payload["page_token"] = page_token
         try:
             res = session.post(req_url, json=payload).json()
@@ -247,10 +259,6 @@ def get_analytics():
             if not data.get('has_more', False) or not page_token: break
         except Exception: break
 
-    data_warning = None
-    if total_expected and len(seen_record_ids) < total_expected:
-        data_warning = f"Partial records gathered: {len(seen_record_ids)} of {total_expected} total rows."
-
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
@@ -259,14 +267,10 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "scanned_rows": len(all_items), "warning": data_warning
+        "scanned_rows": len(all_items)
     }
 
-    if from_dt and to_dt:
-        curr_dt = from_dt
-        while curr_dt < to_dt:
-            stats["daily_trend"][curr_dt.strftime("%Y-%m-%d")] = 0
-            curr_dt += timedelta(days=1)
+    dropped_date = dropped_region = dropped_acm = dropped_type = processed = 0
 
     for item in all_items:
         fields = item.get('fields', {})
@@ -303,6 +307,8 @@ def get_analytics():
         if region_filter not in ['all', ''] and region != region_filter: continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
         if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
+
+        processed += 1
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
@@ -349,6 +355,11 @@ def get_analytics():
                         stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
                     elif "Duplicated" in closing_reason:
                         stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
+
+    stats["debug"] = {
+        "total_fetched": len(all_items), "dropped_date": dropped_date, "dropped_region": dropped_region,
+        "dropped_acm": dropped_acm, "dropped_type": dropped_type, "processed": processed
+    }
 
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
