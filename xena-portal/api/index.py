@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +17,7 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
+# 🔒 SECURE ADMIN VAULT
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
@@ -58,20 +59,24 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Bulletproof date parser handling nested data and slashes (2026/04/30)."""
+    """Bulletproof date parser enforcing CAIRO Timezone (UTC+3)."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
         
-    if isinstance(date_val, (int, float)): return datetime.fromtimestamp(date_val / 1000.0)
-    if isinstance(date_val, str):
-        if date_val.isdigit(): return datetime.fromtimestamp(int(date_val) / 1000.0)
-        try:
-            # Safely convert '2026/04/30' to '2026-04-30'
-            clean_str = date_val[:10].replace('/', '-').replace('.', '-')
-            return datetime.strptime(clean_str, "%Y-%m-%d")
-        except Exception: pass
-    return None
+    dt = None
+    if isinstance(date_val, (int, float)): 
+        dt = datetime.utcfromtimestamp(date_val / 1000.0) + timedelta(hours=3) # Shift to Cairo Time
+    elif isinstance(date_val, str):
+        if date_val.isdigit(): 
+            dt = datetime.utcfromtimestamp(int(date_val) / 1000.0) + timedelta(hours=3) # Shift to Cairo Time
+        else:
+            try:
+                # Safely convert '2026/04/30' to '2026-04-30'
+                clean_str = date_val[:10].replace('/', '-').replace('.', '-')
+                dt = datetime.strptime(clean_str, "%Y-%m-%d")
+            except Exception: pass
+    return dt
 
 @app.route('/', methods=['GET'])
 def home():
@@ -148,7 +153,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 BLAZING FAST ANALYTICS ENGINE WITH REVERSE TIME SORTING ---
+# --- 📊 MASTERPIECE ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -160,7 +165,7 @@ def get_analytics():
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-    region_filter = request.args.get('region', 'ALL').strip().upper()
+    region_filter = request.args.get('region', 'ALL').strip().lower()
     acm_filter = request.args.get('acm', 'All').strip().lower()
     type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '')
@@ -171,9 +176,9 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # 🚀 PRE-FLIGHT SCANNER: Find the exact date column name to sort Newest-First safely
+    # 🚀 PRE-FLIGHT SCANNER: Find valid sort column, fallback to none if missing
     valid_sort = None
-    for sort_col in ["Submitted on", "Submitted on Copy"]:
+    for sort_col in ["Submitted on Copy", "Submitted on", "Created Time"]:
         test_res = requests.post(req_url, headers=headers, json={"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}).json()
         if test_res.get("code") == 0:
             valid_sort = [{"field_name": sort_col, "desc": True}]
@@ -183,22 +188,23 @@ def get_analytics():
     page_token = ""
     start_time = time.time()
     
-    for _ in range(40): # Loops to fetch up to 20,000 rows
-        payload = {"page_size": 500}
+    for _ in range(40): # Cap loop safety
+        # SPEED FIX: Grabbing 1000 rows per request instead of 500
+        payload = {"page_size": 1000} 
         if valid_sort: payload["sort"] = valid_sort
         if page_token: payload["page_token"] = page_token
         
         try:
-            res = requests.post(req_url, headers=headers, json=payload, timeout=8).json()
+            res = requests.post(req_url, headers=headers, json=payload, timeout=9).json()
             if res.get("code") != 0: break
                 
             fetched_items = res.get('data', {}).get('items', [])
             all_items.extend(fetched_items)
             page_token = res.get('data', {}).get('page_token')
             
-            # Anti-Crash safety net: Stop fetching if we approach Vercel's 10-second limit
+            # Anti-Crash safety net: Stop fetching if we approach Vercel's 10-second limit (Slack given to 9.5s)
             if not page_token or not res.get('data', {}).get('has_more'): break
-            if time.time() - start_time > 8.0: break 
+            if time.time() - start_time > 9.5: break 
         except Exception:
             break
 
@@ -221,8 +227,8 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Filtering
-        record_dt = parse_feishu_date(get_field(fields, 'Submitted on', 'Submitted on Copy'))
+        # 1. Date Filtering (With Cairo Timezone Override)
+        record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
         if from_dt or to_dt:
             if not record_dt: 
                 dropped_date += 1
@@ -236,65 +242,75 @@ def get_analytics():
 
         # 2. Extract Values 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
-        status = extract_field_text(get_field(fields, 'Status', 'Request Status')).strip().lower()
-        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
+        
+        # STRICT STATUS FIX: Looks ONLY at 'Status'
+        status = extract_field_text(get_field(fields, 'Status')).strip().lower()
+        
+        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip().lower()
         creation_type = extract_field_text(get_field(fields, 'Create Way', 'Creation Type')).strip()
-        region = extract_field_text(get_field(fields, 'Region')).strip().upper()
+        region = extract_field_text(get_field(fields, 'Region')).strip().lower()
         reject_reason = extract_field_text(get_field(fields, 'Reject Reason', 'Rejection Reason')).strip()
         closing_reason = extract_field_text(get_field(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
+        # Dynamic Status Mapper (Treats "Closed" or "Completed" as "Done")
+        is_done = "done" in status or "closed" in status or "completed" in status
+        is_rejected = "rejected" in status
+
         acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
         acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
-        acm = acm_in if region == "IN" else acm_pk
+        acm = acm_in if region == "in" else acm_pk
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
         acm = acm.title()
 
-        # 3. Dynamic Filter Tracking
-        if region_filter not in ['ALL', ''] and region != region_filter: 
+        # 3. Dynamic Filter Tracking (Robust Case/Space Check)
+        if region_filter not in ['all', ''] and region != region_filter: 
             dropped_region += 1
             continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): 
             dropped_acm += 1
             continue
-        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): 
+        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type: 
             dropped_type += 1
             continue
 
         processed += 1
 
         # 4. Routing
-        if "done" in status and record_dt:
+        if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
-        if "agency creation" in req_type:
+        # FIX: Check if Request Type contains 'agency creation' OR 'agency applied already'
+        if "agency creation" in req_type or "agency applied already" in req_type:
             stats["kpis"]["creations"] += 1
-            if "done" in status: stats["creation_status"]["Done"] += 1
-            elif "rejected" in status: stats["creation_status"]["Rejected"] += 1
+            if is_done: stats["creation_status"]["Done"] += 1
+            elif is_rejected: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
             
-            if "done" in status and acm:
+            if is_done and acm:
                 stats["acm_performance"][acm] = stats["acm_performance"].get(acm, 0) + 1
-            if "done" in status and other_app:
+            if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
             if agency_type:
-                stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
-            if "rejected" in status and reject_reason:
+                # Re-capitalize for beautiful charts
+                clean_type = agency_type.title()
+                stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
+            if is_rejected and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
         elif "bd creation" in req_type:
             stats["kpis"]["bds"] += 1
-            if "done" in status: stats["bd_status"]["Done"] += 1
-            elif "rejected" in status: stats["bd_status"]["Rejected"] += 1
+            if is_done: stats["bd_status"]["Done"] += 1
+            elif is_rejected: stats["bd_status"]["Rejected"] += 1
             else: stats["bd_status"]["Under Investigation"] += 1
 
         elif "closing agency" in req_type:
             stats["kpis"]["closings"] += 1
-            if "done" in status: stats["closing_status"]["Done"] += 1
-            elif "rejected" in status: stats["closing_status"]["Rejected"] += 1
+            if is_done: stats["closing_status"]["Done"] += 1
+            elif is_rejected: stats["closing_status"]["Rejected"] += 1
             else: stats["closing_status"]["Under Investigation"] += 1
             
             if closing_reason:
