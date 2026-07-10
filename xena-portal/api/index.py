@@ -19,7 +19,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# --- CACHE FOR FIELD SCHEMA (Eliminates Alias Guessing) ---
+# --- CACHE FOR FIELD SCHEMA ---
 _field_schema_cache = None
 _field_schema_timestamp = 0
 
@@ -30,28 +30,28 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_schema():
-    """Fetch exact field names from Feishu to map regional prefixes dynamically."""
+    """Fetch exact field names from Feishu to eliminate alias guessing."""
     global _field_schema_cache, _field_schema_timestamp
     if _field_schema_cache and (time.time() - _field_schema_timestamp < 300):
         return _field_schema_cache
-    
-    tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/fields"
-    res = requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
-    
-    if res.get("code") == 0:
-        _field_schema_cache = {f['field_name'].strip().lower(): f['field_name'] for f in res.get('data', {}).get('items', [])}
-        _field_schema_timestamp = time.time()
-        return _field_schema_cache
+    try:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/fields"
+        res = requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
+        if res.get("code") == 0:
+            _field_schema_cache = {f['field_name'].strip().lower(): f['field_name'] for f in res.get('data', {}).get('items', [])}
+            _field_schema_timestamp = time.time()
+            return _field_schema_cache
+    except Exception as e:
+        logging.error(f"Error fetching schema fields: {e}")
     return {}
 
 def resolve_field_name(*aliases):
+    """Maps custom text safely to the exact live Feishu column key."""
     schema = get_field_schema()
-    # 1. Exact match
     for alias in aliases:
         key = alias.strip().lower()
         if key in schema: return schema[key]
-    # 2. Substring match (Catches 'PK Agencies Creation Type')
     for alias in aliases:
         key = alias.strip().lower()
         for k, v in schema.items():
@@ -60,18 +60,14 @@ def resolve_field_name(*aliases):
 
 def get_field(fields, *names):
     if not fields: return None
-    # 1. Direct dict match
     for name in names:
         if name in fields: return fields[name]
-    # 2. Schema resolved match
     exact = resolve_field_name(*names)
     if exact and exact in fields: return fields[exact]
-    # 3. Fuzzy fallback
     for name in names:
         name_clean = name.strip().lower()
         for key in fields:
-            if name_clean in key.strip().lower():
-                return fields[key]
+            if name_clean in key.strip().lower(): return fields[key]
     return None
 
 def extract_field_text(field_data):
@@ -194,12 +190,10 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 BULLETPROOF ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
     uat = request.args.get('uat', '')
-    
     if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
     if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
@@ -218,8 +212,7 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # 🚀 SERVER-SIDE REGION FILTER (Massive Payload Reduction)
-    payload = {"page_size": 500} # Stick to Feishu's absolute safe limit
+    payload = {"page_size": 500}
     if region_filter not in ['all', '']:
         region_col = resolve_field_name("Region") or "Region"
         payload["filter"] = {
@@ -227,26 +220,22 @@ def get_analytics():
             "conditions": [{"field_name": region_col, "operator": "contains", "value": [region_filter.upper()]}]
         }
 
-    # 🚀 GUARANTEED UNIQUE SORTING: Prevents Feishu skipping duplicated dates
     payload["sort"] = [{"field_name": "Created Time", "desc": True}]
 
     all_items = []
     seen_record_ids = set()
     page_token = ""
     total_expected = None
-    api_total = 0
     
     for page_num in range(100):
         if page_token: payload["page_token"] = page_token
-            
         try:
-            res = session.post(req_url, json=payload, timeout=12).json()
+            res = session.post(req_url, json=payload).json()
             if res.get("code") != 0: break
             
             data = res.get('data', {})
             fetched_items = data.get('items', [])
-            api_total = data.get('total', api_total)
-            if total_expected is None: total_expected = api_total
+            if total_expected is None: total_expected = data.get('total')
                 
             for item in fetched_items:
                 record_id = item.get("record_id")
@@ -256,14 +245,11 @@ def get_analytics():
                     
             page_token = data.get('page_token')
             if not data.get('has_more', False) or not page_token: break
-                
-        except Exception as e:
-            logging.error(f"Pagination error: {e}")
-            break
+        except Exception: break
 
     data_warning = None
     if total_expected and len(seen_record_ids) < total_expected:
-        data_warning = f"Partial data loaded: {len(seen_record_ids)} of {total_expected} records. Consider narrowing date range."
+        data_warning = f"Partial records gathered: {len(seen_record_ids)} of {total_expected} total rows."
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -276,26 +262,21 @@ def get_analytics():
         "scanned_rows": len(all_items), "warning": data_warning
     }
 
-    dropped_date = dropped_region = dropped_acm = dropped_type = processed = 0
+    if from_dt and to_dt:
+        curr_dt = from_dt
+        while curr_dt < to_dt:
+            stats["daily_trend"][curr_dt.strftime("%Y-%m-%d")] = 0
+            curr_dt += timedelta(days=1)
 
     for item in all_items:
         fields = item.get('fields', {})
-        
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
+        
         if from_dt or to_dt:
-            if not record_dt:
-                dropped_date += 1
-                continue
-            if from_dt and record_dt < from_dt:
-                dropped_date += 1
-                continue
-            if to_dt and record_dt >= to_dt:
-                dropped_date += 1
-                continue
+            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         
-        # STRICT STATUS
         status_val = fields.get('Status')
         if not status_val:
             for k, v in fields.items():
@@ -304,7 +285,6 @@ def get_analytics():
                     break
         status = extract_field_text(status_val).strip().lower()
 
-        # SCHEMA ASSISTED EXTRACTIONS
         creation_type = extract_field_text(get_field(fields, 'Agencies Creation Type', 'Create Way', 'Creation Type')).strip()
         reject_reason = extract_field_text(get_field(fields, 'Agencies Rejection Reason', 'Agencies Rejection reason', 'Reject Reason', 'Rejection Reason')).strip()
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
@@ -320,17 +300,9 @@ def get_analytics():
         acm = acm_in if region == "in" else acm_pk
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
 
-        if region_filter not in ['all', ''] and region != region_filter:
-            dropped_region += 1
-            continue
-        if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower():
-            dropped_acm += 1
-            continue
-        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower():
-            dropped_type += 1
-            continue
-
-        processed += 1
+        if region_filter not in ['all', ''] and region != region_filter: continue
+        if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
+        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
