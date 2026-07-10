@@ -139,8 +139,8 @@
         </div>
 
         <div id="analyticsParams" style="display:none;">
-            <div class="filter-row">
-                <div class="filter-item">
+            <div class="control-grid">
+                <div class="control-group">
                     <label>Date Filter</label>
                     <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
                         <option value="this_month" selected>Current Month</option>
@@ -196,7 +196,6 @@
             <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
         </div>
-        <!-- FIXED NODE DETECTOR ID APPLIED BELOW -->
         <div class="card" id="privilegeArea">
             <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Available Privilege</h3>
             <div class="control-group" style="max-width: 300px; margin-bottom: 16px;">
@@ -218,7 +217,8 @@
         </div>
     </div>
 
-    <div id="analyticsContainer">
+    <!-- 🚀 UI BLEED FIX: style="display: none;" added so charts don't render on the Target page -->
+    <div id="analyticsContainer" style="display: none;">
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-label">Total Agency Creations</div>
@@ -307,6 +307,9 @@
         
         updateAcmDropdown();
         setDatePresets();
+        
+        // 🚀 Ensure UI blocks are correctly hidden on first load
+        toggleViewModes(); 
     }
 
     function logout() { localStorage.clear(); location.reload(); }
