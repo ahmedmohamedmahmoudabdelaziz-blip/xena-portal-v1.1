@@ -275,6 +275,7 @@
         }
     }
 
+    // FIX: Date math correctly stretches to the very last day of the month/week!
     function setDatePresets() {
         const preset = document.getElementById('anaDatePreset').value;
         const fromInput = document.getElementById('anaFrom');
@@ -291,11 +292,15 @@
 
         if (preset === 'this_month') {
             from = new Date(from.getFullYear(), from.getMonth(), 1);
+            // Perfectly grabs the very last day of the current month
+            to = new Date(from.getFullYear(), from.getMonth() + 1, 0); 
         } else if (preset === 'last_month') {
             from = new Date(from.getFullYear(), from.getMonth() - 1, 1);
             to = new Date(from.getFullYear(), from.getMonth(), 0);
         } else if (preset === 'this_week') {
             from = new Date(from.setDate(diff));
+            to = new Date(from);
+            to.setDate(to.getDate() + 6);
         } else if (preset === 'last_week') {
             from = new Date(from.setDate(diff - 7));
             to = new Date(from.setDate(from.getDate() + 6));
