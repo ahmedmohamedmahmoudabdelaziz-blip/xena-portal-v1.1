@@ -56,7 +56,7 @@
         .chart-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
         .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px; }
 
-        .chart-box { background: #1c1c28; border: 1px solid #33334d; border-radius: 10px; padding: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .chart-box { background: #1c1c28; border: 1px solid #33334d; border-radius: 10px; padding: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative;}
         .chart-box h3 { color: #fff; font-size: 1.1em; margin-top: 0; margin-bottom: 25px; font-weight: 500; }
         
         .chart-wrapper-pie { position: relative; height: 260px; width: 100%; }
@@ -209,12 +209,12 @@
     let loggedUat = localStorage.getItem('xenaUat');
     let charts = {}; 
 
-    const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
+    const pkAcms = ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
     const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
     Chart.defaults.color = '#a1a1b5';
-    Chart.defaults.font.family = "'Segoe UI', Tahoma, sans-serif";
-    const F_COLORS = ['#3370ff', '#f54a45', '#ffb000', '#2196f3', '#8854ff', '#00d2ff', '#ff8a65', '#4db6ac']; 
+    Chart.defaults.font.family = "'Segoe UI', Tahoma, sans-serif';
+    const F_COLORS = ['#3370ff', '#f54a45', '#ffb000', '#2196f3', '#8854ff', '#00d2ff', '#ff8a65', '#4db6ac', '#e91e63', '#ffeb3b', '#9c27b0', '#00bcd4']; 
 
     const urlParams = new URLSearchParams(window.location.search);
     const urlUser = urlParams.get('user');
@@ -272,9 +272,9 @@
         } else {
             fromDiv.style.display = 'none';
             toDiv.style.display = 'none';
-            // CRITICAL FRONTEND FIX: Immediately updates the hidden fields when dropdown changes
-            setDatePresets();
         }
+        // FIX: Auto-update the date inputs the moment a dropdown option is changed
+        if(preset !== 'specific' && preset !== 'all') setDatePresets();
     }
 
     function setDatePresets() {
@@ -373,9 +373,10 @@
         Object.values(charts).forEach(c => c.destroy()); 
         
         const buildPie = (id, dataset) => {
-            // FRONTEND FIX: Handled empty chart data to prevent white blank spaces
+            // UI Fix: Show "No Data" if the dataset is empty
             if(!dataset || Object.keys(dataset).length === 0) {
-                 dataset = {"No Data Found": 1};
+                document.getElementById(id).parentElement.innerHTML = "<div style='text-align:center; padding:20px; color:#666; font-weight:bold;'>No Data Available</div>";
+                return;
             }
             charts[id] = new Chart(document.getElementById(id), {
                 type: 'pie',
@@ -389,7 +390,7 @@
         buildPie('cClosing', data.closing_status);
         buildPie('cReject', data.reject_reasons);
         buildPie('cClosePie', data.closing_reasons_pie);
-        buildPie('cCreationType', data.creation_types);
+        buildPie('cCreationType', data.creation_types); // This will now populate!
         buildPie('cType', data.agency_types);
 
         const acmsWithClosings = Object.keys(data.acm_closing_reasons);
