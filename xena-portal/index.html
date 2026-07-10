@@ -209,7 +209,7 @@
     let loggedUat = localStorage.getItem('xenaUat');
     let charts = {}; 
 
-    const pkAcms = ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
+    const pkAcms = ["Nabeel", "Hasseb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"];
     const inAcms = ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA"];
 
     Chart.defaults.color = '#a1a1b5';
@@ -272,10 +272,11 @@
         } else {
             fromDiv.style.display = 'none';
             toDiv.style.display = 'none';
+            // CRITICAL FRONTEND FIX: Immediately updates the hidden fields when dropdown changes
+            setDatePresets();
         }
     }
 
-    // FIX: Date math correctly stretches to the very last day of the month/week!
     function setDatePresets() {
         const preset = document.getElementById('anaDatePreset').value;
         const fromInput = document.getElementById('anaFrom');
@@ -292,7 +293,6 @@
 
         if (preset === 'this_month') {
             from = new Date(from.getFullYear(), from.getMonth(), 1);
-            // Perfectly grabs the very last day of the current month
             to = new Date(from.getFullYear(), from.getMonth() + 1, 0); 
         } else if (preset === 'last_month') {
             from = new Date(from.getFullYear(), from.getMonth() - 1, 1);
@@ -373,7 +373,10 @@
         Object.values(charts).forEach(c => c.destroy()); 
         
         const buildPie = (id, dataset) => {
-            if(!dataset || Object.keys(dataset).length === 0) return;
+            // FRONTEND FIX: Handled empty chart data to prevent white blank spaces
+            if(!dataset || Object.keys(dataset).length === 0) {
+                 dataset = {"No Data Found": 1};
+            }
             charts[id] = new Chart(document.getElementById(id), {
                 type: 'pie',
                 data: { labels: Object.keys(dataset), datasets: [{ data: Object.values(dataset), backgroundColor: F_COLORS, borderWidth: 0 }] },
