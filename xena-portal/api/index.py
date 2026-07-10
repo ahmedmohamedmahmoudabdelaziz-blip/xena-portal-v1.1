@@ -66,13 +66,12 @@ def parse_feishu_date(date_val):
         
     dt = None
     if isinstance(date_val, (int, float)): 
-        dt = datetime.utcfromtimestamp(date_val / 1000.0) + timedelta(hours=3) # Shift to Cairo Time
+        dt = datetime.utcfromtimestamp(date_val / 1000.0) + timedelta(hours=3)
     elif isinstance(date_val, str):
         if date_val.isdigit(): 
-            dt = datetime.utcfromtimestamp(int(date_val) / 1000.0) + timedelta(hours=3) # Shift to Cairo Time
+            dt = datetime.utcfromtimestamp(int(date_val) / 1000.0) + timedelta(hours=3)
         else:
             try:
-                # Safely convert '2026/04/30' to '2026-04-30'
                 clean_str = date_val[:10].replace('/', '-').replace('.', '-')
                 dt = datetime.strptime(clean_str, "%Y-%m-%d")
             except Exception: pass
@@ -153,7 +152,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 MASTERPIECE ANALYTICS ENGINE ---
+# --- 📊 PRECISION ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -163,7 +162,10 @@ def get_analytics():
     if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
     tat = get_tenant_access_token()
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    # SPEED FIX: Using Session to keep TCP connection alive
+    session = requests.Session()
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
     region_filter = request.args.get('region', 'ALL').strip().lower()
     acm_filter = request.args.get('acm', 'All').strip().lower()
@@ -173,13 +175,16 @@ def get_analytics():
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
+    
+    # FIX: Ensure to_dt covers the absolute end of the target day
+    if to_dt:
+        to_dt = to_dt.replace(hour=23, minute=59, second=59)
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # 🚀 PRE-FLIGHT SCANNER: Find valid sort column, fallback to none if missing
     valid_sort = None
     for sort_col in ["Submitted on Copy", "Submitted on", "Created Time"]:
-        test_res = requests.post(req_url, headers=headers, json={"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}).json()
+        test_res = session.post(req_url, json={"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}).json()
         if test_res.get("code") == 0:
             valid_sort = [{"field_name": sort_col, "desc": True}]
             break
@@ -188,23 +193,21 @@ def get_analytics():
     page_token = ""
     start_time = time.time()
     
-    for _ in range(40): # Cap loop safety
-        # SPEED FIX: Grabbing 1000 rows per request instead of 500
-        payload = {"page_size": 1000} 
+    for _ in range(40): # Loops to fetch maximum available data
+        payload = {"page_size": 1000} # Max pull size to prevent timeouts
         if valid_sort: payload["sort"] = valid_sort
         if page_token: payload["page_token"] = page_token
         
         try:
-            res = requests.post(req_url, headers=headers, json=payload, timeout=9).json()
+            res = session.post(req_url, json=payload, timeout=9).json()
             if res.get("code") != 0: break
                 
             fetched_items = res.get('data', {}).get('items', [])
             all_items.extend(fetched_items)
             page_token = res.get('data', {}).get('page_token')
             
-            # Anti-Crash safety net: Stop fetching if we approach Vercel's 10-second limit (Slack given to 9.5s)
             if not page_token or not res.get('data', {}).get('has_more'): break
-            if time.time() - start_time > 9.5: break 
+            if time.time() - start_time > 9.0: break 
         except Exception:
             break
 
@@ -218,59 +221,58 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {}, "scanned_rows": len(all_items)
     }
 
-    dropped_date = 0
-    dropped_region = 0
-    dropped_acm = 0
-    dropped_type = 0
-    processed = 0
+    dropped_date = dropped_region = dropped_acm = dropped_type = processed = 0
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Date Filtering (With Cairo Timezone Override)
+        # 1. Precise Date Filtering
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
         if from_dt or to_dt:
             if not record_dt: 
                 dropped_date += 1
                 continue
-            if from_dt and record_dt.date() < from_dt.date(): 
+            # Compare mathematically including the end-of-day fix
+            if from_dt and record_dt < from_dt: 
                 dropped_date += 1
                 continue
-            if to_dt and record_dt.date() > to_dt.date(): 
+            if to_dt and record_dt > to_dt: 
                 dropped_date += 1
                 continue
 
         # 2. Extract Values 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         
-        # STRICT STATUS FIX: Looks ONLY at 'Status'
+        # FIX: STRICTLY ONLY LOOK AT 'Status'
         status = extract_field_text(get_field(fields, 'Status')).strip().lower()
         
-        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip().lower()
-        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Creation Type')).strip()
+        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
+        
+        # FIX: Aggressively search for Create Way and Agencies Creation Type
+        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Agencies Creation Type', 'Creation Type')).strip()
+        
         region = extract_field_text(get_field(fields, 'Region')).strip().lower()
         reject_reason = extract_field_text(get_field(fields, 'Reject Reason', 'Rejection Reason')).strip()
         closing_reason = extract_field_text(get_field(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
-        # Dynamic Status Mapper (Treats "Closed" or "Completed" as "Done")
-        is_done = "done" in status or "closed" in status or "completed" in status
+        # Dynamic Status Mapper
+        is_done = "done" in status or "completed" in status or "closed" in status
         is_rejected = "rejected" in status
 
         acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
         acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
         acm = acm_in if region == "in" else acm_pk
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
-        acm = acm.title()
 
-        # 3. Dynamic Filter Tracking (Robust Case/Space Check)
+        # 3. Dynamic Filter Tracking
         if region_filter not in ['all', ''] and region != region_filter: 
             dropped_region += 1
             continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): 
             dropped_acm += 1
             continue
-        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type: 
+        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): 
             dropped_type += 1
             continue
 
@@ -281,8 +283,8 @@ def get_analytics():
             date_str = record_dt.strftime("%Y-%m-%d")
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
-        # FIX: Check if Request Type contains 'agency creation' OR 'agency applied already'
-        if "agency creation" in req_type or "agency applied already" in req_type:
+        # FIX: Includes Follow-up creations exactly as requested
+        if "agency creation" in req_type or "agency applied" in req_type:
             stats["kpis"]["creations"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
@@ -292,12 +294,15 @@ def get_analytics():
                 stats["acm_performance"][acm] = stats["acm_performance"].get(acm, 0) + 1
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
+            
+            # Agencies Creation Type (Audit/Manually)
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
+            
+            # Agency Types (Walkin/ACM Hunting)
             if agency_type:
-                # Re-capitalize for beautiful charts
-                clean_type = agency_type.title()
-                stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
+                stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
+            
             if is_rejected and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
