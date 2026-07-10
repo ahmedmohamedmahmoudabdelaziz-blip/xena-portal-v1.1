@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -226,7 +226,6 @@ def get_analytics():
                     # 🚀 THE SMART BRAKE: If we are looking for July, and Python sees May, instantly kill the loop!
                     if from_dt and valid_sort:
                         record_dt = parse_feishu_date(get_field(item.get('fields', {}), 'Submitted on Copy', 'Submitted on'))
-                        # Buffer of 2 days to account for any weird local timezone shifts
                         if record_dt and record_dt < (from_dt - timedelta(days=2)):
                             stop_paginating = True
                             early_exit_triggered = True
