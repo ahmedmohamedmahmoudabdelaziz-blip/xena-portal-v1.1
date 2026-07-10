@@ -20,18 +20,15 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
-    """Smart lookup for Feishu columns to guarantee charts populate."""
+    """Fuzzy and regional fallback selector to guarantee no blank fields."""
     if not fields: return None
-    # 1. Exact case-sensitive
     for name in names:
         if name in fields: return fields[name]
-    # 2. Exact case-insensitive
     for name in names:
         name_clean = name.strip().lower()
         for key in fields:
             if key.strip().lower() == name_clean:
                 return fields[key]
-    # 3. Substring match (Catches renamed Feishu columns)
     for name in names:
         name_clean = name.strip().lower()
         for key in fields:
@@ -68,7 +65,6 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """PURE Date Parser: Strips all time components. No Timezone issues."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -182,12 +178,12 @@ def get_analytics():
     date_to = request.args.get('to', '')
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # Push Region to Feishu to reduce load
-    payload = {"page_size": 1000}
+    # 🚀 Native Payload Filter
+    payload = {"page_size": 500} # Hard limit constraint fix
     if region_filter not in ['all', '']:
         payload["filter"] = {
             "conjunction": "and",
@@ -196,9 +192,9 @@ def get_analytics():
             ]
         }
 
-    # Find sorting column
+    # Sorting resolution via system timestamp
     valid_sort = None
-    for sort_col in ["Submitted on Copy", "Submitted on", "Created Time"]:
+    for sort_col in ["Created Time", "Submitted on Copy", "Submitted on"]:
         test_payload = {"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}
         if "filter" in payload: test_payload["filter"] = payload["filter"]
         
@@ -214,15 +210,13 @@ def get_analytics():
     seen_record_ids = set()
     page_token = ""
     
-    # 🚀 NO TIME LIMIT: Loops as long as necessary
-    for _ in range(100):
+    for _ in range(150):
         if page_token: payload["page_token"] = page_token
         try:
             res = session.post(req_url, json=payload).json()
             if res.get("code") != 0: break
                 
             fetched_items = res.get('data', {}).get('items', [])
-            
             for item in fetched_items:
                 record_id = item.get("record_id")
                 if record_id and record_id not in seen_record_ids:
@@ -244,18 +238,11 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {}, "scanned_rows": len(all_items)
     }
 
-    if from_dt and to_dt:
-        curr_dt = from_dt
-        while curr_dt <= to_dt:
-            stats["daily_trend"][curr_dt.strftime("%Y-%m-%d")] = 0
-            curr_dt += timedelta(days=1)
-
     dropped_date = dropped_region = dropped_acm = dropped_type = processed = 0
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. PURE DATE FILTERING (No Timezones)
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
         if from_dt or to_dt:
             if not record_dt: 
@@ -264,13 +251,13 @@ def get_analytics():
             if from_dt and record_dt < from_dt: 
                 dropped_date += 1
                 continue
-            if to_dt and record_dt > to_dt: 
+            if to_dt and record_dt >= to_dt: 
                 dropped_date += 1
                 continue
 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         
-        # 🚀 STRICT STATUS FIX: Bypasses "Request Status" completely so Rejections show up!
+        # Exact Column Isolation
         status_val = fields.get('Status')
         if not status_val:
             for k, v in fields.items():
@@ -279,16 +266,15 @@ def get_analytics():
                     break
         status = extract_field_text(status_val).strip().lower()
 
-        # 🚀 CHART POPULATION FIX: Reads from multiple Dashboard Title names
-        creation_type = extract_field_text(get_field(fields, 'Agencies Creation Type', 'Agency Creation Type', 'Create Way', 'Creation Type')).strip() 
-        reject_reason = extract_field_text(get_field(fields, 'Agencies Rejection Reason', 'Agencies Rejection reason', 'Reject Reason', 'Rejection Reason')).strip() 
+        # Regional Prefix Mappings
+        creation_type = extract_field_text(get_field(fields, 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Agencies Creation Type', 'Agency Creation Type', 'Create Way', 'Creation Type')).strip() 
+        reject_reason = extract_field_text(get_field(fields, 'PK Agencies Rejection reason', 'IN Agencies Rejection reason', 'Agencies Rejection Reason', 'Agencies Rejection reason', 'Reject Reason', 'Rejection Reason')).strip() 
+        closing_reason = extract_field_text(get_field(fields, 'PK Closing Agencies Reason', 'IN Closing Agencies Reason', 'Closing Agencies Reason', 'Closing Reason')).strip()
         
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
         region = extract_field_text(get_field(fields, 'Region')).strip().lower()
-        closing_reason = extract_field_text(get_field(fields, 'Closing Agencies Reason', 'Closing Reason')).strip() 
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
-        # 🚀 DONE/REJECT FIX: No longer allows "Closed" to mark things as "Done"
         is_done = "done" in status
         is_rejected = "rejected" in status
 
@@ -315,8 +301,6 @@ def get_analytics():
 
         if "agency creation" in req_type or "agency applied" in req_type:
             stats["kpis"]["creations"] += 1
-            
-            # Now counts accurately!
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
