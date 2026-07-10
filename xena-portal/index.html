@@ -36,6 +36,9 @@
         .page-header h1 { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
         .page-header p { color: var(--text-muted); font-size: 1.05rem; }
         
+        /* THE BIG UI FIX: Centered box for Target Search */
+        .centered-search-box { max-width: 450px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+        
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); transition: border-color 0.2s; margin-bottom: 24px; }
         .card:hover { border-color: var(--border-hover); }
         
@@ -73,7 +76,6 @@
         .chart-wrapper-bar { position: relative; height: 320px; }
         
         .toast { padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: 500; display: none; align-items: center; gap: 10px; }
-        .toast-warning { background: rgba(255,184,0,0.1); border: 1px solid rgba(255,184,0,0.3); color: var(--accent-amber); }
         .toast-error { background: rgba(255,77,109,0.1); border: 1px solid rgba(255,77,109,0.3); color: var(--accent-rose); }
         
         .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.8); backdrop-filter: blur(4px); z-index: 500; justify-content: center; align-items: center; flex-direction: column; gap: 16px; }
@@ -117,7 +119,8 @@
     </div>
 
     <div class="card">
-        <div class="control-grid" style="max-width: 300px; margin-bottom: 16px;">
+        <!-- Centered Dropdown Tracker -->
+        <div class="centered-search-box" style="margin-bottom: 16px;">
             <div class="control-group">
                 <label>Inquiry Type</label>
                 <select id="queryType" onchange="toggleViewModes()">
@@ -128,14 +131,13 @@
             </div>
         </div>
 
-        <div id="standardSearchParams">
-            <div class="control-grid">
-                <div class="control-group" style="max-width: 300px;">
-                    <label>Agency Code</label>
-                    <input type="text" id="agencyCode" placeholder="e.g., 40775">
-                </div>
+        <!-- 🚀 UI FIX: Now perfectly mid-sized and centered -->
+        <div id="standardSearchParams" class="centered-search-box">
+            <div class="control-group">
+                <label>Agency Code</label>
+                <input type="text" id="agencyCode" placeholder="e.g., 40775">
             </div>
-            <button class="btn btn-primary" style="max-width: 300px;" onclick="fetchAgencyData()">Search Current Month</button>
+            <button class="btn btn-primary" onclick="fetchAgencyData()">Search Current Month</button>
         </div>
 
         <div id="analyticsParams" style="display:none;">
@@ -187,7 +189,6 @@
         </div>
     </div>
 
-    <div id="warningToast" class="toast toast-warning"></div>
     <div id="errorToast" class="toast toast-error"></div>
 
     <div id="resultsContainer" style="display: none;">
@@ -217,7 +218,7 @@
         </div>
     </div>
 
-    <!-- 🚀 UI BLEED FIX: style="display: none;" added so charts don't render on the Target page -->
+    <!-- 🚀 UI BLEED FIX: Container is mathematically hidden when swapped back -->
     <div id="analyticsContainer" style="display: none;">
         <div class="kpi-grid">
             <div class="kpi-card">
@@ -308,8 +309,8 @@
         updateAcmDropdown();
         setDatePresets();
         
-        // 🚀 Ensure UI blocks are correctly hidden on first load
-        toggleViewModes(); 
+        // 🚀 Initialize view correctly on page load
+        toggleViewModes();
     }
 
     function logout() { localStorage.clear(); location.reload(); }
@@ -323,10 +324,11 @@
 
     function toggleViewModes() {
         const isAna = document.getElementById('queryType').value === 'analytics';
-        document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'block';
+        // Display flex is used here to keep it centered inside the wrapper!
+        document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex'; 
         document.getElementById('resultsContainer').style.display = 'none';
         document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
-        document.getElementById('analyticsContainer').style.display = 'none';
+        document.getElementById('analyticsContainer').style.display = 'none'; // 🚀 GUARANTEES CHARTS ARE HIDDEN!
     }
 
     function updateCustomDateVisibility() {
@@ -380,7 +382,6 @@
     async function generateAnalytics() {
         setDatePresets();
         document.getElementById('errorToast').style.display = 'none';
-        document.getElementById('warningToast').style.display = 'none';
         document.getElementById('loadingOverlay').style.display = 'flex';
         document.getElementById('analyticsContainer').style.display = 'none';
 
@@ -396,12 +397,6 @@
             const data = await res.json();
             
             if (!res.ok) throw new Error(data.error || 'Unknown error');
-            
-            if (data.warning) {
-                const w = document.getElementById('warningToast');
-                w.innerText = '⚠️ ' + data.warning;
-                w.style.display = 'flex';
-            }
             
             document.getElementById('kpiCreations').innerText = data.kpis.creations.toLocaleString();
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
