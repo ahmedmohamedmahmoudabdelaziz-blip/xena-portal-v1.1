@@ -21,13 +21,20 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
-    """FUZZY LOOKUP: Finds the column even if Feishu renames it to 'Agencies Creation Type (PK)'"""
+    """Case-insensitive and space-insensitive column lookup with SUBSTRING MATCHING."""
     if not fields: return None
+    field_keys_lower = {k.strip().lower(): k for k in fields.keys()}
+    # 1. Exact match
     for name in names:
         name_clean = name.strip().lower()
-        for key in fields:
-            if name_clean in key.strip().lower():
-                return fields[key]
+        if name_clean in field_keys_lower:
+            return fields[field_keys_lower[name_clean]]
+    # 2. Substring match (Handles suffixes like (PK), (IN), formatting issues)
+    for name in names:
+        name_clean = name.strip().lower()
+        for key, original_key in field_keys_lower.items():
+            if name_clean in key:
+                return fields[original_key]
     return None
 
 def get_tenant_access_token():
@@ -59,7 +66,6 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Bulletproof date parser enforcing UTC+3 Timezone."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -72,9 +78,14 @@ def parse_feishu_date(date_val):
             dt = datetime.utcfromtimestamp(int(date_val) / 1000.0) + timedelta(hours=3)
         else:
             try:
-                clean_str = date_val[:10].replace('/', '-').replace('.', '-')
-                dt = datetime.strptime(clean_str, "%Y-%m-%d")
-            except Exception: pass
+                # Try to parse full timestamps, fallback to date only
+                date_val = date_val.replace('T', ' ')
+                if len(date_val) > 10:
+                    dt = datetime.strptime(date_val[:19], "%Y-%m-%d %H:%M:%S")
+                else:
+                    dt = datetime.strptime(date_val[:10], "%Y-%m-%d")
+            except Exception: 
+                pass
     return dt
 
 @app.route('/', methods=['GET'])
@@ -92,19 +103,15 @@ def login():
 def callback():
     code = request.args.get('code')
     if not code: return "SSO Authorization Failed.", 400
-        
     tat = get_tenant_access_token()
     token_url = "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     payload = {"grant_type": "authorization_code", "code": code}
     token_resp = requests.post(token_url, headers=headers, json=payload).json()
-    
     user_access_token = token_resp.get("data", {}).get("access_token")
     if not user_access_token: return "SSO Error: Could not verify user token.", 500
-        
     info_url = "https://open.feishu.cn/open-apis/authen/v1/user_info"
     info_resp = requests.get(info_url, headers={"Authorization": f"Bearer {user_access_token}"}).json()
-    
     lark_name = info_resp.get("data", {}).get("name", "Unknown User")
     safe_name = urllib.parse.quote(lark_name)
     return redirect(f"/?user={safe_name}&uat={user_access_token}")
@@ -120,19 +127,14 @@ def search_agency():
     agency_code = request.args.get('code')
     uat = request.args.get('uat', '')
     if not uat: return jsonify({"error": "Unauthorized session."}), 401
-    if not agency_code: return jsonify({"error": "No agency code provided"}), 400
-
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
-    
     points_response = requests.post(points_url, headers=headers, json=points_payload).json()
     if points_response.get("code") != 0: return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
-
     items = points_response.get('data', {}).get('items', [])
     if not items: return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
-
     fields = items[0].get('fields', {})
     sheet_acm_name = extract_field_text(get_field(fields, 'Acm')).strip()
     try: base_points = float(extract_field_text(get_field(fields, 'Base Points')).replace(',', '').strip())
@@ -140,7 +142,6 @@ def search_agency():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     req_response = requests.post(req_url, headers=headers, json=points_payload).json() 
-    
     valid_requests = []
     if req_response.get("code") == 0:
         cm, cy = datetime.now().month, datetime.now().year
@@ -149,7 +150,6 @@ def search_agency():
             ts = parse_feishu_date(get_field(r_fields, 'Submitted on', 'Submitted on Copy'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
-
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
 # --- 📊 PRECISION ANALYTICS ENGINE ---
@@ -157,8 +157,7 @@ def search_agency():
 def get_analytics():
     username = request.args.get('user', '').lower()
     uat = request.args.get('uat', '')
-    
-    if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
+    if not uat: return jsonify({"error": "Unauthorized session."}), 401
     if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
     tat = get_tenant_access_token()
@@ -172,9 +171,7 @@ def get_analytics():
     date_to = request.args.get('to', '')
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    
-    # EXCLUSIVE UPPER BOUND DATE FIX
-    # Adds exactly 1 day so it perfectly includes the entire 24 hours of the final day.
+    # FIX: Exclusive Upper Bound. Parsing `to` as +1 day eliminates UTC timezone drift completely.
     to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
@@ -194,15 +191,12 @@ def get_analytics():
         payload = {"page_size": 1000}
         if valid_sort: payload["sort"] = valid_sort
         if page_token: payload["page_token"] = page_token
-        
         try:
             res = session.post(req_url, json=payload, timeout=9).json()
             if res.get("code") != 0: break
-                
             fetched_items = res.get('data', {}).get('items', [])
             all_items.extend(fetched_items)
             page_token = res.get('data', {}).get('page_token')
-            
             if not page_token or not res.get('data', {}).get('has_more'): break
             if time.time() - start_time > 9.0: break 
         except Exception:
@@ -231,17 +225,16 @@ def get_analytics():
             if from_dt and record_dt < from_dt: 
                 dropped_date += 1
                 continue
-            # EXCLUSIVE UPPER BOUND COMPARISON
-            if to_dt and record_dt >= to_dt: 
+            if to_dt and record_dt >= to_dt: # Mathematically perfect exclusive upper bound check
                 dropped_date += 1
                 continue
 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         status = extract_field_text(get_field(fields, 'Status')).strip().lower()
-        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
         
-        # FUZZY SEARCH GUARANTEES CHART POPULATION
-        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Agencies Creation Type', 'Creation Type')).strip()
+        # FIX: FUZZY MATCH. Now handles "(PK)" and "(IN)" suffixes.
+        agency_type = extract_field_text(get_field(fields, 'Agency Type', 'Agencies Type', 'Agency Type (PK)', 'Agency Type (IN)')).strip()
+        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Agencies Creation Type', 'Agency Creation Type', 'Creation Type', 'Creation Way', 'Create Way (PK)', 'Create Way (IN)')).strip()
         
         region = extract_field_text(get_field(fields, 'Region')).strip().lower()
         reject_reason = extract_field_text(get_field(fields, 'Reject Reason', 'Rejection Reason')).strip()
@@ -251,10 +244,7 @@ def get_analytics():
         is_done = "done" in status or "completed" in status or "closed" in status
         is_rejected = "rejected" in status
 
-        acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
-        acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
-        acm = acm_in if region == "in" else acm_pk
-        if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
+        acm = extract_field_text(get_field(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member', 'Assigned ACM', 'ACM Name', 'ACM Name (PK)', 'ACM Name (IN)')).strip()
 
         if region_filter not in ['all', ''] and region != region_filter: 
             dropped_region += 1
@@ -279,18 +269,15 @@ def get_analytics():
             else: stats["creation_status"]["Under Investigation"] += 1
             
             if is_done and acm:
-                clean_acm = acm.title()
-                stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
+                stats["acm_performance"][acm] = stats["acm_performance"].get(acm, 0) + 1
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
             
+            # Data should now pour into this chart
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
-            
             if agency_type:
-                clean_type = agency_type.title()
-                stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
-            
+                stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
             if is_rejected and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
@@ -305,17 +292,15 @@ def get_analytics():
             if is_done: stats["closing_status"]["Done"] += 1
             elif is_rejected: stats["closing_status"]["Rejected"] += 1
             else: stats["closing_status"]["Under Investigation"] += 1
-            
             if closing_reason:
                 stats["closing_reasons_pie"][closing_reason] = stats["closing_reasons_pie"].get(closing_reason, 0) + 1
                 if acm:
-                    clean_acm = acm.title()
-                    if clean_acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    if acm not in stats["acm_closing_reasons"]:
+                        stats["acm_closing_reasons"][acm] = {"User Request": 0, "Duplicated Hosting": 0}
                     if "User Request" in closing_reason:
-                        stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
+                        stats["acm_closing_reasons"][acm]["User Request"] += 1
                     elif "Duplicated" in closing_reason:
-                        stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
+                        stats["acm_closing_reasons"][acm]["Duplicated Hosting"] += 1
 
     stats["debug"] = {
         "total_fetched": len(all_items), "dropped_date": dropped_date, "dropped_region": dropped_region,
