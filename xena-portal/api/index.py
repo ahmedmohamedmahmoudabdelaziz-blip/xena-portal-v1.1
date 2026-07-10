@@ -90,6 +90,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
+    """THE TIME-TRAP DESTROYER: Forces purely YYYY-MM-DD logic."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -102,9 +103,12 @@ def parse_feishu_date(date_val):
             dt = datetime.fromtimestamp(int(date_val) / 1000.0)
         else:
             try:
-                clean_str = date_val[:10].replace('/', '-').replace('.', '-')
+                # Forces "2026/07/10" AND "2026-07-10 20:09" to become "2026-07-10"
+                clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
                 dt = datetime.strptime(clean_str, "%Y-%m-%d")
             except Exception: pass
+    
+    # Zero out hours, minutes, and seconds so timezone drift is mathematically impossible
     if dt: return dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return None
 
@@ -182,7 +186,9 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy', 'Submitted on'))
+            # Prioritizing the "Copy" text date field to avoid time traps
+            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy'))
+            if not ts: ts = parse_feishu_date(get_field(r_fields, 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
@@ -210,46 +216,27 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # 🚀 NATIVE FEISHU FILTERING: The "Agency Target" Method for Analytics
-    conditions = []
-    
-    # 1. PUSH REGION
+    payload = {"page_size": 500}
     if region_filter not in ['all', '']:
         region_col = resolve_field_name("Region") or "Region"
-        conditions.append({"field_name": region_col, "operator": "contains", "value": [region_filter.upper()]})
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [{"field_name": region_col, "operator": "contains", "value": [region_filter.upper()]}]
+        }
 
-    # 2. PROBE FOR NATIVE DATE FILTERING 
-    date_col = resolve_field_name("Submitted on Copy", "Submitted on", "Created Time") or "Submitted on"
-    date_pushed_successfully = False
-    
-    if from_dt:
-        test_conds = list(conditions)
-        test_conds.append({
-            "field_name": date_col, 
-            "operator": "isGreaterEqual", 
-            "value": [int(from_dt.timestamp() * 1000)] # Feishu expects millisecond epochs
-        })
+    # PROBER: Tests native sorting
+    valid_sort = None
+    for sort_col in ["Created Time", "Submitted on Copy", "Submitted on"]:
+        test_payload = {"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}
+        if "filter" in payload: test_payload["filter"] = payload["filter"]
         
-        test_payload = {"page_size": 1, "filter": {"conjunction": "and", "conditions": test_conds}}
         test_res = session.post(req_url, json=test_payload).json()
-        
-        # If Feishu accepts millisecond mathematical operators on this specific column
         if test_res.get("code") == 0:
-            conditions = test_conds
-            if to_dt:
-                conditions.append({
-                    "field_name": date_col,
-                    "operator": "isLess",
-                    "value": [int(to_dt.timestamp() * 1000)]
-                })
-            date_pushed_successfully = True
-
-    payload = {"page_size": 500}
-    if conditions:
-        payload["filter"] = {"conjunction": "and", "conditions": conditions}
-
-    # 🚀 Guaranteed Unique Sorting
-    payload["sort"] = [{"field_name": "Created Time", "desc": True}]
+            valid_sort = [{"field_name": sort_col, "desc": True}]
+            break
+            
+    if valid_sort:
+        payload["sort"] = valid_sort
 
     all_items = []
     seen_record_ids = set()
@@ -272,9 +259,12 @@ def get_analytics():
                     seen_record_ids.add(record_id)
                     all_items.append(item)
                     
-                    # 🚀 SMART BRAKE: If native date pushing failed, kill loop locally if dates get too old
-                    if not date_pushed_successfully and from_dt:
-                        rec_dt = parse_feishu_date(get_field(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time'))
+                    if from_dt and valid_sort:
+                        rec_fields = item.get('fields', {})
+                        # SMART BRAKE PRIORITIZES 'SUBMITTED ON COPY'
+                        rec_dt = parse_feishu_date(get_field(rec_fields, 'Submitted on Copy'))
+                        if not rec_dt: rec_dt = parse_feishu_date(get_field(rec_fields, 'Created Time', 'Submitted on'))
+                        
                         if rec_dt and rec_dt < (from_dt - timedelta(days=3)):
                             stop_paginating = True
                             
@@ -302,9 +292,15 @@ def get_analytics():
             curr_dt += timedelta(days=1)
             limit += 1
 
+    dropped_date = dropped_region = dropped_acm = dropped_type = processed = 0
+
     for item in all_items:
         fields = item.get('fields', {})
-        record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
+        
+        # 🚀 STRICT DATE PRIORITY LOGIC
+        record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy'))
+        if not record_dt:
+            record_dt = parse_feishu_date(get_field(fields, 'Submitted on', 'Created Time'))
         
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
@@ -337,6 +333,8 @@ def get_analytics():
         if region_filter not in ['all', ''] and region != region_filter: continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
         if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
+
+        processed += 1
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
