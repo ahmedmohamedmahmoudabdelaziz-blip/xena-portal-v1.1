@@ -20,12 +20,13 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
-    """Case-insensitive and space-insensitive column lookup."""
     if not fields: return None
+    for name in names:
+        if name in fields: return fields[name]
     for name in names:
         name_clean = name.strip().lower()
         for key in fields:
-            if name_clean in key.strip().lower():
+            if key.strip().lower() == name_clean:
                 return fields[key]
     return None
 
@@ -132,7 +133,7 @@ def search_agency():
     if not items: return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
 
     fields = items[0].get('fields', {})
-    sheet_acm_name = extract_field_text(get_field(fields, 'Acm')).strip()
+    sheet_acm_name = extract_field_text(get_field(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
     try: base_points = float(extract_field_text(get_field(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
 
@@ -144,13 +145,13 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(get_field(r_fields, 'Submitted on', 'Submitted on Copy'))
+            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy', 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 PRECISION ANALYTICS ENGINE ---
+# --- 📊 ULTIMATE ENTERPRISE ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -163,7 +164,7 @@ def get_analytics():
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
-    region_filter = request.args.get('region', 'ALL').strip().lower()
+    region_filter = request.args.get('region', 'ALL').strip().upper()
     acm_filter = request.args.get('acm', 'All').strip().lower()
     type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '')
@@ -174,21 +175,59 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
+    # 🚀 PRE-FLIGHT PROBER: Test if Feishu accepts Timestamp Filtering on your Date column
     valid_sort = None
+    valid_date_col = None
+    date_filter_works = False
+
     for sort_col in ["Submitted on Copy", "Submitted on", "Created Time"]:
-        test_res = session.post(req_url, json={"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}).json()
+        test_payload = {"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}
+        test_res = session.post(req_url, json=test_payload).json()
         if test_res.get("code") == 0:
+            valid_date_col = sort_col
             valid_sort = [{"field_name": sort_col, "desc": True}]
+            
+            # Test Server-Side Date Filter Capability
+            if from_dt:
+                tf_payload = {
+                    "page_size": 1,
+                    "filter": {
+                        "conjunction": "and",
+                        "conditions": [{"field_name": sort_col, "operator": "isGreaterEqual", "value": [str(int(from_dt.timestamp() * 1000))]}]
+                    }
+                }
+                tf_res = session.post(req_url, json=tf_payload).json()
+                if tf_res.get("code") == 0:
+                    date_filter_works = True
             break
 
+    # 🚀 CONSTRUCT SERVER-SIDE PAYLOAD
+    feishu_conditions = []
+    if region_filter not in ['ALL', '']:
+        feishu_conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter]})
+    
+    # Push Date Boundaries to Feishu (with 3-day buffer to protect Cairo Timezone)
+    if date_filter_works and valid_date_col:
+        if from_dt:
+            loose_from = from_dt - timedelta(days=3) 
+            feishu_conditions.append({"field_name": valid_date_col, "operator": "isGreaterEqual", "value": [str(int(loose_from.timestamp() * 1000))]})
+        if to_dt:
+            loose_to = to_dt + timedelta(days=3)
+            feishu_conditions.append({"field_name": valid_date_col, "operator": "isLessEqual", "value": [str(int(loose_to.timestamp() * 1000))]})
+
+    payload = {"page_size": 1000}
+    if feishu_conditions: payload["filter"] = {"conjunction": "and", "conditions": feishu_conditions}
+    if valid_sort: payload["sort"] = valid_sort
+
     all_items = []
+    seen_record_ids = set()
     page_token = ""
     start_time = time.time()
     timeout_hit = False
+    stop_paginating = False
     
     for _ in range(40):
-        payload = {"page_size": 1000}
-        if valid_sort: payload["sort"] = valid_sort
+        if stop_paginating: break
         if page_token: payload["page_token"] = page_token
         
         try:
@@ -196,11 +235,23 @@ def get_analytics():
             if res.get("code") != 0: break
                 
             fetched_items = res.get('data', {}).get('items', [])
-            all_items.extend(fetched_items)
+            
+            for item in fetched_items:
+                record_id = item.get("record_id")
+                if record_id and record_id not in seen_record_ids:
+                    seen_record_ids.add(record_id)
+                    all_items.append(item)
+                    
+                    # EARLY EXIT BRAKE: If we are sorting Newest to Oldest, stop when dates get too old!
+                    record_dt = parse_feishu_date(get_field(item.get('fields', {}), 'Submitted on Copy', 'Submitted on'))
+                    if record_dt and from_dt and valid_sort:
+                        if record_dt < (from_dt - timedelta(days=4)):
+                            stop_paginating = True
+                            
             page_token = res.get('data', {}).get('page_token')
             
             if not page_token or not res.get('data', {}).get('has_more'): break
-            if time.time() - start_time > 8.8: 
+            if time.time() - start_time > 8.5: 
                 timeout_hit = True
                 break 
         except Exception:
@@ -217,7 +268,6 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {}, "scanned_rows": len(all_items)
     }
 
-    # FIX: PRE-POPULATE CALENDAR DAYS SO CHART ALWAYS STARTS AT DAY 1
     if from_dt and to_dt:
         curr_dt = from_dt
         while curr_dt < to_dt:
@@ -244,10 +294,10 @@ def get_analytics():
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         status = extract_field_text(get_field(fields, 'Status')).strip().lower()
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
-        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Agencies Creation Type', 'Creation Type')).strip()
-        region = extract_field_text(get_field(fields, 'Region')).strip().lower()
-        reject_reason = extract_field_text(get_field(fields, 'Reject Reason', 'Rejection Reason')).strip()
-        closing_reason = extract_field_text(get_field(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
+        creation_type = extract_field_text(get_field(fields, 'Create Way')).strip()
+        region = extract_field_text(get_field(fields, 'Region')).strip().upper()
+        reject_reason = extract_field_text(get_field(fields, 'Reject Reason')).strip()
+        closing_reason = extract_field_text(get_field(fields, 'Closing Reason')).strip()
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
         is_done = "done" in status or "completed" in status or "closed" in status
@@ -255,10 +305,10 @@ def get_analytics():
 
         acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
         acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
-        acm = acm_in if region == "in" else acm_pk
+        acm = acm_in if region == "IN" else acm_pk
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
 
-        if region_filter not in ['all', ''] and region != region_filter: 
+        if region_filter not in ['ALL', ''] and region != region_filter: 
             dropped_region += 1
             continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): 
@@ -272,7 +322,6 @@ def get_analytics():
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
-            # Will add to the pre-populated 0
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
         if "agency creation" in req_type or "agency applied" in req_type:
@@ -286,14 +335,11 @@ def get_analytics():
                 stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
-            
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
-            
             if agency_type:
                 clean_type = agency_type.title()
                 stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
-            
             if is_rejected and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
@@ -321,7 +367,7 @@ def get_analytics():
                         stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
     stats["debug"] = {
-        "timeout_hit": timeout_hit,
+        "timeout_hit": timeout_hit, "early_exit": stop_paginating,
         "total_fetched": len(all_items), "dropped_date": dropped_date, "dropped_region": dropped_region,
         "dropped_acm": dropped_acm, "dropped_type": dropped_type, "processed": processed
     }
@@ -330,8 +376,6 @@ def get_analytics():
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
     stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
-    
-    # Sort dates chronologically for the trend chart
     stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
 
     return jsonify(stats)
