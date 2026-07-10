@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -19,59 +19,36 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# --- SCHEMA CACHE ---
-_field_schema_cache = None
-_field_schema_timestamp = 0
-
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
     response = requests.post(url, json=payload, timeout=10).json()
     return response.get("tenant_access_token")
 
-def get_field_schema():
-    global _field_schema_cache, _field_schema_timestamp
-    if _field_schema_cache and (time.time() - _field_schema_timestamp < 300):
-        return _field_schema_cache
-    try:
-        tat = get_tenant_access_token()
-        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/fields"
-        res = requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
-        if res.get("code") == 0:
-            _field_schema_cache = {f['field_name'].strip().lower(): f['field_name'] for f in res.get('data', {}).get('items', [])}
-            _field_schema_timestamp = time.time()
-            return _field_schema_cache
-    except Exception: pass
-    return {}
-
-def resolve_field_name(*aliases):
-    schema = get_field_schema()
-    for alias in aliases:
-        key = alias.strip().lower()
-        if key in schema: return schema[key]
-    for alias in aliases:
-        key = alias.strip().lower()
-        for k, v in schema.items():
-            if key in k: return v
-    return None
-
 def get_field(fields, *names):
+    """Bulletproof Extractor: Exact match -> Case-Insensitive -> Substring."""
     if not fields: return None
+    # 1. Exact Match
     for name in names:
         if name in fields: return fields[name]
-    exact = resolve_field_name(*names)
-    if exact and exact in fields: return fields[exact]
+    # 2. Case-Insensitive
     for name in names:
         name_clean = name.strip().lower()
         for key in fields:
-            if name_clean in key.strip().lower(): return fields[key]
+            if key.strip().lower() == name_clean: return fields[key]
+    # 3. Substring (Catches "PK Agencies Creation Type" from "Create Way")
+    for name in names:
+        name_clean = name.strip().lower()
+        for key in fields:
+            if name_clean in key.strip().lower() or key.strip().lower() in name_clean:
+                return fields[key]
     return None
 
 def extract_field_text(field_data):
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
-        for key in ['text', 'name', 'en_name', 'value', 'label']:
+        for key in ['text', 'name', 'en_name', 'value', 'label', 'id']:
             if key in field_data: return str(field_data[key])
         return str(field_data)
     if isinstance(field_data, list):
@@ -79,7 +56,7 @@ def extract_field_text(field_data):
         for item in field_data:
             if isinstance(item, dict):
                 extracted = False
-                for key in ['text', 'name', 'en_name', 'value']:
+                for key in ['text', 'name', 'en_name', 'value', 'id']:
                     if key in item:
                         texts.append(str(item[key]))
                         extracted = True
@@ -90,7 +67,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """THE TIME-TRAP DESTROYER: Forces purely YYYY-MM-DD logic."""
+    """Time-Trap Destroyer: Strips all hours/mins for pure calendar comparison."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -103,12 +80,9 @@ def parse_feishu_date(date_val):
             dt = datetime.fromtimestamp(int(date_val) / 1000.0)
         else:
             try:
-                # Forces "2026/07/10" AND "2026-07-10 20:09" to become "2026-07-10"
-                clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
+                clean_str = date_val[:10].replace('/', '-').replace('.', '-')
                 dt = datetime.strptime(clean_str, "%Y-%m-%d")
             except Exception: pass
-    
-    # Zero out hours, minutes, and seconds so timezone drift is mathematically impossible
     if dt: return dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return None
 
@@ -159,12 +133,7 @@ def search_agency():
 
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    points_payload = {
-        "filter": {
-            "conjunction": "and",
-            "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]
-        }
-    }
+    points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
     
     points_response = requests.post(points_url, headers=headers, json=points_payload, timeout=10).json()
@@ -186,14 +155,13 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            # Prioritizing the "Copy" text date field to avoid time traps
-            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy'))
-            if not ts: ts = parse_feishu_date(get_field(r_fields, 'Submitted on'))
+            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy', 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
+# --- 🚀 THE NATIVE "AGENCY TARGET" ANALYTICS METHOD ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -216,39 +184,46 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    payload = {"page_size": 500}
+    # 🚀 BUILD NATIVE FEISHU PAYLOAD (Unix Milliseconds + Region)
+    conditions = []
+    
     if region_filter not in ['all', '']:
-        region_col = resolve_field_name("Region") or "Region"
-        payload["filter"] = {
-            "conjunction": "and",
-            "conditions": [{"field_name": region_col, "operator": "contains", "value": [region_filter.upper()]}]
-        }
+        conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
 
-    # PROBER: Tests native sorting
-    valid_sort = None
-    for sort_col in ["Created Time", "Submitted on Copy", "Submitted on"]:
-        test_payload = {"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}
-        if "filter" in payload: test_payload["filter"] = payload["filter"]
+    if from_dt:
+        # Subtract 1 day buffer to absorb global timezone differences; exact cut done locally.
+        safe_from = from_dt - timedelta(days=1)
+        from_ts = int(safe_from.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        conditions.append({"field_name": "Submitted on Copy", "operator": "isGreaterEqual", "value": [str(from_ts)]})
         
-        test_res = session.post(req_url, json=test_payload).json()
-        if test_res.get("code") == 0:
-            valid_sort = [{"field_name": sort_col, "desc": True}]
-            break
-            
-    if valid_sort:
-        payload["sort"] = valid_sort
+    if to_dt:
+        # Add 1 day buffer
+        safe_to = to_dt + timedelta(days=1)
+        to_ts = int(safe_to.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        conditions.append({"field_name": "Submitted on Copy", "operator": "isLess", "value": [str(to_ts)]})
+
+    payload = {"page_size": 500} # Safe Feishu native limit
+    if len(conditions) > 0:
+        payload["filter"] = {"conjunction": "and", "conditions": conditions}
 
     all_items = []
     seen_record_ids = set()
     page_token = ""
-    stop_paginating = False
     
-    for _ in range(150):
-        if stop_paginating: break
+    # 🚀 ELIMINATED TIMEOUTS: Since Feishu filters first, this only loops 1 to 2 times instead of 150 times!
+    for _ in range(50):
         if page_token: payload["page_token"] = page_token
         try:
             res = session.post(req_url, json=payload, timeout=12).json()
-            if res.get("code") != 0: break
+            if res.get("code") != 0: 
+                # Fallback if "Submitted on Copy" fails natively: Run without date payload
+                if from_dt and "filter" in payload:
+                    payload["filter"]["conditions"] = [c for c in conditions if c["field_name"] == "Region"]
+                    if not payload["filter"]["conditions"]: del payload["filter"]
+                    res = session.post(req_url, json=payload, timeout=12).json()
+                    if res.get("code") != 0: break
+                else:
+                    break
             
             data = res.get('data', {})
             fetched_items = data.get('items', [])
@@ -259,15 +234,6 @@ def get_analytics():
                     seen_record_ids.add(record_id)
                     all_items.append(item)
                     
-                    if from_dt and valid_sort:
-                        rec_fields = item.get('fields', {})
-                        # SMART BRAKE PRIORITIZES 'SUBMITTED ON COPY'
-                        rec_dt = parse_feishu_date(get_field(rec_fields, 'Submitted on Copy'))
-                        if not rec_dt: rec_dt = parse_feishu_date(get_field(rec_fields, 'Created Time', 'Submitted on'))
-                        
-                        if rec_dt and rec_dt < (from_dt - timedelta(days=3)):
-                            stop_paginating = True
-                            
             page_token = data.get('page_token')
             if not data.get('has_more', False) or not page_token: break
         except Exception: break
@@ -283,24 +249,14 @@ def get_analytics():
         "scanned_rows": len(all_items)
     }
 
-    if from_dt and date_to:
-        curr_dt = from_dt
-        end_dt = datetime.strptime(date_to, "%Y-%m-%d")
-        limit = 0
-        while curr_dt <= end_dt and limit < 365:
-            stats["daily_trend"][curr_dt.strftime("%Y-%m-%d")] = 0
-            curr_dt += timedelta(days=1)
-            limit += 1
-
     dropped_date = dropped_region = dropped_acm = dropped_type = processed = 0
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 🚀 STRICT DATE PRIORITY LOGIC
+        # 1. Date Math (Absolute priority to Submitted on Copy)
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy'))
-        if not record_dt:
-            record_dt = parse_feishu_date(get_field(fields, 'Submitted on', 'Created Time'))
+        if not record_dt: record_dt = parse_feishu_date(get_field(fields, 'Submitted on', 'Created Time'))
         
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
@@ -315,11 +271,12 @@ def get_analytics():
                     break
         status = extract_field_text(status_val).strip().lower()
 
-        creation_type = extract_field_text(get_field(fields, 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Agencies Creation Type', 'Agency Creation Type', 'Create Way', 'Creation Type')).strip()
-        reject_reason = extract_field_text(get_field(fields, 'PK Agencies Rejection reason', 'IN Agencies Rejection reason', 'Agencies Rejection Reason', 'Agencies Rejection reason', 'Reject Reason', 'Rejection Reason')).strip()
+        # 🚀 PIE CHART FIX: Aggressive aliases mapping directly to your CSV values
+        creation_type = extract_field_text(get_field(fields, 'Create Way', 'Agencies Creation Type', 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Creation Type')).strip()
+        reject_reason = extract_field_text(get_field(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason', 'IN Agencies Rejection reason')).strip()
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
         region = extract_field_text(get_field(fields, 'Region')).strip().lower()
-        closing_reason = extract_field_text(get_field(fields, 'PK Closing Agencies Reason', 'IN Closing Agencies Reason', 'Closing Agencies Reason', 'Closing Reason')).strip()
+        closing_reason = extract_field_text(get_field(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason', 'IN Closing Agencies Reason')).strip()
         other_app = extract_field_text(get_field(fields, 'Otherapp Name', 'Other App Name')).strip()
 
         is_done = "done" in status
