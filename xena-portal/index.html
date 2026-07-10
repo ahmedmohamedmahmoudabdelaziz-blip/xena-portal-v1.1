@@ -80,7 +80,6 @@
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Results / Targets */
         .target-banner { background: linear-gradient(135deg, rgba(0,230,118,0.08), rgba(0,176,255,0.08)); border: 1px solid rgba(0,230,118,0.2); border-radius: var(--radius); padding: 32px; text-align: center; margin-bottom: 24px; position: relative; }
         .target-banner h2 { font-size: 2.5rem; color: var(--accent-green); margin: 8px 0; }
         .acm-badge { position: absolute; top: 16px; right: 16px; background: var(--bg); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; color: var(--text-muted); border: 1px solid var(--border); }
@@ -140,8 +139,8 @@
         </div>
 
         <div id="analyticsParams" style="display:none;">
-            <div class="control-grid">
-                <div class="control-group">
+            <div class="filter-row">
+                <div class="filter-item">
                     <label>Date Filter</label>
                     <select id="anaDatePreset" onchange="updateCustomDateVisibility()">
                         <option value="this_month" selected>Current Month</option>
@@ -197,7 +196,8 @@
             <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
         </div>
-        <div class="card">
+        <!-- FIXED NODE DETECTOR ID APPLIED BELOW -->
+        <div class="card" id="privilegeArea">
             <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Available Privilege</h3>
             <div class="control-group" style="max-width: 300px; margin-bottom: 16px;">
                 <select id="specificPrivilege" onchange="updatePrivilegeGrid()">
@@ -218,7 +218,7 @@
         </div>
     </div>
 
-    <div id="analyticsContainer" style="display: none;">
+    <div id="analyticsContainer">
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-label">Total Agency Creations</div>
@@ -546,7 +546,7 @@
         document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
         
         if (document.getElementById('queryType').value === 'target') {
-            document.getElementById('privilegeArea')?.closest('.card')?.style?.display || (document.querySelector('.privilege-section').style.display = 'block');
+            document.getElementById('privilegeArea').style.display = 'block';
             updatePrivilegeGrid();
         }
         document.getElementById('resultsContainer').style.display = 'block';
