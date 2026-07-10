@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +20,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
+    """Strict exact match, followed by case-insensitive exact match."""
     if not fields: return None
     for name in names:
         if name in fields: return fields[name]
@@ -59,16 +60,17 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
+    """Raw Date Parser - NO Timezone Adjustments."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
         
     dt = None
     if isinstance(date_val, (int, float)): 
-        dt = datetime.utcfromtimestamp(date_val / 1000.0) + timedelta(hours=3)
+        dt = datetime.fromtimestamp(date_val / 1000.0)
     elif isinstance(date_val, str):
         if date_val.isdigit(): 
-            dt = datetime.utcfromtimestamp(int(date_val) / 1000.0) + timedelta(hours=3)
+            dt = datetime.fromtimestamp(int(date_val) / 1000.0)
         else:
             try:
                 clean_str = date_val[:10].replace('/', '-').replace('.', '-')
@@ -151,7 +153,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 📊 ULTIMATE ENTERPRISE ANALYTICS ENGINE ---
+# --- 📊 ULTIMATE HYBRID ANALYTICS ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -164,74 +166,53 @@ def get_analytics():
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
-    region_filter = request.args.get('region', 'ALL').strip().upper()
+    region_filter = request.args.get('region', 'ALL').strip().lower()
     acm_filter = request.args.get('acm', 'All').strip().lower()
     type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '')
     date_to = request.args.get('to', '')
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
-    # 🚀 PRE-FLIGHT PROBER: Test if Feishu accepts Timestamp Filtering on your Date column
-    valid_sort = None
-    valid_date_col = None
-    date_filter_works = False
+    # 🚀 SERVER-SIDE FILTERING: Tell Feishu to delete wrong regions before sending data
+    payload = {"page_size": 1000}
+    if region_filter not in ['all', '']:
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}
+            ]
+        }
 
+    # 🚀 FIND SORT COLUMN
+    valid_sort = None
     for sort_col in ["Submitted on Copy", "Submitted on", "Created Time"]:
         test_payload = {"page_size": 1, "sort": [{"field_name": sort_col, "desc": True}]}
+        if "filter" in payload: test_payload["filter"] = payload["filter"]
+        
         test_res = session.post(req_url, json=test_payload).json()
         if test_res.get("code") == 0:
-            valid_date_col = sort_col
             valid_sort = [{"field_name": sort_col, "desc": True}]
-            
-            # Test Server-Side Date Filter Capability
-            if from_dt:
-                tf_payload = {
-                    "page_size": 1,
-                    "filter": {
-                        "conjunction": "and",
-                        "conditions": [{"field_name": sort_col, "operator": "isGreaterEqual", "value": [str(int(from_dt.timestamp() * 1000))]}]
-                    }
-                }
-                tf_res = session.post(req_url, json=tf_payload).json()
-                if tf_res.get("code") == 0:
-                    date_filter_works = True
             break
-
-    # 🚀 CONSTRUCT SERVER-SIDE PAYLOAD
-    feishu_conditions = []
-    if region_filter not in ['ALL', '']:
-        feishu_conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter]})
-    
-    # Push Date Boundaries to Feishu (with 3-day buffer to protect Cairo Timezone)
-    if date_filter_works and valid_date_col:
-        if from_dt:
-            loose_from = from_dt - timedelta(days=3) 
-            feishu_conditions.append({"field_name": valid_date_col, "operator": "isGreaterEqual", "value": [str(int(loose_from.timestamp() * 1000))]})
-        if to_dt:
-            loose_to = to_dt + timedelta(days=3)
-            feishu_conditions.append({"field_name": valid_date_col, "operator": "isLessEqual", "value": [str(int(loose_to.timestamp() * 1000))]})
-
-    payload = {"page_size": 1000}
-    if feishu_conditions: payload["filter"] = {"conjunction": "and", "conditions": feishu_conditions}
-    if valid_sort: payload["sort"] = valid_sort
+            
+    if valid_sort:
+        payload["sort"] = valid_sort
 
     all_items = []
     seen_record_ids = set()
     page_token = ""
-    start_time = time.time()
-    timeout_hit = False
     stop_paginating = False
+    early_exit_triggered = False
     
-    for _ in range(40):
+    for _ in range(100):
         if stop_paginating: break
         if page_token: payload["page_token"] = page_token
         
         try:
-            res = session.post(req_url, json=payload, timeout=9).json()
+            res = session.post(req_url, json=payload).json()
             if res.get("code") != 0: break
                 
             fetched_items = res.get('data', {}).get('items', [])
@@ -242,20 +223,18 @@ def get_analytics():
                     seen_record_ids.add(record_id)
                     all_items.append(item)
                     
-                    # EARLY EXIT BRAKE: If we are sorting Newest to Oldest, stop when dates get too old!
-                    record_dt = parse_feishu_date(get_field(item.get('fields', {}), 'Submitted on Copy', 'Submitted on'))
-                    if record_dt and from_dt and valid_sort:
-                        if record_dt < (from_dt - timedelta(days=4)):
+                    # 🚀 THE SMART BRAKE: If we are looking for July, and Python sees May, instantly kill the loop!
+                    if from_dt and valid_sort:
+                        record_dt = parse_feishu_date(get_field(item.get('fields', {}), 'Submitted on Copy', 'Submitted on'))
+                        # Buffer of 2 days to account for any weird local timezone shifts
+                        if record_dt and record_dt < (from_dt - timedelta(days=2)):
                             stop_paginating = True
+                            early_exit_triggered = True
                             
             page_token = res.get('data', {}).get('page_token')
-            
             if not page_token or not res.get('data', {}).get('has_more'): break
-            if time.time() - start_time > 8.5: 
-                timeout_hit = True
-                break 
+            
         except Exception:
-            timeout_hit = True
             break
 
     stats = {
@@ -268,9 +247,10 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {}, "scanned_rows": len(all_items)
     }
 
+    # Pre-populate calendar
     if from_dt and to_dt:
         curr_dt = from_dt
-        while curr_dt < to_dt:
+        while curr_dt <= to_dt:
             stats["daily_trend"][curr_dt.strftime("%Y-%m-%d")] = 0
             curr_dt += timedelta(days=1)
 
@@ -279,6 +259,7 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
+        # 1. Exact Date Filtering (Local Math)
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
         if from_dt or to_dt:
             if not record_dt: 
@@ -287,17 +268,20 @@ def get_analytics():
             if from_dt and record_dt < from_dt: 
                 dropped_date += 1
                 continue
-            if to_dt and record_dt >= to_dt: 
+            
+            # Add exactly 1 day to 'to_dt' to include 23:59:59 of the final day
+            if to_dt and record_dt >= (to_dt + timedelta(days=1)): 
                 dropped_date += 1
                 continue
 
+        # 2. Extract EXACT Match Values
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
         status = extract_field_text(get_field(fields, 'Status')).strip().lower()
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
-        creation_type = extract_field_text(get_field(fields, 'Create Way')).strip()
-        region = extract_field_text(get_field(fields, 'Region')).strip().upper()
-        reject_reason = extract_field_text(get_field(fields, 'Reject Reason')).strip()
-        closing_reason = extract_field_text(get_field(fields, 'Closing Reason')).strip()
+        creation_type = extract_field_text(get_field(fields, 'Create Way')).strip() 
+        region = extract_field_text(get_field(fields, 'Region')).strip().lower()
+        reject_reason = extract_field_text(get_field(fields, 'Reject Reason')).strip() 
+        closing_reason = extract_field_text(get_field(fields, 'Closing Reason')).strip() 
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
         is_done = "done" in status or "completed" in status or "closed" in status
@@ -305,10 +289,11 @@ def get_analytics():
 
         acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
         acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
-        acm = acm_in if region == "IN" else acm_pk
+        acm = acm_in if region == "in" else acm_pk
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
 
-        if region_filter not in ['ALL', ''] and region != region_filter: 
+        # 3. Dynamic Strict Filtering
+        if region_filter not in ['all', ''] and region != region_filter: 
             dropped_region += 1
             continue
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): 
@@ -320,6 +305,7 @@ def get_analytics():
 
         processed += 1
 
+        # 4. Routing
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
@@ -335,11 +321,14 @@ def get_analytics():
                 stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
+            
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
+            
             if agency_type:
                 clean_type = agency_type.title()
                 stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
+            
             if is_rejected and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
@@ -367,7 +356,7 @@ def get_analytics():
                         stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
     stats["debug"] = {
-        "timeout_hit": timeout_hit, "early_exit": stop_paginating,
+        "early_exit": early_exit_triggered,
         "total_fetched": len(all_items), "dropped_date": dropped_date, "dropped_region": dropped_region,
         "dropped_acm": dropped_acm, "dropped_type": dropped_type, "processed": processed
     }
@@ -376,6 +365,8 @@ def get_analytics():
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
     stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
+    
+    # Sort dates chronologically
     stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
 
     return jsonify(stats)
