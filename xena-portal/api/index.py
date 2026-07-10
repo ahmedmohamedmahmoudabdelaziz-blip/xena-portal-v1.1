@@ -21,12 +21,12 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 def get_field(fields, *names):
-    """Case-insensitive and space-insensitive column lookup."""
+    """FUZZY LOOKUP: Finds the column even if Feishu renames it to 'Agencies Creation Type (PK)'"""
     if not fields: return None
     for name in names:
         name_clean = name.strip().lower()
         for key in fields:
-            if key.strip().lower() == name_clean:
+            if name_clean in key.strip().lower():
                 return fields[key]
     return None
 
@@ -59,7 +59,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Bulletproof date parser enforcing CAIRO Timezone (UTC+3)."""
+    """Bulletproof date parser enforcing UTC+3 Timezone."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -162,8 +162,6 @@ def get_analytics():
     if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
     tat = get_tenant_access_token()
-    
-    # SPEED FIX: Using Session to keep TCP connection alive
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
@@ -174,11 +172,10 @@ def get_analytics():
     date_to = request.args.get('to', '')
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    to_dt = datetime.strptime(date_to, "%Y-%m-%d") if date_to else None
     
-    # FIX: Ensure to_dt covers the absolute end of the target day
-    if to_dt:
-        to_dt = to_dt.replace(hour=23, minute=59, second=59)
+    # EXCLUSIVE UPPER BOUND DATE FIX
+    # Adds exactly 1 day so it perfectly includes the entire 24 hours of the final day.
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     
@@ -193,8 +190,8 @@ def get_analytics():
     page_token = ""
     start_time = time.time()
     
-    for _ in range(40): # Loops to fetch maximum available data
-        payload = {"page_size": 1000} # Max pull size to prevent timeouts
+    for _ in range(40):
+        payload = {"page_size": 1000}
         if valid_sort: payload["sort"] = valid_sort
         if page_token: payload["page_token"] = page_token
         
@@ -226,29 +223,24 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
-        # 1. Precise Date Filtering
         record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy', 'Submitted on'))
         if from_dt or to_dt:
             if not record_dt: 
                 dropped_date += 1
                 continue
-            # Compare mathematically including the end-of-day fix
             if from_dt and record_dt < from_dt: 
                 dropped_date += 1
                 continue
-            if to_dt and record_dt > to_dt: 
+            # EXCLUSIVE UPPER BOUND COMPARISON
+            if to_dt and record_dt >= to_dt: 
                 dropped_date += 1
                 continue
 
-        # 2. Extract Values 
         req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
-        
-        # FIX: STRICTLY ONLY LOOK AT 'Status'
         status = extract_field_text(get_field(fields, 'Status')).strip().lower()
-        
         agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
         
-        # FIX: Aggressively search for Create Way and Agencies Creation Type
+        # FUZZY SEARCH GUARANTEES CHART POPULATION
         creation_type = extract_field_text(get_field(fields, 'Create Way', 'Agencies Creation Type', 'Creation Type')).strip()
         
         region = extract_field_text(get_field(fields, 'Region')).strip().lower()
@@ -256,7 +248,6 @@ def get_analytics():
         closing_reason = extract_field_text(get_field(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
         other_app = extract_field_text(get_field(fields, 'Otherapp Name')).strip()
 
-        # Dynamic Status Mapper
         is_done = "done" in status or "completed" in status or "closed" in status
         is_rejected = "rejected" in status
 
@@ -265,7 +256,6 @@ def get_analytics():
         acm = acm_in if region == "in" else acm_pk
         if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
 
-        # 3. Dynamic Filter Tracking
         if region_filter not in ['all', ''] and region != region_filter: 
             dropped_region += 1
             continue
@@ -278,12 +268,10 @@ def get_analytics():
 
         processed += 1
 
-        # 4. Routing
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
-        # FIX: Includes Follow-up creations exactly as requested
         if "agency creation" in req_type or "agency applied" in req_type:
             stats["kpis"]["creations"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
@@ -291,17 +279,17 @@ def get_analytics():
             else: stats["creation_status"]["Under Investigation"] += 1
             
             if is_done and acm:
-                stats["acm_performance"][acm] = stats["acm_performance"].get(acm, 0) + 1
+                clean_acm = acm.title()
+                stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
             
-            # Agencies Creation Type (Audit/Manually)
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
             
-            # Agency Types (Walkin/ACM Hunting)
             if agency_type:
-                stats["agency_types"][agency_type] = stats["agency_types"].get(agency_type, 0) + 1
+                clean_type = agency_type.title()
+                stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
             
             if is_rejected and reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
@@ -321,12 +309,13 @@ def get_analytics():
             if closing_reason:
                 stats["closing_reasons_pie"][closing_reason] = stats["closing_reasons_pie"].get(closing_reason, 0) + 1
                 if acm:
-                    if acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    clean_acm = acm.title()
+                    if clean_acm not in stats["acm_closing_reasons"]:
+                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
                     if "User Request" in closing_reason:
-                        stats["acm_closing_reasons"][acm]["User Request"] += 1
+                        stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
                     elif "Duplicated" in closing_reason:
-                        stats["acm_closing_reasons"][acm]["Duplicated Hosting"] += 1
+                        stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
     stats["debug"] = {
         "total_fetched": len(all_items), "dropped_date": dropped_date, "dropped_region": dropped_region,
