@@ -36,7 +36,6 @@
         .page-header h1 { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
         .page-header p { color: var(--text-muted); font-size: 1.05rem; }
         
-        /* THE BIG UI FIX: Centered box for Target Search */
         .centered-search-box { max-width: 450px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
         
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); transition: border-color 0.2s; margin-bottom: 24px; }
@@ -119,7 +118,6 @@
     </div>
 
     <div class="card">
-        <!-- Centered Dropdown Tracker -->
         <div class="centered-search-box" style="margin-bottom: 16px;">
             <div class="control-group">
                 <label>Inquiry Type</label>
@@ -131,7 +129,6 @@
             </div>
         </div>
 
-        <!-- 🚀 UI FIX: Now perfectly mid-sized and centered -->
         <div id="standardSearchParams" class="centered-search-box">
             <div class="control-group">
                 <label>Agency Code</label>
@@ -218,7 +215,6 @@
         </div>
     </div>
 
-    <!-- 🚀 UI BLEED FIX: Container is mathematically hidden when swapped back -->
     <div id="analyticsContainer" style="display: none;">
         <div class="kpi-grid">
             <div class="kpi-card">
@@ -308,8 +304,6 @@
         
         updateAcmDropdown();
         setDatePresets();
-        
-        // 🚀 Initialize view correctly on page load
         toggleViewModes();
     }
 
@@ -324,11 +318,10 @@
 
     function toggleViewModes() {
         const isAna = document.getElementById('queryType').value === 'analytics';
-        // Display flex is used here to keep it centered inside the wrapper!
-        document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex'; 
+        document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex';
         document.getElementById('resultsContainer').style.display = 'none';
         document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
-        document.getElementById('analyticsContainer').style.display = 'none'; // 🚀 GUARANTEES CHARTS ARE HIDDEN!
+        document.getElementById('analyticsContainer').style.display = 'none';
     }
 
     function updateCustomDateVisibility() {
@@ -394,8 +387,16 @@
         try {
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const res = await fetch(url);
-            const data = await res.json();
             
+            // 🔥 JSON SAFETY CATCHER: Protects against Vercel HTML timeout pages
+            const textResponse = await res.text();
+            let data;
+            try {
+                data = JSON.parse(textResponse);
+            } catch (jsonErr) {
+                throw new Error("Feishu server timeout. The database is extremely large and took longer than Vercel allows.");
+            }
+
             if (!res.ok) throw new Error(data.error || 'Unknown error');
             
             document.getElementById('kpiCreations').innerText = data.kpis.creations.toLocaleString();
