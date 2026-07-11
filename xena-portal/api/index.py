@@ -31,6 +31,21 @@ RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link 
 RT_BD = "bd creation"
 RT_CLOSING = "closing agency"
 
+# 🚨 TIMEZONE FIX: Feishu stores "Submitted on" as a raw millisecond epoch. That
+# epoch was created relative to whatever timezone your Feishu Base is configured
+# to (Feishu/Lark bases default to Asia/Shanghai, UTC+8, and this base belongs to
+# a Beijing-registered company, so that is almost certainly the base's timezone).
+# The old code converted that epoch to a calendar day using the SERVER's local
+# time (Vercel runs in UTC) for per-record filtering, but built the native filter's
+# from/to cutoffs assuming UTC too - two different unstated assumptions that don't
+# match the base's real timezone. The practical effect: anything submitted in the
+# early morning (Beijing time) on a boundary day gets attributed to the PREVIOUS
+# day, or excluded from the range entirely - which is exactly a partial/undercount
+# right at day boundaries like "not the full 7/7".
+# If your Feishu Base's timezone (Settings -> Base timezone) is NOT Beijing time,
+# change the offset below to match it.
+FEISHU_TZ = timezone(timedelta(hours=8))  # Asia/Shanghai (Beijing time)
+
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
@@ -81,10 +96,10 @@ def parse_feishu_date(date_val):
 
     dt = None
     if isinstance(date_val, (int, float)):
-        dt = datetime.fromtimestamp(date_val / 1000.0)
+        dt = datetime.fromtimestamp(date_val / 1000.0, tz=FEISHU_TZ).replace(tzinfo=None)
     elif isinstance(date_val, str):
         if date_val.isdigit():
-            dt = datetime.fromtimestamp(int(date_val) / 1000.0)
+            dt = datetime.fromtimestamp(int(date_val) / 1000.0, tz=FEISHU_TZ).replace(tzinfo=None)
         else:
             try:
                 clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
@@ -228,10 +243,10 @@ def get_analytics():
     if region_filter not in ['all', '']:
         conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
     if from_dt:
-        from_ts = int(from_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        from_ts = int(from_dt.replace(tzinfo=FEISHU_TZ).timestamp() * 1000)
         conditions.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [from_ts]})
     if to_dt:
-        to_ts = int(to_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        to_ts = int(to_dt.replace(tzinfo=FEISHU_TZ).timestamp() * 1000)
         conditions.append({"field_name": "Submitted on", "operator": "isLess", "value": [to_ts]})
 
     payload = {"page_size": 500}
