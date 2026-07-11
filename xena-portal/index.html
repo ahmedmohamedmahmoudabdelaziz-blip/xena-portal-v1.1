@@ -388,12 +388,13 @@
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const res = await fetch(url);
 
+            // Catches Python Crashes cleanly
             const textResponse = await res.text();
             let data;
             try {
                 data = JSON.parse(textResponse);
             } catch (jsonErr) {
-                throw new Error("Feishu server timeout. Vercel killed the connection.");
+                throw new Error("Server crashed (Code 500). Please check Vercel Logs.");
             }
 
             if (!res.ok) throw new Error(data.error || 'Unknown error');
