@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +19,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# --- 🎯 CANONICAL REQUEST TYPES (From Video) ---
+# --- 🎯 CANONICAL REQUEST TYPES ---
 RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link ( follow-up )"}
 RT_BD = "bd creation"
 RT_CLOSING = "closing agency"
@@ -67,9 +67,6 @@ def extract_field_text(field_data):
         return " ".join(texts).strip()
     return str(field_data)
 
-def clean(field_data):
-    return extract_field_text(field_data).strip().lower()
-
 def parse_feishu_date(date_val):
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
@@ -87,6 +84,9 @@ def parse_feishu_date(date_val):
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except Exception:
         return None
+
+def clean(field_data):
+    return extract_field_text(field_data).strip().lower()
 
 @app.route('/', methods=['GET'])
 def home():
@@ -168,7 +168,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE UNBREAKABLE ANALYTICS PIPELINE ---
+# --- 🚀 THE BULLETPROOF ANALYTICS PIPELINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -183,8 +183,8 @@ def get_analytics():
     region_filter = request.args.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
 
-    date_from = request.args.get('from', '')
-    date_to = request.args.get('to', '')
+    date_from = request.args.get('from', '').strip()
+    date_to = request.args.get('to', '').strip()
 
     now = datetime.now()
     if not date_from or not date_to:
@@ -211,12 +211,6 @@ def get_analytics():
             time.sleep(0.6 * (attempt + 1))
         return last, False
 
-    # =========================================================================
-    # 🚨 BLIND FETCHING: NO FILTERS, NO SORTING. 
-    # Feishu will reliably dump all 10,000 rows in default order without breaking.
-    # =========================================================================
-    payload = {"page_size": 500}
-
     all_items = []
     seen_ids = set()
     page_token = ""
@@ -224,13 +218,23 @@ def get_analytics():
     fetch_complete = True
     stop_reason = None
 
-    for page_num in range(150): # Cap at 75,000 records
+    # =========================================================================
+    # 🚨 BLIND FETCH: NO API FILTERS.
+    # Mixing filters + custom sorting causes Feishu to timeout after Page 2. 
+    # By strictly using ONLY 'sort', Feishu streams the entire table incredibly fast.
+    # =========================================================================
+    payload = {
+        "page_size": 500,
+        "sort": [{"field_name": "Numbering", "desc": True}]
+    }
+
+    for page_num in range(150): # Allow up to 75,000 records
         if page_token: payload["page_token"] = page_token
-        
         res, ok = fetch_page(payload)
+        
         if not ok:
             fetch_complete = False
-            stop_reason = f"Feishu error after {page_num} page(s): {res.get('msg', 'unknown error')}"
+            stop_reason = f"Feishu API error after {page_num} page(s): {res.get('msg', 'unknown error')}"
             error_msg = stop_reason
             break
 
@@ -239,21 +243,23 @@ def get_analytics():
 
         for item in items:
             rid = item.get("record_id")
-            if rid not in seen_ids:
+            if rid and rid not in seen_ids:
                 seen_ids.add(rid)
                 all_items.append(item)
                 new_records_in_page += 1
 
+        # Because we used "Numbering", pagination is perfectly unique and stable.
         if new_records_in_page == 0: break
 
         page_token = res.get("data", {}).get("page_token")
-        if not page_token: break
+        if not page_token or not res.get("data", {}).get("has_more", False): 
+            break
     else:
         if page_token:
             fetch_complete = False
             stop_reason = "Hit the 150-page safety cap while more data remained."
 
-    # DIAGNOSTIC SCANNER 
+    # 3. DIAGNOSTIC SCANNER RESTORED
     master_keys = set()
     for item in all_items:
         master_keys.update(item.get('fields', {}).keys())
@@ -267,59 +273,57 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "other_request_types": {},
+        "other_request_types": {},  
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
         "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
-    if from_dt and date_to:
+    if from_dt and to_dt:
         cur = from_dt
         while cur < to_dt:
             stats["daily_trend"][cur.strftime("%Y-%m-%d")] = 0
             cur += timedelta(days=1)
 
-    acm_filter = request.args.get('acm', 'All').strip().lower()
-    type_filter = request.args.get('type', 'All').strip().lower()
-
     for item in all_items:
         fields = item.get('fields', {})
 
-        # 1. LOCAL DATE ENFORCEMENT
-        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time'))
+        # EXACT LOCAL DATE ENFORCEMENT
+        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
-        # 2. LOCAL REGION ENFORCEMENT
+        # EXACT LOCAL REGION ENFORCEMENT
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
         if region_filter != 'all' and region != region_filter: continue
 
-        req_type = extract_field_text(get_field_local(fields, 'Request Type')).strip().lower()
-        status_val = get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State')
-        status = extract_field_text(status_val).strip().lower()
+        req_type = clean(get_field_local(fields, 'Request Type'))
+        status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
 
-        creation_type = extract_field_text(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type')).strip()
-        reject_reason = extract_field_text(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason')).strip()
-        agency_type = extract_field_text(get_field_local(fields, 'Agency Type', 'Type of Agency')).strip()
-        closing_reason = extract_field_text(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
-        other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps')).strip()
+        creation_type = clean(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type'))
+        reject_reason = clean(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason'))
+        agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
+        closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason'))
+        other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
 
         is_done = "done" in status or "complet" in status or "approv" in status
         is_rejected = "reject" in status or "fail" in status or "decline" in status
 
-        acm_pk = extract_field_text(get_field_local(fields, 'Acm Name (PK)')).strip()
-        acm_in = extract_field_text(get_field_local(fields, 'Acm Name (IN)')).strip()
+        acm_pk = clean(get_field_local(fields, 'Acm Name (PK)'))
+        acm_in = clean(get_field_local(fields, 'Acm Name (IN)'))
         acm = acm_in if region == "in" else acm_pk
-        if not acm: acm = extract_field_text(get_field_local(fields, 'Acm', 'Assigned Member')).strip()
+        if not acm: acm = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
 
-        if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
-        if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
+        if acm_filter != 'all' and acm_filter != acm: continue
+
+        agency_type_title = agency_type.title() if agency_type else "Unknown"
+        if type_filter != 'all' and type_filter != agency_type: continue
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 3. EXACT KPI CLASSIFICATION
+        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
         is_creation_kpi = req_type in RT_CREATION_SET
         is_bd_kpi = req_type == RT_BD
         is_closing_kpi = req_type == RT_CLOSING
@@ -336,11 +340,9 @@ def get_analytics():
                 if acm:
                     clean_acm = acm.title()
                     if clean_acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
-                    if "user" in closing_reason.lower():
-                        stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
-                    elif "dup" in closing_reason.lower():
-                        stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
+                        stats["acm_closing_reasons"][clean_acm] = {}
+                    bucket = stats["acm_closing_reasons"][clean_acm]
+                    bucket[cr_title] = bucket.get(cr_title, 0) + 1
 
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
@@ -363,9 +365,8 @@ def get_analytics():
             if creation_type:
                 ct_title = creation_type.title()
                 stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title, 0) + 1
-            if agency_type:
-                at_title = agency_type.title()
-                stats["agency_types"][at_title] = stats["agency_types"].get(at_title, 0) + 1
+            if agency_type_title != "Unknown":
+                stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
             if reject_reason:
                 rr_title = reject_reason.title()
                 stats["reject_reasons"][rr_title] = stats["reject_reasons"].get(rr_title, 0) + 1
