@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -69,29 +69,23 @@ def clean(field_data):
     return extract_field_text(field_data).strip()
 
 def parse_feishu_date(date_val):
-    """The Timezone Protector: Offsets Vercel's UTC clock to Cairo (+3 Hours)."""
+    """PURE, SIMPLE DATE PARSER. No timezone math. Will never crash."""
     if not date_val: return None
     if isinstance(date_val, list) and date_val: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
 
-    dt = None
-    if isinstance(date_val, (int, float)):
-        # Apply Egypt UTC+3 Timezone Offset safely
-        dt = datetime.fromtimestamp(date_val / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
-    elif isinstance(date_val, str):
-        s = date_val.strip()
-        if s.isdigit():
-            dt = datetime.fromtimestamp(int(s) / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
-        else:
-            for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y/%m/%d"):
-                try:
-                    dt = datetime.strptime(s[:16], fmt)
-                    break
-                except ValueError:
-                    continue
-                    
-    if dt: return dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    return None
+    try:
+        if isinstance(date_val, (int, float)):
+            return datetime.fromtimestamp(date_val / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        date_str = str(date_val).strip()
+        if date_str.isdigit():
+            return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        clean_str = date_str[:10].replace('/', '-').replace('.', '-')
+        return datetime.strptime(clean_str, "%Y-%m-%d")
+    except Exception:
+        return None
 
 @app.route('/', methods=['GET'])
 def home():
@@ -173,9 +167,6 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# =========================================================================
-# 🚀 GROUND TRUTH ANALYTICS ENGINE (Matched to Video Logic)
-# =========================================================================
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -196,40 +187,43 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
-    # 1. FETCH ALL (No Native Filter to Prevent Feishu "0 Data" Bug)
+    # 1. NATIVE REGION FILTER TO AVOID VERCEL TIMEOUTS
     payload = {"page_size": 500}
-    
-    all_items = []
-    seen_ids = set()
-    page_token = ""
-    error_msg = None
+    if region_filter not in ('all', ''):
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]
+        }
 
+    all_items = []
+    page_token = ""
+
+    # 2. BULLETPROOF FETCH LOOP
     for _ in range(50):
         if page_token: payload["page_token"] = page_token
         try:
-            res = session.post(req_url, json=payload, timeout=15).json()
-            if res.get("code") != 0:
-                error_msg = res.get("msg")
-                break
-
-            items = res.get("data", {}).get("items", [])
-            new_count = 0
-            for item in items:
-                rid = item.get("record_id")
-                if rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    new_count += 1
-
-            if new_count == 0: break # Infinite Loop Destroyer
+            res = session.post(req_url, json=payload, timeout=10)
             
-            page_token = res.get("data", {}).get("page_token")
-            if not page_token: break
-        except Exception as e:
-            error_msg = str(e)
-            break
+            # IF FEISHU BLOCKS THE REQUEST, TELL THE USER EXACTLY WHY:
+            if res.status_code != 200:
+                return jsonify({"error": f"Feishu Server Error ({res.status_code}): {res.text}"}), 400
+                
+            res_json = res.json()
+            if res_json.get("code") != 0:
+                return jsonify({"error": f"Feishu API Blocked Filter: {res_json.get('msg')} (Code {res_json.get('code')})"}), 400
 
-    # 2. DATA AGGREGATOR
+            items = res_json.get("data", {}).get("items", [])
+            all_items.extend(items)
+            
+            page_token = res_json.get("data", {}).get("page_token")
+            if not page_token or not res_json.get("data", {}).get("has_more", False): 
+                break
+        except requests.exceptions.Timeout:
+            return jsonify({"error": "Vercel Timeout: Feishu took more than 10 seconds to respond. Please try again."}), 504
+        except Exception as e:
+            return jsonify({"error": f"Backend Error: {str(e)}"}), 500
+
+    # 3. DATA AGGREGATOR
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
@@ -238,7 +232,7 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "scanned_rows": len(all_items), "error_debug": error_msg,
+        "scanned_rows": len(all_items)
     }
 
     if from_dt and date_to:
@@ -254,12 +248,16 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        # Priority 1: Use absolute Submitted on.
-        raw_date = get_field_local(fields, 'Submitted on', 'Created Time', 'Submitted on Copy')
+        raw_date = get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time')
         record_dt = parse_feishu_date(raw_date)
         
         if from_dt or to_dt:
-            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt):
+            # If the date failed to parse entirely, we skip it to prevent counting it in the wrong month.
+            if not record_dt:
+                continue
+            if from_dt and record_dt < from_dt:
+                continue
+            if to_dt and record_dt >= to_dt:
                 continue
 
         region = clean(get_field_local(fields, 'Region')).lower()
@@ -269,7 +267,7 @@ def get_analytics():
         req_type = clean(get_field_local(fields, 'Request Type')).lower()
         status = clean(get_field_local(fields, 'Status', 'Request Status')).lower()
         
-        # Mirror Lark exact status logic
+        # Mirror Lark exact logic
         is_done = "done" in status or "complet" in status
         is_rejected = "reject" in status or "fail" in status
 
@@ -286,15 +284,14 @@ def get_analytics():
         if type_filter not in ('all', 'all types', '') and type_filter != agency_type.lower():
             continue
 
-        # KPI #12 Daily trend: Video confirms this tracks "Status Done" for the selected Date Range
+        # KPI #12 Daily trend
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # ---- LARK VIDEO MIRRORING (Uses "Contains" logic, not exact match) --------
+        # ---- LARK VIDEO MIRRORING (Uses "Contains" logic) --------
         
-        # KPI: Closing Agency 
         if "closing agency" in req_type:
             stats["kpis"]["closings"] += 1
             if is_done: stats["closing_status"]["Done"] += 1
@@ -309,26 +306,22 @@ def get_analytics():
                     bucket = stats["acm_closing_reasons"].setdefault(clean_acm, {})
                     bucket[closing_reason] = bucket.get(closing_reason, 0) + 1
 
-        # KPI: BD Creation
         elif "bd creation" in req_type:
             stats["kpis"]["bds"] += 1
             if is_done: stats["bd_status"]["Done"] += 1
             elif is_rejected: stats["bd_status"]["Rejected"] += 1
             else: stats["bd_status"]["Under Investigation"] += 1
 
-        # KPI: Agency Creation 
         elif "agency creation" in req_type:
             stats["kpis"]["creations"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
 
-            # ACM Onboarding Performance (Only counts "Done" per video)
             if is_done and acm:
                 clean_acm = acm.title()
                 stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
 
-            # Other App Name (Only counts "Done" per video)
             other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name'))
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
@@ -340,7 +333,6 @@ def get_analytics():
             if agency_type_norm:
                 stats["agency_types"][agency_type_norm] = stats["agency_types"].get(agency_type_norm, 0) + 1
 
-            # Rejection Reasons (Only counts Rejected per video)
             if is_rejected:
                 reject_reason = clean(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'PK Agencies Rejection reason'))
                 if reject_reason:
