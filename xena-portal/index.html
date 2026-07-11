@@ -36,6 +36,7 @@
         .page-header h1 { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
         .page-header p { color: var(--text-muted); font-size: 1.05rem; }
         
+        /* Fixed Structure Center Frame */
         .centered-search-box { max-width: 450px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
         
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); transition: border-color 0.2s; margin-bottom: 24px; }
@@ -388,13 +389,13 @@
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const res = await fetch(url);
             
-            // 🔥 JSON SAFETY CATCHER: Protects against Vercel HTML timeout pages
+            // Catches Vercel HTML timeout errors cleanly
             const textResponse = await res.text();
             let data;
             try {
                 data = JSON.parse(textResponse);
             } catch (jsonErr) {
-                throw new Error("Feishu server timeout. The database is extremely large and took longer than Vercel allows.");
+                throw new Error("Feishu server timeout. Vercel killed the connection.");
             }
 
             if (!res.ok) throw new Error(data.error || 'Unknown error');
