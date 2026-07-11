@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +19,11 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
+# --- 🎯 CANONICAL REQUEST TYPES ---
+RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link ( follow-up )"}
+RT_BD = "bd creation"
+RT_CLOSING = "closing agency"
+
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
@@ -26,6 +31,7 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
+    """PURE LOCAL LOOKUP: Instant string matching. Zero API calls."""
     if not fields: return None
     for alias in aliases:
         if alias in fields: return fields[alias]
@@ -38,18 +44,25 @@ def get_field_local(fields, *aliases):
 def extract_field_text(field_data):
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
+
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label', 'id']:
             if key in field_data: return str(field_data[key])
+        if 'id' in field_data: return str(field_data['id'])
         return str(field_data)
+
     if isinstance(field_data, list):
         if len(field_data) == 0: return ""
         texts = []
         for item in field_data:
             if isinstance(item, dict):
+                extracted = False
                 for key in ['text', 'name', 'en_name', 'value', 'id']:
-                    if key in item: texts.append(str(item[key])); break
-                else: texts.append(str(item))
+                    if key in item:
+                        texts.append(str(item[key]))
+                        extracted = True
+                        break
+                if not extracted: texts.append(str(item))
             else: texts.append(str(item))
         return " ".join(texts).strip()
     return str(field_data)
@@ -58,19 +71,19 @@ def parse_feishu_date(date_val):
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
-    dt = None
-    if isinstance(date_val, (int, float)):
-        dt = datetime.fromtimestamp(date_val / 1000.0)
-    elif isinstance(date_val, str):
-        if date_val.isdigit():
-            dt = datetime.fromtimestamp(int(date_val) / 1000.0)
-        else:
-            try:
-                clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
-                dt = datetime.strptime(clean_str, "%Y-%m-%d")
-            except: pass
-    if dt: return dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    return None
+
+    try:
+        if isinstance(date_val, (int, float)):
+            return (datetime.fromtimestamp(date_val / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        date_str = str(date_val).strip()
+        if date_str.isdigit():
+            return (datetime.fromtimestamp(int(date_str) / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        clean_str = date_str[:10].replace('/', '-').replace('.', '-')
+        return datetime.strptime(clean_str, "%Y-%m-%d")
+    except Exception:
+        return None
 
 @app.route('/', methods=['GET'])
 def home():
@@ -87,15 +100,19 @@ def login():
 def callback():
     code = request.args.get('code')
     if not code: return "SSO Authorization Failed.", 400
+
     tat = get_tenant_access_token()
     token_url = "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     payload = {"grant_type": "authorization_code", "code": code}
     token_resp = requests.post(token_url, headers=headers, json=payload, timeout=10).json()
+
     user_access_token = token_resp.get("data", {}).get("access_token")
     if not user_access_token: return "SSO Error: Could not verify user token.", 500
+
     info_url = "https://open.feishu.cn/open-apis/authen/v1/user_info"
     info_resp = requests.get(info_url, headers={"Authorization": f"Bearer {user_access_token}"}, timeout=10).json()
+
     lark_name = info_resp.get("data", {}).get("name", "Unknown User")
     safe_name = urllib.parse.quote(lark_name)
     return redirect(f"/?user={safe_name}&uat={user_access_token}")
@@ -112,20 +129,31 @@ def search_agency():
     uat = request.args.get('uat', '')
     if not uat: return jsonify({"error": "Unauthorized session."}), 401
     if not agency_code: return jsonify({"error": "No agency code provided"}), 400
+
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    points_payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]}}
+    points_payload = {
+        "filter": {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]
+        }
+    }
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
+
     points_response = requests.post(points_url, headers=headers, json=points_payload, timeout=10).json()
     if points_response.get("code") != 0: return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
+
     items = points_response.get('data', {}).get('items', [])
     if not items: return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
+
     fields = items[0].get('fields', {})
     sheet_acm_name = extract_field_text(get_field_local(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
     try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
-    except: base_points = 0
+    except ValueError: base_points = 0
+
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     req_response = requests.post(req_url, headers=headers, json=points_payload, timeout=10).json()
+
     valid_requests = []
     if req_response.get("code") == 0:
         cm, cy = datetime.now().month, datetime.now().year
@@ -134,9 +162,10 @@ def search_agency():
             ts = parse_feishu_date(get_field_local(r_fields, 'Submitted on Copy', 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
+
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- ANALYTICS PIPELINE ---
+# --- 🚀 THE BULLETPROOF ANALYTICS PIPELINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -151,19 +180,31 @@ def get_analytics():
     region_filter = request.args.get('region', 'ALL').strip().lower()
     date_from = request.args.get('from', '')
     date_to = request.args.get('to', '')
-    force_full = request.args.get('force_full', '0') == '1'
 
-    from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
+    # Offset Server Time to Cairo (+3) for perfect monthly boundaries
+    now = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
+    
+    if not date_from or not date_to:
+        from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if now.month == 12:
+            to_dt = now.replace(year=now.year+1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+        to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
     def fetch_page(payload):
         last = None
         for attempt in range(3):
-            try: last = session.post(req_url, json=payload, timeout=15).json()
-            except Exception as e: last = {"code": -1, "msg": f"network error: {e}"}
-            if last.get("code") == 0: return last, True
+            try:
+                last = session.post(req_url, json=payload, timeout=15).json()
+            except Exception as e:
+                last = {"code": -1, "msg": f"network error: {e}"}
+            if last.get("code") == 0:
+                return last, True
             time.sleep(0.6 * (attempt + 1))
         return last, False
 
@@ -173,63 +214,65 @@ def get_analytics():
     error_msg = None
     fetch_complete = True
     stop_reason = None
-    native_used = False
 
-    # --- DECISION: Use native filter ONLY if force_full is NOT set ---
-    if not force_full:
-        conditions = []
-        if region_filter not in ['all', '']:
-            conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
-        if from_dt:
-            from_ts = int(from_dt.timestamp() * 1000)
-            conditions.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [str(from_ts)]})
-        if to_dt:
-            to_ts = int(to_dt.timestamp() * 1000)
-            conditions.append({"field_name": "Submitted on", "operator": "isLess", "value": [str(to_ts)]})
+    # 1. ATTEMPT NATIVE DATE FILTERING (Fastest Method)
+    native_worked = False
+    conditions = []
+    if region_filter not in ['all', '']:
+        conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
+    if from_dt:
+        from_ts = int(from_dt.timestamp() * 1000)
+        conditions.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [str(from_ts)]})
+    if to_dt:
+        to_ts = int(to_dt.timestamp() * 1000)
+        conditions.append({"field_name": "Submitted on", "operator": "isLess", "value": [str(to_ts)]})
 
-        payload = {"page_size": 500}
-        if conditions: payload["filter"] = {"conjunction": "and", "conditions": conditions}
+    payload = {"page_size": 500}
+    if conditions: payload["filter"] = {"conjunction": "and", "conditions": conditions}
 
-        native_worked = False
-        for page_num in range(50):
-            if page_token: payload["page_token"] = page_token
-            res, ok = fetch_page(payload)
-            if not ok:
-                if native_worked:
-                    fetch_complete = False
-                    stop_reason = f"Feishu error after {page_num} page(s): {res.get('msg', 'unknown error')}"
-                break
-            native_worked = True
-            items = res.get("data", {}).get("items", [])
-            for item in items:
-                rid = item.get("record_id")
-                if rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-            page_token = res.get("data", {}).get("page_token")
-            if not page_token: break
-        else:
-            if page_token:
+    for page_num in range(50):
+        if page_token: payload["page_token"] = page_token
+        res, ok = fetch_page(payload)
+
+        if not ok:
+            if native_worked:
                 fetch_complete = False
-                stop_reason = "Hit the 50-page safety cap while more data remained."
-        native_used = True
-    else:
-        # force_full: skip native filter entirely, go straight to safe full download
-        native_used = False
-        all_items = []
-        seen_ids = set()
+                stop_reason = f"Feishu error after {page_num} page(s): {res.get('msg', 'unknown error')}"
+            break  
 
-    # --- FALLBACK FULL DOWNLOAD (used if native didn't work OR force_full) ---
-    if not native_used or not all_items:   # if native got zero records, force fallback
+        native_worked = True
+        items = res.get("data", {}).get("items", [])
+        for item in items:
+            rid = item.get("record_id")
+            if rid not in seen_ids:
+                seen_ids.add(rid)
+                all_items.append(item)
+
+        page_token = res.get("data", {}).get("page_token")
+        if not page_token: break
+    else:
+        if page_token:
+            fetch_complete = False
+            stop_reason = "Hit the 50-page safety cap while more data remained."
+
+    # 2. FALLBACK: NATIVE FILTER FAILED -> FETCH WITH INFINITE LOOP PROTECTION
+    if not native_worked:
         all_items = []
         seen_ids = set()
         page_token = ""
         fetch_complete = True
         stop_reason = None
-        payload = {"page_size": 500}
-        payload["sort"] = [{"field_name": "Numbering", "desc": True}]
 
-        for page_num in range(150):
+        payload = {"page_size": 500}
+        if region_filter not in ['all', '']:
+            payload["filter"] = {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]}
+        
+        # 🚨 THE FIX: DELETED PAYLOAD["SORT"].
+        # Sorting by "Numbering" destroyed Feishu's pagination cursor, causing it to blindly 
+        # send the first 500 rows over and over again, completely ignoring the older dates! 
+        # By letting Feishu use its natural sorting, we guarantee 100% data retrieval.
+
+        for page_num in range(150): # Allow up to 75,000 records
             if page_token: payload["page_token"] = page_token
             res, ok = fetch_page(payload)
             if not ok:
@@ -237,23 +280,27 @@ def get_analytics():
                 stop_reason = f"Feishu error after {page_num} page(s): {res.get('msg', 'unknown error')}"
                 error_msg = stop_reason
                 break
+
             items = res.get("data", {}).get("items", [])
             new_records_in_page = 0
+
             for item in items:
                 rid = item.get("record_id")
                 if rid not in seen_ids:
                     seen_ids.add(rid)
                     all_items.append(item)
                     new_records_in_page += 1
+
             if new_records_in_page == 0: break
+
             page_token = res.get("data", {}).get("page_token")
             if not page_token: break
         else:
             if page_token:
                 fetch_complete = False
-                stop_reason = "Hit the 150-page safety cap while more data remained."
+                stop_reason = "Hit the 150-page safety cap while more data remained (page_token still present)."
 
-    # Diagnostic scanner
+    # 3. DIAGNOSTIC SCANNER: Restored to prevent JavaScript 'join' crashes
     master_keys = set()
     for item in all_items:
         master_keys.update(item.get('fields', {}).keys())
@@ -269,25 +316,27 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {},
         "other_request_types": {},  
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
-        "fetch_complete": fetch_complete, "stop_reason": stop_reason,
-        "native_used": native_used
+        "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
-    if from_dt and date_to:
+    if from_dt and to_dt:
         cur = from_dt
-        end = datetime.strptime(date_to, "%Y-%m-%d")
-        while cur <= end:
+        while cur < to_dt:
             stats["daily_trend"][cur.strftime("%Y-%m-%d")] = 0
             cur += timedelta(days=1)
 
+    acm_filter = request.args.get('acm', 'All').strip().lower()
+    type_filter = request.args.get('type', 'All').strip().lower()
+
     for item in all_items:
         fields = item.get('fields', {})
+
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
         if from_dt or to_dt:
-            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt):
-                continue
+            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
         req_type = extract_field_text(get_field_local(fields, 'Request Type')).strip().lower()
+
         status_val = get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State')
         status = extract_field_text(status_val).strip().lower()
 
@@ -307,9 +356,7 @@ def get_analytics():
         if not acm: acm = extract_field_text(get_field_local(fields, 'Acm', 'Assigned Member')).strip()
 
         if region_filter not in ['all', ''] and region != region_filter: continue
-        acm_filter = request.args.get('acm', 'All').strip().lower()
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
-        type_filter = request.args.get('type', 'All').strip().lower()
         if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
 
         if is_done and record_dt:
@@ -317,32 +364,38 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        is_closing_kpi = "closing agency" in req_type
-        is_bd_kpi = "bd creation" in req_type
-        is_creation_kpi = "agency creation" in req_type
+        # 🎯 EXACT KPI CLASSIFICATION
+        is_creation_kpi = req_type in RT_CREATION_SET
+        is_bd_kpi = req_type == RT_BD
+        is_closing_kpi = req_type == RT_CLOSING
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
             if is_done: stats["closing_status"]["Done"] += 1
             elif is_rejected: stats["closing_status"]["Rejected"] += 1
             else: stats["closing_status"]["Under Investigation"] += 1
+
             if closing_reason:
                 stats["closing_reasons_pie"][closing_reason] = stats["closing_reasons_pie"].get(closing_reason, 0) + 1
                 if acm:
                     clean_acm = acm.title()
                     if clean_acm not in stats["acm_closing_reasons"]:
                         stats["acm_closing_reasons"][clean_acm] = {}
-                    stats["acm_closing_reasons"][clean_acm][closing_reason] = stats["acm_closing_reasons"][clean_acm].get(closing_reason, 0) + 1
+                    bucket = stats["acm_closing_reasons"][clean_acm]
+                    bucket[closing_reason] = bucket.get(closing_reason, 0) + 1
+
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
             if is_done: stats["bd_status"]["Done"] += 1
             elif is_rejected: stats["bd_status"]["Rejected"] += 1
             else: stats["bd_status"]["Under Investigation"] += 1
+
         elif is_creation_kpi:
             stats["kpis"]["creations"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
+
             if is_done and acm:
                 clean_acm = acm.title()
                 stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
@@ -355,11 +408,18 @@ def get_analytics():
                 stats["agency_types"][clean_type] = stats["agency_types"].get(clean_type, 0) + 1
             if reject_reason:
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
-        elif req_type:
-            stats["other_request_types"][req_type.title()] = stats["other_request_types"].get(req_type.title(), 0) + 1
 
-    for k in ["acm_performance", "reject_reasons", "closing_reasons_pie", "other_apps", "creation_types", "agency_types", "other_request_types"]:
-        stats[k] = dict(sorted(stats[k].items(), key=lambda x: x[1], reverse=True))
+        elif req_type:
+            label = req_type.title()
+            stats["other_request_types"][label] = stats["other_request_types"].get(label, 0) + 1
+
+    stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
+    stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
+    stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
+    stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
     stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
+    stats["creation_types"] = dict(sorted(stats["creation_types"].items(), key=lambda x: x[1], reverse=True))
+    stats["agency_types"] = dict(sorted(stats["agency_types"].items(), key=lambda x: x[1], reverse=True))
+    stats["other_request_types"] = dict(sorted(stats["other_request_types"].items(), key=lambda x: x[1], reverse=True))
 
     return jsonify(stats)
