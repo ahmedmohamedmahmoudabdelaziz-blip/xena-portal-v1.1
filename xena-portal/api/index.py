@@ -20,13 +20,6 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
 # --- 🎯 CANONICAL REQUEST TYPES ---
-# These are the EXACT strings Feishu sends in the "Request Type" field.
-# We match on these instead of loose substrings, because loose substrings
-# ("bd" in text, or "everything else = creation") were silently swallowing
-# unrelated request types into the wrong KPI bucket.
-# "Agency Creation" also folds in the follow-up type below by design - a
-# follow-up on an agency already applied for via an ACM/BD link is still
-# part of the Agency Creation KPI, per how the native Feishu dashboard counts it.
 RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link ( follow-up )"}
 RT_BD = "bd creation"
 RT_CLOSING = "closing agency"
@@ -42,8 +35,6 @@ RT_CLOSING = "closing agency"
 # early morning (Beijing time) on a boundary day gets attributed to the PREVIOUS
 # day, or excluded from the range entirely - which is exactly a partial/undercount
 # right at day boundaries like "not the full 7/7".
-# If your Feishu Base's timezone (Settings -> Base timezone) is NOT Beijing time,
-# change the offset below to match it.
 FEISHU_TZ = timezone(timedelta(hours=8))  # Asia/Shanghai (Beijing time)
 
 def get_tenant_access_token():
@@ -53,14 +44,21 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
-    """PURE LOCAL LOOKUP: Instant string matching. Zero API calls."""
+    """
+    PURE LOCAL LOOKUP: Instant string matching. 
+    🚨 BUGFIX: Explicitly ignores empty fields so a blank 'Submitted on Copy' 
+    doesn't override a valid 'Submitted on'.
+    """
     if not fields: return None
     for alias in aliases:
-        if alias in fields: return fields[alias]
+        if alias in fields and fields[alias] not in (None, "", []): 
+            return fields[alias]
     for alias in aliases:
         tgt = alias.lower().strip()
         for k, v in fields.items():
-            if tgt in k.lower() or k.lower() in tgt: return v
+            if tgt in k.lower() or k.lower() in tgt: 
+                if v not in (None, "", []):
+                    return v
     return None
 
 def extract_field_text(field_data):
@@ -210,15 +208,7 @@ def get_analytics():
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
     def fetch_page(payload):
-        """POST one page to Feishu with retries. A transient error (rate limit,
-        network blip, momentary 5xx) used to be treated exactly like 'no more
-        data' - the loop just broke and returned whatever had been collected
-        so far, with no error surfaced. That is the most likely reason the
-        dashboard has been quietly cutting off partway through a day: Feishu
-        hiccups once on page N, and the old code silently accepted pages
-        1..N-1 as 'the whole answer'. Now we retry a few times before giving up,
-        and the caller can tell the difference between 'Feishu said no more
-        pages' and 'we gave up after repeated errors'."""
+        """POST one page to Feishu with retries."""
         last = None
         for attempt in range(3):
             try:
@@ -244,10 +234,11 @@ def get_analytics():
         conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
     if from_dt:
         from_ts = int(from_dt.replace(tzinfo=FEISHU_TZ).timestamp() * 1000)
-        conditions.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [from_ts]})
+        # BUGFIX: API expects string values in the array
+        conditions.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [str(from_ts)]})
     if to_dt:
         to_ts = int(to_dt.replace(tzinfo=FEISHU_TZ).timestamp() * 1000)
-        conditions.append({"field_name": "Submitted on", "operator": "isLess", "value": [to_ts]})
+        conditions.append({"field_name": "Submitted on", "operator": "isLess", "value": [str(to_ts)]})
 
     payload = {"page_size": 500}
     if conditions: payload["filter"] = {"conjunction": "and", "conditions": conditions}
@@ -258,8 +249,6 @@ def get_analytics():
 
         if not ok:
             if native_worked:
-                # We had a good run going and then Feishu started erroring - this is
-                # the silent-truncation bug. Surface it instead of hiding it.
                 fetch_complete = False
                 stop_reason = f"Feishu error after {page_num} page(s): {res.get('msg', 'unknown error')}"
             break  # Native filter rejected or failed - break to fallback
@@ -275,7 +264,6 @@ def get_analytics():
         page_token = res.get("data", {}).get("page_token")
         if not page_token: break
     else:
-        # Ran all 50 iterations without Feishu ever telling us we were done.
         if page_token:
             fetch_complete = False
             stop_reason = "Hit the 50-page safety cap while more data remained (page_token still present)."
@@ -289,19 +277,14 @@ def get_analytics():
         stop_reason = None
 
         payload = {"page_size": 500}
-        if region_filter not in ['all', '']:
-            payload["filter"] = {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]}
-        # 🚨 FIX: "Submitted on" is a date field - many records share the same day,
-        # so it is NOT a unique sort key. Feishu's pagination cursor can get confused
-        # when sorting on a non-unique field and re-send the same page forever. Our
-        # "Infinite Loop Destroyer" below was catching that and bailing out early,
-        # which silently truncated the fetch to the first ~500 records of the month.
-        # "Numbering" is a true auto-increment unique field, so sorting on it gives
-        # Feishu a stable, unambiguous cursor and pagination proceeds correctly
-        # through the entire table.
+        
+        # 🚨 BUGFIX: Removed payload["filter"] from Fallback. Mixing a "Contains" 
+        # filter with a custom sort causes Feishu to randomly error mid-download.
+        # Python will handle the Region filtering natively in local memory.
+        
         payload["sort"] = [{"field_name": "Numbering", "desc": True}]
 
-        for page_num in range(50):
+        for page_num in range(150): # Increased loop cap to 150 to pull 75,000 rows
             if page_token: payload["page_token"] = page_token
             res, ok = fetch_page(payload)
             if not ok:
@@ -320,17 +303,6 @@ def get_analytics():
                     all_items.append(item)
                     new_records_in_page += 1
 
-            # NOTE: we no longer early-exit based on date once we cross from_dt.
-            # That shortcut only worked when results arrived in descending date
-            # order (the old, unstable "Submitted on" sort). Now that we sort by
-            # "Numbering" for pagination stability, records are NOT in date order,
-            # so we must walk every page and let the per-record date filter further
-            # down in this function do the actual date-range filtering.
-
-            # 🚨 INFINITE LOOP DESTROYER: kept as a genuine safety net - if Feishu
-            # really does resend a page with zero new record_ids, stop instead of
-            # spinning. With a unique sort key this should no longer trigger
-            # prematurely.
             if new_records_in_page == 0: break
 
             page_token = res.get("data", {}).get("page_token")
@@ -338,7 +310,7 @@ def get_analytics():
         else:
             if page_token:
                 fetch_complete = False
-                stop_reason = "Hit the 50-page safety cap while more data remained (page_token still present)."
+                stop_reason = "Hit the 150-page safety cap while more data remained."
 
     # 3. DIAGNOSTIC SCANNER: Aggregate ALL columns found in the downloaded records
     master_keys = set()
@@ -354,11 +326,8 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "other_request_types": {},  # 🔎 visibility into everything that is NOT a KPI (was silently miscounted before)
+        "other_request_types": {},  
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
-        # 🚨 NEW: tells the frontend (and you) whether this is the FULL answer or a
-        # truncated one. Before, a mid-fetch Feishu error or hitting the page cap
-        # looked identical to "that's all the data there is" - now it's explicit.
         "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
@@ -372,6 +341,8 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
+        # 🚨 BUGFIX: Explicitly search for 'Submitted on Copy' and 'Submitted on'.
+        # Since we patched get_field_local, blank cells no longer corrupt the dates.
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
@@ -388,7 +359,7 @@ def get_analytics():
         closing_reason = extract_field_text(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
         other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps')).strip()
 
-        # 🚀 STATUS MATCHING (kept fuzzy on purpose - Done/Rejected/Under Investigation are stable Feishu labels)
+        # 🚀 STATUS MATCHING
         is_done = "done" in status or "complet" in status or "approv" in status
         is_rejected = "reject" in status or "fail" in status or "decline" in status
 
@@ -409,12 +380,6 @@ def get_analytics():
                 stats["daily_trend"][date_str] += 1
 
         # 🎯 EXACT KPI CLASSIFICATION
-        # Previously: anything that wasn't "clos.." or "bd.." got dumped into "Creations".
-        # That caught Agency Target Privilege, Point Requests, Host Sign changes, App Rating
-        # Rewards, Short ID changes, Room Pinup, Welcome Package, name changes, etc. and
-        # inflated the Creation KPI by roughly 2.5x on real data. We now match the exact
-        # Feishu "Request Type" labels for each KPI, and put everything else into
-        # "other_request_types" instead of silently miscounting it.
         is_creation_kpi = req_type in RT_CREATION_SET
         is_bd_kpi = req_type == RT_BD
         is_closing_kpi = req_type == RT_CLOSING
@@ -429,9 +394,6 @@ def get_analytics():
                 stats["closing_reasons_pie"][closing_reason] = stats["closing_reasons_pie"].get(closing_reason, 0) + 1
                 if acm:
                     clean_acm = acm.title()
-                    # Build the reason bucket dynamically so we never silently drop a reason
-                    # (the old hardcoded {"User Request":0, "Duplicated Hosting":0} dict was
-                    # dropping "Acm Request" and "Opened by mistake" records).
                     if clean_acm not in stats["acm_closing_reasons"]:
                         stats["acm_closing_reasons"][clean_acm] = {}
                     bucket = stats["acm_closing_reasons"][clean_acm]
@@ -463,9 +425,6 @@ def get_analytics():
                 stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
         elif req_type:
-            # Anything else (Agency Target Privilege, Point Request, Host Sign, Short ID,
-            # Room Pinup, Welcome Package, name change, etc.) is tracked for visibility
-            # only - it is NOT one of the three KPI cards.
             label = req_type.title()
             stats["other_request_types"][label] = stats["other_request_types"].get(label, 0) + 1
 
