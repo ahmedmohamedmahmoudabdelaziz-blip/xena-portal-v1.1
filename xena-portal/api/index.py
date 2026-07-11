@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -74,11 +74,11 @@ def parse_feishu_date(date_val):
 
     try:
         if isinstance(date_val, (int, float)):
-            return datetime.fromtimestamp(date_val / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+            return (datetime.fromtimestamp(date_val / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0)
         
         date_str = str(date_val).strip()
         if date_str.isdigit():
-            return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+            return (datetime.fromtimestamp(int(date_str) / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0)
         
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
@@ -168,7 +168,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE BULLETPROOF ANALYTICS PIPELINE ---
+# --- 🚀 THE UNBREAKABLE ANALYTICS PIPELINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -180,13 +180,19 @@ def get_analytics():
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
+    # 1. PARSE ALL FILTERS
     region_filter = request.args.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
+
+    acm_filter = request.args.get('acm', 'All').strip().lower()
+    type_filter = request.args.get('type', 'All').strip().lower()
 
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    now = datetime.now()
+    # Offset Server Time to Cairo (+3) for perfect monthly boundaries
+    now = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
+    
     if not date_from or not date_to:
         from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         if now.month == 12:
@@ -211,6 +217,12 @@ def get_analytics():
             time.sleep(0.6 * (attempt + 1))
         return last, False
 
+    # =========================================================================
+    # 🚨 BLIND FETCHING: NO FILTERS, NO SORTING. 
+    # Feishu will reliably dump all 10,000 rows in default order without breaking.
+    # =========================================================================
+    payload = {"page_size": 500}
+
     all_items = []
     seen_ids = set()
     page_token = ""
@@ -218,23 +230,13 @@ def get_analytics():
     fetch_complete = True
     stop_reason = None
 
-    # =========================================================================
-    # 🚨 BLIND FETCH: NO API FILTERS.
-    # Mixing filters + custom sorting causes Feishu to timeout after Page 2. 
-    # By strictly using ONLY 'sort', Feishu streams the entire table incredibly fast.
-    # =========================================================================
-    payload = {
-        "page_size": 500,
-        "sort": [{"field_name": "Numbering", "desc": True}]
-    }
-
-    for page_num in range(150): # Allow up to 75,000 records
+    for page_num in range(150): # Cap at 75,000 records
         if page_token: payload["page_token"] = page_token
-        res, ok = fetch_page(payload)
         
+        res, ok = fetch_page(payload)
         if not ok:
             fetch_complete = False
-            stop_reason = f"Feishu API error after {page_num} page(s): {res.get('msg', 'unknown error')}"
+            stop_reason = f"Feishu error after {page_num} page(s): {res.get('msg', 'unknown error')}"
             error_msg = stop_reason
             break
 
@@ -243,23 +245,22 @@ def get_analytics():
 
         for item in items:
             rid = item.get("record_id")
-            if rid and rid not in seen_ids:
+            if rid not in seen_ids:
                 seen_ids.add(rid)
                 all_items.append(item)
                 new_records_in_page += 1
 
-        # Because we used "Numbering", pagination is perfectly unique and stable.
         if new_records_in_page == 0: break
 
         page_token = res.get("data", {}).get("page_token")
-        if not page_token or not res.get("data", {}).get("has_more", False): 
+        if not page_token or not res.get("data", {}).get("has_more", False):
             break
     else:
         if page_token:
             fetch_complete = False
             stop_reason = "Hit the 150-page safety cap while more data remained."
 
-    # 3. DIAGNOSTIC SCANNER RESTORED
+    # DIAGNOSTIC SCANNER 
     master_keys = set()
     for item in all_items:
         master_keys.update(item.get('fields', {}).keys())
@@ -273,7 +274,7 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "other_request_types": {},  
+        "other_request_types": {},
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
         "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
@@ -287,22 +288,22 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        # EXACT LOCAL DATE ENFORCEMENT
+        # 1. LOCAL DATE ENFORCEMENT
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
-        # EXACT LOCAL REGION ENFORCEMENT
+        # 2. LOCAL REGION ENFORCEMENT
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
         if region_filter != 'all' and region != region_filter: continue
 
         req_type = clean(get_field_local(fields, 'Request Type'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
 
-        creation_type = clean(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type'))
-        reject_reason = clean(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason'))
+        creation_type = clean(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type'))
+        reject_reason = clean(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason'))
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
-        closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason'))
+        closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
 
         is_done = "done" in status or "complet" in status or "approv" in status
@@ -340,9 +341,11 @@ def get_analytics():
                 if acm:
                     clean_acm = acm.title()
                     if clean_acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][clean_acm] = {}
-                    bucket = stats["acm_closing_reasons"][clean_acm]
-                    bucket[cr_title] = bucket.get(cr_title, 0) + 1
+                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    if "user" in closing_reason:
+                        stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
+                    elif "dup" in closing_reason:
+                        stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
