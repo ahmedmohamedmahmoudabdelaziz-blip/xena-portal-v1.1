@@ -69,19 +69,19 @@ def clean(field_data):
     return extract_field_text(field_data).strip()
 
 def parse_feishu_date(date_val):
-    """The Timezone Protector: Offsets Vercel's UTC clock to Cairo (+3 Hours)."""
+    """The Timezone Protector FIX: Strips tzinfo to prevent Python math crashes."""
     if not date_val: return None
     if isinstance(date_val, list) and date_val: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
 
     dt = None
     if isinstance(date_val, (int, float)):
-        # Apply Egypt UTC+3 Timezone Offset
-        dt = datetime.fromtimestamp(date_val / 1000.0, timezone.utc) + timedelta(hours=3)
+        # UTC + 3 Hours (Egypt). replace(tzinfo=None) makes it safely comparable.
+        dt = datetime.fromtimestamp(date_val / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
     elif isinstance(date_val, str):
         s = date_val.strip()
         if s.isdigit():
-            dt = datetime.fromtimestamp(int(s) / 1000.0, timezone.utc) + timedelta(hours=3)
+            dt = datetime.fromtimestamp(int(s) / 1000.0, timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
         else:
             for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y/%m/%d"):
                 try:
@@ -173,10 +173,6 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# =========================================================================
-# 🚀 GROUND TRUTH ANALYTICS ENGINE
-# Mirrored perfectly against your Lark Video Filters
-# =========================================================================
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -197,7 +193,6 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
-    # 1. THE NATIVE REGION PROTECTOR (Prevent Vercel Timeouts)
     payload = {"page_size": 500}
     if region_filter not in ('all', ''):
         payload["filter"] = {
@@ -227,7 +222,7 @@ def get_analytics():
                     all_items.append(item)
                     new_count += 1
 
-            if new_count == 0: break # Infinite Loop Destroyer
+            if new_count == 0: break 
             
             page_token = res.get("data", {}).get("page_token")
             if not page_token: break
@@ -235,7 +230,6 @@ def get_analytics():
             error_msg = str(e)
             break
 
-    # 2. DATA AGGREGATOR
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
@@ -260,7 +254,6 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        # Protect against empty date cells and prioritize literal strings over epoch timestamps
         raw_date = get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time')
         record_dt = parse_feishu_date(raw_date)
         
@@ -275,7 +268,6 @@ def get_analytics():
         req_type = clean(get_field_local(fields, 'Request Type')).lower()
         status = clean(get_field_local(fields, 'Status', 'Request Status')).lower()
         
-        # Mirror Lark exact logic
         is_done = "done" in status or "complet" in status
         is_rejected = "reject" in status or "fail" in status
 
@@ -288,20 +280,15 @@ def get_analytics():
             continue
 
         agency_type = clean(get_field_local(fields, 'Agency Type'))
-        # Normalize Casing (Acm hunting vs ACM hunting)
         agency_type_norm = agency_type.title() if agency_type else ""
         if type_filter not in ('all', 'all types', '') and type_filter != agency_type.lower():
             continue
 
-        # KPI #12 Daily trend: Video confirms this tracks "Status Done" for the selected Date Range
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
-            if date_str in stats["daily_trend"]:
-                stats["daily_trend"][date_str] += 1
+            # Safe assignment for 'All Time' view
+            stats["daily_trend"][date_str] = stats["daily_trend"].get(date_str, 0) + 1
 
-        # ---- LARK VIDEO MIRRORING (Uses "Contains" logic, not exact match) --------
-        
-        # KPI: Closing Agency 
         if "closing agency" in req_type:
             stats["kpis"]["closings"] += 1
             if is_done: stats["closing_status"]["Done"] += 1
@@ -316,40 +303,35 @@ def get_analytics():
                     bucket = stats["acm_closing_reasons"].setdefault(clean_acm, {})
                     bucket[closing_reason] = bucket.get(closing_reason, 0) + 1
 
-        # KPI: BD Creation
         elif "bd creation" in req_type:
             stats["kpis"]["bds"] += 1
             if is_done: stats["bd_status"]["Done"] += 1
             elif is_rejected: stats["bd_status"]["Rejected"] += 1
             else: stats["bd_status"]["Under Investigation"] += 1
 
-        # KPI: Agency Creation 
         elif "agency creation" in req_type:
             stats["kpis"]["creations"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
 
-            # ACM Onboarding Performance (Only counts "Done" per video)
             if is_done and acm:
                 clean_acm = acm.title()
                 stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
 
-            # Other App Name (Only counts "Done" per video)
             other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name'))
             if is_done and other_app:
                 stats["other_apps"][other_app] = stats["other_apps"].get(other_app, 0) + 1
 
-            creation_type = clean(get_field_local(fields, 'Create Way', 'Agencies Creation Type'))
+            creation_type = clean(get_field_local(fields, 'Create Way', 'Agencies Creation Type', 'PK Agencies Creation Type', 'IN Agencies Creation Type'))
             if creation_type:
                 stats["creation_types"][creation_type] = stats["creation_types"].get(creation_type, 0) + 1
 
             if agency_type_norm:
                 stats["agency_types"][agency_type_norm] = stats["agency_types"].get(agency_type_norm, 0) + 1
 
-            # Rejection Reasons (Only counts Rejected per video)
             if is_rejected:
-                reject_reason = clean(get_field_local(fields, 'Reject Reason', 'Rejection Reason'))
+                reject_reason = clean(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'PK Agencies Rejection reason'))
                 if reject_reason:
                     stats["reject_reasons"][reject_reason] = stats["reject_reasons"].get(reject_reason, 0) + 1
 
