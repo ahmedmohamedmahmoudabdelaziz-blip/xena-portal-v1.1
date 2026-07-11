@@ -241,7 +241,15 @@ def get_analytics():
         payload = {"page_size": 500}
         if region_filter not in ['all', '']:
             payload["filter"] = {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]}
-        payload["sort"] = [{"field_name": "Submitted on", "desc": True}]
+        # 🚨 FIX: "Submitted on" is a date field - many records share the same day,
+        # so it is NOT a unique sort key. Feishu's pagination cursor can get confused
+        # when sorting on a non-unique field and re-send the same page forever. Our
+        # "Infinite Loop Destroyer" below was catching that and bailing out early,
+        # which silently truncated the fetch to the first ~500 records of the month.
+        # "Numbering" is a true auto-increment unique field, so sorting on it gives
+        # Feishu a stable, unambiguous cursor and pagination proceeds correctly
+        # through the entire table.
+        payload["sort"] = [{"field_name": "Numbering", "desc": True}]
 
         for _ in range(50):
             if page_token: payload["page_token"] = page_token
@@ -251,7 +259,6 @@ def get_analytics():
 
                 items = res.get("data", {}).get("items", [])
                 new_records_in_page = 0
-                stop_paginating = False
 
                 for item in items:
                     rid = item.get("record_id")
@@ -260,15 +267,17 @@ def get_analytics():
                         all_items.append(item)
                         new_records_in_page += 1
 
-                        # Apply Date Brakes
-                        if from_dt:
-                            rec_dt = parse_feishu_date(get_field_local(item.get('fields', {}), 'Submitted on', 'Submitted on Copy'))
-                            if rec_dt and rec_dt < from_dt:
-                                stop_paginating = True
+                # NOTE: we no longer early-exit based on date once we cross from_dt.
+                # That shortcut only worked when results arrived in descending date
+                # order (the old, unstable "Submitted on" sort). Now that we sort by
+                # "Numbering" for pagination stability, records are NOT in date order,
+                # so we must walk every page and let the per-record date filter further
+                # down in this function do the actual date-range filtering.
 
-                if stop_paginating: break
-
-                # 🚨 INFINITE LOOP DESTROYER: If Feishu sends the exact same page, stop immediately!
+                # 🚨 INFINITE LOOP DESTROYER: kept as a genuine safety net - if Feishu
+                # really does resend a page with zero new record_ids, stop instead of
+                # spinning. With a unique sort key this should no longer trigger
+                # prematurely.
                 if new_records_in_page == 0: break
 
                 page_token = res.get("data", {}).get("page_token")
