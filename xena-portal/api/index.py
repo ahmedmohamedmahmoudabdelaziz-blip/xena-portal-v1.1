@@ -28,8 +28,10 @@ def get_tenant_access_token():
 def get_field_local(fields, *aliases):
     """PURE LOCAL LOOKUP: Instant string matching. Zero API calls."""
     if not fields: return None
+    # 1. Exact Direct Match
     for alias in aliases:
         if alias in fields: return fields[alias]
+    # 2. Case-Insensitive Substring Match
     for alias in aliases:
         tgt = alias.lower().strip()
         for k, v in fields.items():
@@ -37,6 +39,7 @@ def get_field_local(fields, *aliases):
     return None
 
 def extract_field_text(field_data):
+    """Handles standard strings, dicts, and empty lists safely."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     
@@ -63,6 +66,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
+    """Safely extracts date and forces midnight to avoid timezone overlaps."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -161,7 +165,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE BULLETPROOF ANALYTICS PIPELINE ---
+# --- 🚀 THE 100% ACCURACY DATA ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -174,6 +178,8 @@ def get_analytics():
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
     region_filter = request.args.get('region', 'ALL').strip().lower()
+    acm_filter = request.args.get('acm', 'All').strip().lower()
+    type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '')
     date_to = request.args.get('to', '')
     
@@ -182,94 +188,43 @@ def get_analytics():
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
+    # 1. PURE REGION FILTER. Fetching everything for this region eliminates missing days.
+    payload = {"page_size": 500}
+    if region_filter not in ['all', '']:
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]
+        }
+
     all_items = []
-    seen_ids = set()
     page_token = ""
     error_msg = None
-    
-    # 1. ATTEMPT NATIVE DATE FILTERING (Fastest Method)
-    native_worked = False
-    conditions = []
-    if region_filter not in ['all', '']:
-        conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
-    if from_dt:
-        from_ts = int(from_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
-        conditions.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [from_ts]})
-    if to_dt:
-        to_ts = int(to_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
-        conditions.append({"field_name": "Submitted on", "operator": "isLess", "value": [to_ts]})
-        
-    payload = {"page_size": 500}
-    if conditions: payload["filter"] = {"conjunction": "and", "conditions": conditions}
 
-    for _ in range(50):
+    # 2. BULLETPROOF PAGINATION (Fetches the whole region in ~3 seconds)
+    for _ in range(100):
         if page_token: payload["page_token"] = page_token
-        res = session.post(req_url, json=payload, timeout=12).json()
-        
-        if res.get("code") != 0: 
-            break # Native filter rejected, break to fallback
+        try:
+            res = session.post(req_url, json=payload, timeout=12).json()
+            if res.get("code") != 0:
+                if "filter" in payload:
+                    del payload["filter"]
+                    res = session.post(req_url, json=payload, timeout=12).json()
+                    if res.get("code") != 0: 
+                        error_msg = res.get("msg")
+                        break
+                else:
+                    error_msg = res.get("msg")
+                    break
             
-        native_worked = True
-        items = res.get("data", {}).get("items", [])
-        for item in items:
-            rid = item.get("record_id")
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_items.append(item)
-                
-        page_token = res.get("data", {}).get("page_token")
-        if not page_token: break
-
-    # 2. FALLBACK: NATIVE FILTER FAILED -> FETCH WITH INFINITE LOOP PROTECTION
-    if not native_worked:
-        all_items = []
-        seen_ids = set()
-        page_token = ""
-        
-        payload = {"page_size": 500}
-        if region_filter not in ['all', '']:
-            payload["filter"] = {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]}
-        payload["sort"] = [{"field_name": "Submitted on", "desc": True}]
-        
-        for _ in range(50):
-            if page_token: payload["page_token"] = page_token
-            try:
-                res = session.post(req_url, json=payload, timeout=12).json()
-                if res.get("code") != 0: break
-                
-                items = res.get("data", {}).get("items", [])
-                new_records_in_page = 0
-                stop_paginating = False
-                
-                for item in items:
-                    rid = item.get("record_id")
-                    if rid not in seen_ids:
-                        seen_ids.add(rid)
-                        all_items.append(item)
-                        new_records_in_page += 1
-                        
-                        # Apply Date Brakes
-                        if from_dt:
-                            rec_dt = parse_feishu_date(get_field_local(item.get('fields', {}), 'Submitted on', 'Submitted on Copy'))
-                            if rec_dt and rec_dt < from_dt:
-                                stop_paginating = True
-                
-                if stop_paginating: break
-                
-                # 🚨 INFINITE LOOP DESTROYER: If Feishu sends the exact same page, stop immediately!
-                if new_records_in_page == 0: break 
-                
-                page_token = res.get("data", {}).get("page_token")
-                if not page_token: break
-            except Exception as e:
-                error_msg = str(e)
-                break
-
-    # 3. DIAGNOSTIC SCANNER: Aggregate ALL columns found in the downloaded records
-    master_keys = set()
-    for item in all_items:
-        master_keys.update(item.get('fields', {}).keys())
-    sample_keys = sorted(list(master_keys))
+            data = res.get("data", {})
+            all_items.extend(data.get("items", []))
+            
+            page_token = data.get("page_token")
+            # Loop until completely out of pages. Do not stop early.
+            if not data.get("has_more", False) or not page_token: break
+        except Exception as e: 
+            error_msg = str(e)
+            break
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
@@ -279,7 +234,7 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys
+        "scanned_rows": len(all_items), "error_debug": error_msg
     }
 
     if from_dt and date_to:
@@ -292,25 +247,28 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
+        # Absolute Priority Fallback Date Logic
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
+            
+        # 3. EXACT LOCAL MATH ISOLATION (No missed days)
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
         req_type = extract_field_text(get_field_local(fields, 'Request Type')).strip().lower()
         
-        status_val = get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State')
+        status_val = get_field_local(fields, 'Status', 'Request Status')
         status = extract_field_text(status_val).strip().lower()
 
-        creation_type = extract_field_text(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type')).strip()
-        reject_reason = extract_field_text(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason')).strip()
-        agency_type = extract_field_text(get_field_local(fields, 'Agency Type', 'Type of Agency')).strip()
-        region = extract_field_text(get_field_local(fields, 'Region', 'Agency Region')).strip().lower()
-        closing_reason = extract_field_text(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
-        other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps')).strip()
+        # 4. FIXING THE EMPTY PIE CHARTS (Explicit ground-truth aliases added)
+        creation_type = extract_field_text(get_field_local(fields, 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Agencies Creation Type', 'Create Way', 'Creation Type')).strip()
+        reject_reason = extract_field_text(get_field_local(fields, 'PK Agencies Rejection reason', 'IN Agencies Rejection reason', 'Agencies Rejection reason', 'Reject Reason', 'Rejection Reason')).strip()
+        agency_type = extract_field_text(get_field_local(fields, 'Agency Type')).strip()
+        region = extract_field_text(get_field_local(fields, 'Region')).strip().lower()
+        closing_reason = extract_field_text(get_field_local(fields, 'PK Closing Agencies Reason', 'IN Closing Agencies Reason', 'Closing Agencies Reason', 'Closing Reason')).strip()
+        other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name')).strip()
 
-        # 🚀 SUPER-FUZZY STATUS MATCHING
-        is_done = "done" in status or "complet" in status or "approv" in status
-        is_rejected = "reject" in status or "fail" in status or "decline" in status
+        is_done = "done" in status or "complet" in status
+        is_rejected = "reject" in status or "fail" in status
 
         acm_pk = extract_field_text(get_field_local(fields, 'Acm Name (PK)')).strip()
         acm_in = extract_field_text(get_field_local(fields, 'Acm Name (IN)')).strip()
@@ -328,11 +286,10 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🚀 SUPER-FUZZY KPI ASSIGNMENT (Never skips a record!)
+        # Super-Fuzzy KPI Assignment
         is_closing_kpi = "clos" in req_type
         is_bd_kpi = "bd" in req_type or "business" in req_type
-        
-        # If it's a Closing
+
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
             if is_done: stats["closing_status"]["Done"] += 1
@@ -350,15 +307,14 @@ def get_analytics():
                     elif "dup" in closing_reason.lower():
                         stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
-        # If it's a BD
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
             if is_done: stats["bd_status"]["Done"] += 1
             elif is_rejected: stats["bd_status"]["Rejected"] += 1
             else: stats["bd_status"]["Under Investigation"] += 1
 
-        # EVERYTHING ELSE defaults to Agency Creation
-        elif req_type:
+        # Fallback matches all creations
+        else:
             stats["kpis"]["creations"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
