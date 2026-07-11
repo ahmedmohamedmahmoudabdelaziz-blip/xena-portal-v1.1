@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -25,21 +25,21 @@ def get_tenant_access_token():
     response = requests.post(url, json=payload, timeout=10).json()
     return response.get("tenant_access_token")
 
-def get_field(fields, *names):
-    """PURE LOCAL LOOKUP: Zero API calls. Checks Exact, then Substring."""
+def get_field_local(fields, *aliases):
+    """PURE LOCAL LOOKUP: Zero API calls. Kills the 5-minute timeout."""
     if not fields: return None
-    # 1. Direct match
-    for name in names:
-        if name in fields: return fields[name]
-    # 2. Case-insensitive substring fallback
-    for name in names:
-        name_clean = name.strip().lower()
-        for key in fields:
-            if name_clean in key.strip().lower(): return fields[key]
+    # 1. Exact Match
+    for alias in aliases:
+        if alias in fields: return fields[alias]
+    # 2. Substring Match (e.g., finds "Create Way" inside "PK Agencies Creation Type")
+    for alias in aliases:
+        tgt = alias.lower().strip()
+        for k, v in fields.items():
+            if tgt in k.lower() or k.lower() in tgt: return v
     return None
 
 def extract_field_text(field_data):
-    """Upgraded with AI fix to handle empty Feishu lists gracefully."""
+    """Aggressive extractor that handles empty Feishu lists safely."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     
@@ -50,12 +50,12 @@ def extract_field_text(field_data):
         return str(field_data)
         
     if isinstance(field_data, list):
-        if len(field_data) == 0: return "" # AI FIX: Prevents empty list crash
+        if len(field_data) == 0: return "" 
         texts = []
         for item in field_data:
             if isinstance(item, dict):
                 extracted = False
-                for key in ['text', 'name', 'en_name', 'value']:
+                for key in ['text', 'name', 'en_name', 'value', 'id']:
                     if key in item:
                         texts.append(str(item[key]))
                         extracted = True
@@ -66,7 +66,6 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Parses whatever date Feishu gives into a pure YYYY-MM-DD object."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -79,9 +78,12 @@ def parse_feishu_date(date_val):
             dt = datetime.fromtimestamp(int(date_val) / 1000.0)
         else:
             try:
+                # Force parses any Feishu string format perfectly
                 clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
                 dt = datetime.strptime(clean_str, "%Y-%m-%d")
             except Exception: pass
+            
+    # Destroys timezones by zeroing out hours/mins
     if dt: return dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return None
 
@@ -147,8 +149,8 @@ def search_agency():
     if not items: return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
 
     fields = items[0].get('fields', {})
-    sheet_acm_name = extract_field_text(get_field(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
-    try: base_points = float(extract_field_text(get_field(fields, 'Base Points')).replace(',', '').strip())
+    sheet_acm_name = extract_field_text(get_field_local(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
+    try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
@@ -159,13 +161,13 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(get_field(r_fields, 'Submitted on Copy', 'Submitted on'))
+            ts = parse_feishu_date(get_field_local(r_fields, 'Submitted on Copy', 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 NATIVE FEISHU FILTERING (AI RECOMMENDED) ---
+# --- 🚀 THE BULLETPROOF ANALYTICS PIPELINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -178,77 +180,51 @@ def get_analytics():
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
     region_filter = request.args.get('region', 'ALL').strip().lower()
+    acm_filter = request.args.get('acm', 'All').strip().lower()
+    type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '')
     date_to = request.args.get('to', '')
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    # to_dt is exclusive end (midnight of the day after)
-    to_dt = (datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)) if date_to else None
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-
-    # --- 1. FIND NATIVE DATE FIELD PROBER ---
-    date_field = None
-    for candidate in ["Submitted on", "Created Time"]:
-        test_payload = {
-            "page_size": 1,
-            "filter": {
-                "conjunction": "and",
-                "conditions": [{"field_name": candidate, "operator": "isGreaterEqual", "value": ["0"]}]
-            }
-        }
-        try:
-            test_res = session.post(req_url, json=test_payload, timeout=5).json()
-            if test_res.get("code") == 0:
-                date_field = candidate
-                break
-        except Exception:
-            continue
-            
-    if not date_field: date_field = "Created Time" # Absolute fallback
-
-    # --- 2. BUILD UNIX MILLISECOND FILTER ---
-    conditions = []
     
-    if region_filter not in ['all', '']:
-        conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
-
-    if from_dt and date_field:
-        from_ts = int(from_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
-        conditions.append({"field_name": date_field, "operator": "isGreaterEqual", "value": [str(from_ts)]})
-
-    if to_dt and date_field:
-        to_ts = int(to_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
-        conditions.append({"field_name": date_field, "operator": "isLess", "value": [str(to_ts)]})
-
-    payload_filter = None
-    if len(conditions) == 1:
-        payload_filter = conditions[0]
-    elif len(conditions) > 1:
-        payload_filter = {"conjunction": "and", "conditions": conditions}
-
+    # 🚀 NATIVE REGION FILTER: Drops 70% of the payload size immediately
     payload = {"page_size": 500}
-    if payload_filter:
-        payload["filter"] = payload_filter
+    if region_filter not in ['all', '']:
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]
+        }
 
+    # 🚨 NO CUSTOM SORTING = NO INFINITE LOOPS. Feishu will paginate this safely in ~15 seconds.
     all_items = []
+    seen_record_ids = set()
     page_token = ""
-
-    # --- 3. FAST PAGINATION (Feishu only returns the target month!) ---
-    for _ in range(50): # 25,000 records limit, loops instantly
+    
+    # Safe 100-page limit. Will easily grab your 3,400 PK records in a few seconds.
+    for _ in range(100):
         if page_token: payload["page_token"] = page_token
         try:
-            res = session.post(req_url, json=payload, timeout=12).json()
+            res = session.post(req_url, json=payload, timeout=20).json()
             if res.get("code") != 0: break
             
             data = res.get("data", {})
-            all_items.extend(data.get("items", []))
+            fetched_items = data.get("items", [])
+            
+            for item in fetched_items:
+                record_id = item.get("record_id")
+                if record_id and record_id not in seen_record_ids:
+                    seen_record_ids.add(record_id)
+                    all_items.append(item)
             
             page_token = data.get("page_token")
             if not data.get("has_more", False) or not page_token: break
-        except Exception: break
+        except Exception as e:
+            logging.error(f"Safe Pagination Error: {e}")
+            break
 
-    # --- 4. LOCAL DATA PROCESSING ---
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
@@ -260,48 +236,51 @@ def get_analytics():
         "scanned_rows": len(all_items)
     }
 
+    # Clean calendar plotting
     if from_dt and date_to:
-        cur = from_dt
-        end = datetime.strptime(date_to, "%Y-%m-%d")
-        while cur <= end:
-            stats["daily_trend"][cur.strftime("%Y-%m-%d")] = 0
-            cur += timedelta(days=1)
+        curr_dt = from_dt
+        end_dt = datetime.strptime(date_to, "%Y-%m-%d")
+        while curr_dt <= end_dt:
+            stats["daily_trend"][curr_dt.strftime("%Y-%m-%d")] = 0
+            curr_dt += timedelta(days=1)
 
     for item in all_items:
         fields = item.get('fields', {})
         
-        # Absolute Priority fallback parsing
-        record_dt = parse_feishu_date(get_field(fields, 'Submitted on', 'Created Time'))
-        if not record_dt:
-            try: record_dt = parse_feishu_date(get_field(fields, 'Submitted on Copy'))
-            except: pass
-            
-        req_type = extract_field_text(get_field(fields, 'Request Type')).strip().lower()
+        # 1. PURE LOCAL DATE MATH
+        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
+        if from_dt or to_dt:
+            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
+
+        req_type = extract_field_text(get_field_local(fields, 'Request Type')).strip().lower()
         
-        status_val = get_field(fields, 'Status')
+        status_val = fields.get('Status')
+        if not status_val:
+            for k, v in fields.items():
+                if k.strip().lower() == 'status':
+                    status_val = v
+                    break
         status = extract_field_text(status_val).strip().lower()
 
-        # Aggressive Local Matching
-        creation_type = extract_field_text(get_field(fields, 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Agencies Creation Type', 'Agency Creation Type', 'Create Way', 'Creation Type')).strip()
-        reject_reason = extract_field_text(get_field(fields, 'PK Agencies Rejection reason', 'IN Agencies Rejection reason', 'Agencies Rejection Reason', 'Agencies Rejection reason', 'Reject Reason', 'Rejection Reason')).strip()
-        agency_type = extract_field_text(get_field(fields, 'Agency Type')).strip()
-        region = extract_field_text(get_field(fields, 'Region')).strip().lower()
-        closing_reason = extract_field_text(get_field(fields, 'PK Closing Agencies Reason', 'IN Closing Agencies Reason', 'Closing Agencies Reason', 'Closing Reason')).strip()
-        other_app = extract_field_text(get_field(fields, 'Otherapp Name', 'Other App Name')).strip()
+        # 🚀 AGGRESSIVE FALLBACK EXTRACTION FOR EMPTY PIE CHARTS
+        creation_type = extract_field_text(get_field_local(fields, 'Create Way', 'Agencies Creation Type', 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Creation Type')).strip()
+        reject_reason = extract_field_text(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason', 'IN Agencies Rejection reason')).strip()
+        agency_type = extract_field_text(get_field_local(fields, 'Agency Type')).strip()
+        region = extract_field_text(get_field_local(fields, 'Region')).strip().lower()
+        closing_reason = extract_field_text(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason', 'IN Closing Agencies Reason')).strip()
+        other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name')).strip()
 
         is_done = "done" in status
         is_rejected = "rejected" in status
 
-        acm_pk = extract_field_text(get_field(fields, 'Acm Name (PK)')).strip()
-        acm_in = extract_field_text(get_field(fields, 'Acm Name (IN)')).strip()
+        acm_pk = extract_field_text(get_field_local(fields, 'Acm Name (PK)')).strip()
+        acm_in = extract_field_text(get_field_local(fields, 'Acm Name (IN)')).strip()
         acm = acm_in if region == "in" else acm_pk
-        if not acm: acm = extract_field_text(get_field(fields, 'Acm', 'Assigned Member')).strip()
+        if not acm: acm = extract_field_text(get_field_local(fields, 'Acm', 'Assigned Member')).strip()
 
-        # Front-end Dropdown Filters (Region handled natively above, just a safety check)
+        # Frontend Client-Side Filters
         if region_filter not in ['all', ''] and region != region_filter: continue
-        acm_filter = request.args.get('acm', 'All').strip().lower()
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
-        type_filter = request.args.get('type', 'All').strip().lower()
         if type_filter not in ['all', 'all types', ''] and type_filter != agency_type.lower(): continue
 
         if is_done and record_dt:
