@@ -230,41 +230,44 @@ def get_analytics():
             if not page_token:
                 break
 
-        # Fallback (if native filter fails)
-        if not native_worked:
-            all_items = []
-            seen_ids = set()
-            page_token = ""
-            payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": ["PK"]}]},
-                       "sort": [{"field_name": "Submitted on", "desc": True}]}
-            for _ in range(50):
-                if page_token:
-                    payload["page_token"] = page_token
-                try:
-                    res = session.post(req_url, json=payload, timeout=12).json()
-                    if res.get("code") != 0:
-                        break
-                    items = res.get("data", {}).get("items", [])
-                    new_records_in_page = 0
-                    stop_paginating = False
-                    for item in items:
-                        rid = item.get("record_id")
-                        if rid not in seen_ids:
-                            seen_ids.add(rid)
-                            all_items.append(item)
-                            new_records_in_page += 1
-                            # stop if we go before from_dt
-                            rec_dt = parse_feishu_date(get_field_local(item.get('fields', {}), 'Submitted on', 'Submitted on Copy'))
-                            if rec_dt and rec_dt < from_dt:
-                                stop_paginating = True
-                    if stop_paginating or new_records_in_page == 0:
-                        break
-                    page_token = res.get("data", {}).get("page_token")
-                    if not page_token:
-                        break
-                except Exception as e:
-                    error_msg = str(e)
-                    break
+       # Fallback (if native filter fails)
+if not native_worked:
+    all_items = []
+    seen_ids = set()
+    page_token = ""
+    payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": ["PK"]}]},
+               "sort": [{"field_name": "Submitted on", "desc": True}]}
+    for _ in range(50):
+        if page_token:
+            payload["page_token"] = page_token
+        try:
+            res = session.post(req_url, json=payload, timeout=12).json()
+            if res.get("code") != 0:
+                break
+            items = res.get("data", {}).get("items", [])
+            new_records_in_page = 0
+            stop_paginating = False
+            for item in items:
+                rid = item.get("record_id")
+                if rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_items.append(item)
+                    new_records_in_page += 1
+                    # stop if we go before from_dt
+                    rec_dt = parse_feishu_date(get_field_local(item.get('fields', {}), 'Submitted on', 'Submitted on Copy'))
+                    if rec_dt:
+                        if rec_dt.tzinfo is None:
+                            rec_dt = rec_dt.replace(tzinfo=timezone.utc)
+                        if rec_dt < from_dt:
+                            stop_paginating = True
+            if stop_paginating or new_records_in_page == 0:
+                break
+            page_token = res.get("data", {}).get("page_token")
+            if not page_token:
+                break
+        except Exception as e:
+            error_msg = str(e)
+            break
 
         # ---- PROCESS RECORDS ----
         stats = {
