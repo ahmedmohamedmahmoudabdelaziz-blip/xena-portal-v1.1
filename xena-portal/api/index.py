@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -26,20 +26,28 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
-    """PURE LOCAL LOOKUP: Zero API calls. Checks Exact, then Substring."""
+    """ULTRA-AGGRESSIVE LOOKUP: Strips spaces, underscores, and cases."""
     if not fields: return None
-    # 1. Direct match
+    
+    # 1. Exact Match
     for alias in aliases:
         if alias in fields: return fields[alias]
-    # 2. Case-insensitive substring fallback
+        
+    # 2. Aggressive Stripping Match (e.g. "Request_Type " -> "requesttype")
+    fields_clean = {k.lower().replace(" ", "").replace("_", ""): v for k, v in fields.items()}
     for alias in aliases:
-        tgt = alias.lower().strip()
-        for k, v in fields.items():
-            if tgt in k.lower() or k.lower() in tgt: return v
+        a_clean = alias.lower().replace(" ", "").replace("_", "")
+        if a_clean in fields_clean: return fields_clean[a_clean]
+        
+    # 3. Substring Fallback
+    for alias in aliases:
+        a_clean = alias.lower().replace(" ", "").replace("_", "")
+        for k, v in fields_clean.items():
+            if a_clean in k or k in a_clean: return v
+            
     return None
 
 def extract_field_text(field_data):
-    """Upgraded to handle empty Feishu lists gracefully (Fixes Blank Pie Charts)."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     
@@ -50,12 +58,12 @@ def extract_field_text(field_data):
         return str(field_data)
         
     if isinstance(field_data, list):
-        if len(field_data) == 0: return "" # Prevents empty list crash
+        if len(field_data) == 0: return "" 
         texts = []
         for item in field_data:
             if isinstance(item, dict):
                 extracted = False
-                for key in ['text', 'name', 'en_name', 'value']:
+                for key in ['text', 'name', 'en_name', 'value', 'id']:
                     if key in item:
                         texts.append(str(item[key]))
                         extracted = True
@@ -66,7 +74,6 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
-    """Parses date and strips hours/mins to prevent Server Timezone Drift."""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -165,7 +172,6 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE NATIVE UNIX MILLISECOND ANALYTICS ENGINE (OPTION A) ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -184,72 +190,50 @@ def get_analytics():
     date_to = request.args.get('to', '')
     
     from_dt = datetime.strptime(date_from, "%Y-%m-%d") if date_from else None
-    # to_dt is exclusive end (midnight of the day after)
-    to_dt = (datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)) if date_to else None
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1) if date_to else None
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
-    # --- 1. FIND NATIVE DATE FIELD PROBER (Fast & Safe) ---
-    date_field = None
-    for candidate in ["Submitted on", "Created Time"]:
-        test_payload = {
-            "page_size": 1,
-            "filter": {
-                "conjunction": "and",
-                "conditions": [{"field_name": candidate, "operator": "isGreaterEqual", "value": ["0"]}]
-            }
-        }
-        try:
-            test_res = session.post(req_url, json=test_payload, timeout=5).json()
-            if test_res.get("code") == 0:
-                date_field = candidate
-                break
-        except Exception:
-            continue
-
-    # --- 2. BUILD UNIX MILLISECOND FILTER ---
-    conditions = []
-    
-    if region_filter not in ['all', '']:
-        conditions.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
-
-    if from_dt and date_field:
-        from_ts = int(from_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
-        conditions.append({"field_name": date_field, "operator": "isGreaterEqual", "value": [str(from_ts)]})
-
-    if to_dt and date_field:
-        to_ts = int(to_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
-        conditions.append({"field_name": date_field, "operator": "isLess", "value": [str(to_ts)]})
-
-    payload_filter = None
-    if len(conditions) == 1:
-        payload_filter = conditions[0]
-    elif len(conditions) > 1:
-        payload_filter = {"conjunction": "and", "conditions": conditions}
-
-    # 🚨 DO NOT ADD CUSTOM SORTING. Let Feishu handle order naturally to prevent infinite loops.
     payload = {"page_size": 500}
-    if payload_filter:
-        payload["filter"] = payload_filter
+    if region_filter not in ['all', '']:
+        payload["filter"] = {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]
+        }
 
     all_items = []
     page_token = ""
+    error_msg = None
 
-    # --- 3. FAST PAGINATION (Feishu only returns the target month data!) ---
-    for _ in range(50): # 25,000 records safety limit
+    for _ in range(50):
         if page_token: payload["page_token"] = page_token
         try:
             res = session.post(req_url, json=payload, timeout=12).json()
-            if res.get("code") != 0: break
+            if res.get("code") != 0:
+                if "filter" in payload:
+                    del payload["filter"]
+                    res = session.post(req_url, json=payload, timeout=12).json()
+                    if res.get("code") != 0: 
+                        error_msg = res.get("msg")
+                        break
+                else:
+                    error_msg = res.get("msg")
+                    break
             
             data = res.get("data", {})
             all_items.extend(data.get("items", []))
             
             page_token = data.get("page_token")
             if not data.get("has_more", False) or not page_token: break
-        except Exception: break
+        except Exception as e: 
+            error_msg = str(e)
+            break
 
-    # --- 4. LOCAL DATA PROCESSING ---
+    # 🚀 DIAGNOSTIC SCANNER: Expose exact keys Feishu sent back to us
+    sample_keys = []
+    if all_items:
+        sample_keys = list(all_items[0].get('fields', {}).keys())
+
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
@@ -258,10 +242,9 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "scanned_rows": len(all_items)
+        "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys
     }
 
-    # Setup Calendar Padding
     if from_dt and date_to:
         cur = from_dt
         end = datetime.strptime(date_to, "%Y-%m-%d")
@@ -272,21 +255,22 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
         
-        # Parse standard date object 
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
         
-        req_type = extract_field_text(get_field_local(fields, 'Request Type')).strip().lower()
+        if from_dt or to_dt:
+            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
+
+        req_type = extract_field_text(get_field_local(fields, 'Request Type', 'Type', 'Request_Type')).strip().lower()
         
-        status_val = get_field_local(fields, 'Status')
+        status_val = get_field_local(fields, 'Status', 'Agency Status', 'State')
         status = extract_field_text(status_val).strip().lower()
 
-        # Aggressive Local Matching for charts
-        creation_type = extract_field_text(get_field_local(fields, 'Create Way', 'Agencies Creation Type', 'PK Agencies Creation Type', 'IN Agencies Creation Type', 'Creation Type')).strip()
-        reject_reason = extract_field_text(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason', 'IN Agencies Rejection reason')).strip()
-        agency_type = extract_field_text(get_field_local(fields, 'Agency Type')).strip()
-        region = extract_field_text(get_field_local(fields, 'Region')).strip().lower()
-        closing_reason = extract_field_text(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason', 'IN Closing Agencies Reason')).strip()
-        other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name')).strip()
+        creation_type = extract_field_text(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type')).strip()
+        reject_reason = extract_field_text(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason')).strip()
+        agency_type = extract_field_text(get_field_local(fields, 'Agency Type', 'Type of Agency')).strip()
+        region = extract_field_text(get_field_local(fields, 'Region', 'Agency Region')).strip().lower()
+        closing_reason = extract_field_text(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason')).strip()
+        other_app = extract_field_text(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps')).strip()
 
         is_done = "done" in status
         is_rejected = "rejected" in status
@@ -296,7 +280,6 @@ def get_analytics():
         acm = acm_in if region == "in" else acm_pk
         if not acm: acm = extract_field_text(get_field_local(fields, 'Acm', 'Assigned Member')).strip()
 
-        # Front-end Dropdown Filters (Region handled natively above, just a safety check)
         if region_filter not in ['all', ''] and region != region_filter: continue
         acm_filter = request.args.get('acm', 'All').strip().lower()
         if acm_filter not in ['all', 'all acms', ''] and acm_filter != acm.lower(): continue
@@ -305,9 +288,13 @@ def get_analytics():
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
-            # Only track dates that fall inside our padding boundaries
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
+
+        # Fallback counter to capture ANYTHING if 'Request Type' is somehow empty
+        if not req_type:
+            stats["kpis"]["creations"] += 1
+            if is_done: stats["creation_status"]["Done"] += 1
 
         if "agency creation" in req_type or "agency applied" in req_type:
             stats["kpis"]["creations"] += 1
