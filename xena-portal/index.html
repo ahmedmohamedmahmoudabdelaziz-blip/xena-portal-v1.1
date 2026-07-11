@@ -76,6 +76,7 @@
 
         .toast { padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: 500; display: none; align-items: flex-start; flex-direction: column; gap: 10px; word-wrap: break-word; }
         .toast-error { background: rgba(255,77,109,0.1); border: 1px solid rgba(255,77,109,0.3); color: var(--accent-rose); }
+        .toast-warning { background: rgba(255,184,0,0.1); border: 1px solid rgba(255,184,0,0.35); color: var(--accent-amber); }
 
         .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.8); backdrop-filter: blur(4px); z-index: 500; justify-content: center; align-items: center; flex-direction: column; gap: 16px; }
         .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -186,7 +187,10 @@
         </div>
     </div>
 
+    <!-- DIAGNOSTIC ERROR BOX -->
     <div id="errorToast" class="toast toast-error"></div>
+    <!-- INCOMPLETE-FETCH WARNING (separate from hard errors, since numbers can still render) -->
+    <div id="incompleteToast" class="toast toast-warning"></div>
 
     <div id="resultsContainer" style="display: none;">
         <div class="target-banner">
@@ -375,6 +379,7 @@
     async function generateAnalytics() {
         setDatePresets();
         document.getElementById('errorToast').style.display = 'none';
+        document.getElementById('incompleteToast').style.display = 'none';
         document.getElementById('loadingOverlay').style.display = 'flex';
         document.getElementById('analyticsContainer').style.display = 'none';
 
@@ -388,21 +393,31 @@
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
             const res = await fetch(url);
 
-            // Catches Python Crashes cleanly
             const textResponse = await res.text();
             let data;
             try {
                 data = JSON.parse(textResponse);
             } catch (jsonErr) {
-                throw new Error("Server crashed (Code 500). Please check Vercel Logs.");
+                throw new Error("Feishu server timeout. Vercel killed the connection.");
             }
 
             if (!res.ok) throw new Error(data.error || 'Unknown error');
 
-            if (data.error_debug) {
+            // 🚨 THE DIAGNOSTIC X-RAY: Shows exactly what Feishu columns are called if things mismatch.
+            if (data.scanned_rows > 0 && data.kpis.creations === 0) {
                 const e = document.getElementById('errorToast');
-                e.innerHTML = `⚠️ Fetched ${data.scanned_rows} rows, but hit an error mid-pagination: ${data.error_debug}. Numbers below may be partial.`;
+                e.innerHTML = `<strong>⚠️ Column Name Mismatch Warning!</strong><br>We downloaded ${data.scanned_rows} records, but couldn't find your "Request Type" column.<br><br><strong>Here are the EXACT column names Feishu sent:</strong><br><span style="color:#00d4ff;">${data.feishu_keys.join(', ')}</span><br><br>Please copy those exact names to your backend aliases.`;
                 e.style.display = 'flex';
+            }
+
+            // 🚨 NEW: this is different from the column-mismatch box above. This means the
+            // numbers on screen are REAL but INCOMPLETE - Feishu errored out mid-fetch, or
+            // we hit the page safety cap before reaching the end of the table. Every previous
+            // version of this app hid this exact situation; now it's front and center.
+            if (data.fetch_complete === false) {
+                const w = document.getElementById('incompleteToast');
+                w.innerHTML = `<strong>⚠️ Data may be incomplete.</strong> Only ${data.scanned_rows.toLocaleString()} record(s) were retrieved before the fetch stopped early.<br><span style="opacity:0.85;">Reason: ${data.stop_reason || 'unknown'}</span><br>Try narrowing the date range, or re-run the report - this is usually a transient Feishu API hiccup.`;
+                w.style.display = 'flex';
             }
 
             document.getElementById('kpiCreations').innerText = data.kpis.creations.toLocaleString();
