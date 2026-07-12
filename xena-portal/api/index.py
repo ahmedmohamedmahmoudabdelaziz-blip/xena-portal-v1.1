@@ -26,18 +26,17 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
-    """🚨 STRICT MATCHING FIX: Stops 'Agency Type' from hijacking 'Agency Creation Type'"""
+    """🚨 STRICT EXACT MATCHING: Solves the column-hijacking bug."""
     if not fields: return None
-    # 1. Exact case-sensitive match
-    for alias in aliases:
-        if alias in fields and fields[alias] not in (None, "", []): 
-            return fields[alias]
-    # 2. Exact case-insensitive match (NO SUBSTRINGS)
+    # Normalize the incoming Feishu columns to exact lowercase, stripped keys
+    normalized_fields = {k.lower().strip(): v for k, v in fields.items()}
+    
     for alias in aliases:
         tgt = alias.lower().strip()
-        for k, v in fields.items():
-            if k.lower().strip() == tgt: 
-                if v not in (None, "", []): return v
+        if tgt in normalized_fields:
+            val = normalized_fields[tgt]
+            if val not in (None, "", []):
+                return val
     return None
 
 def extract_field_text(field_data):
@@ -67,32 +66,32 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_field_list(field_data):
-    """🚨 THE PIE CHART FIX: Unpacks BOTH Dictionaries and Arrays correctly."""
+    """🚨 PIE CHART FIX: Safely extracts strings from both Dicts (Single) and Lists (Multi)."""
     if not field_data: return []
     
-    # 1. Handle Single-Selects (Feishu sends these as Dictionaries)
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label']:
-            if key in field_data: return [str(field_data[key]).strip()]
-        if 'id' in field_data: return [str(field_data['id']).strip()]
+            if key in field_data and field_data[key] not in (None, ""):
+                return [str(field_data[key]).strip()]
+        if 'id' in field_data and field_data['id'] not in (None, ""):
+            return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
 
-    # 2. Handle Strings (Fallback)
     if isinstance(field_data, str):
         return [s.strip() for s in field_data.split(',') if s.strip()]
         
-    # 3. Handle Multi-Selects (Feishu sends these as Lists)
     if isinstance(field_data, list):
         res = []
         for item in field_data:
+            if not item: continue
             if isinstance(item, dict):
                 extracted = False
                 for key in ['text', 'name', 'en_name', 'value', 'label']:
-                    if key in item:
+                    if key in item and item[key] not in (None, ""):
                         res.append(str(item[key]).strip())
                         extracted = True
                         break
-                if not extracted and 'id' in item:
+                if not extracted and 'id' in item and item['id'] not in (None, ""):
                     res.append(str(item['id']).strip())
                 elif not extracted:
                     res.append(str(item).strip())
@@ -103,7 +102,6 @@ def extract_field_list(field_data):
     return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
-    """DEAD-SIMPLE LOCAL DATE PARSER (No Timezones)"""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -227,11 +225,10 @@ def get_analytics():
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    # 🚨 THE DATE-SWAP FIX: Prevents 6500-record infinite loop crash
+    # 🚨 DATE-SWAP FIX: Prevents 6500-record crash
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
-        # Swap if dates were sent backwards by the frontend
         if dt1 > dt2:
             dt1, dt2 = dt2, dt1
         from_dt = dt1
@@ -244,7 +241,6 @@ def get_analytics():
         else:
             to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # 🚨 YOUR EXACT WORKING 'GET' LOOP
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
@@ -253,13 +249,23 @@ def get_analytics():
     error_msg = None
     fetch_complete = True
     stop_reason = None
+    
+    # 🚨 VERCEL HARD-KILL PROTECTION (8.5 Seconds)
+    start_time = time.time()
+    consecutive_old_pages = 0
 
-    for page_num in range(150):  # Flawlessly iterates up to 75,000 records
+    for page_num in range(150):
+        # Prevent 504 Gateway Timeout
+        if time.time() - start_time > 8.5:
+            fetch_complete = False
+            stop_reason = "Vercel 10s limit approaching. Safely paused."
+            break
+
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
         
         try:
-            res = session.get(base_url, params=params, timeout=12)
+            res = session.get(base_url, params=params, timeout=8)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
@@ -285,7 +291,6 @@ def get_analytics():
                     seen_ids.add(rid)
                     all_items.append(item)
                     
-                    # Track dates for our Early Exit logic
                     raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
                     record_dt = parse_feishu_date(raw_date)
                     if record_dt and from_dt:
@@ -293,14 +298,20 @@ def get_analytics():
                         if record_dt < from_dt:
                             page_old_count += 1
 
-            # Safely stops downloading when reaching older months
+            # 🚨 SAFER EARLY EXIT (Waits for 2 full pages of old records)
             if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                stop_reason = "Safely reached records older than requested date."
+                consecutive_old_pages += 1
+            else:
+                consecutive_old_pages = 0
+                
+            if consecutive_old_pages >= 2:
+                stop_reason = "Safely reached older records."
                 break
 
             page_token = data_block.get("page_token")
             if not page_token or not data_block.get("has_more", False): 
                 break
+                
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
@@ -343,7 +354,8 @@ def get_analytics():
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
         if region_filter != 'all' and region != region_filter: continue
 
-        req_type = clean(get_field_local(fields, 'Request Type'))
+        # Robust Aliases for Request Type
+        req_type = clean(get_field_local(fields, 'Request Type', 'Request type'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
 
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
@@ -372,11 +384,11 @@ def get_analytics():
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
         
-        # 🚨 THE FOLLOW-UP FIX: Bulletproof Substring Match
+        # 🚨 BULLETPROOF FOLLOW-UP LOGIC
         is_creation_kpi = (
             "agency creation" in req_type or 
             "agency applied already" in req_type or 
-            "follow-up" in req_type or
+            "follow-up" in req_type or 
             "follow up" in req_type
         )
 
@@ -419,7 +431,7 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # 🚨 THE PIE CHART FIX: Extract Multiple Options flawlessly
+            # Extract Multiple Options seamlessly
             raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
