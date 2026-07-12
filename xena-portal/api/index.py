@@ -368,7 +368,7 @@ def get_analytics():
         is_closing_kpi = "closing agency" in req_type
         
         # 🚨 SAFE SUBSTRING MATCHING for Follow-ups
-        is_creation_kpi = "agency creation" in req_type or "agency applied already" in req_type
+        is_creation_kpi = "agency creation" in req_type or "agency applied already by acm or bd link ( follow-up )" in req_type
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
