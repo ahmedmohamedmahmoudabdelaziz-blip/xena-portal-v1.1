@@ -1,5 +1,4 @@
 import os
-import re
 import time
 import urllib.parse
 import logging
@@ -27,17 +26,20 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
-    """PURE LOCAL LOOKUP: Instant string matching. Explicitly ignores blank cells."""
+    """🚨 THE CHART FIX: Strict Exact Lookup. Prevents 'Agency Type' from hijacking 'Agency Creation Type'."""
     if not fields: return None
+    
+    # 1. Exact case-sensitive match
     for alias in aliases:
         if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
+            
+    # 2. Exact case-insensitive match (NO SUBSTRINGS)
     for alias in aliases:
         tgt = alias.lower().strip()
         for k, v in fields.items():
-            if tgt in k.lower() or k.lower() in tgt: 
-                if v not in (None, "", []):
-                    return v
+            if k.lower().strip() == tgt: 
+                if v not in (None, "", []): return v
     return None
 
 def extract_field_text(field_data):
@@ -67,7 +69,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_field_list(field_data):
-    """🚨 THE FIX: Perfectly extracts BOTH Dictionaries and Arrays for Pie Charts."""
+    """Perfectly extracts BOTH Dictionaries (Single-Select) and Arrays (Multi-Select) for Pie Charts."""
     if not field_data: return []
     
     # 1. Handle Single-Selects (Feishu sends these as Dictionaries)
@@ -121,17 +123,7 @@ def parse_feishu_date(date_val):
         return None
 
 def clean(field_data):
-    """
-    🚨 HARDENED NORMALIZATION:
-    Collapses any double-spaces/tabs/newlines Feishu sometimes injects around
-    parentheses, and normalizes en/em dashes to a plain hyphen. Without this,
-    a string like "Agency Applied Already by ACM or BD link ( Follow-up )"
-    with a stray double space could silently fail a substring match.
-    """
-    text = extract_field_text(field_data).strip().lower()
-    text = text.replace('\u2013', '-').replace('\u2014', '-')  # – — -> -
-    text = re.sub(r'\s+', ' ', text)  # collapse all whitespace runs to single space
-    return text
+    return extract_field_text(field_data).strip().lower()
 
 @app.route('/', methods=['GET'])
 def home():
@@ -213,7 +205,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE UNLIMITED DIRECT-STREAM ENGINE ---
+# --- 🚀 RESTORED 1-SECOND LARK SERVER ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -223,7 +215,7 @@ def get_analytics():
 
     tat = get_tenant_access_token()
     session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}"})
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
 
     region_filter = request.args.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
@@ -237,9 +229,7 @@ def get_analytics():
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    # 🚨 THE 6500-RECORD FIX: Auto-swaps inverted dates from the frontend.
-    # NOTE: this is a safety net only. The real fix is on the frontend
-    # (setDatePresets no longer sends inverted ranges for "Last Month").
+    # 🚨 THE DATE-SWAP FIX: Prevents 6500-record infinite loop crash
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
@@ -255,68 +245,75 @@ def get_analytics():
         else:
             to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # 🚨 THE SOLUTION: Direct GET request, NO API filters. Lightning fast.
-    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    # 🚨 THE SPEED FIX: Offload filtering completely to Lark Server (Lightning fast)
+    req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+
+    def fetch_records(payload_data):
+        fetched = []
+        seen = set()
+        token = ""
+        for _ in range(150):
+            if token: payload_data["page_token"] = token
+            res = None
+            for _ in range(3):
+                try:
+                    res = session.post(req_url, json=payload_data, timeout=12).json()
+                    if res.get("code") == 0: break
+                except Exception: pass
+                time.sleep(0.5)
+
+            if not res or res.get("code") != 0:
+                return False, res.get("msg") if res else "Network Timeout", []
+
+            data = res.get("data", {})
+            for item in data.get("items", []):
+                rid = item.get("record_id")
+                if rid and rid not in seen:
+                    seen.add(rid)
+                    fetched.append(item)
+
+            token = data.get("page_token")
+            if not token or not data.get("has_more", False): 
+                break
+        return True, "Success", fetched
 
     all_items = []
-    seen_ids = set()
-    page_token = ""
     error_msg = None
-    fetch_complete = True
-    stop_reason = None
+    fetch_complete = False
 
-    for page_num in range(150):  # Flawlessly iterates up to 75,000 records
-        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
-        if page_token: params["page_token"] = page_token
+    # TIER 1: FASTEST NATIVE FEISHU FILTER
+    conditions_full = []
+    if region_filter != 'all':
+        conditions_full.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
+    
+    # Feishu requires timestamps as strings to prevent 400 Bad Request errors
+    if from_dt:
+        from_ts = str(int(from_dt.timestamp() * 1000))
+        conditions_full.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [from_ts]})
+    if to_dt:
+        to_ts = str(int(to_dt.timestamp() * 1000))
+        conditions_full.append({"field_name": "Submitted on", "operator": "isLess", "value": [to_ts]})
+
+    payload_full = {"page_size": 500}
+    if conditions_full:
+        payload_full["filter"] = {"conjunction": "and", "conditions": conditions_full}
         
-        try:
-            res = session.get(base_url, params=params, timeout=12)
-            if res.status_code != 200:
-                fetch_complete = False
-                stop_reason = f"HTTP Error {res.status_code}: {res.text}"
-                error_msg = stop_reason
-                break
-                
-            res_json = res.json()
-            if res_json.get("code") != 0:
-                fetch_complete = False
-                stop_reason = res_json.get("msg")
-                error_msg = stop_reason
-                break
-                
-            data_block = res_json.get("data", {})
-            items = data_block.get("items", [])
-            
-            page_old_count = 0
-            valid_dates_in_page = 0
+    ok, msg, all_items = fetch_records(payload_full)
 
-            for item in items:
-                rid = item.get("record_id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    
-                    # Track dates for our Early Exit logic
-                    raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
-                    record_dt = parse_feishu_date(raw_date)
-                    if record_dt and from_dt:
-                        valid_dates_in_page += 1
-                        if record_dt < from_dt:
-                            page_old_count += 1
+    # TIER 2: FALLBACK (If Feishu Database refuses Date strings)
+    if not ok:
+        payload_fallback = {"page_size": 500, "sort": [{"field_name": "Numbering", "desc": True}]}
+        if region_filter != 'all':
+            payload_fallback["filter"] = {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]}
+        ok, msg, all_items_fallback = fetch_records(payload_fallback)
+        
+        if ok:
+            all_items = all_items_fallback
 
-            # 🚨 THE VERCEL TIMEOUT FIX: Safely stops downloading when reaching older months
-            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                stop_reason = "Safely reached records older than requested date."
-                break
-
-            page_token = data_block.get("page_token")
-            if not page_token or not data_block.get("has_more", False): 
-                break
-        except Exception as e:
-            fetch_complete = False
-            stop_reason = str(e)
-            error_msg = stop_reason
-            break
+    if not ok:
+        error_msg = f"Feishu Server Error: {msg}"
+    else:
+        fetch_complete = True
 
     # DIAGNOSTIC ENGINE
     master_keys = set()
@@ -334,7 +331,7 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {},
         "other_request_types": {},
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
-        "fetch_complete": fetch_complete, "stop_reason": stop_reason
+        "fetch_complete": fetch_complete, "stop_reason": error_msg
     }
 
     if from_dt and to_dt:
@@ -379,19 +376,15 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 CANONICAL KPI CLASSIFICATION (normalized substring match)
+        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
-
-        # 🚨 THE FOLLOW-UP FIX: Covers the full option text
-        # "Agency Applied Already by ACM or BD link ( Follow-up )" as well as
-        # any minor punctuation/spacing/hyphen variant Feishu might send,
-        # since `clean()` already normalized whitespace and dashes above.
+        
+        # 🚨 THE FOLLOW-UP FIX: Captures both formats perfectly
         is_creation_kpi = (
-            "agency creation" in req_type or
-            "agency applied already" in req_type or
-            "follow-up" in req_type or
-            "follow up" in req_type
+            "agency creation" in req_type or 
+            "agency applied already" in req_type or 
+            "follow-up" in req_type
         )
 
         if is_closing_kpi:
