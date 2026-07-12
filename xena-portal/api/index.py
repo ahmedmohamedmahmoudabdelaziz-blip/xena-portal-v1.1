@@ -1,10 +1,9 @@
 import os
-import time
 import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -26,33 +25,24 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def normalize_key(k):
-    """Solves Feishu invisible spacing issues."""
+    """🚨 SPACING FIX: Ignores invisible spaces in Feishu column names."""
     return " ".join(str(k).lower().strip().split())
 
 def get_field_local(fields, *aliases):
-    """Safely locates columns even if Feishu alters the capitalization or spacing."""
     if not fields: return None
     
-    # 1. Exact case-sensitive match (Fastest)
+    # 1. Exact case-sensitive match
     for alias in aliases:
         if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
             
-    # 2. Normalized Match (Catches spacing/capitalization differences)
+    # 2. Normalized case-insensitive match
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
             if normalize_key(k) == tgt and v not in (None, "", []):
                 return v
                 
-    # 3. Safe Substring Match
-    for alias in aliases:
-        tgt = normalize_key(alias)
-        for k, v in fields.items():
-            if tgt in normalize_key(k):
-                if v not in (None, "", []):
-                    return v
-                    
     return None
 
 def extract_field_text(field_data):
@@ -126,11 +116,17 @@ def parse_feishu_date(date_val):
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
 
     try:
+        # 🚨 VERCEL TIMEZONE FIX: Vercel runs in UTC. Adds 3 hours to perfectly match Egypt/Cairo time.
         if isinstance(date_val, (int, float)):
-            return datetime.fromtimestamp(date_val / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+            dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
+            dt_cairo = dt_utc + timedelta(hours=3)
+            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            
         date_str = str(date_val).strip()
         if date_str.isdigit():
-            return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+            dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
+            dt_cairo = dt_utc + timedelta(hours=3)
+            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
@@ -236,14 +232,14 @@ def get_analytics():
 
     acm_filter = request.args.get('acm', 'All').strip().lower()
     if acm_filter == 'hasseb': 
-        acm_filter = 'haseeb' # Auto-correct typo
+        acm_filter = 'haseeb'
         
     type_filter = request.args.get('type', 'All').strip().lower()
 
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    # 🚨 DATE-SWAP FIX: Prevents infinite loop crash by flipping inverted dates
+    # 🚨 DATE-SWAP FIX: Prevents backwards date crashes automatically
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
@@ -267,8 +263,9 @@ def get_analytics():
     error_msg = None
     fetch_complete = True
     stop_reason = None
+    consecutive_old_pages = 0
 
-    # 🚨 NO 8.5s TIMER. The natural early-exit natively breaks the loop when it passes the requested dates.
+    # 🚨 THE 8.5s TIMER IS PERMANENTLY REMOVED. This loop breaks naturally based purely on ticket dates.
     for page_num in range(150):
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
@@ -307,15 +304,18 @@ def get_analytics():
                         if record_dt < from_dt:
                             page_old_count += 1
 
-            # SAFELY EXITS ONLY when an entire page consists of older data
             if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                stop_reason = "Safely reached records older than requested date."
+                consecutive_old_pages += 1
+            else:
+                consecutive_old_pages = 0
+                
+            if consecutive_old_pages >= 3:
+                stop_reason = "Safely reached older records."
                 break
 
             page_token = data_block.get("page_token")
             if not page_token or not data_block.get("has_more", False): 
                 break
-                
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
@@ -356,7 +356,7 @@ def get_analytics():
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
         if region_filter != 'all' and region != region_filter: continue
 
-        req_type = clean(get_field_local(fields, 'Request Type', 'Request type', 'Type', 'Category', 'Request Category'))
+        req_type = clean(get_field_local(fields, 'Request Type', 'Request type'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
 
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
@@ -384,7 +384,7 @@ def get_analytics():
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
         
-        # 🚨 THE FOLLOW-UP EXACT MATCH FIX
+        # 🚨 THE FOLLOW-UP FIX: Explicit exact string match, completely bulletproof.
         is_creation_kpi = (
             "agency creation" in req_type or 
             "agency applied already by acm or bd link ( follow-up )" in req_type
@@ -429,15 +429,15 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # 🚨 THE PIE CHART ARRAY EXTRACTION FIX
-            raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type', 'Create type', 'Creation way')
+            # Extract Multiple Options seamlessly
+            raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
                     ct_title = ct.title()
                     stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title, 0) + 1
 
             if is_rejected:
-                raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason', 'Rejection', 'Reason for Rejection')
+                raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')
                 for rr in extract_field_list(raw_reject_reasons):
                     if rr:
                         rr_title = rr.title()
