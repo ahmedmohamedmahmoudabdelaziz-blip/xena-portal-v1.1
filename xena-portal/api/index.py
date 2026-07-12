@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -23,8 +23,6 @@ ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link ( follow-up )"}
 RT_BD = "bd creation"
 RT_CLOSING = "closing agency"
-
-FEISHU_TZ = timezone(timedelta(hours=8))  # Asia/Shanghai (Beijing time)
 
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -73,23 +71,22 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def parse_feishu_date(date_val):
+    """DEAD-SIMPLE LOCAL DATE PARSER (No Timezones)"""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
 
-    dt = None
-    if isinstance(date_val, (int, float)):
-        dt = datetime.fromtimestamp(date_val / 1000.0, tz=FEISHU_TZ).replace(tzinfo=None)
-    elif isinstance(date_val, str):
-        if date_val.isdigit():
-            dt = datetime.fromtimestamp(int(date_val) / 1000.0, tz=FEISHU_TZ).replace(tzinfo=None)
-        else:
-            try:
-                clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
-                dt = datetime.strptime(clean_str, "%Y-%m-%d")
-            except Exception: pass
-    if dt: return dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    return None
+    try:
+        if isinstance(date_val, (int, float)):
+            return datetime.fromtimestamp(date_val / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+        date_str = str(date_val).strip()
+        if date_str.isdigit():
+            return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        clean_str = date_str[:10].replace('/', '-').replace('.', '-')
+        return datetime.strptime(clean_str, "%Y-%m-%d")
+    except Exception:
+        return None
 
 def clean(field_data):
     return extract_field_text(field_data).strip().lower()
@@ -168,13 +165,13 @@ def search_agency():
         cm, cy = datetime.now().month, datetime.now().year
         for item in req_response.get('data', {}).get('items', []):
             r_fields = item.get('fields', {})
-            ts = parse_feishu_date(get_field_local(r_fields, 'Submitted on', 'Submitted on Copy'))
+            ts = parse_feishu_date(get_field_local(r_fields, 'Submitted on Copy', 'Submitted on'))
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE UNBREAKABLE DIRECT-STREAM ANALYTICS ENGINE ---
+# --- 🚀 THE UNLIMITED DIRECT-STREAM ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -195,8 +192,7 @@ def get_analytics():
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
-    
+    now = datetime.now()
     if not date_from or not date_to:
         from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         if now.month == 12:
@@ -207,7 +203,7 @@ def get_analytics():
         from_dt = datetime.strptime(date_from, "%Y-%m-%d")
         to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
 
-    # 🚨 THE SOLUTION: Switch to the stable, unlimited GET List Records pipeline
+    # 🚨 THE FIX: USE THE 'GET' ENDPOINT TO BYPASS THE 500-CAP
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
@@ -217,12 +213,14 @@ def get_analytics():
     fetch_complete = True
     stop_reason = None
 
-    for page_num in range(150):  # Flawlessly iterates up to 75,000 records
-        params = {"page_size": 500, "automatic_fields": "true"}
+    for page_num in range(150):
+        # 🚨 THE HYBRID OPTIMIZATION: 
+        # By sorting strictly by 'Numbering DESC', the API sends us the newest records first.
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
         
         try:
-            res = session.get(base_url, params=params, timeout=20)
+            res = session.get(base_url, params=params, timeout=12)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
@@ -238,20 +236,35 @@ def get_analytics():
                 
             data_block = res_json.get("data", {})
             items = data_block.get("items", [])
-            new_records_in_page = 0
+            
+            page_old_count = 0
+            valid_dates_in_page = 0
 
             for item in items:
                 rid = item.get("record_id")
                 if rid and rid not in seen_ids:
                     seen_ids.add(rid)
                     all_items.append(item)
-                    new_records_in_page += 1
+                    
+                    # Track dates for our Early Exit logic
+                    raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
+                    record_dt = parse_feishu_date(raw_date)
+                    if record_dt and from_dt:
+                        valid_dates_in_page += 1
+                        if record_dt < from_dt:
+                            page_old_count += 1
 
-            if new_records_in_page == 0: break
+            # 🚨 THE VERCEL TIMEOUT FIX:
+            # If every single valid date on this entire page is OLDER than our target month, 
+            # we have safely crossed the boundary. We sever the connection instantly to save time.
+            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                stop_reason = "Safely reached records older than requested date."
+                break
 
             page_token = data_block.get("page_token")
             if not page_token or not data_block.get("has_more", False): 
                 break
+                
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
@@ -286,12 +299,11 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        # LOCAL DATE ENFORCEMENT
+        # LOCAL MEMORY ENFORCEMENT
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
-        # LOCAL REGION ENFORCEMENT
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
         if region_filter != 'all' and region != region_filter: continue
 
@@ -322,7 +334,7 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 KPI PROCESSING
+        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
         is_creation_kpi = req_type in RT_CREATION_SET
         is_bd_kpi = req_type == RT_BD
         is_closing_kpi = req_type == RT_CLOSING
