@@ -189,7 +189,7 @@
 
     <!-- DIAGNOSTIC ERROR BOX -->
     <div id="errorToast" class="toast toast-error"></div>
-    <!-- INCOMPLETE-FETCH WARNING (separate from hard errors, since numbers can still render) -->
+    <!-- INCOMPLETE-FETCH WARNING -->
     <div id="incompleteToast" class="toast toast-warning"></div>
 
     <div id="resultsContainer" style="display: none;">
@@ -344,24 +344,28 @@
 
         if (preset === 'all') { fromInput.value = ''; toInput.value = ''; return; }
 
-        let from = new Date(), to = new Date();
-        const day = from.getDay();
-        const monDiff = from.getDate() - day + (day === 0 ? -6 : 1);
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = now.getMonth();
+        let from, to;
 
         if (preset === 'this_month') {
-            from = new Date(from.getFullYear(), from.getMonth(), 1);
-            to = new Date(from.getFullYear(), from.getMonth() + 1, 0);
+            from = new Date(y, m, 1);
+            to = new Date(y, m + 1, 0);
         } else if (preset === 'last_month') {
-            from = new Date(from.getFullYear(), from.getMonth() - 1, 1);
-            to = new Date(from.getFullYear(), from.getMonth(), 0);
+            // 🚨 FRONTEND DATE FIX: Prevents calculating negative days which broke the backend
+            from = new Date(y, m - 1, 1);
+            to = new Date(y, m, 0);
         } else if (preset === 'this_week') {
-            from = new Date(from.setDate(monDiff));
-            to = new Date(from);
-            to.setDate(to.getDate() + 6);
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            from = new Date(y, m, diff);
+            to = new Date(y, m, diff + 6);
         } else if (preset === 'last_week') {
-            from = new Date(from.setDate(monDiff - 7));
-            to = new Date(from);
-            to.setDate(to.getDate() + 6);
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1) - 7;
+            from = new Date(y, m, diff);
+            to = new Date(y, m, diff + 6);
         }
 
         fromInput.value = fmtDate(from);
@@ -403,17 +407,12 @@
 
             if (!res.ok) throw new Error(data.error || 'Unknown error');
 
-            // 🚨 THE DIAGNOSTIC X-RAY: Shows exactly what Feishu columns are called if things mismatch.
             if (data.scanned_rows > 0 && data.kpis.creations === 0) {
                 const e = document.getElementById('errorToast');
                 e.innerHTML = `<strong>⚠️ Column Name Mismatch Warning!</strong><br>We downloaded ${data.scanned_rows} records, but couldn't find your "Request Type" column.<br><br><strong>Here are the EXACT column names Feishu sent:</strong><br><span style="color:#00d4ff;">${data.feishu_keys.join(', ')}</span><br><br>Please copy those exact names to your backend aliases.`;
                 e.style.display = 'flex';
             }
 
-            // 🚨 NEW: this is different from the column-mismatch box above. This means the
-            // numbers on screen are REAL but INCOMPLETE - Feishu errored out mid-fetch, or
-            // we hit the page safety cap before reaching the end of the table. Every previous
-            // version of this app hid this exact situation; now it's front and center.
             if (data.fetch_complete === false) {
                 const w = document.getElementById('incompleteToast');
                 w.innerHTML = `<strong>⚠️ Data may be incomplete.</strong> Only ${data.scanned_rows.toLocaleString()} record(s) were retrieved before the fetch stopped early.<br><span style="opacity:0.85;">Reason: ${data.stop_reason || 'unknown'}</span><br>Try narrowing the date range, or re-run the report - this is usually a transient Feishu API hiccup.`;
