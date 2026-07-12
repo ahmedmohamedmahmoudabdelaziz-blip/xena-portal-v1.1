@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import urllib.parse
 import logging
@@ -120,7 +121,17 @@ def parse_feishu_date(date_val):
         return None
 
 def clean(field_data):
-    return extract_field_text(field_data).strip().lower()
+    """
+    🚨 HARDENED NORMALIZATION:
+    Collapses any double-spaces/tabs/newlines Feishu sometimes injects around
+    parentheses, and normalizes en/em dashes to a plain hyphen. Without this,
+    a string like "Agency Applied Already by ACM or BD link ( Follow-up )"
+    with a stray double space could silently fail a substring match.
+    """
+    text = extract_field_text(field_data).strip().lower()
+    text = text.replace('\u2013', '-').replace('\u2014', '-')  # – — -> -
+    text = re.sub(r'\s+', ' ', text)  # collapse all whitespace runs to single space
+    return text
 
 @app.route('/', methods=['GET'])
 def home():
@@ -227,6 +238,8 @@ def get_analytics():
     date_to = request.args.get('to', '').strip()
 
     # 🚨 THE 6500-RECORD FIX: Auto-swaps inverted dates from the frontend.
+    # NOTE: this is a safety net only. The real fix is on the frontend
+    # (setDatePresets no longer sends inverted ranges for "Last Month").
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
@@ -366,15 +379,19 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
+        # 🎯 CANONICAL KPI CLASSIFICATION (normalized substring match)
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
-        
-        # 🚨 THE FOLLOW-UP FIX: Captures both formats perfectly
+
+        # 🚨 THE FOLLOW-UP FIX: Covers the full option text
+        # "Agency Applied Already by ACM or BD link ( Follow-up )" as well as
+        # any minor punctuation/spacing/hyphen variant Feishu might send,
+        # since `clean()` already normalized whitespace and dashes above.
         is_creation_kpi = (
-            "agency creation" in req_type or 
-            "agency applied already" in req_type or 
-            "follow-up" in req_type
+            "agency creation" in req_type or
+            "agency applied already" in req_type or
+            "follow-up" in req_type or
+            "follow up" in req_type
         )
 
         if is_closing_kpi:
