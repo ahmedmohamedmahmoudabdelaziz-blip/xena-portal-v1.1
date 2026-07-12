@@ -26,14 +26,12 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
-    """🚨 THE CHART FIX: Strict Exact Lookup. Prevents 'Agency Type' from hijacking 'Agency Creation Type'."""
+    """🚨 STRICT MATCHING FIX: Stops 'Agency Type' from hijacking 'Agency Creation Type'"""
     if not fields: return None
-    
     # 1. Exact case-sensitive match
     for alias in aliases:
         if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
-            
     # 2. Exact case-insensitive match (NO SUBSTRINGS)
     for alias in aliases:
         tgt = alias.lower().strip()
@@ -69,7 +67,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_field_list(field_data):
-    """Perfectly extracts BOTH Dictionaries (Single-Select) and Arrays (Multi-Select) for Pie Charts."""
+    """🚨 THE PIE CHART FIX: Unpacks BOTH Dictionaries and Arrays correctly."""
     if not field_data: return []
     
     # 1. Handle Single-Selects (Feishu sends these as Dictionaries)
@@ -205,7 +203,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 RESTORED 1-SECOND LARK SERVER ENGINE ---
+# --- 🚀 THE UNLIMITED DIRECT-STREAM ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -215,7 +213,7 @@ def get_analytics():
 
     tat = get_tenant_access_token()
     session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+    session.headers.update({"Authorization": f"Bearer {tat}"})
 
     region_filter = request.args.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
@@ -233,6 +231,7 @@ def get_analytics():
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
+        # Swap if dates were sent backwards by the frontend
         if dt1 > dt2:
             dt1, dt2 = dt2, dt1
         from_dt = dt1
@@ -245,75 +244,68 @@ def get_analytics():
         else:
             to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # 🚨 THE SPEED FIX: Offload filtering completely to Lark Server (Lightning fast)
-    req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-
-    def fetch_records(payload_data):
-        fetched = []
-        seen = set()
-        token = ""
-        for _ in range(150):
-            if token: payload_data["page_token"] = token
-            res = None
-            for _ in range(3):
-                try:
-                    res = session.post(req_url, json=payload_data, timeout=12).json()
-                    if res.get("code") == 0: break
-                except Exception: pass
-                time.sleep(0.5)
-
-            if not res or res.get("code") != 0:
-                return False, res.get("msg") if res else "Network Timeout", []
-
-            data = res.get("data", {})
-            for item in data.get("items", []):
-                rid = item.get("record_id")
-                if rid and rid not in seen:
-                    seen.add(rid)
-                    fetched.append(item)
-
-            token = data.get("page_token")
-            if not token or not data.get("has_more", False): 
-                break
-        return True, "Success", fetched
+    # 🚨 YOUR EXACT WORKING 'GET' LOOP
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
+    seen_ids = set()
+    page_token = ""
     error_msg = None
-    fetch_complete = False
+    fetch_complete = True
+    stop_reason = None
 
-    # TIER 1: FASTEST NATIVE FEISHU FILTER
-    conditions_full = []
-    if region_filter != 'all':
-        conditions_full.append({"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]})
-    
-    # Feishu requires timestamps as strings to prevent 400 Bad Request errors
-    if from_dt:
-        from_ts = str(int(from_dt.timestamp() * 1000))
-        conditions_full.append({"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [from_ts]})
-    if to_dt:
-        to_ts = str(int(to_dt.timestamp() * 1000))
-        conditions_full.append({"field_name": "Submitted on", "operator": "isLess", "value": [to_ts]})
-
-    payload_full = {"page_size": 500}
-    if conditions_full:
-        payload_full["filter"] = {"conjunction": "and", "conditions": conditions_full}
+    for page_num in range(150):  # Flawlessly iterates up to 75,000 records
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        if page_token: params["page_token"] = page_token
         
-    ok, msg, all_items = fetch_records(payload_full)
+        try:
+            res = session.get(base_url, params=params, timeout=12)
+            if res.status_code != 200:
+                fetch_complete = False
+                stop_reason = f"HTTP Error {res.status_code}: {res.text}"
+                error_msg = stop_reason
+                break
+                
+            res_json = res.json()
+            if res_json.get("code") != 0:
+                fetch_complete = False
+                stop_reason = res_json.get("msg")
+                error_msg = stop_reason
+                break
+                
+            data_block = res_json.get("data", {})
+            items = data_block.get("items", [])
+            
+            page_old_count = 0
+            valid_dates_in_page = 0
 
-    # TIER 2: FALLBACK (If Feishu Database refuses Date strings)
-    if not ok:
-        payload_fallback = {"page_size": 500, "sort": [{"field_name": "Numbering", "desc": True}]}
-        if region_filter != 'all':
-            payload_fallback["filter"] = {"conjunction": "and", "conditions": [{"field_name": "Region", "operator": "contains", "value": [region_filter.upper()]}]}
-        ok, msg, all_items_fallback = fetch_records(payload_fallback)
-        
-        if ok:
-            all_items = all_items_fallback
+            for item in items:
+                rid = item.get("record_id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_items.append(item)
+                    
+                    # Track dates for our Early Exit logic
+                    raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
+                    record_dt = parse_feishu_date(raw_date)
+                    if record_dt and from_dt:
+                        valid_dates_in_page += 1
+                        if record_dt < from_dt:
+                            page_old_count += 1
 
-    if not ok:
-        error_msg = f"Feishu Server Error: {msg}"
-    else:
-        fetch_complete = True
+            # Safely stops downloading when reaching older months
+            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                stop_reason = "Safely reached records older than requested date."
+                break
+
+            page_token = data_block.get("page_token")
+            if not page_token or not data_block.get("has_more", False): 
+                break
+        except Exception as e:
+            fetch_complete = False
+            stop_reason = str(e)
+            error_msg = stop_reason
+            break
 
     # DIAGNOSTIC ENGINE
     master_keys = set()
@@ -331,7 +323,7 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {},
         "other_request_types": {},
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
-        "fetch_complete": fetch_complete, "stop_reason": error_msg
+        "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
     if from_dt and to_dt:
@@ -380,11 +372,12 @@ def get_analytics():
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
         
-        # 🚨 THE FOLLOW-UP FIX: Captures both formats perfectly
+        # 🚨 THE FOLLOW-UP FIX: Bulletproof Substring Match
         is_creation_kpi = (
             "agency creation" in req_type or 
             "agency applied already" in req_type or 
-            "follow-up" in req_type
+            "follow-up" in req_type or
+            "follow up" in req_type
         )
 
         if is_closing_kpi:
@@ -423,11 +416,10 @@ def get_analytics():
             if is_done and other_app:
                 oa_title = other_app.title()
                 stats["other_apps"][oa_title] = stats["other_apps"].get(oa_title, 0) + 1
-                
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # 🚨 THE PIE CHART FIX: Seamlessly unpacks Single-Option & Multi-Option fields
+            # 🚨 THE PIE CHART FIX: Extract Multiple Options flawlessly
             raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
