@@ -4,7 +4,7 @@ import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -19,15 +19,10 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# 🚨 SPEED FIX: cache the full-table download in memory for a short window.
-# This is why it went from <1min to >1min - the new approach (correctly, per your
-# request) downloads the ENTIRE table every single time instead of asking Feishu to
-# pre-filter. That is real, unavoidable work as the table grows. A short cache means
-# clicking "Generate" 3 times in a minute reuses the same download instead of hitting
-# Feishu 3 times. Nothing on Lark's side changed - this is purely about how often
-# we ask it for the same thing.
-CACHE_TTL_SECONDS = 90
-_table_cache = {"items": None, "fetched_at": 0, "fetch_complete": True, "stop_reason": None}
+# --- 🎯 CANONICAL REQUEST TYPES ---
+RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link ( follow-up )"}
+RT_BD = "bd creation"
+RT_CLOSING = "closing agency"
 
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -39,12 +34,12 @@ def get_field_local(fields, *aliases):
     """PURE LOCAL LOOKUP: Instant string matching. Explicitly ignores blank cells."""
     if not fields: return None
     for alias in aliases:
-        if alias in fields and fields[alias] not in (None, "", []):
+        if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
     for alias in aliases:
         tgt = alias.lower().strip()
         for k, v in fields.items():
-            if tgt in k.lower() or k.lower() in tgt:
+            if tgt in k.lower() or k.lower() in tgt: 
                 if v not in (None, "", []):
                     return v
     return None
@@ -76,9 +71,10 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_field_list(field_data):
-    """Perfectly extracts arrays for Multiple Select Pie Charts."""
+    """🚨 THE FIX: Splits string arrays natively so Lark Pie Charts populate correctly."""
     if not field_data: return []
     if isinstance(field_data, str):
+        # Feishu sends Multiple Choice fields as comma-separated strings natively
         return [s.strip() for s in field_data.split(',') if s.strip()]
     if isinstance(field_data, list):
         res = []
@@ -109,7 +105,7 @@ def parse_feishu_date(date_val):
         date_str = str(date_val).strip()
         if date_str.isdigit():
             return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
-
+        
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except Exception:
@@ -198,60 +194,7 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-def fetch_full_table(session):
-    """Downloads the ENTIRE requests table once, cached for CACHE_TTL_SECONDS.
-    Returns (items, fetch_complete, stop_reason)."""
-    now = time.time()
-    if _table_cache["items"] is not None and (now - _table_cache["fetched_at"]) < CACHE_TTL_SECONDS:
-        return _table_cache["items"], _table_cache["fetch_complete"], _table_cache["stop_reason"]
-
-    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-    all_items = []
-    seen_ids = set()
-    page_token = ""
-    fetch_complete = True
-    stop_reason = None
-
-    for page_num in range(150):  # up to 75,000 records of headroom
-        params = {"page_size": 500, "automatic_fields": "true"}
-        if page_token: params["page_token"] = page_token
-        try:
-            res = session.get(base_url, params=params, timeout=15)
-            if res.status_code != 200:
-                fetch_complete = False
-                stop_reason = f"HTTP Error {res.status_code}: {res.text[:200]}"
-                break
-            res_json = res.json()
-            if res_json.get("code") != 0:
-                fetch_complete = False
-                stop_reason = res_json.get("msg")
-                break
-
-            data_block = res_json.get("data", {})
-            items = data_block.get("items", [])
-            new_records_in_page = 0
-            for item in items:
-                rid = item.get("record_id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    new_records_in_page += 1
-
-            if new_records_in_page == 0: break
-            page_token = data_block.get("page_token")
-            if not page_token or not data_block.get("has_more", False): break
-        except Exception as e:
-            fetch_complete = False
-            stop_reason = str(e)
-            break
-
-    _table_cache["items"] = all_items
-    _table_cache["fetched_at"] = now
-    _table_cache["fetch_complete"] = fetch_complete
-    _table_cache["stop_reason"] = stop_reason
-    return all_items, fetch_complete, stop_reason
-
-# --- 🚀 THE UNLIMITED DIRECT-STREAM ENGINE (now cached) ---
+# --- 🚀 THE UNLIMITED DIRECT-STREAM ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
@@ -267,9 +210,9 @@ def get_analytics():
     if not region_filter: region_filter = 'pk'
 
     acm_filter = request.args.get('acm', 'All').strip().lower()
-    if acm_filter == 'hasseb':
-        acm_filter = 'haseeb'  # Auto-correct typo
-
+    if acm_filter == 'hasseb': 
+        acm_filter = 'haseeb' # Auto-correct typo
+        
     type_filter = request.args.get('type', 'All').strip().lower()
 
     date_from = request.args.get('from', '').strip()
@@ -286,8 +229,75 @@ def get_analytics():
         from_dt = datetime.strptime(date_from, "%Y-%m-%d")
         to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
 
-    all_items, fetch_complete, stop_reason = fetch_full_table(session)
-    error_msg = stop_reason
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+
+    all_items = []
+    seen_ids = set()
+    page_token = ""
+    error_msg = None
+    fetch_complete = True
+    stop_reason = None
+
+    for page_num in range(150):
+        # 🚨 THE TIMEOUT FIX: Sort natively by "Numbering DESC". 
+        # This streams the newest records first, so we don't have to download old months.
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        if page_token: params["page_token"] = page_token
+        
+        try:
+            res = session.get(base_url, params=params, timeout=12)
+            if res.status_code != 200:
+                fetch_complete = False
+                stop_reason = f"HTTP Error {res.status_code}: {res.text}"
+                error_msg = stop_reason
+                break
+                
+            res_json = res.json()
+            if res_json.get("code") != 0:
+                fetch_complete = False
+                stop_reason = res_json.get("msg")
+                error_msg = stop_reason
+                break
+                
+            data_block = res_json.get("data", {})
+            items = data_block.get("items", [])
+            
+            new_records_in_page = 0
+            page_old_count = 0
+            valid_dates_in_page = 0
+
+            for item in items:
+                rid = item.get("record_id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_items.append(item)
+                    new_records_in_page += 1
+                    
+                    # Track dates for our Early Exit logic
+                    raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
+                    record_dt = parse_feishu_date(raw_date)
+                    if record_dt and from_dt:
+                        valid_dates_in_page += 1
+                        if record_dt < from_dt:
+                            page_old_count += 1
+
+            # 🚨 THE VERCEL TIMEOUT FIX:
+            # If every single valid date on this entire page is OLDER than our target month, 
+            # we have safely crossed the boundary. We sever the connection instantly to save time.
+            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                stop_reason = "Safely reached records older than requested date."
+                break
+
+            if new_records_in_page == 0: break
+
+            page_token = data_block.get("page_token")
+            if not page_token or not data_block.get("has_more", False): 
+                break
+        except Exception as e:
+            fetch_complete = False
+            stop_reason = str(e)
+            error_msg = stop_reason
+            break
 
     # DIAGNOSTIC ENGINE
     master_keys = set()
@@ -305,14 +315,7 @@ def get_analytics():
         "acm_closing_reasons": {}, "daily_trend": {},
         "other_request_types": {},
         "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
-        "fetch_complete": fetch_complete, "stop_reason": stop_reason,
-        # 🔎 NEW: tells us, out of every Agency Creation record actually processed,
-        # how many times get_field_local found a usable (non-empty) value for
-        # Create Way / Reject Reason. If these come back as 0 while
-        # "creation_records_seen" is > 0, the alias list genuinely does not match
-        # what Feishu is naming these columns live - and feishu_keys above will
-        # show us the real name to add.
-        "field_diagnostics": {"creation_records_seen": 0, "create_way_found": 0, "reject_reason_found": 0}
+        "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
     if from_dt and to_dt:
@@ -324,7 +327,8 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
+        # LOCAL MEMORY ENFORCEMENT
+        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
@@ -333,6 +337,7 @@ def get_analytics():
 
         req_type = clean(get_field_local(fields, 'Request Type'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
+
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
         closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
@@ -355,9 +360,11 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 KPI PROCESSING
+        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
+        
+        # 🚨 THE FOLLOW-UP BUGFIX: Safe Substring matching to catch all Agency Creations & Follow-ups seamlessly
         is_creation_kpi = "agency creation" in req_type or "agency applied already" in req_type
 
         if is_closing_kpi:
@@ -372,9 +379,11 @@ def get_analytics():
                 if acm:
                     clean_acm = acm.title()
                     if clean_acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][clean_acm] = {}
-                    bucket = stats["acm_closing_reasons"][clean_acm]
-                    bucket[cr_title] = bucket.get(cr_title, 0) + 1
+                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    if "user" in closing_reason:
+                        stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
+                    elif "dup" in closing_reason:
+                        stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
@@ -384,7 +393,6 @@ def get_analytics():
 
         elif is_creation_kpi:
             stats["kpis"]["creations"] += 1
-            stats["field_diagnostics"]["creation_records_seen"] += 1
             if is_done: stats["creation_status"]["Done"] += 1
             elif is_rejected: stats["creation_status"]["Rejected"] += 1
             else: stats["creation_status"]["Under Investigation"] += 1
@@ -395,13 +403,11 @@ def get_analytics():
             if is_done and other_app:
                 oa_title = other_app.title()
                 stats["other_apps"][oa_title] = stats["other_apps"].get(oa_title, 0) + 1
-
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
+            # 🚨 THE MULTI-SELECT BUGFIX: Extracts Arrays perfectly so Feishu Pie Charts don't show "No Data"
             raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
-            if raw_creation_types not in (None, "", []):
-                stats["field_diagnostics"]["create_way_found"] += 1
             for ct in extract_field_list(raw_creation_types):
                 if ct:
                     ct_title = ct.title()
@@ -409,8 +415,6 @@ def get_analytics():
 
             if is_rejected:
                 raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')
-                if raw_reject_reasons not in (None, "", []):
-                    stats["field_diagnostics"]["reject_reason_found"] += 1
                 for rr in extract_field_list(raw_reject_reasons):
                     if rr:
                         rr_title = rr.title()
