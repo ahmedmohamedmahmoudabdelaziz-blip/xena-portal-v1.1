@@ -19,11 +19,6 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# --- 🎯 CANONICAL REQUEST TYPES ---
-RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link ( follow-up )"}
-RT_BD = "bd creation"
-RT_CLOSING = "closing agency"
-
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
@@ -71,19 +66,21 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_field_list(field_data):
-    """🚨 THE CHART FIX: Perfectly unpacks BOTH Single-Select and Multi-Select fields."""
+    """🚨 THE FIX: Perfectly extracts BOTH Dictionaries and Arrays for Pie Charts."""
     if not field_data: return []
-    if isinstance(field_data, str):
-        return [s.strip() for s in field_data.split(',') if s.strip()]
-        
-    # Fix for Single-Option fields like "Create Way" (Feishu sends a Dictionary)
+    
+    # 1. Handle Single-Selects (Feishu sends these as Dictionaries)
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label']:
             if key in field_data: return [str(field_data[key]).strip()]
         if 'id' in field_data: return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
+
+    # 2. Handle Strings (Fallback)
+    if isinstance(field_data, str):
+        return [s.strip() for s in field_data.split(',') if s.strip()]
         
-    # Fix for Multi-Option fields like "Reject Reason" (Feishu sends a List)
+    # 3. Handle Multi-Selects (Feishu sends these as Lists)
     if isinstance(field_data, list):
         res = []
         for item in field_data:
@@ -105,7 +102,7 @@ def extract_field_list(field_data):
     return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
-    """🚨 DEAD-SIMPLE LOCAL DATE PARSER (Timezone logic completely removed)"""
+    """DEAD-SIMPLE LOCAL DATE PARSER (No Timezones)"""
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
@@ -229,17 +226,23 @@ def get_analytics():
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    now = datetime.now()
-    if not date_from or not date_to:
+    # 🚨 THE 6500-RECORD FIX: Auto-swaps inverted dates from the frontend.
+    if date_from and date_to:
+        dt1 = datetime.strptime(date_from, "%Y-%m-%d")
+        dt2 = datetime.strptime(date_to, "%Y-%m-%d")
+        if dt1 > dt2:
+            dt1, dt2 = dt2, dt1
+        from_dt = dt1
+        to_dt = dt2 + timedelta(days=1)
+    else:
+        now = datetime.now()
         from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         if now.month == 12:
             to_dt = now.replace(year=now.year+1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         else:
             to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        from_dt = datetime.strptime(date_from, "%Y-%m-%d")
-        to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
 
+    # 🚨 THE SOLUTION: Direct GET request, NO API filters. Lightning fast.
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
@@ -249,7 +252,7 @@ def get_analytics():
     fetch_complete = True
     stop_reason = None
 
-    for page_num in range(150):
+    for page_num in range(150):  # Flawlessly iterates up to 75,000 records
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
         
@@ -288,6 +291,7 @@ def get_analytics():
                         if record_dt < from_dt:
                             page_old_count += 1
 
+            # 🚨 THE VERCEL TIMEOUT FIX: Safely stops downloading when reaching older months
             if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
                 stop_reason = "Safely reached records older than requested date."
                 break
@@ -295,7 +299,6 @@ def get_analytics():
             page_token = data_block.get("page_token")
             if not page_token or not data_block.get("has_more", False): 
                 break
-                
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
@@ -363,12 +366,16 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 KPI PROCESSING
+        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
         
-        # 🚨 SAFE SUBSTRING MATCHING for Follow-ups
-        is_creation_kpi = "agency creation" in req_type or "agency applied already by acm or bd link ( follow-up )" in req_type
+        # 🚨 THE FOLLOW-UP FIX: Captures both formats perfectly
+        is_creation_kpi = (
+            "agency creation" in req_type or 
+            "agency applied already" in req_type or 
+            "follow-up" in req_type
+        )
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
@@ -410,14 +417,13 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # 🚨 CHART FIX: Safely splits Create Way Dictionaries
+            # 🚨 THE PIE CHART FIX: Seamlessly unpacks Single-Option & Multi-Option fields
             raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
                     ct_title = ct.title()
                     stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title, 0) + 1
 
-            # 🚨 CHART FIX: Safely splits Reject Reason Lists
             if is_rejected:
                 raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')
                 for rr in extract_field_list(raw_reject_reasons):
