@@ -65,30 +65,28 @@ def extract_field_text(field_data):
         return " ".join(texts).strip()
     return str(field_data)
 
-def get_field_list(field_data):
-    """🚨 NEW EXTRACTOR: Splits 'Multiple Options' into Arrays for Pie Charts."""
+def extract_field_list(field_data):
+    """🚨 THE FIX: Perfectly extracts arrays for your Multiple Select Pie Charts."""
     if not field_data: return []
-    if isinstance(field_data, (str, int, float)): return [str(field_data).strip()]
-    
-    if isinstance(field_data, dict):
-        for key in ['text', 'name', 'en_name', 'value', 'label']:
-            if key in field_data: return [str(field_data[key]).strip()]
-        return [str(field_data)]
-        
+    if isinstance(field_data, str):
+        # Fallback if Feishu sends it as a comma-separated string
+        return [s.strip() for s in field_data.split(',') if s.strip()]
     if isinstance(field_data, list):
-        texts = []
+        res = []
         for item in field_data:
             if isinstance(item, dict):
                 extracted = False
                 for key in ['text', 'name', 'en_name', 'value', 'label']:
                     if key in item:
-                        texts.append(str(item[key]).strip())
+                        res.append(str(item[key]).strip())
                         extracted = True
                         break
-                if not extracted: texts.append(str(item).strip())
-            else: texts.append(str(item).strip())
-        return texts
-    return [str(field_data)]
+                if not extracted and 'id' in item:
+                    res.append(str(item['id']).strip())
+            else:
+                res.append(str(item).strip())
+        return res
+    return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
     """DEAD-SIMPLE LOCAL DATE PARSER (No Timezones)"""
@@ -207,10 +205,8 @@ def get_analytics():
     if not region_filter: region_filter = 'pk'
 
     acm_filter = request.args.get('acm', 'All').strip().lower()
-    
-    # 🚨 BUGFIX: Auto-correct the 'Hasseb' dropdown typo to match Feishu DB.
     if acm_filter == 'hasseb': 
-        acm_filter = 'haseeb'
+        acm_filter = 'haseeb' # Auto-correct typo
         
     type_filter = request.args.get('type', 'All').strip().lower()
 
@@ -228,6 +224,7 @@ def get_analytics():
         from_dt = datetime.strptime(date_from, "%Y-%m-%d")
         to_dt = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
 
+    # 🚨 THE SOLUTION: Direct GET request, NO filters, NO cascades. Lightning fast.
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
@@ -237,12 +234,12 @@ def get_analytics():
     fetch_complete = True
     stop_reason = None
 
-    for page_num in range(150):
+    for page_num in range(150):  # Flawlessly iterates up to 75,000 records
         params = {"page_size": 500, "automatic_fields": "true"}
         if page_token: params["page_token"] = page_token
         
         try:
-            res = session.get(base_url, params=params, timeout=20)
+            res = session.get(base_url, params=params, timeout=12)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
@@ -306,8 +303,7 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        # LOCAL MEMORY ENFORCEMENT
-        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time'))
+        record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on Copy', 'Submitted on', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
@@ -316,7 +312,6 @@ def get_analytics():
 
         req_type = clean(get_field_local(fields, 'Request Type'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
-
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
         closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
@@ -339,11 +334,12 @@ def get_analytics():
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
-        # 🚨 BUGFIX: Added "agency applied already" via Contains/Substring for Follow-up integration.
-        is_creation_kpi = "agency creation" in req_type or "agency applied already" in req_type
+        # 🎯 KPI PROCESSING
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
+        
+        # 🚨 THE FIX: Safe Substring matching to catch the "follow-up" perfectly
+        is_creation_kpi = "agency creation" in req_type or "agency applied already" in req_type
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
@@ -378,7 +374,6 @@ def get_analytics():
             if is_done and acm:
                 clean_acm = acm.title()
                 stats["acm_performance"][clean_acm] = stats["acm_performance"].get(clean_acm, 0) + 1
-            
             if is_done and other_app:
                 oa_title = other_app.title()
                 stats["other_apps"][oa_title] = stats["other_apps"].get(oa_title, 0) + 1
@@ -386,17 +381,17 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # 🚨 BUGFIX: Extract MULTIPLE options for Creation Types using the new get_field_list extractor
+            # 🚨 THE FIX: Split Multiple Options seamlessly for Creation Types
             raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
-            for ct in get_field_list(raw_creation_types):
+            for ct in extract_field_list(raw_creation_types):
                 if ct:
                     ct_title = ct.title()
                     stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title, 0) + 1
 
-            # 🚨 BUGFIX: Extract MULTIPLE options for Rejection Reasons ONLY if ticket is rejected
+            # 🚨 THE FIX: Split Multiple Options seamlessly for Reject Reasons
             if is_rejected:
                 raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')
-                for rr in get_field_list(raw_reject_reasons):
+                for rr in extract_field_list(raw_reject_reasons):
                     if rr:
                         rr_title = rr.title()
                         stats["reject_reasons"][rr_title] = stats["reject_reasons"].get(rr_title, 0) + 1
