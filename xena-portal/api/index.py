@@ -19,110 +19,86 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano']
 
-# --- VERCEL SAFETY LIMITS ---
-MAX_RUNTIME_SECONDS = 8.5    # Hard ceiling to stay under Vercel's 10-15s timeout
-API_TIMEOUT_SECONDS = 6      # Per-request timeout
-PAGE_SIZE = 500              # Maximum Feishu limit for fastest scanning
-
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
     response = requests.post(url, json=payload, timeout=10).json()
     return response.get("tenant_access_token")
 
-# =============================================================================
-# 1. FIELD LOOKUP HELPERS  (Fixed: empty-value guard + space-normalization)
-# =============================================================================
-
-def is_empty_value(v):
-    """Treat None, "", [], and lists of only None/"" as empty."""
-    if v in (None, "", []): return True
-    if isinstance(v, list): return all(item in (None, "") for item in v)
-    return False
-
 def normalize_key(k):
-    """Collapse multiple spaces and lower-case for fuzzy column matching."""
+    """Solves Feishu invisible spacing issues."""
     return " ".join(str(k).lower().strip().split())
 
 def get_field_local(fields, *aliases):
-    """Find a field value by trying multiple aliases with normalization."""
+    """Safely locates columns even if Feishu alters the capitalization or spacing."""
     if not fields: return None
-
-    # 1. Exact case-sensitive match
+    
+    # 1. Exact case-sensitive match (Fastest)
     for alias in aliases:
-        if alias in fields and not is_empty_value(fields[alias]):
+        if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
-
-    # 2. Normalized case-insensitive match (handles extra spaces in Feishu names)
+            
+    # 2. Normalized Match (Catches spacing/capitalization differences)
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
-            if normalize_key(k) == tgt and not is_empty_value(v):
+            if normalize_key(k) == tgt and v not in (None, "", []):
                 return v
+                
+    # 3. Safe Substring Match
+    for alias in aliases:
+        tgt = normalize_key(alias)
+        for k, v in fields.items():
+            if tgt in normalize_key(k):
+                if v not in (None, "", []):
+                    return v
+                    
     return None
 
-# =============================================================================
-# 2. TEXT / LIST EXTRACTION  (Fixed: no more "None" strings, flat list output)
-# =============================================================================
-
 def extract_field_text(field_data):
-    """Extract a single human-readable string from a Feishu field value."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
 
     if isinstance(field_data, dict):
-        for key in ['text', 'name', 'en_name', 'value', 'label']:
-            if key in field_data and field_data[key] not in (None, ""):
-                return str(field_data[key])
-        if 'id' in field_data and field_data['id'] not in (None, ""):
-            return str(field_data['id'])
+        for key in ['text', 'name', 'en_name', 'value', 'label', 'id']:
+            if key in field_data: return str(field_data[key])
+        if 'id' in field_data: return str(field_data['id'])
         return str(field_data)
 
     if isinstance(field_data, list):
         if len(field_data) == 0: return ""
         texts = []
         for item in field_data:
-            if not item: continue
             if isinstance(item, dict):
                 extracted = False
-                for key in ['text', 'name', 'en_name', 'value', 'label']:
-                    if key in item and item[key] not in (None, ""):
+                for key in ['text', 'name', 'en_name', 'value', 'id']:
+                    if key in item:
                         texts.append(str(item[key]))
                         extracted = True
                         break
-                if not extracted:
-                    if 'id' in item and item['id'] not in (None, ""): texts.append(str(item['id']))
-                    else: texts.append(str(item))
-            elif isinstance(item, (str, int, float)): texts.append(str(item))
+                if not extracted: texts.append(str(item))
             else: texts.append(str(item))
         return " ".join(texts).strip()
-
     return str(field_data)
 
 def extract_field_list(field_data):
-    """
-    🚨 THE CHART FIX: Return a flat list of non-empty strings.
-    Handles: Single-Option (Dict), Multiple-Option (List), and Strings.
-    """
+    """🚨 THE PIE CHART FIX: Safely unpacks BOTH Single-Select and Multi-Select fields without crashing."""
     if not field_data: return []
-
-    if isinstance(field_data, str):
-        return [s.strip() for s in field_data.split(',') if s.strip()]
-
-    if isinstance(field_data, (int, float)):
-        val = str(field_data).strip()
-        return [val] if val else []
-
+    
+    # Handle Single-Select fields (Feishu sends these as Dictionaries)
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label']:
             if key in field_data and field_data[key] not in (None, ""):
-                val = str(field_data[key]).strip()
-                return [val] if val else []
+                return [str(field_data[key]).strip()]
         if 'id' in field_data and field_data['id'] not in (None, ""):
-            val = str(field_data['id']).strip()
-            return [val] if val else []
-        return []
+            return [str(field_data['id']).strip()]
+        return [str(field_data).strip()]
 
+    # Handle Comma-Separated Strings
+    if isinstance(field_data, str):
+        return [s.strip() for s in field_data.split(',') if s.strip()]
+        
+    # Handle Multi-Select fields (Feishu sends these as Lists)
     if isinstance(field_data, list):
         res = []
         for item in field_data:
@@ -131,27 +107,18 @@ def extract_field_list(field_data):
                 extracted = False
                 for key in ['text', 'name', 'en_name', 'value', 'label']:
                     if key in item and item[key] not in (None, ""):
-                        val = str(item[key]).strip()
-                        if val: res.append(val)
+                        res.append(str(item[key]).strip())
                         extracted = True
                         break
-                if not extracted:
-                    if 'id' in item and item['id'] not in (None, ""):
-                        val = str(item['id']).strip()
-                        if val: res.append(val)
-                    else:
-                        val = str(item).strip()
-                        if val: res.append(val)
-            elif isinstance(item, (str, int, float)):
-                val = str(item).strip()
-                if val: res.append(val)
+                if not extracted and 'id' in item and item['id'] not in (None, ""):
+                    res.append(str(item['id']).strip())
+                elif not extracted:
+                    res.append(str(item).strip())
             else:
-                val = str(item).strip()
-                if val: res.append(val)
+                res.append(str(item).strip())
         return res
-
-    val = str(field_data).strip()
-    return [val] if val else []
+        
+    return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
     if not date_val: return None
@@ -164,7 +131,7 @@ def parse_feishu_date(date_val):
         date_str = str(date_val).strip()
         if date_str.isdigit():
             return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
-
+        
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except Exception:
@@ -268,68 +235,62 @@ def get_analytics():
     if not region_filter: region_filter = 'pk'
 
     acm_filter = request.args.get('acm', 'All').strip().lower()
-    if acm_filter == 'hasseb': acm_filter = 'haseeb'
-
+    if acm_filter == 'hasseb': 
+        acm_filter = 'haseeb' # Auto-correct typo
+        
     type_filter = request.args.get('type', 'All').strip().lower()
+
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
+    # 🚨 DATE-SWAP FIX: Prevents infinite loop crash by flipping inverted dates
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
-        if dt1 > dt2: dt1, dt2 = dt2, dt1
-        from_dt, to_dt = dt1, dt2 + timedelta(days=1)
+        if dt1 > dt2:
+            dt1, dt2 = dt2, dt1
+        from_dt = dt1
+        to_dt = dt2 + timedelta(days=1)
     else:
         now = datetime.now()
         from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if now.month == 12: to_dt = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else: to_dt = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        if now.month == 12:
+            to_dt = now.replace(year=now.year+1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
     seen_ids = set()
-    master_keys = set()
     page_token = ""
     error_msg = None
     fetch_complete = True
     stop_reason = None
-    start_time = time.time()
 
-    consecutive_old_pages = 0
-
-    # =============================================================================
-    # PAGINATION LOOP  (Fixed: Vercel Safety Switch prevents 504 Timeout)
-    # =============================================================================
+    # 🚨 NO 8.5s TIMER. The natural early-exit natively breaks the loop when it passes the requested dates.
     for page_num in range(150):
-        # 🚨 VERCEL SAFETY NET: Ensures clean exit for older months.
-        if time.time() - start_time > MAX_RUNTIME_SECONDS:
-            fetch_complete = False
-            stop_reason = "Reached Vercel timeout limit while scanning. Showing data processed so far."
-            break
-
-        params = {"page_size": PAGE_SIZE, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
-
+        
         try:
-            res = session.get(base_url, params=params, timeout=API_TIMEOUT_SECONDS)
+            res = session.get(base_url, params=params, timeout=12)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
                 error_msg = stop_reason
                 break
-
+                
             res_json = res.json()
             if res_json.get("code") != 0:
                 fetch_complete = False
                 stop_reason = res_json.get("msg")
                 error_msg = stop_reason
                 break
-
+                
             data_block = res_json.get("data", {})
             items = data_block.get("items", [])
-            if not items: break
-
+            
             page_old_count = 0
             valid_dates_in_page = 0
 
@@ -338,34 +299,32 @@ def get_analytics():
                 if rid and rid not in seen_ids:
                     seen_ids.add(rid)
                     all_items.append(item)
-                    master_keys.update(item.get('fields', {}).keys())
-
+                    
                     raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
                     record_dt = parse_feishu_date(raw_date)
-                    if record_dt:
+                    if record_dt and from_dt:
                         valid_dates_in_page += 1
-                        if from_dt and record_dt < from_dt:
+                        if record_dt < from_dt:
                             page_old_count += 1
 
-            # SAFER EARLY EXIT: Breaks only after 3 full pages of old records to ensure accuracy
+            # SAFELY EXITS ONLY when an entire page consists of older data
             if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                consecutive_old_pages += 1
-            else:
-                consecutive_old_pages = 0
-
-            if consecutive_old_pages >= 3:
-                stop_reason = "Safely reached pages with all older records."
+                stop_reason = "Safely reached records older than requested date."
                 break
 
             page_token = data_block.get("page_token")
-            if not page_token or not data_block.get("has_more", False): break
-
+            if not page_token or not data_block.get("has_more", False): 
+                break
+                
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
             error_msg = stop_reason
             break
 
+    master_keys = set()
+    for item in all_items:
+        master_keys.update(item.get('fields', {}).keys())
     sample_keys = sorted(list(master_keys))
 
     stats = {
@@ -376,8 +335,8 @@ def get_analytics():
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
         "acm_closing_reasons": {}, "daily_trend": {},
-        "other_request_types": {}, "scanned_rows": len(all_items),
-        "error_debug": error_msg, "feishu_keys": sample_keys,
+        "other_request_types": {},
+        "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
         "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
@@ -386,17 +345,6 @@ def get_analytics():
         while cur < to_dt:
             stats["daily_trend"][cur.strftime("%Y-%m-%d")] = 0
             cur += timedelta(days=1)
-
-    # =============================================================================
-    # 3. KPI BOOLEAN CHECKS  (Fixed: explicit pattern list guarantees follow-ups)
-    # =============================================================================
-    CREATION_PATTERNS = [
-        "agency creation",
-        "agency applied already by acm or bd link ( follow-up )",
-        "agency applied already",
-        "follow-up",
-        "follow up"
-    ]
 
     for item in all_items:
         fields = item.get('fields', {})
@@ -410,6 +358,7 @@ def get_analytics():
 
         req_type = clean(get_field_local(fields, 'Request Type', 'Request type', 'Type', 'Category', 'Request Category'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
+
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
         closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
@@ -434,9 +383,12 @@ def get_analytics():
 
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
-
-        # 🚨 BULLETPROOF CREATION KPI CHECK
-        is_creation_kpi = any(p in req_type for p in CREATION_PATTERNS)
+        
+        # 🚨 THE FOLLOW-UP EXACT MATCH FIX
+        is_creation_kpi = (
+            "agency creation" in req_type or 
+            "agency applied already by acm or bd link ( follow-up )" in req_type
+        )
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
@@ -477,20 +429,15 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # 🚨 Extract Creation Types (With extra aliases to guarantee it finds the column)
-            raw_creation_types = get_field_local(
-                fields, 'Create Way', 'Create way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type'
-            )
+            # 🚨 THE PIE CHART ARRAY EXTRACTION FIX
+            raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type', 'Create type', 'Creation way')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
                     ct_title = ct.title()
                     stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title, 0) + 1
 
-            # 🚨 Extract Reject Reasons
             if is_rejected:
-                raw_reject_reasons = get_field_local(
-                    fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason'
-                )
+                raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason', 'Rejection', 'Reason for Rejection')
                 for rr in extract_field_list(raw_reject_reasons):
                     if rr:
                         rr_title = rr.title()
