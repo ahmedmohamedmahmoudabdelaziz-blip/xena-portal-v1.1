@@ -69,9 +69,12 @@
         .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 24px; }
 
         .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+        .chart-box.full-width { grid-column: 1 / -1; } /* 🚨 CSS FIX: Forces chart to take entire row horizontally */
+        
         .chart-box h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
         .chart-box h3::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent-cyan); }
         .chart-wrapper-pie { position: relative; height: 240px; }
+        .chart-wrapper-pie-large { position: relative; height: 350px; } /* 🚨 EXTRA HEIGHT FIX: Larger canvas for Rejections */
         .chart-wrapper-bar { position: relative; height: 320px; }
 
         .toast { padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: 500; display: none; align-items: flex-start; flex-direction: column; gap: 10px; word-wrap: break-word; }
@@ -241,8 +244,13 @@
             <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
         </div>
 
-        <div class="chart-grid-3">
-            <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie"><canvas id="cReject"></canvas></div></div>
+        <!-- 🚨 ROW FIX: Rejection Reasons isolated in a single full-width column to handle legend crowding -->
+        <div class="chart-grid-1">
+            <div class="chart-box full-width"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
+        </div>
+
+        <!-- 🚨 CLOSING ROW: Moved other 2 charts to their own row -->
+        <div class="chart-grid-2">
             <div class="chart-box"><h3>Closing Reasons</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
             <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-pie"><canvas id="cCloseBar"></canvas></div></div>
         </div>
@@ -351,9 +359,9 @@
 
         if (preset === 'this_month') {
             from = new Date(y, m, 1);
-            to = new Date(y, m + 1, 0);
+            // 🚨 CURRENT MONTH DATE FIX: Set 'to' as the exact current day so Trend lines stop drawing flat zeroes forward into the future
+            to = new Date(y, m, now.getDate());
         } else if (preset === 'last_month') {
-            // 🚨 FRONTEND DATE FIX: Prevents calculating negative days which broke the backend
             from = new Date(y, m - 1, 1);
             to = new Date(y, m, 0);
         } else if (preset === 'this_week') {
@@ -381,7 +389,9 @@
     }
 
     async function generateAnalytics() {
-        setDatePresets();
+        if (document.getElementById('anaDatePreset').value !== 'specific') {
+            setDatePresets();
+        }
         document.getElementById('errorToast').style.display = 'none';
         document.getElementById('incompleteToast').style.display = 'none';
         document.getElementById('loadingOverlay').style.display = 'flex';
@@ -391,7 +401,11 @@
         const acm = document.getElementById('anaAcm').value;
         const type = document.getElementById('anaType').value;
         const fromDate = document.getElementById('anaFrom').value;
-        const toDate = document.getElementById('anaTo').value;
+        
+        // 🚨 DATE ADJUSTMENT: Add 1 day to 'toDate' before passing to API to ensure midnight cutoff includes the last selected day.
+        const uiToDate = new Date(document.getElementById('anaTo').value);
+        uiToDate.setDate(uiToDate.getDate() + 1);
+        const toDate = fmtDate(uiToDate);
 
         try {
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
@@ -451,36 +465,71 @@
                 }
             }
         };
+        
+        // 🚨 REJECTION PIE FIX: Adjusted Legend styling so the Rejection chart is highly legible
+        const pieOptsReject = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    position: 'right', // Stack legends to the side so they don't get squished below the donut
+                    labels: { padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 10 } }
+                },
+                datalabels: {
+                    color: '#fff', font: { weight: 'bold', size: 10 },
+                    formatter: (v, ctx) => {
+                        const sum = ctx.dataset.data.reduce((a,b)=>a+b,0);
+                        return sum === 0 || (v/sum) < 0.05 ? '' : (v/sum*100).toFixed(1) + '%'; // Hide labels on tiny slivers (<5%) to stop overlapping
+                    }
+                }
+            }
+        };
 
-        const buildPie = (id, dataset) => {
+        const buildPie = (id, dataset, isRejectChart = false) => {
             const ctx = document.getElementById(id);
             if (!ctx) return;
-            if (!dataset || Object.keys(dataset).length === 0) dataset = {"No Data": 1};
+            
+            // 🚨 SORTING FIX: Ensure pie chart data is sorted from Highest -> Lowest
+            let sortedEntries = Object.entries(dataset).sort((a, b) => b[1] - a[1]);
+            let labels = sortedEntries.map(e => e[0]);
+            let dataValues = sortedEntries.map(e => e[1]);
+            
+            if (sortedEntries.length === 0) {
+                labels = ["No Data"];
+                dataValues = [1];
+            }
 
             charts[id] = new Chart(ctx, {
                 type: 'doughnut',
-                data: { labels: Object.keys(dataset), datasets: [{ data: Object.values(dataset), backgroundColor: PALETTE, borderWidth: 0, hoverOffset: 8 }] },
-                options: pieOpts
+                data: { labels: labels, datasets: [{ data: dataValues, backgroundColor: PALETTE, borderWidth: 0, hoverOffset: 8 }] },
+                options: isRejectChart ? pieOptsReject : pieOpts
             });
         };
 
         buildPie('cCreation', data.creation_status);
         buildPie('cBd', data.bd_status);
         buildPie('cClosing', data.closing_status);
-        buildPie('cReject', data.reject_reasons);
+        buildPie('cReject', data.reject_reasons, true); // 🚨 Apply special layout for Rejections
         buildPie('cClosePie', data.closing_reasons_pie);
         buildPie('cCreationType', data.creation_types);
         buildPie('cType', data.agency_types);
 
         const acmsClose = Object.keys(data.acm_closing_reasons);
         if (acmsClose.length > 0) {
+            
+            // 🚨 SORTING FIX (ACM Closing Breakdown): Sort ACMs based on the Total volume of closings (User Request + Duplicated Hosting)
+            const sortedAcmsClose = acmsClose.sort((a, b) => {
+                const totalA = Object.values(data.acm_closing_reasons[a]).reduce((acc, curr) => acc + curr, 0);
+                const totalB = Object.values(data.acm_closing_reasons[b]).reduce((acc, curr) => acc + curr, 0);
+                return totalB - totalA;
+            });
+            
             const reasons = Object.keys(data.closing_reasons_pie);
             const datasets = reasons.map((r, i) => ({
-                label: r, data: acmsClose.map(a => data.acm_closing_reasons[a][r] || 0),
+                label: r, data: sortedAcmsClose.map(a => data.acm_closing_reasons[a][r] || 0),
                 backgroundColor: PALETTE[i % PALETTE.length], borderRadius: 4
             }));
             charts['cCloseBar'] = new Chart(document.getElementById('cCloseBar'), {
-                type: 'bar', data: { labels: acmsClose, datasets },
+                type: 'bar', data: { labels: sortedAcmsClose, datasets },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#2a2c3f' } } },
@@ -490,11 +539,16 @@
         }
 
         if (Object.keys(data.acm_performance).length > 0) {
+            // 🚨 SORTING FIX (ACM Performance): Backend dictionary is technically sorted but forcing it here just to be bulletproof.
+            let sortedAcmPerf = Object.entries(data.acm_performance).sort((a, b) => b[1] - a[1]);
+            let labels = sortedAcmPerf.map(e => e[0]);
+            let dataValues = sortedAcmPerf.map(e => e[1]);
+            
             charts['cAcm'] = new Chart(document.getElementById('cAcm'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.acm_performance),
-                    datasets: [{ label: 'Onboarded', data: Object.values(data.acm_performance), backgroundColor: '#00e676', borderRadius: 4 }]
+                    labels: labels,
+                    datasets: [{ label: 'Onboarded', data: dataValues, backgroundColor: '#00e676', borderRadius: 4 }]
                 },
                 options: {
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
@@ -505,9 +559,14 @@
         }
 
         if (Object.keys(data.other_apps).length > 0) {
+            // 🚨 SORTING FIX (Other Apps Hosted): Sort Apps from Highest -> Lowest
+            let sortedOtherApps = Object.entries(data.other_apps).sort((a, b) => b[1] - a[1]);
+            let labels = sortedOtherApps.map(e => e[0]);
+            let dataValues = sortedOtherApps.map(e => e[1]);
+            
             charts['cOtherApp'] = new Chart(document.getElementById('cOtherApp'), {
                 type: 'bar',
-                data: { labels: Object.keys(data.other_apps), datasets: [{ data: Object.values(data.other_apps), backgroundColor: '#b967ff', borderRadius: 4 }] },
+                data: { labels: labels, datasets: [{ data: dataValues, backgroundColor: '#b967ff', borderRadius: 4 }] },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false }, datalabels: { display: false } },
@@ -517,6 +576,26 @@
         }
 
         if (Object.keys(data.daily_trend).length > 0) {
+            // 🚨 TREND LINE FIX: Remove empty trailing zeroes dynamically generated beyond today's date if filtering the "Current Month"
+            const trendDates = Object.keys(data.daily_trend);
+            const trendValues = Object.values(data.daily_trend);
+            const preset = document.getElementById('anaDatePreset').value;
+            
+            let filteredLabels = trendDates;
+            let filteredValues = trendValues;
+            
+            // Only truncate the zeros if we requested "Current Month" preset specifically, and today isn't the final day.
+            if (preset === 'this_month') {
+                const todayFormatted = fmtDate(new Date());
+                const todayIndex = trendDates.indexOf(todayFormatted);
+                
+                // If today's date exists inside the trend array, slice the array there so no empty future zeros appear.
+                if(todayIndex !== -1) {
+                   filteredLabels = trendDates.slice(0, todayIndex + 1);
+                   filteredValues = trendValues.slice(0, todayIndex + 1);
+                }
+            }
+            
             const ctx = document.getElementById('cTrend');
             const grad = ctx.getContext('2d').createLinearGradient(0,0,0,300);
             grad.addColorStop(0, 'rgba(0,212,255,0.3)');
@@ -525,9 +604,9 @@
             charts['cTrend'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: Object.keys(data.daily_trend),
+                    labels: filteredLabels,
                     datasets: [{
-                        data: Object.values(data.daily_trend),
+                        data: filteredValues,
                         borderColor: '#00d4ff', backgroundColor: grad, fill: true,
                         tension: 0.4, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6
                     }]
