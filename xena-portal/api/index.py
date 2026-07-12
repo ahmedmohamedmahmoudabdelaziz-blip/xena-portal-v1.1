@@ -26,31 +26,36 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def get_field_local(fields, *aliases):
-    """🚨 STRICT EXACT MATCHING: Solves the column-hijacking bug."""
-    if not fields: return None
-    # Normalize the incoming Feishu columns to exact lowercase, stripped keys
-    normalized_fields = {k.lower().strip(): v for k, v in fields.items()}
-    
+    if not fields:
+        return None
+    # 1. Exact case-sensitive match
+    for alias in aliases:
+        if alias in fields and fields[alias] not in (None, "", []):
+            return fields[alias]
+    # 2. Exact case-insensitive match (NO SUBSTRINGS)
     for alias in aliases:
         tgt = alias.lower().strip()
-        if tgt in normalized_fields:
-            val = normalized_fields[tgt]
-            if val not in (None, "", []):
-                return val
+        for k, v in fields.items():
+            if k.lower().strip() == tgt:
+                if v not in (None, "", []):
+                    return v
     return None
 
 def extract_field_text(field_data):
-    if not field_data: return ""
-    if isinstance(field_data, (str, int, float)): return str(field_data)
+    if not field_data:
+        return ""
+    if isinstance(field_data, (str, int, float)):
+        return str(field_data)
 
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label', 'id']:
-            if key in field_data: return str(field_data[key])
-        if 'id' in field_data: return str(field_data['id'])
+            if key in field_data:
+                return str(field_data[key])
         return str(field_data)
 
     if isinstance(field_data, list):
-        if len(field_data) == 0: return ""
+        if len(field_data) == 0:
+            return ""
         texts = []
         for item in field_data:
             if isinstance(item, dict):
@@ -60,51 +65,55 @@ def extract_field_text(field_data):
                         texts.append(str(item[key]))
                         extracted = True
                         break
-                if not extracted: texts.append(str(item))
-            else: texts.append(str(item))
+                if not extracted:
+                    texts.append(str(item))
+            else:
+                texts.append(str(item))
         return " ".join(texts).strip()
     return str(field_data)
 
 def extract_field_list(field_data):
-    """🚨 PIE CHART FIX: Safely extracts strings from both Dicts (Single) and Lists (Multi)."""
-    if not field_data: return []
-    
+    if not field_data:
+        return []
+
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label']:
-            if key in field_data and field_data[key] not in (None, ""):
+            if key in field_data:
                 return [str(field_data[key]).strip()]
-        if 'id' in field_data and field_data['id'] not in (None, ""):
+        if 'id' in field_data:
             return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
 
     if isinstance(field_data, str):
         return [s.strip() for s in field_data.split(',') if s.strip()]
-        
+
     if isinstance(field_data, list):
         res = []
         for item in field_data:
-            if not item: continue
             if isinstance(item, dict):
                 extracted = False
                 for key in ['text', 'name', 'en_name', 'value', 'label']:
-                    if key in item and item[key] not in (None, ""):
+                    if key in item:
                         res.append(str(item[key]).strip())
                         extracted = True
                         break
-                if not extracted and 'id' in item and item['id'] not in (None, ""):
+                if not extracted and 'id' in item:
                     res.append(str(item['id']).strip())
                 elif not extracted:
                     res.append(str(item).strip())
             else:
                 res.append(str(item).strip())
         return res
-        
+
     return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
-    if not date_val: return None
-    if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
-    if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
+    if not date_val:
+        return None
+    if isinstance(date_val, list) and len(date_val) > 0:
+        date_val = date_val[0]
+    if isinstance(date_val, dict):
+        date_val = date_val.get('value', date_val.get('text', ''))
 
     try:
         if isinstance(date_val, (int, float)):
@@ -112,7 +121,7 @@ def parse_feishu_date(date_val):
         date_str = str(date_val).strip()
         if date_str.isdigit():
             return datetime.fromtimestamp(int(date_str) / 1000.0).replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except Exception:
@@ -135,7 +144,8 @@ def login():
 @app.route('/api/callback', methods=['GET'])
 def callback():
     code = request.args.get('code')
-    if not code: return "SSO Authorization Failed.", 400
+    if not code:
+        return "SSO Authorization Failed.", 400
 
     tat = get_tenant_access_token()
     token_url = "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token"
@@ -144,7 +154,8 @@ def callback():
     token_resp = requests.post(token_url, headers=headers, json=payload, timeout=10).json()
 
     user_access_token = token_resp.get("data", {}).get("access_token")
-    if not user_access_token: return "SSO Error: Could not verify user token.", 500
+    if not user_access_token:
+        return "SSO Error: Could not verify user token.", 500
 
     info_url = "https://open.feishu.cn/open-apis/authen/v1/user_info"
     info_resp = requests.get(info_url, headers={"Authorization": f"Bearer {user_access_token}"}, timeout=10).json()
@@ -163,8 +174,10 @@ def check_auth():
 def search_agency():
     agency_code = request.args.get('code')
     uat = request.args.get('uat', '')
-    if not uat: return jsonify({"error": "Unauthorized session."}), 401
-    if not agency_code: return jsonify({"error": "No agency code provided"}), 400
+    if not uat:
+        return jsonify({"error": "Unauthorized session."}), 401
+    if not agency_code:
+        return jsonify({"error": "No agency code provided"}), 400
 
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -177,15 +190,19 @@ def search_agency():
     points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
 
     points_response = requests.post(points_url, headers=headers, json=points_payload, timeout=10).json()
-    if points_response.get("code") != 0: return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
+    if points_response.get("code") != 0:
+        return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
 
     items = points_response.get('data', {}).get('items', [])
-    if not items: return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
+    if not items:
+        return jsonify({"error": f"⚠️ Notice: Access Denied: Agency {agency_code} is not related to your team."}), 403
 
     fields = items[0].get('fields', {})
     sheet_acm_name = extract_field_text(get_field_local(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
-    try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
-    except ValueError: base_points = 0
+    try:
+        base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
+    except ValueError:
+        base_points = 0
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     req_response = requests.post(req_url, headers=headers, json=points_payload, timeout=10).json()
@@ -201,31 +218,32 @@ def search_agency():
 
     return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
 
-# --- 🚀 THE UNLIMITED DIRECT-STREAM ENGINE ---
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
     username = request.args.get('user', '').lower()
     uat = request.args.get('uat', '')
-    if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
-    if not any(admin in username for admin in ADMIN_USERS): return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
+    if not uat:
+        return jsonify({"error": "Unauthorized session. Please log in again."}), 401
+    if not any(admin in username for admin in ADMIN_USERS):
+        return jsonify({"error": "Unauthorized. Analytics are restricted to Administrators."}), 403
 
     tat = get_tenant_access_token()
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}"})
 
     region_filter = request.args.get('region', 'PK').strip().lower()
-    if not region_filter: region_filter = 'pk'
+    if not region_filter:
+        region_filter = 'pk'
 
     acm_filter = request.args.get('acm', 'All').strip().lower()
-    if acm_filter == 'hasseb': 
-        acm_filter = 'haseeb' # Auto-correct typo
-        
+    if acm_filter == 'hasseb':
+        acm_filter = 'haseeb'  # Auto-correct typo
+
     type_filter = request.args.get('type', 'All').strip().lower()
 
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    # 🚨 DATE-SWAP FIX: Prevents 6500-record crash
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
@@ -249,39 +267,32 @@ def get_analytics():
     error_msg = None
     fetch_complete = True
     stop_reason = None
-    
-    # 🚨 VERCEL HARD-KILL PROTECTION (8.5 Seconds)
-    start_time = time.time()
-    consecutive_old_pages = 0
+
+    consecutive_old_pages = 0   # NEW: safer early exit counter
 
     for page_num in range(150):
-        # Prevent 504 Gateway Timeout
-        if time.time() - start_time > 8.5:
-            fetch_complete = False
-            stop_reason = "Vercel 10s limit approaching. Safely paused."
-            break
-
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
-        if page_token: params["page_token"] = page_token
-        
+        if page_token:
+            params["page_token"] = page_token
+
         try:
-            res = session.get(base_url, params=params, timeout=8)
+            res = session.get(base_url, params=params, timeout=12)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
                 error_msg = stop_reason
                 break
-                
+
             res_json = res.json()
             if res_json.get("code") != 0:
                 fetch_complete = False
                 stop_reason = res_json.get("msg")
                 error_msg = stop_reason
                 break
-                
+
             data_block = res_json.get("data", {})
             items = data_block.get("items", [])
-            
+
             page_old_count = 0
             valid_dates_in_page = 0
 
@@ -290,35 +301,36 @@ def get_analytics():
                 if rid and rid not in seen_ids:
                     seen_ids.add(rid)
                     all_items.append(item)
-                    
+
                     raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
                     record_dt = parse_feishu_date(raw_date)
-                    if record_dt and from_dt:
+                    if record_dt:
                         valid_dates_in_page += 1
-                        if record_dt < from_dt:
+                        if from_dt and record_dt < from_dt:
                             page_old_count += 1
 
-            # 🚨 SAFER EARLY EXIT (Waits for 2 full pages of old records)
+            # === SAFER EARLY EXIT LOGIC ===
             if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                # All dated records on this page are older than from_dt
                 consecutive_old_pages += 1
             else:
                 consecutive_old_pages = 0
-                
-            if consecutive_old_pages >= 2:
-                stop_reason = "Safely reached older records."
+
+            # Break after 3 full pages of exclusively old records
+            if consecutive_old_pages >= 3:
+                stop_reason = "Safely reached consecutive pages with all records older than requested date."
                 break
 
             page_token = data_block.get("page_token")
-            if not page_token or not data_block.get("has_more", False): 
+            if not page_token or not data_block.get("has_more", False):
                 break
-                
+
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
             error_msg = stop_reason
             break
 
-    # DIAGNOSTIC ENGINE
     master_keys = set()
     for item in all_items:
         master_keys.update(item.get('fields', {}).keys())
@@ -346,16 +358,17 @@ def get_analytics():
     for item in all_items:
         fields = item.get('fields', {})
 
-        # LOCAL MEMORY ENFORCEMENT
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time'))
         if from_dt or to_dt:
-            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
+            if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt):
+                continue
 
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
-        if region_filter != 'all' and region != region_filter: continue
+        if region_filter != 'all' and region != region_filter:
+            continue
 
-        # Robust Aliases for Request Type
-        req_type = clean(get_field_local(fields, 'Request Type', 'Request type'))
+        # ADDED more aliases to reliably catch "Request Type"
+        req_type = clean(get_field_local(fields, 'Request Type', 'Request type', 'request type'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
 
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
@@ -368,35 +381,40 @@ def get_analytics():
         acm_pk = clean(get_field_local(fields, 'Acm Name (PK)'))
         acm_in = clean(get_field_local(fields, 'Acm Name (IN)'))
         acm = acm_in if region == "in" else acm_pk
-        if not acm: acm = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
+        if not acm:
+            acm = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
 
-        if acm_filter != 'all' and acm_filter != acm: continue
+        if acm_filter != 'all' and acm_filter != acm:
+            continue
 
         agency_type_title = agency_type.title() if agency_type else "Unknown"
-        if type_filter != 'all' and type_filter != agency_type: continue
+        if type_filter != 'all' and type_filter != agency_type:
+            continue
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
             if date_str in stats["daily_trend"]:
                 stats["daily_trend"][date_str] += 1
 
-        # 🎯 CANONICAL EXACT KPI CLASSIFICATION
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
-        
-        # 🚨 BULLETPROOF FOLLOW-UP LOGIC
+
+        # EXPANDED check to guarantee follow‑up tickets are treated as creations
         is_creation_kpi = (
-            "agency creation" in req_type or 
-            "agency applied already" in req_type or 
-            "follow-up" in req_type or 
+            "agency creation" in req_type or
+            "agency applied already" in req_type or
+            "follow-up" in req_type or
             "follow up" in req_type
         )
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
-            if is_done: stats["closing_status"]["Done"] += 1
-            elif is_rejected: stats["closing_status"]["Rejected"] += 1
-            else: stats["closing_status"]["Under Investigation"] += 1
+            if is_done:
+                stats["closing_status"]["Done"] += 1
+            elif is_rejected:
+                stats["closing_status"]["Rejected"] += 1
+            else:
+                stats["closing_status"]["Under Investigation"] += 1
 
             if closing_reason:
                 cr_title = closing_reason.title()
@@ -412,15 +430,21 @@ def get_analytics():
 
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
-            if is_done: stats["bd_status"]["Done"] += 1
-            elif is_rejected: stats["bd_status"]["Rejected"] += 1
-            else: stats["bd_status"]["Under Investigation"] += 1
+            if is_done:
+                stats["bd_status"]["Done"] += 1
+            elif is_rejected:
+                stats["bd_status"]["Rejected"] += 1
+            else:
+                stats["bd_status"]["Under Investigation"] += 1
 
         elif is_creation_kpi:
             stats["kpis"]["creations"] += 1
-            if is_done: stats["creation_status"]["Done"] += 1
-            elif is_rejected: stats["creation_status"]["Rejected"] += 1
-            else: stats["creation_status"]["Under Investigation"] += 1
+            if is_done:
+                stats["creation_status"]["Done"] += 1
+            elif is_rejected:
+                stats["creation_status"]["Rejected"] += 1
+            else:
+                stats["creation_status"]["Under Investigation"] += 1
 
             if is_done and acm:
                 clean_acm = acm.title()
@@ -431,15 +455,17 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # Extract Multiple Options seamlessly
-            raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
+            # ADDED more aliases for creation type and reject reason
+            raw_creation_types = get_field_local(fields,
+                'Create Way', 'Create way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
                     ct_title = ct.title()
                     stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title, 0) + 1
 
             if is_rejected:
-                raw_reject_reasons = get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')
+                raw_reject_reasons = get_field_local(fields,
+                    'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')
                 for rr in extract_field_list(raw_reject_reasons):
                     if rr:
                         rr_title = rr.title()
