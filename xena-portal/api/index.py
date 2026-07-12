@@ -24,7 +24,6 @@ RT_CREATION_SET = {"agency creation", "agency applied already by acm or bd link 
 RT_BD = "bd creation"
 RT_CLOSING = "closing agency"
 
-FEISHU_TZ = timezone(timedelta(hours=8))  # Asia/Shanghai (Beijing time)
 
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
