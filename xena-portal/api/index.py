@@ -16,7 +16,7 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
-ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano', 'marvin', '哈帕 (marvin)', 'hazel']
+ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano', 'marvin', '哈帕 (marvin)', 'hazel', '哈帕']
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
