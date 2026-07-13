@@ -75,7 +75,6 @@
         .chart-box h3::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent-cyan); }
         
         .chart-wrapper-pie { position: relative; height: 240px; }
-        /* 🚨 CANVAS HEIGHT FIX: Huge height to ensure fanned-out labels never get cut off at the top/bottom */
         .chart-wrapper-pie-large { position: relative; height: 520px; } 
         .chart-wrapper-bar { position: relative; height: 320px; }
 
@@ -266,15 +265,22 @@
             <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar"><canvas id="cOtherApp"></canvas></div></div>
         </div>
 
-        <div class="chart-grid-1">
-            <div class="chart-box"><h3>Daily Requests Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrend"></canvas></div></div>
+        <!-- 🚨 TREND CHARTS FIX: Split side-by-side into Agency Creations and BD Creations -->
+        <div class="chart-grid-2">
+            <div class="chart-box">
+                <h3 style="color: var(--accent-cyan);">Daily Agency Creations Trend</h3>
+                <div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div>
+            </div>
+            <div class="chart-box">
+                <h3 style="color: var(--accent-green);">Daily BD Creations Trend</h3>
+                <div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    // 🚨 100% REWRITTEN LINE ALGORITHM
-    // This uses "Iterative Relaxation" to mathematically guarantee labels never overlap.
+    // 🚨 REJECTION ANTI-COLLISION ENGINE
     const leaderLinePlugin = {
         id: 'leaderLine',
         afterDraw(chart, args, options) {
@@ -295,12 +301,11 @@
                 const val = dataset.data[i];
                 if (val === 0) return;
                 const percent = (val / total * 100);
-                if (percent < 0.5) return; // Hide slices smaller than 0.5%
+                if (percent < 0.5) return; 
                 
                 const angle = (arc.startAngle + arc.endAngle) / 2;
                 const isRight = Math.cos(angle) >= 0;
                 
-                // Get the point directly on the edge of the pie
                 const radius = arc.outerRadius;
                 const startX = centerX + Math.cos(angle) * radius;
                 const startY = centerY + Math.sin(angle) * radius;
@@ -309,19 +314,16 @@
                     i, val, percent, angle, startX, startY, radius,
                     text: `${chart.data.labels[i]}: ${val} (${percent.toFixed(2)}%)`,
                     color: dataset.backgroundColor[i % dataset.backgroundColor.length],
-                    targetY: startY // Initial assumption: draw the text exactly where the slice is
+                    targetY: startY 
                 };
                 
                 if (isRight) rightLabels.push(labelObj);
                 else leftLabels.push(labelObj);
             });
 
-            // Sort arrays top-to-bottom
             leftLabels.sort((a, b) => a.startY - b.startY);
             rightLabels.sort((a, b) => a.startY - b.startY);
 
-            // 🚨 THE ANTI-COLLISION ENGINE
-            // If labels are closer than 18px, this pushes them apart smoothly.
             const SPACING = 18; 
             const relaxLabels = (labels) => {
                 for (let iter = 0; iter < 50; iter++) {
@@ -341,18 +343,13 @@
 
             const drawSide = (labels, isRight) => {
                 if (labels.length === 0) return;
-                
-                // Find the widest part of the pie so lines clear the edge perfectly
                 const maxRad = meta.data[0].outerRadius;
-                
-                // The 'elbow' is where the diagonal line turns into a flat horizontal line
                 const elbowX = centerX + (isRight ? maxRad + 25 : -maxRad - 25);
                 const endX = elbowX + (isRight ? 15 : -15);
                 
                 labels.forEach((lb) => {
                     ctx.save();
                     
-                    // 1. Draw the leader line (Edge -> Elbow -> End)
                     ctx.beginPath();
                     ctx.moveTo(lb.startX, lb.startY);
                     ctx.lineTo(elbowX, lb.targetY);
@@ -361,13 +358,11 @@
                     ctx.lineWidth = 1.2;
                     ctx.stroke();
 
-                    // 2. Draw a neat colored dot on the edge of the pie
                     ctx.beginPath();
                     ctx.arc(lb.startX, lb.startY, 4, 0, 2 * Math.PI);
                     ctx.fillStyle = lb.color;
                     ctx.fill();
 
-                    // 3. Draw the Text
                     ctx.fillStyle = '#e0e0e0';
                     ctx.font = '11px Inter, sans-serif';
                     ctx.textBaseline = 'middle';
@@ -573,14 +568,13 @@
             }
         };
         
-        // 🚨 REJECTION CHART OUTLABEL CONFIG: Adds huge 240px side margins so the long labels fit without clipping
         const pieOptsReject = {
             responsive: true, maintainAspectRatio: false,
             layout: { padding: { left: 240, right: 240, top: 40, bottom: 40 } }, 
             plugins: {
                 legend: { display: false },
                 datalabels: { display: false },
-                leaderLine: { display: true } // Triggers the custom engine above
+                leaderLine: { display: true } 
             }
         };
 
@@ -681,9 +675,11 @@
             });
         }
 
-        if (Object.keys(data.daily_trend).length > 0) {
-            const trendDates = Object.keys(data.daily_trend);
-            const trendValues = Object.values(data.daily_trend);
+        // 🚨 TREND CHART DRAWING ALGORITHM (Now builds 2 separate charts)
+        const buildTrendChart = (id, trendData, chartColor, gradStartColor) => {
+            if (!trendData || Object.keys(trendData).length === 0) return;
+            const trendDates = Object.keys(trendData);
+            const trendValues = Object.values(trendData);
             const preset = document.getElementById('anaDatePreset').value;
             
             let filteredLabels = [];
@@ -698,18 +694,18 @@
                 }
             }
             
-            const ctx = document.getElementById('cTrend');
+            const ctx = document.getElementById(id);
             const grad = ctx.getContext('2d').createLinearGradient(0,0,0,300);
-            grad.addColorStop(0, 'rgba(0,212,255,0.3)');
-            grad.addColorStop(1, 'rgba(0,212,255,0.0)');
+            grad.addColorStop(0, gradStartColor);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
 
-            charts['cTrend'] = new Chart(ctx, {
+            charts[id] = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: filteredLabels,
                     datasets: [{
                         data: filteredValues,
-                        borderColor: '#00d4ff', backgroundColor: grad, fill: true,
+                        borderColor: chartColor, backgroundColor: grad, fill: true,
                         tension: 0.4, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6
                     }]
                 },
@@ -719,7 +715,11 @@
                     scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }, y: { grid: { color: '#2a2c3f' }, beginAtZero: true } }
                 }
             });
-        }
+        };
+
+        // Draw Agency Trend in Cyan, BD Trend in Green
+        buildTrendChart('cTrendCreation', data.daily_trend_creation, '#00d4ff', 'rgba(0,212,255,0.3)');
+        buildTrendChart('cTrendBd', data.daily_trend_bd, '#00e676', 'rgba(0,230,118,0.3)');
     }
 
     async function fetchAgencyData() {
