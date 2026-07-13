@@ -73,8 +73,10 @@
         
         .chart-box h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
         .chart-box h3::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent-cyan); }
+        
         .chart-wrapper-pie { position: relative; height: 240px; }
-        .chart-wrapper-pie-large { position: relative; height: 420px; } /* Increased height for leader lines */
+        /* 🚨 CANVAS HEIGHT FIX: Huge height to ensure fanned-out labels never get cut off at the top/bottom */
+        .chart-wrapper-pie-large { position: relative; height: 520px; } 
         .chart-wrapper-bar { position: relative; height: 320px; }
 
         .toast { padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: 500; display: none; align-items: flex-start; flex-direction: column; gap: 10px; word-wrap: break-word; }
@@ -271,7 +273,8 @@
 </div>
 
 <script>
-    // 🚨 CUSTOM LEADER LINE PLUGIN: Draws the exact callout lines and labels for Rejection Reasons
+    // 🚨 100% REWRITTEN LINE ALGORITHM
+    // This uses "Iterative Relaxation" to mathematically guarantee labels never overlap.
     const leaderLinePlugin = {
         id: 'leaderLine',
         afterDraw(chart, args, options) {
@@ -280,73 +283,104 @@
             const dataset = chart.data.datasets[0];
             const meta = chart.getDatasetMeta(0);
             if (!meta.data || meta.data.length === 0) return;
-            const total = dataset.data.reduce((a,b) => a+b, 0);
+            
+            const total = dataset.data.reduce((a, b) => a + b, 0);
+            const centerX = chart.chartArea.left + chart.chartArea.width / 2;
+            const centerY = chart.chartArea.top + chart.chartArea.height / 2;
 
-            // Collision avoidance arrays
-            let leftY = [];
-            let rightY = [];
+            let leftLabels = [];
+            let rightLabels = [];
 
             meta.data.forEach((arc, i) => {
                 const val = dataset.data[i];
                 if (val === 0) return;
                 const percent = (val / total * 100);
-                if (percent < 0.5) return; // Hide lines for tiny slices to prevent severe overlap
+                if (percent < 0.5) return; // Hide slices smaller than 0.5%
                 
                 const angle = (arc.startAngle + arc.endAngle) / 2;
-                const xCenter = chart.chartArea.left + chart.chartArea.width / 2;
-                const yCenter = chart.chartArea.top + chart.chartArea.height / 2;
-                const outerRadius = arc.outerRadius;
-
-                // Start point on the outer edge of the pie slice
-                const startX = xCenter + Math.cos(angle) * outerRadius;
-                const startY = yCenter + Math.sin(angle) * outerRadius;
+                const isRight = Math.cos(angle) >= 0;
                 
-                // First bend point (elbow)
-                const isRight = Math.cos(angle) > 0;
-                const elbowDist = outerRadius + 20;
-                let breakX = xCenter + Math.cos(angle) * elbowDist;
-                let breakY = yCenter + Math.sin(angle) * elbowDist;
+                // Get the point directly on the edge of the pie
+                const radius = arc.outerRadius;
+                const startX = centerX + Math.cos(angle) * radius;
+                const startY = centerY + Math.sin(angle) * radius;
+                
+                const labelObj = {
+                    i, val, percent, angle, startX, startY, radius,
+                    text: `${chart.data.labels[i]}: ${val} (${percent.toFixed(2)}%)`,
+                    color: dataset.backgroundColor[i % dataset.backgroundColor.length],
+                    targetY: startY // Initial assumption: draw the text exactly where the slice is
+                };
+                
+                if (isRight) rightLabels.push(labelObj);
+                else leftLabels.push(labelObj);
+            });
 
-                // Collision Avoidance (Push labels away if they overlap)
-                const yArr = isRight ? rightY : leftY;
-                const ySpacing = 16; 
-                for(let j=0; j<yArr.length; j++) {
-                    if (Math.abs(breakY - yArr[j]) < ySpacing) {
-                        breakY += (breakY > yCenter ? ySpacing : -ySpacing);
+            // Sort arrays top-to-bottom
+            leftLabels.sort((a, b) => a.startY - b.startY);
+            rightLabels.sort((a, b) => a.startY - b.startY);
+
+            // 🚨 THE ANTI-COLLISION ENGINE
+            // If labels are closer than 18px, this pushes them apart smoothly.
+            const SPACING = 18; 
+            const relaxLabels = (labels) => {
+                for (let iter = 0; iter < 50; iter++) {
+                    for (let i = 0; i < labels.length - 1; i++) {
+                        const diff = labels[i+1].targetY - labels[i].targetY;
+                        if (diff < SPACING) {
+                            const push = (SPACING - diff) / 2;
+                            labels[i].targetY -= push;
+                            labels[i+1].targetY += push;
+                        }
                     }
                 }
-                yArr.push(breakY);
+            };
 
-                // Horizontal line end
-                const endX = isRight ? breakX + 30 : breakX - 30;
+            relaxLabels(leftLabels);
+            relaxLabels(rightLabels);
 
-                // Draw connecting lines
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(breakX, breakY);
-                ctx.lineTo(endX, breakY);
-                ctx.strokeStyle = '#8b8fa3';
-                ctx.lineWidth = 1.2;
-                ctx.stroke();
-
-                // Draw color dot at the slice edge
-                ctx.beginPath();
-                ctx.arc(startX, startY, 4, 0, 2*Math.PI);
-                ctx.fillStyle = dataset.backgroundColor[i % dataset.backgroundColor.length];
-                ctx.fill();
-
-                // Draw Label Text
-                ctx.fillStyle = '#e0e0e0';
-                ctx.font = '11px Inter, sans-serif';
-                ctx.textBaseline = 'middle';
-                ctx.textAlign = isRight ? 'left' : 'right';
-                const label = chart.data.labels[i];
-                const text = `${label}: ${val} (${percent.toFixed(2)}%)`;
+            const drawSide = (labels, isRight) => {
+                if (labels.length === 0) return;
                 
-                ctx.fillText(text, isRight ? endX + 5 : endX - 5, breakY);
-                ctx.restore();
-            });
+                // Find the widest part of the pie so lines clear the edge perfectly
+                const maxRad = meta.data[0].outerRadius;
+                
+                // The 'elbow' is where the diagonal line turns into a flat horizontal line
+                const elbowX = centerX + (isRight ? maxRad + 25 : -maxRad - 25);
+                const endX = elbowX + (isRight ? 15 : -15);
+                
+                labels.forEach((lb) => {
+                    ctx.save();
+                    
+                    // 1. Draw the leader line (Edge -> Elbow -> End)
+                    ctx.beginPath();
+                    ctx.moveTo(lb.startX, lb.startY);
+                    ctx.lineTo(elbowX, lb.targetY);
+                    ctx.lineTo(endX, lb.targetY);
+                    ctx.strokeStyle = '#4a4d63';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+
+                    // 2. Draw a neat colored dot on the edge of the pie
+                    ctx.beginPath();
+                    ctx.arc(lb.startX, lb.startY, 4, 0, 2 * Math.PI);
+                    ctx.fillStyle = lb.color;
+                    ctx.fill();
+
+                    // 3. Draw the Text
+                    ctx.fillStyle = '#e0e0e0';
+                    ctx.font = '11px Inter, sans-serif';
+                    ctx.textBaseline = 'middle';
+                    ctx.textAlign = isRight ? 'left' : 'right';
+                    
+                    const textX = isRight ? endX + 6 : endX - 6;
+                    ctx.fillText(lb.text, textX, lb.targetY);
+                    ctx.restore();
+                });
+            };
+
+            drawSide(leftLabels, false);
+            drawSide(rightLabels, true);
         }
     };
 
@@ -434,7 +468,7 @@
 
         if (preset === 'this_month') {
             from = new Date(y, m, 1);
-            to = new Date(y, m + 1, 0);
+            to = new Date(y, m, now.getDate());
         } else if (preset === 'last_month') {
             from = new Date(y, m - 1, 1);
             to = new Date(y, m, 0);
@@ -539,14 +573,14 @@
             }
         };
         
-        // 🚨 REJECTION CHART OUTLABEL CONFIG: Hides default labels to make room for custom leader lines
+        // 🚨 REJECTION CHART OUTLABEL CONFIG: Adds huge 240px side margins so the long labels fit without clipping
         const pieOptsReject = {
             responsive: true, maintainAspectRatio: false,
-            layout: { padding: { left: 160, right: 160, top: 40, bottom: 40 } }, // Gives large margins so text fits on sides
+            layout: { padding: { left: 240, right: 240, top: 40, bottom: 40 } }, 
             plugins: {
-                legend: { display: false }, // Hides default legend
-                datalabels: { display: false }, // Hides default inner text
-                leaderLine: { display: true } // Triggers our custom line-drawing plugin
+                legend: { display: false },
+                datalabels: { display: false },
+                leaderLine: { display: true } // Triggers the custom engine above
             }
         };
 
@@ -554,7 +588,6 @@
             const ctx = document.getElementById(id);
             if (!ctx) return;
             
-            // 🚨 SORTING FIX: Highest to Lowest for Pie Charts
             let sortedEntries = Object.entries(dataset).sort((a, b) => b[1] - a[1]);
             let labels = sortedEntries.map(e => e[0]);
             let dataValues = sortedEntries.map(e => e[1]);
@@ -578,7 +611,6 @@
 
         const acmsClose = Object.keys(data.acm_closing_reasons);
         if (acmsClose.length > 0) {
-            // 🚨 ACM CLOSING SORT FIX: Highest to Lowest
             const sortedAcmsClose = acmsClose.sort((a, b) => {
                 const totalA = Object.values(data.acm_closing_reasons[a]).reduce((acc, curr) => acc + curr, 0);
                 const totalB = Object.values(data.acm_closing_reasons[b]).reduce((acc, curr) => acc + curr, 0);
@@ -601,7 +633,6 @@
         }
 
         if (Object.keys(data.acm_performance).length > 0) {
-            // 🚨 ACM ONBOARDING FIX: Highest to Lowest & Datalabels enabled
             let sortedAcmPerf = Object.entries(data.acm_performance).sort((a, b) => b[1] - a[1]);
             let labels = sortedAcmPerf.map(e => e[0]);
             let dataValues = sortedAcmPerf.map(e => e[1]);
@@ -614,7 +645,7 @@
                 },
                 options: {
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                    layout: { padding: { right: 40 } }, // Prevent numbers from getting cut off
+                    layout: { padding: { right: 40 } }, 
                     plugins: { 
                         legend: { display: false }, 
                         datalabels: { display: true, anchor: 'end', align: 'right', color: '#fff', font: {weight: 'bold'} } 
@@ -628,7 +659,6 @@
         }
 
         if (Object.keys(data.other_apps).length > 0) {
-            // 🚨 OTHER APPS FIX: Highest to Lowest & Datalabels enabled
             let sortedOtherApps = Object.entries(data.other_apps).sort((a, b) => b[1] - a[1]);
             let labels = sortedOtherApps.map(e => e[0]);
             let dataValues = sortedOtherApps.map(e => e[1]);
@@ -638,7 +668,7 @@
                 data: { labels: labels, datasets: [{ data: dataValues, backgroundColor: '#b967ff', borderRadius: 4 }] },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    layout: { padding: { top: 30 } }, // Prevent numbers from getting cut off
+                    layout: { padding: { top: 30 } }, 
                     plugins: { 
                         legend: { display: false }, 
                         datalabels: { display: true, anchor: 'end', align: 'top', color: '#fff', font: {weight: 'bold'} } 
@@ -660,7 +690,6 @@
             let filteredValues = [];
             const todayStr = fmtDate(new Date());
             
-            // 🚨 TREND FIX: Stops plotting flat zeros automatically after today's date when viewing "Current Month"
             for (let i = 0; i < trendDates.length; i++) {
                 filteredLabels.push(trendDates[i]);
                 filteredValues.push(trendValues[i]);
