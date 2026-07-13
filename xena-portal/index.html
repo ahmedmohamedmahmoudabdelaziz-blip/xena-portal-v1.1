@@ -74,7 +74,7 @@
         .chart-box h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
         .chart-box h3::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent-cyan); }
         .chart-wrapper-pie { position: relative; height: 240px; }
-        .chart-wrapper-pie-large { position: relative; height: 350px; } 
+        .chart-wrapper-pie-large { position: relative; height: 420px; } /* Increased height for leader lines */
         .chart-wrapper-bar { position: relative; height: 320px; }
 
         .toast { padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: 500; display: none; align-items: flex-start; flex-direction: column; gap: 10px; word-wrap: break-word; }
@@ -271,7 +271,86 @@
 </div>
 
 <script>
-    Chart.register(ChartDataLabels);
+    // 🚨 CUSTOM LEADER LINE PLUGIN: Draws the exact callout lines and labels for Rejection Reasons
+    const leaderLinePlugin = {
+        id: 'leaderLine',
+        afterDraw(chart, args, options) {
+            if (!options.display) return;
+            const ctx = chart.ctx;
+            const dataset = chart.data.datasets[0];
+            const meta = chart.getDatasetMeta(0);
+            if (!meta.data || meta.data.length === 0) return;
+            const total = dataset.data.reduce((a,b) => a+b, 0);
+
+            // Collision avoidance arrays
+            let leftY = [];
+            let rightY = [];
+
+            meta.data.forEach((arc, i) => {
+                const val = dataset.data[i];
+                if (val === 0) return;
+                const percent = (val / total * 100);
+                if (percent < 0.5) return; // Hide lines for tiny slices to prevent severe overlap
+                
+                const angle = (arc.startAngle + arc.endAngle) / 2;
+                const xCenter = chart.chartArea.left + chart.chartArea.width / 2;
+                const yCenter = chart.chartArea.top + chart.chartArea.height / 2;
+                const outerRadius = arc.outerRadius;
+
+                // Start point on the outer edge of the pie slice
+                const startX = xCenter + Math.cos(angle) * outerRadius;
+                const startY = yCenter + Math.sin(angle) * outerRadius;
+                
+                // First bend point (elbow)
+                const isRight = Math.cos(angle) > 0;
+                const elbowDist = outerRadius + 20;
+                let breakX = xCenter + Math.cos(angle) * elbowDist;
+                let breakY = yCenter + Math.sin(angle) * elbowDist;
+
+                // Collision Avoidance (Push labels away if they overlap)
+                const yArr = isRight ? rightY : leftY;
+                const ySpacing = 16; 
+                for(let j=0; j<yArr.length; j++) {
+                    if (Math.abs(breakY - yArr[j]) < ySpacing) {
+                        breakY += (breakY > yCenter ? ySpacing : -ySpacing);
+                    }
+                }
+                yArr.push(breakY);
+
+                // Horizontal line end
+                const endX = isRight ? breakX + 30 : breakX - 30;
+
+                // Draw connecting lines
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(breakX, breakY);
+                ctx.lineTo(endX, breakY);
+                ctx.strokeStyle = '#8b8fa3';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                // Draw color dot at the slice edge
+                ctx.beginPath();
+                ctx.arc(startX, startY, 4, 0, 2*Math.PI);
+                ctx.fillStyle = dataset.backgroundColor[i % dataset.backgroundColor.length];
+                ctx.fill();
+
+                // Draw Label Text
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = '11px Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = isRight ? 'left' : 'right';
+                const label = chart.data.labels[i];
+                const text = `${label}: ${val} (${percent.toFixed(2)}%)`;
+                
+                ctx.fillText(text, isRight ? endX + 5 : endX - 5, breakY);
+                ctx.restore();
+            });
+        }
+    };
+
+    Chart.register(ChartDataLabels, leaderLinePlugin);
     Chart.defaults.color = '#8b8fa3';
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(21,22,33,0.95)';
@@ -283,7 +362,7 @@
     Chart.defaults.plugins.tooltip.cornerRadius = 8;
     Chart.defaults.plugins.tooltip.displayColors = true;
 
-    const PALETTE = ['#00d4ff', '#ff4d6d', '#ffb800', '#00e676', '#b967ff', '#2196f3', '#ff8a65', '#4db6ac', '#e040fb', '#69f0ae'];
+    const PALETTE = ['#00d4ff', '#ff4d6d', '#ffb800', '#00e676', '#b967ff', '#2196f3', '#ff8a65', '#4db6ac', '#e040fb', '#69f0ae', '#ff5252', '#00bcd4', '#ffeb3b', '#7c4dff'];
     const pkAcms = ["Nabeel","Hasseb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"];
     const inAcms = ["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","BELLA"];
 
@@ -460,23 +539,14 @@
             }
         };
         
-        // 🚨 REJECTION CHART FIX: Formats legend gracefully on the right side.
+        // 🚨 REJECTION CHART OUTLABEL CONFIG: Hides default labels to make room for custom leader lines
         const pieOptsReject = {
             responsive: true, maintainAspectRatio: false,
-            layout: { padding: { left: 0, right: 20, top: 0, bottom: 0 } },
+            layout: { padding: { left: 160, right: 160, top: 40, bottom: 40 } }, // Gives large margins so text fits on sides
             plugins: {
-                legend: { 
-                    position: 'right',
-                    align: 'center',
-                    labels: { padding: 15, usePointStyle: true, pointStyle: 'circle', font: { size: 11, family: "'Inter', sans-serif" }, color: '#e0e0e0' }
-                },
-                datalabels: {
-                    color: '#fff', font: { weight: 'bold', size: 10 },
-                    formatter: (v, ctx) => {
-                        const sum = ctx.dataset.data.reduce((a,b)=>a+b,0);
-                        return sum === 0 || (v/sum) < 0.04 ? '' : (v/sum*100).toFixed(1) + '%';
-                    }
-                }
+                legend: { display: false }, // Hides default legend
+                datalabels: { display: false }, // Hides default inner text
+                leaderLine: { display: true } // Triggers our custom line-drawing plugin
             }
         };
 
@@ -544,6 +614,7 @@
                 },
                 options: {
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { right: 40 } }, // Prevent numbers from getting cut off
                     plugins: { 
                         legend: { display: false }, 
                         datalabels: { display: true, anchor: 'end', align: 'right', color: '#fff', font: {weight: 'bold'} } 
@@ -567,6 +638,7 @@
                 data: { labels: labels, datasets: [{ data: dataValues, backgroundColor: '#b967ff', borderRadius: 4 }] },
                 options: {
                     responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { top: 30 } }, // Prevent numbers from getting cut off
                     plugins: { 
                         legend: { display: false }, 
                         datalabels: { display: true, anchor: 'end', align: 'top', color: '#fff', font: {weight: 'bold'} } 
@@ -588,13 +660,13 @@
             let filteredValues = [];
             const todayStr = fmtDate(new Date());
             
-            // 🚨 TREND FIX: Stops plotting flat lines into the future
+            // 🚨 TREND FIX: Stops plotting flat zeros automatically after today's date when viewing "Current Month"
             for (let i = 0; i < trendDates.length; i++) {
-                if (preset === 'this_month' && trendDates[i] > todayStr) {
-                    break;
-                }
                 filteredLabels.push(trendDates[i]);
                 filteredValues.push(trendValues[i]);
+                if (preset === 'this_month' && trendDates[i] >= todayStr) {
+                    break;
+                }
             }
             
             const ctx = document.getElementById('cTrend');
