@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.parse
 import logging
 from flask import Flask, request, jsonify, send_file, redirect
@@ -16,7 +17,8 @@ BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 
-ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano', 'marvin', '哈帕 (marvin)', 'hazel', '哈帕']
+ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954', 'noora', 'mano', 'marvin', '哈帕 (marvin)']
+
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
@@ -24,36 +26,34 @@ def get_tenant_access_token():
     return response.get("tenant_access_token")
 
 def normalize_key(k):
-    """🚨 SPACING FIX: Ignores invisible spaces in Feishu column names."""
     return " ".join(str(k).lower().strip().split())
 
 def get_field_local(fields, *aliases):
     if not fields: return None
-    
-    # 1. Exact case-sensitive match
     for alias in aliases:
         if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
-            
-    # 2. Normalized case-insensitive match
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
             if normalize_key(k) == tgt and v not in (None, "", []):
                 return v
-                
+    for alias in aliases:
+        tgt = normalize_key(alias)
+        for k, v in fields.items():
+            if tgt in normalize_key(k):
+                if v not in (None, "", []):
+                    return v
     return None
 
 def extract_field_text(field_data):
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
-
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label', 'id']:
             if key in field_data: return str(field_data[key])
         if 'id' in field_data: return str(field_data['id'])
         return str(field_data)
-
     if isinstance(field_data, list):
         if len(field_data) == 0: return ""
         texts = []
@@ -71,10 +71,7 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_field_list(field_data):
-    """🚨 THE PIE CHART FIX: Safely unpacks BOTH Single-Select and Multi-Select fields without crashing."""
     if not field_data: return []
-    
-    # Handle Single-Select fields (Feishu sends these as Dictionaries)
     if isinstance(field_data, dict):
         for key in ['text', 'name', 'en_name', 'value', 'label']:
             if key in field_data and field_data[key] not in (None, ""):
@@ -82,12 +79,8 @@ def extract_field_list(field_data):
         if 'id' in field_data and field_data['id'] not in (None, ""):
             return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
-
-    # Handle Comma-Separated Strings
     if isinstance(field_data, str):
         return [s.strip() for s in field_data.split(',') if s.strip()]
-        
-    # Handle Multi-Select fields (Feishu sends these as Lists)
     if isinstance(field_data, list):
         res = []
         for item in field_data:
@@ -106,7 +99,6 @@ def extract_field_list(field_data):
             else:
                 res.append(str(item).strip())
         return res
-        
     return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
@@ -115,7 +107,6 @@ def parse_feishu_date(date_val):
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
 
     try:
-        # 🚨 VERCEL TIMEZONE FIX: Vercel runs in UTC. Adds 3 hours to perfectly match Egypt/Cairo time.
         if isinstance(date_val, (int, float)):
             dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
             dt_cairo = dt_utc + timedelta(hours=3)
@@ -234,41 +225,35 @@ def get_analytics():
         acm_filter = 'haseeb'
         
     type_filter = request.args.get('type', 'All').strip().lower()
-
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    # 🚨 DATE-SWAP FIX: Prevents backwards date crashes automatically
     if date_from and date_to:
         dt1 = datetime.strptime(date_from, "%Y-%m-%d")
         dt2 = datetime.strptime(date_to, "%Y-%m-%d")
-        if dt1 > dt2:
-            dt1, dt2 = dt2, dt1
-        from_dt = dt1
-        to_dt = dt2 + timedelta(days=1)
+        if dt1 > dt2: dt1, dt2 = dt2, dt1
+        from_dt, to_dt = dt1, dt2 + timedelta(days=1)
     else:
         now = datetime.now()
         from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if now.month == 12:
-            to_dt = now.replace(year=now.year+1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            to_dt = now.replace(month=now.month+1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        if now.month == 12: to_dt = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else: to_dt = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
     seen_ids = set()
+    master_keys = set()
     page_token = ""
     error_msg = None
     fetch_complete = True
     stop_reason = None
     consecutive_old_pages = 0
 
-    # 🚨 THE 8.5s TIMER IS PERMANENTLY REMOVED. This loop breaks naturally based purely on ticket dates.
     for page_num in range(150):
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
-        
+
         try:
             res = session.get(base_url, params=params, timeout=12)
             if res.status_code != 200:
@@ -276,17 +261,18 @@ def get_analytics():
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
                 error_msg = stop_reason
                 break
-                
+
             res_json = res.json()
             if res_json.get("code") != 0:
                 fetch_complete = False
                 stop_reason = res_json.get("msg")
                 error_msg = stop_reason
                 break
-                
+
             data_block = res_json.get("data", {})
             items = data_block.get("items", [])
-            
+            if not items: break
+
             page_old_count = 0
             valid_dates_in_page = 0
 
@@ -295,35 +281,33 @@ def get_analytics():
                 if rid and rid not in seen_ids:
                     seen_ids.add(rid)
                     all_items.append(item)
-                    
+                    master_keys.update(item.get('fields', {}).keys())
+
                     raw_date = get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time')
                     record_dt = parse_feishu_date(raw_date)
-                    if record_dt and from_dt:
+                    if record_dt:
                         valid_dates_in_page += 1
-                        if record_dt < from_dt:
+                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
                             page_old_count += 1
 
             if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
                 consecutive_old_pages += 1
             else:
                 consecutive_old_pages = 0
-                
+
             if consecutive_old_pages >= 3:
-                stop_reason = "Safely reached older records."
+                stop_reason = "Safely reached pages with all older records."
                 break
 
             page_token = data_block.get("page_token")
-            if not page_token or not data_block.get("has_more", False): 
-                break
+            if not page_token or not data_block.get("has_more", False): break
+
         except Exception as e:
             fetch_complete = False
             stop_reason = str(e)
             error_msg = stop_reason
             break
 
-    master_keys = set()
-    for item in all_items:
-        master_keys.update(item.get('fields', {}).keys())
     sample_keys = sorted(list(master_keys))
 
     stats = {
@@ -333,16 +317,21 @@ def get_analytics():
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "acm_performance": {}, "creation_types": {}, "agency_types": {},
         "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
-        "acm_closing_reasons": {}, "daily_trend": {},
-        "other_request_types": {},
-        "scanned_rows": len(all_items), "error_debug": error_msg, "feishu_keys": sample_keys,
+        "acm_closing_reasons": {}, 
+        "daily_trend_creation": {},  # 🚨 NEW: Isolated Creation Trend Bucket
+        "daily_trend_bd": {},        # 🚨 NEW: Isolated BD Trend Bucket
+        "other_request_types": {}, "scanned_rows": len(all_items),
+        "error_debug": error_msg, "feishu_keys": sample_keys,
         "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
+    # Initialize the zero-baselines for both charts
     if from_dt and to_dt:
         cur = from_dt
         while cur < to_dt:
-            stats["daily_trend"][cur.strftime("%Y-%m-%d")] = 0
+            date_str = cur.strftime("%Y-%m-%d")
+            stats["daily_trend_creation"][date_str] = 0
+            stats["daily_trend_bd"][date_str] = 0
             cur += timedelta(days=1)
 
     for item in all_items:
@@ -353,11 +342,18 @@ def get_analytics():
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
         region = clean(get_field_local(fields, 'Region', 'Agency Region'))
+        acm_pk = clean(get_field_local(fields, 'Acm Name (PK)'))
+        acm_in = clean(get_field_local(fields, 'Acm Name (IN)'))
+        acm_fallback = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
+        
+        if region == '' or region == 'none':
+            if acm_pk in ["nabeel", "hasseb", "haseeb", "enzo", "farooq", "mubeen", "cruz", "ehtisham", "usama", "sehar ch", "hamza malik", "zohaib", "eagle", "leo", "berlin"] or acm_fallback in ["nabeel", "hasseb", "haseeb", "enzo", "farooq", "mubeen", "cruz", "ehtisham", "usama", "sehar ch", "hamza malik", "zohaib", "eagle", "leo", "berlin"]:
+                region = 'pk'
+
         if region_filter != 'all' and region != region_filter: continue
 
-        req_type = clean(get_field_local(fields, 'Request Type', 'Request type'))
+        req_type = clean(get_field_local(fields, 'Request Type', 'Request type', 'Type', 'Category', 'Request Category'))
         status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
-
         agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
         closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
@@ -365,29 +361,30 @@ def get_analytics():
         is_done = "done" in status or "complet" in status or "approv" in status
         is_rejected = "reject" in status or "fail" in status or "decline" in status
 
-        acm_pk = clean(get_field_local(fields, 'Acm Name (PK)'))
-        acm_in = clean(get_field_local(fields, 'Acm Name (IN)'))
         acm = acm_in if region == "in" else acm_pk
-        if not acm: acm = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
-
+        if not acm: acm = acm_fallback
         if acm_filter != 'all' and acm_filter != acm: continue
 
         agency_type_title = agency_type.title() if agency_type else "Unknown"
         if type_filter != 'all' and type_filter != agency_type: continue
 
-        if is_done and record_dt:
-            date_str = record_dt.strftime("%Y-%m-%d")
-            if date_str in stats["daily_trend"]:
-                stats["daily_trend"][date_str] += 1
-
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
-        
-        # 🚨 THE FOLLOW-UP FIX: Explicit exact string match, completely bulletproof.
-        is_creation_kpi = (
-            "agency creation" in req_type or 
-            "agency applied already by acm or bd link ( follow-up )" in req_type
-        )
+        is_creation_kpi = any(p in req_type for p in [
+            "agency creation",
+            "agency applied already by acm or bd link ( follow-up )",
+            "agency applied already",
+            "follow-up",
+            "follow up"
+        ])
+
+        # 🚨 NEW LOGIC: Only increment the trend counters if they are specifically Creations or BDs
+        if is_done and record_dt:
+            date_str = record_dt.strftime("%Y-%m-%d")
+            if is_creation_kpi and date_str in stats["daily_trend_creation"]:
+                stats["daily_trend_creation"][date_str] += 1
+            if is_bd_kpi and date_str in stats["daily_trend_bd"]:
+                stats["daily_trend_bd"][date_str] += 1
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
@@ -428,7 +425,6 @@ def get_analytics():
             if agency_type_title != "Unknown":
                 stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title, 0) + 1
 
-            # Extract Multiple Options seamlessly
             raw_creation_types = get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')
             for ct in extract_field_list(raw_creation_types):
                 if ct:
@@ -450,7 +446,8 @@ def get_analytics():
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
     stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
-    stats["daily_trend"] = dict(sorted(stats["daily_trend"].items()))
+    stats["daily_trend_creation"] = dict(sorted(stats["daily_trend_creation"].items()))
+    stats["daily_trend_bd"] = dict(sorted(stats["daily_trend_bd"].items()))
     stats["creation_types"] = dict(sorted(stats["creation_types"].items(), key=lambda x: x[1], reverse=True))
     stats["agency_types"] = dict(sorted(stats["agency_types"].items(), key=lambda x: x[1], reverse=True))
     stats["other_request_types"] = dict(sorted(stats["other_request_types"].items(), key=lambda x: x[1], reverse=True))
