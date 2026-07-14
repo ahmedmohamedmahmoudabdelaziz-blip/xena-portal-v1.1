@@ -147,8 +147,8 @@
         
         <div class="admin-form">
             <div class="control-group">
-                <label>Agent Email (Lark Email)</label>
-                <input type="email" id="newAgentEmail" placeholder="e.g., agent@xena.live">
+                <label>Agent Identity (Lark Email OR Exact Name)</label>
+                <input type="text" id="newAgentEmail" placeholder="e.g., muhammedusman@micous.com OR Muhammad Usman">
             </div>
             <div class="control-group">
                 <label>Allowed Modules</label>
@@ -208,9 +208,6 @@
             <div class="control-group" id="queryTypeContainer" style="display:none;">
                 <label>Inquiry Type</label>
                 <select id="queryType" onchange="toggleViewModes()">
-                    <option value="target">Agency Target Privilege</option>
-                    <option value="points">Agency Points System</option>
-                    <option value="analytics" id="optAnalytics" style="display:none;">📊 Agency Data Analyses</option>
                 </select>
             </div>
             <div id="noAccessMsg" style="display:none; color: var(--accent-rose); text-align: center; font-weight: bold; padding: 20px; background: rgba(255,77,109,0.1); border-radius: 8px;">
@@ -494,35 +491,37 @@
         if(loggedEmail) displayTxt += ` (${loggedEmail})`;
         document.getElementById('welcomeText').innerText = displayTxt;
 
-        // 🚨 FIX: CORRECT VARIABLE NAME (d.is_super_admin)
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
             .then(r => r.json())
             .then(d => { 
+                const selector = document.getElementById('queryType');
+                selector.innerHTML = '';
                 
-                // Show Admin Button ONLY if Super Admin
                 if (d.is_super_admin) {
                     document.getElementById('adminBtn').style.display = 'block';
                 }
                 
-                // Show Analytics Option if they have the module OR are Super Admin
                 if (d.is_super_admin || (d.modules && d.modules.includes('analytics'))) {
                     document.getElementById('optAnalytics').style.display = 'block';
                 }
                 
-                // If they have literally ZERO access, show error.
                 if (!d.is_super_admin && (!d.modules || d.modules.length === 0)) {
                     document.getElementById('noAccessMsg').style.display = 'block';
                     document.getElementById('queryTypeContainer').style.display = 'none';
                     document.getElementById('standardSearchParams').style.display = 'none';
                 } else {
                     document.getElementById('queryTypeContainer').style.display = 'block';
+                    if(d.is_super_admin || d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
+                    if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
+                    if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
                 }
+                
+                toggleViewModes();
             });
 
         updateAcmDropdown();
         setDatePresets();
         buildAcmCheckboxDropdown();
-        toggleViewModes();
     }
 
     function logout() { localStorage.clear(); location.reload(); }
@@ -624,6 +623,7 @@
         document.getElementById('adminModal').style.display = 'flex';
         fetchAdminUsers();
     }
+    
     function closeAdmin() {
         document.getElementById('adminModal').style.display = 'none';
         document.getElementById('acmDropdownContainer').classList.remove('visible');
@@ -642,10 +642,11 @@
                 return;
             }
             users.forEach(u => {
+                let dispEmail = u.email ? u.email : u.person; 
                 listDiv.innerHTML += `
                     <div class="user-row">
                         <div class="user-info">
-                            <span class="user-email">${u.email}</span>
+                            <span class="user-email">${dispEmail}</span>
                             <span class="user-details"><b>Modules:</b> ${u.modules} | <b>Regions:</b> ${u.regions.toUpperCase()} | <b>ACMs:</b> ${u.acms}</span>
                         </div>
                         <button class="del-btn" onclick="deleteAgent('${u.id}')">Remove</button>
@@ -668,7 +669,7 @@
         if (acms.length === 0) acms = ['all'];
         if (regions.length === 0) regions = ['all'];
         
-        if(!email) { alert("Please enter an email address."); return; }
+        if(!email) { alert("Please enter an email or name."); return; }
         
         try {
             const res = await fetch(`/api/admin/users`, {
@@ -679,7 +680,7 @@
             const data = await res.json();
             
             if(!res.ok || !data.success) {
-                throw new Error(data.error || "Failed to save to Feishu Database. Check column names and permissions.");
+                throw new Error(data.error || "Failed to save to Feishu Database. Ensure your Feishu Access Management Table only uses Text columns.");
             }
             
             document.getElementById('newAgentEmail').value = '';
