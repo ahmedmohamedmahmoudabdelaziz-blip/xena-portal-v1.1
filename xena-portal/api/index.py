@@ -20,7 +20,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 # 🚨 ACCESS MANAGEMENT TABLE ID
 ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 
-# 🚨 MASTER ADMIN (Bypasses all checks)
+# 🚨 ONLY YOU ARE MASTER ADMIN NOW. Everyone else must be added via the Website Admin Panel.
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
 # ACM Lists for auto-detecting blank regions
@@ -135,19 +135,17 @@ def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
 # =============================================================================
-# 🚨 GRANULAR PERMISSIONS PARSER (target=pk;points=all;analytics=zohaib)
+# 🚨 GRANULAR PERMISSIONS PARSER (Decodes: "target=pk;points=all")
 # =============================================================================
 def parse_granular_string(raw_str):
     default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     if not raw_str or str(raw_str).strip() == "": return default
     
-    # Legacy Fallback
     if "=" not in raw_str:
         parts = [x.strip().lower() for x in raw_str.split(",") if x.strip()]
         if not parts: parts = ["all"]
         return {"target": parts, "points": parts, "analytics": parts}
     
-    # Granular Parsing
     res = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     for chunk in raw_str.split(";"):
         if "=" in chunk:
@@ -182,7 +180,6 @@ def get_user_permissions(email, name):
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        # 🚨 Fetch all records to do Manual python-side check (Bypasses Feishu API bugs)
         res = requests.get(url, headers=headers, params={"page_size": 500}, timeout=10).json()
         items = res.get("data", {}).get("items", [])
         
@@ -262,13 +259,12 @@ def check_auth():
     return jsonify(perms)
 
 # =============================================================================
-# 🚨 ADMIN PANEL ROUTES (Added Perfect Edit/Upsert Logic)
+# 🚨 ADMIN PANEL ROUTES (Added Safe 'PUT' Upsert Logic)
 # =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
     admin_name = request.headers.get('X-User-Name', '').lower()
     
-    # Verify access via hardcode OR if they were given 'admin' checkbox rights
     is_authorized = any(admin in admin_name for admin in ADMIN_USERS)
     if not is_authorized:
         perms = get_user_permissions("", admin_name)
@@ -286,8 +282,7 @@ def manage_users():
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
             display_email = extract_field_text(fields.get("Email", ""))
-            if not display_email:
-                display_email = extract_field_text(fields.get("Person", ""))
+            if not display_email: display_email = extract_field_text(fields.get("Person", ""))
 
             users.append({
                 "id": item.get("record_id"),
@@ -300,11 +295,11 @@ def manage_users():
 
     elif request.method == 'POST':
         data = request.json
-        email_to_check = data.get("email").strip()
+        email_to_check = data.get("email", "").strip()
         
-        # Structure the granular strings
-        acms_formatted = f"target={data['acms']['target']};points={data['acms']['points']};analytics={data['acms']['analytics']}"
-        regs_formatted = f"target={data['regions']['target']};points={data['regions']['points']};analytics={data['regions']['analytics']}"
+        # Package UI selections into Granular strings
+        acms_formatted = f"target={data.get('acms', {}).get('target', 'all')};points={data.get('acms', {}).get('points', 'all')};analytics={data.get('acms', {}).get('analytics', 'all')}"
+        regs_formatted = f"target={data.get('regions', {}).get('target', 'all')};points={data.get('regions', {}).get('points', 'all')};analytics={data.get('regions', {}).get('analytics', 'all')}"
 
         payload = {
             "fields": {
@@ -315,7 +310,7 @@ def manage_users():
             }
         }
         
-        # 🚨 PERFECT UPSERT LOGIC: Download list and manually find duplicate to overwrite
+        # 🚨 UPSERT LOGIC: Prevent duplicates by manually locating matching rows in Feishu
         res_all = requests.get(base_url, headers=headers, params={"page_size": 500}).json()
         existing_record_id = None
         for item in res_all.get("data", {}).get("items", []):
@@ -353,7 +348,7 @@ def search_agency():
     if not agency_code: return jsonify({"error": "No agency code provided"}), 400
 
     perms = get_user_permissions(email, username)
-    if inquiry_type not in perms["modules"] and not perms["is_super_admin"]:
+    if inquiry_type not in perms["modules"] and not perms.get("is_super_admin"):
         return jsonify({"error": f"Access Denied: You do not have permission to view the {inquiry_type.title()} module."}), 403
 
     tat = get_tenant_access_token()
@@ -376,7 +371,7 @@ def search_agency():
     region = clean(get_field_local(fields, 'Region', 'Agency Region'))
     sheet_acm_name = extract_field_text(get_field_local(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
     
-    # 🚨 Auto-Detect Region Fallback if empty in Feishu
+    # 🚨 REGION FALLBACK: Auto-Detect Region if empty in Feishu
     if region in ('', 'none'):
         if sheet_acm_name.lower() in PK_ACMS:
             region = 'pk'
@@ -384,11 +379,12 @@ def search_agency():
             region = 'in'
     
     # 🚨 Read granular permissions
-    allowed_regs = perms["permissions"]["regions"].get(inquiry_type, ["all"]) if "permissions" in perms else ["all"]
-    allowed_acms = perms["permissions"]["acms"].get(inquiry_type, ["all"]) if "permissions" in perms else ["all"]
+    allowed_regs = perms.get("permissions", {}).get("regions", {}).get(inquiry_type, ["all"])
+    allowed_acms = perms.get("permissions", {}).get("acms", {}).get(inquiry_type, ["all"])
 
     if "all" not in allowed_regs and region not in allowed_regs:
-        return jsonify({"error": f"Access Denied: Your profile restricts querying Region: {region.upper() if region else 'UNKNOWN'}"}), 403
+        display_reg = region.upper() if region else 'UNKNOWN'
+        return jsonify({"error": f"Access Denied: Your profile restricts querying Region: {display_reg}"}), 403
         
     if "all" not in allowed_acms and sheet_acm_name.lower() not in allowed_acms:
         return jsonify({"error": f"Access Denied: You are not authorized to view data for ACM: {sheet_acm_name}"}), 403
@@ -422,8 +418,8 @@ def get_analytics():
         return jsonify({"error": "Unauthorized. Analytics module restricted."}), 403
 
     # 🚨 Read granular permissions
-    allowed_regs = perms["permissions"]["regions"].get("analytics", ["all"]) if "permissions" in perms else ["all"]
-    allowed_acms = perms["permissions"]["acms"].get("analytics", ["all"]) if "permissions" in perms else ["all"]
+    allowed_regs = perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"])
+    allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
 
     tat = get_tenant_access_token()
     session = requests.Session()
