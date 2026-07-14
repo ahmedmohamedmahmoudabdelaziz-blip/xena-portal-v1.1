@@ -491,6 +491,7 @@
         if(loggedEmail) displayTxt += ` (${loggedEmail})`;
         document.getElementById('welcomeText').innerText = displayTxt;
 
+        // 🚨 FIX: Safely removes the ghost element that crashed the UI
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
             .then(r => r.json())
             .then(d => { 
@@ -499,10 +500,6 @@
                 
                 if (d.is_super_admin) {
                     document.getElementById('adminBtn').style.display = 'block';
-                }
-                
-                if (d.is_super_admin || (d.modules && d.modules.includes('analytics'))) {
-                    document.getElementById('optAnalytics').style.display = 'block';
                 }
                 
                 if (!d.is_super_admin && (!d.modules || d.modules.length === 0)) {
@@ -517,7 +514,7 @@
                 }
                 
                 toggleViewModes();
-            });
+            }).catch(e => console.error("Authorization check failed:", e));
 
         updateAcmDropdown();
         setDatePresets();
@@ -534,8 +531,10 @@
     }
 
     function toggleViewModes() {
-        const val = document.getElementById('queryType').value;
+        const queryTypeElem = document.getElementById('queryType');
+        const val = queryTypeElem ? queryTypeElem.value : '';
         const isAna = val === 'analytics';
+        
         document.getElementById('standardSearchParams').style.display = (isAna || !val) ? 'none' : 'flex';
         document.getElementById('resultsContainer').style.display = 'none';
         document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
