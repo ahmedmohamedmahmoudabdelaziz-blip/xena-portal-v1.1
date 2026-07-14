@@ -54,9 +54,9 @@
         .btn-success { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #000; }
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
 
-        /* 🚨 ADMIN MODAL UI + DROPDOWN CHECKLIST CSS */
+        /* 🚨 ADMIN MODAL UI & CHECKBOX CSS */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-content { background: var(--surface); width: 100%; max-width: 650px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--surface); width: 100%; max-width: 600px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .modal-header h2 { font-size: 1.5rem; color: var(--text); margin: 0;}
         .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
@@ -69,7 +69,6 @@
         .user-email { font-weight: 600; color: var(--accent-cyan); }
         .user-details { font-size: 0.8rem; color: var(--text-muted); }
         .del-btn { background: rgba(255,77,109,0.1); color: var(--accent-rose); border: 1px solid rgba(255,77,109,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-
         .dropdown-check-list { display: inline-block; width: 100%; position: relative; }
         .dropdown-check-list .anchor { width: 100%; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; display: block; font-size: 0.95rem;}
         .dropdown-check-list .anchor:hover { border-color: var(--accent-cyan); }
@@ -138,7 +137,7 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
-<!-- 🚨 MODAL: Admin Access Control Panel (With Checkbox Dropdowns) -->
+<!-- 🚨 MODAL: Admin Access Control Panel -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -165,7 +164,7 @@
                     <div id="acmDropdownContainer" class="dropdown-check-list" tabindex="100">
                       <span class="anchor" onclick="document.getElementById('acmDropdownContainer').classList.toggle('visible')">Select ACMs ▼</span>
                       <ul class="items" id="acmCheckboxes">
-                        <!-- Populated dynamically by JS below -->
+                        <!-- Populated by JS -->
                       </ul>
                     </div>
                 </div>
@@ -206,16 +205,18 @@
 
     <div class="card">
         <div class="centered-search-box" style="margin-bottom: 16px;">
-            <div class="control-group" id="queryTypeContainer" style="display:none;">
+            <div class="control-group">
                 <label>Inquiry Type</label>
-                <select id="queryType" onchange="toggleViewModes()"></select>
-            </div>
-            <div id="noAccessMsg" style="display:none; color: var(--accent-rose); text-align: center; font-weight: bold; padding: 20px; background: rgba(255,77,109,0.1); border-radius: 8px;">
-                You do not have access to any modules. Please contact an administrator.
+                <!-- 🚨 EXACT ORIGINAL HTML RETAINED -->
+                <select id="queryType" onchange="toggleViewModes()">
+                    <option value="target">Agency Target Privilege</option>
+                    <option value="points">Agency Points System</option>
+                    <option value="analytics" id="optAnalytics" style="display:none;">📊 Agency Data Analyses</option>
+                </select>
             </div>
         </div>
 
-        <div id="standardSearchParams" class="centered-search-box" style="display:none;">
+        <div id="standardSearchParams" class="centered-search-box">
             <div class="control-group">
                 <label>Agency Code</label>
                 <input type="text" id="agencyCode" placeholder="e.g., 40775">
@@ -468,7 +469,7 @@
 
     let currentAgencyData = null;
     let loggedUser = localStorage.getItem('xenaUser');
-    let loggedEmail = localStorage.getItem('xenaEmail');
+    let loggedEmail = localStorage.getItem('xenaEmail') || '';
     let loggedUat = localStorage.getItem('xenaUat');
     let charts = {};
 
@@ -491,37 +492,22 @@
         if(loggedEmail) displayTxt += ` (${loggedEmail})`;
         document.getElementById('welcomeText').innerText = displayTxt;
 
-        // 🚨 VERIFY ACCESS & BUILD DROPDOWN
+        // 🚨 PRESERVED ORIGINAL UI LOGIC
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
             .then(r => r.json())
             .then(d => { 
-                const selector = document.getElementById('queryType');
-                selector.innerHTML = '';
-                
-                if (d.modules.length === 0 && !d.is_super_admin) {
-                    document.getElementById('noAccessMsg').style.display = 'block';
-                    return;
-                }
-                
-                document.getElementById('queryTypeContainer').style.display = 'block';
-                
-                if(d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
-                if(d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
-                if(d.modules.includes('analytics')) {
-                    selector.add(new Option("📊 Agency Data Analyses", "analytics"));
+                if (d.isAdmin) {
+                    document.getElementById('optAnalytics').style.display = 'block';
+                    document.getElementById('adminBtn').style.display = 'block';
+                } else if (d.modules && d.modules.includes('analytics')) {
                     document.getElementById('optAnalytics').style.display = 'block';
                 }
-                
-                if(d.is_super_admin) {
-                    document.getElementById('adminBtn').style.display = 'block';
-                }
-                
-                toggleViewModes();
             });
 
         updateAcmDropdown();
         setDatePresets();
         buildAcmCheckboxDropdown();
+        toggleViewModes();
     }
 
     function logout() { localStorage.clear(); location.reload(); }
@@ -534,8 +520,9 @@
     }
 
     function toggleViewModes() {
-        const isAna = document.getElementById('queryType').value === 'analytics';
-        document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex';
+        const val = document.getElementById('queryType').value;
+        const isAna = val === 'analytics';
+        document.getElementById('standardSearchParams').style.display = (isAna || !val) ? 'none' : 'flex';
         document.getElementById('resultsContainer').style.display = 'none';
         document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
         document.getElementById('analyticsContainer').style.display = 'none';
@@ -591,12 +578,10 @@
         const list = region === 'IN' ? inAcms : region === 'PK' ? pkAcms : [...pkAcms, ...inAcms].sort();
         list.forEach(n => sel.add(new Option(n, n.toLowerCase())));
     }
-    
+
     // ====================================================================
-    // 🚨 ADMIN PANEL API FUNCTIONS & CUSTOM DROPDOWNS
+    // 🚨 ADMIN PANEL API FUNCTIONS
     // ====================================================================
-    
-    // Dynamically builds the ACM checkbox list using your exact array data
     function buildAcmCheckboxDropdown() {
         const acmListDiv = document.getElementById('acmCheckboxes');
         acmListDiv.innerHTML = `<li><label><input type="checkbox" value="all" class="acm-chk" checked> All ACMs</label></li>`;
@@ -605,14 +590,12 @@
         });
     }
 
-    // Smart toggling: If "All" is checked, uncheck others. If others are checked, uncheck "All".
     document.addEventListener('change', function(e) {
         if(e.target.classList.contains('reg-chk') || e.target.classList.contains('acm-chk')) {
             const isAllBtn = e.target.value === 'all';
             const className = e.target.className;
             const parent = e.target.closest('.items');
             const checkboxes = parent.querySelectorAll(`.${className}`);
-            
             if (isAllBtn && e.target.checked) {
                 checkboxes.forEach(cb => { if(cb !== e.target) cb.checked = false; });
             } else if (!isAllBtn && e.target.checked) {
@@ -626,7 +609,6 @@
         document.getElementById('adminModal').style.display = 'flex';
         fetchAdminUsers();
     }
-    
     function closeAdmin() {
         document.getElementById('adminModal').style.display = 'none';
         document.getElementById('acmDropdownContainer').classList.remove('visible');
@@ -661,7 +643,6 @@
     
     async function addAgent() {
         const email = document.getElementById('newAgentEmail').value.trim();
-        
         let modules = [];
         if(document.getElementById('modTarget').checked) modules.push('target');
         if(document.getElementById('modPoints').checked) modules.push('points');
@@ -669,7 +650,6 @@
         
         let acms = Array.from(document.querySelectorAll('.acm-chk:checked')).map(cb => cb.value);
         let regions = Array.from(document.querySelectorAll('.reg-chk:checked')).map(cb => cb.value);
-        
         if (acms.length === 0) acms = ['all'];
         if (regions.length === 0) regions = ['all'];
         
@@ -683,7 +663,7 @@
             });
             const data = await res.json();
             
-            // 🚨 Strict Error Catching: Alerts exact error from Feishu if saving fails
+            // 🚨 STRICT ERROR CATCHING: Shows exact Feishu DB Error if submission fails
             if(!res.ok || !data.success) {
                 throw new Error(data.error || "Failed to save to Feishu Database. Check column names and permissions.");
             }
@@ -693,7 +673,6 @@
             document.querySelectorAll('.reg-chk').forEach(cb => cb.checked = (cb.value === 'all'));
             document.getElementById('acmDropdownContainer').classList.remove('visible');
             document.getElementById('regDropdownContainer').classList.remove('visible');
-            
             fetchAdminUsers();
         } catch (e) {
             alert("Error adding agent:\n\n" + e.message);
