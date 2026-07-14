@@ -406,7 +406,6 @@
             </div>
         </div>
     </div>
-</div>
 
 <script>
     // 🚨 PILL MULTI-SELECT COMPONENT (Sleek SaaS Design)
@@ -430,6 +429,7 @@
 
         setValues(vals) {
             this.selected = vals;
+            if(this.selected.length === 0) this.selected = ['all'];
             this.renderPills();
             this.renderDropdown();
         }
@@ -630,6 +630,8 @@
                         document.getElementById('optAnalytics').style.display = 'block';
                     }
                 }
+                
+                // 🚨 UI FIX: Safely toggles visibility after options load
                 toggleViewModes();
             }).catch(e => console.error(e));
 
@@ -650,9 +652,15 @@
         const val = queryTypeElem ? queryTypeElem.value : '';
         const isAna = val === 'analytics';
         
-        document.getElementById('standardSearchParams').style.display = (isAna || !val) ? 'none' : 'flex';
+        // 🚨 FIX: Ensures search bar does not vanish if val exists
+        if (val) {
+            document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex';
+            document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
+        } else {
+            document.getElementById('standardSearchParams').style.display = 'none';
+            document.getElementById('analyticsParams').style.display = 'none';
+        }
         document.getElementById('resultsContainer').style.display = 'none';
-        document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
         document.getElementById('analyticsContainer').style.display = 'none';
     }
 
