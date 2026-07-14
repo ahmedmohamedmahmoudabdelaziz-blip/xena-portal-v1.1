@@ -54,23 +54,33 @@
         .btn-success { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #000; }
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
 
-        /* 🚨 ADMIN MODAL UI & CHECKBOX CSS */
+        /* 🚨 UPGRADED ADMIN MODAL UI */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-content { background: var(--surface); width: 100%; max-width: 600px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--surface); width: 100%; max-width: 650px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .modal-header h2 { font-size: 1.5rem; color: var(--text); margin: 0;}
-        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
-        .admin-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: 0.2s; }
+        .close-btn:hover { color: var(--accent-rose); }
+        .admin-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; background: rgba(255,255,255,0.02); padding: 24px; border-radius: 12px; border: 1px solid var(--border); }
         .checkbox-group { display: flex; gap: 16px; align-items: center; }
         .checkbox-group label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 0.9rem; font-weight: normal; cursor: pointer; text-transform: none;}
-        .user-list { display: flex; flex-direction: column; gap: 8px; }
-        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+        
+        .user-list { display: flex; flex-direction: column; gap: 10px; }
+        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; transition: 0.2s;}
+        .user-row:hover { border-color: var(--accent-cyan); }
         .user-info { display: flex; flex-direction: column; gap: 4px; }
-        .user-email { font-weight: 600; color: var(--accent-cyan); }
+        .user-email { font-weight: 600; color: var(--accent-cyan); font-size: 1rem;}
         .user-details { font-size: 0.8rem; color: var(--text-muted); }
-        .del-btn { background: rgba(255,77,109,0.1); color: var(--accent-rose); border: 1px solid rgba(255,77,109,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+        
+        /* Edit & Delete Buttons */
+        .action-btns { display: flex; gap: 8px; }
+        .edit-btn { background: rgba(0,212,255,0.1); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; }
+        .edit-btn:hover { background: var(--accent-cyan); color: #000; }
+        .del-btn { background: rgba(255,77,109,0.1); color: var(--accent-rose); border: 1px solid rgba(255,77,109,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; }
+        .del-btn:hover { background: var(--accent-rose); color: #000; }
+
         .dropdown-check-list { display: inline-block; width: 100%; position: relative; }
-        .dropdown-check-list .anchor { width: 100%; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; display: block; font-size: 0.95rem;}
+        .dropdown-check-list .anchor { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; display: block; font-size: 0.95rem; transition: 0.2s;}
         .dropdown-check-list .anchor:hover { border-color: var(--accent-cyan); }
         .dropdown-check-list .items { padding: 10px; display: none; position: absolute; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: var(--shadow); }
         .dropdown-check-list.visible .items { display: block; }
@@ -137,7 +147,7 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
-<!-- 🚨 MODAL: Admin Access Control Panel (With Checkbox Dropdowns) -->
+<!-- 🚨 MODAL: Admin Access Control Panel (With Checkbox Dropdowns & Edit Logic) -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -147,8 +157,8 @@
         
         <div class="admin-form">
             <div class="control-group">
-                <label>Agent Identity (Lark Email OR Exact Name)</label>
-                <input type="text" id="newAgentEmail" placeholder="e.g., muhammedusman@micous.com OR Muhammad Usman">
+                <label>Agent Identity (Exact Lark Name OR Email)</label>
+                <input type="text" id="newAgentEmail" placeholder="e.g., Muhammad Usman">
             </div>
             <div class="control-group">
                 <label>Allowed Modules</label>
@@ -181,10 +191,10 @@
                     </div>
                 </div>
             </div>
-            <button class="btn btn-primary" onclick="addAgent()" style="padding: 10px; margin-top:10px;">+ Add Agent</button>
+            <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding: 12px; margin-top:10px; font-size: 1.1rem;">+ Add / Update Agent</button>
         </div>
 
-        <h3 style="margin-bottom: 12px; font-size: 0.9rem; color: var(--text-muted);">Current Active Agents</h3>
+        <h3 style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px;">Current Active Agents</h3>
         <div class="user-list" id="adminUserList"></div>
     </div>
 </div>
@@ -491,7 +501,6 @@
         if(loggedEmail) displayTxt += ` (${loggedEmail})`;
         document.getElementById('welcomeText').innerText = displayTxt;
 
-        // 🚨 FIX: Safely removes the ghost element that crashed the UI
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
             .then(r => r.json())
             .then(d => { 
@@ -514,7 +523,7 @@
                 }
                 
                 toggleViewModes();
-            }).catch(e => console.error("Authorization check failed:", e));
+            });
 
         updateAcmDropdown();
         setDatePresets();
@@ -593,7 +602,7 @@
     }
 
     // ====================================================================
-    // 🚨 ADMIN PANEL API FUNCTIONS
+    // 🚨 ADMIN PANEL API FUNCTIONS (With Edit Logic)
     // ====================================================================
     function buildAcmCheckboxDropdown() {
         const acmListDiv = document.getElementById('acmCheckboxes');
@@ -620,6 +629,8 @@
 
     function openAdmin() {
         document.getElementById('adminModal').style.display = 'flex';
+        document.getElementById('adminBtnSubmit').innerText = '+ Add / Update Agent';
+        document.getElementById('newAgentEmail').value = '';
         fetchAdminUsers();
     }
     
@@ -627,6 +638,28 @@
         document.getElementById('adminModal').style.display = 'none';
         document.getElementById('acmDropdownContainer').classList.remove('visible');
         document.getElementById('regDropdownContainer').classList.remove('visible');
+    }
+    
+    // 🚨 UI FIX: Instantly fills the form when you click "Edit"
+    function editAgent(email, modulesStr, acmsStr, regionsStr) {
+        document.getElementById('newAgentEmail').value = email;
+        
+        document.getElementById('modTarget').checked = modulesStr.includes('target');
+        document.getElementById('modPoints').checked = modulesStr.includes('points');
+        document.getElementById('modAnalytics').checked = modulesStr.includes('analytics');
+        
+        document.querySelectorAll('.acm-chk').forEach(cb => {
+            cb.checked = acmsStr.includes(cb.value) || acmsStr === 'all';
+        });
+        if (acmsStr !== 'all' && acmsStr !== '') document.querySelector('.acm-chk[value="all"]').checked = false;
+
+        document.querySelectorAll('.reg-chk').forEach(cb => {
+            cb.checked = regionsStr.includes(cb.value) || regionsStr === 'all';
+        });
+        if (regionsStr !== 'all' && regionsStr !== '') document.querySelector('.reg-chk[value="all"]').checked = false;
+        
+        document.getElementById('adminBtnSubmit').innerText = '💾 Save Changes';
+        document.getElementById('newAgentEmail').focus();
     }
     
     async function fetchAdminUsers() {
@@ -648,7 +681,10 @@
                             <span class="user-email">${dispEmail}</span>
                             <span class="user-details"><b>Modules:</b> ${u.modules} | <b>Regions:</b> ${u.regions.toUpperCase()} | <b>ACMs:</b> ${u.acms}</span>
                         </div>
-                        <button class="del-btn" onclick="deleteAgent('${u.id}')">Remove</button>
+                        <div class="action-btns">
+                            <button class="edit-btn" onclick="editAgent('${dispEmail}', '${u.modules}', '${u.acms}', '${u.regions}')">Edit</button>
+                            <button class="del-btn" onclick="deleteAgent('${u.id}')">Remove</button>
+                        </div>
                     </div>`;
             });
         } catch (e) {
@@ -670,6 +706,8 @@
         
         if(!email) { alert("Please enter an email or name."); return; }
         
+        document.getElementById('adminBtnSubmit').innerText = 'Saving...';
+        
         try {
             const res = await fetch(`/api/admin/users`, {
                 method: 'POST',
@@ -679,7 +717,7 @@
             const data = await res.json();
             
             if(!res.ok || !data.success) {
-                throw new Error(data.error || "Failed to save to Feishu Database. Ensure your Feishu Access Management Table only uses Text columns.");
+                throw new Error(data.error || "Failed to save to Feishu Database.");
             }
             
             document.getElementById('newAgentEmail').value = '';
@@ -687,9 +725,11 @@
             document.querySelectorAll('.reg-chk').forEach(cb => cb.checked = (cb.value === 'all'));
             document.getElementById('acmDropdownContainer').classList.remove('visible');
             document.getElementById('regDropdownContainer').classList.remove('visible');
+            document.getElementById('adminBtnSubmit').innerText = '+ Add / Update Agent';
             fetchAdminUsers();
         } catch (e) {
             alert("Error adding agent:\n\n" + e.message);
+            document.getElementById('adminBtnSubmit').innerText = '+ Add / Update Agent';
         }
     }
     
