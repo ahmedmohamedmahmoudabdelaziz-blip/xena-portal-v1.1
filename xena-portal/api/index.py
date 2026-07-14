@@ -23,6 +23,10 @@ ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 # 🚨 ONLY YOU ARE MASTER ADMIN NOW. Everyone else must be added via the Website Admin Panel.
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
+# ACM Lists for auto-detecting blank regions
+PK_ACMS = ["nabeel", "hasseb", "haseeb", "enzo", "farooq", "mubeen", "cruz", "ehtisham", "usama", "sehar ch", "hamza malik", "zohaib", "eagle", "leo", "berlin"]
+IN_ACMS = ["holy", "vihan", "shivam", "ravikant", "ansh", "rocky", "bella"]
+
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
@@ -147,7 +151,6 @@ def get_user_permissions(email, name):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records/search"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # 🚨 Bypassing Feishu API Filter Rules: We fetch ALL access records and check them in Python.
     payload = {"page_size": 500}
     
     try:
@@ -160,10 +163,8 @@ def get_user_permissions(email, name):
             db_person = extract_field_text(fields.get("Person", "")).lower()
             
             match_found = False
-            # If the user has an email, does it match the DB's Email or Person column?
             if email_clean and (email_clean in db_email or email_clean in db_person):
                 match_found = True
-            # If the user has a name, does it match the DB's Email or Person column?
             if name_clean and (name_clean in db_email or name_clean in db_person):
                 match_found = True
                 
@@ -226,7 +227,7 @@ def check_auth():
     return jsonify(perms)
 
 # =============================================================================
-# 🚨 ADMIN PANEL ROUTES (Website <-> Feishu DB)
+# 🚨 ADMIN PANEL ROUTES (Added Upsert Logic for Editing)
 # =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
@@ -243,10 +244,13 @@ def manage_users():
         users = []
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
+            display_email = extract_field_text(fields.get("Email", ""))
+            if not display_email:
+                display_email = extract_field_text(fields.get("Person", ""))
+
             users.append({
                 "id": item.get("record_id"),
-                "email": extract_field_text(fields.get("Email", "")),
-                "person": extract_field_text(fields.get("Person", "")),
+                "email": display_email,
                 "modules": extract_field_text(fields.get("Modules", "")),
                 "acms": extract_field_text(fields.get("ACMs", "")),
                 "regions": extract_field_text(fields.get("Regions", "all"))
@@ -255,9 +259,31 @@ def manage_users():
 
     elif request.method == 'POST':
         data = request.json
-        # Writes directly to the "Email" text column safely.
-        payload = {"fields": {"Email": data.get("email").strip(), "Modules": data.get("modules"), "ACMs": data.get("acms"), "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"}}
-        res = requests.post(base_url, headers=headers, json=payload).json()
+        email_to_check = data.get("email").strip()
+        
+        payload = {
+            "fields": {
+                "Email": email_to_check, 
+                "Modules": data.get("modules"), 
+                "ACMs": data.get("acms"), 
+                "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"
+            }
+        }
+        
+        # 🚨 FIX: "Upsert" Logic. Check if user already exists to edit them instead of creating duplicate.
+        search_payload = {"filter": {"conjunction": "or", "conditions": [
+            {"field_name": "Email", "operator": "contains", "value": [email_to_check.lower()]},
+            {"field_name": "Person", "operator": "contains", "value": [email_to_check]}
+        ]}}
+        
+        search_res = requests.post(f"{base_url}/search", headers=headers, json=search_payload).json()
+        existing_items = search_res.get("data", {}).get("items", [])
+        
+        if existing_items:
+            record_id = existing_items[0]["record_id"]
+            res = requests.put(f"{base_url}/{record_id}", headers=headers, json=payload).json()
+        else:
+            res = requests.post(base_url, headers=headers, json=payload).json()
         
         if res.get("code") != 0:
             return jsonify({"success": False, "error": res.get("msg")}), 400
@@ -303,8 +329,17 @@ def search_agency():
     region = clean(get_field_local(fields, 'Region', 'Agency Region'))
     sheet_acm_name = extract_field_text(get_field_local(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
     
+    # 🚨 FIX: Auto-Detect the Region if the Points Table left it completely blank!
+    if region in ('', 'none'):
+        if sheet_acm_name.lower() in PK_ACMS:
+            region = 'pk'
+        elif sheet_acm_name.lower() in IN_ACMS:
+            region = 'in'
+    
     if "all" not in perms.get("regions", ["all"]) and region not in perms.get("regions", []):
-        return jsonify({"error": f"Access Denied: Your profile restricts querying Region: {region.upper()}"}), 403
+        display_reg = region.upper() if region else 'UNKNOWN'
+        return jsonify({"error": f"Access Denied: Your profile restricts querying Region: {display_reg}"}), 403
+        
     if "all" not in perms["acms"] and sheet_acm_name.lower() not in perms["acms"]:
         return jsonify({"error": f"Access Denied: You are not authorized to view data for ACM: {sheet_acm_name}"}), 403
 
@@ -343,7 +378,6 @@ def get_analytics():
     region_filter = request.args.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
     
-    # 🚨 Block invalid Regional requests dynamically
     if region_filter == 'all' and "all" not in perms.get("regions", ["all"]):
         return jsonify({"error": "Access Denied: Please specify a specific region filter you own."}), 403
     if region_filter != 'all' and "all" not in perms.get("regions", ["all"]) and region_filter not in perms.get("regions", []):
