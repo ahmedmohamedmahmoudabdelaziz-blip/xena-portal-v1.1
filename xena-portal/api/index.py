@@ -20,7 +20,7 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 # 🚨 ACCESS MANAGEMENT TABLE ID
 ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 
-# 🚨 MASTER ADMINS: These users bypass the database and always have full access to everything.
+# 🚨 ONLY YOU ARE MASTER ADMIN NOW. Everyone else must be added via the Website Admin Panel.
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
 def get_tenant_access_token():
@@ -54,7 +54,7 @@ def extract_field_text(field_data):
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
-        for key in ['email', 'text', 'name', 'en_name', 'value', 'label', 'id']:
+        for key in ['text', 'name', 'en_name', 'value', 'label', 'id']:
             if key in field_data: return str(field_data[key])
         if 'id' in field_data: return str(field_data['id'])
         return str(field_data)
@@ -64,7 +64,7 @@ def extract_field_text(field_data):
         for item in field_data:
             if isinstance(item, dict):
                 extracted = False
-                for key in ['email', 'text', 'name', 'en_name', 'value', 'id']:
+                for key in ['text', 'name', 'en_name', 'value', 'id']:
                     if key in item:
                         texts.append(str(item[key]))
                         extracted = True
@@ -77,7 +77,7 @@ def extract_field_text(field_data):
 def extract_field_list(field_data):
     if not field_data: return []
     if isinstance(field_data, dict):
-        for key in ['email', 'text', 'name', 'en_name', 'value', 'label']:
+        for key in ['text', 'name', 'en_name', 'value', 'label']:
             if key in field_data and field_data[key] not in (None, ""):
                 return [str(field_data[key]).strip()]
         if 'id' in field_data and field_data['id'] not in (None, ""):
@@ -91,7 +91,7 @@ def extract_field_list(field_data):
             if not item: continue
             if isinstance(item, dict):
                 extracted = False
-                for key in ['email', 'text', 'name', 'en_name', 'value', 'label']:
+                for key in ['text', 'name', 'en_name', 'value', 'label']:
                     if key in item and item[key] not in (None, ""):
                         res.append(str(item[key]).strip())
                         extracted = True
@@ -131,48 +131,57 @@ def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
 # =============================================================================
-# 🚨 DYNAMIC ACCESS CONTROL (Checks Both "Email" AND "Person" columns)
+# 🚨 BULLETPROOF ACCESS CONTROL (PYTHON-SIDE MATCHING)
 # =============================================================================
 def get_user_permissions(email, name):
-    name_clean = name.strip().lower()
+    name_clean = name.strip().lower() if name else ""
+    email_clean = email.strip().lower() if email else ""
     
     if any(admin in name_clean for admin in ADMIN_USERS):
         return {"is_super_admin": True, "modules": ["target", "points", "analytics"], "acms": ["all"], "regions": ["all"]}
 
-    # Prepare search: Check the Email column for their email, OR the Person column for their name
-    conditions = []
-    if email:
-        conditions.append({"field_name": "Email", "operator": "contains", "value": [email.strip().lower()]})
-    if name:
-        conditions.append({"field_name": "Person", "operator": "contains", "value": [name.strip()]})
-
-    if not conditions: 
+    if not email_clean and not name_clean: 
         return {"is_super_admin": False, "modules": [], "acms": [], "regions": []}
 
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records/search"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # Use OR conjunction so either column matching grants access
-    payload = {"filter": {"conjunction": "or", "conditions": conditions}}
+    # 🚨 Bypassing Feishu API Filter Rules: We fetch ALL access records and check them in Python.
+    payload = {"page_size": 500}
     
     try:
         res = requests.post(url, headers=headers, json=payload, timeout=10).json()
         items = res.get("data", {}).get("items", [])
-        if not items: return {"is_super_admin": False, "modules": [], "acms": [], "regions": []}
         
-        fields = items[0].get("fields", {})
-        modules_raw = extract_field_text(get_field_local(fields, "Modules"))
-        acms_raw = extract_field_text(get_field_local(fields, "ACMs"))
-        regions_raw = extract_field_text(get_field_local(fields, "Regions"))
-        
-        modules = [m.strip().lower() for m in modules_raw.split(",") if m.strip()]
-        acms = [a.strip().lower() for a in acms_raw.split(",") if a.strip()]
-        regions = [r.strip().lower() for r in regions_raw.split(",") if r.strip()]
-        if not regions: regions = ["all"]
-        
-        return {"is_super_admin": False, "modules": modules, "acms": acms, "regions": regions}
-    except Exception:
+        for item in items:
+            fields = item.get("fields", {})
+            db_email = extract_field_text(fields.get("Email", "")).lower()
+            db_person = extract_field_text(fields.get("Person", "")).lower()
+            
+            match_found = False
+            # If the user has an email, does it match the DB's Email or Person column?
+            if email_clean and (email_clean in db_email or email_clean in db_person):
+                match_found = True
+            # If the user has a name, does it match the DB's Email or Person column?
+            if name_clean and (name_clean in db_email or name_clean in db_person):
+                match_found = True
+                
+            if match_found:
+                modules_raw = extract_field_text(get_field_local(fields, "Modules"))
+                acms_raw = extract_field_text(get_field_local(fields, "ACMs"))
+                regions_raw = extract_field_text(get_field_local(fields, "Regions"))
+                
+                modules = [m.strip().lower() for m in modules_raw.split(",") if m.strip()]
+                acms = [a.strip().lower() for a in acms_raw.split(",") if a.strip()]
+                regions = [r.strip().lower() for r in regions_raw.split(",") if r.strip()]
+                if not regions: regions = ["all"]
+                
+                return {"is_super_admin": False, "modules": modules, "acms": acms, "regions": regions}
+                
+        return {"is_super_admin": False, "modules": [], "acms": [], "regions": []}
+    except Exception as e:
+        print("Auth Error:", str(e))
         return {"is_super_admin": False, "modules": [], "acms": [], "regions": []}
 
 @app.route('/', methods=['GET'])
@@ -217,7 +226,7 @@ def check_auth():
     return jsonify(perms)
 
 # =============================================================================
-# 🚨 ADMIN PANEL ROUTES
+# 🚨 ADMIN PANEL ROUTES (Website <-> Feishu DB)
 # =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
@@ -234,14 +243,10 @@ def manage_users():
         users = []
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
-            # Safely extract from either the Email or Person column to show in the list
-            display_email = extract_field_text(fields.get("Email", ""))
-            if not display_email:
-                display_email = extract_field_text(fields.get("Person", ""))
-
             users.append({
                 "id": item.get("record_id"),
-                "email": display_email,
+                "email": extract_field_text(fields.get("Email", "")),
+                "person": extract_field_text(fields.get("Person", "")),
                 "modules": extract_field_text(fields.get("Modules", "")),
                 "acms": extract_field_text(fields.get("ACMs", "")),
                 "regions": extract_field_text(fields.get("Regions", "all"))
@@ -250,15 +255,8 @@ def manage_users():
 
     elif request.method == 'POST':
         data = request.json
-        # Writes directly to the "Email" column using the text format, which API fully supports
-        payload = {
-            "fields": {
-                "Email": data.get("email").strip().lower(), 
-                "Modules": data.get("modules"), 
-                "ACMs": data.get("acms"), 
-                "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"
-            }
-        }
+        # Writes directly to the "Email" text column safely.
+        payload = {"fields": {"Email": data.get("email").strip(), "Modules": data.get("modules"), "ACMs": data.get("acms"), "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"}}
         res = requests.post(base_url, headers=headers, json=payload).json()
         
         if res.get("code") != 0:
@@ -345,6 +343,7 @@ def get_analytics():
     region_filter = request.args.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
     
+    # 🚨 Block invalid Regional requests dynamically
     if region_filter == 'all' and "all" not in perms.get("regions", ["all"]):
         return jsonify({"error": "Access Denied: Please specify a specific region filter you own."}), 403
     if region_filter != 'all' and "all" not in perms.get("regions", ["all"]) and region_filter not in perms.get("regions", []):
