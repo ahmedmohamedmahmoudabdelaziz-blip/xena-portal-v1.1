@@ -145,7 +145,9 @@ def get_user_permissions(email, name):
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records/search"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Email", "operator": "is", "value": [email.strip().lower()]}]}}
+    
+    # 🚨 FIX: Changed from 'is' to 'contains' to ensure trailing spaces in the Feishu sheet don't break the match
+    payload = {"filter": {"conjunction": "and", "conditions": [{"field_name": "Email", "operator": "contains", "value": [email.strip().lower()]}]}}
     
     try:
         res = requests.post(url, headers=headers, json=payload, timeout=10).json()
@@ -196,7 +198,9 @@ def callback():
 
     data = info_resp.get("data", {})
     lark_name = data.get("name", "Unknown User")
-    lark_email = data.get("email", "") 
+    
+    # 🚨 FIX: For corporate users, Feishu puts the email in 'enterprise_email' instead of 'email'. We now fetch both.
+    lark_email = data.get("email") or data.get("enterprise_email") or "" 
     
     return redirect(f"/?user={urllib.parse.quote(lark_name)}&email={urllib.parse.quote(lark_email)}&uat={user_access_token}")
 
@@ -236,16 +240,8 @@ def manage_users():
 
     elif request.method == 'POST':
         data = request.json
-        payload = {
-            "fields": {
-                "Email": data.get("email").strip().lower(), 
-                "Modules": data.get("modules"), 
-                "ACMs": data.get("acms"), 
-                "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"
-            }
-        }
+        payload = {"fields": {"Email": data.get("email").strip().lower(), "Modules": data.get("modules"), "ACMs": data.get("acms"), "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"}}
         res = requests.post(base_url, headers=headers, json=payload).json()
-        # 🚨 Sends exact error back to website if Feishu rejects it
         if res.get("code") != 0:
             return jsonify({"success": False, "error": res.get("msg")}), 400
         return jsonify({"success": True})
