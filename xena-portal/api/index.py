@@ -196,7 +196,7 @@ def callback():
 
     data = info_resp.get("data", {})
     lark_name = data.get("name", "Unknown User")
-    lark_email = data.get("email", "") # 🚨 Retrieves Email automatically
+    lark_email = data.get("email", "") 
     
     return redirect(f"/?user={urllib.parse.quote(lark_name)}&email={urllib.parse.quote(lark_email)}&uat={user_access_token}")
 
@@ -236,9 +236,19 @@ def manage_users():
 
     elif request.method == 'POST':
         data = request.json
-        payload = {"fields": {"Email": data.get("email").strip().lower(), "Modules": data.get("modules"), "ACMs": data.get("acms"), "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"}}
+        payload = {
+            "fields": {
+                "Email": data.get("email").strip().lower(), 
+                "Modules": data.get("modules"), 
+                "ACMs": data.get("acms"), 
+                "Regions": data.get("regions").strip().lower() if data.get("regions") else "all"
+            }
+        }
         res = requests.post(base_url, headers=headers, json=payload).json()
-        return jsonify({"success": res.get("code") == 0})
+        # 🚨 Sends exact error back to website if Feishu rejects it
+        if res.get("code") != 0:
+            return jsonify({"success": False, "error": res.get("msg")}), 400
+        return jsonify({"success": True})
 
     elif request.method == 'DELETE':
         record_id = request.args.get('id')
