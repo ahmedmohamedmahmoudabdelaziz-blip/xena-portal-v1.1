@@ -137,7 +137,7 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
-<!-- 🚨 MODAL: Admin Access Control Panel -->
+<!-- 🚨 MODAL: Admin Access Control Panel (With Checkbox Dropdowns) -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -164,7 +164,7 @@
                     <div id="acmDropdownContainer" class="dropdown-check-list" tabindex="100">
                       <span class="anchor" onclick="document.getElementById('acmDropdownContainer').classList.toggle('visible')">Select ACMs ▼</span>
                       <ul class="items" id="acmCheckboxes">
-                        <!-- Populated by JS -->
+                        <!-- Populated dynamically by JS below -->
                       </ul>
                     </div>
                 </div>
@@ -205,18 +205,20 @@
 
     <div class="card">
         <div class="centered-search-box" style="margin-bottom: 16px;">
-            <div class="control-group">
+            <div class="control-group" id="queryTypeContainer" style="display:none;">
                 <label>Inquiry Type</label>
-                <!-- 🚨 EXACT ORIGINAL HTML RETAINED -->
                 <select id="queryType" onchange="toggleViewModes()">
                     <option value="target">Agency Target Privilege</option>
                     <option value="points">Agency Points System</option>
                     <option value="analytics" id="optAnalytics" style="display:none;">📊 Agency Data Analyses</option>
                 </select>
             </div>
+            <div id="noAccessMsg" style="display:none; color: var(--accent-rose); text-align: center; font-weight: bold; padding: 20px; background: rgba(255,77,109,0.1); border-radius: 8px;">
+                You do not have access to any modules. Please contact an administrator.
+            </div>
         </div>
 
-        <div id="standardSearchParams" class="centered-search-box">
+        <div id="standardSearchParams" class="centered-search-box" style="display:none;">
             <div class="control-group">
                 <label>Agency Code</label>
                 <input type="text" id="agencyCode" placeholder="e.g., 40775">
@@ -469,7 +471,7 @@
 
     let currentAgencyData = null;
     let loggedUser = localStorage.getItem('xenaUser');
-    let loggedEmail = localStorage.getItem('xenaEmail') || '';
+    let loggedEmail = localStorage.getItem('xenaEmail');
     let loggedUat = localStorage.getItem('xenaUat');
     let charts = {};
 
@@ -492,15 +494,28 @@
         if(loggedEmail) displayTxt += ` (${loggedEmail})`;
         document.getElementById('welcomeText').innerText = displayTxt;
 
-        // 🚨 PRESERVED ORIGINAL UI LOGIC
+        // 🚨 FIX: CORRECT VARIABLE NAME (d.is_super_admin)
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
             .then(r => r.json())
             .then(d => { 
-                if (d.isAdmin) {
-                    document.getElementById('optAnalytics').style.display = 'block';
+                
+                // Show Admin Button ONLY if Super Admin
+                if (d.is_super_admin) {
                     document.getElementById('adminBtn').style.display = 'block';
-                } else if (d.modules && d.modules.includes('analytics')) {
+                }
+                
+                // Show Analytics Option if they have the module OR are Super Admin
+                if (d.is_super_admin || (d.modules && d.modules.includes('analytics'))) {
                     document.getElementById('optAnalytics').style.display = 'block';
+                }
+                
+                // If they have literally ZERO access, show error.
+                if (!d.is_super_admin && (!d.modules || d.modules.length === 0)) {
+                    document.getElementById('noAccessMsg').style.display = 'block';
+                    document.getElementById('queryTypeContainer').style.display = 'none';
+                    document.getElementById('standardSearchParams').style.display = 'none';
+                } else {
+                    document.getElementById('queryTypeContainer').style.display = 'block';
                 }
             });
 
@@ -663,7 +678,6 @@
             });
             const data = await res.json();
             
-            // 🚨 STRICT ERROR CATCHING: Shows exact Feishu DB Error if submission fails
             if(!res.ok || !data.success) {
                 throw new Error(data.error || "Failed to save to Feishu Database. Check column names and permissions.");
             }
