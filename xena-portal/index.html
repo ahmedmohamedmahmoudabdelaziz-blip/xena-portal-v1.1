@@ -265,8 +265,7 @@
         <div class="centered-search-box" style="margin-bottom: 16px;">
             <div class="control-group" id="queryTypeContainer" style="display:none;">
                 <label>Inquiry Type</label>
-                <select id="queryType" onchange="toggleViewModes()">
-                </select>
+                <select id="queryType" onchange="toggleViewModes()"></select>
             </div>
             <div id="noAccessMsg" style="display:none; color: var(--accent-rose); text-align: center; font-weight: bold; padding: 20px; background: rgba(255,77,109,0.1); border-radius: 8px;">
                 You do not have access to any modules. Please contact an administrator.
@@ -406,6 +405,7 @@
             </div>
         </div>
     </div>
+</div>
 
 <script>
     // 🚨 PILL MULTI-SELECT COMPONENT (Sleek SaaS Design)
@@ -609,30 +609,31 @@
         if(loggedEmail) displayTxt += ` (${loggedEmail})`;
         document.getElementById('welcomeText').innerText = displayTxt;
 
+        // 🚨 FIX: Strict logic to prevent the Search Box from crashing
         fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
             .then(r => r.json())
             .then(d => { 
                 const selector = document.getElementById('queryType');
                 selector.innerHTML = '';
                 
-                if (d.is_super_admin) document.getElementById('adminBtn').style.display = 'block';
+                if (d.is_super_admin) {
+                    document.getElementById('adminBtn').style.display = 'block';
+                }
                 
                 if (!d.is_super_admin && (!d.modules || d.modules.length === 0)) {
                     document.getElementById('noAccessMsg').style.display = 'block';
                     document.getElementById('queryTypeContainer').style.display = 'none';
                     document.getElementById('standardSearchParams').style.display = 'none';
+                    document.getElementById('analyticsParams').style.display = 'none';
                 } else {
                     document.getElementById('queryTypeContainer').style.display = 'block';
                     if(d.is_super_admin || d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
                     if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
-                    if(d.is_super_admin || d.modules.includes('analytics')) {
-                        selector.add(new Option("📊 Agency Data Analyses", "analytics"));
-                        document.getElementById('optAnalytics').style.display = 'block';
-                    }
+                    if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
+                    
+                    // 🚨 Safely triggers view mode only AFTER options are populated
+                    toggleViewModes();
                 }
-                
-                // 🚨 UI FIX: Safely toggles visibility after options load
-                toggleViewModes();
             }).catch(e => console.error(e));
 
         updateAcmDropdown();
@@ -647,12 +648,12 @@
         return `${y}-${m}-${day}`;
     }
 
+    // 🚨 FIX: Safe toggle logic that never hides elements incorrectly
     function toggleViewModes() {
         const queryTypeElem = document.getElementById('queryType');
         const val = queryTypeElem ? queryTypeElem.value : '';
         const isAna = val === 'analytics';
         
-        // 🚨 FIX: Ensures search bar does not vanish if val exists
         if (val) {
             document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex';
             document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
@@ -660,6 +661,7 @@
             document.getElementById('standardSearchParams').style.display = 'none';
             document.getElementById('analyticsParams').style.display = 'none';
         }
+        
         document.getElementById('resultsContainer').style.display = 'none';
         document.getElementById('analyticsContainer').style.display = 'none';
     }
@@ -709,7 +711,9 @@
         fetchAdminUsers();
     }
     
-    function closeAdmin() { document.getElementById('adminModal').style.display = 'none'; }
+    function closeAdmin() { 
+        document.getElementById('adminModal').style.display = 'none'; 
+    }
     
     function parseGranular(str, module) {
         if (!str || str.indexOf('=') === -1) {
@@ -780,11 +784,13 @@
         if(document.getElementById('modPoints').checked) modules.push('points');
         if(document.getElementById('modAnalytics').checked) modules.push('analytics');
         if(document.getElementById('modAdmin').checked) modules.push('admin');
+        
         if(!email) { alert("Please enter an Agent Identity."); return; }
         document.getElementById('adminBtnSubmit').innerText = 'Saving...';
         
         const payload = { 
-            email: email, modules: modules.join(', '),
+            email: email, 
+            modules: modules.join(', '),
             acms: { target: pTargetAcm.getValues().join(','), points: pPointsAcm.getValues().join(','), analytics: pAnalyticsAcm.getValues().join(',') },
             regions: { target: pTargetReg.getValues().join(','), points: pPointsReg.getValues().join(','), analytics: pAnalyticsReg.getValues().join(',') }
         };
