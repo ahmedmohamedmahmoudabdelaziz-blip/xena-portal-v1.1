@@ -157,7 +157,7 @@ def parse_granular_string(raw_str):
     return res
 
 # =============================================================================
-# 🚨 BULLETPROOF ACCESS CONTROL
+# 🚨 BULLETPROOF ACCESS CONTROL (PYTHON-SIDE MATCHING)
 # =============================================================================
 def get_user_permissions(email, name):
     name_clean = name.strip().lower() if name else ""
@@ -259,7 +259,7 @@ def check_auth():
     return jsonify(perms)
 
 # =============================================================================
-# 🚨 ADMIN PANEL ROUTES
+# 🚨 ADMIN PANEL ROUTES 
 # =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
@@ -385,17 +385,21 @@ def search_agency():
     if "all" not in allowed_acms and sheet_acm_name.lower() not in allowed_acms:
         return jsonify({"error": f"Access Denied: You are not authorized to view data for ACM: {sheet_acm_name}"}), 403
 
-    # 🚨 ADDED: Extract the required columns for the Points System Module
+    # 🚨 UPDATED: Robust Point Extraction with Mathematical Fallback
     try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
-    try: total_points = float(extract_field_text(get_field_local(fields, '# Total Points', 'Total Points', 'Total')).replace(',', '').strip())
+    try: total_points = float(extract_field_text(get_field_local(fields, '# Total Points', 'Total Points', 'Total', 'Total points')).replace(',', '').strip())
     except ValueError: total_points = 0
-    try: used_points = float(extract_field_text(get_field_local(fields, 'Used Points', 'Used')).replace(',', '').strip())
+    try: used_points = float(extract_field_text(get_field_local(fields, 'Used Points', 'Used', 'Used points')).replace(',', '').strip())
     except ValueError: used_points = 0
-    try: point_balance = float(extract_field_text(get_field_local(fields, 'Point Balance', 'Balance')).replace(',', '').strip())
+    try: point_balance = float(extract_field_text(get_field_local(fields, 'Point Balance', 'Balance', 'Point balance')).replace(',', '').strip())
     except ValueError: point_balance = 0
     
-    monthly_tracker = extract_field_text(get_field_local(fields, 'Monthly Usage Tracker', 'Monthly Usage', 'Usage Tracker'))
+    # Mathematical Safety Net (Fixes the formula extraction issue where Balance shows 0)
+    if point_balance == 0 and total_points > 0:
+        point_balance = total_points - used_points
+    
+    monthly_tracker = extract_field_text(get_field_local(fields, 'Monthly Usage Tracker', 'Monthly Usage', 'Usage Tracker', 'Latest Usage Tracker'))
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     req_response = requests.post(req_url, headers=headers, json=points_payload, timeout=10).json()
@@ -409,7 +413,6 @@ def search_agency():
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
-    # 🚨 ADDED: Returning the new Point variables securely to the frontend
     return jsonify({
         "base_points": base_points, 
         "total_points": total_points,
