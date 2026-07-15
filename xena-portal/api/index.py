@@ -135,7 +135,7 @@ def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
 # =============================================================================
-# 🚨 GRANULAR PERMISSIONS PARSER
+# 🚨 GRANULAR PERMISSIONS PARSER 
 # =============================================================================
 def parse_granular_string(raw_str):
     default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
@@ -259,7 +259,7 @@ def check_auth():
     return jsonify(perms)
 
 # =============================================================================
-# 🚨 ADMIN PANEL ROUTES (Added Safe 'PUT' Upsert Logic)
+# 🚨 ADMIN PANEL ROUTES
 # =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
@@ -459,7 +459,6 @@ def get_analytics():
     consecutive_old_pages = 0
 
     for page_num in range(150):
-        # 🚨 IF YOU RENAMED "Numbering" IN FEISHU, FIX IT HERE:
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
 
