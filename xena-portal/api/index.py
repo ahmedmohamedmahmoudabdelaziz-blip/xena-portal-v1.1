@@ -135,7 +135,7 @@ def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
 # =============================================================================
-# 🚨 GRANULAR PERMISSIONS PARSER (Decodes: "target=pk;points=all")
+# 🚨 GRANULAR PERMISSIONS PARSER
 # =============================================================================
 def parse_granular_string(raw_str):
     default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
@@ -157,7 +157,7 @@ def parse_granular_string(raw_str):
     return res
 
 # =============================================================================
-# 🚨 BULLETPROOF ACCESS CONTROL (PYTHON-SIDE MATCHING)
+# 🚨 BULLETPROOF ACCESS CONTROL
 # =============================================================================
 def get_user_permissions(email, name):
     name_clean = name.strip().lower() if name else ""
@@ -259,7 +259,7 @@ def check_auth():
     return jsonify(perms)
 
 # =============================================================================
-# 🚨 ADMIN PANEL ROUTES (With Safe 'PUT' Upsert Logic)
+# 🚨 ADMIN PANEL ROUTES (Added Safe 'PUT' Upsert Logic)
 # =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
@@ -447,40 +447,7 @@ def get_analytics():
         if now.month == 12: to_dt = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         else: to_dt = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    # 🚨 PERFORMANCE UPGRADE: Tells Feishu to ONLY send the necessary columns to save download time.
-    used_fields = [
-        "Submitted on", "Submitted on Copy", "Created Time",
-        "Region", "Agency Region", "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
-        "Request Type", "Request type", "Type", "Category", "Request Category",
-        "Status", "Request Status", "Agency Status", "State",
-        "Agency Type", "Type of Agency",
-        "Closing Reason", "Closing Agencies Reason", "PK Closing Agencies Reason",
-        "Otherapp Name", "Other App Name", "Other Apps",
-        "Create Way", "Creation Type", "Agency Creation Type", "PK Agencies Creation Type",
-        "Reject Reason", "Rejection Reason", "Agencies Rejection Reason", "PK Agencies Rejection reason",
-        "Numbering"
-    ]
-
-    # 🚨 PERFORMANCE UPGRADE: A safe pre-filter that skips downloading old pages.
-    conditions = []
-    if from_dt:
-        safe_from = from_dt - timedelta(days=2) # 2-day timezone padding to ensure 100% accurate data
-        safe_from_ms = int(safe_from.timestamp() * 1000)
-        conditions.append({"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", str(safe_from_ms)]})
-
-    payload_base = {
-        "page_size": 500,
-        "field_names": used_fields,
-        "sort": [{"field_name": "Numbering", "desc": True}]
-    }
-    
-    if conditions:
-        payload_base["filter"] = {
-            "conjunction": "and",
-            "conditions": conditions
-        }
-
-    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
     all_items = []
     seen_ids = set()
@@ -492,12 +459,12 @@ def get_analytics():
     consecutive_old_pages = 0
 
     for page_num in range(150):
-        payload = dict(payload_base)
-        if page_token:
-            payload["page_token"] = page_token
+        # 🚨 IF YOU RENAMED "Numbering" IN FEISHU, FIX IT HERE:
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        if page_token: params["page_token"] = page_token
 
         try:
-            res = session.post(base_url, json=payload, timeout=12)
+            res = session.get(base_url, params=params, timeout=12)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
