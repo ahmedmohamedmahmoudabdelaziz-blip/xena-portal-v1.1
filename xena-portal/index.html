@@ -55,7 +55,7 @@
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
         .btn-primary:active, .btn-success:active { transform: translateY(0) scale(0.98); }
 
-        /* 🚨 BRAND NEW ADMIN MODAL & GRANULAR UI CSS */
+        /* 🚨 UPGRADED SAAS GLASSMORPHISM ADMIN MODAL */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content { background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85)); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04); width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -512,73 +512,78 @@
         pAnalyticsReg = new PillSelect('analyticsRegSelect', allRegs);
     }
 
+    // 🚨 REJECTION LEADER LINE ENGINE (Added Safe Error Catch)
     const leaderLinePlugin = {
         id: 'leaderLine',
         afterDraw(chart, args, options) {
             if (!options.display) return;
-            const ctx = chart.ctx;
-            const dataset = chart.data.datasets[0];
-            const meta = chart.getDatasetMeta(0);
-            if (!meta.data || meta.data.length === 0) return;
-            
-            const total = dataset.data.reduce((a, b) => a + b, 0);
-            const centerX = chart.chartArea.left + chart.chartArea.width / 2;
-            const centerY = chart.chartArea.top + chart.chartArea.height / 2;
-
-            let leftLabels = [], rightLabels = [];
-
-            meta.data.forEach((arc, i) => {
-                const val = dataset.data[i];
-                if (val === 0) return;
-                const percent = (val / total * 100);
-                if (percent < 0.5) return; 
+            try {
+                const ctx = chart.ctx;
+                const dataset = chart.data.datasets[0];
+                const meta = chart.getDatasetMeta(0);
+                if (!meta.data || meta.data.length === 0) return;
                 
-                const angle = (arc.startAngle + arc.endAngle) / 2;
-                const isRight = Math.cos(angle) >= 0;
-                const radius = arc.outerRadius;
-                const startX = centerX + Math.cos(angle) * radius;
-                const startY = centerY + Math.sin(angle) * radius;
-                
-                const labelObj = {
-                    i, val, percent, angle, startX, startY, radius,
-                    text: `${chart.data.labels[i]}: ${val} (${percent.toFixed(2)}%)`,
-                    color: dataset.backgroundColor[i % dataset.backgroundColor.length],
-                    targetY: startY 
-                };
-                if (isRight) rightLabels.push(labelObj); else leftLabels.push(labelObj);
-            });
+                const total = dataset.data.reduce((a, b) => a + b, 0);
+                if (total === 0) return; // Prevent division by zero crash
 
-            leftLabels.sort((a, b) => a.startY - b.startY);
-            rightLabels.sort((a, b) => a.startY - b.startY);
-            const SPACING = 18; 
-            const relaxLabels = (labels) => {
-                for (let iter = 0; iter < 50; iter++) {
-                    for (let i = 0; i < labels.length - 1; i++) {
-                        const diff = labels[i+1].targetY - labels[i].targetY;
-                        if (diff < SPACING) {
-                            const push = (SPACING - diff) / 2;
-                            labels[i].targetY -= push; labels[i+1].targetY += push;
+                const centerX = chart.chartArea.left + chart.chartArea.width / 2;
+                const centerY = chart.chartArea.top + chart.chartArea.height / 2;
+
+                let leftLabels = [], rightLabels = [];
+
+                meta.data.forEach((arc, i) => {
+                    const val = dataset.data[i];
+                    if (val === 0) return;
+                    const percent = (val / total * 100);
+                    if (percent < 0.5) return; 
+                    
+                    const angle = (arc.startAngle + arc.endAngle) / 2;
+                    const isRight = Math.cos(angle) >= 0;
+                    const radius = arc.outerRadius;
+                    const startX = centerX + Math.cos(angle) * radius;
+                    const startY = centerY + Math.sin(angle) * radius;
+                    
+                    const labelObj = {
+                        i, val, percent, angle, startX, startY, radius,
+                        text: `${chart.data.labels[i]}: ${val} (${percent.toFixed(2)}%)`,
+                        color: dataset.backgroundColor[i % dataset.backgroundColor.length],
+                        targetY: startY 
+                    };
+                    if (isRight) rightLabels.push(labelObj); else leftLabels.push(labelObj);
+                });
+
+                leftLabels.sort((a, b) => a.startY - b.startY);
+                rightLabels.sort((a, b) => a.startY - b.startY);
+                const SPACING = 18; 
+                const relaxLabels = (labels) => {
+                    for (let iter = 0; iter < 50; iter++) {
+                        for (let i = 0; i < labels.length - 1; i++) {
+                            const diff = labels[i+1].targetY - labels[i].targetY;
+                            if (diff < SPACING) {
+                                const push = (SPACING - diff) / 2;
+                                labels[i].targetY -= push; labels[i+1].targetY += push;
+                            }
                         }
                     }
-                }
-            };
+                };
 
-            relaxLabels(leftLabels); relaxLabels(rightLabels);
+                relaxLabels(leftLabels); relaxLabels(rightLabels);
 
-            const drawSide = (labels, isRight) => {
-                if (labels.length === 0) return;
-                const maxRad = meta.data[0].outerRadius;
-                const elbowX = centerX + (isRight ? maxRad + 25 : -maxRad - 25);
-                const endX = elbowX + (isRight ? 15 : -15);
-                labels.forEach((lb) => {
-                    ctx.save(); ctx.beginPath(); ctx.moveTo(lb.startX, lb.startY); ctx.lineTo(elbowX, lb.targetY); ctx.lineTo(endX, lb.targetY);
-                    ctx.strokeStyle = '#4a4d63'; ctx.lineWidth = 1.2; ctx.stroke();
-                    ctx.beginPath(); ctx.arc(lb.startX, lb.startY, 4, 0, 2 * Math.PI); ctx.fillStyle = lb.color; ctx.fill();
-                    ctx.fillStyle = '#e0e0e0'; ctx.font = '11px Inter, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = isRight ? 'left' : 'right';
-                    ctx.fillText(lb.text, isRight ? endX + 6 : endX - 6, lb.targetY); ctx.restore();
-                });
-            };
-            drawSide(leftLabels, false); drawSide(rightLabels, true);
+                const drawSide = (labels, isRight) => {
+                    if (labels.length === 0) return;
+                    const maxRad = meta.data[0].outerRadius;
+                    const elbowX = centerX + (isRight ? maxRad + 25 : -maxRad - 25);
+                    const endX = elbowX + (isRight ? 15 : -15);
+                    labels.forEach((lb) => {
+                        ctx.save(); ctx.beginPath(); ctx.moveTo(lb.startX, lb.startY); ctx.lineTo(elbowX, lb.targetY); ctx.lineTo(endX, lb.targetY);
+                        ctx.strokeStyle = '#4a4d63'; ctx.lineWidth = 1.2; ctx.stroke();
+                        ctx.beginPath(); ctx.arc(lb.startX, lb.startY, 4, 0, 2 * Math.PI); ctx.fillStyle = lb.color; ctx.fill();
+                        ctx.fillStyle = '#e0e0e0'; ctx.font = '11px Inter, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = isRight ? 'left' : 'right';
+                        ctx.fillText(lb.text, isRight ? endX + 6 : endX - 6, lb.targetY); ctx.restore();
+                    });
+                };
+                drawSide(leftLabels, false); drawSide(rightLabels, true);
+            } catch(e) { console.error("Leaderline Engine:", e); }
         }
     };
 
@@ -640,9 +645,7 @@
                     document.getElementById('queryTypeContainer').style.display = 'block';
                     if(d.is_super_admin || d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
                     if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
-                    if(d.is_super_admin || d.modules.includes('analytics')) {
-                        selector.add(new Option("📊 Agency Data Analyses", "analytics"));
-                    }
+                    if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
                     
                     toggleViewModes();
                 }
@@ -835,7 +838,7 @@
         const acm = document.getElementById('anaAcm').value;
         const type = document.getElementById('anaType').value;
         
-        // 🚨 FIXED: Just reads the exact dates in the box. No more +1 day bug!
+        // 🚨 DOUBLE DATE BUG FINALLY DESTROYED: Simply reads your exact inputs without adding days.
         const fromDate = document.getElementById('anaFrom').value;
         const toDate = document.getElementById('anaTo').value;
 
@@ -862,8 +865,9 @@
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
             document.getElementById('kpiClosings').innerText = data.kpis.closings.toLocaleString();
 
-            drawCharts(data);
+            // 🚨 GUARANTEED CHART RENDER FIX: Must be 'block' BEFORE drawCharts to stop 0x0 bug
             document.getElementById('analyticsContainer').style.display = 'block';
+            drawCharts(data);
 
         } catch (err) {
             const e = document.getElementById('errorToast');
