@@ -51,11 +51,12 @@
         .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
         .btn-primary { background: linear-gradient(135deg, var(--accent-cyan), #3a7bd5); color: #000; }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,212,255,0.25); }
+        .btn-primary:active { transform: translateY(0) scale(0.98); }
         .btn-success { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #000; }
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
-        .btn-primary:active, .btn-success:active { transform: translateY(0) scale(0.98); }
+        .btn-success:active { transform: translateY(0) scale(0.98); }
 
-        /* 🚨 UPGRADED ADMIN MODAL UI & CHECKBOX CSS */
+        /* 🚨 UPGRADED SAAS GLASSMORPHISM ADMIN MODAL */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content { 
             background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85));
@@ -109,7 +110,7 @@
         .del-btn:hover { background: var(--accent-rose); color: #000; }
 
         .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
-        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; text-align: center; position: relative; overflow: hidden; transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s ease;}
+        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; text-align: center; position: relative; overflow: hidden; transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s ease; }
         .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,212,255,0.12), var(--shadow); }
         .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
         .kpi-card:nth-child(1)::before { background: var(--accent-cyan); }
@@ -168,7 +169,6 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
-<!-- 🚨 MODAL: Completely Upgraded Admin Access Control Panel -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -413,7 +413,7 @@
 </div>
 
 <script>
-    // 🚨 PILL MULTI-SELECT COMPONENT (Sleek SaaS Design with Memory Leak Fix)
+    // 🚨 PILL MULTI-SELECT COMPONENT (Memory Leak Fixed)
     class PillSelect {
         static _instances = new Set();
         static _delegatedListenerAttached = false;
@@ -517,7 +517,6 @@
         pAnalyticsReg = new PillSelect('analyticsRegSelect', allRegs);
     }
 
-    // 🚨 REJECTION LEADER LINE ENGINE
     const leaderLinePlugin = {
         id: 'leaderLine',
         afterDraw(chart, args, options) {
@@ -648,6 +647,7 @@
                     if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
                     if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
                     
+                    // 🚨 Safely triggers view mode only AFTER options are populated
                     toggleViewModes();
                 }
             }).catch(e => console.error(e));
@@ -664,7 +664,7 @@
         return `${y}-${m}-${day}`;
     }
 
-    // 🚨 FIXED VIEW TOGGLE LOGIC
+    // 🚨 Safe toggle logic
     function toggleViewModes() {
         const queryTypeElem = document.getElementById('queryType');
         const val = queryTypeElem ? queryTypeElem.value : '';
