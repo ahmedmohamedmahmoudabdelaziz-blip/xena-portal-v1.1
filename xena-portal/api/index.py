@@ -385,8 +385,17 @@ def search_agency():
     if "all" not in allowed_acms and sheet_acm_name.lower() not in allowed_acms:
         return jsonify({"error": f"Access Denied: You are not authorized to view data for ACM: {sheet_acm_name}"}), 403
 
+    # 🚨 ADDED: Extract the required columns for the Points System Module
     try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
+    try: total_points = float(extract_field_text(get_field_local(fields, '# Total Points', 'Total Points', 'Total')).replace(',', '').strip())
+    except ValueError: total_points = 0
+    try: used_points = float(extract_field_text(get_field_local(fields, 'Used Points', 'Used')).replace(',', '').strip())
+    except ValueError: used_points = 0
+    try: point_balance = float(extract_field_text(get_field_local(fields, 'Point Balance', 'Balance')).replace(',', '').strip())
+    except ValueError: point_balance = 0
+    
+    monthly_tracker = extract_field_text(get_field_local(fields, 'Monthly Usage Tracker', 'Monthly Usage', 'Usage Tracker'))
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     req_response = requests.post(req_url, headers=headers, json=points_payload, timeout=10).json()
@@ -400,7 +409,17 @@ def search_agency():
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
-    return jsonify({"base_points": base_points, "requests": valid_requests, "acm": sheet_acm_name.title(), "role": "Verified by Feishu"})
+    # 🚨 ADDED: Returning the new Point variables securely to the frontend
+    return jsonify({
+        "base_points": base_points, 
+        "total_points": total_points,
+        "used_points": used_points,
+        "point_balance": point_balance,
+        "monthly_tracker": monthly_tracker,
+        "requests": valid_requests, 
+        "acm": sheet_acm_name.title(), 
+        "role": "Verified by Feishu"
+    })
 
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():
