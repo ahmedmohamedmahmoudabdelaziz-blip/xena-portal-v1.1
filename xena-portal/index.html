@@ -55,7 +55,6 @@
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
         .btn-primary:active, .btn-success:active { transform: translateY(0) scale(0.98); }
 
-        /* 🚨 UPGRADED SAAS GLASSMORPHISM ADMIN MODAL */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content { background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85)); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04); width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -163,7 +162,6 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
-<!-- 🚨 MODAL: Completely Upgraded Admin Access Control Panel -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -277,7 +275,7 @@
                 <label>Agency Code</label>
                 <input type="text" id="agencyCode" placeholder="e.g., 40775">
             </div>
-            <button class="btn btn-primary" onclick="fetchAgencyData()">Search Current Month</button>
+            <button class="btn btn-primary" onclick="fetchAgencyData()">Search</button>
         </div>
 
         <div id="analyticsParams" style="display:none;">
@@ -338,8 +336,10 @@
             <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
         </div>
-        <div class="card" id="privilegeArea">
-            <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Available Privilege</h3>
+        
+        <!-- 🚨 TARGET MODULE UI -->
+        <div class="card" id="privilegeArea" style="display:none;">
+            <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Available Target Privilege</h3>
             <div class="control-group" style="max-width: 300px; margin-bottom: 16px;">
                 <select id="specificPrivilege" onchange="updatePrivilegeGrid()">
                     <option value="Dynamic Avatar">Dynamic Avatar</option>
@@ -357,6 +357,68 @@
                 <div class="stat-box"><div class="stat-label">Rejected</div><div class="stat-value" id="valRejected" style="color: var(--accent-rose);">0</div></div>
             </div>
         </div>
+
+        <!-- 🚨 NEW: AGENCY POINTS SYSTEM UI -->
+        <div class="card" id="pointsArea" style="display:none;">
+            <h3 style="margin-bottom: 16px; color: var(--accent-purple);">🪙 Agency Points System</h3>
+            
+            <div class="stat-grid" style="margin-bottom: 24px;">
+                <div class="stat-box"><div class="stat-label">Total Points Earned</div><div class="stat-value" id="ptTotal" style="color: var(--accent-green);">0</div></div>
+                <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color: var(--accent-rose);">0</div></div>
+                <div class="stat-box"><div class="stat-label">Current Balance</div><div class="stat-value" id="ptBalance" style="color: var(--accent-cyan);">0</div></div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                <!-- Left: Smart Allocator Calculator -->
+                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px;">
+                    <h4 style="color: var(--accent-cyan); margin-bottom: 16px;">🤖 Smart Allocator Preview</h4>
+                    
+                    <div class="control-group">
+                        <label>Privileges (Hold CTRL/CMD to select multiple)</label>
+                        <select id="calcPriv" multiple style="height: 120px;">
+                            <option value="Trend card">Trend card ( 40 - 50 )</option>
+                            <option value="Traffic card">Traffic card ( 30 - 40 )</option>
+                            <option value="30 mic 15 days">30 Mic 15 days ( 150 - 175 )</option>
+                            <option value="30 mic 30 days">30 Mic 30 days ( 300 - 350 )</option>
+                            <option value="normal short id ( 2 levels above ) 15 days">Normal Short ID 15 days</option>
+                            <option value="normal short id ( 2 levels above ) 30 days">Normal Short ID 30 days</option>
+                            <option value="customized short id 15 days">Customized Short ID 15 days</option>
+                            <option value="customized short id 30 days">Customized Short ID 30 days</option>
+                            <option value="room pin-up">Room Pin-up</option>
+                            <option value="welcome package 3">Welcome Package 3</option>
+                            <option value="welcome package 2">Welcome Package 2</option>
+                            <option value="main page banner">Main Page Banner</option>
+                            <option value="news banner">News Banner</option>
+                            <option value="live banner">Live Banner</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Quantities Input (e.g., "9 and 30" or "2, 5")</label>
+                        <input type="text" id="calcQty" placeholder="Type quantities matching selection order">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Target Type</label>
+                        <select id="calcTarget">
+                            <option value="Same agency">Same Agency</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-outline" style="width: 100%; margin-top: 10px; border-color: var(--accent-purple); color: var(--accent-purple);" onclick="runAllocatorPreview()">Check Availability & Calculate</button>
+                    
+                    <div style="margin-top: 20px; background: #000; padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; color: var(--text-muted); max-height: 250px; overflow-y: auto;" id="allocatorOutput">Enter details and click calculate to preview the receipt...</div>
+                </div>
+
+                <!-- Right: Daily Usage History -->
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 550px; overflow-y: auto;">
+                    <h4 style="color: var(--accent-amber); margin-bottom: 16px;">📅 Day-by-Day Point History</h4>
+                    <div id="pointsHistoryList"></div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div id="analyticsContainer" style="display: none;">
@@ -408,7 +470,6 @@
 </div>
 
 <script>
-    // 🚨 PILL MULTI-SELECT COMPONENT (Memory Leak Fixed)
     class PillSelect {
         static _instances = new Set();
         static _delegatedListenerAttached = false;
@@ -436,9 +497,7 @@
             PillSelect._registerInstance(this);
         }
         
-        getValues() {
-            return this.selected.length === 0 ? ['all'] : this.selected;
-        }
+        getValues() { return this.selected.length === 0 ? ['all'] : this.selected; }
 
         setValues(vals) {
             this.selected = vals;
@@ -448,15 +507,11 @@
         }
 
         toggle(val) {
-            if (val === 'all') {
-                this.selected = ['all'];
-            } else {
+            if (val === 'all') this.selected = ['all'];
+            else {
                 this.selected = this.selected.filter(x => x !== 'all');
-                if (this.selected.includes(val)) {
-                    this.selected = this.selected.filter(x => x !== val);
-                } else {
-                    this.selected.push(val);
-                }
+                if (this.selected.includes(val)) this.selected = this.selected.filter(x => x !== val);
+                else this.selected.push(val);
                 if (this.selected.length === 0) this.selected = ['all'];
             }
             this.renderPills();
@@ -512,7 +567,6 @@
         pAnalyticsReg = new PillSelect('analyticsRegSelect', allRegs);
     }
 
-    // 🚨 REJECTION LEADER LINE ENGINE (Added Safe Error Catch)
     const leaderLinePlugin = {
         id: 'leaderLine',
         afterDraw(chart, args, options) {
@@ -524,7 +578,7 @@
                 if (!meta.data || meta.data.length === 0) return;
                 
                 const total = dataset.data.reduce((a, b) => a + b, 0);
-                if (total === 0) return; // Prevent division by zero crash
+                if (total === 0) return;
 
                 const centerX = chart.chartArea.left + chart.chartArea.width / 2;
                 const centerY = chart.chartArea.top + chart.chartArea.height / 2;
@@ -583,7 +637,7 @@
                     });
                 };
                 drawSide(leftLabels, false); drawSide(rightLabels, true);
-            } catch(e) { console.error("Leaderline Engine:", e); }
+            } catch(e) {}
         }
     };
 
@@ -632,9 +686,7 @@
                 const selector = document.getElementById('queryType');
                 selector.innerHTML = '';
                 
-                if (d.is_super_admin) {
-                    document.getElementById('adminBtn').style.display = 'block';
-                }
+                if (d.is_super_admin) document.getElementById('adminBtn').style.display = 'block';
                 
                 if (!d.is_super_admin && (!d.modules || d.modules.length === 0)) {
                     document.getElementById('noAccessMsg').style.display = 'block';
@@ -646,7 +698,6 @@
                     if(d.is_super_admin || d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
                     if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
                     if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
-                    
                     toggleViewModes();
                 }
             }).catch(e => console.error(e));
@@ -663,6 +714,7 @@
         return `${y}-${m}-${day}`;
     }
 
+    // 🚨 Safe toggle logic for new Points Area
     function toggleViewModes() {
         const queryTypeElem = document.getElementById('queryType');
         const val = queryTypeElem ? queryTypeElem.value : '';
@@ -678,6 +730,8 @@
         
         document.getElementById('resultsContainer').style.display = 'none';
         document.getElementById('analyticsContainer').style.display = 'none';
+        document.getElementById('privilegeArea').style.display = 'none';
+        document.getElementById('pointsArea').style.display = 'none';
     }
 
     function updateCustomDateVisibility() {
@@ -722,9 +776,7 @@
         fetchAdminUsers();
     }
     
-    function closeAdmin() { 
-        document.getElementById('adminModal').style.display = 'none'; 
-    }
+    function closeAdmin() { document.getElementById('adminModal').style.display = 'none'; }
     
     function parseGranular(str, module) {
         if (!str || str.indexOf('=') === -1) {
@@ -775,9 +827,7 @@
                     <div class="user-row">
                         <div class="user-info">
                             <span class="user-email">${dispEmail}${badge}</span>
-                            <div class="user-details">
-                                <span style="color:var(--text); font-weight:bold;">Modules:</span> <span>${u.modules || 'none'}</span>
-                            </div>
+                            <div class="user-details"><span style="color:var(--text); font-weight:bold;">Modules:</span> <span>${u.modules || 'none'}</span></div>
                         </div>
                         <div class="action-btns">
                             <button class="edit-btn" onclick="editAgent('${dispEmail}', '${u.modules}', '${u.acms_raw}', '${u.regions_raw}')">Edit</button>
@@ -816,10 +866,7 @@
             initPills();
             document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
             fetchAdminUsers();
-        } catch (e) {
-            alert("Error adding agent:\n\n" + e.message);
-            document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
-        }
+        } catch (e) { alert("Error adding agent:\n\n" + e.message); document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration'; }
     }
     
     async function deleteAgent(recordId) {
@@ -837,8 +884,6 @@
         const region = document.getElementById('anaRegion').value;
         const acm = document.getElementById('anaAcm').value;
         const type = document.getElementById('anaType').value;
-        
-        // 🚨 DOUBLE DATE BUG FINALLY DESTROYED: Simply reads your exact inputs without adding days.
         const fromDate = document.getElementById('anaFrom').value;
         const toDate = document.getElementById('anaTo').value;
 
@@ -865,7 +910,6 @@
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
             document.getElementById('kpiClosings').innerText = data.kpis.closings.toLocaleString();
 
-            // 🚨 GUARANTEED CHART RENDER FIX: Must be 'block' BEFORE drawCharts to stop 0x0 bug
             document.getElementById('analyticsContainer').style.display = 'block';
             drawCharts(data);
 
@@ -942,6 +986,9 @@
         buildTrendChart('cTrendBd', data.daily_trend_bd, '#00e676', 'rgba(0,230,118,0.3)');
     }
 
+    // ============================================================================
+    // 🚨 SEARCH & RENDER
+    // ============================================================================
     async function fetchAgencyData() {
         const code = document.getElementById('agencyCode').value.trim();
         if (!code) return;
@@ -956,10 +1003,24 @@
             const e = document.getElementById('errorToast'); e.innerHTML = err.message; e.style.display = 'flex'; return;
         }
         document.getElementById('loadingOverlay').style.display = 'none';
+        
         const bp = currentAgencyData.base_points || 0;
         document.getElementById('displayTargetCoins').innerText = (bp * 100000).toLocaleString() + ' Coins';
         document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
-        if (document.getElementById('queryType').value === 'target') { document.getElementById('privilegeArea').style.display = 'block'; updatePrivilegeGrid(); }
+        
+        // 🚨 SHOW APPROPRIATE UI BASED ON QUERY TYPE
+        const queryType = document.getElementById('queryType').value;
+        document.getElementById('privilegeArea').style.display = 'none';
+        document.getElementById('pointsArea').style.display = 'none';
+        
+        if (queryType === 'target') { 
+            document.getElementById('privilegeArea').style.display = 'block'; 
+            updatePrivilegeGrid(); 
+        } else if (queryType === 'points') {
+            document.getElementById('pointsArea').style.display = 'block'; 
+            updatePointsGrid();
+        }
+        
         document.getElementById('resultsContainer').style.display = 'block';
     }
 
@@ -982,6 +1043,204 @@
             }
         });
         document.getElementById('valTotal').innerText = total; document.getElementById('valClaimed').innerText = claimed; document.getElementById('valRemaining').innerText = Math.max(0, total - claimed); document.getElementById('valPending').innerText = pending; document.getElementById('valRejected').innerText = rejected;
+    }
+
+    // ============================================================================
+    // 🚨 NEW: AGENCY POINTS LOGIC & SMART ALLOCATOR
+    // ============================================================================
+    function updatePointsGrid() {
+        if (!currentAgencyData) return;
+        
+        // 1. Update Stats
+        document.getElementById('ptTotal').innerText = (currentAgencyData.total_points || 0).toLocaleString();
+        document.getElementById('ptUsed').innerText = (currentAgencyData.used_points || 0).toLocaleString();
+        document.getElementById('ptBalance').innerText = (currentAgencyData.point_balance || 0).toLocaleString();
+
+        // 2. Build Daily History
+        let historyHtml = '';
+        const requests = currentAgencyData.requests || [];
+        
+        // Filter out point requests (they usually have quantities or specific privileges attached)
+        const pointReqs = requests.filter(r => r['Agency Point Privilege'] || r['Quantities Input'] || r['Transaction Receipt']);
+        
+        if (pointReqs.length === 0) {
+            historyHtml = '<div style="color:var(--text-muted); padding:10px;">No points usage found this month.</div>';
+        } else {
+            pointReqs.sort((a, b) => {
+                const dA = new Date(a['Submitted on'] || a['Submitted on Copy'] || 0);
+                const dB = new Date(b['Submitted on'] || b['Submitted on Copy'] || 0);
+                return dB - dA;
+            });
+
+            pointReqs.forEach(req => {
+                const dateRaw = req['Submitted on'] || req['Submitted on Copy'];
+                let dateStr = 'Unknown Date';
+                if (dateRaw) {
+                    const d = new Date(dateRaw);
+                    if (!isNaN(d)) dateStr = d.toISOString().split('T')[0];
+                }
+                
+                let privs = req['Agency Point Privilege'];
+                if (typeof privs === 'object') privs = privs.text || privs.name || JSON.stringify(privs);
+                let qty = req['Quantities Input'] || 'N/A';
+                if (typeof qty === 'object') qty = qty.text || qty.name || qty;
+                let status = req['Status'] || req['Order Action'] || 'Pending';
+                if (typeof status === 'object') status = status.text || status.name || status;
+                
+                let statusColor = status.toLowerCase().includes('confirm') || status.toLowerCase().includes('done') ? 'var(--accent-green)' : 
+                                  status.toLowerCase().includes('reject') ? 'var(--accent-rose)' : 'var(--accent-amber)';
+
+                historyHtml += `
+                <div style="background: var(--bg); padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="color: var(--accent-cyan); font-weight: 600;">${dateStr}</span>
+                        <span style="color: ${statusColor}; font-weight: bold; font-size: 0.85rem; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.05);">${status.toUpperCase()}</span>
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--text); margin-bottom: 4px;"><strong>Items:</strong> <span style="color: var(--text-muted);">${privs}</span></div>
+                    <div style="font-size: 0.9rem; color: var(--text);"><strong>Quantities:</strong> <span style="color: var(--text-muted);">${qty}</span></div>
+                </div>`;
+            });
+        }
+        document.getElementById('pointsHistoryList').innerHTML = historyHtml;
+        document.getElementById('allocatorOutput').innerText = 'Enter details and click calculate to preview the receipt...';
+    }
+
+    // Triggers the Smart Allocator JS
+    function runAllocatorPreview() {
+        if (!currentAgencyData) return;
+        
+        // Grab the multiple selections
+        const privSelect = document.getElementById('calcPriv');
+        const privInput = Array.from(privSelect.selectedOptions).map(opt => opt.value);
+        
+        const qtyInput = document.getElementById('calcQty').value;
+        const target = document.getElementById('calcTarget').value;
+        
+        const used = currentAgencyData.used_points || 0;
+        const bal = currentAgencyData.point_balance || 0;
+        const monthText = currentAgencyData.monthly_tracker || "";
+        
+        const result = feishuSmartAllocator(privInput, qtyInput, target, used, bal, monthText);
+        document.getElementById('allocatorOutput').innerText = result;
+    }
+
+    // 🚨 EXACT COPY OF YOUR JAVASCRIPT HANDLER (Converted to run locally)
+    function feishuSmartAllocator(param1, param2, param3, param4, param5, param6, param7) {
+        const priv = Array.isArray(param1) ? param1 : String(param1 || "").split(',').map(s => s.trim());
+        const qty = String(param2 || "").match(/\d+/g) || [];
+        const target = String(param3 || "").toLowerCase();
+        const used = Number(Array.isArray(param4) ? param4[0] : param4) || 0;
+        const bal = Number(Array.isArray(param5) ? param5[0] : param5) || 0;
+        const monthText = String(Array.isArray(param6) ? param6[0] : param6 || "");
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        let currentD = new Date();
+        if (param7) { const d = new Date(param7); if (!isNaN(d)) currentD = d; }
+        let submittedMonthName = monthNames[currentD.getMonth()];
+        
+        if (priv.length === 0 || priv[0] === "") return "No items selected.";
+        
+        const db = [
+            { key: "trend card", same: 40, other: 50, limit: 10 },
+            { key: "traffic card", same: 30, other: 40, limit: 50 },
+            { key: "30 mic 15 days", same: 150, other: 175, limit: 999 },
+            { key: "30 mic 30 days", same: 300, other: 350, limit: 999 },
+            { key: "normal short id", same: 120, other: 180, limit: 999 }, // Simplified key matching
+            { key: "customized short id 15 days", same: 300, other: 450, limit: 999 },
+            { key: "customized short id 30 days", same: 600, other: 900, limit: 999 },
+            { key: "room pin-up", same: 100, other: 150, limit: 999 },
+            { key: "welcome package 3", same: 80, other: 80, limit: 15 },
+            { key: "welcome package 2", same: 30, other: 30, limit: 50 },
+            { key: "main page banner", same: 150, other: 150, limit: 3, type: "order" },
+            { key: "news banner", same: 100, other: 100, limit: 5, type: "order" },
+            { key: "live banner", same: 90, other: 90, limit: 5, type: "order" }
+        ];
+        
+        let storedMonth = "";
+        const monthly = {};
+        const lines = monthText.split('\n');
+        for (const line of lines) {
+            if (line.includes('━') || line.includes('┈')) continue; 
+            let monthMatch = line.match(/Month:\s*([A-Za-z0-9]+)/i);
+            if (monthMatch) {
+                storedMonth = monthMatch[1].trim();
+            }
+            else if (line.includes(':')) { 
+                let parts = line.split(':');
+                if (parts.length >= 2) {
+                    let itemName = parts[0].replace(/[🔹📋🌟【】]/g, '').trim(); 
+                    let itemQty = parseInt(parts[1].trim());
+                    if (!isNaN(itemQty)) monthly[itemName] = itemQty;
+                }
+            }
+        }
+        
+        let isSameMonth = false;
+        if (storedMonth.toLowerCase() === submittedMonthName.toLowerCase()) isSameMonth = true;
+        else if (parseInt(storedMonth) === currentD.getMonth() + 1) isSameMonth = true; 
+        
+        if (!isSameMonth) { for (const k in monthly) delete monthly[k]; }
+        
+        let remainingBalance = bal;
+        let totalCost = 0;
+        let receiptLines = [];
+        let currentOrder = {};
+        
+        for (let i = 0; i < priv.length; i++) {
+            const item = priv[i].toLowerCase();
+            const q = Number(qty[i]) || 0;
+            if (q <= 0) continue;
+            
+            const rule = db.find(r => item.includes(r.key));
+            if (!rule) continue;
+            
+            const price = target.includes("other") ? rule.other : rule.same;
+            const display = rule.key.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+            const pastUsage = monthly[display] || 0;
+            
+            let limitAllowed;
+            if (rule.type === "order") {
+                limitAllowed = rule.limit; 
+            } else {
+                limitAllowed = rule.limit - pastUsage; 
+            }
+            
+            if (limitAllowed < 0) limitAllowed = 0;
+            let desired = Math.min(q, limitAllowed);
+            let affordable = Math.floor(remainingBalance / price);
+            let approved = Math.min(desired, affordable);
+            
+            if (approved === q) {
+                receiptLines.push(`✅ FULLY APPROVED: ${approved}x ${display} @ ${price} pts = ${approved * price}`);
+            } else if (approved > 0) {
+                let reason = (q > limitAllowed) ? 
+                    (rule.type === "order" ? `Max ${rule.limit} allowed per request.` : `Limit maxes out at ${limitAllowed} more.`) 
+                    : `Not enough points for ${desired}.`;
+                receiptLines.push(`⚠️ PARTIALLY APPROVED: ${approved}x ${display} @ ${price} pts = ${approved * price}\n    └─ (Rejected ${q - approved}x: ${reason})`);
+            } else {
+                let reason = (limitAllowed === 0) ? 
+                    (rule.type === "order" ? `Max ${rule.limit} allowed per request.` : `Monthly limit (${rule.limit}) already reached.`) 
+                    : `Insufficient points (${remainingBalance} left).`;
+                receiptLines.push(`❌ FULLY REJECTED: 0x ${display}\n    └─ (Reason: ${reason})`);
+            }
+            
+            if (approved > 0) {
+                totalCost += approved * price;
+                remainingBalance -= approved * price;
+                currentOrder[display] = (currentOrder[display] || 0) + approved;
+                monthly[display] = pastUsage + approved; 
+            }
+        }
+        
+        let baseReceipt = receiptLines.join('\n') + `\n\n💰 TOTAL DEDUCTED: ${totalCost} pts\n💳 REMAINING BALANCE: ${remainingBalance} pts\n`;
+        
+        let monthlySummary = "\n🌟 **CURRENT MONTH USAGE** 🌟\n" + 
+                             "━━━━━\n" + 
+                             Object.entries(monthly).map(([k,v]) => `🔹 ${k}: ${v}`).join('\n ┈┈┈ \n');
+        
+        let out_preview = "👀 **ORDER PREVIEW (Smart Allocation)** 👀\n\n" + baseReceipt + "\n⚠️ Remember: This is a preview, points are NOT deducted yet.\n" + monthlySummary;
+        
+        return out_preview; 
     }
 </script>
 </body>
