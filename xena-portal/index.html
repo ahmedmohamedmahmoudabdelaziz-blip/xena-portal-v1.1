@@ -55,14 +55,9 @@
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
         .btn-primary:active, .btn-success:active { transform: translateY(0) scale(0.98); }
 
-        /* 🚨 UPGRADED SAAS GLASSMORPHISM ADMIN MODAL */
+        /* 🚨 BRAND NEW ADMIN MODAL & GRANULAR UI CSS */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-content { 
-            background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85));
-            backdrop-filter: blur(20px) saturate(140%);
-            box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
-            width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; 
-        }
+        .modal-content { background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85)); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04); width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .modal-header h2 { font-size: 1.5rem; color: var(--text); margin: 0;}
         .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: 0.2s; }
@@ -70,13 +65,11 @@
         
         .admin-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
         
-        /* Module Cards for Granular Permissions */
         .module-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 0.2s, background 0.2s; }
         .module-card:hover { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
         .module-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;}
         .module-header h4 { margin: 0; font-size: 1rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;}
         
-        /* Sleek Toggles */
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .3s; border-radius: 34px; }
@@ -86,7 +79,6 @@
         .admin-toggle { background: rgba(255,184,0,0.1); border: 1px solid rgba(255,184,0,0.3); padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
         .admin-toggle h4 { color: var(--accent-amber); margin: 0; font-size: 1rem;}
 
-        /* Modern Tag/Pill Multi-Select */
         .pill-select-container { position: relative; width: 100%; }
         .pill-input-box { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; min-height: 42px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; align-items: center;}
         .pill { background: rgba(0,212,255,0.15); color: var(--accent-cyan); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(0,212,255,0.3);}
@@ -842,11 +834,10 @@
         const region = document.getElementById('anaRegion').value;
         const acm = document.getElementById('anaAcm').value;
         const type = document.getElementById('anaType').value;
-        const fromDate = document.getElementById('anaFrom').value;
         
-        const uiToDate = new Date(document.getElementById('anaTo').value);
-        uiToDate.setDate(uiToDate.getDate() + 1);
-        const toDate = fmtDate(uiToDate);
+        // 🚨 FIXED: Just reads the exact dates in the box. No more +1 day bug!
+        const fromDate = document.getElementById('anaFrom').value;
+        const toDate = document.getElementById('anaTo').value;
 
         try {
             const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
@@ -975,7 +966,7 @@
         let total = 0;
         if (priv === "Dynamic Avatar") total = Math.floor(bp / 100);
         else if (priv === "30 Mics") { if(bp>=1000) total=4; else if(bp>=500) total=2; else if(bp>=300) total=1; }
-        else if (priv === "20 Mics") total = bp >= 150 ? 1 : 0; else total = bp >= 20 ? 1 : 0;
+        else if (priv === "20 Mics") total = Math.floor(bp / 150); else total = Math.floor(bp / 20);
 
         let claimed=0, pending=0, rejected=0;
         (currentAgencyData.requests || []).forEach(req => {
