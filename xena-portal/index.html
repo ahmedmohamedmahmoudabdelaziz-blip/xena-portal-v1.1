@@ -53,7 +53,18 @@
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,212,255,0.25); }
         .btn-success { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #000; }
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
-        .btn-primary:active, .btn-success:active { transform: translateY(0) scale(0.98); }
+        
+        /* 🚨 PREMIUM ALLOCATOR BUTTON */
+        .btn-allocator { background: transparent; border: 1px solid var(--accent-purple); color: var(--accent-purple); box-shadow: 0 0 10px rgba(185, 103, 255, 0.1); width: 100%; padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; font-family: inherit; margin-top: 10px; }
+        .btn-allocator:hover { background: var(--accent-purple); color: #000; box-shadow: 0 8px 25px rgba(185, 103, 255, 0.4); transform: translateY(-2px); }
+
+        .btn-primary:active, .btn-success:active, .btn-allocator:active { transform: translateY(0) scale(0.98); }
+
+        /* 🚨 BRAND NEW TOGGLE CHECKBOXES */
+        .priv-toggle { background: var(--bg); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; color: var(--text-muted); text-align: left; display: flex; align-items: center; justify-content: space-between; }
+        .priv-toggle:hover { border-color: var(--accent-cyan); color: var(--text); }
+        .priv-toggle.active { background: rgba(0,212,255,0.1); border-color: var(--accent-cyan); color: var(--accent-cyan); box-shadow: inset 0 0 10px rgba(0,212,255,0.1); font-weight: 600; }
+        .priv-toggle.active::after { content: '✓'; font-weight: bold; }
 
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .modal-content { background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85)); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04); width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
@@ -162,6 +173,7 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
+<!-- 🚨 ADMIN MODAL -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -331,9 +343,10 @@
     <div id="incompleteToast" class="toast toast-warning"></div>
 
     <div id="resultsContainer" style="display: none;">
+        <!-- 🚨 DYNAMIC BANNER: Title text swaps based on user's module choice -->
         <div class="target-banner">
             <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
-            <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
+            <div id="displayTargetTitle" style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
         </div>
         
@@ -369,28 +382,28 @@
             </div>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-                <!-- Left: Smart Allocator Calculator -->
+                <!-- Left: Smart Allocator Calculator (PREMIUM UI UPGRADE) -->
                 <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px;">
                     <h4 style="color: var(--accent-cyan); margin-bottom: 16px;">🤖 Smart Allocator Preview</h4>
                     
                     <div class="control-group">
-                        <label>Privileges (Hold CTRL/CMD to select multiple)</label>
-                        <select id="calcPriv" multiple style="height: 120px;">
-                            <option value="Trend card">Trend card ( 40 - 50 )</option>
-                            <option value="Traffic card">Traffic card ( 30 - 40 )</option>
-                            <option value="30 mic 15 days">30 Mic 15 days ( 150 - 175 )</option>
-                            <option value="30 mic 30 days">30 Mic 30 days ( 300 - 350 )</option>
-                            <option value="normal short id ( 2 levels above ) 15 days">Normal Short ID 15 days</option>
-                            <option value="normal short id ( 2 levels above ) 30 days">Normal Short ID 30 days</option>
-                            <option value="customized short id 15 days">Customized Short ID 15 days</option>
-                            <option value="customized short id 30 days">Customized Short ID 30 days</option>
-                            <option value="room pin-up">Room Pin-up</option>
-                            <option value="welcome package 3">Welcome Package 3</option>
-                            <option value="welcome package 2">Welcome Package 2</option>
-                            <option value="main page banner">Main Page Banner</option>
-                            <option value="news banner">News Banner</option>
-                            <option value="live banner">Live Banner</option>
-                        </select>
+                        <label>Select Privileges</label>
+                        <!-- 🚨 NO MORE <SELECT MULTIPLE>! Sleek toggle grid instead -->
+                        <div id="calcPrivGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+                            <div class="priv-toggle" data-val="trend card" onclick="this.classList.toggle('active')">Trend Card (40-50)</div>
+                            <div class="priv-toggle" data-val="traffic card" onclick="this.classList.toggle('active')">Traffic Card (30-40)</div>
+                            <div class="priv-toggle" data-val="30 mic 15 days" onclick="this.classList.toggle('active')">30 Mic 15 Days (150-175)</div>
+                            <div class="priv-toggle" data-val="30 mic 30 days" onclick="this.classList.toggle('active')">30 Mic 30 Days (300-350)</div>
+                            <div class="priv-toggle" data-val="normal short id" onclick="this.classList.toggle('active')">Normal Short ID</div>
+                            <div class="priv-toggle" data-val="customized short id 15 days" onclick="this.classList.toggle('active')">Custom Short ID 15D</div>
+                            <div class="priv-toggle" data-val="customized short id 30 days" onclick="this.classList.toggle('active')">Custom Short ID 30D</div>
+                            <div class="priv-toggle" data-val="room pin-up" onclick="this.classList.toggle('active')">Room Pin-up (100-150)</div>
+                            <div class="priv-toggle" data-val="welcome package 3" onclick="this.classList.toggle('active')">Welcome Package 3</div>
+                            <div class="priv-toggle" data-val="welcome package 2" onclick="this.classList.toggle('active')">Welcome Package 2</div>
+                            <div class="priv-toggle" data-val="main page banner" onclick="this.classList.toggle('active')">Main Page Banner</div>
+                            <div class="priv-toggle" data-val="news banner" onclick="this.classList.toggle('active')">News Banner</div>
+                            <div class="priv-toggle" data-val="live banner" onclick="this.classList.toggle('active')">Live Banner</div>
+                        </div>
                     </div>
                     
                     <div class="control-group">
@@ -406,13 +419,14 @@
                         </select>
                     </div>
                     
-                    <button class="btn btn-outline" style="width: 100%; margin-top: 10px; border-color: var(--accent-purple); color: var(--accent-purple);" onclick="runAllocatorPreview()">Check Availability & Calculate</button>
+                    <button class="btn-allocator" onclick="runAllocatorPreview()">Check Availability & Calculate</button>
                     
-                    <div style="margin-top: 20px; background: #000; padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; color: var(--text-muted); max-height: 250px; overflow-y: auto;" id="allocatorOutput">Enter details and click calculate to preview the receipt...</div>
+                    <!-- 🚨 PREMIUM RECEIPT BOX DESIGN -->
+                    <div style="margin-top: 20px; background: #0a0b10; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--accent-purple); box-shadow: inset 0 0 20px rgba(0,0,0,0.8); font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; color: var(--text-muted); max-height: 350px; overflow-y: auto;" id="allocatorOutput">Select items above and click calculate to generate receipt...</div>
                 </div>
 
-                <!-- Right: Daily Usage History -->
-                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 550px; overflow-y: auto;">
+                <!-- Right: Daily Usage History (NOW READS LATEST USAGE TRACKER) -->
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 800px; overflow-y: auto;">
                     <h4 style="color: var(--accent-amber); margin-bottom: 16px;">📅 Day-by-Day Point History</h4>
                     <div id="pointsHistoryList"></div>
                 </div>
@@ -697,7 +711,10 @@
                     document.getElementById('queryTypeContainer').style.display = 'block';
                     if(d.is_super_admin || d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
                     if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
-                    if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
+                    if(d.is_super_admin || d.modules.includes('analytics')) {
+                        selector.add(new Option("📊 Agency Data Analyses", "analytics"));
+                    }
+                    
                     toggleViewModes();
                 }
             }).catch(e => console.error(e));
@@ -714,7 +731,6 @@
         return `${y}-${m}-${day}`;
     }
 
-    // 🚨 Safe toggle logic for new Points Area
     function toggleViewModes() {
         const queryTypeElem = document.getElementById('queryType');
         const val = queryTypeElem ? queryTypeElem.value : '';
@@ -1004,19 +1020,27 @@
         }
         document.getElementById('loadingOverlay').style.display = 'none';
         
-        const bp = currentAgencyData.base_points || 0;
-        document.getElementById('displayTargetCoins').innerText = (bp * 100000).toLocaleString() + ' Coins';
         document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
         
-        // 🚨 SHOW APPROPRIATE UI BASED ON QUERY TYPE
+        // 🚨 SHOW APPROPRIATE UI & BANNER BASED ON QUERY TYPE
         const queryType = document.getElementById('queryType').value;
         document.getElementById('privilegeArea').style.display = 'none';
         document.getElementById('pointsArea').style.display = 'none';
         
         if (queryType === 'target') { 
+            const bp = currentAgencyData.base_points || 0;
+            document.getElementById('displayTargetTitle').innerText = 'Current Month Target';
+            document.getElementById('displayTargetCoins').innerText = (bp * 100000).toLocaleString() + ' Coins';
+            document.getElementById('displayTargetCoins').style.color = 'var(--text)'; // Default white
+            
             document.getElementById('privilegeArea').style.display = 'block'; 
             updatePrivilegeGrid(); 
         } else if (queryType === 'points') {
+            const bal = currentAgencyData.point_balance || 0;
+            document.getElementById('displayTargetTitle').innerText = 'Current Available Points';
+            document.getElementById('displayTargetCoins').innerText = bal.toLocaleString() + ' Points';
+            document.getElementById('displayTargetCoins').style.color = 'var(--accent-cyan)'; // Glow cyan
+            
             document.getElementById('pointsArea').style.display = 'block'; 
             updatePointsGrid();
         }
@@ -1060,8 +1084,8 @@
         let historyHtml = '';
         const requests = currentAgencyData.requests || [];
         
-        // Filter out point requests (they usually have quantities or specific privileges attached)
-        const pointReqs = requests.filter(r => r['Agency Point Privilege'] || r['Quantities Input'] || r['Transaction Receipt']);
+        // Filter out point requests
+        const pointReqs = requests.filter(r => r['Agency Point Privilege'] || r['Quantities Input'] || r['Transaction Receipt'] || r['Latest Usage Tracker']);
         
         if (pointReqs.length === 0) {
             historyHtml = '<div style="color:var(--text-muted); padding:10px;">No points usage found this month.</div>';
@@ -1087,31 +1111,50 @@
                 let status = req['Status'] || req['Order Action'] || 'Pending';
                 if (typeof status === 'object') status = status.text || status.name || status;
                 
+                let tracker = req['Latest Usage Tracker'] || req['Latest usage tracker'];
+                if (typeof tracker === 'object') tracker = tracker.text || tracker.name || JSON.stringify(tracker);
+
                 let statusColor = status.toLowerCase().includes('confirm') || status.toLowerCase().includes('done') ? 'var(--accent-green)' : 
                                   status.toLowerCase().includes('reject') ? 'var(--accent-rose)' : 'var(--accent-amber)';
 
+                // 🚨 NEW PARSING: Displays "Items approved in this order: Trend Card: 10" elegantly
+                let itemsDisplay = `<span style="color: var(--text-muted);">${privs || 'Unknown Items'}</span>`;
+                let qtyDisplay = `<span style="color: var(--text-muted);">${qty}</span>`;
+
+                if (tracker && tracker !== 'undefined') {
+                    let cleanTracker = tracker.replace(/Items approved in this order:/i, '').trim();
+                    if (cleanTracker.length > 0) {
+                        qtyDisplay = `<div style="margin-top: 6px; padding: 8px 12px; background: rgba(0,212,255,0.05); border-radius: 6px; border-left: 2px solid var(--accent-cyan); white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; color: var(--accent-cyan);">${cleanTracker}</div>`;
+                        itemsDisplay = `<span style="color: var(--text-muted); font-size: 0.85rem; opacity: 0.7;">(See usage below)</span>`;
+                    }
+                }
+
                 historyHtml += `
-                <div style="background: var(--bg); padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--border);">
-                    <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="color: var(--accent-cyan); font-weight: 600;">${dateStr}</span>
+                <div style="background: var(--bg); padding: 16px; margin-bottom: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                    <div style="display:flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: #fff; font-weight: 600;">🗓️ ${dateStr}</span>
                         <span style="color: ${statusColor}; font-weight: bold; font-size: 0.85rem; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.05);">${status.toUpperCase()}</span>
                     </div>
-                    <div style="font-size: 0.9rem; color: var(--text); margin-bottom: 4px;"><strong>Items:</strong> <span style="color: var(--text-muted);">${privs}</span></div>
-                    <div style="font-size: 0.9rem; color: var(--text);"><strong>Quantities:</strong> <span style="color: var(--text-muted);">${qty}</span></div>
+                    <div style="font-size: 0.9rem; color: var(--text); margin-bottom: 4px;"><strong>Original Request:</strong> <br>${itemsDisplay}</div>
+                    <div style="font-size: 0.9rem; color: var(--text);"><strong>Quantity Allocated:</strong> <br>${qtyDisplay}</div>
                 </div>`;
             });
         }
         document.getElementById('pointsHistoryList').innerHTML = historyHtml;
-        document.getElementById('allocatorOutput').innerText = 'Enter details and click calculate to preview the receipt...';
+        document.getElementById('allocatorOutput').innerText = 'Select items above and click calculate to generate receipt...';
+        
+        // Reset selections
+        document.querySelectorAll('.priv-toggle').forEach(el => el.classList.remove('active'));
+        document.getElementById('calcQty').value = '';
     }
 
     // Triggers the Smart Allocator JS
     function runAllocatorPreview() {
         if (!currentAgencyData) return;
         
-        // Grab the multiple selections
-        const privSelect = document.getElementById('calcPriv');
-        const privInput = Array.from(privSelect.selectedOptions).map(opt => opt.value);
+        // Grab the multiple selections from the new Toggle Grid
+        const activeToggles = document.querySelectorAll('.priv-toggle.active');
+        const privInput = Array.from(activeToggles).map(el => el.getAttribute('data-val'));
         
         const qtyInput = document.getElementById('calcQty').value;
         const target = document.getElementById('calcTarget').value;
