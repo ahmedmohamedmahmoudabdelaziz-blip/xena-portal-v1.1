@@ -570,9 +570,8 @@ def get_analytics():
         closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
 
-        # 🚨 STRICT MATCHING: Guarantees 65 vs 66 count accurately matches Feishu Dashboard
-        is_done = status == "done"
-        is_rejected = status == "rejected"
+        is_done = "done" in status or "complet" in status or "approv" in status
+        is_rejected = "reject" in status or "fail" in status or "decline" in status
 
         acm = acm_in if region == "in" else acm_pk
         if not acm: acm = acm_fallback
@@ -583,16 +582,15 @@ def get_analytics():
         agency_type_title = agency_type.title() if agency_type else "Unknown"
         if type_filter != 'all' and type_filter != agency_type: continue
 
-        # 🚨 STRICT MATCHING ENFORCED
-        is_bd_kpi = req_type == "bd creation"
-        is_closing_kpi = req_type == "closing agency"
-        is_creation_kpi = req_type in [
+        is_bd_kpi = "bd creation" in req_type
+        is_closing_kpi = "closing agency" in req_type
+        is_creation_kpi = any(p in req_type for p in [
             "agency creation",
             "agency applied already by acm or bd link ( follow-up )",
             "agency applied already",
             "follow-up",
             "follow up"
-        ]
+        ])
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
