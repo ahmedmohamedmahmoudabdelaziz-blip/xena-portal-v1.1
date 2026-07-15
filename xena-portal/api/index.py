@@ -38,7 +38,7 @@ ACCESS_TABLE_TTL_SECONDS = 60
 
 _analytics_cache = {}
 _analytics_cache_lock = threading.Lock()
-ANALYTICS_CACHE_TTL_SECONDS = 90  
+ANALYTICS_CACHE_TTL_SECONDS = 20 
 
 def get_tenant_access_token():
     now = time.time()
