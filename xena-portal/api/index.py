@@ -447,7 +447,40 @@ def get_analytics():
         if now.month == 12: to_dt = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         else: to_dt = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    # 🚨 PERFORMANCE UPGRADE: Tells Feishu to ONLY send the necessary columns to save download time.
+    used_fields = [
+        "Submitted on", "Submitted on Copy", "Created Time",
+        "Region", "Agency Region", "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
+        "Request Type", "Request type", "Type", "Category", "Request Category",
+        "Status", "Request Status", "Agency Status", "State",
+        "Agency Type", "Type of Agency",
+        "Closing Reason", "Closing Agencies Reason", "PK Closing Agencies Reason",
+        "Otherapp Name", "Other App Name", "Other Apps",
+        "Create Way", "Creation Type", "Agency Creation Type", "PK Agencies Creation Type",
+        "Reject Reason", "Rejection Reason", "Agencies Rejection Reason", "PK Agencies Rejection reason",
+        "Numbering"
+    ]
+
+    # 🚨 PERFORMANCE UPGRADE: A safe pre-filter that skips downloading old pages.
+    conditions = []
+    if from_dt:
+        safe_from = from_dt - timedelta(days=2) # 2-day timezone padding to ensure 100% accurate data
+        safe_from_ms = int(safe_from.timestamp() * 1000)
+        conditions.append({"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", str(safe_from_ms)]})
+
+    payload_base = {
+        "page_size": 500,
+        "field_names": used_fields,
+        "sort": [{"field_name": "Numbering", "desc": True}]
+    }
+    
+    if conditions:
+        payload_base["filter"] = {
+            "conjunction": "and",
+            "conditions": conditions
+        }
+
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
     all_items = []
     seen_ids = set()
@@ -458,13 +491,13 @@ def get_analytics():
     stop_reason = None
     consecutive_old_pages = 0
 
-    # 🚨 ORIGINAL FETCH LOOP RESTORED (No logic changes)
     for page_num in range(150):
-        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
-        if page_token: params["page_token"] = page_token
+        payload = dict(payload_base)
+        if page_token:
+            payload["page_token"] = page_token
 
         try:
-            res = session.get(base_url, params=params, timeout=12)
+            res = session.post(base_url, json=payload, timeout=12)
             if res.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP Error {res.status_code}: {res.text}"
@@ -566,7 +599,6 @@ def get_analytics():
         closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
         other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
 
-        # 🚨 ORIGINAL FUZZY MATCHING RESTORED (Guarantees exact mapping of your custom tags)
         is_done = "done" in status or "complet" in status or "approv" in status
         is_rejected = "reject" in status or "fail" in status or "decline" in status
 
