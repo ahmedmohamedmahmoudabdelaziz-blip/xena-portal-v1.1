@@ -151,7 +151,7 @@
         .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
         .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
         .stat-value { font-size: 1.5rem; font-weight: 700; }
-        
+
         .health-badge { position: absolute; top: 16px; left: 16px; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; border: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
         .health-Healthy { background: rgba(0,230,118,0.1); color: var(--accent-green); border-color: rgba(0,230,118,0.3); }
         .health-AtRisk { background: rgba(255,184,0,0.1); color: var(--accent-amber); border-color: rgba(255,184,0,0.3); }
@@ -174,13 +174,11 @@
         .insight-panel ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
         .insight-panel li { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
 
-        /* 🚨 PHASE 3: IMPROVED EMPTY STATES (3.4) */
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); border: 1px dashed var(--border); border-radius: var(--radius); background: rgba(255,255,255,0.01); }
         .empty-state svg { width: 80px; height: 80px; fill: var(--border); margin-bottom: 16px; transition: fill 0.3s; }
         .empty-state:hover svg { fill: var(--accent-cyan); }
         .empty-state h3 { color: var(--text); font-size: 1.2rem; margin-bottom: 8px;}
 
-        /* 🚨 PHASE 3: MOBILE RESPONSIVENESS (3.3) */
         @media (max-width: 768px) {
             .app-shell { padding: 12px; }
             .top-bar { flex-direction: column; align-items: stretch; gap: 16px; }
@@ -395,7 +393,6 @@
         </div>
     </div>
 
-    <!-- 🚨 PHASE 3: Enhanced Empty State SVG & UX (3.4) -->
     <div id="initialEmptyState" class="empty-state">
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <h3>Ready to Explore</h3>
@@ -568,23 +565,48 @@
         }
     }
 
-    // 🚨 PHASE 3: KEYBOARD SHORTCUTS & ACCESSIBILITY (3.2)
+    // 🚨 PHASE 4: IDLE SESSION TIMEOUT (4.2)
+    let idleSeconds = 0;
+    const IDLE_WARNING_TIME = 25 * 60; // 25 minutes
+    const IDLE_LOGOUT_TIME = 30 * 60; // 30 minutes
+
+    document.addEventListener('mousemove', () => idleSeconds = 0);
     document.addEventListener('keydown', (e) => {
-        // Ctrl+K or '/' to focus search box safely
+        idleSeconds = 0;
         if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && document.activeElement.tagName !== 'INPUT') { 
             e.preventDefault(); 
             const searchBox = document.getElementById('agencyCode');
             if (searchBox && searchBox.offsetParent !== null) searchBox.focus(); 
         }
-        // Esc to close modal
         if (e.key === 'Escape') closeAdmin();
-        
-        // Enter to trigger search if in input
         if (e.key === 'Enter' && document.activeElement.id === 'agencyCode') {
             e.preventDefault();
             fetchAgencyData();
         }
     });
+
+    // 🚨 PHASE 4: SESSION TIMERS & ABSOLUTE EXPIRATION
+    setInterval(() => {
+        let uat = localStorage.getItem('xenaUat');
+        if (!uat) return; 
+
+        idleSeconds++;
+
+        if (idleSeconds === IDLE_WARNING_TIME) {
+            ToastManager.show("Your session will expire in 5 minutes due to inactivity.", "warning");
+        }
+        if (idleSeconds >= IDLE_LOGOUT_TIME) {
+            logout();
+        }
+
+        const loginTimestamp = localStorage.getItem('xenaLoginTimestamp');
+        if (loginTimestamp) {
+            const elapsedHours = (Date.now() - parseInt(loginTimestamp)) / (1000 * 60 * 60);
+            if (elapsedHours > 8) {
+                logout(); 
+            }
+        }
+    }, 1000);
 
     function toggleSkeletons(show, type) {
         if(show) {
@@ -810,6 +832,10 @@
         localStorage.setItem('xenaUser', loggedUser);
         localStorage.setItem('xenaEmail', loggedEmail);
         localStorage.setItem('xenaUat', loggedUat);
+        
+        // 🚨 PHASE 4: Establish Session Creation Time
+        localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
+        
         window.history.replaceState({}, document.title, "/");
     }
 
@@ -866,7 +892,7 @@
         if (val) {
             document.getElementById('standardSearchParams').style.display = isAna ? 'none' : 'flex';
             document.getElementById('analyticsParams').style.display = isAna ? 'block' : 'none';
-            document.getElementById('initialEmptyState').style.display = 'none'; // Clear empty state once selected
+            document.getElementById('initialEmptyState').style.display = 'none'; 
         } else {
             document.getElementById('standardSearchParams').style.display = 'none';
             document.getElementById('analyticsParams').style.display = 'none';
@@ -1075,7 +1101,7 @@
     
     async function deleteAgent(recordId) {
         if(!confirm("Are you sure you want to remove this agent's access?")) return;
-        try { await fetch(`/api/admin/users?id=${recordId}`, { method: 'DELETE', headers: { 'X-User-Name': loggedUser } }); ToastManager.show("Agent removed successfully", "success"); fetchAdminUsers(); } catch (e) { ToastManager.show("Error removing agent.", "error"); }
+        try { await fetch(`/api/admin/users?id=${recordId}`, { method: 'DELETE', headers: { 'X-User-Name': loggedUser } }); ToastManager.show("Agent removed.", "success"); fetchAdminUsers(); } catch (e) { ToastManager.show("Error removing agent.", "error"); }
     }
 
     async function generateAnalytics() {
@@ -1087,11 +1113,22 @@
         const fromDate = document.getElementById('anaFrom').value;
         const toDate = document.getElementById('anaTo').value;
 
-        const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
+        // 🚨 PHASE 4: SECURE POST REQUEST IMPLEMENTATION (Hides Tokens from URL)
+        const payload = {
+            user: loggedUser,
+            email: loggedEmail,
+            uat: loggedUat,
+            region: region,
+            acm: acm,
+            type: type,
+            from: fromDate,
+            to: toDate
+        };
+        
+        const cacheKey = JSON.stringify(payload);
 
-        if (pendingRequests.has(url)) {
-            console.log("Request already in flight, deduplicating...");
-            return pendingRequests.get(url);
+        if (pendingRequests.has(cacheKey)) {
+            return pendingRequests.get(cacheKey);
         }
 
         document.getElementById('loadingOverlay').style.display = 'flex';
@@ -1103,18 +1140,31 @@
             const btn = document.getElementById('btnGenAna');
             const origText = btn.innerText; btn.innerText = "⏳ Fetching Feishu Data..."; btn.disabled = true;
 
-            const requestPromise = fetch(url);
-            pendingRequests.set(url, requestPromise);
+            const requestPromise = fetch('/api/analytics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            pendingRequests.set(cacheKey, requestPromise);
             const res = await requestPromise;
-            pendingRequests.delete(url);
+            pendingRequests.delete(cacheKey);
 
             const textResponse = await res.text();
             let data;
-            try { data = JSON.parse(textResponse); } catch (jsonErr) { throw new Error("Feishu API timeout. Try a smaller date range."); }
-            if (!res.ok) throw new Error(data.error || 'Unknown error');
+            try { 
+                data = JSON.parse(textResponse); 
+            } catch (jsonErr) { 
+                throw new Error("Feishu server timeout. Try a smaller date range."); 
+            }
+            if (!res.ok) throw new Error(data.error || 'Unknown API error');
 
             latestAnalyticsData = data; 
             btn.innerText = origText; btn.disabled = false;
+
+            if (data.scanned_rows > 0 && data.kpis.creations === 0) {
+                ToastManager.show(`Column Mismatch Warning! Checked ${data.scanned_rows} records.`, "warning");
+            }
 
             document.getElementById('kpiCreations').innerText = data.kpis.creations.toLocaleString();
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
@@ -1134,7 +1184,7 @@
             document.getElementById('analyticsContainer').style.display = 'none';
             ToastManager.show(err.message, "error");
             document.getElementById('btnGenAna').innerText = "Generate Analytics Report"; document.getElementById('btnGenAna').disabled = false;
-            pendingRequests.delete(url);
+            pendingRequests.delete(cacheKey);
         }
         document.getElementById('loadingOverlay').style.display = 'none';
     }
@@ -1207,8 +1257,6 @@
             let labels = sortedEntries.map(e => e[0]);
             let dataValues = sortedEntries.map(e => e[1]);
             if (sortedEntries.length === 0) { labels = ["No Data"]; dataValues = [1]; }
-            
-            // 🚨 PHASE 3: Ensure "No Data" states look clean
             charts[id] = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: dataValues, backgroundColor: sortedEntries.length ? PALETTE : ['#2a2c3f'], borderWidth: 0, hoverOffset: 8 }] }, options: isRejectChart ? pieOptsReject : pieOpts });
         };
 
@@ -1282,7 +1330,22 @@
             const origText = btn.innerText; btn.innerText = "⏳ Searching..."; btn.disabled = true;
 
             const currentType = document.getElementById('queryType').value;
-            const res = await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=${currentType}`);
+            
+            // 🚨 PHASE 4: SECURE POST REQUEST IMPLEMENTATION (Hides Tokens from URL)
+            const payload = {
+                code: code,
+                user: loggedUser,
+                email: loggedEmail,
+                uat: loggedUat,
+                type: currentType
+            };
+            
+            const res = await fetch(`/api/search`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
             const data = await res.json();
             if (!res.ok) throw new Error(data.error); currentAgencyData = data;
 
