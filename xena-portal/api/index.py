@@ -134,18 +134,13 @@ def parse_feishu_date(date_val):
 def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
-# =============================================================================
-# 🚨 GRANULAR PERMISSIONS PARSER 
-# =============================================================================
 def parse_granular_string(raw_str):
     default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     if not raw_str or str(raw_str).strip() == "": return default
-    
     if "=" not in raw_str:
         parts = [x.strip().lower() for x in raw_str.split(",") if x.strip()]
         if not parts: parts = ["all"]
         return {"target": parts, "points": parts, "analytics": parts}
-    
     res = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     for chunk in raw_str.split(";"):
         if "=" in chunk:
@@ -156,20 +151,13 @@ def parse_granular_string(raw_str):
             if mod in res: res[mod] = val_list
     return res
 
-# =============================================================================
-# 🚨 BULLETPROOF ACCESS CONTROL (PYTHON-SIDE MATCHING)
-# =============================================================================
 def get_user_permissions(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
-    
     if any(admin in name_clean for admin in ADMIN_USERS):
         return {
             "is_super_admin": True, "modules": ["target", "points", "analytics", "admin"], 
-            "permissions": {
-                "acms": {"target": ["all"], "points": ["all"], "analytics": ["all"]},
-                "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"]}
-            }
+            "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"]}, "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"]}}
         }
 
     if not email_clean and not name_clean: 
@@ -182,7 +170,6 @@ def get_user_permissions(email, name):
     try:
         res = requests.get(url, headers=headers, params={"page_size": 500}, timeout=10).json()
         items = res.get("data", {}).get("items", [])
-        
         for item in items:
             fields = item.get("fields", {})
             db_email = extract_field_text(fields.get("Email", "")).lower()
@@ -204,14 +191,9 @@ def get_user_permissions(email, name):
                 parsed_regions = parse_granular_string(regions_raw)
                 
                 return {
-                    "is_super_admin": is_admin, 
-                    "modules": modules, 
-                    "permissions": {
-                        "acms": parsed_acms,
-                        "regions": parsed_regions
-                    }
+                    "is_super_admin": is_admin, "modules": modules, 
+                    "permissions": {"acms": parsed_acms, "regions": parsed_regions}
                 }
-                
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
     except Exception as e:
         print("Auth Error:", str(e))
@@ -248,7 +230,6 @@ def callback():
     data = info_resp.get("data", {})
     lark_name = data.get("name", "Unknown User")
     lark_email = data.get("email") or data.get("enterprise_email") or "" 
-    
     return redirect(f"/?user={urllib.parse.quote(lark_name)}&email={urllib.parse.quote(lark_email)}&uat={user_access_token}")
 
 @app.route('/api/auth/me', methods=['GET'])
@@ -258,13 +239,9 @@ def check_auth():
     perms = get_user_permissions(email, username)
     return jsonify(perms)
 
-# =============================================================================
-# 🚨 ADMIN PANEL ROUTES 
-# =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
     admin_name = request.headers.get('X-User-Name', '').lower()
-    
     is_authorized = any(admin in admin_name for admin in ADMIN_USERS)
     if not is_authorized:
         perms = get_user_permissions("", admin_name)
@@ -296,37 +273,29 @@ def manage_users():
     elif request.method == 'POST':
         data = request.json
         email_to_check = data.get("email", "").strip()
-        
         acms_formatted = f"target={data.get('acms', {}).get('target', 'all')};points={data.get('acms', {}).get('points', 'all')};analytics={data.get('acms', {}).get('analytics', 'all')}"
         regs_formatted = f"target={data.get('regions', {}).get('target', 'all')};points={data.get('regions', {}).get('points', 'all')};analytics={data.get('regions', {}).get('analytics', 'all')}"
 
         payload = {
             "fields": {
-                "Email": email_to_check, 
-                "Modules": data.get("modules", ""), 
-                "ACMs": acms_formatted, 
-                "Regions": regs_formatted
+                "Email": email_to_check, "Modules": data.get("modules", ""), 
+                "ACMs": acms_formatted, "Regions": regs_formatted
             }
         }
-        
         res_all = requests.get(base_url, headers=headers, params={"page_size": 500}).json()
         existing_record_id = None
         for item in res_all.get("data", {}).get("items", []):
             db_email = extract_field_text(item.get("fields", {}).get("Email", "")).lower().strip()
             db_person = extract_field_text(item.get("fields", {}).get("Person", "")).lower().strip()
             target_check = email_to_check.lower().strip()
-            
             if target_check and (target_check == db_email or target_check == db_person):
                 existing_record_id = item["record_id"]
                 break
         
-        if existing_record_id:
-            res = requests.put(f"{base_url}/{existing_record_id}", headers=headers, json=payload).json()
-        else:
-            res = requests.post(base_url, headers=headers, json=payload).json()
+        if existing_record_id: res = requests.put(f"{base_url}/{existing_record_id}", headers=headers, json=payload).json()
+        else: res = requests.post(base_url, headers=headers, json=payload).json()
         
-        if res.get("code") != 0:
-            return jsonify({"success": False, "error": res.get("msg")}), 400
+        if res.get("code") != 0: return jsonify({"success": False, "error": res.get("msg")}), 400
         return jsonify({"success": True})
 
     elif request.method == 'DELETE':
@@ -370,10 +339,8 @@ def search_agency():
     sheet_acm_name = extract_field_text(get_field_local(fields, 'Acm Name (PK)', 'Acm Name (IN)', 'Acm', 'Assigned Member')).strip()
     
     if region in ('', 'none'):
-        if sheet_acm_name.lower() in PK_ACMS:
-            region = 'pk'
-        elif sheet_acm_name.lower() in IN_ACMS:
-            region = 'in'
+        if sheet_acm_name.lower() in PK_ACMS: region = 'pk'
+        elif sheet_acm_name.lower() in IN_ACMS: region = 'in'
     
     allowed_regs = perms.get("permissions", {}).get("regions", {}).get(inquiry_type, ["all"])
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get(inquiry_type, ["all"])
@@ -385,7 +352,7 @@ def search_agency():
     if "all" not in allowed_acms and sheet_acm_name.lower() not in allowed_acms:
         return jsonify({"error": f"Access Denied: You are not authorized to view data for ACM: {sheet_acm_name}"}), 403
 
-    # 🚨 UPDATED: Robust Point Extraction with Mathematical Fallback
+    # 🚨 POINTS SYSTEM EXTRACTION (With Mathematical Fallback)
     try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
     try: total_points = float(extract_field_text(get_field_local(fields, '# Total Points', 'Total Points', 'Total', 'Total points')).replace(',', '').strip())
@@ -395,7 +362,7 @@ def search_agency():
     try: point_balance = float(extract_field_text(get_field_local(fields, 'Point Balance', 'Balance', 'Point balance')).replace(',', '').strip())
     except ValueError: point_balance = 0
     
-    # Mathematical Safety Net (Fixes the formula extraction issue where Balance shows 0)
+    # Solves Feishu Formula Hiding Bug (Guarantees Balance is Accurate)
     if point_balance == 0 and total_points > 0:
         point_balance = total_points - used_points
     
@@ -451,8 +418,7 @@ def get_analytics():
         return jsonify({"error": f"Access Denied: You lack permissions for Region: {region_filter.upper()}."}), 403
 
     acm_filter = request.args.get('acm', 'All').strip().lower()
-    if acm_filter == 'hasseb': 
-        acm_filter = 'haseeb'
+    if acm_filter == 'hasseb': acm_filter = 'haseeb'
         
     type_filter = request.args.get('type', 'All').strip().lower()
     date_from = request.args.get('from', '').strip()
@@ -576,8 +542,7 @@ def get_analytics():
         acm_fallback = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
         
         if region in ('', 'none'):
-            if acm_pk in PK_ACMS or acm_fallback in PK_ACMS:
-                region = 'pk'
+            if acm_pk in PK_ACMS or acm_fallback in PK_ACMS: region = 'pk'
 
         if region_filter != 'all' and region != region_filter: continue
 
@@ -601,20 +566,12 @@ def get_analytics():
 
         is_bd_kpi = "bd creation" in req_type
         is_closing_kpi = "closing agency" in req_type
-        is_creation_kpi = any(p in req_type for p in [
-            "agency creation",
-            "agency applied already by acm or bd link ( follow-up )",
-            "agency applied already",
-            "follow-up",
-            "follow up"
-        ])
+        is_creation_kpi = any(p in req_type for p in ["agency creation", "agency applied already by acm or bd link ( follow-up )", "agency applied already", "follow-up", "follow up"])
 
         if is_done and record_dt:
             date_str = record_dt.strftime("%Y-%m-%d")
-            if is_creation_kpi and date_str in stats["daily_trend_creation"]:
-                stats["daily_trend_creation"][date_str] += 1
-            if is_bd_kpi and date_str in stats["daily_trend_bd"]:
-                stats["daily_trend_bd"][date_str] += 1
+            if is_creation_kpi and date_str in stats["daily_trend_creation"]: stats["daily_trend_creation"][date_str] += 1
+            if is_bd_kpi and date_str in stats["daily_trend_bd"]: stats["daily_trend_bd"][date_str] += 1
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
@@ -627,12 +584,9 @@ def get_analytics():
                 stats["closing_reasons_pie"][cr_title] = stats["closing_reasons_pie"].get(cr_title, 0) + 1
                 if acm:
                     clean_acm = acm.title()
-                    if clean_acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
-                    if "user" in closing_reason:
-                        stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
-                    elif "dup" in closing_reason:
-                        stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
+                    if clean_acm not in stats["acm_closing_reasons"]: stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    if "user" in closing_reason: stats["acm_closing_reasons"][clean_acm]["User Request"] += 1
+                    elif "dup" in closing_reason: stats["acm_closing_reasons"][clean_acm]["Duplicated Hosting"] += 1
 
         elif is_bd_kpi:
             stats["kpis"]["bds"] += 1
