@@ -273,6 +273,9 @@ def check_auth():
     perms = get_user_permissions(email, username)
     return jsonify(perms)
 
+# =============================================================================
+# 🚨 ADMIN PANEL ROUTES 
+# =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
     admin_name = request.headers.get('X-User-Name', '').lower()
@@ -418,6 +421,24 @@ def search_agency():
     if point_balance == 0 and total_points > 0:
         point_balance = total_points - used_points
     
+    # 🚨 PHASE 5 Support: Health Score Logic
+    health_score = 100
+    health_status = "Healthy"
+    if total_points > 0:
+        utilization = used_points / total_points
+        if utilization > 0.90: 
+            health_score = 40
+            health_status = "Critical"
+        elif utilization > 0.70: 
+            health_score = 70
+            health_status = "At Risk"
+        else: 
+            health_score = 95
+            health_status = "Healthy"
+    else: 
+        health_score = 0
+        health_status = "Inactive"
+        
     monthly_tracker = extract_field_text(get_field_local(fields, 'Monthly Usage Tracker', 'Monthly Usage', 'Usage Tracker', 'Latest Usage Tracker'))
 
     req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
@@ -437,6 +458,8 @@ def search_agency():
         "total_points": total_points,
         "used_points": used_points,
         "point_balance": point_balance,
+        "health_score": health_score,
+        "health_status": health_status,
         "monthly_tracker": monthly_tracker,
         "requests": valid_requests, 
         "acm": sheet_acm_name.title(), 
@@ -446,7 +469,6 @@ def search_agency():
 # 🚨 PHASE 4: POST Route Support (Hides tokens from Vercel URL Logs)
 @app.route('/api/analytics', methods=['GET', 'POST'])
 def get_analytics():
-    # Safely handle both GET and POST requests dynamically
     req_data = request.json if request.method == 'POST' else request.args
     
     username = req_data.get('user', '').lower()
