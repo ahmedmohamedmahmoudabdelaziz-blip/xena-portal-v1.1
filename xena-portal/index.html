@@ -379,7 +379,7 @@
             </div>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-                <!-- Left: Smart Allocator Calculator (PREMIUM UI UPGRADE) -->
+                <!-- Left: Smart Allocator Calculator -->
                 <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px;">
                     <h4 style="color: var(--accent-cyan); margin-bottom: 16px;">🤖 Smart Allocator Preview</h4>
                     
@@ -422,7 +422,7 @@
                     <div style="margin-top: 20px; background: #0a0b10; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--accent-purple); box-shadow: inset 0 0 20px rgba(0,0,0,0.8); font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); max-height: 350px; overflow-y: auto;" id="allocatorOutput">Select items above and click calculate to generate receipt...</div>
                 </div>
 
-                <!-- Right: Daily Usage History (NOW FORMATS DATA BEAUTIFULLY) -->
+                <!-- Right: Daily Usage History (NOW FORMATS MULTIPLE ITEMS & REJECTIONS) -->
                 <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 800px; overflow-y: auto;">
                     <h4 style="color: var(--accent-amber); margin-bottom: 16px;">📅 Day-by-Day Point History</h4>
                     <div id="pointsHistoryList"></div>
@@ -708,7 +708,10 @@
                     document.getElementById('queryTypeContainer').style.display = 'block';
                     if(d.is_super_admin || d.modules.includes('target')) selector.add(new Option("Agency Target Privilege", "target"));
                     if(d.is_super_admin || d.modules.includes('points')) selector.add(new Option("Agency Points System", "points"));
-                    if(d.is_super_admin || d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses", "analytics"));
+                    if(d.is_super_admin || d.modules.includes('analytics')) {
+                        selector.add(new Option("📊 Agency Data Analyses", "analytics"));
+                    }
+                    
                     toggleViewModes();
                 }
             }).catch(e => console.error(e));
@@ -1155,15 +1158,26 @@
                 // 🚨 DYNAMIC RECEIPT GENERATOR FOR LATEST USAGE TRACKER
                 let allocationHtml = '';
                 if (trackerRaw && trackerRaw !== 'undefined' && trackerRaw.trim() !== '') {
-                    if (trackerRaw.toLowerCase().includes('items approved')) {
+                    
+                    // Explicitly catch the Rejected logic you requested
+                    if (trackerRaw.toLowerCase().includes('no items approved')) {
+                        allocationHtml = `
+                        <div style="margin-top: 12px; padding: 12px; background: rgba(255,77,109,0.05); border-radius: 8px; border: 1px solid rgba(255,77,109,0.2);">
+                            <div style="color: var(--accent-rose); font-weight: 600;">❌ No items approved in this order.</div>
+                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">0 Points Deducted</div>
+                        </div>`;
+                        qtyHtml = `<span style="color: var(--accent-rose);">Rejected (0)</span>`;
+                        
+                    } else if (trackerRaw.toLowerCase().includes('items approved')) {
                         let lines = trackerRaw.split('\n');
                         let totalPointsDeducted = 0;
                         let allocatedItemsHtml = [];
                         
                         lines.forEach(line => {
-                            if (line.includes(':')) {
+                            // Ensure we skip the header line itself
+                            if (line.includes(':') && !line.toLowerCase().includes('items approved')) {
                                 let parts = line.split(':');
-                                let itemName = parts[0].replace(/[🔹📋🌟【】]/g, '').trim();
+                                let itemName = parts[0].replace(/[🔹📋🌟【】\-]/g, '').trim();
                                 let itemQty = parseInt(parts[1].trim());
                                 
                                 if (!isNaN(itemQty)) {
@@ -1171,7 +1185,7 @@
                                     let price = rule ? (isOther ? rule.other : rule.same) : 0;
                                     let cost = price * itemQty;
                                     totalPointsDeducted += cost;
-                                    allocatedItemsHtml.push(`🔹 ${itemName}: ${itemQty} <span style="color:var(--text-muted);font-size:0.8rem;">(@ ${price} pts = ${cost} pts)</span>`);
+                                    allocatedItemsHtml.push(`🔹 ${itemName}: <span style="color:#fff; font-weight:bold;">${itemQty}</span> <span style="color:var(--text-muted);font-size:0.8rem;">(@ ${price} pts = ${cost} pts)</span>`);
                                 }
                             }
                         });
@@ -1179,9 +1193,9 @@
                         if (allocatedItemsHtml.length > 0) {
                             allocationHtml = `
                             <div style="margin-top: 12px; padding: 12px; background: rgba(0,212,255,0.05); border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);">
-                                <div style="font-weight:600; color:var(--accent-cyan); margin-bottom:6px;">Items Approved & Deducted:</div>
-                                ${allocatedItemsHtml.join('<br>')}
-                                <div style="margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; color: var(--accent-rose); font-weight: bold;">
+                                <div style="font-weight:600; color:var(--accent-cyan); margin-bottom:8px;">✅ Items Approved & Deducted:</div>
+                                <div style="line-height: 1.8;">${allocatedItemsHtml.join('<br>')}</div>
+                                <div style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px; color: var(--accent-rose); font-weight: bold; font-size: 0.95rem;">
                                     💰 Total Deducted: ${totalPointsDeducted} Points
                                 </div>
                             </div>`;
