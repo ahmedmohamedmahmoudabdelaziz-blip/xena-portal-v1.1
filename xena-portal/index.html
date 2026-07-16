@@ -936,6 +936,7 @@ let loggedEmail=localStorage.getItem('xenaEmail');
 let loggedUat=localStorage.getItem('xenaUat');
 let pendingRequests=new Map();  // 2.3 deduplication
 let activeFilters={};           // 1.2 cross-filter state
+let sparkCharts={};             // 1.3 sparkline chart instances
 let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg;
 
 // Restore from URL (8.2 deep linking)
@@ -1456,7 +1457,6 @@ async function generateAnalytics() {
 // ════════════════════════════════════════════════════════════════════
 // 1.3  SPARKLINES & DELTA BADGES
 // ════════════════════════════════════════════════════════════════════
-const sparkCharts={};
 function drawSparkline(canvasId, dataObj, color) {
     const canvas=document.getElementById(canvasId);
     if (!canvas) return;
