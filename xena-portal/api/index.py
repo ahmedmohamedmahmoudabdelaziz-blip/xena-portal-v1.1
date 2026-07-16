@@ -2,6 +2,7 @@ import os
 import time
 import urllib.parse
 import logging
+import json
 import re
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
@@ -9,13 +10,27 @@ from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 
-# 🚨 PHASE 1: Structured Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [XenaPortal] - %(message)s')
-logger = logging.getLogger(__name__)
+# 🚨 PHASE 4: Native Structured JSON Logging
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "message": record.getMessage()
+        }
+        return json.dumps(log_record)
 
-# 🚨 PHASE 1: Native In-Memory Caching (100% Crash-Proof on Vercel)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+logger.propagate = False
+
+# 🚨 PHASE 1: Native In-Memory Caching
 api_cache = {}
-CACHE_TTL = 300  # 5 minutes
+CACHE_TTL_SECONDS = 300  # 5 minutes
 
 # --- SECURE CONFIGURATION ---
 APP_ID = os.environ.get("LARK_APP_ID")
@@ -24,14 +39,9 @@ REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
 BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
-
-# 🚨 ACCESS MANAGEMENT TABLE ID
 ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 
-# 🚨 ONLY YOU ARE MASTER ADMIN NOW. Everyone else must be added via the Website Admin Panel.
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
-
-# ACM Lists for auto-detecting blank regions
 PK_ACMS = ["nabeel", "hasseb", "haseeb", "enzo", "farooq", "mubeen", "cruz", "ehtisham", "usama", "sehar ch", "hamza malik", "zohaib", "eagle", "leo", "berlin"]
 IN_ACMS = ["holy", "vihan", "shivam", "ravikant", "ansh", "rocky", "bella"]
 
@@ -142,9 +152,6 @@ def parse_feishu_date(date_val):
 def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
-# =============================================================================
-# 🚨 GRANULAR PERMISSIONS PARSER 
-# =============================================================================
 def parse_granular_string(raw_str):
     default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     if not raw_str or str(raw_str).strip() == "": return default
@@ -164,9 +171,6 @@ def parse_granular_string(raw_str):
             if mod in res: res[mod] = val_list
     return res
 
-# =============================================================================
-# 🚨 BULLETPROOF ACCESS CONTROL (PYTHON-SIDE MATCHING)
-# =============================================================================
 def get_user_permissions(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
@@ -222,7 +226,7 @@ def get_user_permissions(email, name):
                 
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
     except Exception as e:
-        print("Auth Error:", str(e))
+        logger.error(f"Auth Error: {str(e)}")
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
 @app.route('/', methods=['GET'])
@@ -257,6 +261,9 @@ def callback():
     lark_name = data.get("name", "Unknown User")
     lark_email = data.get("email") or data.get("enterprise_email") or "" 
     
+    # Secure logging of login event
+    logger.info(f"USER_LOGIN: {lark_name}")
+    
     return redirect(f"/?user={urllib.parse.quote(lark_name)}&email={urllib.parse.quote(lark_email)}&uat={user_access_token}")
 
 @app.route('/api/auth/me', methods=['GET'])
@@ -266,9 +273,6 @@ def check_auth():
     perms = get_user_permissions(email, username)
     return jsonify(perms)
 
-# =============================================================================
-# 🚨 ADMIN PANEL ROUTES 
-# =============================================================================
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
     admin_name = request.headers.get('X-User-Name', '').lower()
@@ -305,7 +309,6 @@ def manage_users():
         data = request.json
         email_to_check = data.get("email", "").strip()
         
-        # 🚨 PHASE 1: Audit Logging
         logger.info(f"AUDIT LOG: Admin '{admin_name}' updated permissions for user '{email_to_check}'")
         
         acms_formatted = f"target={data.get('acms', {}).get('target', 'all')};points={data.get('acms', {}).get('points', 'all')};analytics={data.get('acms', {}).get('analytics', 'all')}"
@@ -342,24 +345,24 @@ def manage_users():
 
     elif request.method == 'DELETE':
         record_id = request.args.get('id')
-        
-        # 🚨 PHASE 1: Audit Logging
         logger.info(f"AUDIT LOG: Admin '{admin_name}' deleted user record ID '{record_id}'")
-        
         res = requests.delete(f"{base_url}/{record_id}", headers=headers).json()
         return jsonify({"success": res.get("code") == 0})
 
-@app.route('/api/search', methods=['GET'])
+# 🚨 PHASE 4: POST Route Support (Hides tokens from Vercel URL Logs)
+@app.route('/api/search', methods=['GET', 'POST'])
 def search_agency():
-    username = request.args.get('user', '')
-    email = request.args.get('email', '')
-    agency_code = request.args.get('code')
-    uat = request.args.get('uat', '')
-    inquiry_type = request.args.get('type', 'target').strip().lower()
+    # Safely handle both GET and POST requests dynamically
+    req_data = request.json if request.method == 'POST' else request.args
+    
+    username = req_data.get('user', '')
+    email = req_data.get('email', '')
+    agency_code = req_data.get('code')
+    uat = req_data.get('uat', '')
+    inquiry_type = req_data.get('type', 'target').strip().lower()
 
     if not uat: return jsonify({"error": "Unauthorized session."}), 401
     
-    # 🚨 PHASE 1: Input Sanitization
     if not agency_code or not re.match(r'^\d+$', str(agency_code)): 
         return jsonify({"error": "Invalid agency code format. Numbers only."}), 400
 
@@ -440,11 +443,16 @@ def search_agency():
         "role": "Verified by Feishu"
     })
 
-@app.route('/api/analytics', methods=['GET'])
+# 🚨 PHASE 4: POST Route Support (Hides tokens from Vercel URL Logs)
+@app.route('/api/analytics', methods=['GET', 'POST'])
 def get_analytics():
-    username = request.args.get('user', '').lower()
-    email = request.args.get('email', '')
-    uat = request.args.get('uat', '')
+    # Safely handle both GET and POST requests dynamically
+    req_data = request.json if request.method == 'POST' else request.args
+    
+    username = req_data.get('user', '').lower()
+    email = req_data.get('email', '')
+    uat = req_data.get('uat', '')
+    
     if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
     
     perms = get_user_permissions(email, username)
@@ -454,7 +462,7 @@ def get_analytics():
     allowed_regs = perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"])
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
 
-    region_filter = request.args.get('region', 'PK').strip().lower()
+    region_filter = req_data.get('region', 'PK').strip().lower()
     if not region_filter: region_filter = 'pk'
     
     if region_filter == 'all' and "all" not in allowed_regs:
@@ -462,19 +470,17 @@ def get_analytics():
     if region_filter != 'all' and "all" not in allowed_regs and region_filter not in allowed_regs:
         return jsonify({"error": f"Access Denied: You lack permissions for Region: {region_filter.upper()}."}), 403
 
-    acm_filter = request.args.get('acm', 'All').strip().lower()
+    acm_filter = req_data.get('acm', 'All').strip().lower()
     if acm_filter == 'hasseb': 
         acm_filter = 'haseeb'
         
-    type_filter = request.args.get('type', 'All').strip().lower()
-    date_from = request.args.get('from', '').strip()
-    date_to = request.args.get('to', '').strip()
+    type_filter = req_data.get('type', 'All').strip().lower()
+    date_from = req_data.get('from', '').strip()
+    date_to = req_data.get('to', '').strip()
 
-    # 🚨 PHASE 1: NATIVE CACHING CHECK (No Vercel timeouts!)
     cache_key = f"analytics:{region_filter}:{acm_filter}:{type_filter}:{date_from}:{date_to}"
     now_time = time.time()
-    if cache_key in api_cache and (now_time - api_cache[cache_key]['time']) < CACHE_TTL:
-        logger.info(f"Serving cached analytics for {cache_key}")
+    if cache_key in api_cache and (now_time - api_cache[cache_key]['time']) < CACHE_TTL_SECONDS:
         return jsonify(api_cache[cache_key]['data'])
 
     tat = get_tenant_access_token()
@@ -573,7 +579,7 @@ def get_analytics():
         "acm_closing_reasons": {}, 
         "daily_trend_creation": {},  
         "daily_trend_bd": {},  
-        "daily_trend_closing": {}, # 🚨 PHASE 2: Sparkline fix for Total Closings      
+        "daily_trend_closing": {},      
         "other_request_types": {}, "scanned_rows": len(all_items),
         "error_debug": error_msg, "feishu_keys": sample_keys,
         "fetch_complete": fetch_complete, "stop_reason": stop_reason
@@ -585,7 +591,7 @@ def get_analytics():
             date_str = cur.strftime("%Y-%m-%d")
             stats["daily_trend_creation"][date_str] = 0
             stats["daily_trend_bd"][date_str] = 0
-            stats["daily_trend_closing"][date_str] = 0 # 🚨 Added to complete sparkline data
+            stats["daily_trend_closing"][date_str] = 0
             cur += timedelta(days=1)
 
     for item in all_items:
@@ -644,7 +650,6 @@ def get_analytics():
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
             
-            # 🚨 PHASE 2: Track Daily Closings for the Sparkline
             if is_done and record_dt:
                 date_str = record_dt.strftime("%Y-%m-%d")
                 if date_str in stats["daily_trend_closing"]:
@@ -710,7 +715,7 @@ def get_analytics():
     stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
     stats["daily_trend_creation"] = dict(sorted(stats["daily_trend_creation"].items()))
     stats["daily_trend_bd"] = dict(sorted(stats["daily_trend_bd"].items()))
-    stats["daily_trend_closing"] = dict(sorted(stats["daily_trend_closing"].items())) # 🚨 Sorting the new closing array
+    stats["daily_trend_closing"] = dict(sorted(stats["daily_trend_closing"].items()))
     stats["creation_types"] = dict(sorted(stats["creation_types"].items(), key=lambda x: x[1], reverse=True))
     stats["agency_types"] = dict(sorted(stats["agency_types"].items(), key=lambda x: x[1], reverse=True))
     stats["other_request_types"] = dict(sorted(stats["other_request_types"].items(), key=lambda x: x[1], reverse=True))
