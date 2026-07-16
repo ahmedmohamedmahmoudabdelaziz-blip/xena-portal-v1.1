@@ -2,6 +2,7 @@ import os
 import time
 import urllib.parse
 import logging
+import re
 from flask import Flask, request, jsonify, send_file, redirect
 import requests
 from datetime import datetime, timedelta, timezone
@@ -304,6 +305,7 @@ def manage_users():
         data = request.json
         email_to_check = data.get("email", "").strip()
         
+        # 🚨 PHASE 1: Audit Logging
         logger.info(f"AUDIT LOG: Admin '{admin_name}' updated permissions for user '{email_to_check}'")
         
         acms_formatted = f"target={data.get('acms', {}).get('target', 'all')};points={data.get('acms', {}).get('points', 'all')};analytics={data.get('acms', {}).get('analytics', 'all')}"
@@ -340,7 +342,10 @@ def manage_users():
 
     elif request.method == 'DELETE':
         record_id = request.args.get('id')
+        
+        # 🚨 PHASE 1: Audit Logging
         logger.info(f"AUDIT LOG: Admin '{admin_name}' deleted user record ID '{record_id}'")
+        
         res = requests.delete(f"{base_url}/{record_id}", headers=headers).json()
         return jsonify({"success": res.get("code") == 0})
 
@@ -354,8 +359,8 @@ def search_agency():
 
     if not uat: return jsonify({"error": "Unauthorized session."}), 401
     
-    # 🚨 PHASE 1: Safe Input Sanitization
-    if not agency_code or not str(agency_code).strip().isdigit(): 
+    # 🚨 PHASE 1: Input Sanitization
+    if not agency_code or not re.match(r'^\d+$', str(agency_code)): 
         return jsonify({"error": "Invalid agency code format. Numbers only."}), 400
 
     perms = get_user_permissions(email, username)
@@ -465,7 +470,7 @@ def get_analytics():
     date_from = request.args.get('from', '').strip()
     date_to = request.args.get('to', '').strip()
 
-    # 🚨 PHASE 1: Native Cached Analytics
+    # 🚨 PHASE 1: NATIVE CACHING CHECK (No Vercel timeouts!)
     cache_key = f"analytics:{region_filter}:{acm_filter}:{type_filter}:{date_from}:{date_to}"
     now_time = time.time()
     if cache_key in api_cache and (now_time - api_cache[cache_key]['time']) < CACHE_TTL:
@@ -639,7 +644,7 @@ def get_analytics():
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
             
-            # 🚨 PHASE 2: Track Daily Closings for the Sparkline!
+            # 🚨 PHASE 2: Track Daily Closings for the Sparkline
             if is_done and record_dt:
                 date_str = record_dt.strftime("%Y-%m-%d")
                 if date_str in stats["daily_trend_closing"]:
