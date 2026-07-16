@@ -12,14 +12,14 @@ from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 
-# --- Structured Logging & Cache & Limits ---
+# --- Structured Logging & Cache & Limits Layer ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [XenaPortal] - %(message)s')
 logger = logging.getLogger(__name__)
 
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 limiter = Limiter(get_remote_address, app=app, default_limits=["1000 per day", "200 per hour"])
 
-# --- Centralized Config ---
+# --- Centralized Configuration ---
 APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = "https://xena-portal-v1-1.vercel.app/api/callback"
@@ -32,18 +32,22 @@ ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 PK_ACMS = ["nabeel", "haseeb", "enzo", "farooq", "mubeen", "cruz", "ehtisham", "usama", "sehar ch", "hamza malik", "zohaib", "eagle", "leo", "berlin"]
 IN_ACMS = ["holy", "vihan", "shivam", "ravikant", "ansh", "rocky", "bella"]
 
+# --- PII Data Privacy Masking Utility ---
 def mask_email(email):
     if not email or '@' not in email: return email
     name, domain = email.split('@', 1)
     return f"{name[0]}***{name[-1]}@{domain}" if len(name) > 2 else f"***@{domain}"
 
+# --- Token Management Layer ---
 @cache.memoize(timeout=3500)
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     res = requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
     return res.get("tenant_access_token")
 
-def normalize_key(k): return " ".join(str(k).lower().strip().split())
+# --- String Parsing & Normalization Engines ---
+def normalize_key(k): 
+    return " ".join(str(k).lower().strip().split())
 
 def get_field_local(fields, *aliases):
     if not fields: return None
@@ -74,7 +78,7 @@ def extract_field_text(field_data):
                 extracted = False
                 for k in ['text', 'name', 'en_name', 'email', 'value', 'id']:
                     if k in item:
-                        texts.append(str(item[k]))
+                        texts.append(str(item[key]))
                         extracted = True
                         break
                 if not extracted: texts.append(str(item))
@@ -96,8 +100,8 @@ def extract_field_list(field_data):
             if isinstance(item, dict):
                 ext = False
                 for k in ['text', 'name', 'en_name', 'email', 'value', 'label']:
-                    if k in item and item[k] not in (None, ""):
-                        res.append(str(item[k]).strip())
+                    if k in item and item[key] not in (None, ""):
+                        res.append(str(item[key]).strip())
                         ext = True
                         break
                 if not ext and 'id' in item and item['id'] not in (None, ""): res.append(str(item['id']).strip())
@@ -159,29 +163,46 @@ def get_user_permissions(email, name):
         logger.error(f"Auth Error: {str(e)}")
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
-@app.route('/')
-def home(): return send_file(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'index.html'))
+# --- Route Handlers ---
+@app.route('/', methods=['GET'])
+def home():
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return send_file(os.path.join(root_dir, 'index.html'))
 
-@app.route('/api/login')
+@app.route('/api/login', methods=['GET'])
 @limiter.limit("10 per minute")
-def login(): return redirect(f"https://open.feishu.cn/open-apis/authen/v1/index?app_id={APP_ID}&redirect_uri={urllib.parse.quote(REDIRECT_URI)}")
+def login():
+    safe_redirect = urllib.parse.quote(REDIRECT_URI)
+    feishu_url = f"https://open.feishu.cn/open-apis/authen/v1/index?app_id={APP_ID}&redirect_uri={safe_redirect}"
+    return redirect(feishu_url)
 
-@app.route('/api/callback')
+@app.route('/api/callback', methods=['GET'])
 def callback():
     code = request.args.get('code')
     if not code: return "SSO Authorization Failed.", 400
+
     tat = get_tenant_access_token()
-    token_resp = requests.post("https://open.feishu.cn/open-apis/authen/v1/oidc/access_token", headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}, json={"grant_type": "authorization_code", "code": code}, timeout=10).json()
+    token_url = "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token"
+    token_resp = requests.post(token_url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}, json={"grant_type": "authorization_code", "code": code}, timeout=10).json()
+
     uat = token_resp.get("data", {}).get("access_token")
     if not uat: return "SSO Error: Could not verify user token.", 500
-    info_resp = requests.get("https://open.feishu.cn/open-apis/authen/v1/user_info", headers={"Authorization": f"Bearer {uat}"}, timeout=10).json()
+
+    info_url = "https://open.feishu.cn/open-apis/authen/v1/user_info"
+    info_resp = requests.get(info_url, headers={"Authorization": f"Bearer {uat}"}, timeout=10).json()
+
     data = info_resp.get("data", {})
     ln, le = data.get("name", "Unknown User"), data.get("email") or data.get("enterprise_email") or "" 
     logger.info(f"USER_LOGIN: {ln} ({mask_email(le)})")
+    
     return redirect(f"/?user={urllib.parse.quote(ln)}&email={urllib.parse.quote(le)}&uat={uat}")
 
-@app.route('/api/auth/me')
-def check_auth(): return jsonify(get_user_permissions(request.args.get('email', ''), request.args.get('user', '')))
+@app.route('/api/auth/me', methods=['GET'])
+def check_auth():
+    username = request.args.get('user', '')
+    email = request.args.get('email', '')
+    perms = get_user_permissions(email, username)
+    return jsonify(perms)
 
 @app.route('/api/admin/users', methods=['GET', 'POST', 'DELETE'])
 def manage_users():
@@ -202,7 +223,18 @@ def manage_users():
         email_check = data.get("email", "").strip()
         logger.info(f"ADMIN_ACTION: {admin_name} updated user {mask_email(email_check)}")
         
-        payload = {"fields": {"Email": email_check, "Modules": data.get("modules", ""), "ACMs": f"target={data.get('acms', {}).get('target', 'all')};points={data.get('acms', {}).get('points', 'all')};analytics={data.get('acms', {}).get('analytics', 'all')}", "Regions": f"target={data.get('regions', {}).get('target', 'all')};points={data.get('regions', {}).get('points', 'all')};analytics={data.get('regions', {}).get('analytics', 'all')"}}
+        # 🚨 This is the section that was correctly spaced out to fix the Python Syntax Error
+        acms_formatted = f"target={data.get('acms', {}).get('target', 'all')};points={data.get('acms', {}).get('points', 'all')};analytics={data.get('acms', {}).get('analytics', 'all')}"
+        regs_formatted = f"target={data.get('regions', {}).get('target', 'all')};points={data.get('regions', {}).get('points', 'all')};analytics={data.get('regions', {}).get('analytics', 'all')}"
+        
+        payload = {
+            "fields": {
+                "Email": email_check, 
+                "Modules": data.get("modules", ""), 
+                "ACMs": acms_formatted, 
+                "Regions": regs_formatted
+            }
+        }
         
         res_all = requests.get(base_url, headers=headers, params={"page_size": 500}).json()
         existing_id = next((i["record_id"] for i in res_all.get("data", {}).get("items", []) if email_check.lower() in (extract_field_text(i.get("fields", {}).get("Email", "")).lower(), extract_field_text(i.get("fields", {}).get("Person", "")).lower())), None)
@@ -257,6 +289,7 @@ def search_agency():
     
     if pb == 0 and tp > 0: pb = tp - up
     
+    # --- Health scorecard algorithm mapping ---
     health_score = 100
     health_status = "Healthy"
     if tp > 0:
@@ -268,6 +301,7 @@ def search_agency():
 
     req_res = requests.post(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true", headers=headers, json=points_payload, timeout=10).json()
     
+    # Construct complete historical lists to power the visual tracking interface
     valid_requests = []
     if req_res.get("code") == 0:
         for item in req_res.get('data', {}).get('items', []):
