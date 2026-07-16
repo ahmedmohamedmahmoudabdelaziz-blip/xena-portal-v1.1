@@ -340,7 +340,7 @@
     <div id="incompleteToast" class="toast toast-warning"></div>
 
     <div id="resultsContainer" style="display: none;">
-        <!-- 🚨 DYNAMIC BANNER: Title text swaps based on user's module choice -->
+        <!-- 🚨 DYNAMIC BANNER -->
         <div class="target-banner">
             <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
             <div id="displayTargetTitle" style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
@@ -385,7 +385,7 @@
                     
                     <div class="control-group">
                         <label>Select Privileges</label>
-                        <!-- 🚨 NO MORE <SELECT MULTIPLE>! Sleek toggle grid instead -->
+                        <!-- 🚨 TOGGLE GRID -->
                         <div id="calcPrivGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
                             <div class="priv-toggle" data-val="trend card" onclick="this.classList.toggle('active')">Trend Card (40-50)</div>
                             <div class="priv-toggle" data-val="traffic card" onclick="this.classList.toggle('active')">Traffic Card (30-40)</div>
@@ -1132,7 +1132,11 @@
                 
                 // 🚨 BEAUTIFUL FORMATTING FOR ARRAYS
                 let privsRaw = parseFeishuField(req['Agency Point Privilege']);
-                let privsList = privsRaw.split(',').map(s => s.replace(/["\[\]]/g, '').trim()).filter(Boolean);
+                let privsList = [];
+                try { if (privsRaw.startsWith('[')) privsList = JSON.parse(privsRaw); else privsList = privsRaw.split(','); } 
+                catch(e) { privsList = privsRaw.split(','); }
+                
+                privsList = privsList.map(s => s.replace(/["\[\]]/g, '').trim()).filter(Boolean);
                 let privsHtml = privsList.length > 0 ? privsList.map(p => `🔹 ${p}`).join('<br>') : 'N/A';
                 
                 let qtyRaw = parseFeishuField(req['Quantities Input']);
@@ -1142,7 +1146,7 @@
                 let statusColor = status.toLowerCase().includes('confirm') || status.toLowerCase().includes('done') ? 'var(--accent-green)' : 
                                   status.toLowerCase().includes('reject') ? 'var(--accent-rose)' : 'var(--accent-amber)';
                 
-                let targetTypeRaw = parseFeishuField(req['Target Type'] || req['Target type']).toLowerCase();
+                let targetTypeRaw = parseFeishuField(req['Target Type'] || req['Target type'] || req['target_type']).toLowerCase();
                 let isOther = targetTypeRaw.includes('other');
                 let targetTypeHtml = targetTypeRaw ? (isOther ? 'Others' : 'Same Agency') : 'Unknown Target';
 
@@ -1150,43 +1154,46 @@
                 
                 // 🚨 DYNAMIC RECEIPT GENERATOR FOR LATEST USAGE TRACKER
                 let allocationHtml = '';
-                if (trackerRaw.toLowerCase().includes('items approved')) {
-                    let lines = trackerRaw.split('\n');
-                    let totalPointsDeducted = 0;
-                    let allocatedItemsHtml = [];
-                    
-                    lines.forEach(line => {
-                        if (line.includes(':')) {
-                            let parts = line.split(':');
-                            let itemName = parts[0].replace(/[🔹📋🌟【】]/g, '').trim();
-                            let itemQty = parseInt(parts[1].trim());
-                            
-                            if (!isNaN(itemQty)) {
-                                let rule = pointPriceDB.find(r => itemName.toLowerCase().includes(r.key));
-                                let price = rule ? (isOther ? rule.other : rule.same) : 0;
-                                let cost = price * itemQty;
-                                totalPointsDeducted += cost;
-                                allocatedItemsHtml.push(`🔹 ${itemName}: ${itemQty} <span style="color:var(--text-muted);font-size:0.8rem;">(@ ${price} pts = ${cost} pts)</span>`);
+                if (trackerRaw && trackerRaw !== 'undefined' && trackerRaw.trim() !== '') {
+                    if (trackerRaw.toLowerCase().includes('items approved')) {
+                        let lines = trackerRaw.split('\n');
+                        let totalPointsDeducted = 0;
+                        let allocatedItemsHtml = [];
+                        
+                        lines.forEach(line => {
+                            if (line.includes(':')) {
+                                let parts = line.split(':');
+                                let itemName = parts[0].replace(/[🔹📋🌟【】]/g, '').trim();
+                                let itemQty = parseInt(parts[1].trim());
+                                
+                                if (!isNaN(itemQty)) {
+                                    let rule = pointPriceDB.find(r => itemName.toLowerCase().includes(r.key));
+                                    let price = rule ? (isOther ? rule.other : rule.same) : 0;
+                                    let cost = price * itemQty;
+                                    totalPointsDeducted += cost;
+                                    allocatedItemsHtml.push(`🔹 ${itemName}: ${itemQty} <span style="color:var(--text-muted);font-size:0.8rem;">(@ ${price} pts = ${cost} pts)</span>`);
+                                }
                             }
+                        });
+                        
+                        if (allocatedItemsHtml.length > 0) {
+                            allocationHtml = `
+                            <div style="margin-top: 12px; padding: 12px; background: rgba(0,212,255,0.05); border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);">
+                                <div style="font-weight:600; color:var(--accent-cyan); margin-bottom:6px;">Items Approved & Deducted:</div>
+                                ${allocatedItemsHtml.join('<br>')}
+                                <div style="margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; color: var(--accent-rose); font-weight: bold;">
+                                    💰 Total Deducted: ${totalPointsDeducted} Points
+                                </div>
+                            </div>`;
+                            qtyHtml = `<span style="color: var(--accent-green);">Processed (See below)</span>`;
+                        } else {
+                            allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerRaw}</div>`;
                         }
-                    });
-                    
-                    if (allocatedItemsHtml.length > 0) {
-                        allocationHtml = `
-                        <div style="margin-top: 12px; padding: 12px; background: rgba(0,212,255,0.05); border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);">
-                            <div style="font-weight:600; color:var(--accent-cyan); margin-bottom:6px;">Items Approved & Deducted:</div>
-                            ${allocatedItemsHtml.join('<br>')}
-                            <div style="margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; color: var(--accent-rose); font-weight: bold;">
-                                💰 Total Deducted: ${totalPointsDeducted} Points
-                            </div>
-                        </div>`;
                     } else {
-                        allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerRaw}</div>`;
+                         allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerRaw}</div>`;
                     }
-                } else if (trackerRaw && trackerRaw !== 'undefined') {
-                     allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerRaw}</div>`;
                 } else {
-                     allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">No approved items found.</div>`;
+                     allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px; font-style: italic;">No allocation receipt generated.</div>`;
                 }
 
                 historyHtml += `
