@@ -54,13 +54,11 @@
         .btn-success { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #000; }
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
         
-        /* 🚨 PREMIUM ALLOCATOR BUTTON */
         .btn-allocator { background: transparent; border: 1px solid var(--accent-purple); color: var(--accent-purple); box-shadow: 0 0 10px rgba(185, 103, 255, 0.1); width: 100%; padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; font-family: inherit; margin-top: 10px; }
         .btn-allocator:hover { background: var(--accent-purple); color: #000; box-shadow: 0 8px 25px rgba(185, 103, 255, 0.4); transform: translateY(-2px); }
 
         .btn-primary:active, .btn-success:active, .btn-allocator:active { transform: translateY(0) scale(0.98); }
 
-        /* 🚨 BRAND NEW TOGGLE CHECKBOXES */
         .priv-toggle { background: var(--bg); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; color: var(--text-muted); text-align: left; display: flex; align-items: center; justify-content: space-between; }
         .priv-toggle:hover { border-color: var(--accent-cyan); color: var(--text); }
         .priv-toggle.active { background: rgba(0,212,255,0.1); border-color: var(--accent-cyan); color: var(--accent-cyan); box-shadow: inset 0 0 10px rgba(0,212,255,0.1); font-weight: 600; }
@@ -140,6 +138,25 @@
         .chart-wrapper-pie-large { position: relative; height: 520px; } 
         .chart-wrapper-bar { position: relative; height: 320px; }
 
+        /* 🚨 PHASE 2: DELTAS & SPARKLINES CSS */
+        .delta-badge { font-size: 0.8rem; font-weight: bold; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+        .delta-up { background: rgba(0, 230, 118, 0.1); color: var(--accent-green); }
+        .delta-down { background: rgba(255, 77, 109, 0.1); color: var(--accent-rose); }
+        .delta-neutral { background: rgba(139, 143, 163, 0.1); color: var(--text-muted); }
+        .sparkline-container { height: 40px; width: 100%; margin-top: 12px; }
+
+        /* 🚨 PHASE 2: PRINT TO PDF CSS */
+        @media print {
+            body { background: #fff !important; color: #000 !important; }
+            .top-bar, .centered-search-box, .btn, .modal-overlay, #toastContainer, #initialEmptyState { display: none !important; }
+            .app-shell { max-width: 100%; padding: 0; }
+            .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; background: #fff !important; }
+            h1, h2, h3, h4, .kpi-value, span, div { color: #000 !important; -webkit-text-fill-color: #000 !important; }
+            .kpi-card::before { display: none; }
+            .chart-wrapper-pie { height: 200px; }
+            .chart-wrapper-bar { height: 250px; }
+        }
+
         .target-banner { background: linear-gradient(135deg, rgba(0,230,118,0.08), rgba(0,176,255,0.08)); border: 1px solid rgba(0,230,118,0.2); border-radius: var(--radius); padding: 32px; text-align: center; margin-bottom: 24px; position: relative; }
         .target-banner h2 { font-size: 2.5rem; color: var(--accent-green); margin: 8px 0; }
         .acm-badge { position: absolute; top: 16px; right: 16px; background: var(--bg); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; color: var(--text-muted); border: 1px solid var(--border); }
@@ -149,7 +166,6 @@
         .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
         .stat-value { font-size: 1.5rem; font-weight: 700; }
 
-        /* 🚨 PHASE 1: SKELETON CSS (Replaced the full-screen spinner) */
         .skeleton { 
             background: linear-gradient(90deg, var(--surface-hover) 25%, var(--border) 50%, var(--surface-hover) 75%); 
             background-size: 200% 100%; 
@@ -161,7 +177,6 @@
         }
         @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-        /* 🚨 PHASE 1: TOAST NOTIFICATIONS CSS */
         #toastContainer { position: fixed; top: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
         .toast-modern { padding: 16px 20px; border-radius: 12px; font-weight: 500; font-size: 0.95rem; box-shadow: var(--shadow); background: var(--surface); border-left: 4px solid var(--border); display: flex; align-items: center; gap: 12px; min-width: 300px; animation: slideIn 0.3s ease forwards; color: #fff;}
         .toast-modern.success { border-left-color: var(--accent-green); }
@@ -178,7 +193,6 @@
 </head>
 <body>
 
-<!-- 🚨 PHASE 1: Toast Container Injected -->
 <div id="toastContainer"></div>
 
 <div id="loginOverlay">
@@ -194,7 +208,6 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
-<!-- 🚨 ADMIN MODAL -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -303,13 +316,18 @@
         <div id="standardSearchParams" class="centered-search-box" style="display:none;">
             <div class="control-group">
                 <label>Agency Code</label>
-                <!-- 🚨 Restored the Missing ID here so your JS doesn't crash -->
                 <input type="text" id="agencyCode" placeholder="e.g., 40775">
             </div>
             <button class="btn btn-primary" id="btnSearch" onclick="fetchAgencyData()">Search Database</button>
         </div>
 
         <div id="analyticsParams" style="display:none;">
+            <!-- 🚨 PHASE 2: SAVED FILTER PRESETS UI -->
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-bottom: -10px; z-index: 10; position: relative;">
+                <button onclick="saveFilterPreset()" style="background:none; border:none; color:var(--accent-cyan); font-size:0.8rem; cursor:pointer; font-weight:600;">💾 Save Filters</button>
+                <button onclick="loadFilterPreset()" style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; font-weight:600;">📂 Load Saved</button>
+            </div>
+
             <div class="control-grid">
                 <div class="control-group">
                     <label>Date Filter</label>
@@ -354,23 +372,23 @@
                     </select>
                 </div>
             </div>
-            <!-- 🚨 Restored the Missing ID here so your JS doesn't crash -->
-            <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()">Generate Analytics Report</button>
+            
+            <!-- 🚨 PHASE 2: DATA EXPORT BUTTONS -->
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()">Generate Analytics Report</button>
+                <button class="btn btn-outline" id="exportBtn" style="display:none; flex: 0.3; border-color: var(--accent-green); color: var(--accent-green);" onclick="exportCSV()">📥 CSV</button>
+                <button class="btn btn-outline" id="exportPdfBtn" style="display:none; flex: 0.3; border-color: var(--accent-purple); color: var(--accent-purple);" onclick="window.print()">🖨️ PDF</button>
+            </div>
         </div>
     </div>
 
-    <div id="errorToast" class="toast toast-error"></div>
-    <div id="incompleteToast" class="toast toast-warning"></div>
-
     <div id="resultsContainer" style="display: none;">
-        <!-- 🚨 DYNAMIC BANNER -->
         <div class="target-banner">
             <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
             <div id="displayTargetTitle" style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
         </div>
         
-        <!-- 🚨 TARGET MODULE UI -->
         <div class="card" id="privilegeArea" style="display:none;">
             <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Available Target Privilege</h3>
             <div class="control-group" style="max-width: 300px; margin-bottom: 16px;">
@@ -391,7 +409,6 @@
             </div>
         </div>
 
-        <!-- 🚨 NEW: AGENCY POINTS SYSTEM UI -->
         <div class="card" id="pointsArea" style="display:none;">
             <h3 style="margin-bottom: 16px; color: var(--accent-purple);">🪙 Agency Points System</h3>
             
@@ -400,66 +417,29 @@
                 <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color: var(--accent-rose);">0</div></div>
                 <div class="stat-box"><div class="stat-label">Current Balance</div><div class="stat-value" id="ptBalance" style="color: var(--accent-cyan);">0</div></div>
             </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-                <!-- Left: Smart Allocator Calculator (PREMIUM UI UPGRADE) -->
-                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px;">
-                    <h4 style="color: var(--accent-cyan); margin-bottom: 16px;">🤖 Smart Allocator Preview</h4>
-                    
-                    <div class="control-group">
-                        <label>Select Privileges</label>
-                        <!-- 🚨 TOGGLE GRID -->
-                        <div id="calcPrivGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
-                            <div class="priv-toggle" data-val="trend card" onclick="this.classList.toggle('active')">Trend Card (40-50)</div>
-                            <div class="priv-toggle" data-val="traffic card" onclick="this.classList.toggle('active')">Traffic Card (30-40)</div>
-                            <div class="priv-toggle" data-val="30 mic 15 days" onclick="this.classList.toggle('active')">30 Mic 15 Days (150-175)</div>
-                            <div class="priv-toggle" data-val="30 mic 30 days" onclick="this.classList.toggle('active')">30 Mic 30 Days (300-350)</div>
-                            <div class="priv-toggle" data-val="normal short id" onclick="this.classList.toggle('active')">Normal Short ID</div>
-                            <div class="priv-toggle" data-val="customized short id 15 days" onclick="this.classList.toggle('active')">Custom Short ID 15D</div>
-                            <div class="priv-toggle" data-val="customized short id 30 days" onclick="this.classList.toggle('active')">Custom Short ID 30D</div>
-                            <div class="priv-toggle" data-val="room pin-up" onclick="this.classList.toggle('active')">Room Pin-up (100-150)</div>
-                            <div class="priv-toggle" data-val="welcome package 3" onclick="this.classList.toggle('active')">Welcome Package 3</div>
-                            <div class="priv-toggle" data-val="welcome package 2" onclick="this.classList.toggle('active')">Welcome Package 2</div>
-                            <div class="priv-toggle" data-val="main page banner" onclick="this.classList.toggle('active')">Main Page Banner</div>
-                            <div class="priv-toggle" data-val="news banner" onclick="this.classList.toggle('active')">News Banner</div>
-                            <div class="priv-toggle" data-val="live banner" onclick="this.classList.toggle('active')">Live Banner</div>
-                        </div>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label>Quantities Input (e.g., "9 and 30" or "2, 5")</label>
-                        <input type="text" id="calcQty" placeholder="Type quantities matching selection order">
-                    </div>
-                    
-                    <div class="control-group">
-                        <label>Target Type</label>
-                        <select id="calcTarget">
-                            <option value="Same agency">Same Agency</option>
-                            <option value="Others">Others</option>
-                        </select>
-                    </div>
-                    
-                    <button class="btn-allocator" onclick="runAllocatorPreview()">Check Availability & Calculate</button>
-                    
-                    <!-- 🚨 PREMIUM RECEIPT BOX DESIGN -->
-                    <div style="margin-top: 20px; background: #0a0b10; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--accent-purple); box-shadow: inset 0 0 20px rgba(0,0,0,0.8); font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); max-height: 350px; overflow-y: auto;" id="allocatorOutput">Select items above and click calculate to generate receipt...</div>
-                </div>
-
-                <!-- Right: Daily Usage History -->
-                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 800px; overflow-y: auto;">
-                    <h4 style="color: var(--accent-amber); margin-bottom: 16px;">📅 Day-by-Day Point History</h4>
-                    <div id="pointsHistoryList"></div>
-                </div>
-            </div>
         </div>
-
     </div>
 
     <div id="analyticsContainer" style="display: none;">
+        
+        <!-- 🚨 PHASE 2: KPIs with Deltas & Sparklines -->
         <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-label">Total Agency Creations</div><div class="kpi-value" id="kpiCreations">0</div></div>
-            <div class="kpi-card"><div class="kpi-label">Total BD Creations</div><div class="kpi-value" id="kpiBds">0</div></div>
-            <div class="kpi-card"><div class="kpi-label">Total Closings</div><div class="kpi-value" id="kpiClosings">0</div></div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total Agency Creations</div>
+                <div class="kpi-value" id="kpiCreations">0</div>
+                <div id="deltaCreations" class="delta-badge delta-neutral">--</div>
+                <div class="sparkline-container"><canvas id="sparkCreations"></canvas></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total BD Creations</div>
+                <div class="kpi-value" id="kpiBds">0</div>
+                <div id="deltaBds" class="delta-badge delta-neutral">--</div>
+                <div class="sparkline-container"><canvas id="sparkBds"></canvas></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total Closings</div>
+                <div class="kpi-value" id="kpiClosings">0</div>
+            </div>
         </div>
 
         <div class="chart-grid-3">
@@ -504,7 +484,6 @@
 </div>
 
 <script>
-    // 🚨 PHASE 1: Toast Manager Added
     class ToastManager {
         static show(msg, type = 'success') {
             const container = document.getElementById('toastContainer');
@@ -517,10 +496,9 @@
         }
     }
 
-    // 🚨 PHASE 1: Skeleton UI Toggle Added
     function toggleSkeletons(show, type) {
         if(show) {
-            document.getElementById('loadingOverlay').style.display = 'none'; // Overrides old full-screen spinner
+            document.getElementById('loadingOverlay').style.display = 'none';
             if(type === 'search') {
                 document.getElementById('resultsContainer').style.display = 'block';
                 document.getElementById('privilegeArea').style.display = 'none';
@@ -530,7 +508,8 @@
             } else if (type === 'analytics') {
                 document.getElementById('analyticsContainer').style.display = 'block';
                 document.querySelectorAll('.kpi-value').forEach(el => el.innerHTML = '<div class="skeleton" style="height: 40px; width: 80px; margin: 0 auto;"></div>');
-                document.querySelectorAll('.chart-wrapper-pie, .chart-wrapper-bar, .chart-wrapper-pie-large').forEach(el => {
+                document.querySelectorAll('.delta-badge').forEach(el => el.innerHTML = '');
+                document.querySelectorAll('.chart-wrapper-pie, .chart-wrapper-bar, .chart-wrapper-pie-large, .sparkline-container').forEach(el => {
                     const ctx = el.querySelector('canvas');
                     if(ctx) { const chart = Chart.getChart(ctx); if(chart) chart.destroy(); }
                     el.innerHTML = '<div class="skeleton" style="width:100%; height:100%;"></div>';
@@ -626,6 +605,10 @@
     const allRegs = ['pk', 'in'];
 
     let pTargetAcm, pTargetReg, pPointsAcm, pPointsReg, pAnalyticsAcm, pAnalyticsReg;
+    
+    // 🚨 PHASE 2: State variables
+    let latestAnalyticsData = null; 
+    let pendingRequests = new Map();
 
     function initPills() {
         pTargetAcm = new PillSelect('targetAcmSelect', allAcms);
@@ -803,6 +786,8 @@
         document.getElementById('analyticsContainer').style.display = 'none';
         document.getElementById('privilegeArea').style.display = 'none';
         document.getElementById('pointsArea').style.display = 'none';
+        document.getElementById('exportBtn').style.display = 'none';
+        document.getElementById('exportPdfBtn').style.display = 'none';
     }
 
     function updateCustomDateVisibility() {
@@ -838,6 +823,57 @@
         sel.innerHTML = '<option value="All">All ACMs</option>';
         const list = region === 'IN' ? inAcms : region === 'PK' ? pkAcms : [...pkAcms, ...inAcms].sort();
         list.forEach(n => sel.add(new Option(n, n.toLowerCase())));
+    }
+
+    // 🚨 PHASE 2: SAVE/LOAD FILTER PRESETS
+    function saveFilterPreset() {
+        const preset = {
+            preset: document.getElementById('anaDatePreset').value,
+            region: document.getElementById('anaRegion').value,
+            acm: document.getElementById('anaAcm').value,
+            type: document.getElementById('anaType').value
+        };
+        localStorage.setItem(`xena_filters_${loggedUser}`, JSON.stringify(preset));
+        ToastManager.show('Filter preset saved to browser!', 'success');
+    }
+
+    function loadFilterPreset() {
+        const saved = localStorage.getItem(`xena_filters_${loggedUser}`);
+        if(saved) {
+            const p = JSON.parse(saved);
+            document.getElementById('anaDatePreset').value = p.preset;
+            document.getElementById('anaRegion').value = p.region;
+            updateAcmDropdown();
+            setTimeout(() => { document.getElementById('anaAcm').value = p.acm; }, 50);
+            document.getElementById('anaType').value = p.type;
+            updateCustomDateVisibility();
+            ToastManager.show('Filters loaded!', 'success');
+        } else {
+            ToastManager.show('No saved filters found.', 'warning');
+        }
+    }
+
+    // 🚨 PHASE 2: EXPORT CSV
+    function exportCSV() {
+        if(!latestAnalyticsData) return ToastManager.show("No data to export. Generate report first.", "error");
+        
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Metric,Value\n";
+        csvContent += `Total Creations,${latestAnalyticsData.kpis.creations}\n`;
+        csvContent += `Total BDs,${latestAnalyticsData.kpis.bds}\n`;
+        csvContent += `Total Closings,${latestAnalyticsData.kpis.closings}\n\n`;
+        
+        csvContent += "ACM Performance\nACM,Creations\n";
+        Object.entries(latestAnalyticsData.acm_performance).forEach(([k,v]) => csvContent += `"${k}",${v}\n`);
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Xena_Analytics_${fmtDate(new Date())}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        ToastManager.show("CSV Exported successfully!", "success");
     }
 
     function openAdmin() {
@@ -936,62 +972,112 @@
             document.getElementById('modAdmin').checked = false;
             initPills();
             document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
-            ToastManager.show("Agent saved successfully", "success");
+            ToastManager.show("Agent saved successfully.", "success");
             fetchAdminUsers();
         } catch (e) { ToastManager.show("Error adding agent: " + e.message, "error"); document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration'; }
     }
     
     async function deleteAgent(recordId) {
         if(!confirm("Are you sure you want to remove this agent's access?")) return;
-        try { await fetch(`/api/admin/users?id=${recordId}`, { method: 'DELETE', headers: { 'X-User-Name': loggedUser } }); ToastManager.show("Agent removed successfully", "success"); fetchAdminUsers(); } catch (e) { ToastManager.show("Error removing agent.", "error"); }
+        try { await fetch(`/api/admin/users?id=${recordId}`, { method: 'DELETE', headers: { 'X-User-Name': loggedUser } }); ToastManager.show("Agent removed.", "success"); fetchAdminUsers(); } catch (e) { ToastManager.show("Error removing agent.", "error"); }
     }
 
     async function generateAnalytics() {
         if (document.getElementById('anaDatePreset').value !== 'specific') setDatePresets();
         
-        // 🚨 SKELETON LOADER
-        toggleSkeletons(true, 'analytics');
-
         const region = document.getElementById('anaRegion').value;
         const acm = document.getElementById('anaAcm').value;
         const type = document.getElementById('anaType').value;
         const fromDate = document.getElementById('anaFrom').value;
         const toDate = document.getElementById('anaTo').value;
 
+        const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
+
+        // 🚨 PHASE 2: API Request Deduplication
+        if (pendingRequests.has(url)) {
+            console.log("Request already in flight, deduplicating...");
+            return pendingRequests.get(url);
+        }
+
+        document.getElementById('loadingOverlay').style.display = 'flex';
+        document.getElementById('analyticsContainer').style.display = 'none';
+        document.getElementById('exportBtn').style.display = 'none';
+        document.getElementById('exportPdfBtn').style.display = 'none';
+
         try {
             const btn = document.getElementById('btnGenAna');
             const origText = btn.innerText; btn.innerText = "⏳ Fetching Feishu Data..."; btn.disabled = true;
 
-            const url = `/api/analytics?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&region=${region}&acm=${encodeURIComponent(acm)}&type=${encodeURIComponent(type)}&from=${fromDate}&to=${toDate}`;
-            const res = await fetch(url);
-            
-            // Safe JSON parse to trigger toast error instead of Javascript crash
+            const requestPromise = fetch(url);
+            pendingRequests.set(url, requestPromise);
+            const res = await requestPromise;
+            pendingRequests.delete(url);
+
+            const textResponse = await res.text();
             let data;
-            try { 
-                data = JSON.parse(await res.text()); 
-            } catch (jsonErr) { 
-                throw new Error("Feishu server timeout. Try a smaller date range."); 
-            }
-            if (!res.ok) throw new Error(data.error || 'Unknown API error');
+            try { data = JSON.parse(textResponse); } catch (jsonErr) { throw new Error("Feishu API timeout. The backend cache is filling, try again in 30 seconds."); }
+            if (!res.ok) throw new Error(data.error || 'Unknown error');
 
+            latestAnalyticsData = data; 
             btn.innerText = origText; btn.disabled = false;
-
-            if (data.scanned_rows > 0 && data.kpis.creations === 0) {
-                ToastManager.show(`Column Mismatch Warning! Checked ${data.scanned_rows} records.`, "warning");
-            }
 
             document.getElementById('kpiCreations').innerText = data.kpis.creations.toLocaleString();
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
             document.getElementById('kpiClosings').innerText = data.kpis.closings.toLocaleString();
 
-            document.getElementById('analyticsContainer').style.display = 'block'; 
+            // 🚨 PHASE 2: Calculate Deltas for KPI Badges
+            calculateDelta(data.daily_trend_creation, 'deltaCreations');
+            calculateDelta(data.daily_trend_bd, 'deltaBds');
+
+            document.getElementById('analyticsContainer').style.display = 'block';
+            document.getElementById('exportBtn').style.display = 'block';
+            document.getElementById('exportPdfBtn').style.display = 'block';
             
-            setTimeout(() => drawCharts(data), 50); // Delay allows CSS to unhide elements before rendering
+            setTimeout(() => drawCharts(data), 50); 
 
         } catch (err) {
             document.getElementById('analyticsContainer').style.display = 'none';
             ToastManager.show(err.message, "error");
             document.getElementById('btnGenAna').innerText = "Generate Analytics Report"; document.getElementById('btnGenAna').disabled = false;
+            pendingRequests.delete(url);
+        }
+        document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    // 🚨 PHASE 2: Delta Engine Logic
+    function calculateDelta(obj, elementId) {
+        const vals = Object.values(obj);
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        
+        if (vals.length < 2) { 
+            el.innerHTML = `&nbsp;&nbsp;--&nbsp;&nbsp;`; 
+            el.className = 'delta-badge delta-neutral'; 
+            return; 
+        }
+        
+        const half = Math.floor(vals.length / 2);
+        const firstHalf = vals.slice(0, half).reduce((a,b)=>a+b, 0);
+        const secondHalf = vals.slice(half).reduce((a,b)=>a+b, 0);
+        
+        if (firstHalf === 0 && secondHalf === 0) {
+            el.innerHTML = `&nbsp;&nbsp;--&nbsp;&nbsp;`; 
+            el.className = 'delta-badge delta-neutral';
+        } else if (firstHalf === 0) {
+            el.innerHTML = `▲ +100%`; 
+            el.className = 'delta-badge delta-up';
+        } else {
+            const perc = Math.round(((secondHalf - firstHalf) / firstHalf) * 100);
+            if (perc > 0) { 
+                el.innerHTML = `▲ +${perc}%`; 
+                el.className = 'delta-badge delta-up'; 
+            } else if (perc < 0) { 
+                el.innerHTML = `▼ ${perc}%`; 
+                el.className = 'delta-badge delta-down'; 
+            } else { 
+                el.innerHTML = `&nbsp;&nbsp;0%&nbsp;&nbsp;`; 
+                el.className = 'delta-badge delta-neutral'; 
+            }
         }
     }
 
@@ -999,9 +1085,18 @@
         Object.values(charts).forEach(c => c.destroy());
         charts = {};
 
-        // REBUILD CHART CONTAINERS OVERWRITTEN BY SKELETONS
+        document.querySelectorAll('.chart-wrapper-pie, .chart-wrapper-bar, .chart-wrapper-pie-large, .sparkline-container').forEach(el => {
+            el.innerHTML = `<canvas id="${el.dataset.targetId || el.querySelector('canvas')?.id}"></canvas>`;
+        });
+
+        // Re-inject IDs explicitly
         document.querySelectorAll('.chart-wrapper-pie, .chart-wrapper-bar, .chart-wrapper-pie-large').forEach((el, i) => {
             const ids = ['cCreation', 'cBd', 'cClosing', 'cReject', 'cClosePie', 'cCloseBar', 'cAcm', 'cCreationType', 'cType', 'cOtherApp', 'cTrendCreation', 'cTrendBd'];
+            el.innerHTML = `<canvas id="${ids[i]}"></canvas>`;
+        });
+        
+        document.querySelectorAll('.sparkline-container').forEach((el, i) => {
+            const ids = ['sparkCreations', 'sparkBds'];
             el.innerHTML = `<canvas id="${ids[i]}"></canvas>`;
         });
 
@@ -1064,16 +1159,26 @@
 
         buildTrendChart('cTrendCreation', data.daily_trend_creation, '#00d4ff', 'rgba(0,212,255,0.3)');
         buildTrendChart('cTrendBd', data.daily_trend_bd, '#00e676', 'rgba(0,230,118,0.3)');
+
+        // 🚨 PHASE 2: Build KPI Sparklines
+        const buildSparkline = (id, trendData, color) => {
+            if (!trendData || Object.keys(trendData).length === 0) return;
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            charts[id] = new Chart(ctx, { 
+                type: 'line', 
+                data: { labels: Object.keys(trendData), datasets: [{ data: Object.values(trendData), borderColor: color, borderWidth: 2, tension: 0.4, pointRadius: 0 }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, layout: { padding: 0 } } 
+            });
+        };
+        buildSparkline('sparkCreations', data.daily_trend_creation, '#00d4ff');
+        buildSparkline('sparkBds', data.daily_trend_bd, '#00e676');
     }
 
-    // ============================================================================
-    // 🚨 SEARCH & RENDER
-    // ============================================================================
     async function fetchAgencyData() {
         const code = document.getElementById('agencyCode').value.trim();
         if (!code) return;
         
-        // 🚨 SKELETON LOADER
         toggleSkeletons(true, 'search');
 
         try {
@@ -1096,7 +1201,6 @@
         
         document.getElementById('displayAcm').innerText = `ACM: ${currentAgencyData.acm || 'N/A'}`;
         
-        // 🚨 SHOW APPROPRIATE UI & BANNER BASED ON QUERY TYPE
         const queryType = document.getElementById('queryType').value;
         document.getElementById('privilegeArea').style.display = 'none';
         document.getElementById('pointsArea').style.display = 'none';
@@ -1105,7 +1209,7 @@
             const bp = currentAgencyData.base_points || 0;
             document.getElementById('displayTargetTitle').innerText = 'Current Month Target';
             document.getElementById('displayTargetCoins').innerText = (bp * 100000).toLocaleString() + ' Coins';
-            document.getElementById('displayTargetCoins').style.color = 'var(--text)'; // Default white
+            document.getElementById('displayTargetCoins').style.color = 'var(--text)'; 
             
             document.getElementById('privilegeArea').style.display = 'block'; 
             updatePrivilegeGrid(); 
@@ -1113,10 +1217,9 @@
             const bal = currentAgencyData.point_balance || 0;
             document.getElementById('displayTargetTitle').innerText = 'Current Available Points';
             document.getElementById('displayTargetCoins').innerText = bal.toLocaleString() + ' Points';
-            document.getElementById('displayTargetCoins').style.color = 'var(--accent-cyan)'; // Glow cyan
+            document.getElementById('displayTargetCoins').style.color = 'var(--accent-cyan)'; 
             
             document.getElementById('pointsArea').style.display = 'block'; 
-            updatePointsGrid();
         }
         
         document.getElementById('resultsContainer').style.display = 'block';
@@ -1141,345 +1244,6 @@
             }
         });
         document.getElementById('valTotal').innerText = total; document.getElementById('valClaimed').innerText = claimed; document.getElementById('valRemaining').innerText = Math.max(0, total - claimed); document.getElementById('valPending').innerText = pending; document.getElementById('valRejected').innerText = rejected;
-    }
-
-    // ============================================================================
-    // 🚨 HELPER TO PARSE FEISHU JUNK DATA
-    // ============================================================================
-    function parseFeishuField(val) {
-        if (!val) return "";
-        if (typeof val === 'string') {
-            try { let arr = JSON.parse(val); if (Array.isArray(arr)) return arr.join(', '); } catch(e) {}
-            return val;
-        }
-        if (Array.isArray(val)) return val.map(v => v.text || v.name || v.id || JSON.stringify(v)).join(', ');
-        if (typeof val === 'object') return val.text || val.name || val.id || "";
-        return String(val);
-    }
-    
-    function getFuzzyField(req, searchStrings) {
-        if (!req) return null;
-        for (let searchStr of searchStrings) {
-            let searchLower = searchStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-            for (let key in req) {
-                let keyLower = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (keyLower === searchLower) return req[key];
-            }
-        }
-        for (let searchStr of searchStrings) {
-            let searchLower = searchStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-            for (let key in req) {
-                let keyLower = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (keyLower.includes(searchLower)) return req[key];
-            }
-        }
-        return null;
-    }
-
-    // ============================================================================
-    // 🚨 NEW: AGENCY POINTS LOGIC & SMART ALLOCATOR
-    // ============================================================================
-    
-    // DB used for point calculations in the history
-    const pointPriceDB = [
-        { key: "trend card", same: 40, other: 50 },
-        { key: "traffic card", same: 30, other: 40 },
-        { key: "30 mic 15 days", same: 150, other: 175 },
-        { key: "30 mic 30 days", same: 300, other: 350 },
-        { key: "normal short id", same: 120, other: 180 },
-        { key: "customized short id 15 days", same: 300, other: 450 },
-        { key: "customized short id 30 days", same: 600, other: 900 },
-        { key: "room pin-up", same: 100, other: 150 },
-        { key: "welcome package 3", same: 80, other: 80 },
-        { key: "welcome package 2", same: 30, other: 30 },
-        { key: "main page banner", same: 150, other: 150 },
-        { key: "news banner", same: 100, other: 100 },
-        { key: "live banner", same: 90, other: 90 }
-    ];
-
-    function updatePointsGrid() {
-        if (!currentAgencyData) return;
-        
-        // 1. Update Stats
-        document.getElementById('ptTotal').innerText = (currentAgencyData.total_points || 0).toLocaleString();
-        document.getElementById('ptUsed').innerText = (currentAgencyData.used_points || 0).toLocaleString();
-        document.getElementById('ptBalance').innerText = (currentAgencyData.point_balance || 0).toLocaleString();
-
-        // 2. Build Daily History
-        let historyHtml = '';
-        const requests = currentAgencyData.requests || [];
-        
-        // Filter out point requests
-        const pointReqs = requests.filter(r => getFuzzyField(r, ['agencypointprivilege']) || getFuzzyField(r, ['quantitiesinput']) || getFuzzyField(r, ['transactionreceipt']) || getFuzzyField(r, ['latestusagetracker']));
-        
-        if (pointReqs.length === 0) {
-            historyHtml = '<div style="color:var(--text-muted); padding:10px;">No points usage found this month.</div>';
-        } else {
-            pointReqs.sort((a, b) => {
-                const dA = new Date(a['Submitted on'] || a['Submitted on Copy'] || 0);
-                const dB = new Date(b['Submitted on'] || b['Submitted on Copy'] || 0);
-                return dB - dA;
-            });
-
-            pointReqs.forEach(req => {
-                const dateRaw = req['Submitted on'] || req['Submitted on Copy'];
-                let dateStr = 'Unknown Date';
-                if (dateRaw) {
-                    const d = new Date(dateRaw);
-                    if (!isNaN(d)) dateStr = d.toISOString().split('T')[0];
-                }
-                
-                // 🚨 BEAUTIFUL FORMATTING FOR ARRAYS
-                let privsRaw = parseFeishuField(getFuzzyField(req, ['agencypointprivilege', 'privilege']));
-                let privsList = [];
-                try { if (privsRaw.startsWith('[')) privsList = JSON.parse(privsRaw); else privsList = privsRaw.split(','); } 
-                catch(e) { privsList = privsRaw.split(','); }
-                
-                privsList = privsList.map(s => s.replace(/["\[\]]/g, '').trim()).filter(Boolean);
-                let privsHtml = privsList.length > 0 ? privsList.map(p => `🔹 ${p}`).join('<br>') : 'N/A';
-                
-                let qtyRaw = parseFeishuField(getFuzzyField(req, ['quantitiesinput', 'quantities', 'qty']));
-                let qtyHtml = qtyRaw ? qtyRaw.replace(/["\[\]]/g, '').trim() : '';
-
-                let status = parseFeishuField(getFuzzyField(req, ['orderaction', 'status', 'state'])) || 'Pending';
-                let statusColor = status.toLowerCase().includes('confirm') || status.toLowerCase().includes('done') ? 'var(--accent-green)' : 
-                                  status.toLowerCase().includes('reject') ? 'var(--accent-rose)' : 'var(--accent-amber)';
-                
-                let targetTypeRaw = parseFeishuField(getFuzzyField(req, ['targettype', 'target'])).toLowerCase();
-                let isOther = targetTypeRaw.includes('other');
-                let targetTypeHtml = targetTypeRaw ? (isOther ? 'Others' : 'Same Agency') : '<span style="color:var(--accent-amber);">Unknown Target (Assuming Same Agency)</span>';
-
-                let trackerRaw = parseFeishuField(getFuzzyField(req, ['latestusagetracker', 'usagetracker', 'tracker', 'latestusage']));
-                
-                // 🚨 DYNAMIC RECEIPT GENERATOR FOR LATEST USAGE TRACKER
-                let allocationHtml = '';
-                if (trackerRaw && trackerRaw !== 'undefined' && trackerRaw.trim() !== '') {
-                    
-                    let trackerText = trackerRaw.replace(/\\n/g, '\n');
-                    
-                    // Explicitly catch the Rejected logic
-                    if (trackerText.toLowerCase().includes('no items approved') || trackerText.toLowerCase().includes('fully rejected')) {
-                        allocationHtml = `
-                        <div style="margin-top: 12px; padding: 12px; background: rgba(255,77,109,0.05); border-radius: 8px; border: 1px solid rgba(255,77,109,0.2);">
-                            <div style="color: var(--accent-rose); font-weight: 600;">❌ No items approved in this order.</div>
-                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">0 Points Deducted</div>
-                        </div>`;
-                        if (!qtyHtml) qtyHtml = `<span style="color: var(--accent-rose);">Rejected (0)</span>`;
-                        
-                    } else if (trackerText.toLowerCase().includes('items approved')) {
-                        let lines = trackerText.split('\n');
-                        let totalPointsDeducted = 0;
-                        let allocatedItemsHtml = [];
-                        let extractedQuantities = [];
-                        
-                        lines.forEach(line => {
-                            if (line.includes(':') && !line.toLowerCase().includes('items approved')) {
-                                let parts = line.split(':');
-                                let itemName = parts[0].replace(/[🔹📋🌟【】\-]/g, '').trim();
-                                let itemQty = parseInt(parts[1].trim());
-                                
-                                if (!isNaN(itemQty)) {
-                                    let rule = pointPriceDB.find(r => itemName.toLowerCase().includes(r.key.toLowerCase()) || r.key.toLowerCase().includes(itemName.toLowerCase()));
-                                    let price = rule ? (isOther ? rule.other : rule.same) : 0;
-                                    let cost = price * itemQty;
-                                    totalPointsDeducted += cost;
-                                    allocatedItemsHtml.push(`🔹 ${itemName}: <span style="color:#fff; font-weight:bold;">${itemQty}</span> <span style="color:var(--text-muted);font-size:0.8rem;">(@ ${price} pts = ${cost} pts)</span>`);
-                                    extractedQuantities.push(`<span style="color: var(--accent-cyan); font-weight: bold;">${itemQty}</span> <span style="font-size: 0.8rem; color: var(--text-muted);">(${itemName})</span>`);
-                                }
-                            }
-                        });
-                        
-                        if (allocatedItemsHtml.length > 0) {
-                            allocationHtml = `
-                            <div style="margin-top: 12px; padding: 12px; background: rgba(0,212,255,0.05); border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);">
-                                <div style="font-weight:600; color:var(--accent-cyan); margin-bottom:8px;">✅ Items Approved & Deducted:</div>
-                                <div style="line-height: 1.8;">${allocatedItemsHtml.join('<br>')}</div>
-                                <div style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px; color: var(--accent-rose); font-weight: bold; font-size: 0.95rem;">
-                                    💰 Total Deducted: ${totalPointsDeducted} Points
-                                </div>
-                            </div>`;
-                            
-                            if (!qtyHtml || qtyHtml === 'N/A') {
-                                qtyHtml = extractedQuantities.join('<br>');
-                            }
-                        } else {
-                            allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerText.replace(/\n/g, '<br>')}</div>`;
-                        }
-                    } else {
-                         allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerText.replace(/\n/g, '<br>')}</div>`;
-                    }
-                } else {
-                     allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px; font-style: italic;">No allocation receipt generated.</div>`;
-                }
-                
-                if (!qtyHtml || qtyHtml === '') {
-                    let fallbackQty = parseFeishuField(getFuzzyField(req, ['quantitiesinput', 'quantities', 'qty']));
-                    qtyHtml = fallbackQty ? fallbackQty.replace(/["\[\]]/g, '').trim() : '<span style="color: var(--text-muted);">N/A</span>';
-                }
-
-                historyHtml += `
-                <div style="background: var(--surface-hover); padding: 16px; margin-bottom: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                    <div style="display:flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                        <span style="color: #fff; font-weight: 600; font-size: 1rem;">🗓️ ${dateStr}</span>
-                        <span style="color: ${statusColor}; font-weight: bold; font-size: 0.85rem; padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid ${statusColor};">${status.toUpperCase()}</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Original Request</div>
-                            <div style="font-size: 0.9rem; color: var(--text); line-height: 1.6;">${privsHtml}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Details</div>
-                            <div style="font-size: 0.9rem; color: var(--text);">Requested Quantities: <br>${qtyHtml}</div>
-                            <div style="font-size: 0.9rem; color: var(--text); margin-top: 4px;">Target Type: <br><span style="color: var(--accent-purple);">${targetTypeHtml}</span></div>
-                        </div>
-                    </div>
-                    ${allocationHtml}
-                </div>`;
-            });
-        }
-        document.getElementById('pointsHistoryList').innerHTML = historyHtml;
-        document.getElementById('allocatorOutput').innerHTML = '<span style="color: var(--text-muted);">Select items above and click calculate to generate preview receipt...</span>';
-        
-        document.querySelectorAll('.priv-toggle').forEach(el => el.classList.remove('active'));
-        document.getElementById('calcQty').value = '';
-    }
-
-    function runAllocatorPreview() {
-        if (!currentAgencyData) return;
-        
-        const activeToggles = document.querySelectorAll('.priv-toggle.active');
-        const privInput = Array.from(activeToggles).map(el => el.getAttribute('data-val'));
-        
-        const qtyInput = document.getElementById('calcQty').value;
-        const target = document.getElementById('calcTarget').value;
-        
-        const used = currentAgencyData.used_points || 0;
-        const bal = currentAgencyData.point_balance || 0;
-        const monthText = currentAgencyData.monthly_tracker || "";
-        
-        const result = feishuSmartAllocator(privInput, qtyInput, target, used, bal, monthText);
-        document.getElementById('allocatorOutput').innerHTML = result;
-    }
-
-    function feishuSmartAllocator(param1, param2, param3, param4, param5, param6, param7) {
-        const priv = Array.isArray(param1) ? param1 : String(param1 || "").split(',').map(s => s.trim());
-        const qty = String(param2 || "").match(/\d+/g) || [];
-        const target = String(param3 || "").toLowerCase();
-        const used = Number(Array.isArray(param4) ? param4[0] : param4) || 0;
-        const bal = Number(Array.isArray(param5) ? param5[0] : param5) || 0;
-        const monthText = String(Array.isArray(param6) ? param6[0] : param6 || "");
-        
-        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        let currentD = new Date();
-        if (param7) { const d = new Date(param7); if (!isNaN(d)) currentD = d; }
-        let submittedMonthName = monthNames[currentD.getMonth()];
-        
-        if (priv.length === 0 || priv[0] === "") return "<span style='color: var(--accent-rose);'>⚠️ No items selected. Please select at least one privilege.</span>";
-        
-        const db = [
-            { key: "trend card", same: 40, other: 50, limit: 10 },
-            { key: "traffic card", same: 30, other: 40, limit: 50 },
-            { key: "30 mic 15 days", same: 150, other: 175, limit: 999 },
-            { key: "30 mic 30 days", same: 300, other: 350, limit: 999 },
-            { key: "normal short id", same: 120, other: 180, limit: 999 },
-            { key: "customized short id 15 days", same: 300, other: 450, limit: 999 },
-            { key: "customized short id 30 days", same: 600, other: 900, limit: 999 },
-            { key: "room pin-up", same: 100, other: 150, limit: 999 },
-            { key: "welcome package 3", same: 80, other: 80, limit: 15 },
-            { key: "welcome package 2", same: 30, other: 30, limit: 50 },
-            { key: "main page banner", same: 150, other: 150, limit: 3, type: "order" },
-            { key: "news banner", same: 100, other: 100, limit: 5, type: "order" },
-            { key: "live banner", same: 90, other: 90, limit: 5, type: "order" }
-        ];
-        
-        let storedMonth = "";
-        const monthly = {};
-        const lines = monthText.split('\n');
-        for (const line of lines) {
-            if (line.includes('━') || line.includes('┈')) continue; 
-            let monthMatch = line.match(/Month:\s*([A-Za-z0-9]+)/i);
-            if (monthMatch) {
-                storedMonth = monthMatch[1].trim();
-            }
-            else if (line.includes(':')) { 
-                let parts = line.split(':');
-                if (parts.length >= 2) {
-                    let itemName = parts[0].replace(/[🔹📋🌟【】]/g, '').trim(); 
-                    let itemQty = parseInt(parts[1].trim());
-                    if (!isNaN(itemQty)) monthly[itemName] = itemQty;
-                }
-            }
-        }
-        
-        let isSameMonth = false;
-        if (storedMonth.toLowerCase() === submittedMonthName.toLowerCase()) isSameMonth = true;
-        else if (parseInt(storedMonth) === currentD.getMonth() + 1) isSameMonth = true; 
-        
-        if (!isSameMonth) { for (const k in monthly) delete monthly[k]; }
-        
-        let remainingBalance = bal;
-        let totalCost = 0;
-        let receiptLines = [];
-        let currentOrder = {};
-        
-        for (let i = 0; i < priv.length; i++) {
-            const item = priv[i].toLowerCase();
-            const q = Number(qty[i]) || 0;
-            if (q <= 0) continue;
-            
-            const rule = db.find(r => item.includes(r.key));
-            if (!rule) continue;
-            
-            const price = target.includes("other") ? rule.other : rule.same;
-            const display = rule.key.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-            const pastUsage = monthly[display] || 0;
-            
-            let limitAllowed;
-            if (rule.type === "order") {
-                limitAllowed = rule.limit; 
-            } else {
-                limitAllowed = rule.limit - pastUsage; 
-            }
-            
-            if (limitAllowed < 0) limitAllowed = 0;
-            let desired = Math.min(q, limitAllowed);
-            let affordable = Math.floor(remainingBalance / price);
-            let approved = Math.min(desired, affordable);
-            
-            if (approved === q) {
-                receiptLines.push(`<span style="color: var(--accent-green);">✅ FULLY APPROVED:</span> ${approved}x ${display} @ ${price} pts = <span style="color: #fff;">${approved * price}</span>`);
-            } else if (approved > 0) {
-                let reason = (q > limitAllowed) ? 
-                    (rule.type === "order" ? `Max ${rule.limit} allowed per request.` : `Limit maxes out at ${limitAllowed} more.`) 
-                    : `Not enough points for ${desired}.`;
-                receiptLines.push(`<span style="color: var(--accent-amber);">⚠️ PARTIALLY APPROVED:</span> ${approved}x ${display} @ ${price} pts = <span style="color: #fff;">${approved * price}</span>\n    <span style="color: var(--text-muted);">└─ (Rejected ${q - approved}x: ${reason})</span>`);
-            } else {
-                let reason = (limitAllowed === 0) ? 
-                    (rule.type === "order" ? `Max ${rule.limit} allowed per request.` : `Monthly limit (${rule.limit}) already reached.`) 
-                    : `Insufficient points (${remainingBalance} left).`;
-                receiptLines.push(`<span style="color: var(--accent-rose);">❌ FULLY REJECTED:</span> 0x ${display}\n    <span style="color: var(--text-muted);">└─ (Reason: ${reason})</span>`);
-            }
-            
-            if (approved > 0) {
-                totalCost += approved * price;
-                remainingBalance -= approved * price;
-                currentOrder[display] = (currentOrder[display] || 0) + approved;
-                monthly[display] = pastUsage + approved; 
-            }
-        }
-        
-        let baseReceipt = receiptLines.join('\n\n') + `\n\n<div style="border-top: 1px dashed var(--border); margin: 10px 0; padding-top: 10px;"></div><span style="color: var(--accent-rose); font-weight: bold; font-size: 1rem;">💰 TOTAL DEDUCTED: ${totalCost} pts</span>\n<span style="color: var(--accent-cyan); font-weight: bold; font-size: 1rem;">💳 REMAINING BALANCE: ${remainingBalance} pts</span>\n`;
-        
-        let monthlySummary = `\n<div style="border-top: 1px solid var(--border); margin: 16px 0;"></div><span style="color: var(--accent-amber); font-weight: bold;">🌟 CURRENT MONTH USAGE 🌟</span>\n\n` + 
-                             Object.entries(monthly).map(([k,v]) => `<span style="color: var(--accent-cyan);">🔹</span> ${k}: <span style="color: #fff;">${v}</span>`).join('\n');
-        
-        let out_preview = `<div style="font-size: 1.1rem; color: var(--accent-purple); font-weight: bold; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">👀 ORDER PREVIEW (Smart Allocation) 👀</div>` + 
-                          baseReceipt + 
-                          `<br><span style="color: var(--accent-amber);">⚠️ Remember: This is a preview, points are NOT deducted yet.</span>\n` + 
-                          monthlySummary;
-        
-        return out_preview; 
     }
 </script>
 </body>
