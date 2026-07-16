@@ -385,6 +385,7 @@ def search_agency():
     if "all" not in allowed_acms and sheet_acm_name.lower() not in allowed_acms:
         return jsonify({"error": f"Access Denied: You are not authorized to view data for ACM: {sheet_acm_name}"}), 403
 
+    # 🚨 Extract the required columns for the Points System Module
     try: base_points = float(extract_field_text(get_field_local(fields, 'Base Points')).replace(',', '').strip())
     except ValueError: base_points = 0
     try: total_points = float(extract_field_text(get_field_local(fields, '# Total Points', 'Total Points', 'Total', 'Total points')).replace(',', '').strip())
@@ -394,6 +395,7 @@ def search_agency():
     try: point_balance = float(extract_field_text(get_field_local(fields, 'Point Balance', 'Balance', 'Point balance')).replace(',', '').strip())
     except ValueError: point_balance = 0
     
+    # Mathematical Safety Net (Fixes the formula extraction issue where Balance shows 0)
     if point_balance == 0 and total_points > 0:
         point_balance = total_points - used_points
     
@@ -411,6 +413,7 @@ def search_agency():
             if ts and ts.month == cm and ts.year == cy:
                 valid_requests.append(r_fields)
 
+    # Returning the Point variables securely to the frontend
     return jsonify({
         "base_points": base_points, 
         "total_points": total_points,
