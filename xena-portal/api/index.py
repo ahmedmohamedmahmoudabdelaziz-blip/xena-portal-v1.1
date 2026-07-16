@@ -375,7 +375,7 @@ def search_agency():
             "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [agency_code]}]
         }
     }
-    points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
+    points_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
 
     points_response = requests.post(points_url, headers=headers, json=points_payload, timeout=10).json()
     if points_response.get("code") != 0: return jsonify({"error": f"Feishu API Blocked: {points_response.get('msg')}"}), 403
