@@ -130,9 +130,11 @@
         .chart-box.full-width{grid-column:1/-1}
         .chart-box h3{font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:8px}
         .chart-box h3::before{content:'';width:4px;height:16px;border-radius:2px;background:var(--accent-cyan)}
-        .chart-wrapper-pie{position:relative;height:240px}
-        .chart-wrapper-pie-large{position:relative;height:520px}
-        .chart-wrapper-bar{position:relative;height:320px}
+        .chart-wrapper-pie{position:relative;height:280px}
+        .chart-wrapper-pie-large{position:relative;height:580px}
+        .chart-wrapper-bar{position:relative;height:340px}
+        .chart-wrapper-bar-tall{position:relative;height:420px}
+        .chart-wrapper-bar-acm{position:relative;height:480px}
 
         /* ── 1.2  CROSS-FILTER CHIPS ─────────────────────────────────────── */
         #activeFiltersBar{display:none;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -159,13 +161,19 @@
         .score-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent-green),var(--accent-cyan));transition:width .6s ease}
 
         /* ── 1.6  HEATMAP ───────────────────────────────────────────────── */
-        .heatmap-scroll{overflow-x:auto;padding-bottom:10px;margin-top:10px}
-        .heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:4px;width:max-content}
-        .heatmap-cell{width:14px;height:14px;border-radius:3px;background:rgba(255,255,255,.05);position:relative;cursor:crosshair;transition:transform .1s}
-        .heatmap-cell:hover{transform:scale(1.4);z-index:2}
-        .heatmap-cell:hover::after{content:attr(data-tooltip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:4px 8px;border-radius:4px;font-size:.75rem;white-space:nowrap;z-index:10;pointer-events:none}
+        .heatmap-outer{display:flex;gap:6px;margin-top:12px}
+        .heatmap-day-labels{display:grid;grid-template-rows:repeat(7,16px);gap:4px;padding-top:22px}
+        .heatmap-day-label{font-size:.65rem;color:var(--text-muted);line-height:16px;width:28px;text-align:right;padding-right:4px}
+        .heatmap-right{display:flex;flex-direction:column;flex:1;min-width:0}
+        .heatmap-month-row{display:flex;gap:0;margin-bottom:4px;height:18px;position:relative}
+        .heatmap-month-label{font-size:.65rem;color:var(--text-muted);position:absolute;white-space:nowrap}
+        .heatmap-scroll{overflow-x:auto;padding-bottom:10px}
+        .heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,16px);gap:4px;width:max-content}
+        .heatmap-cell{width:16px;height:16px;border-radius:4px;background:rgba(255,255,255,.06);position:relative;cursor:crosshair;transition:transform .12s,box-shadow .12s}
+        .heatmap-cell:hover{transform:scale(1.35);z-index:2;box-shadow:0 0 8px rgba(0,212,255,.5)}
+        .heatmap-tooltip{position:fixed;background:rgba(0,0,0,.9);color:#fff;padding:5px 10px;border-radius:6px;font-size:.75rem;white-space:nowrap;z-index:9999;pointer-events:none;border:1px solid rgba(0,212,255,.3);display:none}
         .heatmap-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:.75rem;color:var(--text-muted)}
-        .heatmap-legend-cell{width:14px;height:14px;border-radius:3px}
+        .heatmap-legend-cell{width:16px;height:16px;border-radius:4px}
 
         /* ── 1.1  COMPARISON ────────────────────────────────────────────── */
         .compare-section{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.15);border-radius:12px;padding:16px;margin-bottom:20px}
@@ -237,10 +245,15 @@
         .stat-box{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
         .stat-label{font-size:.8rem;color:var(--text-muted);margin-bottom:4px}
         .stat-value{font-size:1.5rem;font-weight:700}
-        .priv-toggle{background:var(--bg);border:1px solid var(--border);padding:10px 14px;border-radius:8px;font-size:.85rem;cursor:pointer;transition:.2s;color:var(--text-muted);text-align:left;display:flex;align-items:center;justify-content:space-between}
+        .priv-toggle{background:var(--bg);border:1px solid var(--border);padding:10px 12px;border-radius:8px;font-size:.85rem;cursor:pointer;transition:.2s;color:var(--text-muted);text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none}
         .priv-toggle:hover{border-color:var(--accent-cyan);color:var(--text)}
         .priv-toggle.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:600}
-        .priv-toggle.active::after{content:'✓';font-weight:bold}
+        .priv-toggle-label{flex:1;pointer-events:none}
+        .priv-toggle-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+        .priv-qty{width:46px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-hover);background:var(--surface);color:var(--text);font-size:.82rem;text-align:center;cursor:default}
+        .priv-toggle.active .priv-qty{border-color:var(--accent-cyan)}
+        .priv-check{font-size:.85rem;color:var(--accent-cyan);opacity:0;width:14px;text-align:center}
+        .priv-toggle.active .priv-check{opacity:1}
 
         /* ── 5.1  HEALTH BADGE ──────────────────────────────────────────── */
         .health-badge{position:absolute;top:16px;left:16px;padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid}
@@ -588,19 +601,19 @@
                     <div class="control-group">
                         <label>Select Privileges</label>
                         <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-                            <div class="priv-toggle" data-val="trend card" onclick="this.classList.toggle('active')">Trend Card (40-50)</div>
-                            <div class="priv-toggle" data-val="traffic card" onclick="this.classList.toggle('active')">Traffic Card (30-40)</div>
-                            <div class="priv-toggle" data-val="30 mic 15 days" onclick="this.classList.toggle('active')">30 Mic 15 Days (150-175)</div>
-                            <div class="priv-toggle" data-val="30 mic 30 days" onclick="this.classList.toggle('active')">30 Mic 30 Days (300-350)</div>
-                            <div class="priv-toggle" data-val="normal short id" onclick="this.classList.toggle('active')">Normal Short ID</div>
-                            <div class="priv-toggle" data-val="customized short id 15 days" onclick="this.classList.toggle('active')">Custom Short ID 15D</div>
-                            <div class="priv-toggle" data-val="customized short id 30 days" onclick="this.classList.toggle('active')">Custom Short ID 30D</div>
-                            <div class="priv-toggle" data-val="room pin-up" onclick="this.classList.toggle('active')">Room Pin-up (100-150)</div>
-                            <div class="priv-toggle" data-val="welcome package 3" onclick="this.classList.toggle('active')">Welcome Package 3</div>
-                            <div class="priv-toggle" data-val="welcome package 2" onclick="this.classList.toggle('active')">Welcome Package 2</div>
-                            <div class="priv-toggle" data-val="main page banner" onclick="this.classList.toggle('active')">Main Page Banner</div>
-                            <div class="priv-toggle" data-val="news banner" onclick="this.classList.toggle('active')">News Banner</div>
-                            <div class="priv-toggle" data-val="live banner" onclick="this.classList.toggle('active')">Live Banner</div>
+                            <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
                         </div>
                     </div>
                     <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
@@ -674,59 +687,53 @@
         </div>
 
         <!-- Status pie row -->
+        <!-- Row 1: 3 Status Donuts -->
         <div class="chart-grid-3">
             <div class="chart-box">
-                <h3>Creation Status</h3>
+                <h3>Agency Creation Status</h3>
                 <div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div>
             </div>
             <div class="chart-box">
-                <h3>BD Status</h3>
+                <h3>BD-Creation Status</h3>
                 <div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div>
             </div>
             <div class="chart-box">
-                <h3>Closing Status</h3>
+                <h3>Closing Agency Status</h3>
                 <div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div>
             </div>
         </div>
 
-        <!-- Trends row -->
+        <!-- Row 2: Rejection Reasons — full width, tall -->
+        <div class="chart-grid-1" style="margin-bottom:24px">
+            <div class="chart-box">
+                <h3>Rejection Reasons</h3>
+                <div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
         <div class="chart-grid-2">
             <div class="chart-box">
-                <h3>Daily Creation Trend</h3>
-                <div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div>
+                <h3>Closing Reasons</h3>
+                <div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div>
             </div>
             <div class="chart-box">
-                <h3>Daily BD Trend</h3>
-                <div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div>
+                <h3>ACM Closing Breakdown</h3>
+                <div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div>
             </div>
         </div>
 
-        <!-- 1.6  Heatmap -->
-        <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
-            <h3>Activity Heatmap</h3>
-            <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
-            <div class="heatmap-legend">
-                <span>Less</span>
-                <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.05)"></div>
-                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.2)"></div>
-                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.5)"></div>
-                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.8)"></div>
-                <div class="heatmap-legend-cell" style="background:#00d4ff"></div>
-                <span>More</span>
-            </div>
-        </div>
-
-        <!-- ACM Performance + Leaderboard -->
+        <!-- Row 4: ACM Performance + Leaderboard — full width -->
         <div class="chart-box full-width" style="margin-bottom:24px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <h3 style="margin-bottom:0">ACM Performance</h3>
+                <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
                 <div class="tab-bar" style="margin-bottom:0;max-width:280px">
                     <button class="tab-btn active" onclick="switchAcmView('chart',this)">📊 Chart</button>
                     <button class="tab-btn" onclick="switchAcmView('leaderboard',this)">🏆 Leaderboard</button>
                 </div>
             </div>
             <div id="acmChartView">
-                <div class="chart-wrapper-bar"><canvas id="cAcm"></canvas></div>
+                <div class="chart-wrapper-bar-acm"><canvas id="cAcm"></canvas></div>
             </div>
             <div id="acmLeaderboardView" style="display:none">
                 <div style="overflow-x:auto">
@@ -746,39 +753,67 @@
             </div>
         </div>
 
-        <!-- More charts -->
+        <!-- Row 5: Guardian Types + Agency Types -->
         <div class="chart-grid-2">
             <div class="chart-box">
-                <h3>Rejection Reasons</h3>
-                <div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div>
+                <h3>Guardian Types</h3>
+                <div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div>
             </div>
             <div class="chart-box">
-                <h3>Agency Type Distribution</h3>
+                <h3>Agency Types</h3>
                 <div class="chart-wrapper-pie"><canvas id="cType"></canvas></div>
             </div>
         </div>
 
-        <div class="chart-grid-2">
+        <!-- Row 6: Other Apps Hosted — full width -->
+        <div class="chart-grid-1" style="margin-bottom:24px">
             <div class="chart-box">
-                <h3>Creation Method</h3>
-                <div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>Other App Distribution</h3>
-                <div class="chart-wrapper-bar"><canvas id="cOtherApp"></canvas></div>
+                <h3>Other Apps Hosted</h3>
+                <div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div>
             </div>
         </div>
 
+        <!-- Row 7: Daily Trend lines -->
         <div class="chart-grid-2">
             <div class="chart-box">
-                <h3>Closing Reasons</h3>
-                <div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div>
+                <h3>Daily Agency Creations Trend</h3>
+                <div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div>
             </div>
             <div class="chart-box">
-                <h3>ACM Closing Breakdown</h3>
-                <div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div>
+                <h3>Daily BD Creations Trend</h3>
+                <div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div>
             </div>
         </div>
+
+        <!-- Row 8: Activity Heatmap — full width -->
+        <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
+            <h3>Activity Heatmap</h3>
+            <div class="heatmap-outer">
+                <div class="heatmap-day-labels">
+                    <div class="heatmap-day-label"></div>
+                    <div class="heatmap-day-label">Mon</div>
+                    <div class="heatmap-day-label"></div>
+                    <div class="heatmap-day-label">Wed</div>
+                    <div class="heatmap-day-label"></div>
+                    <div class="heatmap-day-label">Fri</div>
+                    <div class="heatmap-day-label"></div>
+                </div>
+                <div class="heatmap-right">
+                    <div class="heatmap-month-row" id="heatmapMonths"></div>
+                    <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
+                </div>
+            </div>
+            <div class="heatmap-legend">
+                <span>Less</span>
+                <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.06)"></div>
+                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.2)"></div>
+                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.45)"></div>
+                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.75)"></div>
+                <div class="heatmap-legend-cell" style="background:#00d4ff"></div>
+                <span>More</span>
+            </div>
+        </div>
+        <div class="heatmap-tooltip" id="heatmapTooltip"></div>
     </div>
 </div>
 
@@ -1558,10 +1593,17 @@ function drawCharts(data) {
     charts={};
 
     const pieOpts={responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle'}},
+        plugins:{legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',boxWidth:10,font:{size:12}}},
                  datalabels:{color:'#fff',font:{weight:'bold',size:11},formatter:(v,ctx)=>{const sum=ctx.dataset.data.reduce((a,b)=>a+b,0);return sum===0?'':(v/sum*100).toFixed(1)+'%'}}}};
-    const pieOptsReject={responsive:true,maintainAspectRatio:false,layout:{padding:{left:240,right:240,top:40,bottom:40}},
-        plugins:{legend:{display:false},datalabels:{display:false},leaderLine:{display:true}}};
+    // Rejection reasons: show % labels on segments + full legend below (scrollable)
+    const pieOptsReject={responsive:true,maintainAspectRatio:false,layout:{padding:20},
+        cutout:'55%',
+        plugins:{
+            legend:{position:'bottom',labels:{padding:14,usePointStyle:true,pointStyle:'circle',boxWidth:10,font:{size:11},
+                filter:(item,data)=>{const v=data.datasets[0].data[item.index];const sum=data.datasets[0].data.reduce((a,b)=>a+b,0);return sum>0&&(v/sum*100)>=0.5;}}},
+            datalabels:{color:'#fff',font:{weight:'bold',size:10},
+                formatter:(v,ctx)=>{const sum=ctx.dataset.data.reduce((a,b)=>a+b,0);if(sum===0)return'';const pct=v/sum*100;return pct>=2?pct.toFixed(1)+'%':'';},
+                textStrokeColor:'rgba(0,0,0,.6)',textStrokeWidth:3}}};
 
     const buildPie=(id,dataset,isReject=false)=>{
         const ctx=document.getElementById(id);
@@ -1696,29 +1738,96 @@ function switchAcmView(view,btn) {
 // ════════════════════════════════════════════════════════════════════
 function renderHeatmap(dataObj) {
     const container=document.getElementById('heatmapGrid');
+    const monthRow=document.getElementById('heatmapMonths');
     if (!container) return;
     container.innerHTML='';
-    const dates=Object.keys(dataObj);
-    if (!dates.length) return;
-    const values=Object.values(dataObj);
-    const maxVal=Math.max(...values,1);
-    const firstDate=new Date(dates[0]);
-    const startDow=firstDate.getDay();
-    // Fill empty cells before first date
-    for (let i=0;i<startDow;i++) {
-        const blank=document.createElement('div');
-        blank.className='heatmap-cell';blank.style.background='transparent';
-        container.appendChild(blank);
+    if (monthRow) monthRow.innerHTML='';
+
+    const dates=Object.keys(dataObj).sort();
+    if (!dates.length) {
+        container.innerHTML='<div style="color:var(--text-muted);font-size:.85rem;padding:20px">No daily data available.</div>';
+        return;
     }
-    dates.forEach((d,i)=>{
-        const cell=document.createElement('div');
-        cell.className='heatmap-cell';
-        const v=values[i];
-        const intensity=v===0?0.05:0.15+(v/maxVal)*0.85;
-        cell.style.background=v===0?'rgba(255,255,255,.05)':`rgba(0,212,255,${intensity.toFixed(2)})`;
-        cell.setAttribute('data-tooltip',`${d}: ${v} creations`);
-        container.appendChild(cell);
-    });
+
+    const values=dates.map(d=>dataObj[d]||0);
+    const maxVal=Math.max(...values,1);
+
+    // Build full-week-aligned grid from Sunday of first week to Saturday of last week
+    const firstDate=new Date(dates[0]+'T00:00:00');
+    const lastDate=new Date(dates[dates.length-1]+'T00:00:00');
+    // Align start to Sunday
+    const startSun=new Date(firstDate);
+    startSun.setDate(startSun.getDate()-startSun.getDay());
+    // Align end to Saturday
+    const endSat=new Date(lastDate);
+    endSat.setDate(endSat.getDate()+(6-endSat.getDay()));
+
+    // Map dates → values for O(1) lookup
+    const valMap={};
+    dates.forEach((d,i)=>valMap[d]=values[i]);
+
+    // Tooltip element
+    const tip=document.getElementById('heatmapTooltip');
+
+    // Build week columns, track month labels
+    const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let monthLabels={}; // weekColIndex → month string
+    let weekCol=0;
+    let cur=new Date(startSun);
+    const cells=[];
+    while(cur<=endSat) {
+        const colStart=new Date(cur);
+        // Week start = Sunday
+        const weekIso=colStart.toISOString().split('T')[0];
+        // Check if any day in this week is in a new month
+        const firstDayOfWeekMonth=cur.getMonth();
+        if (!Object.values(monthLabels).includes(MONTHS[firstDayOfWeekMonth])||weekCol===0) {
+            monthLabels[weekCol]=MONTHS[firstDayOfWeekMonth];
+        }
+        for (let dow=0;dow<7;dow++) {
+            const dateStr=cur.toISOString().split('T')[0];
+            const v=valMap[dateStr]||0;
+            const inRange=cur>=firstDate&&cur<=lastDate;
+            const cell=document.createElement('div');
+            cell.className='heatmap-cell';
+            if (!inRange||v===0) {
+                cell.style.background='rgba(255,255,255,.06)';
+            } else {
+                const intensity=0.18+(v/maxVal)*0.82;
+                cell.style.background=`rgba(0,212,255,${intensity.toFixed(2)})`;
+            }
+            const dayLabel=cur.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+            const tooltip=inRange?`${dayLabel}: ${v} creation${v!==1?'s':''}`:`${dayLabel}`;
+            cell.addEventListener('mouseenter',e=>{
+                tip.textContent=tooltip;
+                tip.style.display='block';
+                tip.style.left=(e.clientX+12)+'px';
+                tip.style.top=(e.clientY-32)+'px';
+            });
+            cell.addEventListener('mousemove',e=>{
+                tip.style.left=(e.clientX+12)+'px';
+                tip.style.top=(e.clientY-32)+'px';
+            });
+            cell.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
+            container.appendChild(cell);
+            cur.setDate(cur.getDate()+1);
+        }
+        weekCol++;
+    }
+
+    // Render month labels above
+    if (monthRow) {
+        const totalWeeks=weekCol;
+        const cellW=20; // 16px cell + 4px gap
+        Object.entries(monthLabels).forEach(([wc,label])=>{
+            const lbl=document.createElement('div');
+            lbl.className='heatmap-month-label';
+            lbl.textContent=label;
+            lbl.style.left=(parseInt(wc)*cellW)+'px';
+            monthRow.appendChild(lbl);
+        });
+        monthRow.style.width=(totalWeeks*cellW)+'px';
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1987,27 +2096,56 @@ function buildPointsHistory(requests) {
 }
 
 // Smart Allocator
+function privToggle(el, e) {
+    // Prevent toggling when user clicks directly on the number input
+    if (e && e.target && e.target.tagName==='INPUT') return;
+    el.classList.toggle('active');
+}
+
 function runAllocator() {
-    if (!currentAgencyData) return;
-    const activePrivs=Array.from(document.querySelectorAll('.priv-toggle.active')).map(el=>el.getAttribute('data-val'));
-    if (!activePrivs.length) { document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select privileges above to preview allocation.</span>'; return; }
+    if (!currentAgencyData) {
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Load an agency first to use the allocator.</span>';
+        return;
+    }
+    const activeToggles=Array.from(document.querySelectorAll('#calcPrivGrid .priv-toggle.active'));
+    if (!activeToggles.length) {
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select one or more privileges above to preview allocation.</span>';
+        return;
+    }
     const balance=currentAgencyData.point_balance||0;
-    let remaining=balance,receiptLines=[],totalCost=0;
-    const qty=1; // Default qty 1 per item for preview
-    activePrivs.forEach(key=>{
+    let remaining=balance, receiptLines=[], totalCost=0;
+
+    activeToggles.forEach(el=>{
+        const key=el.getAttribute('data-val');
+        const qtyInput=el.querySelector('.priv-qty');
+        const qty=Math.max(1,parseInt(qtyInput?.value||'1',10)||1);
         const entry=pointPriceDB.find(e=>e.key===key);
         if (!entry) return;
-        const price=entry.same;
+        const unitPrice=entry.same;
+        const lineCost=unitPrice*qty;
         const display=key.replace(/\b\w/g,c=>c.toUpperCase());
-        if (remaining>=price) { receiptLines.push(`✅ APPROVED: 1x ${display} @ ${price} pts`); totalCost+=price; remaining-=price; }
-        else { receiptLines.push(`❌ REJECTED: ${display} — insufficient points (${remaining} left, need ${price})`); }
+        if (remaining>=lineCost) {
+            receiptLines.push(`✅ APPROVED: ${qty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts`);
+            totalCost+=lineCost;
+            remaining-=lineCost;
+        } else {
+            receiptLines.push(`❌ REJECTED: ${qty}× ${display} — need ${lineCost} pts, only ${remaining} left`);
+        }
     });
-    const out=receiptLines.join('\n')+`\n\n─────────────────\n💰 TOTAL: ${totalCost} pts\n💳 REMAINING: ${remaining} pts`;
+
+    const out=receiptLines.join('\n')+
+        `\n\n─────────────────────────────\n`+
+        `💰 TOTAL COST : ${totalCost.toLocaleString()} pts\n`+
+        `💳 BALANCE    : ${balance.toLocaleString()} pts\n`+
+        `✨ REMAINING  : ${remaining.toLocaleString()} pts`;
+
     document.getElementById('allocatorOutput').innerHTML=out.split('\n').map(l=>{
         if(l.startsWith('✅'))return`<span style="color:var(--accent-green)">${l}</span>`;
         if(l.startsWith('❌'))return`<span style="color:var(--accent-rose)">${l}</span>`;
         if(l.startsWith('💰'))return`<span style="color:var(--accent-rose);font-weight:bold">${l}</span>`;
-        if(l.startsWith('💳'))return`<span style="color:var(--accent-cyan);font-weight:bold">${l}</span>`;
+        if(l.startsWith('💳'))return`<span style="color:var(--text-muted)">${l}</span>`;
+        if(l.startsWith('✨'))return`<span style="color:var(--accent-cyan);font-weight:bold">${l}</span>`;
+        if(l.startsWith('─'))return`<span style="color:var(--border-hover)">${l}</span>`;
         return l;
     }).join('\n');
 }
