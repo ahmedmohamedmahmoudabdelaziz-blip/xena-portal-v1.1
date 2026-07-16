@@ -151,7 +151,7 @@
         .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
         .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
         .stat-value { font-size: 1.5rem; font-weight: 700; }
-
+        
         .health-badge { position: absolute; top: 16px; left: 16px; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; border: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
         .health-Healthy { background: rgba(0,230,118,0.1); color: var(--accent-green); border-color: rgba(0,230,118,0.3); }
         .health-AtRisk { background: rgba(255,184,0,0.1); color: var(--accent-amber); border-color: rgba(255,184,0,0.3); }
@@ -179,6 +179,20 @@
         .empty-state:hover svg { fill: var(--accent-cyan); }
         .empty-state h3 { color: var(--text); font-size: 1.2rem; margin-bottom: 8px;}
 
+        /* 🚨 PHASE 5: HEATMAP CSS */
+        .heatmap-scroll { overflow-x: auto; padding-bottom: 10px; margin-top: 10px;}
+        .heatmap-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 4px; width: max-content;}
+        .heatmap-cell { width: 14px; height: 14px; border-radius: 3px; background: rgba(255,255,255,0.05); position: relative; cursor: crosshair; }
+        .heatmap-cell:hover::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; white-space: nowrap; z-index: 10; pointer-events: none; margin-bottom: 5px;}
+
+        /* 🚨 PHASE 5: COMPARISON MODE CSS */
+        .compare-table { width: 100%; border-collapse: collapse; margin-top: 16px; white-space: nowrap;}
+        .compare-table th, .compare-table td { padding: 14px 16px; text-align: center; border-bottom: 1px solid var(--border); }
+        .compare-table th { background: rgba(255,255,255,0.02); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; font-weight: 600;}
+        .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .compare-best { color: var(--accent-green); font-weight: bold; }
+        .compare-worst { color: var(--accent-rose); font-weight: bold; }
+
         @media (max-width: 768px) {
             .app-shell { padding: 12px; }
             .top-bar { flex-direction: column; align-items: stretch; gap: 16px; }
@@ -201,6 +215,7 @@
             .kpi-card::before { display: none; }
             .chart-wrapper-pie { height: 200px; }
             .chart-wrapper-bar { height: 250px; }
+            .heatmap-scroll, .compare-table { display: none !important; }
         }
     </style>
 </head>
@@ -328,14 +343,16 @@
 
         <div id="standardSearchParams" class="centered-search-box" style="display:none;">
             <div class="control-group">
-                <label>Agency Code <span style="font-size:0.65rem; font-weight:normal; color:var(--text-muted); float:right; text-transform:none;">Press <strong>Ctrl+K</strong> or <strong>/</strong> to focus</span></label>
+                <label>Agency Code <span style="font-size:0.65rem; font-weight:normal; color:var(--text-muted); float:right; text-transform:none;">Use comma for multiple (e.g. 40775, 40776)</span></label>
                 <input type="text" id="agencyCode" placeholder="e.g., 40775">
             </div>
             <button class="btn btn-primary" id="btnSearch" onclick="fetchAgencyData()">Search Database</button>
         </div>
 
         <div id="analyticsParams" style="display:none;">
-            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-bottom: -10px; z-index: 10; position: relative;">
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-bottom: -10px; z-index: 10; position: relative;">
+                <!-- 🚨 PHASE 5: SHARE LINK BUTTON -->
+                <button onclick="copyShareLink()" style="background:none; border:none; color:var(--accent-green); font-size:0.8rem; cursor:pointer; font-weight:600;">🔗 Copy Share Link</button>
                 <button onclick="saveFilterPreset()" style="background:none; border:none; color:var(--accent-cyan); font-size:0.8rem; cursor:pointer; font-weight:600;">💾 Save Filters</button>
                 <button onclick="loadFilterPreset()" style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; font-weight:600;">📂 Load Saved</button>
             </div>
@@ -397,6 +414,12 @@
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <h3>Ready to Explore</h3>
         <p>Select a module from the dropdown above to begin.</p>
+    </div>
+
+    <!-- 🚨 PHASE 5: MULTI-AGENCY COMPARISON UI -->
+    <div id="comparisonArea" class="card" style="display:none; overflow-x:auto;">
+        <h3 style="color:var(--accent-cyan); margin-bottom:16px; display:flex; align-items:center; gap:8px;">⚖️ Agency Comparison Engine</h3>
+        <div id="comparisonTableContainer"></div>
     </div>
 
     <div id="resultsContainer" style="display: none;">
@@ -549,6 +572,16 @@
                 <div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div>
             </div>
         </div>
+        
+        <!-- 🚨 PHASE 5: ACTIVITY HEATMAP UI (1.6) -->
+        <div class="chart-grid-1">
+            <div class="chart-box">
+                <h3 style="color: var(--accent-purple);">🔥 Daily Activity Heatmap</h3>
+                <div class="heatmap-scroll">
+                    <div id="heatmapGrid" class="heatmap-grid"></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -565,10 +598,9 @@
         }
     }
 
-    // 🚨 PHASE 4: IDLE SESSION TIMEOUT (4.2)
     let idleSeconds = 0;
-    const IDLE_WARNING_TIME = 25 * 60; // 25 minutes
-    const IDLE_LOGOUT_TIME = 30 * 60; // 30 minutes
+    const IDLE_WARNING_TIME = 25 * 60; 
+    const IDLE_LOGOUT_TIME = 30 * 60; 
 
     document.addEventListener('mousemove', () => idleSeconds = 0);
     document.addEventListener('keydown', (e) => {
@@ -585,26 +617,17 @@
         }
     });
 
-    // 🚨 PHASE 4: SESSION TIMERS & ABSOLUTE EXPIRATION
     setInterval(() => {
         let uat = localStorage.getItem('xenaUat');
         if (!uat) return; 
-
         idleSeconds++;
-
-        if (idleSeconds === IDLE_WARNING_TIME) {
-            ToastManager.show("Your session will expire in 5 minutes due to inactivity.", "warning");
-        }
-        if (idleSeconds >= IDLE_LOGOUT_TIME) {
-            logout();
-        }
+        if (idleSeconds === IDLE_WARNING_TIME) ToastManager.show("Your session will expire in 5 minutes due to inactivity.", "warning");
+        if (idleSeconds >= IDLE_LOGOUT_TIME) logout();
 
         const loginTimestamp = localStorage.getItem('xenaLoginTimestamp');
         if (loginTimestamp) {
             const elapsedHours = (Date.now() - parseInt(loginTimestamp)) / (1000 * 60 * 60);
-            if (elapsedHours > 8) {
-                logout(); 
-            }
+            if (elapsedHours > 8) logout(); 
         }
     }, 1000);
 
@@ -612,6 +635,7 @@
         if(show) {
             document.getElementById('loadingOverlay').style.display = 'none';
             if(type === 'search') {
+                document.getElementById('comparisonArea').style.display = 'none';
                 document.getElementById('resultsContainer').style.display = 'block';
                 document.getElementById('privilegeArea').style.display = 'none';
                 document.getElementById('pointsArea').style.display = 'none';
@@ -626,6 +650,7 @@
                     if(ctx) { const chart = Chart.getChart(ctx); if(chart) chart.destroy(); }
                     el.innerHTML = '<div class="skeleton" style="width:100%; height:100%;"></div>';
                 });
+                document.getElementById('heatmapGrid').innerHTML = '<div class="skeleton" style="height: 100px; width: 100%;"></div>';
             }
         }
     }
@@ -832,8 +857,6 @@
         localStorage.setItem('xenaUser', loggedUser);
         localStorage.setItem('xenaEmail', loggedEmail);
         localStorage.setItem('xenaUat', loggedUat);
-        
-        // 🚨 PHASE 4: Establish Session Creation Time
         localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
         
         window.history.replaceState({}, document.title, "/");
@@ -869,12 +892,33 @@
                     }
                     
                     toggleViewModes();
+                    initPills();
+                    updateAcmDropdown();
+                    setDatePresets();
+
+                    // 🚨 PHASE 5: Read Hash for Snapshot Loading (8.2)
+                    if (window.location.hash.startsWith('#analyze?')) {
+                        const hashParams = new URLSearchParams(window.location.hash.substring(9));
+                        document.getElementById('queryType').value = 'analytics';
+                        toggleViewModes();
+                        
+                        setTimeout(() => {
+                            document.getElementById('anaRegion').value = hashParams.get('region') || 'PK';
+                            updateAcmDropdown();
+                            setTimeout(() => {
+                                document.getElementById('anaAcm').value = hashParams.get('acm') || 'All';
+                                document.getElementById('anaType').value = hashParams.get('type') || 'All';
+                                document.getElementById('anaFrom').value = hashParams.get('from') || '';
+                                document.getElementById('anaTo').value = hashParams.get('to') || '';
+                                if(hashParams.get('from') || hashParams.get('to')) document.getElementById('anaDatePreset').value = 'specific';
+                                updateCustomDateVisibility();
+                                ToastManager.show("Snapshot Loaded from Link", "success");
+                                generateAnalytics();
+                            }, 50);
+                        }, 50);
+                    }
                 }
             }).catch(e => console.error(e));
-
-        updateAcmDropdown();
-        setDatePresets();
-        initPills();
     }
 
     function logout() { localStorage.clear(); location.reload(); }
@@ -902,6 +946,7 @@
         document.getElementById('analyticsContainer').style.display = 'none';
         document.getElementById('privilegeArea').style.display = 'none';
         document.getElementById('pointsArea').style.display = 'none';
+        document.getElementById('comparisonArea').style.display = 'none';
         document.getElementById('exportBtn').style.display = 'none';
         document.getElementById('exportPdfBtn').style.display = 'none';
     }
@@ -966,6 +1011,24 @@
         } else {
             ToastManager.show('No saved filters found.', 'warning');
         }
+    }
+    
+    // 🚨 PHASE 5: COPY SHARE LINK LOGIC (8.2)
+    function copyShareLink() {
+        const region = document.getElementById('anaRegion').value;
+        const acm = document.getElementById('anaAcm').value;
+        const type = document.getElementById('anaType').value;
+        const fromDate = document.getElementById('anaFrom').value;
+        const toDate = document.getElementById('anaTo').value;
+        
+        const params = new URLSearchParams({ region, acm, type, from: fromDate, to: toDate });
+        const snapshotUrl = window.location.origin + window.location.pathname + `#analyze?${params.toString()}`;
+        
+        navigator.clipboard.writeText(snapshotUrl).then(() => {
+            ToastManager.show('Snapshot Link Copied to Clipboard!', 'success');
+        }).catch(err => {
+            ToastManager.show('Failed to copy link.', 'error');
+        });
     }
 
     function exportCSV() {
@@ -1113,23 +1176,10 @@
         const fromDate = document.getElementById('anaFrom').value;
         const toDate = document.getElementById('anaTo').value;
 
-        // 🚨 PHASE 4: SECURE POST REQUEST IMPLEMENTATION (Hides Tokens from URL)
-        const payload = {
-            user: loggedUser,
-            email: loggedEmail,
-            uat: loggedUat,
-            region: region,
-            acm: acm,
-            type: type,
-            from: fromDate,
-            to: toDate
-        };
-        
+        const payload = { user: loggedUser, email: loggedEmail, uat: loggedUat, region: region, acm: acm, type: type, from: fromDate, to: toDate };
         const cacheKey = JSON.stringify(payload);
 
-        if (pendingRequests.has(cacheKey)) {
-            return pendingRequests.get(cacheKey);
-        }
+        if (pendingRequests.has(cacheKey)) { return pendingRequests.get(cacheKey); }
 
         document.getElementById('loadingOverlay').style.display = 'flex';
         document.getElementById('analyticsContainer').style.display = 'none';
@@ -1140,23 +1190,14 @@
             const btn = document.getElementById('btnGenAna');
             const origText = btn.innerText; btn.innerText = "⏳ Fetching Feishu Data..."; btn.disabled = true;
 
-            const requestPromise = fetch('/api/analytics', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
+            const requestPromise = fetch('/api/analytics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             pendingRequests.set(cacheKey, requestPromise);
             const res = await requestPromise;
             pendingRequests.delete(cacheKey);
 
             const textResponse = await res.text();
             let data;
-            try { 
-                data = JSON.parse(textResponse); 
-            } catch (jsonErr) { 
-                throw new Error("Feishu server timeout. Try a smaller date range."); 
-            }
+            try { data = JSON.parse(textResponse); } catch (jsonErr) { throw new Error("Feishu server timeout. Try a smaller date range."); }
             if (!res.ok) throw new Error(data.error || 'Unknown API error');
 
             latestAnalyticsData = data; 
@@ -1165,6 +1206,10 @@
             if (data.scanned_rows > 0 && data.kpis.creations === 0) {
                 ToastManager.show(`Column Mismatch Warning! Checked ${data.scanned_rows} records.`, "warning");
             }
+
+            // 🚨 PHASE 5: UPDATE URL FOR DEEP LINKING (8.2)
+            const urlParams = new URLSearchParams({ region, acm, type, from: fromDate, to: toDate });
+            window.history.replaceState(null, null, `#analyze?${urlParams.toString()}`);
 
             document.getElementById('kpiCreations').innerText = data.kpis.creations.toLocaleString();
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
@@ -1224,6 +1269,32 @@
                 el.className = 'delta-badge delta-neutral'; 
             }
         }
+    }
+
+    // 🚨 PHASE 5: ACTIVITY HEATMAP RENDERER (1.6)
+    function renderHeatmap(dataObj) {
+        const container = document.getElementById('heatmapGrid');
+        if(!container) return;
+        container.innerHTML = '';
+        
+        const dates = Object.keys(dataObj);
+        if(dates.length === 0) { container.innerHTML = '<span style="color:var(--text-muted)">No data available for heatmap.</span>'; return; }
+        
+        const values = Object.values(dataObj);
+        const max = Math.max(...values, 1);
+        
+        dates.forEach(date => {
+            const count = dataObj[date];
+            let cell = document.createElement('div');
+            cell.className = 'heatmap-cell';
+            cell.setAttribute('data-tooltip', `${date}: ${count} actions`);
+            
+            if(count > 0) {
+                const intensity = Math.max(0.2, count/max);
+                cell.style.background = `rgba(0, 212, 255, ${intensity})`; // Cyan glowing intensity
+            }
+            container.appendChild(cell);
+        });
     }
 
     function drawCharts(data) {
@@ -1317,34 +1388,44 @@
         buildSparkline('sparkCreations', data.daily_trend_creation, '#00d4ff');
         buildSparkline('sparkBds', data.daily_trend_bd, '#00e676');
         buildSparkline('sparkClosings', data.daily_trend_closing, '#ff4d6d'); 
+        
+        // 🚨 PHASE 5: Trigger Heatmap
+        renderHeatmap(data.daily_trend_creation);
     }
 
+    // 🚨 PHASE 5: ENHANCED MULTI-AGENCY COMPARISON FETCH (5.3)
     async function fetchAgencyData() {
-        const code = document.getElementById('agencyCode').value.trim();
-        if (!code) return;
+        const codeInput = document.getElementById('agencyCode').value.trim();
+        if (!codeInput) return;
+        
+        const codes = codeInput.split(',').map(c => c.trim()).filter(c => c);
         
         toggleSkeletons(true, 'search');
+        document.getElementById('comparisonArea').style.display = 'none';
 
         try {
             const btn = document.getElementById('btnSearch');
             const origText = btn.innerText; btn.innerText = "⏳ Searching..."; btn.disabled = true;
-
             const currentType = document.getElementById('queryType').value;
             
-            // 🚨 PHASE 4: SECURE POST REQUEST IMPLEMENTATION (Hides Tokens from URL)
-            const payload = {
-                code: code,
-                user: loggedUser,
-                email: loggedEmail,
-                uat: loggedUat,
-                type: currentType
-            };
-            
-            const res = await fetch(`/api/search`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            // 🚨 MULTI-FETCH COMPARISON MODE
+            if (codes.length > 1) {
+                const fetchPromises = codes.map(c => {
+                    const payload = { code: c, user: loggedUser, email: loggedEmail, uat: loggedUat, type: currentType };
+                    return fetch(`/api/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+                           .then(res => res.json().then(data => ({ code: c, data, ok: res.ok })));
+                });
+                
+                const results = await Promise.all(fetchPromises);
+                renderComparisonMode(results, currentType);
+                btn.innerText = origText; btn.disabled = false;
+                document.getElementById('loadingOverlay').style.display = 'none';
+                return; // Stop normal execution
+            }
+
+            // Normal Single Fetch
+            const payload = { code: codes[0], user: loggedUser, email: loggedEmail, uat: loggedUat, type: currentType };
+            const res = await fetch(`/api/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             
             const data = await res.json();
             if (!res.ok) throw new Error(data.error); currentAgencyData = data;
@@ -1383,6 +1464,54 @@
         }
         
         document.getElementById('resultsContainer').style.display = 'block';
+        document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    // 🚨 PHASE 5: RENDER COMPARISON MODE (5.3)
+    function renderComparisonMode(results, type) {
+        let tableHtml = `<table class="compare-table"><thead><tr>
+            <th>Agency Code</th>
+            <th>ACM Assigned</th>
+            <th>${type === 'target' ? 'Base Target' : 'Total Points'}</th>
+            <th>${type === 'target' ? 'Health Status' : 'Point Balance'}</th>
+            <th>Notes</th>
+        </tr></thead><tbody>`;
+        
+        // Find best performers for highlighting
+        let bestPoints = -1; let worstPoints = Infinity;
+        results.forEach(res => {
+            if(res.ok) {
+                const p = type === 'target' ? (res.data.base_points || 0) : (res.data.point_balance || 0);
+                if (p > bestPoints) bestPoints = p;
+                if (p < worstPoints) worstPoints = p;
+            }
+        });
+
+        results.forEach(res => {
+            if (!res.ok) {
+                tableHtml += `<tr><td style="color:var(--text); font-weight:bold;">${res.code}</td><td colspan="4" style="color:var(--accent-rose);">${res.data.error || 'Fetch Error'}</td></tr>`;
+            } else {
+                const d = res.data;
+                const score = type === 'target' ? (d.base_points || 0) : (d.point_balance || 0);
+                const scoreClass = score === bestPoints && bestPoints > 0 ? 'compare-best' : score === worstPoints && results.length > 2 ? 'compare-worst' : '';
+                
+                let val1 = type === 'target' ? `${((d.base_points||0)*100000).toLocaleString()} Coins` : `${(d.total_points||0).toLocaleString()}`;
+                let val2 = type === 'target' ? `<span class="health-${d.health_status.replace(' ','')}">${d.health_status}</span>` : `${(d.point_balance||0).toLocaleString()}`;
+
+                tableHtml += `<tr>
+                    <td style="color:var(--text); font-weight:bold;">${res.code}</td>
+                    <td style="color:var(--text-muted);">${d.acm || 'N/A'}</td>
+                    <td class="${scoreClass}">${val1}</td>
+                    <td class="${scoreClass}">${val2}</td>
+                    <td style="color:var(--text-muted); font-size:0.8rem;">${d.requests ? d.requests.length : 0} Activity Logs</td>
+                </tr>`;
+            }
+        });
+        tableHtml += '</tbody></table>';
+        
+        document.getElementById('comparisonTableContainer').innerHTML = tableHtml;
+        document.getElementById('resultsContainer').style.display = 'none'; // Hide single profile
+        document.getElementById('comparisonArea').style.display = 'block'; // Show compare table
     }
 
     function updatePrivilegeGrid() {
