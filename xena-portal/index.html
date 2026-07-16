@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* 3.5 Theme Variables Foundation */
         :root {
             --bg: #0b0c10; --surface: #151621; --surface-hover: #1c1d2b;
             --border: #2a2c3f; --border-hover: #3d4059;
@@ -17,8 +18,8 @@
             --shadow: 0 8px 32px rgba(0,0,0,0.4); --radius: 16px;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; overflow-x: hidden;}
+        * { margin: 0; padding: 0; box-sizing: border-box; transition: background-color 0.3s, border-color 0.3s; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; overflow-x: hidden; }
 
         #loginOverlay { position: fixed; inset: 0; background: radial-gradient(circle at 50% 0%, #1a1c2e 0%, var(--bg) 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
         .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 48px 40px; width: 100%; max-width: 400px; text-align: center; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
@@ -29,9 +30,11 @@
         .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 24px; margin-bottom: 24px; backdrop-filter: blur(10px); }
         .user-pill { display: flex; align-items: center; gap: 10px; color: var(--accent-cyan); font-weight: 600; }
         .user-pill::before { content: ''; width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; box-shadow: 0 0 8px var(--accent-green); }
-        .btn-outline { background: transparent; border: 1px solid var(--border-hover); color: var(--text); padding: 8px 20px; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: 'Inter'; font-weight: 500;}
+        
+        .btn-outline, .logout-btn { background: transparent; padding: 8px 20px; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: 'Inter'; font-weight: 500; }
+        .btn-outline { border: 1px solid var(--border-hover); color: var(--text); }
         .btn-outline:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .logout-btn { background: transparent; border: 1px solid var(--accent-rose); color: var(--accent-rose); padding: 8px 20px; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: 'Inter'; font-weight: 500;}
+        .logout-btn { border: 1px solid var(--accent-rose); color: var(--accent-rose); }
         .logout-btn:hover { background: rgba(255,77,109,0.1); }
 
         .page-header { text-align: center; margin-bottom: 32px; }
@@ -39,7 +42,6 @@
         .page-header p { color: var(--text-muted); font-size: 1.05rem; }
 
         .centered-search-box { max-width: 450px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); transition: border-color 0.2s; margin-bottom: 24px; }
         .card:hover { border-color: var(--border-hover); }
 
@@ -50,46 +52,34 @@
 
         .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
         .btn-primary { background: linear-gradient(135deg, var(--accent-cyan), #3a7bd5); color: #000; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,212,255,0.25); }
         .btn-success { background: linear-gradient(135deg, var(--accent-green), #00b0ff); color: #000; }
-        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,230,118,0.25); }
-        
-        .btn-allocator { background: transparent; border: 1px solid var(--accent-purple); color: var(--accent-purple); box-shadow: 0 0 10px rgba(185, 103, 255, 0.1); width: 100%; padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; font-family: inherit; margin-top: 10px; }
-        .btn-allocator:hover { background: var(--accent-purple); color: #000; box-shadow: 0 8px 25px rgba(185, 103, 255, 0.4); transform: translateY(-2px); }
+        .btn-primary:active, .btn-success:active { transform: translateY(0) scale(0.98); }
 
-        .btn-primary:active, .btn-success:active, .btn-allocator:active { transform: translateY(0) scale(0.98); }
+        .btn-allocator { background: transparent; border: 1px solid var(--accent-purple); color: var(--accent-purple); box-shadow: 0 0 10px rgba(185, 103, 255, 0.1); width: 100%; padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; font-family: inherit; margin-top: 10px; }
+        .btn-allocator:hover { background: var(--accent-purple); color: #fff; box-shadow: 0 8px 25px rgba(185, 103, 255, 0.4); transform: translateY(-2px); }
 
         .priv-toggle { background: var(--bg); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; color: var(--text-muted); text-align: left; display: flex; align-items: center; justify-content: space-between; }
         .priv-toggle:hover { border-color: var(--accent-cyan); color: var(--text); }
         .priv-toggle.active { background: rgba(0,212,255,0.1); border-color: var(--accent-cyan); color: var(--accent-cyan); box-shadow: inset 0 0 10px rgba(0,212,255,0.1); font-weight: 600; }
         .priv-toggle.active::after { content: '✓'; font-weight: bold; }
 
+        /* Admin UI */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-content { background: linear-gradient(180deg, rgba(21,22,33,0.95), rgba(21,22,33,0.85)); backdrop-filter: blur(20px) saturate(140%); box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04); width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--surface); width: 100%; max-width: 800px; border-radius: var(--radius); border: 1px solid var(--border); padding: 32px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .modal-header h2 { font-size: 1.5rem; color: var(--text); margin: 0;}
-        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: 0.2s; }
-        .close-btn:hover { color: var(--accent-rose); }
-        
-        .admin-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
-        
-        .module-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 0.2s, background 0.2s; }
-        .module-card:hover { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
-        .module-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;}
-        .module-header h4 { margin: 0; font-size: 1rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;}
-        
+        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
+        .module-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px;}
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .3s; border-radius: 34px; }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--accent-cyan); }
         input:checked + .slider:before { transform: translateX(20px); }
-        .admin-toggle { background: rgba(255,184,0,0.1); border: 1px solid rgba(255,184,0,0.3); padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .admin-toggle h4 { color: var(--accent-amber); margin: 0; font-size: 1rem;}
 
+        /* Pill Select */
         .pill-select-container { position: relative; width: 100%; }
         .pill-input-box { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; min-height: 42px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; align-items: center;}
-        .pill { background: rgba(0,212,255,0.15); color: var(--accent-cyan); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(0,212,255,0.3);}
+        .pill { background: rgba(0,212,255,0.15); color: var(--accent-cyan); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; border: 1px solid rgba(0,212,255,0.3);}
         .pill.all-pill { background: rgba(0,230,118,0.15); color: var(--accent-green); border-color: rgba(0,230,118,0.3); }
         .pill-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface-hover); border: 1px solid var(--border); border-radius: 10px; margin-top: 6px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: var(--shadow); display: none; flex-direction: column; padding: 8px;}
         .pill-dropdown.show { display: flex; }
@@ -97,58 +87,66 @@
         .pill-option:hover { background: var(--border); }
         .pill-option.selected { background: var(--accent-cyan); color: #000; font-weight: bold; }
 
-        .user-list { display: flex; flex-direction: column; gap: 10px; }
-        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; transition: 0.2s;}
-        .user-row:hover { border-color: var(--accent-cyan); }
-        .user-info { display: flex; flex-direction: column; gap: 4px; }
-        .user-email { font-weight: 600; color: var(--accent-cyan); font-size: 1rem;}
-        .user-details { font-size: 0.8rem; color: var(--text-muted); }
-        .user-details span { background: var(--surface); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); margin-right: 4px;}
-        
-        .action-btns { display: flex; gap: 8px; }
-        .edit-btn { background: rgba(0,212,255,0.1); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; }
-        .edit-btn:hover { background: var(--accent-cyan); color: #000; }
-        .del-btn { background: rgba(255,77,109,0.1); color: var(--accent-rose); border: 1px solid rgba(255,77,109,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; }
-        .del-btn:hover { background: var(--accent-rose); color: #000; }
-
-        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
-        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; text-align: center; position: relative; overflow: hidden; transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s ease; }
-        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,212,255,0.12), var(--shadow); }
-        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-        .kpi-card:nth-child(1)::before { background: var(--accent-cyan); }
-        .kpi-card:nth-child(2)::before { background: var(--accent-green); }
-        .kpi-card:nth-child(3)::before { background: var(--accent-rose); }
-        .kpi-label { font-size: 0.875rem; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .kpi-value { font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-        .kpi-card:nth-child(1) .kpi-value { color: var(--accent-cyan); }
-        .kpi-card:nth-child(2) .kpi-value { color: var(--accent-green); }
-        .kpi-card:nth-child(3) .kpi-value { color: var(--accent-rose); }
-
-        .chart-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
-        .chart-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
+        /* KPI & Charts */
+        .kpi-grid, .chart-grid-3, .chart-grid-2 { display: grid; gap: 20px; margin-bottom: 24px; }
+        .kpi-grid, .chart-grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .chart-grid-2 { grid-template-columns: repeat(2, 1fr); }
         .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 24px; }
-
-        .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
-        .chart-box.full-width { grid-column: 1 / -1; } 
-        
-        .chart-box h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .kpi-card, .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+        .kpi-card { text-align: center; border-top: 3px solid var(--accent-cyan); transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-4px); }
+        .kpi-label { font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+        .kpi-value { font-size: 3rem; font-weight: 700; color: var(--accent-cyan); }
+        .chart-box h3 { font-size: 0.95rem; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
         .chart-box h3::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent-cyan); }
-        
         .chart-wrapper-pie { position: relative; height: 240px; }
-        .chart-wrapper-pie-large { position: relative; height: 520px; } 
         .chart-wrapper-bar { position: relative; height: 320px; }
+        .chart-wrapper-pie-large { position: relative; height: 520px; } 
 
-        /* 🚨 PHASE 2: DELTAS & SPARKLINES CSS */
+        /* 🚨 PHASE 2: SPARKLINES & DELTAS CSS */
         .delta-badge { font-size: 0.8rem; font-weight: bold; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
         .delta-up { background: rgba(0, 230, 118, 0.1); color: var(--accent-green); }
         .delta-down { background: rgba(255, 77, 109, 0.1); color: var(--accent-rose); }
         .delta-neutral { background: rgba(139, 143, 163, 0.1); color: var(--text-muted); }
         .sparkline-container { height: 40px; width: 100%; margin-top: 12px; }
 
+        /* Toasts & Loaders */
+        #toastContainer { position: fixed; top: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
+        .toast-modern { padding: 16px 20px; border-radius: 12px; font-size: 0.95rem; background: var(--surface); border-left: 4px solid var(--border); display: flex; align-items: center; gap: 12px; animation: slideIn 0.3s ease forwards; color: #fff;}
+        .toast-modern.success { border-left-color: var(--accent-green); }
+        .toast-modern.error { border-left-color: var(--accent-rose); }
+        .toast-modern.warning { border-left-color: var(--accent-amber); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; } }
+
+        .skeleton { background: linear-gradient(90deg, var(--surface-hover) 25%, var(--border) 50%, var(--surface-hover) 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: 4px; color: transparent !important; border-color: transparent !important; pointer-events: none; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.8); backdrop-filter: blur(4px); z-index: 500; justify-content: center; align-items: center; flex-direction: column; gap: 16px; }
+
+        /* Target Banner & Stats */
+        .target-banner { background: linear-gradient(135deg, rgba(0,230,118,0.08), rgba(0,176,255,0.08)); border: 1px solid rgba(0,230,118,0.2); border-radius: var(--radius); padding: 32px; text-align: center; margin-bottom: 24px; position: relative; }
+        .target-banner h2 { font-size: 2.5rem; color: var(--accent-green); margin: 8px 0; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+        .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
+
+        /* Insights UI */
+        .insight-panel { background: linear-gradient(to right, rgba(0,212,255,0.05), transparent); border-left: 3px solid var(--accent-cyan); padding: 16px 24px; border-radius: 0 var(--radius) var(--radius) 0; margin-bottom: 24px; }
+        .insight-panel ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .insight-panel li { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .empty-state svg { width: 80px; height: 80px; fill: var(--border); margin-bottom: 16px; }
+
+        @media (max-width: 768px) {
+            .chart-grid-3, .chart-grid-2, .kpi-grid { grid-template-columns: 1fr; }
+            .modal-content { padding: 20px; border-radius: 0; }
+        }
+
         /* 🚨 PHASE 2: PRINT TO PDF CSS */
         @media print {
             body { background: #fff !important; color: #000 !important; }
-            .top-bar, .centered-search-box, .btn, .modal-overlay, #toastContainer, #initialEmptyState { display: none !important; }
+            .top-bar, .centered-search-box, .btn, .modal-overlay, #toastContainer, .insight-panel, .btn-outline { display: none !important; }
             .app-shell { max-width: 100%; padding: 0; }
             .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; background: #fff !important; }
             h1, h2, h3, h4, .kpi-value, span, div { color: #000 !important; -webkit-text-fill-color: #000 !important; }
@@ -156,43 +154,11 @@
             .chart-wrapper-pie { height: 200px; }
             .chart-wrapper-bar { height: 250px; }
         }
-
-        .target-banner { background: linear-gradient(135deg, rgba(0,230,118,0.08), rgba(0,176,255,0.08)); border: 1px solid rgba(0,230,118,0.2); border-radius: var(--radius); padding: 32px; text-align: center; margin-bottom: 24px; position: relative; }
-        .target-banner h2 { font-size: 2.5rem; color: var(--accent-green); margin: 8px 0; }
-        .acm-badge { position: absolute; top: 16px; right: 16px; background: var(--bg); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; color: var(--text-muted); border: 1px solid var(--border); }
-
-        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
-        .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
-        .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
-        .stat-value { font-size: 1.5rem; font-weight: 700; }
-
-        .skeleton { 
-            background: linear-gradient(90deg, var(--surface-hover) 25%, var(--border) 50%, var(--surface-hover) 75%); 
-            background-size: 200% 100%; 
-            animation: skeleton-loading 1.5s infinite; 
-            border-radius: 4px; 
-            color: transparent !important; 
-            border-color: transparent !important; 
-            pointer-events: none; 
-        }
-        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
-        #toastContainer { position: fixed; top: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
-        .toast-modern { padding: 16px 20px; border-radius: 12px; font-weight: 500; font-size: 0.95rem; box-shadow: var(--shadow); background: var(--surface); border-left: 4px solid var(--border); display: flex; align-items: center; gap: 12px; min-width: 300px; animation: slideIn 0.3s ease forwards; color: #fff;}
-        .toast-modern.success { border-left-color: var(--accent-green); }
-        .toast-modern.error { border-left-color: var(--accent-rose); }
-        .toast-modern.warning { border-left-color: var(--accent-amber); }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeOut { to { opacity: 0; } }
-
-        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(11,12,16,0.8); backdrop-filter: blur(4px); z-index: 500; justify-content: center; align-items: center; flex-direction: column; gap: 16px; }
-        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
     </style>
 </head>
 <body>
 
+<!-- 🚨 PHASE 1: Toast Container Injected -->
 <div id="toastContainer"></div>
 
 <div id="loginOverlay">
@@ -208,6 +174,7 @@
     <div style="color: var(--text-muted); font-weight: 500;">Crunching Feishu data...</div>
 </div>
 
+<!-- 🚨 ADMIN MODAL -->
 <div class="modal-overlay" id="adminModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -322,6 +289,7 @@
         </div>
 
         <div id="analyticsParams" style="display:none;">
+            
             <!-- 🚨 PHASE 2: SAVED FILTER PRESETS UI -->
             <div style="display: flex; justify-content: flex-end; gap: 8px; margin-bottom: -10px; z-index: 10; position: relative;">
                 <button onclick="saveFilterPreset()" style="background:none; border:none; color:var(--accent-cyan); font-size:0.8rem; cursor:pointer; font-weight:600;">💾 Save Filters</button>
@@ -383,12 +351,14 @@
     </div>
 
     <div id="resultsContainer" style="display: none;">
+        <!-- 🚨 DYNAMIC BANNER -->
         <div class="target-banner">
             <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
             <div id="displayTargetTitle" style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Month Target</div>
             <h2 id="displayTargetCoins">0 Coins</h2>
         </div>
         
+        <!-- 🚨 TARGET MODULE UI -->
         <div class="card" id="privilegeArea" style="display:none;">
             <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Available Target Privilege</h3>
             <div class="control-group" style="max-width: 300px; margin-bottom: 16px;">
@@ -409,6 +379,7 @@
             </div>
         </div>
 
+        <!-- 🚨 NEW: AGENCY POINTS SYSTEM UI -->
         <div class="card" id="pointsArea" style="display:none;">
             <h3 style="margin-bottom: 16px; color: var(--accent-purple);">🪙 Agency Points System</h3>
             
@@ -417,12 +388,64 @@
                 <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color: var(--accent-rose);">0</div></div>
                 <div class="stat-box"><div class="stat-label">Current Balance</div><div class="stat-value" id="ptBalance" style="color: var(--accent-cyan);">0</div></div>
             </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                <!-- Left: Smart Allocator Calculator (PREMIUM UI UPGRADE) -->
+                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px;">
+                    <h4 style="color: var(--accent-cyan); margin-bottom: 16px;">🤖 Smart Allocator Preview</h4>
+                    
+                    <div class="control-group">
+                        <label>Select Privileges</label>
+                        <div id="calcPrivGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+                            <div class="priv-toggle" data-val="trend card" onclick="this.classList.toggle('active')">Trend Card (40-50)</div>
+                            <div class="priv-toggle" data-val="traffic card" onclick="this.classList.toggle('active')">Traffic Card (30-40)</div>
+                            <div class="priv-toggle" data-val="30 mic 15 days" onclick="this.classList.toggle('active')">30 Mic 15 Days (150-175)</div>
+                            <div class="priv-toggle" data-val="30 mic 30 days" onclick="this.classList.toggle('active')">30 Mic 30 Days (300-350)</div>
+                            <div class="priv-toggle" data-val="normal short id" onclick="this.classList.toggle('active')">Normal Short ID</div>
+                            <div class="priv-toggle" data-val="customized short id 15 days" onclick="this.classList.toggle('active')">Custom Short ID 15D</div>
+                            <div class="priv-toggle" data-val="customized short id 30 days" onclick="this.classList.toggle('active')">Custom Short ID 30D</div>
+                            <div class="priv-toggle" data-val="room pin-up" onclick="this.classList.toggle('active')">Room Pin-up (100-150)</div>
+                            <div class="priv-toggle" data-val="welcome package 3" onclick="this.classList.toggle('active')">Welcome Package 3</div>
+                            <div class="priv-toggle" data-val="welcome package 2" onclick="this.classList.toggle('active')">Welcome Package 2</div>
+                            <div class="priv-toggle" data-val="main page banner" onclick="this.classList.toggle('active')">Main Page Banner</div>
+                            <div class="priv-toggle" data-val="news banner" onclick="this.classList.toggle('active')">News Banner</div>
+                            <div class="priv-toggle" data-val="live banner" onclick="this.classList.toggle('active')">Live Banner</div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Quantities Input (e.g., "9 and 30" or "2, 5")</label>
+                        <input type="text" id="calcQty" placeholder="Type quantities matching selection order">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Target Type</label>
+                        <select id="calcTarget">
+                            <option value="Same agency">Same Agency</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn-allocator" onclick="runAllocatorPreview()">Check Availability & Calculate</button>
+                    
+                    <div style="margin-top: 20px; background: #0a0b10; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--accent-purple); box-shadow: inset 0 0 20px rgba(0,0,0,0.8); font-size: 0.85rem; line-height: 1.6; color: var(--text-muted); max-height: 350px; overflow-y: auto;" id="allocatorOutput">Select items above and click calculate to generate receipt...</div>
+                </div>
+
+                <!-- Right: Daily Usage History -->
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 800px; overflow-y: auto;">
+                    <h4 style="color: var(--accent-amber); margin-bottom: 16px;">📅 Day-by-Day Point History</h4>
+                    <div id="pointsHistoryList"></div>
+                </div>
+            </div>
         </div>
+
     </div>
 
     <div id="analyticsContainer" style="display: none;">
         
-        <!-- 🚨 PHASE 2: KPIs with Deltas & Sparklines -->
+        <div class="insight-panel" id="autoInsights"></div>
+
+        <!-- 🚨 PHASE 2: KPIs with Deltas & Sparklines (Including Closings Fix!) -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-label">Total Agency Creations</div>
@@ -439,6 +462,8 @@
             <div class="kpi-card">
                 <div class="kpi-label">Total Closings</div>
                 <div class="kpi-value" id="kpiClosings">0</div>
+                <div id="deltaClosings" class="delta-badge delta-neutral">--</div>
+                <div class="sparkline-container"><canvas id="sparkClosings"></canvas></div>
             </div>
         </div>
 
@@ -498,7 +523,7 @@
 
     function toggleSkeletons(show, type) {
         if(show) {
-            document.getElementById('loadingOverlay').style.display = 'none';
+            document.getElementById('loadingOverlay').style.display = 'none'; // Overrides old full-screen spinner
             if(type === 'search') {
                 document.getElementById('resultsContainer').style.display = 'block';
                 document.getElementById('privilegeArea').style.display = 'none';
@@ -853,22 +878,31 @@
         }
     }
 
-    // 🚨 PHASE 2: EXPORT CSV
+    // 🚨 PHASE 2: EXPORT CSV (FIXED FOR EXCEL COMPATIBILITY)
     function exportCSV() {
         if(!latestAnalyticsData) return ToastManager.show("No data to export. Generate report first.", "error");
         
-        let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "Metric,Value\n";
-        csvContent += `Total Creations,${latestAnalyticsData.kpis.creations}\n`;
-        csvContent += `Total BDs,${latestAnalyticsData.kpis.bds}\n`;
-        csvContent += `Total Closings,${latestAnalyticsData.kpis.closings}\n\n`;
+        let rows = [];
+        rows.push(["Metric Category", "Label", "Value"]);
         
-        csvContent += "ACM Performance\nACM,Creations\n";
-        Object.entries(latestAnalyticsData.acm_performance).forEach(([k,v]) => csvContent += `"${k}",${v}\n`);
+        const appendData = (cat, obj) => {
+            Object.entries(obj).forEach(([l, v]) => {
+                rows.push([`"${cat}"`, `"${l}"`, `"${v}"`]);
+            });
+        };
         
-        const encodedUri = encodeURI(csvContent);
+        appendData("KPIs", latestAnalyticsData.kpis);
+        appendData("ACM Performance", latestAnalyticsData.acm_performance);
+        appendData("Rejection Reasons", latestAnalyticsData.reject_reasons);
+        appendData("Creation Types", latestAnalyticsData.creation_types);
+        
+        let csvContent = rows.map(e => e.join(",")).join("\n");
+        
+        // 🚨 ADDING \uFEFF BOM forces Microsoft Excel to format columns properly
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
+        link.setAttribute("href", url);
         link.setAttribute("download", `Xena_Analytics_${fmtDate(new Date())}.csv`);
         document.body.appendChild(link);
         link.click();
@@ -1015,7 +1049,11 @@
 
             const textResponse = await res.text();
             let data;
-            try { data = JSON.parse(textResponse); } catch (jsonErr) { throw new Error("Feishu API timeout. The backend cache is filling, try again in 30 seconds."); }
+            try { 
+                data = JSON.parse(textResponse); 
+            } catch (jsonErr) { 
+                throw new Error("Feishu server timeout. Try a smaller date range."); 
+            }
             if (!res.ok) throw new Error(data.error || 'Unknown error');
 
             latestAnalyticsData = data; 
@@ -1025,9 +1063,10 @@
             document.getElementById('kpiBds').innerText = data.kpis.bds.toLocaleString();
             document.getElementById('kpiClosings').innerText = data.kpis.closings.toLocaleString();
 
-            // 🚨 PHASE 2: Calculate Deltas for KPI Badges
+            // 🚨 PHASE 2: Calculate Deltas for KPI Badges (Including the fixed Closings array)
             calculateDelta(data.daily_trend_creation, 'deltaCreations');
             calculateDelta(data.daily_trend_bd, 'deltaBds');
+            calculateDelta(data.daily_trend_closing, 'deltaClosings');
 
             document.getElementById('analyticsContainer').style.display = 'block';
             document.getElementById('exportBtn').style.display = 'block';
@@ -1046,6 +1085,7 @@
 
     // 🚨 PHASE 2: Delta Engine Logic
     function calculateDelta(obj, elementId) {
+        if(!obj) return;
         const vals = Object.values(obj);
         const el = document.getElementById(elementId);
         if (!el) return;
@@ -1095,8 +1135,9 @@
             el.innerHTML = `<canvas id="${ids[i]}"></canvas>`;
         });
         
+        // 🚨 PHASE 2: Sparkline Canvases (Including Closings)
         document.querySelectorAll('.sparkline-container').forEach((el, i) => {
-            const ids = ['sparkCreations', 'sparkBds'];
+            const ids = ['sparkCreations', 'sparkBds', 'sparkClosings'];
             el.innerHTML = `<canvas id="${ids[i]}"></canvas>`;
         });
 
@@ -1159,7 +1200,7 @@
 
         buildTrendChart('cTrendCreation', data.daily_trend_creation, '#00d4ff', 'rgba(0,212,255,0.3)');
         buildTrendChart('cTrendBd', data.daily_trend_bd, '#00e676', 'rgba(0,230,118,0.3)');
-
+        
         // 🚨 PHASE 2: Build KPI Sparklines
         const buildSparkline = (id, trendData, color) => {
             if (!trendData || Object.keys(trendData).length === 0) return;
@@ -1173,12 +1214,14 @@
         };
         buildSparkline('sparkCreations', data.daily_trend_creation, '#00d4ff');
         buildSparkline('sparkBds', data.daily_trend_bd, '#00e676');
+        buildSparkline('sparkClosings', data.daily_trend_closing, '#ff4d6d'); // Added the closing sparkline!
     }
 
     async function fetchAgencyData() {
         const code = document.getElementById('agencyCode').value.trim();
         if (!code) return;
         
+        // 🚨 SKELETON LOADER
         toggleSkeletons(true, 'search');
 
         try {
@@ -1220,6 +1263,7 @@
             document.getElementById('displayTargetCoins').style.color = 'var(--accent-cyan)'; 
             
             document.getElementById('pointsArea').style.display = 'block'; 
+            updatePointsGrid();
         }
         
         document.getElementById('resultsContainer').style.display = 'block';
@@ -1244,6 +1288,179 @@
             }
         });
         document.getElementById('valTotal').innerText = total; document.getElementById('valClaimed').innerText = claimed; document.getElementById('valRemaining').innerText = Math.max(0, total - claimed); document.getElementById('valPending').innerText = pending; document.getElementById('valRejected').innerText = rejected;
+    }
+
+    function parseFeishuField(val) {
+        if (!val) return "";
+        if (typeof val === 'string') { try { let arr = JSON.parse(val); if (Array.isArray(arr)) return arr.join(', '); } catch(e) {} return val; }
+        if (Array.isArray(val)) return val.map(v => v.text || v.name || v.id || JSON.stringify(v)).join(', ');
+        if (typeof val === 'object') return val.text || val.name || val.id || "";
+        return String(val);
+    }
+    
+    function getFuzzyField(req, searchStrings) {
+        if (!req) return null;
+        for (let searchStr of searchStrings) {
+            let searchLower = searchStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+            for (let key in req) {
+                let keyLower = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (keyLower === searchLower) return req[key];
+            }
+        }
+        for (let searchStr of searchStrings) {
+            let searchLower = searchStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+            for (let key in req) {
+                let keyLower = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (keyLower.includes(searchLower)) return req[key];
+            }
+        }
+        return null;
+    }
+
+    const pointPriceDB = [
+        { key: "trend card", same: 40, other: 50 }, { key: "traffic card", same: 30, other: 40 }, { key: "30 mic 15 days", same: 150, other: 175 }, { key: "30 mic 30 days", same: 300, other: 350 }, { key: "normal short id", same: 120, other: 180 },
+        { key: "customized short id 15 days", same: 300, other: 450 }, { key: "customized short id 30 days", same: 600, other: 900 }, { key: "room pin-up", same: 100, other: 150 }, { key: "welcome package 3", same: 80, other: 80 }, { key: "welcome package 2", same: 30, other: 30 },
+        { key: "main page banner", same: 150, other: 150 }, { key: "news banner", same: 100, other: 100 }, { key: "live banner", same: 90, other: 90 }
+    ];
+
+    function updatePointsGrid() {
+        if (!currentAgencyData) return;
+        document.getElementById('ptTotal').innerText = (currentAgencyData.total_points || 0).toLocaleString(); document.getElementById('ptUsed').innerText = (currentAgencyData.used_points || 0).toLocaleString(); document.getElementById('ptBalance').innerText = (currentAgencyData.point_balance || 0).toLocaleString();
+        
+        let historyHtml = ''; const requests = currentAgencyData.requests || [];
+        const pointReqs = requests.filter(r => getFuzzyField(r, ['agencypointprivilege']) || getFuzzyField(r, ['quantitiesinput']) || getFuzzyField(r, ['transactionreceipt']) || getFuzzyField(r, ['latestusagetracker']));
+        
+        if (pointReqs.length === 0) { historyHtml = '<div style="color:var(--text-muted); padding:10px;">No points usage found this month.</div>'; } 
+        else {
+            pointReqs.sort((a, b) => new Date(b['_timestamp'] || 0) - new Date(a['_timestamp'] || 0));
+            
+            pointReqs.forEach(req => {
+                const dateRaw = req['_timestamp'] || req['Submitted on'] || req['Submitted on Copy']; 
+                let dateStr = 'Unknown Date';
+                if (dateRaw) { const d = new Date(dateRaw); if (!isNaN(d)) dateStr = d.toISOString().split('T')[0]; }
+                
+                let privsRaw = parseFeishuField(getFuzzyField(req, ['agencypointprivilege', 'privilege'])); let privsList = [];
+                try { if (privsRaw.startsWith('[')) privsList = JSON.parse(privsRaw); else privsList = privsRaw.split(','); } catch(e) { privsList = privsRaw.split(','); }
+                privsList = privsList.map(s => s.replace(/["\[\]]/g, '').trim()).filter(Boolean);
+                let privsHtml = privsList.length > 0 ? privsList.map(p => `🔹 ${p}`).join('<br>') : 'N/A';
+                
+                let qtyRaw = parseFeishuField(getFuzzyField(req, ['quantitiesinput', 'quantities', 'qty']));
+                let qtyHtml = qtyRaw ? qtyRaw.replace(/["\[\]]/g, '').trim() : '';
+
+                let status = parseFeishuField(getFuzzyField(req, ['orderaction', 'status', 'state'])) || 'Pending';
+                let statusColor = status.toLowerCase().includes('confirm') || status.toLowerCase().includes('done') ? 'var(--accent-green)' : status.toLowerCase().includes('reject') ? 'var(--accent-rose)' : 'var(--accent-amber)';
+                let statusClass = status.toLowerCase().includes('confirm') || status.toLowerCase().includes('done') ? 'status-done' : status.toLowerCase().includes('reject') ? 'status-rejected' : '';
+                
+                let targetTypeRaw = parseFeishuField(getFuzzyField(req, ['targettype', 'target'])).toLowerCase();
+                let isOther = targetTypeRaw.includes('other');
+                let targetTypeHtml = targetTypeRaw ? (isOther ? 'Others' : 'Same Agency') : '<span style="color:var(--accent-amber);">Unknown Target (Assuming Same Agency)</span>';
+
+                let trackerRaw = parseFeishuField(getFuzzyField(req, ['latestusagetracker', 'usagetracker', 'tracker', 'latestusage']));
+                let allocationHtml = '';
+                
+                if (trackerRaw && trackerRaw !== 'undefined' && trackerRaw.trim() !== '') {
+                    let trackerText = trackerRaw.replace(/\\n/g, '\n');
+                    
+                    if (trackerText.toLowerCase().includes('no items approved') || trackerText.toLowerCase().includes('fully rejected')) {
+                        allocationHtml = `<div style="margin-top: 12px; padding: 12px; background: rgba(255,77,109,0.05); border-radius: 8px; border: 1px solid rgba(255,77,109,0.2);"><div style="color: var(--accent-rose); font-weight: 600;">❌ No items approved in this order.</div><div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">0 Points Deducted</div></div>`;
+                        if (!qtyHtml) qtyHtml = `<span style="color: var(--accent-rose);">Rejected (0)</span>`;
+                    
+                    } else if (trackerText.toLowerCase().includes('items approved')) {
+                        let lines = trackerText.split('\n'); let totalPointsDeducted = 0; let allocatedItemsHtml = []; let extractedQuantities = [];
+                        
+                        lines.forEach(line => {
+                            if (line.includes(':') && !line.toLowerCase().includes('items approved')) {
+                                let parts = line.split(':'); let itemName = parts[0].replace(/[🔹📋🌟【】\-]/g, '').trim(); let itemQty = parseInt(parts[1].trim());
+                                if (!isNaN(itemQty)) {
+                                    let rule = pointPriceDB.find(r => itemName.toLowerCase().includes(r.key.toLowerCase()) || r.key.toLowerCase().includes(itemName.toLowerCase()));
+                                    let price = rule ? (isOther ? rule.other : rule.same) : 0; let cost = price * itemQty; totalPointsDeducted += cost;
+                                    allocatedItemsHtml.push(`🔹 ${itemName}: <span style="font-weight:bold; color:#fff;">${itemQty}</span> <span style="color:var(--text-muted);font-size:0.8rem;">(@ ${price} pts = ${cost} pts)</span>`);
+                                    extractedQuantities.push(`<span style="color: var(--accent-cyan); font-weight: bold;">${itemQty}</span> <span style="font-size: 0.8rem; color: var(--text-muted);">(${itemName})</span>`);
+                                }
+                            }
+                        });
+                        
+                        if (allocatedItemsHtml.length > 0) {
+                            allocationHtml = `<div style="margin-top: 12px; padding: 12px; background: rgba(0,212,255,0.05); border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);"><div style="font-weight:600; color:var(--accent-cyan); margin-bottom:8px;">✅ Items Approved & Deducted:</div><div style="line-height: 1.8;">${allocatedItemsHtml.join('<br>')}</div><div style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px; color: var(--accent-rose); font-weight: bold; font-size: 0.95rem;">💰 Total Deducted: ${totalPointsDeducted} Points</div></div>`;
+                            if (!qtyHtml || qtyHtml === 'N/A') qtyHtml = extractedQuantities.join('<br>');
+                        } else { allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerText.replace(/\n/g, '<br>')}</div>`; }
+                    } else { allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px;">${trackerText.replace(/\n/g, '<br>')}</div>`; }
+                } else { allocationHtml = `<div style="color:var(--text-muted); font-size:0.85rem; margin-top:8px; font-style: italic;">No allocation receipt generated.</div>`; }
+                
+                if (!qtyHtml || qtyHtml === '') {
+                    let fallbackQty = parseFeishuField(getFuzzyField(req, ['quantitiesinput', 'quantities', 'qty']));
+                    qtyHtml = fallbackQty ? fallbackQty.replace(/["\[\]]/g, '').trim() : '<span style="color: var(--text-muted);">N/A</span>';
+                }
+
+                historyHtml += `<div class="timeline-item ${statusClass}"><div class="timeline-date">${dStr} — <span style="color:${statusColor}; font-weight:bold;">${status.toUpperCase()}</span></div><div class="timeline-content"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;"><div><div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Original Request</div><div style="font-size: 0.9rem; line-height: 1.6;">${privsHtml}</div></div><div><div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; margin-bottom: 4px;">Details</div><div style="font-size: 0.9rem;">Requested Quantities: <br>${qtyHtml}</div><div style="font-size: 0.9rem; margin-top: 4px;">Target Type: <br><span style="color: var(--accent-purple);">${targetTypeHtml}</span></div></div></div>${allocationHtml}</div></div>`;
+            });
+        }
+        document.getElementById('pointsHistoryList').innerHTML = historyHtml;
+        document.getElementById('allocatorOutput').innerHTML = '<span style="color: var(--text-muted);">Select items above and click calculate...</span>';
+        document.querySelectorAll('.priv-toggle').forEach(el => el.classList.remove('active')); document.getElementById('calcQty').value = '';
+    }
+
+    function runAllocatorPreview() {
+        if (!currentAgencyData) return;
+        const activeToggles = document.querySelectorAll('.priv-toggle.active'); const privInput = Array.from(activeToggles).map(el => el.getAttribute('data-val'));
+        const qtyInput = document.getElementById('calcQty').value; const target = document.getElementById('calcTarget').value;
+        const used = currentAgencyData.used_points || 0; const bal = currentAgencyData.point_balance || 0; const monthText = currentAgencyData.monthly_tracker || "";
+        const result = feishuSmartAllocator(privInput, qtyInput, target, used, bal, monthText);
+        document.getElementById('allocatorOutput').innerHTML = result;
+    }
+
+    function feishuSmartAllocator(param1, param2, param3, param4, param5, param6, param7) {
+        const priv = Array.isArray(param1) ? param1 : String(param1 || "").split(',').map(s => s.trim());
+        const qty = String(param2 || "").match(/\d+/g) || [];
+        const target = String(param3 || "").toLowerCase();
+        const used = Number(Array.isArray(param4) ? param4[0] : param4) || 0;
+        const bal = Number(Array.isArray(param5) ? param5[0] : param5) || 0;
+        const monthText = String(Array.isArray(param6) ? param6[0] : param6 || "");
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        let currentD = new Date(); if (param7) { const d = new Date(param7); if (!isNaN(d)) currentD = d; }
+        let submittedMonthName = monthNames[currentD.getMonth()];
+        
+        if (priv.length === 0 || priv[0] === "") return "<span style='color: var(--accent-rose);'>⚠️ No items selected. Please select at least one privilege.</span>";
+        
+        const db = [
+            { key: "trend card", same: 40, other: 50, limit: 10 }, { key: "traffic card", same: 30, other: 40, limit: 50 }, { key: "30 mic 15 days", same: 150, other: 175, limit: 999 },
+            { key: "30 mic 30 days", same: 300, other: 350, limit: 999 }, { key: "normal short id", same: 120, other: 180, limit: 999 }, { key: "customized short id 15 days", same: 300, other: 450, limit: 999 },
+            { key: "customized short id 30 days", same: 600, other: 900, limit: 999 }, { key: "room pin-up", same: 100, other: 150, limit: 999 }, { key: "welcome package 3", same: 80, other: 80, limit: 15 },
+            { key: "welcome package 2", same: 30, other: 30, limit: 50 }, { key: "main page banner", same: 150, other: 150, limit: 3, type: "order" }, { key: "news banner", same: 100, other: 100, limit: 5, type: "order" }, { key: "live banner", same: 90, other: 90, limit: 5, type: "order" }
+        ];
+        
+        let storedMonth = ""; const monthly = {}; const lines = monthText.split('\n');
+        for (const line of lines) {
+            if (line.includes('━') || line.includes('┈')) continue; 
+            let monthMatch = line.match(/Month:\s*([A-Za-z0-9]+)/i);
+            if (monthMatch) storedMonth = monthMatch[1].trim();
+            else if (line.includes(':')) { let parts = line.split(':'); if (parts.length >= 2) { let itemName = parts[0].replace(/[🔹📋🌟【】]/g, '').trim(); let itemQty = parseInt(parts[1].trim()); if (!isNaN(itemQty)) monthly[itemName] = itemQty; } }
+        }
+        
+        let isSameMonth = false;
+        if (storedMonth.toLowerCase() === submittedMonthName.toLowerCase()) isSameMonth = true; else if (parseInt(storedMonth) === currentD.getMonth() + 1) isSameMonth = true; 
+        if (!isSameMonth) { for (const k in monthly) delete monthly[k]; }
+        
+        let remainingBalance = bal; let totalCost = 0; let receiptLines = []; let currentOrder = {};
+        
+        for (let i = 0; i < priv.length; i++) {
+            const item = priv[i].toLowerCase(); const q = Number(qty[i]) || 0; if (q <= 0) continue;
+            const rule = db.find(r => item.includes(r.key)); if (!rule) continue;
+            const price = target.includes("other") ? rule.other : rule.same; const display = rule.key.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' '); const pastUsage = monthly[display] || 0;
+            let limitAllowed = rule.type === "order" ? rule.limit : rule.limit - pastUsage; if (limitAllowed < 0) limitAllowed = 0;
+            let desired = Math.min(q, limitAllowed); let affordable = Math.floor(remainingBalance / price); let approved = Math.min(desired, affordable);
+            
+            if (approved === q) { receiptLines.push(`<span style="color: var(--accent-green);">✅ FULLY APPROVED:</span> ${approved}x ${display} @ ${price} pts = <span style="color:#fff;">${approved * price}</span>`); } 
+            else if (approved > 0) { let reason = (q > limitAllowed) ? (rule.type === "order" ? `Max ${rule.limit} allowed per request.` : `Limit maxes out at ${limitAllowed} more.`) : `Not enough points for ${desired}.`; receiptLines.push(`<span style="color: var(--accent-amber);">⚠️ PARTIALLY APPROVED:</span> ${approved}x ${display} @ ${price} pts = <span style="color:#fff;">${approved * price}</span>\n    <span style="color: var(--text-muted);">└─ (Rejected ${q - approved}x: ${reason})</span>`); } 
+            else { let reason = (limitAllowed === 0) ? (rule.type === "order" ? `Max ${rule.limit} allowed per request.` : `Monthly limit (${rule.limit}) already reached.`) : `Insufficient points (${remainingBalance} left).`; receiptLines.push(`<span style="color: var(--accent-rose);">❌ FULLY REJECTED:</span> 0x ${display}\n    <span style="color: var(--text-muted);">└─ (Reason: ${reason})</span>`); }
+            
+            if (approved > 0) { totalCost += approved * price; remainingBalance -= approved * price; currentOrder[display] = (currentOrder[display] || 0) + approved; monthly[display] = pastUsage + approved; }
+        }
+        
+        let baseReceipt = receiptLines.join('\n\n') + `\n\n<div style="border-top: 1px dashed var(--border); margin: 10px 0; padding-top: 10px;"></div><span style="color: var(--accent-rose); font-weight: bold; font-size: 1rem;">💰 TOTAL DEDUCTED: ${totalCost} pts</span>\n<span style="color: var(--accent-cyan); font-weight: bold; font-size: 1rem;">💳 REMAINING BALANCE: ${remainingBalance} pts</span>\n`;
+        let monthlySummary = `\n<div style="border-top: 1px solid var(--border); margin: 16px 0;"></div><span style="color: var(--accent-amber); font-weight: bold;">🌟 CURRENT MONTH USAGE 🌟</span>\n\n` + Object.entries(monthly).map(([k,v]) => `<span style="color: var(--accent-cyan);">🔹</span> ${k}: <span style="color:#fff;">${v}</span>`).join('\n');
+        return `<div style="font-size: 1.1rem; color: var(--accent-purple); font-weight: bold; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">👀 ORDER PREVIEW (Smart Allocation) 👀</div>` + baseReceipt + `<br><span style="color: var(--accent-amber);">⚠️ Remember: This is a preview, points are NOT deducted yet.</span>\n` + monthlySummary; 
     }
 </script>
 </body>
