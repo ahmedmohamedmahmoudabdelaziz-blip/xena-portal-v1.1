@@ -10,8 +10,9 @@ from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-# --- Structured Logging & Cache & Limits ---
 app = Flask(__name__)
+
+# --- Structured Logging & Cache & Limits ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [XenaPortal] - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -112,9 +113,7 @@ def parse_feishu_date(date_val):
     try:
         if isinstance(date_val, (int, float)) or (isinstance(date_val, str) and date_val.strip().isdigit()):
             ts = float(date_val) if isinstance(date_val, (int, float)) else float(date_val.strip())
-            dt_utc = datetime.fromtimestamp(ts / 1000.0, tz=timezone.utc)
-            dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return (datetime.fromtimestamp(ts / 1000.0, tz=timezone.utc) + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         clean_str = str(date_val)[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except: return None
@@ -258,7 +257,6 @@ def search_agency():
     
     if pb == 0 and tp > 0: pb = tp - up
     
-    # Phase 5: Agency Health Score Calculation
     health_score = 100
     health_status = "Healthy"
     if tp > 0:
@@ -268,7 +266,6 @@ def search_agency():
         else: health_score = 95; health_status = "Healthy"
     else: health_score = 0; health_status = "Inactive"
 
-    # Get ALL historical requests (no month filter)
     req_res = requests.post(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true", headers=headers, json=points_payload, timeout=10).json()
     
     valid_requests = []
@@ -278,17 +275,7 @@ def search_agency():
             r_fields['_timestamp'] = parse_feishu_date(get_field_local(r_fields, 'Submitted on Copy', 'Submitted on'))
             valid_requests.append(r_fields)
 
-    return jsonify({
-        "base_points": bp,
-        "total_points": tp,
-        "used_points": up,
-        "point_balance": pb,
-        "monthly_tracker": extract_field_text(get_field_local(fields, 'Monthly Usage Tracker', 'Latest Usage Tracker')),
-        "requests": valid_requests,
-        "acm": acm.title(),
-        "health_score": health_score,
-        "health_status": health_status
-    })
+    return jsonify({"base_points": bp, "total_points": tp, "used_points": up, "point_balance": pb, "monthly_tracker": extract_field_text(get_field_local(fields, 'Monthly Usage Tracker', 'Latest Usage Tracker')), "requests": valid_requests, "acm": acm.title(), "health_score": health_score, "health_status": health_status})
 
 @app.route('/api/analytics', methods=['GET'])
 @limiter.limit("5 per minute")
@@ -298,182 +285,96 @@ def get_analytics():
     if not uat: return jsonify({"error": "Unauthorized session. Please log in again."}), 401
     
     perms = get_user_permissions(email, username)
-    if "analytics" not in perms["modules"] and not perms.get("is_super_admin"): 
-        return jsonify({"error": "Unauthorized. Analytics module restricted."}), 403
+    if "analytics" not in perms["modules"] and not perms.get("is_super_admin"): return jsonify({"error": "Unauthorized."}), 403
 
-    allowed_regs = perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"])
-    allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
-
+    a_regs, a_acms = perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"]), perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {get_tenant_access_token()}"})
 
-    region_filter = request.args.get('region', 'PK').strip().lower()
-    if not region_filter: region_filter = 'pk'
-    
-    if region_filter == 'all' and "all" not in allowed_regs:
-        return jsonify({"error": "Access Denied: Please specify a specific region filter you own."}), 403
-    if region_filter != 'all' and "all" not in allowed_regs and region_filter not in allowed_regs:
-        return jsonify({"error": f"Access Denied: You lack permissions for Region: {region_filter.upper()}."}), 403
-
-    acm_filter = request.args.get('acm', 'All').strip().lower()
+    reg_filter, acm_filter, type_filter = request.args.get('region', 'PK').strip().lower() or 'pk', request.args.get('acm', 'All').strip().lower(), request.args.get('type', 'All').strip().lower()
     if acm_filter == 'hasseb': acm_filter = 'haseeb'
-    type_filter = request.args.get('type', 'All').strip().lower()
-    date_from = request.args.get('from', '').strip()
-    date_to = request.args.get('to', '').strip()
+    
+    if reg_filter == 'all' and "all" not in a_regs: return jsonify({"error": "Access Denied."}), 403
+    if reg_filter != 'all' and "all" not in a_regs and reg_filter not in a_regs: return jsonify({"error": f"Access Denied: Region {reg_filter.upper()}."}), 403
 
-    if date_from and date_to:
-        dt1 = datetime.strptime(date_from, "%Y-%m-%d")
-        dt2 = datetime.strptime(date_to, "%Y-%m-%d")
+    df, dt = request.args.get('from', '').strip(), request.args.get('to', '').strip()
+    if df and dt:
+        dt1, dt2 = datetime.strptime(df, "%Y-%m-%d"), datetime.strptime(dt, "%Y-%m-%d")
         if dt1 > dt2: dt1, dt2 = dt2, dt1
         from_dt, to_dt = dt1, dt2 + timedelta(days=1)
     else:
-        now = datetime.now()
-        from_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if now.month == 12: to_dt = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else: to_dt = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        n = datetime.now()
+        from_dt = n.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        to_dt = n.replace(year=n.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0) if n.month == 12 else n.replace(month=n.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-
-    all_items = []
-    seen_ids = set()
-    master_keys = set()
-    page_token = ""
-    error_msg = None
-    fetch_complete = True
-    stop_reason = None
-    consecutive_old_pages = 0
+    all_items, seen_ids, page_token, fetch_complete, stop_reason, consecutive_old_pages = [], set(), "", True, None, 0
 
     for _ in range(150):
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
-
         try:
-            res = session.get(base_url, params=params, timeout=12)
-            if res.status_code != 200:
-                fetch_complete = False
-                error_msg = f"HTTP Error {res.status_code}: {res.text}"
-                stop_reason = error_msg
-                break
-
-            res_json = res.json()
-            if res_json.get("code") != 0:
-                fetch_complete = False
-                error_msg = res_json.get("msg")
-                stop_reason = error_msg
-                break
-
-            data_block = res_json.get("data", {})
-            items = data_block.get("items", [])
+            res_json = session.get(base_url, params=params, timeout=12).json()
+            if res_json.get("code") != 0: fetch_complete, stop_reason = False, res_json.get("msg"); break
+            items = res_json.get("data", {}).get("items", [])
             if not items: break
 
-            page_old_count = 0
-            valid_dates_in_page = 0
-
+            old_c, v_c = 0, 0
             for item in items:
                 rid = item.get("record_id")
                 if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    master_keys.update(item.get('fields', {}).keys())
-
+                    seen_ids.add(rid); all_items.append(item)
                     record_dt = parse_feishu_date(get_field_local(item.get('fields', {}), 'Submitted on Copy', 'Submitted on', 'Created Time'))
                     if record_dt:
-                        valid_dates_in_page += 1
-                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
-                            page_old_count += 1
-
-            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                consecutive_old_pages += 1
-            else:
-                consecutive_old_pages = 0
-
-            if consecutive_old_pages >= 3:
-                stop_reason = "Safely reached pages with all older records."
-                break
-
-            page_token = data_block.get("page_token")
-            if not page_token or not data_block.get("has_more", False): break
-
-        except Exception as e:
-            fetch_complete = False
-            error_msg = str(e)
-            stop_reason = error_msg
-            break
+                        v_c += 1
+                        if from_dt and record_dt < (from_dt - timedelta(days=1)): old_c += 1
+            consecutive_old_pages = consecutive_old_pages + 1 if (v_c > 0 and old_c == v_c) else 0
+            if consecutive_old_pages >= 3: stop_reason = "Safely reached pages with all older records."; break
+            
+            page_token = res_json.get("data", {}).get("page_token")
+            if not page_token or not res_json.get("data", {}).get("has_more", False): break
+        except Exception as e: fetch_complete, stop_reason = False, str(e); break
 
     stats = {
         "kpis": {"creations": 0, "bds": 0, "closings": 0},
         "creation_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "bd_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
         "closing_status": {"Done": 0, "Rejected": 0, "Under Investigation": 0},
-        "acm_performance": {}, "creation_types": {}, "agency_types": {},
-        "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {},
-        "acm_closing_reasons": {}, 
-        "daily_trend_creation": {},  
-        "daily_trend_bd": {},        
-        "other_request_types": {}, "scanned_rows": len(all_items),
-        "error_debug": error_msg, "feishu_keys": sorted(list(master_keys)),
-        "fetch_complete": fetch_complete, "stop_reason": stop_reason
+        "acm_performance": {}, "creation_types": {}, "agency_types": {}, "other_apps": {}, "reject_reasons": {}, "closing_reasons_pie": {}, "acm_closing_reasons": {}, 
+        "daily_trend_creation": {}, "daily_trend_bd": {}, "scanned_rows": len(all_items), "fetch_complete": fetch_complete, "stop_reason": stop_reason
     }
 
     if from_dt and to_dt:
         cur = from_dt
         while cur < to_dt:
             d_str = cur.strftime("%Y-%m-%d")
-            stats["daily_trend_creation"][d_str] = 0
-            stats["daily_trend_bd"][d_str] = 0
+            stats["daily_trend_creation"][d_str], stats["daily_trend_bd"][d_str] = 0, 0
             cur += timedelta(days=1)
 
     for item in all_items:
         fields = item.get('fields', {})
-
         record_dt = parse_feishu_date(get_field_local(fields, 'Submitted on', 'Submitted on Copy', 'Created Time'))
         if from_dt or to_dt:
             if not record_dt or (from_dt and record_dt < from_dt) or (to_dt and record_dt >= to_dt): continue
 
-        region = clean(get_field_local(fields, 'Region', 'Agency Region'))
-        acm_pk = clean(get_field_local(fields, 'Acm Name (PK)'))
-        acm_in = clean(get_field_local(fields, 'Acm Name (IN)'))
-        acm_fallback = clean(get_field_local(fields, 'Acm', 'Assigned Member'))
+        region, acm_pk, acm_in, acm_fallback = clean(get_field_local(fields, 'Region', 'Agency Region')), clean(get_field_local(fields, 'Acm Name (PK)')), clean(get_field_local(fields, 'Acm Name (IN)')), clean(get_field_local(fields, 'Acm', 'Assigned Member'))
+        if region in ('', 'none'): region = 'pk' if acm_pk in PK_ACMS or acm_fallback in PK_ACMS else region
+        if reg_filter != 'all' and region != reg_filter: continue
+
+        req_type, status, agency_type, closing_reason, other_app = clean(get_field_local(fields, 'Request Type', 'Request type', 'Type')), clean(get_field_local(fields, 'Status', 'Request Status', 'State')), clean(get_field_local(fields, 'Agency Type')), clean(get_field_local(fields, 'Closing Reason', 'PK Closing Agencies Reason')), clean(get_field_local(fields, 'Otherapp Name', 'Other Apps'))
+        is_done, is_rejected = "done" in status or "approv" in status, "reject" in status or "fail" in status
         
-        if region in ('', 'none'):
-            if acm_pk in PK_ACMS or acm_fallback in PK_ACMS:
-                region = 'pk'
-
-        if region_filter != 'all' and region != region_filter: continue
-
-        req_type = clean(get_field_local(fields, 'Request Type', 'Request type', 'Type', 'Category', 'Request Category'))
-        status = clean(get_field_local(fields, 'Status', 'Request Status', 'Agency Status', 'State'))
-        agency_type = clean(get_field_local(fields, 'Agency Type', 'Type of Agency'))
-        closing_reason = clean(get_field_local(fields, 'Closing Reason', 'Closing Agencies Reason', 'PK Closing Agencies Reason'))
-        other_app = clean(get_field_local(fields, 'Otherapp Name', 'Other App Name', 'Other Apps'))
-
-        is_done = "done" in status or "complet" in status or "approv" in status
-        is_rejected = "reject" in status or "fail" in status or "decline" in status
-
         acm = acm_in if region == "in" else acm_pk
         if not acm: acm = acm_fallback
-        
-        if "all" not in allowed_acms and acm.lower().strip() not in allowed_acms: continue
-        if acm_filter != 'all' and acm_filter != acm: continue
-
+        if ("all" not in a_acms and acm.lower().strip() not in a_acms) or (acm_filter != 'all' and acm_filter != acm): continue
         if type_filter != 'all' and type_filter != agency_type: continue
 
-        is_bd_kpi = "bd creation" in req_type
-        is_closing_kpi = "closing agency" in req_type
-        is_creation_kpi = any(p in req_type for p in [
-            "agency creation",
-            "agency applied already by acm or bd link ( follow-up )",
-            "agency applied already",
-            "follow-up",
-            "follow up"
-        ])
+        is_bd_kpi, is_closing_kpi, is_creation_kpi = "bd creation" in req_type, "closing agency" in req_type, any(p in req_type for p in ["agency creation", "agency applied already", "follow-up"])
 
         if is_done and record_dt:
             d_str = record_dt.strftime("%Y-%m-%d")
-            if is_creation_kpi and d_str in stats["daily_trend_creation"]:
-                stats["daily_trend_creation"][d_str] += 1
-            if is_bd_kpi and d_str in stats["daily_trend_bd"]:
-                stats["daily_trend_bd"][d_str] += 1
+            if is_creation_kpi and d_str in stats["daily_trend_creation"]: stats["daily_trend_creation"][d_str] += 1
+            if is_bd_kpi and d_str in stats["daily_trend_bd"]: stats["daily_trend_bd"][d_str] += 1
 
         if is_closing_kpi:
             stats["kpis"]["closings"] += 1
@@ -483,8 +384,7 @@ def get_analytics():
                 stats["closing_reasons_pie"][cr_title] = stats["closing_reasons_pie"].get(cr_title, 0) + 1
                 if acm:
                     clean_acm = acm.title()
-                    if clean_acm not in stats["acm_closing_reasons"]:
-                        stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
+                    if clean_acm not in stats["acm_closing_reasons"]: stats["acm_closing_reasons"][clean_acm] = {"User Request": 0, "Duplicated Hosting": 0}
                     stats["acm_closing_reasons"][clean_acm]["User Request" if "user" in closing_reason else "Duplicated Hosting"] += 1
 
         elif is_bd_kpi:
@@ -497,27 +397,17 @@ def get_analytics():
             if is_done and acm: stats["acm_performance"][acm.title()] = stats["acm_performance"].get(acm.title(), 0) + 1
             if is_done and other_app: stats["other_apps"][other_app.title()] = stats["other_apps"].get(other_app.title(), 0) + 1
             if agency_type: stats["agency_types"][agency_type.title()] = stats["agency_types"].get(agency_type.title(), 0) + 1
-            for ct in extract_field_list(get_field_local(fields, 'Create Way', 'Creation Type', 'Agency Creation Type', 'PK Agencies Creation Type')):
+            for ct in extract_field_list(get_field_local(fields, 'Create Way', 'Creation Type')):
                 if ct: stats["creation_types"][ct.title()] = stats["creation_types"].get(ct.title(), 0) + 1
             if is_rejected:
-                for rr in extract_field_list(get_field_local(fields, 'Reject Reason', 'Rejection Reason', 'Agencies Rejection Reason', 'PK Agencies Rejection reason')):
+                for rr in extract_field_list(get_field_local(fields, 'Reject Reason', 'Rejection Reason')):
                     if rr: stats["reject_reasons"][rr.title()] = stats["reject_reasons"].get(rr.title(), 0) + 1
+        elif req_type: stats["other_request_types"][req_type.title()] = stats["other_request_types"].get(req_type.title(), 0) + 1
 
-        elif req_type:
-            label = req_type.title()
-            stats["other_request_types"][label] = stats["other_request_types"].get(label, 0) + 1
-
-    # Sorting for consistent output
     stats["acm_performance"] = dict(sorted(stats["acm_performance"].items(), key=lambda x: x[1], reverse=True))
     stats["reject_reasons"] = dict(sorted(stats["reject_reasons"].items(), key=lambda x: x[1], reverse=True))
     stats["closing_reasons_pie"] = dict(sorted(stats["closing_reasons_pie"].items(), key=lambda x: x[1], reverse=True))
     stats["other_apps"] = dict(sorted(stats["other_apps"].items(), key=lambda x: x[1], reverse=True))
-    stats["daily_trend_creation"] = dict(sorted(stats["daily_trend_creation"].items()))
-    stats["daily_trend_bd"] = dict(sorted(stats["daily_trend_bd"].items()))
-    stats["creation_types"] = dict(sorted(stats["creation_types"].items(), key=lambda x: x[1], reverse=True))
-    stats["agency_types"] = dict(sorted(stats["agency_types"].items(), key=lambda x: x[1], reverse=True))
-    stats["other_request_types"] = dict(sorted(stats["other_request_types"].items(), key=lambda x: x[1], reverse=True))
-
     return jsonify(stats)
 
 if __name__ == '__main__':
