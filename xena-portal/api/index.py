@@ -409,7 +409,10 @@ def get_user_permissions(email, name):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING (Fixed Latency/Timeouts)
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None, fields_to_return=None):
+# FIX 1: Removed `fields_to_return` array logic entirely.
+# Feishu's strict schema matching caused 502 FieldNameNotFound errors.
+# Reverting to automatic_fields=true ensures 100% stability.
+def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
     all_items = []
     seen_ids  = set()
@@ -427,12 +430,7 @@ def fetch_feishu_records(table_id, from_dt=None, fields_to_return=None):
     for _ in range(200):
         payload = {"page_size": 500} 
         if page_token: payload["page_token"] = page_token
-        
-        # Optimize Analytics Fetch - Reduces JSON payload size by 90%
-        if fields_to_return: 
-            payload["field_names"] = fields_to_return
             
-        # Reverse Order to hit the Stop Condition faster 
         if table_id == REQUESTS_TABLE_ID:
             payload["sort"] = [{"field_name": "Numbering", "desc": True}]
         
@@ -470,7 +468,6 @@ def fetch_feishu_records(table_id, from_dt=None, fields_to_return=None):
                             if record_dt < (from_dt - timedelta(days=1)):
                                 page_old_count += 1
             
-            # Stop paginating if we've passed the requested target date bounds. 
             if from_dt:
                 if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
                     consecutive_old_pages += 1
@@ -499,7 +496,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # 1. FIX: Fetch Base Identifiers and Core Data EXCLUSIVELY from POINTS_TABLE_ID
     points_payload = {
         "filter": {
             "conjunction": "and",
@@ -534,10 +530,10 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         if region_raw.strip().lower() not in [r.lower() for r in allowed_regs]:
             return {"found": False, "error": f"Access Denied: Not authorized to view Region {region_raw.upper()}."}
 
-    # 2. FIX: Traverse REQUESTS_TABLE_ID for Timeline Tracking & Dynamic Allocator Boundaries 
-    history = []
+    # FIX 3, 4 & 5: Strict Current Month Filter, Target Counter Math, and Timeline Separation
+    history_points = []
+    history_target = []
     privileges_claimed = defaultdict(int)
-    privileges_log = []
     usage_this_month = defaultdict(int)
     cm, cy = datetime.now().month, datetime.now().year
     
@@ -550,51 +546,64 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 hf = r.get("fields", {})
                 h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
                 
-                # FIX 3: Target "Agency Point Privilege" primarily. Stop Timeline returning "Unknown"
+                # FIX 3: SKIP ANYTHING THAT IS NOT THIS MONTH/YEAR
+                if not h_date or h_date.month != cm or h_date.year != cy:
+                    continue
+
                 privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
                 status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
                 req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
-                qty_val       = extract_field_text(get_field_local(hf, "Quantities Input")).strip()
                 target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
                 point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
 
-                if req_type.lower() == "agency target privilege" and privilege_val:
-                    privileges_log.append({"privilege": privilege_val, "status": status_val})
-                    if status_val.lower() in ("done", "completed", "approved", "confirm"):
-                        privileges_claimed[privilege_val] += 1
-                        
-                # Smart Allocator Cap Extraction Layer (Overriding faulty text column limits)
-                if h_date and h_date.month == cm and h_date.year == cy:
-                    s_lower = status_val.lower()
-                    if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
-                        p_lower = privilege_val.lower()
-                        if p_lower:
-                            qty = 1
-                            if qty_val:
-                                m = re.search(r'\d+', str(qty_val))
-                                if m: qty = int(m.group())
-                            
-                            for key in MONTHLY_ALLOCATOR_LIMITS.keys():
-                                if key in p_lower:
-                                    usage_this_month[key] += qty
-                                    break
-                            else:
-                                base_name = p_lower.split('(')[0].strip()
-                                if base_name:
-                                    usage_this_month[base_name] += qty
+                # FIX 4: Exact Counter Extraction (Required for Claimed = 2 vs 6)
+                raw_qty = extract_field_text(get_field_local(hf, "Counter", "Quantities Input", "Qty")).strip()
+                qty = 1
+                if raw_qty:
+                    m = re.search(r'\d+', str(raw_qty))
+                    if m: qty = int(m.group())
 
-                history.append({
-                    "date": h_date.strftime("%Y-%m-%d") if h_date else "",
+                entry = {
+                    "date": h_date.strftime("%Y-%m-%d"),
                     "_dt": h_date,
                     "request_type": req_type,
                     "status": status_val,
                     "privilege": privilege_val,
                     "target_type": target_type,
-                    "quantities_input": qty_val,
+                    "quantities_input": raw_qty or str(qty),
                     "point_balance": point_balance,
-                })
-            history.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
-            for h in history: h.pop("_dt", None)
+                }
+
+                req_type_lower = req_type.lower()
+                s_lower = status_val.lower()
+
+                # FIX 5: Separating Timelines & Applying Exact Count logic
+                if "target" in req_type_lower:
+                    history_target.append(entry)
+                    # For target privileges, sum up the exact counter of Done requests
+                    if s_lower in ("done", "completed", "approved", "confirm") and privilege_val:
+                        privileges_claimed[privilege_val] += qty
+                else:
+                    # Point requests, bd creations, closing requests go to points timeline
+                    history_points.append(entry)
+
+                # Smart Allocator Cap Extraction Layer 
+                if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
+                    p_lower = privilege_val.lower()
+                    if p_lower:
+                        for key in MONTHLY_ALLOCATOR_LIMITS.keys():
+                            if key in p_lower:
+                                usage_this_month[key] += qty
+                                break
+                        else:
+                            base_name = p_lower.split('(')[0].strip()
+                            if base_name:
+                                usage_this_month[base_name] += qty
+
+            history_points.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
+            history_target.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
+            for h in history_points: h.pop("_dt", None)
+            for h in history_target: h.pop("_dt", None)
     except Exception as e:
         logger.error("Points history fetch failed", agency=code, error=str(e))
 
@@ -631,13 +640,12 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "total_points": total_pts, "used_points": used_pts,
             "point_balance": balance, "health_score": health_score,
             "health_status": health_status,
-            "history": history,
+            "history": history_points, # Separated timeline 
             "monthly_usage": {}, 
             "allocator_status": allocator_status,
             "requests": [r.get("fields", {}) for r in all_records]
         }
     else:  
-        # FIX 2: Target 0 Coins Patch - Base Points extracted globally from POINTS_TABLE_ID
         raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
         base_pts_coins = raw_base_pts * COINS_MULTIPLIER
 
@@ -647,7 +655,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "base_points": base_pts_coins, "health_score": 100, "health_status": "Healthy",
             "privileges": list(privileges_claimed.keys()),   
             "privileges_claimed": dict(privileges_claimed),  
-            "privileges_log": privileges_log,
+            "history": history_target, # Passing target-only history for the new target timeline
             "requests": [r.get("fields", {}) for r in all_records]
         }
 
@@ -833,19 +841,6 @@ _bg_sync = {
 }
 _bg_sync_lock = threading.Lock()
 
-# Targeted Analytics payload schema drastically cutting JSON size to circumvent Vercel Timeout
-ANALYTICS_FIELDS = [
-    "Submitted on Copy", "Submitted on", "Created Time", 
-    "Request Type", "Request type", "Type", "Category", "Request Category",
-    "Status", "Request Status", "Agency Status", "State", 
-    "Region", "Agency Region", 
-    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member", 
-    "Agency Type", "Type of Agency", 
-    "Closing Reason", "Closing Agencies Reason", "PK Closing Agencies Reason", 
-    "Otherapp Name", "Other App Name", "Other Apps", 
-    "Reject Reason", "Rejection Reason", "Agencies Rejection Reason", "PK Agencies Rejection reason", 
-    "Create Way", "Creation Type", "Agency Creation Type", "PK Agencies Creation Type"
-]
 
 def get_requests_table_snapshot(from_dt=None):
     with _bg_sync_lock:
@@ -857,7 +852,8 @@ def get_requests_table_snapshot(from_dt=None):
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
         
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt, fields_to_return=ANALYTICS_FIELDS)
+    # FIX 1: Removed fields_to_return entirely to prevent Feishu FieldNameNotFound 502 errors
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
     
     with _bg_sync_lock:
         _bg_sync["requests_items"]  = items
@@ -926,7 +922,7 @@ def check_auth():
     return jsonify(perms)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# AGENCY SEARCH ENDPOINT (Supports GET and POST safely)
+# AGENCY SEARCH ENDPOINT 
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/search', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_SEARCH)
@@ -1007,7 +1003,7 @@ def manage_users():
         
         payload = {"fields": payload_fields}
         
-        # FIX 1: Retrieve existing users to verify if Update is required. Prevents the "dead" UI buttons.
+        # FIX 2: Strict String Matching.
         existing_record_id = None
         res_all = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
         
@@ -1020,7 +1016,6 @@ def manage_users():
                 existing_record_id = item["record_id"]
                 break
 
-        # Dynamically push updates back utilizing correct CRUD headers 
         if existing_record_id:
             res = http_requests.put(f"{base_url}/{existing_record_id}", headers=headers, json=payload, timeout=15).json()
         else:
@@ -1049,7 +1044,7 @@ def audit_logs():
     return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
 
 # ──────────────────────────────────────────────────────────────────────────────
-# PAGINATED POINTS RECORDS ENDPOINT (Fixed Endless Loading)
+# PAGINATED POINTS RECORDS ENDPOINT 
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1077,24 +1072,16 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # FIX 4 & 5: Utilize a direct raw_points_cache independent of user queries to strip repetitive calls and stop the timeout
     raw_points_cache_key = "points_table_raw_items"
     all_items = cache_get(raw_points_cache_key)
 
     if all_items is None:
-        POINTS_FIELDS = [
-            "Agency Code", "Agency Name", "Name", "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member",
-            "Region", "Agency Region", "Base Points", "Bonus Points", 
-            "Total Points", "# Total Points", "Used Points", 
-            "Point Balance", "Monthly Usage Tracker", "Status", "Date"
-        ]
-        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID, fields_to_return=POINTS_FIELDS)
+        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID) # Fix 1 applies here too
         if not fetch_complete and not all_items:
             return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
             
         cache_set(raw_points_cache_key, all_items, ttl=300)
 
-    # Convert mapping logic straight to local client instead of API
     filtered = []
     for item in all_items:
         f = item.get("fields", {})
@@ -1172,7 +1159,7 @@ def sync_refresh():
     if not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, fields_to_return=ANALYTICS_FIELDS)
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
     with _bg_sync_lock:
         _bg_sync["requests_items"]  = items
         _bg_sync["requests_keys"]   = keys
@@ -1244,7 +1231,6 @@ def analytics():
             cached["cache_hit"] = True
             return jsonify(cached)
 
-    # FIX 6: Double Fetch Elimination algorithm. Merge both dates to the oldest possible configuration block to parse seamlessly later
     oldest_dt = from_dt
     if cmp_from and cmp_to:
         try:
