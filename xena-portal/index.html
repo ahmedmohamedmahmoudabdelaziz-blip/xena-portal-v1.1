@@ -36,13 +36,51 @@
         .login-card h1{font-size:2rem;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
         .login-card p{color:var(--text-muted);margin-bottom:32px}
 
-        /* ── APP SHELL ──────────────────────────────────────────────────── */
-        .app-shell{display:none;max-width:1440px;margin:0 auto;padding:24px}
-        .top-bar{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 24px;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-        .top-bar-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-        .top-bar-right{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-        .user-pill{display:flex;align-items:center;gap:10px;color:var(--accent-cyan);font-weight:600;font-size:.95rem}
-        .user-pill::before{content:'';width:8px;height:8px;background:var(--accent-green);border-radius:50%;box-shadow:0 0 8px var(--accent-green)}
+        /* ── APP SHELL (sidebar layout) ─────────────────────────────────── */
+        .app-shell{display:none;flex-direction:row;min-height:100vh}
+        /* ── SIDEBAR ────────────────────────────────────────────────────── */
+        .sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
+        .main-content{margin-left:240px;padding:24px;flex:1;min-width:0;box-sizing:border-box}
+        .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+        .sidebar-brand{font-size:1.05rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+        .sidebar-user-area{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+        .sidebar-username{font-size:.84rem;font-weight:600;color:var(--accent-cyan);display:flex;align-items:center;gap:7px;line-height:1.5;word-break:break-word}
+        .sidebar-username::before{content:'';width:7px;height:7px;background:var(--accent-green);border-radius:50%;flex-shrink:0;box-shadow:0 0 6px var(--accent-green)}
+        .sidebar-nav{flex:1;padding:8px 0;overflow-y:auto}
+        .nav-group{margin-bottom:1px}
+        .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
+        .nav-group-header:hover{color:var(--text);background:rgba(255,255,255,.04)}
+        .nav-group-header.grp-active{color:var(--accent-cyan)}
+        .nav-direct{cursor:pointer}
+        .nav-arr{font-size:.7rem;transition:transform .25s;flex-shrink:0}
+        .nav-arr.open{transform:rotate(90deg)}
+        .nav-group-body{overflow:hidden;max-height:0;transition:max-height .35s ease}
+        .nav-group-body.open{max-height:500px}
+        .nav-item{display:block;padding:9px 16px 9px 32px;font-size:.875rem;color:var(--text-muted);cursor:pointer;transition:all .2s;border-left:3px solid transparent}
+        .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
+        .nav-item.active{color:var(--accent-cyan);border-left-color:var(--accent-cyan);background:rgba(0,212,255,.07);font-weight:600}
+        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0}
+        .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:150}
+        .page-top-bar{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 20px;margin-bottom:24px}
+        .page-title-txt{font-size:.95rem;font-weight:700;color:var(--text)}
+        .hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.25rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1}
+        .hamburger:hover{background:rgba(255,255,255,.06)}
+        .welcome-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:920px;margin:0 auto}
+        .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .25s;box-shadow:var(--shadow);text-align:center}
+        .welcome-card:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:0 12px 40px rgba(0,212,255,.12)}
+        .welcome-card-icon{font-size:2rem;margin-bottom:10px}
+        .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
+        .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
+        .compare-mode-toggle{display:flex;gap:8px;margin-bottom:20px}
+        .compare-mode-btn{flex:1;padding:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.9rem;transition:all .2s;text-align:center}
+        .compare-mode-btn.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:700}
+        @media(max-width:900px){
+          .sidebar{transform:translateX(-240px)}
+          .sidebar.open{transform:translateX(0)}
+          .sidebar-backdrop.visible{display:block}
+          .main-content{margin-left:0;max-width:100vw}
+          .hamburger{display:block}
+        }
 
         /* ── BUTTONS ────────────────────────────────────────────────────── */
         .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
@@ -309,19 +347,16 @@
             .kpi-grid{grid-template-columns:repeat(2,1fr)}
         }
         @media(max-width:600px){
-            .app-shell{padding:12px}
-            .top-bar{padding:12px 16px}
+            .main-content{padding:12px}
             .kpi-grid{grid-template-columns:1fr}
             .chart-grid-3,.chart-grid-2{grid-template-columns:1fr}
             .chart-wrapper-pie-large{height:380px}
-            .modal-content{border-radius:12px;padding:20px;margin:12px;max-height:95vh}
             .control-grid{grid-template-columns:1fr}
             .compare-kpi-row{flex-direction:column}
-            .page-header h1{font-size:1.8rem}
             .user-row{flex-direction:column;align-items:flex-start}
         }
         @media print{
-            .top-bar,.card:has(#analyticsParams),.loading-overlay,#toastContainer,.btn,.tab-bar,
+            .sidebar,.page-top-bar,#pg-analytics .card,.loading-overlay,#toastContainer,.btn,.tab-bar,
             #activeFiltersBar,.preset-bar,.filter-chip{display:none!important}
             body{background:#fff;color:#000}
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
@@ -348,258 +383,213 @@
     </div>
 </div>
 
-<!-- ── ADMIN MODAL ───────────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="adminModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>⚙️ Advanced Access Management</h2>
-            <button class="close-btn" onclick="closeAdmin()" aria-label="Close">×</button>
-        </div>
-
-        <div class="tab-bar" style="margin-bottom:24px">
-            <button class="tab-btn active" onclick="switchAdminTab('users',this)">👥 Agents</button>
-            <button class="tab-btn" onclick="switchAdminTab('audit',this)">📋 Audit Log</button>
-        </div>
-
-        <div id="adminTabUsers">
-            <div class="admin-form">
-                <div class="control-group">
-                    <label>Agent Identity (Exact Lark Name OR Email)</label>
-                    <input type="text" id="newAgentEmail" placeholder="e.g., Muhammad Usman" aria-label="Agent identity">
-                </div>
-                <div class="admin-toggle">
-                    <div>
-                        <h4>👑 Grant Admin Privileges</h4>
-                        <span style="font-size:.8rem;color:var(--text-muted)">Allows user to manage other agents.</span>
-                    </div>
-                    <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
-                </div>
-                <div class="module-card">
-                    <div class="module-header">
-                        <h4>🎯 Target Module</h4>
-                        <label class="switch"><input type="checkbox" id="modTarget" checked><span class="slider"></span></label>
-                    </div>
-                    <div class="control-grid" style="margin-bottom:0">
-                        <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
-                        <div class="control-group"><label>Regions</label><div class="pill-select-container" id="targetRegSelect"></div></div>
-                    </div>
-                </div>
-                <div class="module-card">
-                    <div class="module-header">
-                        <h4>🪙 Points Module</h4>
-                        <label class="switch"><input type="checkbox" id="modPoints" checked><span class="slider"></span></label>
-                    </div>
-                    <div class="control-grid" style="margin-bottom:0">
-                        <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="pointsAcmSelect"></div></div>
-                        <div class="control-group"><label>Regions</label><div class="pill-select-container" id="pointsRegSelect"></div></div>
-                    </div>
-                </div>
-                <div class="module-card">
-                    <div class="module-header">
-                        <h4>📊 Analytics Module</h4>
-                        <label class="switch"><input type="checkbox" id="modAnalytics" checked><span class="slider"></span></label>
-                    </div>
-                    <div class="control-grid" style="margin-bottom:0">
-                        <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
-                        <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
-                    </div>
-                </div>
-                <!-- 4.4  Temporary access -->
-                <div class="expires-group">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                        <span style="color:var(--accent-amber);font-size:.9rem;font-weight:600">⏳ Temporary Access</span>
-                        <span style="font-size:.8rem;color:var(--text-muted)">(optional — leave blank for permanent)</span>
-                    </div>
-                    <div class="control-group" style="margin-bottom:0">
-                        <label>Access Expires On</label>
-                        <input type="date" id="expiresAt" aria-label="Expiry date">
-                    </div>
-                </div>
-                <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
-            </div>
-            <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px">Current Active Agents</h3>
-            <div class="user-list" id="adminUserList"></div>
-        </div>
-
-        <div id="adminTabAudit" style="display:none">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <h4 style="color:var(--text-muted);font-size:.9rem">Recent Admin Actions</h4>
-                <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
-            </div>
-            <div id="auditLogList"><div class="empty-state" style="padding:40px 0"><p>Loading audit log...</p></div></div>
-        </div>
-    </div>
-</div>
-
 <!-- ── MAIN APP ───────────────────────────────────────────────────────────── -->
 <div class="app-shell" id="mainApp">
-    <div class="top-bar">
-        <div class="top-bar-left">
-            <div class="user-pill" id="welcomeText">Not logged in</div>
+
+    <!-- ── SIDEBAR ──────────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <span style="font-size:1.3rem">🚀</span>
+            <span class="sidebar-brand">Xena Portal</span>
         </div>
-        <div class="top-bar-right">
-            <button id="adminBtn" class="btn-outline" style="display:none" onclick="openAdmin()" aria-label="Access control">⚙️ Admin</button>
-            <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle dark/light mode" aria-label="Toggle theme">🌙</button>
+        <div class="sidebar-user-area">
+            <div class="sidebar-username" id="sidebarUsername">Loading…</div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">Live Data Portal</div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-group" id="navGrpAnalytics">
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpAnalytics','navBodyAnalytics')">
+                    <span>📊 Agency Analysis</span><span class="nav-arr" id="navArrAnalytics">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyAnalytics">
+                    <div class="nav-item" id="nav-analytics" onclick="navTo('analytics')">Analytics Report</div>
+                    <div class="nav-item" id="nav-compare"   onclick="navTo('compare')">Compare ACMs / Periods</div>
+                </div>
+            </div>
+            <div class="nav-group" id="navGrpPoints">
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpPoints','navBodyPoints')">
+                    <span>🪙 Agency Points</span><span class="nav-arr" id="navArrPoints">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyPoints">
+                    <div class="nav-item" id="nav-points"    onclick="navTo('points')">Check Agency Points</div>
+                    <div class="nav-item" id="nav-allocator" onclick="navTo('allocator')">Smart Allocator</div>
+                </div>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-header nav-direct" id="nav-target" onclick="navTo('target')">
+                    <span>🎯 Agency Target</span>
+                </div>
+            </div>
+            <div class="nav-group" id="navGrpAdmin" style="display:none">
+                <div style="height:1px;background:var(--border);margin:8px 16px 4px"></div>
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
+                    <span>⚙️ Access Management</span><span class="nav-arr" id="navArrAdmin">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyAdmin">
+                    <div class="nav-item" id="nav-admin-agents" onclick="navTo('admin-agents')">Manage Agents</div>
+                    <div class="nav-item" id="nav-admin-audit"  onclick="navTo('admin-audit')">Audit Log</div>
+                </div>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">🌙</button>
             <button class="logout-btn" onclick="logout()">Logout</button>
         </div>
-    </div>
+    </aside>
 
-    <div class="page-header">
-        <h1>Xena Live Data Portal</h1>
-        <p>Agency Privilege &amp; Operational Analytics</p>
-    </div>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 
-    <div class="card">
-        <div class="centered-search-box" style="margin-bottom:16px">
-            <div class="control-group" id="queryTypeContainer" style="display:none">
-                <label>Inquiry Type</label>
-                <select id="queryType" onchange="toggleViewModes()" aria-label="Module selector"></select>
+    <!-- ── MAIN CONTENT ─────────────────────────────────────────────────────── -->
+    <div class="main-content">
+
+        <div class="page-top-bar">
+            <div style="display:flex;align-items:center;gap:10px">
+                <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">☰</button>
+                <span class="page-title-txt" id="pageTitle">Xena Live Data Portal</span>
             </div>
-            <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:8px">
+        </div>
+
+        <!-- Hidden queryType — read by fetchAgencyData() -->
+        <select id="queryType" style="display:none"></select>
+
+        <!-- ══ PAGE: WELCOME ════════════════════════════════════════════════ -->
+        <div id="pg-welcome" style="display:block">
+            <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
                 You do not have access to any modules. Please contact an administrator.
             </div>
+            <div style="text-align:center;padding:32px 24px 24px">
+                <div style="font-size:2.5rem;margin-bottom:12px">🚀</div>
+                <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">Xena Live Data Portal</h2>
+                <p style="color:var(--text-muted);margin-bottom:32px">Agency Privilege &amp; Operational Analytics</p>
+            </div>
+            <div class="welcome-cards" id="welcomeCards"></div>
         </div>
 
-        <div id="standardSearchParams" class="centered-search-box" style="display:none">
-            <div class="control-group">
-                <label>Agency Code</label>
-                <input type="text" id="agencyCode" placeholder="e.g., 40775" aria-label="Agency code" onkeydown="if(event.key==='Enter')fetchAgencyData()">
-            </div>
-            <!-- 5.3  Compare agencies -->
-            <div class="control-group">
-                <label>Compare With (optional, comma-separated codes)</label>
-                <input type="text" id="compareAgencyCodes" placeholder="e.g., 40776, 40777" aria-label="Comparison codes">
-            </div>
-            <button class="btn btn-primary" onclick="fetchAgencyData()">Search</button>
-        </div>
-
-        <div id="analyticsParams" style="display:none">
-            <!-- 1.4  Preset bar -->
-            <div class="preset-bar" id="presetBar">
-                <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Quick Filters:</span>
-                <button class="preset-save-btn" onclick="saveFilterPreset()">+ Save Current</button>
-            </div>
-
-            <div class="control-grid">
-                <div class="control-group">
-                    <label>Date Filter</label>
-                    <select id="anaDatePreset" onchange="updateCustomDateVisibility()" aria-label="Date preset">
-                        <option value="this_month" selected>Current Month</option>
-                        <option value="last_month">Last Month</option>
-                        <option value="this_week">Current Week</option>
-                        <option value="last_week">Last Week</option>
-                        <option value="specific">Specific Date</option>
-                        <option value="all">All Time</option>
-                    </select>
+        <!-- ══ PAGE: COMPARE ════════════════════════════════════════════════ -->
+        <div id="pg-compare" style="display:none">
+            <div class="card">
+                <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Agency Comparison</h3>
+                <div class="compare-mode-toggle">
+                    <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">👥 ACM Side-by-Side</div>
+                    <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">📅 Period Compare → Analytics</div>
                 </div>
-                <div class="control-group" id="customFromDiv" style="display:none">
-                    <label>From Date</label>
-                    <input type="date" id="anaFrom" aria-label="From date">
+                <div id="cmpModeAcm">
+                    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Enter 2–3 agency codes to compare data side by side.</p>
+                    <div class="control-grid">
+                        <div class="control-group"><label>Primary Agency Code</label><input type="text" id="cmpCode1" placeholder="e.g., 40775"></div>
+                        <div class="control-group"><label>Agency Code 2</label><input type="text" id="cmpCode2" placeholder="e.g., 40776"></div>
+                        <div class="control-group"><label>Agency Code 3 (optional)</label><input type="text" id="cmpCode3" placeholder="e.g., 40777"></div>
+                        <div class="control-group">
+                            <label>Module</label>
+                            <select id="cmpModule"><option value="points">Agency Points</option><option value="target">Agency Target</option></select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmCompare()">⚖️ Compare Agencies</button>
+                    <div id="cmpAcmResults" style="margin-top:24px;overflow-x:auto"></div>
                 </div>
-                <div class="control-group" id="customToDiv" style="display:none">
-                    <label>To Date</label>
-                    <input type="date" id="anaTo" aria-label="To date">
+                <div id="cmpModePeriod" style="display:none">
+                    <div class="empty-state" style="padding:40px 0">
+                        <div style="font-size:2.5rem;margin-bottom:12px">📅</div>
+                        <h3>Period Comparison</h3>
+                        <p>Period comparison is built into Analytics Report — enable the "Period Comparison" toggle there.</p>
+                        <button class="empty-state-action" onclick="navTo('analytics');setTimeout(()=>{document.getElementById('compareToggle').checked=true;toggleCompareDates();},100)">Go to Analytics Report</button>
+                    </div>
                 </div>
-                <div class="control-group">
-                    <label>Region</label>
-                    <select id="anaRegion" onchange="updateAcmDropdown()" aria-label="Region">
-                        <option value="PK" selected>PK</option>
-                        <option value="IN">IN</option>
-                        <option value="All">All Regions</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label>Assigned ACM</label>
-                    <select id="anaAcm" aria-label="ACM"><option value="All">All ACMs</option></select>
-                </div>
-                <div class="control-group">
-                    <label>Agency Type</label>
-                    <select id="anaType" aria-label="Agency type">
-                        <option value="All">All Types</option>
-                        <option value="Acm hunting">ACM Hunting</option>
-                        <option value="BD hunting">BD Hunting</option>
-                        <option value="Walkin">Walk-in</option>
-                        <option value="New BD Hunting">New BD Hunting</option>
-                        <option value="Walkin sub-agency">Walkin sub-agency</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- 1.1  Comparison date range -->
-            <div style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                    <span style="font-size:.85rem;font-weight:600;color:var(--accent-purple)">📊 Period Comparison (optional)</span>
-                    <label class="switch" style="transform:scale(.8)"><input type="checkbox" id="compareToggle" onchange="toggleCompareDates()"><span class="slider"></span></label>
-                </div>
-                <div id="compareDatesRow" style="display:none;grid-template-columns:1fr 1fr;gap:12px" class="control-grid">
-                    <div class="control-group" style="margin-bottom:0"><label>Compare From</label><input type="date" id="cmpFrom" aria-label="Compare from"></div>
-                    <div class="control-group" style="margin-bottom:0"><label>Compare To</label><input type="date" id="cmpTo" aria-label="Compare to"></div>
-                </div>
-            </div>
-
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()" style="flex:1;min-width:200px">Generate Analytics Report</button>
-                <button class="btn-outline" id="exportCsvBtn" style="display:none" onclick="exportCSV()">📥 CSV</button>
-                <button class="btn-outline" id="exportXlsBtn" style="display:none" onclick="exportExcel()">📊 Excel</button>
-                <button class="btn-outline" id="exportPdfBtn" style="display:none" onclick="window.print()">🖨️ PDF</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3.4  Empty state -->
-    <div id="initialEmptyState" class="empty-state">
-        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        <h3>Ready to Explore</h3>
-        <p>Select a module from the dropdown above to begin your analysis.</p>
-    </div>
-
-    <!-- 5.3  Agency comparison area -->
-    <div id="comparisonArea" class="card" style="display:none;overflow-x:auto">
-        <h3 style="color:var(--accent-cyan);margin-bottom:16px">⚖️ Agency Comparison Engine</h3>
-        <div id="comparisonTableContainer"></div>
-    </div>
-
-    <!-- Search results -->
-    <div id="resultsContainer" style="display:none">
-        <div class="target-banner">
-            <div class="health-badge health-Healthy" id="displayHealth" style="display:none">🟢 Healthy</div>
-            <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
-            <div id="displayTargetTitle" style="color:var(--text-muted);font-size:.9rem;text-transform:uppercase;letter-spacing:1px">Current Month Target</div>
-            <h2 id="displayTargetCoins">0 Coins</h2>
-        </div>
-
-        <div class="card" id="privilegeArea" style="display:none">
-            <h3 style="margin-bottom:16px;color:var(--accent-cyan)">Available Target Privilege</h3>
-            <div class="control-group" style="max-width:300px;margin-bottom:16px">
-                <select id="specificPrivilege" onchange="updatePrivilegeGrid()" aria-label="Privilege type">
-                    <option value="Dynamic Avatar">Dynamic Avatar</option>
-                    <option value="30 Mics">30 Mics</option>
-                    <option value="20 Mics">20 Mics</option>
-                    <option value="New User Welcome Room">New User Welcome Room</option>
-                    <option value="Game room">Game room</option>
-                </select>
-            </div>
-            <div class="stat-grid">
-                <div class="stat-box"><div class="stat-label">Total</div><div class="stat-value" id="valTotal" style="color:var(--accent-green)">0</div></div>
-                <div class="stat-box"><div class="stat-label">Claimed</div><div class="stat-value" id="valClaimed">0</div></div>
-                <div class="stat-box"><div class="stat-label">Remaining</div><div class="stat-value" id="valRemaining" style="color:var(--accent-amber)">0</div></div>
-                <div class="stat-box"><div class="stat-label">Pending</div><div class="stat-value" id="valPending" style="color:#ffaa00">0</div></div>
-                <div class="stat-box"><div class="stat-label">Rejected</div><div class="stat-value" id="valRejected" style="color:var(--accent-rose)">0</div></div>
             </div>
         </div>
 
-        <div class="card" id="pointsArea" style="display:none">
-            <h3 style="margin-bottom:16px;color:var(--accent-purple)">🪙 Agency Points System</h3>
-            <div class="stat-grid" style="margin-bottom:24px">
-                <div class="stat-box"><div class="stat-label">Total Points</div><div class="stat-value" id="ptTotal" style="color:var(--accent-green)">0</div></div>
-                <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color:var(--accent-rose)">0</div></div>
-                <div class="stat-box"><div class="stat-label">Balance</div><div class="stat-value" id="ptBalance" style="color:var(--accent-cyan)">0</div></div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
-                <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px">
-                    <h4 style="color:var(--accent-cyan);margin-bottom:16px">🤖 Smart Allocator Preview</h4>
+        <!-- ══ PAGE: AGENCY LOOKUP (target / points) ═══════════════════════ -->
+        <div id="pg-agency" style="display:none">
+            <div class="card" style="margin-bottom:24px">
+                <h3 id="agencyLookupTitle" style="margin-bottom:16px;color:var(--accent-cyan)">🔍 Agency Lookup</h3>
+                <div class="centered-search-box">
                     <div class="control-group">
-                        <label>Select Privileges</label>
+                        <label>Agency Code</label>
+                        <input type="text" id="agencyCode" placeholder="e.g., 40775" aria-label="Agency code" onkeydown="if(event.key==='Enter')fetchAgencyData()">
+                    </div>
+                    <div class="control-group">
+                        <label>Compare With (optional, comma-separated codes)</label>
+                        <input type="text" id="compareAgencyCodes" placeholder="e.g., 40776, 40777" aria-label="Comparison codes">
+                    </div>
+                    <button class="btn btn-primary" onclick="fetchAgencyData()">🔍 Search</button>
+                </div>
+            </div>
+
+            <div id="agencyEmptyState" class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                <h3>Search for an Agency</h3>
+                <p>Enter an agency code above to view data.</p>
+            </div>
+
+            <!-- Search results -->
+            <div id="resultsContainer" style="display:none">
+                <div class="target-banner">
+                    <div class="health-badge health-Healthy" id="displayHealth" style="display:none">🟢 Healthy</div>
+                    <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
+                    <div id="displayTargetTitle" style="color:var(--text-muted);font-size:.9rem;text-transform:uppercase;letter-spacing:1px">Current Month Target</div>
+                    <h2 id="displayTargetCoins">0 Coins</h2>
+                </div>
+
+                <div class="card" id="privilegeArea" style="display:none">
+                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">Available Target Privilege</h3>
+                    <div class="control-group" style="max-width:300px;margin-bottom:16px">
+                        <select id="specificPrivilege" onchange="updatePrivilegeGrid()" aria-label="Privilege type">
+                            <option value="Dynamic Avatar">Dynamic Avatar</option>
+                            <option value="30 Mics">30 Mics</option>
+                            <option value="20 Mics">20 Mics</option>
+                            <option value="New User Welcome Room">New User Welcome Room</option>
+                            <option value="Game room">Game room</option>
+                        </select>
+                    </div>
+                    <div class="stat-grid">
+                        <div class="stat-box"><div class="stat-label">Total</div><div class="stat-value" id="valTotal" style="color:var(--accent-green)">0</div></div>
+                        <div class="stat-box"><div class="stat-label">Claimed</div><div class="stat-value" id="valClaimed">0</div></div>
+                        <div class="stat-box"><div class="stat-label">Remaining</div><div class="stat-value" id="valRemaining" style="color:var(--accent-amber)">0</div></div>
+                        <div class="stat-box"><div class="stat-label">Pending</div><div class="stat-value" id="valPending" style="color:#ffaa00">0</div></div>
+                        <div class="stat-box"><div class="stat-label">Rejected</div><div class="stat-value" id="valRejected" style="color:var(--accent-rose)">0</div></div>
+                    </div>
+                </div>
+
+                <div class="card" id="pointsArea" style="display:none">
+                    <h3 style="margin-bottom:16px;color:var(--accent-purple)">🪙 Agency Points System</h3>
+                    <div class="stat-grid" style="margin-bottom:24px">
+                        <div class="stat-box"><div class="stat-label">Total Points</div><div class="stat-value" id="ptTotal" style="color:var(--accent-green)">0</div></div>
+                        <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color:var(--accent-rose)">0</div></div>
+                        <div class="stat-box"><div class="stat-label">Balance</div><div class="stat-value" id="ptBalance" style="color:var(--accent-cyan)">0</div></div>
+                    </div>
+                    <div style="margin-bottom:16px">
+                        <button class="btn-outline" style="font-size:.85rem;padding:8px 16px" onclick="navTo('allocator')">🤖 Open Smart Allocator with this balance →</button>
+                    </div>
+                    <!-- 5.2  Timeline -->
+                    <div style="margin-top:8px">
+                        <h4 style="color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px">
+                            <span style="color:var(--accent-amber)">⏱</span> Activity Timeline
+                        </h4>
+                        <div class="timeline" id="agencyTimeline"></div>
+                    </div>
+                    <div id="pointsHistoryWrap" style="margin-top:24px"></div>
+                </div>
+            </div>
+
+            <!-- Agency comparison area -->
+            <div id="comparisonArea" class="card" style="display:none;overflow-x:auto">
+                <h3 style="color:var(--accent-cyan);margin-bottom:16px">⚖️ Agency Comparison Engine</h3>
+                <div id="comparisonTableContainer"></div>
+            </div>
+        </div>
+
+        <!-- ══ PAGE: SMART ALLOCATOR (standalone) ══════════════════════════ -->
+        <div id="pg-allocator" style="display:none">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+                <div class="card">
+                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">🤖 Smart Allocator</h3>
+                    <div class="control-group" style="margin-bottom:16px">
+                        <label>Available Points Balance</label>
+                        <input type="number" id="allocatorBalance" min="0" value="0" placeholder="Enter your points balance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;transition:.2s;box-sizing:border-box">
+                        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" id="allocBalHint">Enter balance manually, or <a href="#" onclick="navTo('points');return false" style="color:var(--accent-cyan)">search an agency first</a> to auto-fill.</div>
+                    </div>
+                    <div class="control-group">
+                        <label>Select Privileges &amp; Quantities</label>
                         <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
                             <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
                             <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
@@ -618,204 +608,303 @@
                     </div>
                     <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
                 </div>
-                <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px">
+                <div class="card">
                     <h4 style="color:var(--accent-purple);margin-bottom:12px">📜 Allocation Preview</h4>
-                    <pre id="allocatorOutput" style="font-family:monospace;font-size:.82rem;white-space:pre-wrap;color:var(--text);line-height:1.6;max-height:300px;overflow-y:auto"></pre>
-                </div>
-            </div>
-            <!-- 5.2  Timeline -->
-            <div style="margin-top:24px">
-                <h4 style="color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px">
-                    <span style="color:var(--accent-amber)">⏱</span> Activity Timeline
-                </h4>
-                <div class="timeline" id="agencyTimeline"></div>
-            </div>
-            <div id="pointsHistoryWrap" style="margin-top:24px"></div>
-        </div>
-    </div>
-
-    <!-- ANALYTICS CONTAINER -->
-    <div id="analyticsContainer" style="display:none">
-        <!-- 1.2  Active filter chips -->
-        <div id="activeFiltersBar" style="display:none;margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
-            <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Active Filters:</span>
-            <div id="filterChips"></div>
-            <button class="btn-sm" onclick="clearActiveFilters()" style="background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3)">✕ Clear All</button>
-        </div>
-
-        <!-- 1.7  Insights Panel -->
-        <div id="insightsPanel">
-            <h4>🧠 Auto-Generated Insights</h4>
-            <ul id="insightsList"></ul>
-        </div>
-
-        <!-- 1.1  Comparison KPIs -->
-        <div id="comparisonKpisSection" style="display:none;margin-bottom:24px">
-            <div class="compare-section">
-                <h5>📊 Period Comparison: Current vs Previous</h5>
-                <div class="compare-kpi-row">
-                    <div class="compare-kpi"><div class="compare-kpi-label">Current Creations</div><div class="compare-kpi-val" id="cmpCurCreations">—</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">Previous Creations</div><div class="compare-kpi-val" id="cmpPrevCreations">—</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">Current BDs</div><div class="compare-kpi-val" id="cmpCurBds">—</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">Previous BDs</div><div class="compare-kpi-val" id="cmpPrevBds">—</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">Current Closings</div><div class="compare-kpi-val" id="cmpCurClosings">—</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">Previous Closings</div><div class="compare-kpi-val" id="cmpPrevClosings">—</div></div>
+                    <pre id="allocatorOutput" style="font-family:monospace;font-size:.82rem;white-space:pre-wrap;color:var(--text);line-height:1.6;max-height:420px;overflow-y:auto"><span style="color:var(--text-muted)">Select privileges and click Run to preview allocation.</span></pre>
                 </div>
             </div>
         </div>
 
-        <!-- KPI cards -->
-        <div class="kpi-grid">
-            <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
-                <div class="kpi-label">Creations</div>
-                <div class="kpi-value" id="kpiCreations">0</div>
-                <div class="delta-badge delta-neutral" id="deltaCreations">&nbsp;—&nbsp;</div>
-                <div class="sparkline-wrap"><canvas id="sparkCreations" height="40"></canvas></div>
-            </div>
-            <div class="kpi-card" data-metric="bds">
-                <div class="kpi-label">BD Creations</div>
-                <div class="kpi-value" id="kpiBds">0</div>
-                <div class="delta-badge delta-neutral" id="deltaBds">&nbsp;—&nbsp;</div>
-                <div class="sparkline-wrap"><canvas id="sparkBds" height="40"></canvas></div>
-            </div>
-            <div class="kpi-card" data-metric="closings">
-                <div class="kpi-label">Closings</div>
-                <div class="kpi-value" id="kpiClosings">0</div>
-                <div class="delta-badge delta-neutral" id="deltaClosings">&nbsp;—&nbsp;</div>
-                <div class="sparkline-wrap"><canvas id="sparkClosings" height="40"></canvas></div>
+        <!-- ══ PAGE: ADMIN — MANAGE AGENTS ══════════════════════════════════ -->
+        <div id="pg-admin-agents" style="display:none">
+            <div class="card">
+                <h3 style="color:var(--accent-cyan);margin-bottom:20px">⚙️ Manage Agents</h3>
+                <div class="admin-form">
+                    <div class="control-group">
+                        <label>Agent Identity (Exact Lark Name OR Email)</label>
+                        <input type="text" id="newAgentEmail" placeholder="e.g., Muhammad Usman" aria-label="Agent identity">
+                    </div>
+                    <div class="admin-toggle">
+                        <div>
+                            <h4>👑 Grant Admin Privileges</h4>
+                            <span style="font-size:.8rem;color:var(--text-muted)">Allows user to manage other agents.</span>
+                        </div>
+                        <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
+                    </div>
+                    <div class="module-card">
+                        <div class="module-header">
+                            <h4>🎯 Target Module</h4>
+                            <label class="switch"><input type="checkbox" id="modTarget" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="control-grid" style="margin-bottom:0">
+                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
+                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="targetRegSelect"></div></div>
+                        </div>
+                    </div>
+                    <div class="module-card">
+                        <div class="module-header">
+                            <h4>🪙 Points Module</h4>
+                            <label class="switch"><input type="checkbox" id="modPoints" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="control-grid" style="margin-bottom:0">
+                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="pointsAcmSelect"></div></div>
+                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="pointsRegSelect"></div></div>
+                        </div>
+                    </div>
+                    <div class="module-card">
+                        <div class="module-header">
+                            <h4>📊 Analytics Module</h4>
+                            <label class="switch"><input type="checkbox" id="modAnalytics" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="control-grid" style="margin-bottom:0">
+                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
+                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
+                        </div>
+                    </div>
+                    <!-- 4.4  Temporary access -->
+                    <div class="expires-group">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                            <span style="color:var(--accent-amber);font-size:.9rem;font-weight:600">⏳ Temporary Access</span>
+                            <span style="font-size:.8rem;color:var(--text-muted)">(optional — leave blank for permanent)</span>
+                        </div>
+                        <div class="control-group" style="margin-bottom:0">
+                            <label>Access Expires On</label>
+                            <input type="date" id="expiresAt" aria-label="Expiry date">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
+                </div>
+                <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">Current Active Agents</h3>
+                <div class="user-list" id="adminUserList"></div>
             </div>
         </div>
 
-        <!-- Status pie row -->
-        <!-- Row 1: 3 Status Donuts -->
-        <div class="chart-grid-3">
-            <div class="chart-box">
-                <h3>Agency Creation Status</h3>
-                <div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>BD-Creation Status</h3>
-                <div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>Closing Agency Status</h3>
-                <div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div>
+        <!-- ══ PAGE: ADMIN — AUDIT LOG ═══════════════════════════════════════ -->
+        <div id="pg-admin-audit" style="display:none">
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <h3 style="color:var(--accent-cyan)">📋 Audit Log</h3>
+                    <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
+                </div>
+                <div id="auditLogList"><div class="empty-state" style="padding:40px 0"><p>Loading audit log…</p></div></div>
             </div>
         </div>
 
-        <!-- Row 2: Rejection Reasons — full width, tall -->
-        <div class="chart-grid-1" style="margin-bottom:24px">
-            <div class="chart-box">
-                <h3>Rejection Reasons</h3>
-                <div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div>
-            </div>
-        </div>
+        <!-- ══ PAGE: ANALYTICS ══════════════════════════════════════════════ -->
+        <div id="pg-analytics" style="display:none">
+            <div class="card">
+                <!-- 1.4  Preset bar -->
+                <div class="preset-bar" id="presetBar">
+                    <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Quick Filters:</span>
+                    <button class="preset-save-btn" onclick="saveFilterPreset()">+ Save Current</button>
+                </div>
 
-        <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
-        <div class="chart-grid-2">
-            <div class="chart-box">
-                <h3>Closing Reasons</h3>
-                <div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>ACM Closing Breakdown</h3>
-                <div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div>
-            </div>
-        </div>
+                <div class="control-grid">
+                    <div class="control-group">
+                        <label>Date Filter</label>
+                        <select id="anaDatePreset" onchange="updateCustomDateVisibility()" aria-label="Date preset">
+                            <option value="this_month" selected>Current Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_week">Current Week</option>
+                            <option value="last_week">Last Week</option>
+                            <option value="specific">Specific Date</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    <div class="control-group" id="customFromDiv" style="display:none">
+                        <label>From Date</label>
+                        <input type="date" id="anaFrom" aria-label="From date">
+                    </div>
+                    <div class="control-group" id="customToDiv" style="display:none">
+                        <label>To Date</label>
+                        <input type="date" id="anaTo" aria-label="To date">
+                    </div>
+                    <div class="control-group">
+                        <label>Region</label>
+                        <select id="anaRegion" onchange="updateAcmDropdown()" aria-label="Region">
+                            <option value="PK" selected>PK</option>
+                            <option value="IN">IN</option>
+                            <option value="All">All Regions</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Assigned ACM</label>
+                        <select id="anaAcm" aria-label="ACM"><option value="All">All ACMs</option></select>
+                    </div>
+                    <div class="control-group">
+                        <label>Agency Type</label>
+                        <select id="anaType" aria-label="Agency type">
+                            <option value="All">All Types</option>
+                            <option value="Acm hunting">ACM Hunting</option>
+                            <option value="BD hunting">BD Hunting</option>
+                            <option value="Walkin">Walk-in</option>
+                            <option value="New BD Hunting">New BD Hunting</option>
+                            <option value="Walkin sub-agency">Walkin sub-agency</option>
+                        </select>
+                    </div>
+                </div>
 
-        <!-- Row 4: ACM Performance + Leaderboard — full width -->
-        <div class="chart-box full-width" style="margin-bottom:24px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
-                <div class="tab-bar" style="margin-bottom:0;max-width:280px">
-                    <button class="tab-btn active" onclick="switchAcmView('chart',this)">📊 Chart</button>
-                    <button class="tab-btn" onclick="switchAcmView('leaderboard',this)">🏆 Leaderboard</button>
+                <!-- 1.1  Comparison date range -->
+                <div style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                        <span style="font-size:.85rem;font-weight:600;color:var(--accent-purple)">📊 Period Comparison (optional)</span>
+                        <label class="switch" style="transform:scale(.8)"><input type="checkbox" id="compareToggle" onchange="toggleCompareDates()"><span class="slider"></span></label>
+                    </div>
+                    <div id="compareDatesRow" style="display:none;grid-template-columns:1fr 1fr;gap:12px" class="control-grid">
+                        <div class="control-group" style="margin-bottom:0"><label>Compare From</label><input type="date" id="cmpFrom" aria-label="Compare from"></div>
+                        <div class="control-group" style="margin-bottom:0"><label>Compare To</label><input type="date" id="cmpTo" aria-label="Compare to"></div>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                    <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()" style="flex:1;min-width:200px">Generate Analytics Report</button>
+                    <button class="btn-outline" id="exportCsvBtn" style="display:none" onclick="exportCSV()">📥 CSV</button>
+                    <button class="btn-outline" id="exportXlsBtn" style="display:none" onclick="exportExcel()">📊 Excel</button>
+                    <button class="btn-outline" id="exportPdfBtn" style="display:none" onclick="window.print()">🖨️ PDF</button>
                 </div>
             </div>
-            <div id="acmChartView">
-                <div class="chart-wrapper-bar-acm"><canvas id="cAcm"></canvas></div>
-            </div>
-            <div id="acmLeaderboardView" style="display:none">
-                <div style="overflow-x:auto">
-                    <table class="leaderboard-table" id="leaderboardTable">
-                        <thead>
-                            <tr>
-                                <th>Rank</th>
-                                <th>ACM</th>
-                                <th>Creations</th>
-                                <th>Score</th>
-                                <th>Performance</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboardBody"></tbody>
-                    </table>
+
+            <!-- ANALYTICS CONTAINER -->
+            <div id="analyticsContainer" style="display:none">
+                <!-- 1.2  Active filter chips -->
+                <div id="activeFiltersBar" style="display:none;margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
+                    <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Active Filters:</span>
+                    <div id="filterChips"></div>
+                    <button class="btn-sm" onclick="clearActiveFilters()" style="background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3)">✕ Clear All</button>
                 </div>
-            </div>
-        </div>
 
-        <!-- Row 5: Guardian Types + Agency Types -->
-        <div class="chart-grid-2">
-            <div class="chart-box">
-                <h3>Guardian Types</h3>
-                <div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>Agency Types</h3>
-                <div class="chart-wrapper-pie"><canvas id="cType"></canvas></div>
-            </div>
-        </div>
-
-        <!-- Row 6: Other Apps Hosted — full width -->
-        <div class="chart-grid-1" style="margin-bottom:24px">
-            <div class="chart-box">
-                <h3>Other Apps Hosted</h3>
-                <div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div>
-            </div>
-        </div>
-
-        <!-- Row 7: Daily Trend lines -->
-        <div class="chart-grid-2">
-            <div class="chart-box">
-                <h3>Daily Agency Creations Trend</h3>
-                <div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>Daily BD Creations Trend</h3>
-                <div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div>
-            </div>
-        </div>
-
-        <!-- Row 8: Activity Heatmap — full width -->
-        <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
-            <h3>Activity Heatmap</h3>
-            <div class="heatmap-outer">
-                <div class="heatmap-day-labels">
-                    <div class="heatmap-day-label"></div>
-                    <div class="heatmap-day-label">Mon</div>
-                    <div class="heatmap-day-label"></div>
-                    <div class="heatmap-day-label">Wed</div>
-                    <div class="heatmap-day-label"></div>
-                    <div class="heatmap-day-label">Fri</div>
-                    <div class="heatmap-day-label"></div>
+                <!-- 1.7  Insights Panel -->
+                <div id="insightsPanel">
+                    <h4>🧠 Auto-Generated Insights</h4>
+                    <ul id="insightsList"></ul>
                 </div>
-                <div class="heatmap-right">
-                    <div class="heatmap-month-row" id="heatmapMonths"></div>
-                    <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
+
+                <!-- 1.1  Comparison KPIs -->
+                <div id="comparisonKpisSection" style="display:none;margin-bottom:24px">
+                    <div class="compare-section">
+                        <h5>📊 Period Comparison: Current vs Previous</h5>
+                        <div class="compare-kpi-row">
+                            <div class="compare-kpi"><div class="compare-kpi-label">Current Creations</div><div class="compare-kpi-val" id="cmpCurCreations">—</div></div>
+                            <div class="compare-kpi"><div class="compare-kpi-label">Previous Creations</div><div class="compare-kpi-val" id="cmpPrevCreations">—</div></div>
+                            <div class="compare-kpi"><div class="compare-kpi-label">Current BDs</div><div class="compare-kpi-val" id="cmpCurBds">—</div></div>
+                            <div class="compare-kpi"><div class="compare-kpi-label">Previous BDs</div><div class="compare-kpi-val" id="cmpPrevBds">—</div></div>
+                            <div class="compare-kpi"><div class="compare-kpi-label">Current Closings</div><div class="compare-kpi-val" id="cmpCurClosings">—</div></div>
+                            <div class="compare-kpi"><div class="compare-kpi-label">Previous Closings</div><div class="compare-kpi-val" id="cmpPrevClosings">—</div></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="heatmap-legend">
-                <span>Less</span>
-                <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.06)"></div>
-                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.2)"></div>
-                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.45)"></div>
-                <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.75)"></div>
-                <div class="heatmap-legend-cell" style="background:#00d4ff"></div>
-                <span>More</span>
+
+                <!-- KPI cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
+                        <div class="kpi-label">Creations</div>
+                        <div class="kpi-value" id="kpiCreations">0</div>
+                        <div class="delta-badge delta-neutral" id="deltaCreations">&nbsp;—&nbsp;</div>
+                        <div class="sparkline-wrap"><canvas id="sparkCreations" height="40"></canvas></div>
+                    </div>
+                    <div class="kpi-card" data-metric="bds">
+                        <div class="kpi-label">BD Creations</div>
+                        <div class="kpi-value" id="kpiBds">0</div>
+                        <div class="delta-badge delta-neutral" id="deltaBds">&nbsp;—&nbsp;</div>
+                        <div class="sparkline-wrap"><canvas id="sparkBds" height="40"></canvas></div>
+                    </div>
+                    <div class="kpi-card" data-metric="closings">
+                        <div class="kpi-label">Closings</div>
+                        <div class="kpi-value" id="kpiClosings">0</div>
+                        <div class="delta-badge delta-neutral" id="deltaClosings">&nbsp;—&nbsp;</div>
+                        <div class="sparkline-wrap"><canvas id="sparkClosings" height="40"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Row 1: 3 Status Donuts -->
+                <div class="chart-grid-3">
+                    <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
+                    <div class="chart-box"><h3>BD-Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
+                    <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
+                </div>
+
+                <!-- Row 2: Rejection Reasons — full width -->
+                <div class="chart-grid-1" style="margin-bottom:24px">
+                    <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
+                </div>
+
+                <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
+                <div class="chart-grid-2">
+                    <div class="chart-box"><h3>Closing Reasons</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
+                    <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div></div>
+                </div>
+
+                <!-- Row 4: ACM Performance + Leaderboard — full width -->
+                <div class="chart-box full-width" style="margin-bottom:24px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                        <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
+                        <div class="tab-bar" style="margin-bottom:0;max-width:280px">
+                            <button class="tab-btn active" onclick="switchAcmView('chart',this)">📊 Chart</button>
+                            <button class="tab-btn" onclick="switchAcmView('leaderboard',this)">🏆 Leaderboard</button>
+                        </div>
+                    </div>
+                    <div id="acmChartView"><div class="chart-wrapper-bar-acm"><canvas id="cAcm"></canvas></div></div>
+                    <div id="acmLeaderboardView" style="display:none">
+                        <div style="overflow-x:auto">
+                            <table class="leaderboard-table" id="leaderboardTable">
+                                <thead><tr><th>Rank</th><th>ACM</th><th>Creations</th><th>Score</th><th>Performance</th></tr></thead>
+                                <tbody id="leaderboardBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 5: Guardian Types + Agency Types -->
+                <div class="chart-grid-2">
+                    <div class="chart-box"><h3>Guardian Types</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
+                    <div class="chart-box"><h3>Agency Types</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
+                </div>
+
+                <!-- Row 6: Other Apps Hosted — full width -->
+                <div class="chart-grid-1" style="margin-bottom:24px">
+                    <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div></div>
+                </div>
+
+                <!-- Row 7: Daily Trend lines -->
+                <div class="chart-grid-2">
+                    <div class="chart-box"><h3>Daily Agency Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div></div>
+                    <div class="chart-box"><h3>Daily BD Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div></div>
+                </div>
+
+                <!-- Row 8: Activity Heatmap — full width -->
+                <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
+                    <h3>Activity Heatmap</h3>
+                    <div class="heatmap-outer">
+                        <div class="heatmap-day-labels">
+                            <div class="heatmap-day-label"></div>
+                            <div class="heatmap-day-label">Mon</div>
+                            <div class="heatmap-day-label"></div>
+                            <div class="heatmap-day-label">Wed</div>
+                            <div class="heatmap-day-label"></div>
+                            <div class="heatmap-day-label">Fri</div>
+                            <div class="heatmap-day-label"></div>
+                        </div>
+                        <div class="heatmap-right">
+                            <div class="heatmap-month-row" id="heatmapMonths"></div>
+                            <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
+                        </div>
+                    </div>
+                    <div class="heatmap-legend">
+                        <span>Less</span>
+                        <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.06)"></div>
+                        <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.2)"></div>
+                        <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.45)"></div>
+                        <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.75)"></div>
+                        <div class="heatmap-legend-cell" style="background:#00d4ff"></div>
+                        <span>More</span>
+                    </div>
+                </div>
+                <div class="heatmap-tooltip" id="heatmapTooltip"></div>
             </div>
         </div>
-        <div class="heatmap-tooltip" id="heatmapTooltip"></div>
-    </div>
-</div>
+
+    </div><!-- /main-content -->
+</div><!-- /app-shell #mainApp -->
 
 <script>
 // ════════════════════════════════════════════════════════════════════
@@ -993,25 +1082,25 @@ const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
-    document.querySelector('.app-shell').style.display='block';
-    let displayTxt=loggedUser;
-    if (loggedEmail) displayTxt+=` (${loggedEmail})`;
-    document.getElementById('welcomeText').innerText=displayTxt;
+    document.querySelector('.app-shell').style.display='flex';
+    document.getElementById('sidebarUsername').textContent=loggedUser+(loggedEmail?` (${loggedEmail})`:'');
 
     fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
         .then(r=>r.json())
         .then(d=>{
-            const selector=document.getElementById('queryType');
-            if (d.is_super_admin) document.getElementById('adminBtn').style.display='block';
-            if (!d.is_super_admin&&(!d.modules||d.modules.length===0)) {
+            userModules=d.modules||[];
+            isAdmin=!!d.is_super_admin;
+            if (isAdmin) document.getElementById('navGrpAdmin').style.display='block';
+            if (!isAdmin&&userModules.length===0) {
                 document.getElementById('noAccessMsg').style.display='block';
             } else {
-                document.getElementById('queryTypeContainer').style.display='block';
-                document.getElementById('initialEmptyState').style.display='block';
-                if (d.is_super_admin||d.modules.includes('target')) selector.add(new Option("Agency Target Privilege","target"));
-                if (d.is_super_admin||d.modules.includes('points')) selector.add(new Option("Agency Points System","points"));
-                if (d.is_super_admin||d.modules.includes('analytics')) selector.add(new Option("📊 Agency Data Analyses","analytics"));
-                toggleViewModes();
+                const wc=document.getElementById('welcomeCards');
+                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
+                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
+                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
+                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
+                if (isAdmin||userModules.includes('target'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+                if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
             }
         }).catch(e=>console.error(e));
 
@@ -1020,7 +1109,7 @@ if (loggedUser&&loggedUat) {
     initPills();
     renderPresetBar();
 
-    // Restore hash state
+    // Restore hash state (deep-link to analytics)
     if (hashRegion) {
         const sel=document.getElementById('anaRegion');
         if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
@@ -1029,6 +1118,7 @@ if (loggedUser&&loggedUat) {
             const acmSel=document.getElementById('anaAcm');
             if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
         }
+        navTo('analytics');
     }
 }
 
@@ -1036,20 +1126,115 @@ function logout() { localStorage.clear(); location.reload(); }
 function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 // ════════════════════════════════════════════════════════════════════
-// NAVIGATION
+// NAVIGATION (sidebar-based)
 // ════════════════════════════════════════════════════════════════════
-function toggleViewModes() {
-    const val=document.getElementById('queryType')?.value||'';
-    const isAna=val==='analytics';
-    document.getElementById('standardSearchParams').style.display=isAna?'none':(val?'flex':'none');
-    document.getElementById('analyticsParams').style.display=isAna?'block':'none';
-    document.getElementById('resultsContainer').style.display='none';
-    document.getElementById('analyticsContainer').style.display='none';
-    document.getElementById('initialEmptyState').style.display=val?'none':'block';
-    document.getElementById('comparisonArea').style.display='none';
+let userModules=[], isAdmin=false;
+
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics'];
+function hideAllPages(){
+    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+    document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+    document.querySelectorAll('.nav-group-header.nav-direct').forEach(el=>el.classList.remove('active'));
 }
 
-function toggleCompareDates() {
+function navTo(page){
+    hideAllPages();
+    closeSidebar();
+    const titles={welcome:'Xena Live Data Portal',analytics:'Analytics Report',compare:'Compare Agencies',
+        points:'Check Agency Points',allocator:'Smart Allocator',target:'Agency Target',
+        'admin-agents':'Manage Agents','admin-audit':'Audit Log'};
+    document.getElementById('pageTitle').textContent=titles[page]||'Xena Portal';
+
+    const navEl=document.getElementById('nav-'+page);
+    if(navEl) navEl.classList.add('active');
+
+    if(page==='analytics'){
+        document.getElementById('pg-analytics').style.display='block';
+        document.getElementById('queryType').value='analytics';
+    } else if(page==='target'){
+        document.getElementById('pg-agency').style.display='block';
+        document.getElementById('queryType').value='target';
+        document.getElementById('agencyLookupTitle').textContent='🎯 Agency Target Lookup';
+        document.getElementById('agencyEmptyState').style.display='block';
+        document.getElementById('resultsContainer').style.display='none';
+        const th=document.getElementById('nav-target');
+        if(th) th.classList.add('active');
+    } else if(page==='points'){
+        document.getElementById('pg-agency').style.display='block';
+        document.getElementById('queryType').value='points';
+        document.getElementById('agencyLookupTitle').textContent='🪙 Check Agency Points';
+        document.getElementById('agencyEmptyState').style.display='block';
+        document.getElementById('resultsContainer').style.display='none';
+    } else if(page==='allocator'){
+        document.getElementById('pg-allocator').style.display='block';
+        if(currentAgencyData&&currentAgencyData.point_balance!=null){
+            document.getElementById('allocatorBalance').value=currentAgencyData.point_balance;
+            const code=document.getElementById('agencyCode')?.value||'';
+            document.getElementById('allocBalHint').innerHTML=`Auto-filled from last search (${code}). Edit if needed.`;
+        }
+    } else if(page==='admin-agents'){
+        document.getElementById('pg-admin-agents').style.display='block';
+        fetchAdminUsers();
+    } else if(page==='admin-audit'){
+        document.getElementById('pg-admin-audit').style.display='block';
+        loadAuditLog();
+    } else if(page==='compare'){
+        document.getElementById('pg-compare').style.display='block';
+    } else {
+        document.getElementById('pg-welcome').style.display='block';
+    }
+}
+
+function toggleNavGroup(grpId,bodyId){
+    const body=document.getElementById(bodyId);
+    if(!body) return;
+    body.classList.toggle('open');
+    const arrKey=grpId.replace('navGrp','');
+    const arr=document.getElementById('navArr'+arrKey);
+    if(arr) arr.classList.toggle('open');
+}
+
+function openSidebar(){
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebarBackdrop').classList.add('visible');
+}
+function closeSidebar(){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarBackdrop').classList.remove('visible');
+}
+
+function setCompareMode(mode,btn){
+    document.querySelectorAll('.compare-mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('cmpModeAcm').style.display=mode==='acm'?'block':'none';
+    document.getElementById('cmpModePeriod').style.display=mode==='period'?'block':'none';
+}
+
+async function runAcmCompare(){
+    const codes=[
+        document.getElementById('cmpCode1').value.trim(),
+        document.getElementById('cmpCode2').value.trim(),
+        document.getElementById('cmpCode3').value.trim()
+    ].filter(Boolean);
+    if(codes.length<2){ToastManager.show('Enter at least 2 agency codes to compare.','warning');return;}
+    const type=document.getElementById('cmpModule').value;
+    const container=document.getElementById('cmpAcmResults');
+    container.innerHTML='<div style="color:var(--text-muted)">Loading comparison…</div>';
+    document.getElementById('loadingOverlay').style.display='flex';
+    try{
+        const results=await Promise.all(codes.map(c=>
+            fetch(`/api/search?code=${c}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=${type}`)
+            .then(r=>r.json().then(d=>({code:c,...d})))
+        ));
+        renderComparisonTable(results,type);
+        container.innerHTML=document.getElementById('comparisonTableContainer').innerHTML||'<div style="color:var(--text-muted)">No results.</div>';
+    } catch(e){
+        container.innerHTML=`<div style="color:var(--accent-rose)">Comparison failed: ${e.message}</div>`;
+    }
+    document.getElementById('loadingOverlay').style.display='none';
+}
+
+function toggleCompareDates(){
     const on=document.getElementById('compareToggle').checked;
     document.getElementById('compareDatesRow').style.display=on?'grid':'none';
 }
@@ -1136,18 +1321,10 @@ function loadPreset(p) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ADMIN MODAL
+// ADMIN (sidebar pages — modal removed)
 // ════════════════════════════════════════════════════════════════════
-function openAdmin() { document.getElementById('adminModal').style.display='flex'; fetchAdminUsers(); }
-function closeAdmin() { document.getElementById('adminModal').style.display='none'; }
-
-function switchAdminTab(tab,btn) {
-    document.querySelectorAll('#adminModal .tab-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('adminTabUsers').style.display=tab==='users'?'block':'none';
-    document.getElementById('adminTabAudit').style.display=tab==='audit'?'block':'none';
-    if (tab==='audit') loadAuditLog();
-}
+function openAdmin(){ navTo('admin-agents'); }
+function closeAdmin(){ navTo('welcome'); }
 
 function parseGranular(str,module) {
     if (!str||str.indexOf('=')===-1) {
@@ -1176,9 +1353,8 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
     pAnalyticsAcm.setValues(parseGranular(acmsRaw,'analytics'));
     pAnalyticsReg.setValues(parseGranular(regRaw,'analytics'));
     document.getElementById('adminBtnSubmit').innerText='💾 Save Configuration';
-    document.getElementById('adminModal').scrollTo(0,0);
-    document.getElementById('newAgentEmail').focus();
-    switchAdminTab('users',document.querySelector('#adminModal .tab-btn'));
+    navTo('admin-agents');
+    setTimeout(()=>document.getElementById('newAgentEmail').focus(),120);
 }
 
 async function fetchAdminUsers() {
@@ -1894,6 +2070,7 @@ async function fetchAgencyData() {
 
     document.getElementById('resultsContainer').style.display='none';
     document.getElementById('comparisonArea').style.display='none';
+    document.getElementById('agencyEmptyState').style.display='none';
     document.getElementById('loadingOverlay').style.display='flex';
 
     try {
@@ -1931,6 +2108,9 @@ async function fetchAgencyData() {
             document.getElementById('displayTargetCoins').style.color='var(--accent-cyan)';
             document.getElementById('pointsArea').style.display='block';
             updatePointsGrid();
+            // Auto-fill allocator balance for seamless use
+            const allocEl=document.getElementById('allocatorBalance');
+            if(allocEl) allocEl.value=bal;
         }
         document.getElementById('resultsContainer').style.display='block';
 
@@ -2103,8 +2283,9 @@ function privToggle(el, e) {
 }
 
 function runAllocator() {
-    if (!currentAgencyData) {
-        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Load an agency first to use the allocator.</span>';
+    const balance=parseInt(document.getElementById('allocatorBalance')?.value||'0',10)||0;
+    if (balance<=0) {
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Enter a points balance above to run the allocator.</span>';
         return;
     }
     const activeToggles=Array.from(document.querySelectorAll('#calcPrivGrid .priv-toggle.active'));
@@ -2112,7 +2293,6 @@ function runAllocator() {
         document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select one or more privileges above to preview allocation.</span>';
         return;
     }
-    const balance=currentAgencyData.point_balance||0;
     let remaining=balance, receiptLines=[], totalCost=0;
 
     activeToggles.forEach(el=>{
