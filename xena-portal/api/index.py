@@ -115,6 +115,42 @@ def get_tenant_access_token():
     return token
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 7.1b  APP ACCESS TOKEN (needed for user-auth token exchange)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_app_token_cache: dict = {"token": None, "expires_at": 0.0, "lock": threading.Lock()}
+
+def get_app_access_token() -> str:
+    """
+    Returns a valid *app* access token (different from tenant access token).
+
+    Feishu's user-OAuth token exchange endpoint (/authen/v1/access_token)
+    requires an app_access_token in the Authorization header, NOT a
+    tenant_access_token.  Using the wrong token type causes a silent
+    rejection and uat comes back None.
+
+    Both tokens use the same credentials (app_id + app_secret) but come
+    from different Feishu endpoints and have independent lifetimes.
+    """
+    with _app_token_cache["lock"]:
+        if _app_token_cache["token"] and time.time() < _app_token_cache["expires_at"]:
+            return _app_token_cache["token"]
+
+    url  = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal"
+    resp = http_requests.post(url,
+                              json={"app_id": APP_ID, "app_secret": APP_SECRET},
+                              timeout=10).json()
+    token  = resp.get("app_access_token")
+    expire = resp.get("expire", 7200)
+
+    with _app_token_cache["lock"]:
+        _app_token_cache["token"]      = token
+        _app_token_cache["expires_at"] = time.time() + max(expire - 300, 60)
+
+    return token
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 7.2  STRUCTURED LOGGING
 # ──────────────────────────────────────────────────────────────────────────────
 class StructuredLogger:
@@ -799,6 +835,11 @@ def home():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_file(os.path.join(root_dir, 'index.html'))
 
+@app.route('/api/version', methods=['GET'])
+def version():
+    """Quick check: hit /api/version to confirm new code is deployed."""
+    return jsonify({"version": "1.2", "fix": "aat-token-oauth-loop"})
+
 @app.route('/api/login', methods=['GET'])
 def login():
     safe_redirect = urllib.parse.quote(REDIRECT_URI)
@@ -833,16 +874,18 @@ def callback():
             "Authorization failed: no code returned from Feishu.", safe=''))
 
     try:
-        tat     = get_tenant_access_token()
-        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        # Feishu user-auth token exchange needs the APP access token.
+        # Using tenant_access_token here causes a silent rejection (uat=None).
+        aat     = get_app_access_token()
+        headers = {"Authorization": f"Bearer {aat}", "Content-Type": "application/json"}
 
-        # FIX-1: include redirect_uri — Feishu OIDC requires it in the exchange
+        # Try OIDC endpoint first (newer Feishu apps)
         token_resp = http_requests.post(
             "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token",
             headers=headers,
-            json={"grant_type": "authorization_code",
-                  "code":        code,
-                  "redirect_uri": REDIRECT_URI},   # <─ was missing
+            json={"grant_type":   "authorization_code",
+                  "code":          code,
+                  "redirect_uri":  REDIRECT_URI},   # FIX-1: required by OIDC endpoint
             timeout=15
         ).json()
 
@@ -864,7 +907,7 @@ def callback():
                         feishu_msg=token_resp.get("msg", ""))
             legacy_resp = http_requests.post(
                 "https://open.feishu.cn/open-apis/authen/v1/access_token",
-                headers=headers,
+                headers=headers,                         # already uses aat (app token)
                 json={"grant_type": "authorization_code", "code": code},
                 timeout=15
             ).json()
