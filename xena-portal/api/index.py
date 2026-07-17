@@ -219,17 +219,14 @@ def normalize_key(k):
 
 def get_field_local(fields, *aliases):
     if not fields: return None
-    # 1. Exact Match Fast Path
     for alias in aliases:
         if alias in fields and fields[alias] not in (None, "", []): 
             return fields[alias]
-    # 2. Normalized Exact Match
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
             if normalize_key(k) == tgt and v not in (None, "", []):
                 return v
-    # 3. Normalized Partial Match
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
@@ -361,7 +358,7 @@ def get_user_permissions(email, name):
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=10).json()
+        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
         items = res.get("data", {}).get("items", [])
         for item in items:
             fields = item.get("fields", {})
@@ -399,7 +396,7 @@ def get_user_permissions(email, name):
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING (No Strict Field Names to prevent API crashes)
+# HIGH-SPEED SESSION FETCHING
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
@@ -416,13 +413,14 @@ def fetch_feishu_records(table_id, from_dt=None):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
 
     page_token = None
-    # Hard limit of 200 pages to prevent infinite loops, but using Session() makes this 10x faster
     for _ in range(200):
-        params = {"page_size": 500} # Increased to 500 for massive speed up
+        # Restored automatic_fields and sort from original working code
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'} 
         if page_token: params["page_token"] = page_token
         
         try:
-            resp = session.get(url, params=params, timeout=15)
+            # Increased timeout to 45 seconds to prevent Read timed out errors
+            resp = session.get(url, params=params, timeout=45) 
             if resp.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP {resp.status_code}: {resp.text}"
@@ -474,39 +472,35 @@ def fetch_feishu_records(table_id, from_dt=None):
     return all_items, master_keys, fetch_complete, stop_reason
 
 # ──────────────────────────────────────────────────────────────────────────────
-# AGENCY SEARCH (target / points) WITH HEALTH SCORE RESTORATION
+# AGENCY SEARCH (target / points) RESTORED POST LOGIC
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     tat = get_tenant_access_token()
     table_id = POINTS_TABLE_ID if query_type == "points" else REQUESTS_TABLE_ID
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+    
+    # Restored exactly from working Source 5
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    payload = {
+        "filter": {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
+        }
+    }
 
-    all_records = []
-    page_token = None
-    while True:
-        # Try text matching first
-        params = {"page_size": 500, "filter": f'CurrentValue.[Agency ID] = "{code}"'}
-        if page_token: params["page_token"] = page_token
-        resp = http_requests.get(url, headers=headers, params=params, timeout=20).json()
-        
+    try:
+        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=30).json()
         if resp.get("code") != 0:
-            # Fallback: The column might be formatted as a Number type in Feishu
-            params_num = {"page_size": 500, "filter": f'CurrentValue.[Agency ID] = {code}'}
-            if page_token: params_num["page_token"] = page_token
-            resp_num = http_requests.get(url, headers=headers, params=params_num, timeout=20).json()
-            if resp_num.get("code") != 0:
-                return {"found": False, "error": f"Feishu Filter Error: {resp_num.get('msg')}"}
-            resp = resp_num
-
-        block = resp.get("data", {})
-        all_records.extend(block.get("items", []))
-        if not block.get("has_more") or not block.get("page_token"):
-            break
-        page_token = block["page_token"]
-
-    if not all_records:
-        return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
+            return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
+            
+        all_records = resp.get("data", {}).get("items", [])
+        
+        if not all_records:
+            return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
+            
+    except Exception as e:
+        return {"found": False, "error": f"Search timeout or connection error: {str(e)}"}
 
     fields_list = [r.get("fields", {}) for r in all_records]
     first = fields_list[0]
