@@ -574,6 +574,7 @@
                         </h4>
                         <div class="timeline" id="agencyTimeline"></div>
                     </div>
+                    <div id="allocatorStatusWrap" style="margin-top:24px"></div>
                     <div id="pointsHistoryWrap" style="margin-top:24px"></div>
                 </div>
             </div>
@@ -686,17 +687,10 @@
                             <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
                         </div>
                     </div>
-                    <!-- 4.4  Temporary access -->
-                    <div class="expires-group">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                            <span style="color:var(--accent-amber);font-size:.9rem;font-weight:600">⏳ Temporary Access</span>
-                            <span style="font-size:.8rem;color:var(--text-muted)">(optional — leave blank for permanent)</span>
-                        </div>
-                        <div class="control-group" style="margin-bottom:0">
-                            <label>Access Expires On</label>
-                            <input type="date" id="expiresAt" aria-label="Expiry date">
-                        </div>
-                    </div>
+                    <!-- 4.4  Temporary access removed: the Feishu "Access Management" table has
+                         no ExpiresAt column, so this control never actually expired anyone's
+                         access - it looked like it worked but silently did nothing. Removed
+                         rather than leave a misleading control in the UI. -->
                     <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
                 </div>
                 <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">Current Active Agents</h3>
@@ -937,7 +931,7 @@
                 <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
                     <div class="control-group">
                         <label>Quick Search</label>
-                        <input type="text" id="prSearch" placeholder="Agency ID, name, owner…" oninput="prDebounce()">
+                        <input type="text" id="prSearch" placeholder="Agency Code or ACM…" oninput="prDebounce()">
                     </div>
                     <div class="control-group">
                         <label>Region</label>
@@ -948,24 +942,8 @@
                         </select>
                     </div>
                     <div class="control-group">
-                        <label>Status</label>
-                        <input type="text" id="prStatus" placeholder="e.g. Active, Inactive">
-                    </div>
-                    <div class="control-group">
-                        <label>Agency Level</label>
-                        <input type="text" id="prLevel" placeholder="e.g. Gold, Silver">
-                    </div>
-                    <div class="control-group">
-                        <label>Month (YYYY-MM)</label>
-                        <input type="text" id="prMonth" placeholder="e.g. 2025-07" maxlength="7">
-                    </div>
-                    <div class="control-group">
-                        <label>Date From</label>
-                        <input type="date" id="prDateFrom">
-                    </div>
-                    <div class="control-group">
-                        <label>Date To</label>
-                        <input type="date" id="prDateTo">
+                        <label>ACM</label>
+                        <input type="text" id="prAcm" placeholder="e.g. Enzo, Haseeb">
                     </div>
                     <div class="control-group" style="display:flex;align-items:flex-end">
                         <button class="btn btn-primary" onclick="prFetch(1)" style="width:100%">🔎 Search</button>
@@ -1604,8 +1582,7 @@ async function addAgent() {
     const payload={
         email,modules:modules.join(', '),
         acms:{target:pTargetAcm.getValues().join(','),points:pPointsAcm.getValues().join(','),analytics:pAnalyticsAcm.getValues().join(',')},
-        regions:{target:pTargetReg.getValues().join(','),points:pPointsReg.getValues().join(','),analytics:pAnalyticsReg.getValues().join(',')},
-        expires_at:document.getElementById('expiresAt').value||''
+        regions:{target:pTargetReg.getValues().join(','),points:pPointsReg.getValues().join(','),analytics:pAnalyticsReg.getValues().join(',')}
     };
     try {
         const res=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json','X-User-Name':loggedUser},body:JSON.stringify(payload)});
@@ -1613,7 +1590,6 @@ async function addAgent() {
         if (!res.ok||!data.success) throw new Error(data.error||'Failed to save to Feishu.');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
-        document.getElementById('expiresAt').value='';
         initPills();
         document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
         ToastManager.show('Agent saved successfully.','success');
@@ -2378,27 +2354,27 @@ function updatePrivilegeGrid() {
     else if (priv==="30 Mics") { if(bp>=1000)total=4;else if(bp>=500)total=2;else if(bp>=300)total=1; }
     else if (priv==="20 Mics") total=Math.floor(bp/150);
     else total=Math.floor(bp/20);
-    
-    let claimed=0,pending=0,rejected=0;
-    (currentAgencyData.requests||[]).forEach(req=>{
-        // 🔥 RESTORED V1.1 PRIVILEGE CHECKING LOGIC
-        let p = req['Agency Point Privilege'] || req['Privilege'] || req['Agency Privilege'] || req['Priv'] || req['Request Type'] || req['Type'];
-        if(p && typeof p==='object') p = p.text || p.name || "";
-        if(Array.isArray(p)) p = p.map(x => x.text || x.name || x).join(',');
-        
-        if(String(p).toLowerCase().includes(priv.toLowerCase())){
-            let s = req['Status'] || req['Request Status'] || req['Agency Status'] || req['Order Action'];
-            if(s && typeof s==='object') s = s.text || s.name || "";
-            let statusStr = String(s).trim().toLowerCase();
-            
-            let c = parseInt(req['# Counter'] || req['Counter'] || req['Quantities Input'] || 1);
-            if(isNaN(c)) c = 1;
 
-            if(statusStr === "done" || statusStr === "completed" || statusStr === "approved" || statusStr === "confirm") claimed+=c;
-            else if(statusStr === "rejected" || statusStr === "failed" || statusStr === "declined") rejected+=c;
-            else pending+=c;
-        }
+    // FIX (Missing privileges): the backend now returns privileges_claimed as
+    // {privilege_name: count}, built from the Grand Table and pre-filtered to only
+    // "Agency Target Privilege" rows with Status = Done. Match it against the
+    // dropdown selection the same fuzzy way the old client-side logic did, but
+    // without re-deriving the count from raw, unfiltered request rows.
+    const claimedMap = currentAgencyData.privileges_claimed || {};
+    let claimed=0;
+    Object.keys(claimedMap).forEach(name=>{
+        if (String(name).toLowerCase().includes(priv.toLowerCase())) claimed += claimedMap[name];
     });
+
+    let pending=0, rejected=0;
+    (currentAgencyData.privileges_log||[]).forEach(entry=>{
+        if (!String(entry.privilege||'').toLowerCase().includes(priv.toLowerCase())) return;
+        const s = String(entry.status||'').trim().toLowerCase();
+        if (s === "done" || s === "completed" || s === "approved" || s === "confirm") return; // already in claimed
+        if (s === "rejected" || s === "failed" || s === "declined") rejected++;
+        else pending++;
+    });
+
     document.getElementById('valTotal').innerText=total;
     document.getElementById('valClaimed').innerText=claimed;
     document.getElementById('valRemaining').innerText=Math.max(0,total-claimed);
@@ -2431,64 +2407,76 @@ function updatePointsGrid() {
     document.getElementById('ptTotal').innerText=(currentAgencyData.total_points||0).toLocaleString();
     document.getElementById('ptUsed').innerText=(currentAgencyData.used_points||0).toLocaleString();
     document.getElementById('ptBalance').innerText=(currentAgencyData.point_balance||0).toLocaleString();
-    buildTimeline(currentAgencyData.requests||[]);
-    buildPointsHistory(currentAgencyData.requests||[]);
+    buildTimeline(currentAgencyData.history||[]);
+    buildPointsHistory(currentAgencyData.history||[]);
+    buildAllocatorStatus(currentAgencyData.allocator_status||{});
+}
+
+// FIX (Smart Allocator missing limits): shows this month's usage vs its monthly cap
+// for each item (e.g. Trend Card 10/10 used). Items with no known cap yet show
+// "used" only, with a note - see MONTHLY_ALLOCATOR_LIMITS on the backend.
+function buildAllocatorStatus(status) {
+    const wrap=document.getElementById('allocatorStatusWrap');
+    if (!wrap) return;
+    const items=Object.keys(status);
+    if (!items.length) { wrap.innerHTML=''; return; }
+    wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month's Usage vs Limits</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">`+
+        items.map(name=>{
+            const s=status[name];
+            const hasLimit=s.limit!==null && s.limit!==undefined;
+            const overLimit=hasLimit && s.used>s.limit;
+            const color=hasLimit?(overLimit?'var(--accent-rose)':'var(--accent-green)'):'var(--text-muted)';
+            return `<div class="stat-box" style="padding:10px 14px;text-align:left">
+                <div style="font-size:.8rem;color:var(--text-muted)">${escHtml(name)}</div>
+                <div style="font-weight:700;color:${color}">${s.used}${hasLimit?' / '+s.limit:''}</div>
+                ${!hasLimit?'<div style="font-size:.7rem;color:var(--text-muted)">limit not set</div>':''}
+            </div>`;
+        }).join('')+'</div>';
 }
 
 // 5.2  Agency Activity Timeline
-function buildTimeline(requests) {
+function buildTimeline(history) {
     const tl=document.getElementById('agencyTimeline');
     if (!tl) return;
-    if (!requests.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No activity this month.</div>'; return; }
-    const sorted=[...requests].sort((a,b)=>{
-        const dA=new Date(a['Submitted on']||a['Submitted on Copy']||0);
-        const dB=new Date(b['Submitted on']||b['Submitted on Copy']||0);
-        return dB-dA;
-    });
-    tl.innerHTML=sorted.slice(0,15).map(req=>{
-        const dateRaw=req['Submitted on']||req['Submitted on Copy'];
-        let dateStr='Unknown';
-        if (dateRaw) { const d=new Date(dateRaw); if(!isNaN(d)) dateStr=d.toISOString().split('T')[0]; }
-        const type=parseFeishuField(req['Request Type']||req['Type']||'Request').toLowerCase();
-        const status=parseFeishuField(req['Status']||'');
+    if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No activity found for this agency.</div>'; return; }
+    // history already comes pre-sorted newest-first from the backend
+    tl.innerHTML=history.slice(0,15).map(req=>{
+        const dateStr=req.date||'Unknown';
+        const type=(req.request_type||'Request').toLowerCase();
+        const status=req.status||'';
         const statusColor=status.toLowerCase().includes('done')?'var(--accent-green)':status.toLowerCase().includes('reject')?'var(--accent-rose)':'var(--accent-amber)';
         let dotClass='tl-privilege';
         if (type.includes('creation')) dotClass='tl-creation';
         else if (type.includes('bd')) dotClass='tl-creation';
         else if (type.includes('point')) dotClass='tl-points';
         else if (type.includes('reject')) dotClass='tl-rejection';
-        const priv=parseFeishuField(req['Agency Point Privilege']||req['Privilege']||'');
         return `<div class="timeline-item">
             <div class="timeline-dot ${dotClass}"></div>
             <div class="timeline-date">${dateStr}</div>
-            <div class="timeline-title">${priv||type.replace(/\b\w/g,c=>c.toUpperCase())||'Request'}</div>
+            <div class="timeline-title">${req.privilege||req.target_type||req.request_type.replace(/\b\w/g,c=>c.toUpperCase())||'Request'}</div>
             <div class="timeline-sub" style="color:${statusColor}">${status||'Pending'}</div>
         </div>`;
     }).join('');
 }
 
-function buildPointsHistory(requests) {
+function buildPointsHistory(history) {
     const wrap=document.getElementById('pointsHistoryWrap');
     if (!wrap) return;
-    const pointReqs=requests.filter(r=>r['Agency Point Privilege']||r['Quantities Input']||r['Transaction Receipt']||r['Latest Usage Tracker']||r['Latest usage tracker']);
+    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
     if (!pointReqs.length) { wrap.innerHTML=''; return; }
-    pointReqs.sort((a,b)=>new Date(b['Submitted on']||b['Submitted on Copy']||0)-new Date(a['Submitted on']||a['Submitted on Copy']||0));
+    // history is already sorted newest-first
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
         pointReqs.map(req=>{
-            const dateRaw=req['Submitted on']||req['Submitted on Copy'];
-            let dateStr='Unknown';
-            if(dateRaw){const d=new Date(dateRaw);if(!isNaN(d))dateStr=d.toISOString().split('T')[0];}
-            let privsRaw=parseFeishuField(req['Agency Point Privilege']);
-            let privsList=[];try{if(privsRaw.startsWith('['))privsList=JSON.parse(privsRaw);else privsList=privsRaw.split(',');}catch(e){privsList=privsRaw.split(',');}
-            privsList=privsList.map(s=>s.replace(/["\[\]]/g,'').trim()).filter(Boolean);
-            let status=parseFeishuField(req['Status']||req['Order Action'])||'Pending';
-            let statusColor=status.toLowerCase().includes('confirm')||status.toLowerCase().includes('done')?'var(--accent-green)':status.toLowerCase().includes('reject')?'var(--accent-rose)':'var(--accent-amber)';
+            const status=req.status||'Pending';
+            const statusColor=status.toLowerCase().includes('done')?'var(--accent-green)':status.toLowerCase().includes('reject')?'var(--accent-rose)':'var(--accent-amber)';
+            const items=[req.privilege, req.target_type, req.quantities_input?`Qty: ${req.quantities_input}`:''].filter(Boolean);
             return `<div class="stat-box" style="text-align:left;margin-bottom:12px;padding:16px 20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <span style="font-size:.8rem;color:var(--text-muted)">${dateStr}</span>
-                    <span style="color:${statusColor};font-size:.85rem;font-weight:600">${status}</span>
+                    <span style="font-size:.8rem;color:var(--text-muted)">${req.date||'Unknown'}</span>
+                    <span style="color:${statusColor};font-size:.85rem;font-weight:600">${escHtml(status)}</span>
                 </div>
-                ${privsList.length?privsList.map(p=>`<div style="font-size:.88rem;color:var(--text)">🔹 ${p}</div>`).join(''):'<div style="color:var(--text-muted);font-size:.85rem">No items</div>'}
+                ${items.length?items.map(p=>`<div style="font-size:.88rem;color:var(--text)">🔹 ${escHtml(p)}</div>`).join(''):'<div style="color:var(--text-muted);font-size:.85rem">No items</div>'}
             </div>`;
         }).join('');
 }
@@ -2523,6 +2511,19 @@ function privToggle(el, e) {
     el.classList.toggle('active');
 }
 
+// FIX (Smart Allocator missing limits): looks up the monthly cap/usage for a
+// privilege key (e.g. "trend card") against the allocator_status the backend
+// computed from this agency's Monthly Usage Tracker field.
+function findAllocatorLimit(key) {
+    const status = (currentAgencyData && currentAgencyData.allocator_status) || {};
+    const lower = key.toLowerCase();
+    const match = Object.keys(status).find(name => {
+        const n = name.toLowerCase();
+        return n === lower || n.includes(lower) || lower.includes(n);
+    });
+    return match ? status[match] : null;
+}
+
 function runAllocator() {
     const balance=parseInt(document.getElementById('allocatorBalance')?.value||'0',10)||0;
     if (balance<=0) {
@@ -2545,15 +2546,31 @@ function runAllocator() {
         const entry=pointPriceDB.find(e=>e.key===key);
         if (!entry) return;
         const unitPrice = regionMode === 'other' ? entry.other : entry.same;
-        const lineCost=unitPrice*qty;
         const display=key.replace(/\b\w/g,c=>c.toUpperCase());
+
+        // Enforce the monthly cap (e.g. Trend Card = 10/month) on top of the balance check
+        const limitInfo = findAllocatorLimit(key);
+        let allowedQty = qty;
+        if (limitInfo && limitInfo.limit !== null && limitInfo.limit !== undefined) {
+            allowedQty = Math.max(0, limitInfo.limit - limitInfo.used);
+            if (allowedQty <= 0) {
+                receiptLines.push(`❌ REJECTED: ${qty}× ${display} — monthly limit reached (${limitInfo.used}/${limitInfo.limit} used this month)`);
+                rejectedCount+=qty;
+                return;
+            }
+        }
+        const grantQty = Math.min(qty, allowedQty);
+        const lineCost = unitPrice*grantQty;
+        const cappedNote = grantQty<qty ? ` (capped to ${grantQty}: monthly limit ${limitInfo.used}/${limitInfo.limit})` : '';
+
         if (remaining>=lineCost) {
-            receiptLines.push(`✅ APPROVED: ${qty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts`);
+            receiptLines.push(`✅ APPROVED: ${grantQty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts${cappedNote}`);
             totalCost+=lineCost;
             remaining-=lineCost;
-            approvedCount+=qty;
+            approvedCount+=grantQty;
+            if (grantQty<qty) rejectedCount += (qty-grantQty);
         } else {
-            receiptLines.push(`❌ REJECTED: ${qty}× ${display} — need ${lineCost} pts, only ${remaining} left`);
+            receiptLines.push(`❌ REJECTED: ${grantQty}× ${display} — need ${lineCost} pts, only ${remaining} left${cappedNote}`);
             rejectedCount+=qty;
         }
     });
@@ -2597,13 +2614,9 @@ async function prFetch(page) {
         page_size: 50,
         user: loggedUser || '',
         email: loggedEmail || '',
-        search:    document.getElementById('prSearch')?.value   || '',
-        region:    document.getElementById('prRegion')?.value   || '',
-        status:    document.getElementById('prStatus')?.value   || '',
-        agency_level: document.getElementById('prLevel')?.value || '',
-        month:     document.getElementById('prMonth')?.value    || '',
-        date_from: document.getElementById('prDateFrom')?.value || '',
-        date_to:   document.getElementById('prDateTo')?.value   || '',
+        search: document.getElementById('prSearch')?.value || '',
+        region: document.getElementById('prRegion')?.value || '',
+        acm:    document.getElementById('prAcm')?.value    || '',
     });
 
     // Remove empty params
@@ -2636,14 +2649,15 @@ async function prFetch(page) {
 
         if (countEl) countEl.textContent = `${data.total.toLocaleString()} records found`;
 
-        // Build table
-        const cols = ['agency_id','agency_name','owner_id','owner_name','region','status',
-                      'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+        // FIX (Infinite loading): columns now match the Agency Points table's real
+        // schema (Agency Code, Acm, Region derived from Acm, Base/Bonus/Total/Used
+        // Points, Point Balance, Health). Owner/Status/Level/Month/Date never
+        // existed on this table.
+        const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
         const labels = {
-            agency_id:'Agency ID', agency_name:'Agency Name', owner_id:'Owner ID',
-            owner_name:'Owner Name', region:'Region', status:'Status',
-            agency_level:'Level', month:'Month', total_points:'Total Pts',
-            used_points:'Used Pts', point_balance:'Balance', health_score:'Health', date:'Date'
+            agency_id:'Agency Code', acm:'ACM', region:'Region',
+            base_points:'Base Pts', bonus_points:'Bonus Pts', total_points:'Total Pts',
+            used_points:'Used Pts', point_balance:'Balance', health_score:'Health'
         };
 
         const thead = document.getElementById('prThead');
@@ -2665,7 +2679,7 @@ async function prFetch(page) {
                         const col2 = v > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
                         return `<td style="padding:9px 12px;color:${col2};font-weight:600">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
                     }
-                    if (['total_points','used_points'].includes(c)) {
+                    if (['total_points','used_points','base_points','bonus_points'].includes(c)) {
                         return `<td style="padding:9px 12px;text-align:right">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
                     }
                     return `<td style="padding:9px 12px">${escHtml(String(v ?? '—'))}</td>`;
@@ -2706,8 +2720,7 @@ async function prFetch(page) {
 
 function prExportCsv() {
     if (!prAllData.length) { ToastManager.show('Search first to get records.', 'warning'); return; }
-    const cols = ['agency_id','agency_name','owner_id','owner_name','region','status',
-                  'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+    const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
     const header = cols.join(',');
     const rows = prAllData.map(r => cols.map(c => JSON.stringify(r[c] ?? '')).join(','));
     const blob = new Blob([header + '\n' + rows.join('\n')], {type:'text/csv;charset=utf-8;'});
