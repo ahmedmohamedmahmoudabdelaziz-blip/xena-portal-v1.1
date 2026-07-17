@@ -1122,9 +1122,15 @@ const ToastManager = {
         el.className = `toast-item toast-${type}`;
         el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><span class="toast-body">${msg}</span><button class="toast-close" aria-label="Dismiss">×</button>`;
         el.style.setProperty('--duration', duration+'ms');
-        el.querySelector('.toast-close').onclick = () => this.dismiss(el);
+        
+        const closeBtn = el.querySelector('.toast-close');
+        if (closeBtn) {
+            closeBtn.onclick = (e) => { e.stopPropagation(); this.dismiss(el); };
+        }
+        
         el.onclick = () => this.dismiss(el);
         container.appendChild(el);
+        
         // Apply progress animation
         const after = document.createElement('style');
         const id = 'toast-'+Date.now();
@@ -1356,10 +1362,7 @@ let userModules=[], isAdmin=false;
 
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
 function hideAllPages(){
-    ALL_PAGES.forEach(id=>{
-        const el=document.getElementById(id);
-        if(el) el.style.display='none';
-    });
+    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';document.getElementById('pg-points-records').style.display='none';document.getElementById('pg-points-table').style.display='none';});
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
     document.querySelectorAll('.nav-group-header.nav-direct').forEach(el=>el.classList.remove('active'));
 }
