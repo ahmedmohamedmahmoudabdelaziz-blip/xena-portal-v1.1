@@ -470,10 +470,10 @@ def _fetch_single_page(tat, table_id, page_token, params_base):
         params["page_token"] = page_token
     resp = http_requests.get(url, headers=headers, params=params, timeout=30)
     if resp.status_code != 200:
-        return None, None, False
+        return None, None, f"HTTP {resp.status_code}: {resp.text}"
     data = resp.json()
     if data.get("code") != 0:
-        return None, None, False
+        return None, None, f"Feishu API Code {data.get('code')}: {data.get('msg')}"
     block = data.get("data", {})
     return block.get("items", []), block.get("page_token"), block.get("has_more", False)
 
@@ -481,20 +481,11 @@ def _fetch_single_page(tat, table_id, page_token, params_base):
 def fetch_feishu_records(table_id, fields=None, from_dt=None, max_workers=6):
     """
     Fetch all records from a Feishu Bitable table.
-
-    [IMP-2] Strategy:
-    - Fetch page 1 sequentially to discover total record count and first page token.
-    - If there are more pages, fan them out with ThreadPoolExecutor.
-    - Because page tokens are sequential we must fetch pages in order, but we
-      can pre-fetch several pages ahead while processing earlier ones.
-    - Early-exit: if 3 consecutive pages contain only records older than from_dt,
-      stop fetching (same logic as v1.1 but now parallelised within a sliding window).
     """
     tat = get_tenant_access_token()
     params_base = {"page_size": 100}
-    if fields:
-        params_base["field_names"] = json.dumps(fields)
-
+    # REMOVED field_names serialization to avoid strict FieldNameNotFound crashes if users rename columns
+    
     all_items = []
     seen_ids  = set()
     master_keys: set = set()
@@ -502,15 +493,16 @@ def fetch_feishu_records(table_id, fields=None, from_dt=None, max_workers=6):
     stop_reason    = ""
     consecutive_old_pages = 0
 
-    # Sequential pass — we must follow page_token chains in order
     page_token = None
     while True:
         try:
-            items, next_token, has_more = _fetch_single_page(tat, table_id, page_token, params_base)
-            if items is None:
+            res = _fetch_single_page(tat, table_id, page_token, params_base)
+            if res[0] is None:
                 fetch_complete = False
-                stop_reason = "Feishu API error"
+                stop_reason = res[2]
                 break
+            
+            items, next_token, has_more = res
 
             page_old_count = 0
             valid_dates_in_page = 0
@@ -578,11 +570,20 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     all_records = []
     page_token = None
     while True:
+        # Try text matching first
         params = {"page_size": 100, "filter": f'CurrentValue.[Agency ID] = "{code}"'}
         if page_token: params["page_token"] = page_token
         resp = http_requests.get(url, headers=headers, params=params, timeout=20).json()
+        
         if resp.get("code") != 0:
-            break
+            # Fallback: The column might be formatted as a Number type in Feishu
+            params_num = {"page_size": 100, "filter": f'CurrentValue.[Agency ID] = {code}'}
+            if page_token: params_num["page_token"] = page_token
+            resp_num = http_requests.get(url, headers=headers, params=params_num, timeout=20).json()
+            if resp_num.get("code") != 0:
+                return {"found": False, "error": f"Feishu Filter Error: {resp_num.get('msg')} (Code {resp_num.get('code')})"}
+            resp = resp_num
+
         block = resp.get("data", {})
         all_records.extend(block.get("items", []))
         if not block.get("has_more") or not block.get("page_token"):
@@ -963,7 +964,9 @@ def search():
         data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
         if data.get("found"):
             cache_set(cache_key, data, ttl=180)
-        return jsonify(data)
+            return jsonify(data)
+        else:
+            return jsonify(data), 404
     return jsonify(cached)
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1123,8 +1126,12 @@ def points_records():
     cached_all = cache_get(cache_key)
     if cached_all is None:
         # Fetch from Feishu
-        all_items, _, _, _ = fetch_feishu_records(POINTS_TABLE_ID, fields=POINTS_FIELDS,
-                                                   from_dt=from_dt)
+        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(
+            POINTS_TABLE_ID, fields=POINTS_FIELDS, from_dt=from_dt
+        )
+        if not fetch_complete and not all_items:
+            return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+
         records = []
         for item in all_items:
             f = item.get("fields", {})
@@ -1296,6 +1303,9 @@ def analytics():
     all_items, master_keys, fetch_complete, stop_reason = fetch_feishu_records(
         REQUESTS_TABLE_ID, fields=ANALYTICS_FIELDS, from_dt=from_dt
     )
+
+    if not fetch_complete and not all_items:
+        return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt,
                           region_filter, acm_filter, type_filter,
