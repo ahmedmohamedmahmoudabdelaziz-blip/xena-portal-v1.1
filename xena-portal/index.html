@@ -2667,7 +2667,7 @@ async function prFetch(page) {
 
         if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
             const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
-return '<tr style="' + rowStyle + ';border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='' + (i%2===0?'':'rgba(255,255,255,.025)') + ''">' +                cols.map(c => {
+            return `<tr style="${rowStyle};border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
                     let v = r[c];
                     if (c === 'health_score') {
                         const col = v >= 80 ? 'var(--accent-green)' : v >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
