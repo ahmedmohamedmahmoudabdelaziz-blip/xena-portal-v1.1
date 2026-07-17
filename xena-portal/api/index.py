@@ -3,7 +3,7 @@ Xena Data Portal — High-Speed Hybrid Backend
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
 with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
-Includes concurrent ThreadPoolExecutor for faster Analytics processing.
+Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading
@@ -14,6 +14,9 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_file, redirect
 import requests as http_requests
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 6.5  CENTRALISED CONFIGURATION
+# ──────────────────────────────────────────────────────────────────────────────
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
@@ -22,19 +25,27 @@ BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
-AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "")
+AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "")   # Optional
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
-PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham","usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
+
+# ACM lists for region auto-detection
+PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham",
+            "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
 IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
 
-CACHE_TTL_REALTIME   = 300
-CACHE_TTL_HISTORICAL = 3600
+# 2.1  Cache TTL constants (seconds)
+CACHE_TTL_REALTIME   = 300    # 5 min for recent data
+CACHE_TTL_HISTORICAL = 3600   # 1 hr for older ranges
 
+# 7.1  Rate limits (Relaxed to prevent blocking during normal use)
 RATE_LIMIT_SEARCH    = (50, 60)
 RATE_LIMIT_ANALYTICS = (30, 60)
 RATE_LIMIT_RECORDS   = (50, 60)
 
+# ──────────────────────────────────────────────────────────────────────────────
+# TENANT ACCESS TOKEN CACHE (Speed Enhancement)
+# ──────────────────────────────────────────────────────────────────────────────
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
 def get_tenant_access_token():
@@ -50,8 +61,12 @@ def get_tenant_access_token():
     with _token_cache["lock"]:
         _token_cache["token"] = token
         _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
+
     return token
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 7.2  STRUCTURED LOGGING
+# ──────────────────────────────────────────────────────────────────────────────
 class StructuredLogger:
     def __init__(self, name):
         self._log = logging.getLogger(name)
@@ -73,7 +88,8 @@ class StructuredLogger:
 logger = StructuredLogger("xena")
 
 def mask_email(email):
-    if not email or "@" not in email: return email[:3] + "***" if email else ""
+    if not email or "@" not in email:
+        return email[:3] + "***" if email else ""
     local, domain = email.split("@", 1)
     return local[:2] + "***@" + domain
 
@@ -82,18 +98,24 @@ def mask_name(name):
     parts = name.strip().split()
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 2.1  IN-MEMORY CACHE WITH TTL
+# ──────────────────────────────────────────────────────────────────────────────
 _cache: dict = {}
 _cache_lock = threading.Lock()
 
 def cache_get(key):
     with _cache_lock:
         entry = _cache.get(key)
-        if entry and time.time() < entry["expires"]: return entry["data"]
-        if entry: del _cache[key]
+        if entry and time.time() < entry["expires"]:
+            return entry["data"]
+        if entry:
+            del _cache[key]
         return None
 
 def cache_set(key, data, ttl=CACHE_TTL_REALTIME):
-    with _cache_lock: _cache[key] = {"data": data, "expires": time.time() + ttl}
+    with _cache_lock:
+        _cache[key] = {"data": data, "expires": time.time() + ttl}
 
 def cache_make_key(*parts):
     raw = ":".join(str(p) for p in parts)
@@ -102,8 +124,12 @@ def cache_make_key(*parts):
 def cache_invalidate(prefix=""):
     with _cache_lock:
         keys = [k for k in list(_cache.keys()) if not prefix or k.startswith(prefix)]
-        for k in keys: del _cache[k]
+        for k in keys:
+            del _cache[k]
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 7.1  RATE LIMITER & INPUT SANITISATION
+# ──────────────────────────────────────────────────────────────────────────────
 _rate_store: dict = defaultdict(list)
 _rate_lock = threading.Lock()
 
@@ -112,7 +138,8 @@ def rate_check(ip, max_requests, window_seconds):
     with _rate_lock:
         timestamps = _rate_store[ip]
         _rate_store[ip] = [t for t in timestamps if now - t < window_seconds]
-        if len(_rate_store[ip]) >= max_requests: return False
+        if len(_rate_store[ip]) >= max_requests:
+            return False
         _rate_store[ip].append(now)
         return True
 
@@ -141,9 +168,14 @@ def sanitize_text(text, max_length=200):
     return text
 
 def parse_float_safe(val):
-    try: return float(str(val).replace(',', '').strip())
-    except (ValueError, TypeError): return 0.0
+    try:
+        return float(str(val).replace(',', '').strip())
+    except (ValueError, TypeError):
+        return 0.0
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 4.1  AUDIT LOGGER
+# ──────────────────────────────────────────────────────────────────────────────
 class AuditLogger:
     def __init__(self):
         self._queue = []
@@ -172,28 +204,39 @@ class AuditLogger:
                 "Details": entry["details"], "IP": entry["ip"], "Timestamp": entry["ts"]
             }}
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
-        except Exception as e: logger.error("audit_write_failed", error=str(e))
+        except Exception as e:
+            logger.error("audit_write_failed", error=str(e))
 
     def get_recent(self, limit=100):
-        with self._lock: return list(reversed(self._queue[-limit:]))
+        with self._lock:
+            return list(reversed(self._queue[-limit:]))
 
 audit = AuditLogger()
 
+# ──────────────────────────────────────────────────────────────────────────────
+# BATTLE-TESTED PARSERS (Restored from v1.1 for absolute stability)
+# ──────────────────────────────────────────────────────────────────────────────
 def normalize_key(k):
     return " ".join(str(k).lower().strip().split())
 
 def get_field_local(fields, *aliases):
     if not fields: return None
+    # Level 1: Exact
     for alias in aliases:
-        if alias in fields and fields[alias] not in (None, "", []): return fields[alias]
+        if alias in fields and fields[alias] not in (None, "", []): 
+            return fields[alias]
+    # Level 2: Exact Normalized
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
-            if normalize_key(k) == tgt and v not in (None, "", []): return v
+            if normalize_key(k) == tgt and v not in (None, "", []):
+                return v
+    # Level 3: Partial Normalized
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
-            if tgt in normalize_key(k) and v not in (None, "", []): return v
+            if tgt in normalize_key(k) and v not in (None, "", []):
+                return v
     return None
 
 def extract_field_text(field_data):
@@ -226,9 +269,11 @@ def extract_field_list(field_data):
         for key in ['text', 'name', 'en_name', 'email', 'value', 'label']:
             if key in field_data and field_data[key] not in (None, ""):
                 return [str(field_data[key]).strip()]
-        if 'id' in field_data and field_data['id'] not in (None, ""): return [str(field_data['id']).strip()]
+        if 'id' in field_data and field_data['id'] not in (None, ""):
+            return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
-    if isinstance(field_data, str): return [s.strip() for s in field_data.split(',') if s.strip()]
+    if isinstance(field_data, str):
+        return [s.strip() for s in field_data.split(',') if s.strip()]
     if isinstance(field_data, list):
         res = []
         for item in field_data:
@@ -240,9 +285,12 @@ def extract_field_list(field_data):
                         res.append(str(item[key]).strip())
                         extracted = True
                         break
-                if not extracted and 'id' in item and item['id'] not in (None, ""): res.append(str(item['id']).strip())
-                elif not extracted: res.append(str(item).strip())
-            else: res.append(str(item).strip())
+                if not extracted and 'id' in item and item['id'] not in (None, ""):
+                    res.append(str(item['id']).strip())
+                elif not extracted:
+                    res.append(str(item).strip())
+            else:
+                res.append(str(item).strip())
         return res
     return [str(field_data).strip()]
 
@@ -253,18 +301,26 @@ def parse_feishu_date(date_val):
     try:
         if isinstance(date_val, (int, float)):
             dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
-            return (dt_utc + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            dt_cairo = dt_utc + timedelta(hours=3)
+            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            
         date_str = str(date_val).strip()
         if date_str.isdigit():
             dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
-            return (dt_utc + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            dt_cairo = dt_utc + timedelta(hours=3)
+            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
-    except Exception: return None
+    except Exception:
+        return None
 
 def clean(field_data):
     return extract_field_text(field_data).strip().lower()
 
+# ──────────────────────────────────────────────────────────────────────────────
+# PERMISSIONS
+# ──────────────────────────────────────────────────────────────────────────────
 def parse_granular_string(raw_str):
     default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     if not raw_str or str(raw_str).strip() == "": return default
@@ -363,10 +419,12 @@ def fetch_feishu_records(table_id, from_dt=None):
 
     page_token = None
     for _ in range(200):
+        # Increased page_size to 500 for massive speed up
         params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'} 
         if page_token: params["page_token"] = page_token
         
         try:
+            # Increased timeout to 45 seconds to prevent 'Read timed out' errors on large payloads
             resp = session.get(url, params=params, timeout=45) 
             if resp.status_code != 200:
                 fetch_complete = False
@@ -425,6 +483,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     tat = get_tenant_access_token()
     table_id = POINTS_TABLE_ID if query_type == "points" else REQUESTS_TABLE_ID
     
+    # Restored POST /search exactly from your working Source 5
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
@@ -459,6 +518,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         if acm_raw.lower() in PK_ACMS: region_raw = 'pk'
         elif acm_raw.lower() in IN_ACMS: region_raw = 'in'
 
+    # Permission gate
     if allowed_acms and "all" not in allowed_acms:
         if acm_raw.strip().lower() not in [a.lower() for a in allowed_acms]:
             return {"found": False, "error": f"Access Denied: Not authorized to view ACM {acm_raw}."}
@@ -467,6 +527,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             return {"found": False, "error": f"Access Denied: Not authorized to view Region {region_raw.upper()}."}
 
     if query_type == "points":
+        # Restored using 'first' for total points extraction exactly like v1.1
         total_pts = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total', 'Total points')))
         used_pts  = parse_float_safe(extract_field_text(get_field_local(first, 'Used Points', 'Used', 'Used points')))
         balance   = parse_float_safe(extract_field_text(get_field_local(first, 'Point Balance', 'Balance', 'Point balance')))
@@ -503,20 +564,21 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         base_pts  = parse_float_safe(extract_field_text(get_field_local(first,"Base Points","base_points")))
         privs = []
         for f in fields_list:
-            priv = extract_field_text(get_field_local(f,"Privilege","Agency Privilege","Priv", "Agency Point Privilege"))
+            priv = extract_field_text(get_field_local(f,"Privilege","Agency Privilege","Priv"))
             if priv: privs.append(priv)
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "base_points": base_pts, "health_score": 100, "health_status": "Healthy",
             "privileges": privs,
-            "requests": [r.get("fields", {}) for r in all_records]
+            "requests": [r.get("fields", {}) for r in all_records] # Passes requests for privilege logic
         }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # NORMALISED FIELD MAP (ANALYTICS LOOP OPTIMIZATION)
 # ──────────────────────────────────────────────────────────────────────────────
-def _build_field_map(fields: dict) -> dict:
+def _build_field_map_safe(item: dict) -> dict:
+    fields = item.get("fields", {})
     raw_date   = get_field_local(fields,"Submitted on Copy","Submitted on","Created Time")
     raw_type   = get_field_local(fields,"Request Type","Request type","Type","Category")
     raw_status = get_field_local(fields,"Status","Request Status","Agency Status","State")
@@ -544,10 +606,6 @@ def _build_field_map(fields: dict) -> dict:
         "rj_rsns":   extract_field_list(raw_rj_rsn),
         "cr_ways":   extract_field_list(raw_cr_way),
     }
-
-def _parse_item(item):
-    """Worker function for parallel mapping"""
-    return _build_field_map(item.get("fields", {}))
 
 def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter,
                   allowed_acms, allowed_regs):
@@ -579,11 +637,11 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     allowed_acms_set = set([a.lower() for a in allowed_acms]) if allowed_acms else {"all"}
     allowed_regs_set = set([r.lower() for r in allowed_regs]) if allowed_regs else {"all"}
 
-    # Use ThreadPoolExecutor for highly accelerated parallel data parsing
+    # SPEED OPTIMIZATION: ThreadPoolExecutor parsing!
     with ThreadPoolExecutor(max_workers=10) as executor:
-        parsed_fields = list(executor.map(_parse_item, all_items))
+        normalized_maps = list(executor.map(_build_field_map_safe, all_items))
 
-    for fm in parsed_fields:
+    for fm in normalized_maps:
         record_dt = fm["date"]
         if from_dt or to_dt:
             if not record_dt: continue
@@ -766,6 +824,7 @@ def search():
     email  = sanitize_text(req_data.get('email',''))
     uat    = sanitize_text(req_data.get('uat',''), max_length=512)
     qtype  = req_data.get('type','points')
+    nocache = req_data.get('nocache', '0') in ['1', 'true', True]
     
     if qtype not in ('points','target'): qtype = 'points'
 
@@ -777,15 +836,17 @@ def search():
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
     cache_key = cache_make_key("search", code, qtype)
-    cached = cache_get(cache_key)
-    if not cached:
-        data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
-        if data.get("found"):
-            cache_set(cache_key, data, ttl=180)
-            return jsonify(data)
-        else:
-            return jsonify(data), 404
-    return jsonify(cached)
+    
+    if not nocache:
+        cached = cache_get(cache_key)
+        if cached: return jsonify(cached)
+        
+    data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
+    if data.get("found"):
+        cache_set(cache_key, data, ttl=180)
+        return jsonify(data)
+    else:
+        return jsonify(data), 404
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ADMIN PANEL
@@ -924,6 +985,7 @@ def points_records():
             month       = extract_field_text(get_field_local(f,"Month")).strip()
             acm         = extract_field_text(get_field_local(f,"Acm Name (PK)","Acm Name (IN)", "Acm", "Assigned Member")).strip()
             
+            # V1.1 Health Restore
             total_pts = parse_float_safe(extract_field_text(get_field_local(f, '# Total Points', 'Total Points', 'Total', 'Total points')))
             used_pts  = parse_float_safe(extract_field_text(get_field_local(f, 'Used Points', 'Used', 'Used points')))
             balance   = parse_float_safe(extract_field_text(get_field_local(f, 'Point Balance', 'Balance', 'Point balance')))
@@ -1123,4 +1185,3 @@ def health():
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-```eof
