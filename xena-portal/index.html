@@ -1307,50 +1307,6 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 }
 
 // Restore from URL hash (8.2)
-const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
-const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
-
-if (loggedUser&&loggedUat) {
-    document.getElementById('loginOverlay').style.display='none';
-    document.querySelector('.app-shell').style.display='flex';
-    document.getElementById('sidebarUsername').textContent=loggedUser+(loggedEmail?` (${loggedEmail})`:'');
-
-    fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
-        .then(r=>r.json())
-        .then(d=>{
-            userModules=d.modules||[];
-            isAdmin=!!d.is_super_admin;
-            if (isAdmin) document.getElementById('navGrpAdmin').style.display='block';
-            if (!isAdmin&&userModules.length===0) {
-                document.getElementById('noAccessMsg').style.display='block';
-            } else {
-                const wc=document.getElementById('welcomeCards');
-                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
-                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
-                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
-                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
-                if (isAdmin||userModules.includes('target'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
-                if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
-            }
-        }).catch(e=>console.error(e));
-
-    updateAcmDropdown();
-    setDatePresets();
-    initPills();
-    renderPresetBar();
-
-    // Restore hash state (deep-link to analytics)
-    if (hashRegion) {
-        const sel=document.getElementById('anaRegion');
-        if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
-        updateAcmDropdown();
-        if (hashAcm) {
-            const acmSel=document.getElementById('anaAcm');
-            if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
-        }
-        navTo('analytics');
-    }
-}
 
 function logout() { localStorage.clear(); location.reload(); }
 function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -2876,6 +2832,58 @@ function ptExportExcel() {
     XLSX.writeFile(wb, 'xena_point_table.xlsx');
     ToastManager.show('Excel exported!', 'success');
 }
+
+function ptExportExcel() {
+    if (!ptAllData.length || !window.XLSX) { ToastManager.show('Load table first or XLSX library not loaded.','warning'); return; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ptAllData), 'Point Table');
+    XLSX.writeFile(wb, 'xena_point_table.xlsx');
+    ToastManager.show('Excel exported!', 'success');
+}
+
+/* ⬇️ PASTE THE BLOCK HERE ⬇️ */
+if (loggedUser&&loggedUat) {
+    document.getElementById('loginOverlay').style.display='none';
+    document.querySelector('.app-shell').style.display='flex';
+    document.getElementById('sidebarUsername').textContent=loggedUser+(loggedEmail?` (${loggedEmail})`:'');
+
+    fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
+        .then(r=>r.json())
+        .then(d=>{
+            userModules=d.modules||[];
+            isAdmin=!!d.is_super_admin;
+            if (isAdmin) document.getElementById('navGrpAdmin').style.display='block';
+            if (!isAdmin&&userModules.length===0) {
+                document.getElementById('noAccessMsg').style.display='block';
+            } else {
+                const wc=document.getElementById('welcomeCards');
+                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
+                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
+                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
+                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
+                if (isAdmin||userModules.includes('target'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+                if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+            }
+        }).catch(e=>console.error(e));
+
+    updateAcmDropdown();
+    setDatePresets();
+    initPills();
+    renderPresetBar();
+
+    // Restore hash state (deep-link to analytics)
+    if (hashRegion) {
+        const sel=document.getElementById('anaRegion');
+        if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
+        updateAcmDropdown();
+        if (hashAcm) {
+            const acmSel=document.getElementById('anaAcm');
+            if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
+        }
+        navTo('analytics');
+    }
+}
+/* ⬆️ END OF PASTED BLOCK ⬆️ */
 
 </script>
 </body>
