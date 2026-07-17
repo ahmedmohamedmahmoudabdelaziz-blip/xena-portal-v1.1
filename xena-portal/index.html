@@ -96,7 +96,7 @@
         .btn-allocator:hover{background:var(--accent-purple);color:#000;box-shadow:0 8px 25px rgba(185,103,255,.4);transform:translateY(-2px)}
         .btn-sm{padding:6px 12px;border-radius:6px;font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
 
-        /* ── THEME TOGGLE ────────────────────────────────────────────────── 3.5 */
+        /* ── THEME TOGGLE ────────────────────────────────────────────────── */
         .theme-btn{background:transparent;border:1px solid var(--border-hover);color:var(--text-muted);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:1rem;transition:all .2s;line-height:1}
         .theme-btn:hover{border-color:var(--accent-amber);color:var(--accent-amber)}
 
@@ -111,10 +111,10 @@
         .centered-search-box{max-width:450px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
         .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
-        .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email]{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
+        .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email],.control-group input[type=number]{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
         .control-group select:focus,.control-group input:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
 
-        /* ── SKELETON ────────────────────────────────────────────────────── 2.5 */
+        /* ── SKELETON ────────────────────────────────────────────────────── */
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .skeleton-block{height:120px;border-radius:12px;margin-bottom:16px}
@@ -124,7 +124,7 @@
         .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
 
-        /* ── TOAST SYSTEM ────────────────────────────────────────────────── 3.1 */
+        /* ── TOAST SYSTEM ────────────────────────────────────────────────── */
         #toastContainer{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:380px}
         .toast-item{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid transparent;animation:toast-in .3s ease;cursor:pointer;position:relative;overflow:hidden}
         .toast-item::after{content:'';position:absolute;bottom:0;left:0;height:3px;background:currentColor;opacity:.4;animation:toast-progress linear forwards}
@@ -152,12 +152,10 @@
         .kpi-card:nth-child(1) .kpi-value{color:var(--accent-cyan)}
         .kpi-card:nth-child(2) .kpi-value{color:var(--accent-green)}
         .kpi-card:nth-child(3) .kpi-value{color:var(--accent-rose)}
-        /* 1.3  Delta badges */
         .delta-badge{display:inline-block;font-size:.75rem;font-weight:700;padding:3px 8px;border-radius:20px;margin-top:8px}
         .delta-up{background:rgba(0,230,118,.15);color:var(--accent-green)}
         .delta-down{background:rgba(255,77,109,.15);color:var(--accent-rose)}
         .delta-neutral{background:rgba(255,255,255,.05);color:var(--text-muted)}
-        /* 1.3  Sparklines */
         .sparkline-wrap{height:40px;margin-top:10px;opacity:.8}
 
         /* ── CHARTS ─────────────────────────────────────────────────────── */
@@ -174,20 +172,20 @@
         .chart-wrapper-bar-tall{position:relative;height:420px}
         .chart-wrapper-bar-acm{position:relative;height:480px}
 
-        /* ── 1.2  CROSS-FILTER CHIPS ─────────────────────────────────────── */
+        /* ── CROSS-FILTER CHIPS ─────────────────────────────────────── */
         #activeFiltersBar{display:none;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
         .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;background:rgba(0,212,255,.15);color:var(--accent-cyan);border:1px solid rgba(0,212,255,.3);cursor:pointer;transition:all .2s}
         .filter-chip:hover{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
         .filter-chip-label{font-size:.7rem;opacity:.7}
 
-        /* ── 1.7  INSIGHTS PANEL ────────────────────────────────────────── */
+        /* ── INSIGHTS PANEL ────────────────────────────────────────── */
         #insightsPanel{background:linear-gradient(135deg,rgba(0,212,255,.06),rgba(185,103,255,.06));border:1px solid rgba(0,212,255,.15);border-radius:var(--radius);padding:20px;margin-bottom:24px;display:none}
         #insightsPanel h4{color:var(--accent-cyan);font-size:.9rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
         #insightsList{list-style:none;display:flex;flex-direction:column;gap:8px}
         #insightsList li{font-size:.88rem;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
         #insightsList li:last-child{border-bottom:none}
 
-        /* ── 1.5  LEADERBOARD ────────────────────────────────────────────── */
+        /* ── LEADERBOARD ────────────────────────────────────────────── */
         .leaderboard-table{width:100%;border-collapse:collapse}
         .leaderboard-table th,.leaderboard-table td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.9rem}
         .leaderboard-table th{color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
@@ -198,7 +196,7 @@
         .score-bar{height:6px;border-radius:3px;background:var(--border);position:relative;min-width:60px;display:inline-block;vertical-align:middle}
         .score-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent-green),var(--accent-cyan));transition:width .6s ease}
 
-        /* ── 1.6  HEATMAP REDESIGNED ────────────────────────────────────── */
+        /* ── HEATMAP REDESIGNED ────────────────────────────────────── */
         .heatmap-outer{display:flex;gap:6px;margin-top:12px}
         .heatmap-day-labels{display:grid;grid-template-rows:repeat(7,22px);gap:4px;padding-top:22px}
         .heatmap-day-label{font-size:.7rem;color:var(--text-muted);line-height:22px;width:32px;text-align:right;padding-right:6px}
@@ -213,7 +211,7 @@
         .heatmap-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:.75rem;color:var(--text-muted)}
         .heatmap-legend-cell{width:22px;height:22px;border-radius:4px}
 
-        /* ── 1.1  COMPARISON ────────────────────────────────────────────── */
+        /* ── COMPARISON ────────────────────────────────────────────── */
         .compare-section{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.15);border-radius:12px;padding:16px;margin-bottom:20px}
         .compare-section h5{color:var(--accent-cyan);margin-bottom:12px;font-size:.85rem;font-weight:600}
         .compare-kpi-row{display:flex;gap:16px;flex-wrap:wrap}
@@ -221,7 +219,7 @@
         .compare-kpi-label{font-size:.75rem;color:var(--text-muted);margin-bottom:4px}
         .compare-kpi-val{font-size:1.4rem;font-weight:700;color:var(--text)}
 
-        /* ── FILTER PRESETS ──────────────────────────────────────────────── 1.4 */
+        /* ── FILTER PRESETS ──────────────────────────────────────────────── */
         .preset-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
         .preset-chip{padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:600;background:var(--surface-hover);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;transition:all .2s}
         .preset-chip:hover{border-color:var(--accent-cyan);color:var(--accent-cyan)}
@@ -250,7 +248,6 @@
         input:checked+.slider:before{transform:translateX(20px)}
         .admin-toggle{background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
         .admin-toggle h4{color:var(--accent-amber);margin:0;font-size:1rem}
-        .expires-group{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);padding:12px 16px;border-radius:12px}
         .user-list{display:flex;flex-direction:column;gap:10px}
         .user-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:.2s;flex-wrap:wrap;gap:8px}
         .user-row:hover{border-color:var(--accent-cyan)}
@@ -293,13 +290,13 @@
         .priv-check{font-size:.85rem;color:var(--accent-cyan);opacity:0;width:14px;text-align:center}
         .priv-toggle.active .priv-check{opacity:1}
 
-        /* ── 5.1  HEALTH BADGE ──────────────────────────────────────────── */
+        /* ── HEALTH BADGE ──────────────────────────────────────────── */
         .health-badge{position:absolute;top:16px;left:16px;padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid}
         .health-Healthy{background:rgba(0,230,118,.15);color:var(--accent-green);border-color:rgba(0,230,118,.3)}
-        .health-At.Risk,.health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
+        .health-At\.Risk,.health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
         .health-Critical{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
 
-        /* ── 5.2  TIMELINE ──────────────────────────────────────────────── */
+        /* ── TIMELINE ──────────────────────────────────────────────── */
         .timeline{position:relative;padding-left:28px}
         .timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border)}
         .timeline-item{position:relative;margin-bottom:16px;padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;transition:.2s}
@@ -313,7 +310,7 @@
         .timeline-title{font-size:.9rem;font-weight:600;color:var(--text)}
         .timeline-sub{font-size:.8rem;color:var(--text-muted);margin-top:2px}
 
-        /* ── 5.3  COMPARISON TABLE ──────────────────────────────────────── */
+        /* ── COMPARISON TABLE ──────────────────────────────────────── */
         .compare-table{width:100%;border-collapse:collapse;min-width:500px}
         .compare-table th,.compare-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);font-size:.9rem}
         .compare-table th{color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;background:var(--surface-hover)}
@@ -321,7 +318,7 @@
         .best-val{color:var(--accent-green);font-weight:700}
         .worst-val{color:var(--accent-rose)}
 
-        /* ── EMPTY STATES ────────────────────────────────────────────────── 3.4 */
+        /* ── EMPTY STATES ────────────────────────────────────────────────── */
         .empty-state{text-align:center;padding:60px 24px;color:var(--text-muted)}
         .empty-state svg{width:56px;height:56px;fill:var(--border-hover);margin-bottom:16px}
         .empty-state h3{font-size:1.1rem;color:var(--text);margin-bottom:8px}
@@ -341,10 +338,15 @@
         .tab-btn{flex:1;padding:8px 16px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.85rem;background:transparent;color:var(--text-muted);transition:all .2s}
         .tab-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.2)}
 
-        /* ── MOBILE RESPONSIVENESS ───────────────────────────────────────── 3.3 */
+        /* ── MOBILE RESPONSIVENESS ───────────────────────────────────────── */
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
             .kpi-grid{grid-template-columns:repeat(2,1fr)}
+            .sidebar{transform:translateX(-240px)}
+            .sidebar.open{transform:translateX(0)}
+            .sidebar-backdrop.visible{display:block}
+            .main-content{margin-left:0;max-width:100vw}
+            .hamburger{display:block}
         }
         @media(max-width:600px){
             .main-content{padding:12px}
@@ -453,7 +455,6 @@
             </div>
         </div>
 
-        <!-- Hidden queryType — read by fetchAgencyData() -->
         <input type="hidden" id="queryType" value="points">
 
         <!-- ══ PAGE: WELCOME ════════════════════════════════════════════════ -->
@@ -528,7 +529,6 @@
                 <p>Enter an agency code above to view data.</p>
             </div>
 
-            <!-- Search results -->
             <div id="resultsContainer" style="display:none">
                 <div class="target-banner">
                     <div class="health-badge health-Healthy" id="displayHealth" style="display:none">🟢 Healthy</div>
@@ -567,7 +567,7 @@
                     <div style="margin-bottom:16px">
                         <button class="btn-outline" style="font-size:.85rem;padding:8px 16px" onclick="navTo('allocator')">🤖 Open Smart Allocator with this balance →</button>
                     </div>
-                    <!-- 5.2  Timeline -->
+                    
                     <div style="margin-top:8px">
                         <h4 style="color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px">
                             <span style="color:var(--accent-amber)">⏱</span> Activity Timeline
@@ -579,14 +579,13 @@
                 </div>
             </div>
 
-            <!-- Agency comparison area -->
             <div id="comparisonArea" class="card" style="display:none;overflow-x:auto">
                 <h3 style="color:var(--accent-cyan);margin-bottom:16px">⚖️ Agency Comparison Engine</h3>
                 <div id="comparisonTableContainer"></div>
             </div>
         </div>
 
-        <!-- ══ PAGE: SMART ALLOCATOR (standalone) ══════════════════════════ -->
+        <!-- ══ PAGE: SMART ALLOCATOR ═══════════════════════════════════════ -->
         <div id="pg-allocator" style="display:none">
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                 <div class="card">
@@ -687,10 +686,6 @@
                             <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
                         </div>
                     </div>
-                    <!-- 4.4  Temporary access removed: the Feishu "Access Management" table has
-                         no ExpiresAt column, so this control never actually expired anyone's
-                         access - it looked like it worked but silently did nothing. Removed
-                         rather than leave a misleading control in the UI. -->
                     <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
                 </div>
                 <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">Current Active Agents</h3>
@@ -712,7 +707,6 @@
         <!-- ══ PAGE: ANALYTICS ══════════════════════════════════════════════ -->
         <div id="pg-analytics" style="display:none">
             <div class="card">
-                <!-- 1.4  Preset bar -->
                 <div class="preset-bar" id="presetBar">
                     <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Quick Filters:</span>
                     <button class="preset-save-btn" onclick="saveFilterPreset()">+ Save Current</button>
@@ -763,7 +757,6 @@
                     </div>
                 </div>
 
-                <!-- 1.1  Comparison date range -->
                 <div style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                         <span style="font-size:.85rem;font-weight:600;color:var(--accent-purple)">📊 Period Comparison (optional)</span>
@@ -786,20 +779,17 @@
 
             <!-- ANALYTICS CONTAINER -->
             <div id="analyticsContainer" style="display:none">
-                <!-- 1.2  Active filter chips -->
                 <div id="activeFiltersBar" style="display:none;margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
                     <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Active Filters:</span>
                     <div id="filterChips"></div>
                     <button class="btn-sm" onclick="clearActiveFilters()" style="background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3)">✕ Clear All</button>
                 </div>
 
-                <!-- 1.7  Insights Panel -->
                 <div id="insightsPanel">
                     <h4>🧠 Auto-Generated Insights</h4>
                     <ul id="insightsList"></ul>
                 </div>
 
-                <!-- 1.1  Comparison KPIs -->
                 <div id="comparisonKpisSection" style="display:none;margin-bottom:24px">
                     <div class="compare-section">
                         <h5>📊 Period Comparison: Current vs Previous</h5>
@@ -843,7 +833,7 @@
                     <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
                 </div>
 
-                <!-- Row 2: Rejection Reasons — full width -->
+                <!-- Row 2: Rejection Reasons -->
                 <div class="chart-grid-1" style="margin-bottom:24px">
                     <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
                 </div>
@@ -854,7 +844,7 @@
                     <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div></div>
                 </div>
 
-                <!-- Row 4: ACM Performance + Leaderboard — full width -->
+                <!-- Row 4: ACM Performance -->
                 <div class="chart-box full-width" style="margin-bottom:24px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                         <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
@@ -880,7 +870,7 @@
                     <div class="chart-box"><h3>Agency Types</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
                 </div>
 
-                <!-- Row 6: Other Apps Hosted — full width -->
+                <!-- Row 6: Other Apps Hosted -->
                 <div class="chart-grid-1" style="margin-bottom:24px">
                     <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div></div>
                 </div>
@@ -891,7 +881,7 @@
                     <div class="chart-box"><h3>Daily BD Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div></div>
                 </div>
 
-                <!-- Row 8: Activity Heatmap — full width -->
+                <!-- Row 8: Activity Heatmap -->
                 <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
                     <h3>Activity Heatmap</h3>
                     <div class="heatmap-outer">
@@ -922,7 +912,6 @@
                 <div class="heatmap-tooltip" id="heatmapTooltip"></div>
             </div>
         </div>
-
 
         <!-- ══ PAGE: SEARCH RECORDS ════════════════════════════════════════ -->
         <div id="pg-points-records" style="display:none">
@@ -1043,7 +1032,6 @@
                     </div>
                 </div>
 
-                <!-- KPI summary row -->
                 <div id="ptKpiRow" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px" class="stat-grid">
                     <div class="stat-box"><div class="stat-label">Total Points (filtered)</div><div class="stat-value" id="ptKpiTotal" style="color:var(--accent-cyan)">—</div></div>
                     <div class="stat-box"><div class="stat-label">Used Points (filtered)</div><div class="stat-value" id="ptKpiUsed" style="color:var(--accent-amber)">—</div></div>
@@ -1089,12 +1077,12 @@
             </div>
         </div>
 
-    </div><!-- /main-content -->
-</div><!-- /app-shell #mainApp -->
+    </div>
+</div>
 
 <script>
 // ════════════════════════════════════════════════════════════════════
-// 3.1  TOAST NOTIFICATION SYSTEM
+// TOAST NOTIFICATION SYSTEM
 // ════════════════════════════════════════════════════════════════════
 const ToastManager = {
     show(msg, type='info', duration=5000) {
@@ -1113,7 +1101,6 @@ const ToastManager = {
         el.onclick = () => this.dismiss(el);
         container.appendChild(el);
         
-        // Apply progress animation
         const after = document.createElement('style');
         const id = 'toast-'+Date.now();
         el.id = id;
@@ -1130,7 +1117,7 @@ const ToastManager = {
 };
 
 // ════════════════════════════════════════════════════════════════════
-// 3.2  KEYBOARD SHORTCUTS
+// KEYBOARD SHORTCUTS & THEMES
 // ════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -1155,19 +1142,14 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ════════════════════════════════════════════════════════════════════
-// 3.5  THEME TOGGLE
-// ════════════════════════════════════════════════════════════════════
 function toggleTheme() {
     const html = document.documentElement;
     const isDark = html.getAttribute('data-theme') === 'dark';
     html.setAttribute('data-theme', isDark ? 'light' : 'dark');
     document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
     localStorage.setItem('xenaTheme', isDark ? 'light' : 'dark');
-    // Update chart defaults
     Chart.defaults.color = isDark ? '#1a1c2e' : '#8b8fa3';
 }
-// Apply saved theme
 (function(){
     const t = localStorage.getItem('xenaTheme');
     if (t) {
@@ -1241,7 +1223,6 @@ const inAcms=["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella"];
 const allAcms=[...pkAcms,...inAcms].sort();
 const allRegs=["pk","in","all"];
 
-// ─── XSS helpers + nav group utilities ─────────────────────────────────────
 function escHtml(s){const d=document.createElement('div');d.appendChild(document.createTextNode(String(s||'')));return d.innerHTML;}
 
 function _expandNavGroup(bodyId,arrId){
@@ -1256,17 +1237,13 @@ let currentAgencyData=null, latestAnalyticsData=null, charts={};
 let loggedUser=localStorage.getItem('xenaUser');
 let loggedEmail=localStorage.getItem('xenaEmail');
 let loggedUat=localStorage.getItem('xenaUat');
-let pendingRequests=new Map();  // 2.3 deduplication
-let activeFilters={};           // 1.2 cross-filter state
-let sparkCharts={};             // 1.3 sparkline chart instances
+let pendingRequests=new Map();  
+let activeFilters={};           
+let sparkCharts={};             
 let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg;
 
-// ── Restore session from URL params (set by /api/callback after OAuth) ────
-// FIX-2: URLSearchParams.get() automatically decodes percent-encoding, so
-//         the URL-encoded uat from the fixed callback is read correctly here.
 const urlParams=new URLSearchParams(window.location.search);
 
-// FIX-3: surface auth_error from the callback as a visible toast
 if (urlParams.get('auth_error')) {
     const authErr = urlParams.get('auth_error');
     setTimeout(()=>{
@@ -1278,24 +1255,22 @@ if (urlParams.get('auth_error')) {
 }
 
 if (urlParams.get('user') && urlParams.get('uat')) {
-    loggedUser  = urlParams.get('user');   // URLSearchParams decodes % escapes
+    loggedUser  = urlParams.get('user');   
     loggedEmail = urlParams.get('email') || '';
-    loggedUat   = urlParams.get('uat');    // FIX-2: token is now properly encoded/decoded
+    loggedUat   = urlParams.get('uat');    
     localStorage.setItem('xenaUser',  loggedUser);
     localStorage.setItem('xenaEmail', loggedEmail);
     localStorage.setItem('xenaUat',   loggedUat);
     localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
-    window.history.replaceState({},'','/');   // clean URL so token isn't in browser history
+    window.history.replaceState({},'','/');   
 }
 
-// Restore from URL hash (8.2)
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
 function logout() { localStorage.clear(); location.reload(); }
 function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-// [IMP] FORMAT COINS BEAUTIFULLY
 function formatCoins(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -1303,11 +1278,11 @@ function formatCoins(num) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// NAVIGATION (sidebar-based)
+// NAVIGATION 
 // ════════════════════════════════════════════════════════════════════
 let userModules=[], isAdmin=false;
-
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
+
 function hideAllPages(){
     ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -1460,7 +1435,7 @@ function updateAcmDropdown() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.4  FILTER PRESETS
+// FILTER PRESETS
 // ════════════════════════════════════════════════════════════════════
 function saveFilterPreset() {
     const name=prompt("Name for this filter preset:");
@@ -1480,7 +1455,6 @@ function renderPresetBar() {
     const bar=document.getElementById('presetBar');
     if (!bar) return;
     const presets=JSON.parse(localStorage.getItem(`xena_presets_${loggedUser}`)||'{}');
-    // Remove old chips
     bar.querySelectorAll('.preset-chip').forEach(c=>c.remove());
     const refBtn=bar.querySelector('.preset-save-btn');
     Object.entries(presets).forEach(([name,p])=>{
@@ -1510,7 +1484,7 @@ function loadPreset(p) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ADMIN (sidebar pages — modal removed)
+// ADMIN
 // ════════════════════════════════════════════════════════════════════
 function openAdmin(){ navTo('admin-agents'); }
 function closeAdmin(){ navTo('welcome'); }
@@ -1579,11 +1553,13 @@ async function addAgent() {
     if (document.getElementById('modAnalytics').checked) modules.push('analytics');
     if (document.getElementById('modAdmin').checked) modules.push('admin');
     document.getElementById('adminBtnSubmit').innerText='Saving...';
+    
     const payload={
         email,modules:modules.join(', '),
         acms:{target:pTargetAcm.getValues().join(','),points:pPointsAcm.getValues().join(','),analytics:pAnalyticsAcm.getValues().join(',')},
         regions:{target:pTargetReg.getValues().join(','),points:pPointsReg.getValues().join(','),analytics:pAnalyticsReg.getValues().join(',')}
     };
+    
     try {
         const res=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json','X-User-Name':loggedUser},body:JSON.stringify(payload)});
         const data=await res.json();
@@ -1609,7 +1585,6 @@ async function deleteAgent(recordId) {
     } catch(e) { ToastManager.show('Error removing agent.','error'); }
 }
 
-// 4.1  Audit log viewer
 async function loadAuditLog() {
     const el=document.getElementById('auditLogList');
     el.innerHTML='<div style="color:var(--text-muted);padding:20px">Loading...</div>';
@@ -1697,7 +1672,7 @@ function initPills() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.2  CROSS-FILTERING
+// CROSS-FILTERING
 // ════════════════════════════════════════════════════════════════════
 function crossFilter(dimension, value) {
     if (!latestAnalyticsData) return;
@@ -1725,7 +1700,6 @@ function updateFilterChips() {
 }
 function applyFiltersAndRedraw() {
     if (!latestAnalyticsData) return;
-    // For now, redraw with highlights (client-side filter on status)
     drawCharts(latestAnalyticsData);
 }
 
@@ -1750,14 +1724,13 @@ async function generateAnalytics() {
     if (cmpFrom&&cmpTo) { payload.compare_from=cmpFrom; payload.compare_to=cmpTo; }
 
     const cacheKey=JSON.stringify(payload);
-    if (pendingRequests.has(cacheKey)) return pendingRequests.get(cacheKey); // 2.3 dedup
+    if (pendingRequests.has(cacheKey)) return pendingRequests.get(cacheKey); 
 
     document.getElementById('loadingOverlay').style.display='flex';
     document.getElementById('analyticsContainer').style.display='none';
     ['exportCsvBtn','exportXlsBtn','exportPdfBtn'].forEach(id=>document.getElementById(id).style.display='none');
     document.getElementById('insightsPanel').style.display='none';
 
-    // 2.5  Show skeleton while loading
     const kpiCards=document.querySelectorAll('.kpi-card');
     kpiCards.forEach(c=>c.classList.add('skeleton'));
 
@@ -1793,22 +1766,18 @@ async function generateAnalytics() {
             console.log(`Analytics completed in ${data.duration_ms}ms`);
         }
 
-        // Update KPIs
         document.getElementById('kpiCreations').innerText=data.kpis.creations.toLocaleString();
         document.getElementById('kpiBds').innerText=data.kpis.bds.toLocaleString();
         document.getElementById('kpiClosings').innerText=data.kpis.closings.toLocaleString();
 
-        // 1.3  Delta badges
         calculateDelta(data.daily_trend_creation,'deltaCreations');
         calculateDelta(data.daily_trend_bd,'deltaBds');
         calculateDelta(data.daily_trend_closing,'deltaClosings');
 
-        // 1.3  Sparklines
         drawSparkline('sparkCreations',data.daily_trend_creation,'#00d4ff');
         drawSparkline('sparkBds',data.daily_trend_bd,'#00e676');
         drawSparkline('sparkClosings',data.daily_trend_closing,'#ff4d6d');
 
-        // 1.1  Comparison KPIs
         if (data.comparison) {
             const c=data.comparison;
             document.getElementById('cmpCurCreations').innerText=data.kpis.creations;
@@ -1822,7 +1791,6 @@ async function generateAnalytics() {
             document.getElementById('comparisonKpisSection').style.display='none';
         }
 
-        // 8.2  Update URL for deep linking
         const urlP=new URLSearchParams({region,acm,type,from:fromDate,to:toDate});
         window.history.replaceState(null,null,`#analyze?${urlP.toString()}`);
 
@@ -1830,8 +1798,6 @@ async function generateAnalytics() {
         ['exportCsvBtn','exportXlsBtn','exportPdfBtn'].forEach(id=>document.getElementById(id).style.display='inline-block');
 
         setTimeout(()=>drawCharts(data),50);
-
-        // 1.7  Insights
         setTimeout(()=>generateInsights(data),200);
 
     } catch(err) {
@@ -1845,7 +1811,7 @@ async function generateAnalytics() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.3  SPARKLINES & DELTA BADGES
+// SPARKLINES & DELTA BADGES
 // ════════════════════════════════════════════════════════════════════
 function drawSparkline(canvasId, dataObj, color) {
     const canvas=document.getElementById(canvasId);
@@ -1879,7 +1845,7 @@ function calculateDelta(obj,elementId) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.7  AUTO-GENERATED INSIGHTS
+// AUTO-GENERATED INSIGHTS
 // ════════════════════════════════════════════════════════════════════
 function generateInsights(data) {
     const insights=[];
@@ -1888,14 +1854,13 @@ function generateInsights(data) {
     const rejReasons=data.reject_reasons||{};
     const creStatus=data.creation_status||{};
 
-    // Top ACM
     const topAcm=Object.entries(acmPerf).sort((a,b)=>b[1]-a[1])[0];
     if (topAcm) {
         const total=Object.values(acmPerf).reduce((a,b)=>a+b,0);
         const share=total>0?((topAcm[1]/total)*100).toFixed(0):0;
         insights.push(`📈 <strong>${topAcm[0]}</strong> leads creations with <strong>${topAcm[1]}</strong> onboarded (${share}% share).`);
     }
-    // Rejection rate
+    
     const total=kpis.creations||0;
     const rejected=creStatus.Rejected||0;
     if (total>0) {
@@ -1906,16 +1871,15 @@ function generateInsights(data) {
             insights.push(`✅ Rejection rate is healthy at <strong style="color:var(--accent-green)">${rejRate}%</strong>.`);
         }
     }
-    // Top rejection reason
+    
     const topRej=Object.entries(rejReasons).sort((a,b)=>b[1]-a[1])[0];
     if (topRej) insights.push(`🔍 Most common rejection reason: <strong>${topRej[0]}</strong> (${topRej[1]} cases).`);
 
-    // BD vs Creation ratio
     if (kpis.creations>0&&kpis.bds>0) {
         const ratio=(kpis.creations/kpis.bds).toFixed(1);
         insights.push(`📊 Creation-to-BD ratio is <strong>${ratio}x</strong> — ${ratio>2?'strong organic pipeline':'BD-driven growth'}.`);
     }
-    // Trend direction
+    
     const trendVals=Object.values(data.daily_trend_creation||{});
     if (trendVals.length>=4) {
         const firstHalf=trendVals.slice(0,Math.floor(trendVals.length/2)).reduce((a,b)=>a+b,0);
@@ -1923,7 +1887,7 @@ function generateInsights(data) {
         if (secondHalf>firstHalf*1.1) insights.push(`📈 Trend is <strong style="color:var(--accent-green)">accelerating</strong> — second half of period outperforms first half.`);
         else if (secondHalf<firstHalf*0.9) insights.push(`📉 Trend is <strong style="color:var(--accent-rose)">decelerating</strong> — second half of period underperforms first half.`);
     }
-    // Comparison insights
+    
     if (data.comparison) {
         const c=data.comparison;
         if (c.kpis.creations>0) {
@@ -1950,7 +1914,7 @@ function drawCharts(data) {
     const pieOpts={responsive:true,maintainAspectRatio:false,
         plugins:{legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',boxWidth:10,font:{size:12}}},
                  datalabels:{color:'#fff',font:{weight:'bold',size:11},formatter:(v,ctx)=>{const sum=ctx.dataset.data.reduce((a,b)=>a+b,0);return sum===0?'':(v/sum*100).toFixed(1)+'%'}}}};
-    // Rejection reasons: show % labels on segments + full legend below (scrollable)
+    
     const pieOptsReject={responsive:true,maintainAspectRatio:false,layout:{padding:20},
         cutout:'55%',
         plugins:{
@@ -1982,7 +1946,6 @@ function drawCharts(data) {
     buildPie('cCreationType',data.creation_types);
     buildPie('cType',data.agency_types);
 
-    // ACM closing bar
     const acmsClose=Object.keys(data.acm_closing_reasons||{});
     if (acmsClose.length>0) {
         const sorted=acmsClose.sort((a,b)=>Object.values(data.acm_closing_reasons[b]).reduce((x,y)=>x+y,0)-Object.values(data.acm_closing_reasons[a]).reduce((x,y)=>x+y,0));
@@ -1992,7 +1955,6 @@ function drawCharts(data) {
             options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:'#2a2c3f'}}},plugins:{legend:{position:'top'},datalabels:{display:false}}}});
     }
 
-    // ACM performance bar + leaderboard
     const acmEntries=Object.entries(data.acm_performance||{}).sort((a,b)=>b[1]-a[1]);
     if (acmEntries.length>0) {
         const labels=acmEntries.map(e=>e[0]),vals=acmEntries.map(e=>e[1]);
@@ -2001,11 +1963,10 @@ function drawCharts(data) {
             options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:40}},
                 plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'right',color:'#fff',font:{weight:'bold'}}},
                 scales:{x:{grid:{color:'#2a2c3f'},suggestedMax:Math.max(...vals)*1.15},y:{grid:{display:false}}}}});
-        // 1.5  Leaderboard
+        
         buildLeaderboard(acmEntries);
     }
 
-    // Other apps
     const appEntries=Object.entries(data.other_apps||{}).sort((a,b)=>b[1]-a[1]);
     if (appEntries.length>0) {
         const labels=appEntries.map(e=>e[0]),vals=appEntries.map(e=>e[1]);
@@ -2016,7 +1977,6 @@ function drawCharts(data) {
                 scales:{x:{grid:{display:false}},y:{grid:{color:'#2a2c3f'},suggestedMax:Math.max(...vals)*1.15}}}});
     }
 
-    // Trend lines
     const buildTrend=(id,trendData,chartColor,gradStart)=>{
         if (!trendData||!Object.keys(trendData).length) return;
         const dates=Object.keys(trendData),vals=Object.values(trendData);
@@ -2034,7 +1994,7 @@ function drawCharts(data) {
         charts[id]=new Chart(ctx,{type:'line',data:{labels:filteredLabels,datasets:[{data:filteredVals,borderColor:chartColor,backgroundColor:grad,fill:true,tension:.4,borderWidth:2,pointRadius:3,pointHoverRadius:6}]},
             options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}},
                 scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10}},y:{grid:{color:'#2a2c3f'},beginAtZero:true}}}});
-        // 1.1  Overlay comparison
+        
         if (data.comparison) {
             const cmpKey=id==='cTrendCreation'?'daily_trend_creation':id==='cTrendBd'?'daily_trend_bd':'daily_trend_closing';
             const cmpData=data.comparison[cmpKey]||{};
@@ -2048,12 +2008,11 @@ function drawCharts(data) {
     buildTrend('cTrendCreation',data.daily_trend_creation,'#00d4ff','rgba(0,212,255,.3)');
     buildTrend('cTrendBd',data.daily_trend_bd,'#00e676','rgba(0,230,118,.3)');
 
-    // 1.6  Heatmap
     renderHeatmap(data.daily_trend_creation||{});
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.5  ACM LEADERBOARD
+// ACM LEADERBOARD
 // ════════════════════════════════════════════════════════════════════
 function buildLeaderboard(acmEntries) {
     const tbody=document.getElementById('leaderboardBody');
@@ -2089,7 +2048,7 @@ function switchAcmView(view,btn) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.6  HEATMAP REDESIGN
+// HEATMAP
 // ════════════════════════════════════════════════════════════════════
 function renderHeatmap(dataObj) {
     const container=document.getElementById('heatmapGrid');
@@ -2107,37 +2066,33 @@ function renderHeatmap(dataObj) {
     const values=dates.map(d=>dataObj[d]||0);
     const maxVal=Math.max(...values,1);
 
-    // Build full-week-aligned grid from Sunday of first week to Saturday of last week
     const firstDate=new Date(dates[0]+'T00:00:00');
     const lastDate=new Date(dates[dates.length-1]+'T00:00:00');
-    // Align start to Sunday
+    
     const startSun=new Date(firstDate);
     startSun.setDate(startSun.getDate()-startSun.getDay());
-    // Align end to Saturday
+    
     const endSat=new Date(lastDate);
     endSat.setDate(endSat.getDate()+(6-endSat.getDay()));
 
-    // Map dates → values for O(1) lookup
     const valMap={};
     dates.forEach((d,i)=>valMap[d]=values[i]);
 
-    // Tooltip element
     const tip=document.getElementById('heatmapTooltip');
 
-    // Build week columns, track month labels
     const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    let monthLabels={}; // weekColIndex → month string
+    let monthLabels={}; 
     let weekCol=0;
     let cur=new Date(startSun);
     while(cur<=endSat) {
         const colStart=new Date(cur);
-        // Week start = Sunday
         const weekIso=colStart.toISOString().split('T')[0];
-        // Check if any day in this week is in a new month
         const firstDayOfWeekMonth=cur.getMonth();
+        
         if (!Object.values(monthLabels).includes(MONTHS[firstDayOfWeekMonth])||weekCol===0) {
             monthLabels[weekCol]=MONTHS[firstDayOfWeekMonth];
         }
+        
         for (let dow=0;dow<7;dow++) {
             const dateStr=cur.toISOString().split('T')[0];
             const v=valMap[dateStr]||0;
@@ -2145,15 +2100,14 @@ function renderHeatmap(dataObj) {
             const cell=document.createElement('div');
             cell.className='heatmap-cell';
             
-            // 🔥 HEATMAP COLOR LOGIC REDESIGN
             if (!inRange || v === 0) {
                 cell.style.background = 'rgba(255,255,255,.04)';
             } else {
                 const ratio = v / maxVal;
-                if (ratio <= 0.25) cell.style.background = '#ffeb3b'; // Yellow
-                else if (ratio <= 0.50) cell.style.background = '#ff9800'; // Orange
-                else if (ratio <= 0.75) cell.style.background = '#f44336'; // Red
-                else cell.style.background = '#b71c1c'; // Dark Red
+                if (ratio <= 0.25) cell.style.background = '#ffeb3b'; 
+                else if (ratio <= 0.50) cell.style.background = '#ff9800'; 
+                else if (ratio <= 0.75) cell.style.background = '#f44336'; 
+                else cell.style.background = '#b71c1c'; 
             }
             
             const dayLabel=cur.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -2175,10 +2129,9 @@ function renderHeatmap(dataObj) {
         weekCol++;
     }
 
-    // Render month labels above
     if (monthRow) {
         const totalWeeks=weekCol;
-        const cellW=26; // 22px cell + 4px gap
+        const cellW=26; 
         Object.entries(monthLabels).forEach(([wc,label])=>{
             const lbl=document.createElement('div');
             lbl.className='heatmap-month-label';
@@ -2191,7 +2144,7 @@ function renderHeatmap(dataObj) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.8  EXPORT
+// EXPORT
 // ════════════════════════════════════════════════════════════════════
 function exportCSV() {
     if (!latestAnalyticsData || !latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
@@ -2217,16 +2170,16 @@ function exportExcel() {
     if (!window.XLSX) { ToastManager.show('Excel library not loaded.','warning'); return; }
     const data=latestAnalyticsData;
     const wb=XLSX.utils.book_new();
-    // KPIs sheet
+    
     const kpiData=[['Metric','Value'],['Creations',data.kpis.creations],['BDs',data.kpis.bds],['Closings',data.kpis.closings]];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(kpiData),'KPIs');
-    // ACM sheet
+    
     const acmData=[['ACM','Creations'],...Object.entries(data.acm_performance||{})];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(acmData),'ACM Performance');
-    // Trends sheet
+    
     const trendData=[['Date','Creations','BDs'],...Object.keys(data.daily_trend_creation||{}).map(d=>[d,data.daily_trend_creation[d],data.daily_trend_bd?.[d]||0])];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(trendData),'Daily Trends');
-    // Rejection sheet
+    
     const rejData=[['Reason','Count'],...Object.entries(data.reject_reasons||{})];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rejData),'Rejection Reasons');
 
@@ -2262,7 +2215,6 @@ async function fetchAgencyData() {
 
         document.getElementById('displayAcm').innerText=`ACM: ${data.acm||'N/A'}`;
 
-        // 5.1  Health badge
         const healthEl=document.getElementById('displayHealth');
         if (data.health_status) {
             healthEl.className=`health-badge health-${data.health_status.replace(' ','-')}`;
@@ -2275,10 +2227,8 @@ async function fetchAgencyData() {
         document.getElementById('pointsArea').style.display='none';
 
         if (currentType==='target') {
-            const bp=data.base_points||0;
+            const targetCoins = data.base_points || 0; 
             document.getElementById('displayTargetTitle').innerText='Current Month Target';
-            // 🔥 TARGET MULTIPLIER & FORMATTER FIX
-            const targetCoins = bp * 100000;
             document.getElementById('displayTargetCoins').innerText=formatCoins(targetCoins) + ' Coins';
             document.getElementById('displayTargetCoins').style.color='var(--text)';
             document.getElementById('privilegeArea').style.display='block';
@@ -2290,13 +2240,11 @@ async function fetchAgencyData() {
             document.getElementById('displayTargetCoins').style.color='var(--accent-cyan)';
             document.getElementById('pointsArea').style.display='block';
             updatePointsGrid();
-            // Auto-fill allocator balance for seamless use
             const allocEl=document.getElementById('allocatorBalance');
             if(allocEl) allocEl.value=bal;
         }
         document.getElementById('resultsContainer').style.display='block';
 
-        // 5.3  Comparison
         if (compareCodes) {
             const codes=compareCodes.split(',').map(c=>c.trim()).filter(Boolean);
             if (codes.length>0) fetchComparisonData(code,codes,currentType);
@@ -2307,7 +2255,6 @@ async function fetchAgencyData() {
     document.getElementById('loadingOverlay').style.display='none';
 }
 
-// 5.3  Multi-agency comparison
 async function fetchComparisonData(primaryCode, compareCodes, type) {
     const allCodes=[primaryCode,...compareCodes];
     try {
@@ -2322,7 +2269,6 @@ function renderComparisonTable(agencies,type) {
     if (!agencies.length) { area.style.display='none'; return; }
     const fields=type==='points'?['total_points','used_points','point_balance','health_score']:['base_points','health_score'];
     const labels={'total_points':'Total Points','used_points':'Used Points','point_balance':'Balance','base_points':'Base Points','health_score':'Health Score'};
-    // Find best/worst per field
     const maxVals={},minVals={};
     fields.forEach(f=>{ maxVals[f]=Math.max(...agencies.map(a=>a[f]||0)); minVals[f]=Math.min(...agencies.map(a=>a[f]||0)); });
     let html=`<table class="compare-table"><thead><tr><th>Agency</th><th>ACM</th><th>Status</th>${fields.map(f=>`<th>${labels[f]||f}</th>`).join('')}</tr></thead><tbody>`;
@@ -2348,18 +2294,16 @@ function renderComparisonTable(agencies,type) {
 function updatePrivilegeGrid() {
     if (!currentAgencyData) return;
     const priv=document.getElementById('specificPrivilege').value;
-    const bp=currentAgencyData.base_points||0;
+    
+    // Scale Down fix: Revert pre-multiplied base point state to standard metric for Privilege Calculations.
+    const bp=(currentAgencyData.base_points || 0) / 100000;
+    
     let total=0;
     if (priv==="Dynamic Avatar") total=Math.floor(bp/100);
     else if (priv==="30 Mics") { if(bp>=1000)total=4;else if(bp>=500)total=2;else if(bp>=300)total=1; }
     else if (priv==="20 Mics") total=Math.floor(bp/150);
     else total=Math.floor(bp/20);
 
-    // FIX (Missing privileges): the backend now returns privileges_claimed as
-    // {privilege_name: count}, built from the Grand Table and pre-filtered to only
-    // "Agency Target Privilege" rows with Status = Done. Match it against the
-    // dropdown selection the same fuzzy way the old client-side logic did, but
-    // without re-deriving the count from raw, unfiltered request rows.
     const claimedMap = currentAgencyData.privileges_claimed || {};
     let claimed=0;
     Object.keys(claimedMap).forEach(name=>{
@@ -2370,7 +2314,7 @@ function updatePrivilegeGrid() {
     (currentAgencyData.privileges_log||[]).forEach(entry=>{
         if (!String(entry.privilege||'').toLowerCase().includes(priv.toLowerCase())) return;
         const s = String(entry.status||'').trim().toLowerCase();
-        if (s === "done" || s === "completed" || s === "approved" || s === "confirm") return; // already in claimed
+        if (s === "done" || s === "completed" || s === "approved" || s === "confirm") return; 
         if (s === "rejected" || s === "failed" || s === "declined") rejected++;
         else pending++;
     });
@@ -2385,13 +2329,6 @@ function updatePrivilegeGrid() {
 // ════════════════════════════════════════════════════════════════════
 // POINTS SYSTEM
 // ════════════════════════════════════════════════════════════════════
-function parseFeishuField(val) {
-    if (!val) return "";
-    if (typeof val==='string') { try{let a=JSON.parse(val);if(Array.isArray(a))return a.join(', ');}catch(e){} return val; }
-    if (Array.isArray(val)) return val.map(v=>v.text||v.name||v.id||JSON.stringify(v)).join(', ');
-    if (typeof val==='object') return val.text||val.name||val.id||"";
-    return String(val);
-}
 const pointPriceDB=[
     {key:"trend card",same:40,other:50},{key:"traffic card",same:30,other:40},
     {key:"30 mic 15 days",same:150,other:175},{key:"30 mic 30 days",same:300,other:350},
@@ -2412,9 +2349,6 @@ function updatePointsGrid() {
     buildAllocatorStatus(currentAgencyData.allocator_status||{});
 }
 
-// FIX (Smart Allocator missing limits): shows this month's usage vs its monthly cap
-// for each item (e.g. Trend Card 10/10 used). Items with no known cap yet show
-// "used" only, with a note - see MONTHLY_ALLOCATOR_LIMITS on the backend.
 function buildAllocatorStatus(status) {
     const wrap=document.getElementById('allocatorStatusWrap');
     if (!wrap) return;
@@ -2428,19 +2362,18 @@ function buildAllocatorStatus(status) {
             const overLimit=hasLimit && s.used>s.limit;
             const color=hasLimit?(overLimit?'var(--accent-rose)':'var(--accent-green)'):'var(--text-muted)';
             return `<div class="stat-box" style="padding:10px 14px;text-align:left">
-                <div style="font-size:.8rem;color:var(--text-muted)">${escHtml(name)}</div>
+                <div style="font-size:.8rem;color:var(--text-muted)">${escHtml(name.toUpperCase())}</div>
                 <div style="font-weight:700;color:${color}">${s.used}${hasLimit?' / '+s.limit:''}</div>
                 ${!hasLimit?'<div style="font-size:.7rem;color:var(--text-muted)">limit not set</div>':''}
             </div>`;
         }).join('')+'</div>';
 }
 
-// 5.2  Agency Activity Timeline
 function buildTimeline(history) {
     const tl=document.getElementById('agencyTimeline');
     if (!tl) return;
     if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No activity found for this agency.</div>'; return; }
-    // history already comes pre-sorted newest-first from the backend
+    
     tl.innerHTML=history.slice(0,15).map(req=>{
         const dateStr=req.date||'Unknown';
         const type=(req.request_type||'Request').toLowerCase();
@@ -2465,7 +2398,7 @@ function buildPointsHistory(history) {
     if (!wrap) return;
     const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
     if (!pointReqs.length) { wrap.innerHTML=''; return; }
-    // history is already sorted newest-first
+    
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
         pointReqs.map(req=>{
             const status=req.status||'Pending';
@@ -2504,16 +2437,11 @@ function copyAllocatorReceipt() {
     });
 }
 
-// Smart Allocator
 function privToggle(el, e) {
-    // Prevent toggling when user clicks directly on the number input
     if (e && e.target && e.target.tagName==='INPUT') return;
     el.classList.toggle('active');
 }
 
-// FIX (Smart Allocator missing limits): looks up the monthly cap/usage for a
-// privilege key (e.g. "trend card") against the allocator_status the backend
-// computed from this agency's Monthly Usage Tracker field.
 function findAllocatorLimit(key) {
     const status = (currentAgencyData && currentAgencyData.allocator_status) || {};
     const lower = key.toLowerCase();
@@ -2535,7 +2463,7 @@ function runAllocator() {
         document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select one or more privileges above to preview allocation.</span>';
         return;
     }
-    // [IMP] Use selected region pricing (same vs other region)
+    
     const regionMode = document.getElementById('allocatorRegion')?.value || 'same';
     let remaining=balance, receiptLines=[], totalCost=0, approvedCount=0, rejectedCount=0;
 
@@ -2548,7 +2476,6 @@ function runAllocator() {
         const unitPrice = regionMode === 'other' ? entry.other : entry.same;
         const display=key.replace(/\b\w/g,c=>c.toUpperCase());
 
-        // Enforce the monthly cap (e.g. Trend Card = 10/month) on top of the balance check
         const limitInfo = findAllocatorLimit(key);
         let allowedQty = qty;
         if (limitInfo && limitInfo.limit !== null && limitInfo.limit !== undefined) {
@@ -2595,8 +2522,9 @@ function runAllocator() {
         return l;
     }).join('\n');
 }
+
 // ════════════════════════════════════════════════════════════════════
-// SEARCH RECORDS PAGE (pg-points-records)
+// SEARCH RECORDS PAGE 
 // ════════════════════════════════════════════════════════════════════
 let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
 
@@ -2619,7 +2547,6 @@ async function prFetch(page) {
         acm:    document.getElementById('prAcm')?.value    || '',
     });
 
-    // Remove empty params
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
 
     const spinner  = document.getElementById('prLoadingSpinner');
@@ -2649,10 +2576,6 @@ async function prFetch(page) {
 
         if (countEl) countEl.textContent = `${data.total.toLocaleString()} records found`;
 
-        // FIX (Infinite loading): columns now match the Agency Points table's real
-        // schema (Agency Code, Acm, Region derived from Acm, Base/Bonus/Total/Used
-        // Points, Point Balance, Health). Owner/Status/Level/Month/Date never
-        // existed on this table.
         const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
         const labels = {
             agency_id:'Agency Code', acm:'ACM', region:'Region',
@@ -2687,7 +2610,6 @@ async function prFetch(page) {
             '</tr>';
         }).join('');
 
-        // Totals row
         if (tfoot && data.totals) {
             tfoot.innerHTML = '<tr style="border-top:2px solid var(--border)">' +
                 cols.map((c,i) => {
@@ -2701,7 +2623,6 @@ async function prFetch(page) {
 
         if (tableEl) tableEl.style.display = '';
 
-        // Pagination
         document.getElementById('prPageNum').textContent    = data.page;
         document.getElementById('prTotalPages').textContent = data.total_pages;
         document.getElementById('prTotalCount').textContent = data.total.toLocaleString();
@@ -2731,8 +2652,7 @@ function prExportCsv() {
 
 function prExportExcel() {
     if (!prAllData.length || !window.XLSX) { ToastManager.show('Search first or XLSX library not loaded.','warning'); return; }
-    const cols = ['agency_id','agency_name','owner_id','owner_name','region','status',
-                  'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+    const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
     const ws = XLSX.utils.json_to_sheet(prAllData, {header: cols});
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Point Records');
@@ -2741,7 +2661,7 @@ function prExportExcel() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// POINT TABLE PAGE (pg-points-table)
+// POINT TABLE PAGE 
 // ════════════════════════════════════════════════════════════════════
 let ptCurrentPage = 1, ptAllData = [], ptDebounceTimer = null;
 
@@ -2793,7 +2713,6 @@ async function ptFetch(page) {
             return;
         }
 
-        // KPI row
         if (kpiRow && data.totals) {
             document.getElementById('ptKpiTotal').textContent   = (data.totals.total_points||0).toLocaleString();
             document.getElementById('ptKpiUsed').textContent    = (data.totals.used_points||0).toLocaleString();
@@ -2801,7 +2720,6 @@ async function ptFetch(page) {
             kpiRow.style.display = 'grid';
         }
 
-        // Build rows
         const tbody = document.getElementById('ptTbody');
         const tfoot = document.getElementById('ptTfoot');
         if (tbody) tbody.innerHTML = ptAllData.map((r,i) => {
@@ -2824,7 +2742,6 @@ async function ptFetch(page) {
             </tr>`;
         }).join('');
 
-        // Totals footer
         if (tfoot && data.totals) {
             tfoot.innerHTML = `<tr style="border-top:2px solid var(--border);font-weight:700">
                 <td style="padding:9px 12px;color:var(--text-muted)">TOTALS</td>
@@ -2838,7 +2755,6 @@ async function ptFetch(page) {
 
         if (tableEl) tableEl.style.display = '';
 
-        // Pagination
         document.getElementById('ptPageNum').textContent    = data.page;
         document.getElementById('ptTotalPages').textContent = data.total_pages;
         document.getElementById('ptTotalCount').textContent = data.total.toLocaleString();
@@ -2856,8 +2772,7 @@ async function ptFetch(page) {
 
 function ptExportCsv() {
     if (!ptAllData.length) { ToastManager.show('Load the table first.','warning'); return; }
-    const cols = ['agency_id','agency_name','owner_id','owner_name','region','acm','status',
-                  'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+    const cols = ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
     const rows = [cols.join(','), ...ptAllData.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
     const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -2914,8 +2829,6 @@ if (loggedUser&&loggedUat) {
         navTo('analytics');
     }
 }
-/* ⬆️ END OF INITIALIZATION BLOCK ⬆️ */
-
 </script>
 </body>
 </html>
