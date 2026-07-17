@@ -807,102 +807,24 @@ def login():
 
 @app.route('/api/callback', methods=['GET'])
 def callback():
-    """
-    Feishu OAuth callback — three bugs fixed vs v1.1:
-
-    FIX-1  redirect_uri added to OIDC token exchange body.
-           The Feishu /authen/v1/oidc/access_token endpoint requires
-           redirect_uri to match what was sent in the auth request;
-           omitting it causes a silent rejection so uat is None and
-           the user bounces back to the login page with no error shown.
-
-    FIX-2  uat is now URL-encoded in the redirect.
-           Tokens that contain +, = or & would otherwise corrupt the
-           query-string and produce a mangled value on the frontend.
-
-    FIX-3  All failures redirect to /?auth_error=<msg> instead of
-           returning a raw 4xx/5xx page.  Vercel's error handling would
-           silently fall back to serving index.html (login screen) with
-           zero explanation; now the frontend picks up auth_error and
-           shows a toast so the user knows what went wrong.
-    """
     code = request.args.get('code')
-    if not code:
-        logger.warn("callback_no_code")
-        return redirect("/?auth_error=" + urllib.parse.quote(
-            "Authorization failed: no code returned from Feishu.", safe=''))
-
-    try:
-        tat     = get_tenant_access_token()
-        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-
-        # FIX-1: include redirect_uri — Feishu OIDC requires it in the exchange
-        token_resp = http_requests.post(
-            "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token",
-            headers=headers,
-            json={"grant_type": "authorization_code",
-                  "code":        code,
-                  "redirect_uri": REDIRECT_URI},   # <─ was missing
-            timeout=15
-        ).json()
-
-        logger.info("token_exchange",
-                    feishu_code=token_resp.get("code"),
-                    has_data=bool(token_resp.get("data")))
-
-        uat = (token_resp.get("data") or {}).get("access_token")
-
-        # Some Feishu app configs return the token at the top level
-        if not uat:
-            uat = token_resp.get("access_token")
-
-        # Fallback: retry with the older (non-OIDC) endpoint — handles apps
-        # that were created before Feishu migrated to OIDC
-        if not uat:
-            logger.warn("oidc_exchange_failed_trying_legacy",
-                        feishu_code=token_resp.get("code"),
-                        feishu_msg=token_resp.get("msg", ""))
-            legacy_resp = http_requests.post(
-                "https://open.feishu.cn/open-apis/authen/v1/access_token",
-                headers=headers,
-                json={"grant_type": "authorization_code", "code": code},
-                timeout=15
-            ).json()
-            uat = (legacy_resp.get("data") or {}).get("access_token") or                   legacy_resp.get("access_token")
-            if uat:
-                logger.info("legacy_token_ok")
-
-        if not uat:
-            err = token_resp.get("msg") or token_resp.get("error_description")                   or f"Token exchange failed (code={token_resp.get('code')})"
-            logger.error("callback_no_uat", err=err)
-            return redirect("/?auth_error=" + urllib.parse.quote(
-                f"Login failed: {err}", safe=''))
-
-        # Fetch Feishu user profile
-        info_resp  = http_requests.get(
-            "https://open.feishu.cn/open-apis/authen/v1/user_info",
-            headers={"Authorization": f"Bearer {uat}"},
-            timeout=15
-        ).json()
-        user_data  = info_resp.get("data", {})
-        lark_name  = user_data.get("name", "Unknown User")
-        lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
-
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-        audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
-        logger.info("login_ok", user=mask_name(lark_name), email=mask_email(lark_email))
-
-        # FIX-2: URL-encode every component, including the uat token
-        return redirect(
-            "/?user="  + urllib.parse.quote(lark_name,  safe='') +
-            "&email="  + urllib.parse.quote(lark_email, safe='') +
-            "&uat="    + urllib.parse.quote(uat,         safe='')
-        )
-
-    except Exception as exc:
-        logger.error("callback_exception", error=str(exc))
-        return redirect("/?auth_error=" + urllib.parse.quote(
-            f"Login error: {str(exc)[:120]}", safe=''))
+    if not code: return "SSO Authorization Failed.", 400
+    tat = get_tenant_access_token()
+    token_url = "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token"
+    headers = {"Authorization":f"Bearer {tat}","Content-Type":"application/json"}
+    token_resp = http_requests.post(token_url, headers=headers,
+                                    json={"grant_type":"authorization_code","code":code}, timeout=10).json()
+    uat = token_resp.get("data",{}).get("access_token")
+    if not uat: return "SSO Error: Could not verify user token.", 500
+    info_resp = http_requests.get("https://open.feishu.cn/open-apis/authen/v1/user_info",
+                                  headers={"Authorization":f"Bearer {uat}"}, timeout=10).json()
+    data = info_resp.get("data",{})
+    lark_name  = data.get("name","Unknown User")
+    lark_email = data.get("email") or data.get("enterprise_email") or ""
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
+    logger.info("login", user=mask_name(lark_name), email=mask_email(lark_email))
+    return redirect(f"/?user={urllib.parse.quote(lark_name)}&email={urllib.parse.quote(lark_email)}&uat={uat}")
 
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
