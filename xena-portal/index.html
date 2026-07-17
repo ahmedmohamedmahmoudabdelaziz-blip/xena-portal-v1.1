@@ -1515,7 +1515,7 @@ function updateAcmDropdown() {
 // ════════════════════════════════════════════════════════════════════
 // 1.4  FILTER PRESETS
 // ════════════════════════════════════════════════════════════════════
-// Replace the saveFilterPreset function:
+// AFTER MODIFICATION
 function saveFilterPreset() {
     const name=prompt("Name for this filter preset:");
     if (!name) return;
@@ -1530,8 +1530,6 @@ function saveFilterPreset() {
     ToastManager.show(`Filter preset "${escHtml(name)}" saved!`,'success');
     renderPresetBar();
 }
-
-// Replace the renderPresetBar function:
 function renderPresetBar() {
     const bar=document.getElementById('presetBar');
     if (!bar) return;
@@ -2672,6 +2670,7 @@ async function prFetch(page) {
 
         if (thead) thead.innerHTML = '<tr>' + cols.map(c=>`<th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">${labels[c]||c}</th>`).join('') + '</tr>';
 
+        // AFTER MODIFICATION
         if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
             const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
             return `<tr style="${rowStyle};border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
