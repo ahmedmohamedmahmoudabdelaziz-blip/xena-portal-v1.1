@@ -1114,6 +1114,7 @@
 // ════════════════════════════════════════════════════════════════════
 // 3.1  TOAST NOTIFICATION SYSTEM
 // ════════════════════════════════════════════════════════════════════
+// Replace the ToastManager object definition:
 const ToastManager = {
     show(msg, type='info', duration=5000) {
         const icons = {success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
@@ -1125,7 +1126,6 @@ const ToastManager = {
         el.querySelector('.toast-after, .toast-close').onclick = () => this.dismiss(el);
         el.querySelector('.toast-close').onclick = () => this.dismiss(el);
         el.onclick = () => this.dismiss(el);
-        el.querySelector('::after');
         container.appendChild(el);
         // Apply progress animation
         const after = document.createElement('style');
@@ -1357,8 +1357,12 @@ function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padSta
 let userModules=[], isAdmin=false;
 
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
+// Replace the hideAllPages function:
 function hideAllPages(){
-    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';document.getElementById('pg-points-records').style.display='none';document.getElementById('pg-points-table').style.display='none';});
+    ALL_PAGES.forEach(id=>{
+        const el=document.getElementById(id);
+        if(el) el.style.display='none';
+    });
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
     document.querySelectorAll('.nav-group-header.nav-direct').forEach(el=>el.classList.remove('active'));
 }
@@ -1511,6 +1515,7 @@ function updateAcmDropdown() {
 // ════════════════════════════════════════════════════════════════════
 // 1.4  FILTER PRESETS
 // ════════════════════════════════════════════════════════════════════
+// Replace the saveFilterPreset function:
 function saveFilterPreset() {
     const name=prompt("Name for this filter preset:");
     if (!name) return;
@@ -1522,9 +1527,11 @@ function saveFilterPreset() {
         type:document.getElementById('anaType').value
     };
     localStorage.setItem(`xena_presets_${loggedUser}`,JSON.stringify(presets));
-    ToastManager.show(`Filter preset "${safeName}" saved!`,'success');
+    ToastManager.show(`Filter preset "${escHtml(name)}" saved!`,'success');
     renderPresetBar();
 }
+
+// Replace the renderPresetBar function:
 function renderPresetBar() {
     const bar=document.getElementById('presetBar');
     if (!bar) return;
@@ -1536,7 +1543,7 @@ function renderPresetBar() {
         const chip=document.createElement('button');
         chip.className='preset-chip';
         chip.title=`Region: ${p.region} | ACM: ${p.acm}`;
-        chip.innerHTML=`${safeName} <span style="opacity:.5;font-size:.7em;margin-left:4px">✕</span>`;
+        chip.innerHTML=`${escHtml(name)} <span style="opacity:.5;font-size:.7em;margin-left:4px">✕</span>`;
         chip.addEventListener('click',ev=>{
             if (ev.target.tagName==='SPAN'||ev.target.closest('span')) {
                 delete presets[name];
