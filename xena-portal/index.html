@@ -411,8 +411,10 @@
                     <span>🪙 Agency Points</span><span class="nav-arr" id="navArrPoints">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyPoints">
-                    <div class="nav-item" id="nav-points"    onclick="navTo('points')">Check Agency Points</div>
-                    <div class="nav-item" id="nav-allocator" onclick="navTo('allocator')">Smart Allocator</div>
+                    <div class="nav-item" id="nav-points"         onclick="navTo('points')">Check Agency Points</div>
+                    <div class="nav-item" id="nav-allocator"      onclick="navTo('allocator')">Smart Allocator</div>
+                    <div class="nav-item" id="nav-points-records" onclick="navTo('points-records')">Search Records</div>
+                    <div class="nav-item" id="nav-points-table"   onclick="navTo('points-table')">Point Table</div>
                 </div>
             </div>
             <div class="nav-group">
@@ -583,13 +585,28 @@
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                 <div class="card">
                     <h3 style="margin-bottom:16px;color:var(--accent-cyan)">🤖 Smart Allocator</h3>
-                    <div class="control-group" style="margin-bottom:16px">
-                        <label>Available Points Balance</label>
-                        <input type="number" id="allocatorBalance" min="0" value="0" placeholder="Enter your points balance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;transition:.2s;box-sizing:border-box">
-                        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" id="allocBalHint">Enter balance manually, or <a href="#" onclick="navTo('points');return false" style="color:var(--accent-cyan)">search an agency first</a> to auto-fill.</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                        <div class="control-group" style="margin-bottom:0">
+                            <label>Available Points Balance</label>
+                            <input type="number" id="allocatorBalance" min="0" value="0" placeholder="Enter points balance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;transition:.2s;box-sizing:border-box">
+                        </div>
+                        <div class="control-group" style="margin-bottom:0">
+                            <label>Pricing Region</label>
+                            <select id="allocatorRegion" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;cursor:pointer">
+                                <option value="same">Same Region (Lower Rate)</option>
+                                <option value="other">Other Region (Higher Rate)</option>
+                            </select>
+                        </div>
                     </div>
+                    <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px" id="allocBalHint">Balance auto-fills after agency search, or enter manually. <a href="#" onclick="navTo('points');return false" style="color:var(--accent-cyan)">Search an agency ›</a></div>
                     <div class="control-group">
-                        <label>Select Privileges &amp; Quantities</label>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <label style="margin-bottom:0">Select Privileges &amp; Quantities</label>
+                            <div style="display:flex;gap:8px">
+                                <button onclick="allocSelectAll()" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Select All</button>
+                                <button onclick="allocClearAll()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Clear All</button>
+                            </div>
+                        </div>
                         <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
                             <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
                             <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
@@ -606,7 +623,10 @@
                             <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
                         </div>
                     </div>
-                    <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
+                        <button onclick="copyAllocatorReceipt()" style="background:rgba(185,103,255,.12);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:10px 18px;border-radius:10px;font-size:.9rem;cursor:pointer">📋 Copy Receipt</button>
+                    </div>
                 </div>
                 <div class="card">
                     <h4 style="color:var(--accent-purple);margin-bottom:12px">📜 Allocation Preview</h4>
@@ -903,6 +923,188 @@
             </div>
         </div>
 
+
+        <!-- ══ PAGE: SEARCH RECORDS ════════════════════════════════════════ -->
+        <div id="pg-points-records" style="display:none">
+            <div class="card" style="margin-bottom:20px">
+                <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔎 Search Point Records</h3>
+                <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+                    <div class="control-group">
+                        <label>Quick Search</label>
+                        <input type="text" id="prSearch" placeholder="Agency ID, name, owner…" oninput="prDebounce()">
+                    </div>
+                    <div class="control-group">
+                        <label>Region</label>
+                        <select id="prRegion">
+                            <option value="">All Regions</option>
+                            <option value="pk">PK</option>
+                            <option value="in">IN</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Status</label>
+                        <input type="text" id="prStatus" placeholder="e.g. Active, Inactive">
+                    </div>
+                    <div class="control-group">
+                        <label>Agency Level</label>
+                        <input type="text" id="prLevel" placeholder="e.g. Gold, Silver">
+                    </div>
+                    <div class="control-group">
+                        <label>Month (YYYY-MM)</label>
+                        <input type="text" id="prMonth" placeholder="e.g. 2025-07" maxlength="7">
+                    </div>
+                    <div class="control-group">
+                        <label>Date From</label>
+                        <input type="date" id="prDateFrom">
+                    </div>
+                    <div class="control-group">
+                        <label>Date To</label>
+                        <input type="date" id="prDateTo">
+                    </div>
+                    <div class="control-group" style="display:flex;align-items:flex-end">
+                        <button class="btn btn-primary" onclick="prFetch(1)" style="width:100%">🔎 Search</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <span id="prResultCount" style="font-size:.9rem;color:var(--text-muted)">Enter criteria and search</span>
+                        <span id="prLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button onclick="prExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
+                        <button onclick="prExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
+                    </div>
+                </div>
+
+                <div style="overflow-x:auto">
+                    <table id="prTable" style="width:100%;border-collapse:collapse;font-size:.87rem;display:none">
+                        <thead id="prThead"></thead>
+                        <tbody id="prTbody"></tbody>
+                        <tfoot id="prTfoot" style="font-weight:700;border-top:2px solid var(--border)"></tfoot>
+                    </table>
+                    <div id="prEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
+                        <div style="font-size:2rem;margin-bottom:12px">🔍</div>
+                        <p>No records found matching your criteria.</p>
+                    </div>
+                </div>
+
+                <div id="prPagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;display:none">
+                    <div style="font-size:.85rem;color:var(--text-muted)">
+                        Page <span id="prPageNum">1</span> of <span id="prTotalPages">1</span>
+                        &nbsp;·&nbsp; <span id="prTotalCount">0</span> total records
+                    </div>
+                    <div style="display:flex;gap:6px">
+                        <button onclick="prFetch(prCurrentPage-1)" id="prPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
+                        <button onclick="prFetch(prCurrentPage+1)" id="prNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ PAGE: POINT TABLE ════════════════════════════════════════════ -->
+        <div id="pg-points-table" style="display:none">
+            <div class="card" style="margin-bottom:20px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Agency Point Table</h3>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <select id="ptPageSize" onchange="ptFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
+                            <option value="25">25 / page</option>
+                            <option value="50" selected>50 / page</option>
+                            <option value="100">100 / page</option>
+                            <option value="200">200 / page</option>
+                        </select>
+                        <button onclick="ptExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
+                        <button onclick="ptExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
+                        <button onclick="ptFetch(1)" style="background:rgba(185,103,255,.1);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px">
+                    <div class="control-group">
+                        <label>Search</label>
+                        <input type="text" id="ptSearch" placeholder="Agency ID or name…" oninput="ptDebounce()">
+                    </div>
+                    <div class="control-group">
+                        <label>Region</label>
+                        <select id="ptRegion" onchange="ptFetch(1)">
+                            <option value="">All</option>
+                            <option value="pk">PK</option>
+                            <option value="in">IN</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Status</label>
+                        <input type="text" id="ptStatus" placeholder="e.g. Active" oninput="ptDebounce()">
+                    </div>
+                    <div class="control-group">
+                        <label>Sort By</label>
+                        <select id="ptSortBy" onchange="ptFetch(1)">
+                            <option value="date">Date</option>
+                            <option value="point_balance">Balance</option>
+                            <option value="total_points">Total Pts</option>
+                            <option value="used_points">Used Pts</option>
+                            <option value="agency_name">Name</option>
+                            <option value="region">Region</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Direction</label>
+                        <select id="ptSortDir" onchange="ptFetch(1)">
+                            <option value="desc">Descending</option>
+                            <option value="asc">Ascending</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- KPI summary row -->
+                <div id="ptKpiRow" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px" class="stat-grid">
+                    <div class="stat-box"><div class="stat-label">Total Points (filtered)</div><div class="stat-value" id="ptKpiTotal" style="color:var(--accent-cyan)">—</div></div>
+                    <div class="stat-box"><div class="stat-label">Used Points (filtered)</div><div class="stat-value" id="ptKpiUsed" style="color:var(--accent-amber)">—</div></div>
+                    <div class="stat-box"><div class="stat-label">Balance (filtered)</div><div class="stat-value" id="ptKpiBalance" style="color:var(--accent-green)">—</div></div>
+                </div>
+
+                <div id="ptLoadingBar" style="display:none;text-align:center;padding:24px;color:var(--text-muted)">⏳ Loading point table…</div>
+                <div style="overflow-x:auto">
+                    <table id="ptTable" style="width:100%;border-collapse:collapse;font-size:.85rem;display:none">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--border)">
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Agency ID</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Agency Name</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Region</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">ACM</th>
+                                <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Total Pts</th>
+                                <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Used Pts</th>
+                                <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Balance</th>
+                                <th style="padding:10px 12px;text-align:center;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Health</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Status</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ptTbody"></tbody>
+                        <tfoot id="ptTfoot"></tfoot>
+                    </table>
+                    <div id="ptEmpty" style="display:none;text-align:center;padding:48px;color:var(--text-muted)">
+                        <div style="font-size:2rem;margin-bottom:12px">📋</div>
+                        <p>No records to display. Try adjusting your filters.</p>
+                    </div>
+                </div>
+
+                <div id="ptPagination" style="display:none;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px">
+                    <div style="font-size:.85rem;color:var(--text-muted)">
+                        Page <span id="ptPageNum">1</span> of <span id="ptTotalPages">1</span>
+                        &nbsp;·&nbsp; <span id="ptTotalCount">0</span> records
+                    </div>
+                    <div style="display:flex;gap:6px">
+                        <button onclick="ptFetch(ptCurrentPage-1)" id="ptPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
+                        <button onclick="ptFetch(ptCurrentPage+1)" id="ptNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /main-content -->
 </div><!-- /app-shell #mainApp -->
 
@@ -1051,6 +1253,14 @@ const inAcms=["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella"];
 const allAcms=[...pkAcms,...inAcms].sort();
 const allRegs=["pk","in","all"];
 
+// ─── XSS helpers + nav group utilities ─────────────────────────────────────
+function escHtml(s){const d=document.createElement('div');d.appendChild(document.createTextNode(String(s||'')));return d.innerHTML;}
+
+function _expandNavGroup(bodyId,arrId){
+    const body=document.getElementById(bodyId);const arr=document.getElementById(arrId);
+    if(body&&!body.classList.contains('open')){body.classList.add('open');if(arr)arr.classList.add('open');}
+}
+
 // ════════════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════════════
@@ -1130,9 +1340,9 @@ function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padSta
 // ════════════════════════════════════════════════════════════════════
 let userModules=[], isAdmin=false;
 
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
 function hideAllPages(){
-    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';document.getElementById('pg-points-records').style.display='none';document.getElementById('pg-points-table').style.display='none';});
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
     document.querySelectorAll('.nav-group-header.nav-direct').forEach(el=>el.classList.remove('active'));
 }
@@ -1142,15 +1352,18 @@ function navTo(page){
     closeSidebar();
     const titles={welcome:'Xena Live Data Portal',analytics:'Analytics Report',compare:'Compare Agencies',
         points:'Check Agency Points',allocator:'Smart Allocator',target:'Agency Target',
-        'admin-agents':'Manage Agents','admin-audit':'Audit Log'};
+        'admin-agents':'Manage Agents','admin-audit':'Audit Log',
+        'points-records':'Search Point Records','points-table':'Agency Point Table'};
     document.getElementById('pageTitle').textContent=titles[page]||'Xena Portal';
 
+    document.querySelectorAll('.nav-item,.nav-group-header.nav-direct').forEach(n=>n.classList.remove('active','active-nav'));
     const navEl=document.getElementById('nav-'+page);
-    if(navEl) navEl.classList.add('active');
+    if(navEl){ navEl.classList.add('active'); navEl.classList.add('active-nav'); }
 
     if(page==='analytics'){
         document.getElementById('pg-analytics').style.display='block';
         document.getElementById('queryType').value='analytics';
+        _expandNavGroup('navBodyAnalytics','navArrAnalytics');
     } else if(page==='target'){
         document.getElementById('pg-agency').style.display='block';
         document.getElementById('queryType').value='target';
@@ -1174,12 +1387,21 @@ function navTo(page){
         }
     } else if(page==='admin-agents'){
         document.getElementById('pg-admin-agents').style.display='block';
+        _expandNavGroup('navBodyAdmin','navArrAdmin');
         fetchAdminUsers();
     } else if(page==='admin-audit'){
         document.getElementById('pg-admin-audit').style.display='block';
+        _expandNavGroup('navBodyAdmin','navArrAdmin');
         loadAuditLog();
     } else if(page==='compare'){
         document.getElementById('pg-compare').style.display='block';
+        _expandNavGroup('navBodyAnalytics','navArrAnalytics');
+    } else if(page==='points-records'){
+        document.getElementById('pg-points-records').style.display='block';
+        _expandNavGroup('navBodyPoints','navArrPoints');
+    } else if(page==='points-table'){
+        document.getElementById('pg-points-table').style.display='block';
+        _expandNavGroup('navBodyPoints','navArrPoints');
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
@@ -1284,7 +1506,7 @@ function saveFilterPreset() {
         type:document.getElementById('anaType').value
     };
     localStorage.setItem(`xena_presets_${loggedUser}`,JSON.stringify(presets));
-    ToastManager.show(`Filter preset "${name}" saved!`,'success');
+    ToastManager.show(`Filter preset "${safeName}" saved!`,'success');
     renderPresetBar();
 }
 function renderPresetBar() {
@@ -1298,7 +1520,7 @@ function renderPresetBar() {
         const chip=document.createElement('button');
         chip.className='preset-chip';
         chip.title=`Region: ${p.region} | ACM: ${p.acm}`;
-        chip.innerHTML=`${name} <span style="opacity:.5;font-size:.7em;margin-left:4px">✕</span>`;
+        chip.innerHTML=`${safeName} <span style="opacity:.5;font-size:.7em;margin-left:4px">✕</span>`;
         chip.addEventListener('click',ev=>{
             if (ev.target.tagName==='SPAN'||ev.target.closest('span')) {
                 delete presets[name];
@@ -1375,16 +1597,8 @@ async function fetchAdminUsers() {
         users.forEach(u=>{
             let dispEmail=u.email||u.person;
             let badge=u.modules.includes('admin')?'<span style="background:var(--accent-amber);color:#000;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px">ADMIN</span>':'';
-            listDiv.innerHTML+=`<div class="user-row">
-                <div class="user-info">
-                    <span class="user-email">${dispEmail}${badge}</span>
-                    <div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${u.modules||'none'}</span></div>
-                </div>
-                <div class="action-btns">
-                    <button class="edit-btn" onclick="editAgent('${dispEmail}','${u.modules}','${u.acms_raw}','${u.regions_raw}')">Edit</button>
-                    <button class="del-btn" onclick="deleteAgent('${u.id}')">Remove</button>
-                </div>
-            </div>`;
+            const row=document.createElement('div'); row.className='user-row';
+            row.innerHTML=`<div class="user-info"><span class="user-email">${escHtml(dispEmail)}${badge}</span><div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${escHtml(u.modules||'none')}</span></div></div><div class="action-btns"><button class="edit-btn" onclick="editAgent(${JSON.stringify(dispEmail)},${JSON.stringify(u.modules||'')},${JSON.stringify(u.acms_raw||'')},${JSON.stringify(u.regions_raw||'')})">Edit</button><button class="del-btn" onclick="deleteAgent(${JSON.stringify(u.id)})">Remove</button></div>`; listDiv.appendChild(row);
         });
     } catch(e) { listDiv.innerHTML='<div style="color:var(--accent-rose)">Failed to load agents.</div>'; }
 }
@@ -1881,7 +2095,7 @@ function buildLeaderboard(acmEntries) {
     if (!tbody) return;
     const maxVal=acmEntries.length>0?acmEntries[0][1]:1;
     const medals=['🥇','🥈','🥉'];
-    tbody.innerHTML=acmEntries.map(([name,val],i)=>{
+    tbody.innerHTML=acmEntries.map(([name,val],i)=>{ const safeName=escHtml(name);
         const score=val;
         const pct=Math.round((val/maxVal)*100);
         const medal=medals[i]||`<span style="color:var(--text-muted)">#${i+1}</span>`;
@@ -1890,7 +2104,7 @@ function buildLeaderboard(acmEntries) {
         const trendColor=i<acmEntries.length/2?'var(--accent-green)':'var(--accent-rose)';
         return `<tr class="${isLow?'needs-attention':''}">
             <td><span class="rank-medal">${medal}</span></td>
-            <td><strong>${name}</strong></td>
+            <td><strong>${safeName}</strong></td>
             <td>${val.toLocaleString()}</td>
             <td><span style="color:${trendColor}">${trend}</span> ${score}</td>
             <td style="min-width:120px">
@@ -2018,7 +2232,7 @@ function switchAdminTabBtn(tab,btn) {
 // 1.8  EXPORT
 // ════════════════════════════════════════════════════════════════════
 function exportCSV() {
-    if (!latestAnalyticsData) return;
+    if (!latestAnalyticsData || !latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
     const data=latestAnalyticsData;
     const rows=[['Metric','Value'],
         ['Creations',data.kpis.creations],['BDs',data.kpis.bds],['Closings',data.kpis.closings],
@@ -2037,7 +2251,8 @@ function exportCSV() {
     ToastManager.show('CSV exported successfully!','success');
 }
 function exportExcel() {
-    if (!latestAnalyticsData||!window.XLSX) { ToastManager.show('Excel library not loaded.','warning'); return; }
+    if (!latestAnalyticsData||!latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
+    if (!window.XLSX) { ToastManager.show('Excel library not loaded.','warning'); return; }
     const data=latestAnalyticsData;
     const wb=XLSX.utils.book_new();
     // KPIs sheet
@@ -2275,6 +2490,29 @@ function buildPointsHistory(requests) {
         }).join('');
 }
 
+// ── Smart Allocator helpers ──────────────────────────────────────────────────
+function allocSelectAll() {
+    document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
+        el.classList.add('active');
+    });
+}
+function allocClearAll() {
+    document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
+        el.classList.remove('active');
+    });
+}
+function copyAllocatorReceipt() {
+    const pre = document.getElementById('allocatorOutput');
+    if (!pre || !pre.textContent.trim()) {
+        ToastManager.show('Run the allocator first to generate a receipt.','warning'); return;
+    }
+    navigator.clipboard.writeText(pre.textContent).then(()=>{
+        ToastManager.show('Receipt copied to clipboard!','success');
+    }).catch(()=>{
+        ToastManager.show('Could not copy — try selecting the text manually.','warning');
+    });
+}
+
 // Smart Allocator
 function privToggle(el, e) {
     // Prevent toggling when user clicks directly on the number input
@@ -2293,7 +2531,9 @@ function runAllocator() {
         document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select one or more privileges above to preview allocation.</span>';
         return;
     }
-    let remaining=balance, receiptLines=[], totalCost=0;
+    // [IMP] Use selected region pricing (same vs other region)
+    const regionMode = document.getElementById('allocatorRegion')?.value || 'same';
+    let remaining=balance, receiptLines=[], totalCost=0, approvedCount=0, rejectedCount=0;
 
     activeToggles.forEach(el=>{
         const key=el.getAttribute('data-val');
@@ -2301,20 +2541,25 @@ function runAllocator() {
         const qty=Math.max(1,parseInt(qtyInput?.value||'1',10)||1);
         const entry=pointPriceDB.find(e=>e.key===key);
         if (!entry) return;
-        const unitPrice=entry.same;
+        const unitPrice = regionMode === 'other' ? entry.other : entry.same;
         const lineCost=unitPrice*qty;
         const display=key.replace(/\b\w/g,c=>c.toUpperCase());
         if (remaining>=lineCost) {
             receiptLines.push(`✅ APPROVED: ${qty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts`);
             totalCost+=lineCost;
             remaining-=lineCost;
+            approvedCount+=qty;
         } else {
             receiptLines.push(`❌ REJECTED: ${qty}× ${display} — need ${lineCost} pts, only ${remaining} left`);
+            rejectedCount+=qty;
         }
     });
-
+    const regionLabel = regionMode==='other' ? '(Other Region Rates)' : '(Same Region Rates)';
     const out=receiptLines.join('\n')+
         `\n\n─────────────────────────────\n`+
+        `📍 REGION     : ${regionLabel}\n`+
+        `✅ APPROVED   : ${approvedCount} item(s)\n`+
+        `❌ REJECTED   : ${rejectedCount} item(s)\n`+
         `💰 TOTAL COST : ${totalCost.toLocaleString()} pts\n`+
         `💳 BALANCE    : ${balance.toLocaleString()} pts\n`+
         `✨ REMAINING  : ${remaining.toLocaleString()} pts`;
@@ -2322,6 +2567,7 @@ function runAllocator() {
     document.getElementById('allocatorOutput').innerHTML=out.split('\n').map(l=>{
         if(l.startsWith('✅'))return`<span style="color:var(--accent-green)">${l}</span>`;
         if(l.startsWith('❌'))return`<span style="color:var(--accent-rose)">${l}</span>`;
+        if(l.startsWith('📍'))return`<span style="color:var(--accent-purple)">${l}</span>`;
         if(l.startsWith('💰'))return`<span style="color:var(--accent-rose);font-weight:bold">${l}</span>`;
         if(l.startsWith('💳'))return`<span style="color:var(--text-muted)">${l}</span>`;
         if(l.startsWith('✨'))return`<span style="color:var(--accent-cyan);font-weight:bold">${l}</span>`;
@@ -2329,6 +2575,288 @@ function runAllocator() {
         return l;
     }).join('\n');
 }
+// ════════════════════════════════════════════════════════════════════
+// SEARCH RECORDS PAGE (pg-points-records)
+// ════════════════════════════════════════════════════════════════════
+let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
+
+function prDebounce() {
+    clearTimeout(prDebounceTimer);
+    prDebounceTimer = setTimeout(() => prFetch(1), 400);
+}
+
+async function prFetch(page) {
+    page = Math.max(1, page || 1);
+    prCurrentPage = page;
+
+    const params = new URLSearchParams({
+        page,
+        page_size: 50,
+        user: loggedUser || '',
+        email: loggedEmail || '',
+        search:    document.getElementById('prSearch')?.value   || '',
+        region:    document.getElementById('prRegion')?.value   || '',
+        status:    document.getElementById('prStatus')?.value   || '',
+        agency_level: document.getElementById('prLevel')?.value || '',
+        month:     document.getElementById('prMonth')?.value    || '',
+        date_from: document.getElementById('prDateFrom')?.value || '',
+        date_to:   document.getElementById('prDateTo')?.value   || '',
+    });
+
+    // Remove empty params
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+
+    const spinner  = document.getElementById('prLoadingSpinner');
+    const countEl  = document.getElementById('prResultCount');
+    const tableEl  = document.getElementById('prTable');
+    const emptyEl  = document.getElementById('prEmpty');
+    const pagination = document.getElementById('prPagination');
+
+    if (spinner)  spinner.style.display = 'inline';
+    if (tableEl)  tableEl.style.display = 'none';
+    if (emptyEl)  emptyEl.style.display = 'none';
+    if (pagination) pagination.style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/points/records?' + params.toString());
+        if (!resp.ok) throw new Error('API error ' + resp.status);
+        const data = await resp.json();
+        prAllData = data.records || [];
+
+        if (spinner)  spinner.style.display = 'none';
+
+        if (!prAllData.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (countEl) countEl.textContent = '0 records found';
+            return;
+        }
+
+        if (countEl) countEl.textContent = `${data.total.toLocaleString()} records found`;
+
+        // Build table
+        const cols = ['agency_id','agency_name','owner_id','owner_name','region','status',
+                      'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+        const labels = {
+            agency_id:'Agency ID', agency_name:'Agency Name', owner_id:'Owner ID',
+            owner_name:'Owner Name', region:'Region', status:'Status',
+            agency_level:'Level', month:'Month', total_points:'Total Pts',
+            used_points:'Used Pts', point_balance:'Balance', health_score:'Health', date:'Date'
+        };
+
+        const thead = document.getElementById('prThead');
+        const tbody = document.getElementById('prTbody');
+        const tfoot = document.getElementById('prTfoot');
+
+        if (thead) thead.innerHTML = '<tr>' + cols.map(c=>`<th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">${labels[c]||c}</th>`).join('') + '</tr>';
+
+        if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
+            const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
+            return '<tr style="' + rowStyle + ';border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='' + (i%2===0?'':'rgba(255,255,255,.025)') + ''">' +
+                cols.map(c => {
+                    let v = r[c];
+                    if (c === 'health_score') {
+                        const col = v >= 80 ? 'var(--accent-green)' : v >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+                        return `<td style="padding:9px 12px;color:${col};font-weight:600">${v ?? '—'}</td>`;
+                    }
+                    if (c === 'point_balance') {
+                        const col2 = v > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
+                        return `<td style="padding:9px 12px;color:${col2};font-weight:600">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                    }
+                    if (['total_points','used_points'].includes(c)) {
+                        return `<td style="padding:9px 12px;text-align:right">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                    }
+                    return `<td style="padding:9px 12px">${escHtml(String(v ?? '—'))}</td>`;
+                }).join('') +
+            '</tr>';
+        }).join('');
+
+        // Totals row
+        if (tfoot && data.totals) {
+            tfoot.innerHTML = '<tr style="border-top:2px solid var(--border)">' +
+                cols.map((c,i) => {
+                    if (c === 'total_points') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>`;
+                    if (c === 'used_points')  return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>`;
+                    if (c === 'point_balance') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>`;
+                    if (i === 0) return `<td style="padding:9px 12px;font-weight:700;color:var(--text-muted)">TOTALS</td>`;
+                    return '<td></td>';
+                }).join('') + '</tr>';
+        }
+
+        if (tableEl) tableEl.style.display = '';
+
+        // Pagination
+        document.getElementById('prPageNum').textContent    = data.page;
+        document.getElementById('prTotalPages').textContent = data.total_pages;
+        document.getElementById('prTotalCount').textContent = data.total.toLocaleString();
+        const prevBtn = document.getElementById('prPrevBtn');
+        const nextBtn = document.getElementById('prNextBtn');
+        if (prevBtn) prevBtn.disabled = data.page <= 1;
+        if (nextBtn) nextBtn.disabled = data.page >= data.total_pages;
+        if (pagination) { pagination.style.display = 'flex'; }
+
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Failed to load records: ' + e.message, 'error');
+    }
+}
+
+function prExportCsv() {
+    if (!prAllData.length) { ToastManager.show('Search first to get records.', 'warning'); return; }
+    const cols = ['agency_id','agency_name','owner_id','owner_name','region','status',
+                  'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+    const header = cols.join(',');
+    const rows = prAllData.map(r => cols.map(c => JSON.stringify(r[c] ?? '')).join(','));
+    const blob = new Blob([header + '\n' + rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'xena_point_records.csv'; a.click();
+    ToastManager.show('CSV exported!', 'success');
+}
+
+function prExportExcel() {
+    if (!prAllData.length || !window.XLSX) { ToastManager.show('Search first or XLSX library not loaded.','warning'); return; }
+    const cols = ['agency_id','agency_name','owner_id','owner_name','region','status',
+                  'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+    const ws = XLSX.utils.json_to_sheet(prAllData, {header: cols});
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Point Records');
+    XLSX.writeFile(wb, 'xena_point_records.xlsx');
+    ToastManager.show('Excel exported!', 'success');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// POINT TABLE PAGE (pg-points-table)
+// ════════════════════════════════════════════════════════════════════
+let ptCurrentPage = 1, ptAllData = [], ptDebounceTimer = null;
+
+function ptDebounce() {
+    clearTimeout(ptDebounceTimer);
+    ptDebounceTimer = setTimeout(() => ptFetch(1), 400);
+}
+
+async function ptFetch(page) {
+    page = Math.max(1, page || 1);
+    ptCurrentPage = page;
+
+    const pageSize = parseInt(document.getElementById('ptPageSize')?.value || '50');
+    const params = new URLSearchParams({
+        page,
+        page_size: pageSize,
+        user:     loggedUser || '',
+        email:    loggedEmail || '',
+        search:   document.getElementById('ptSearch')?.value  || '',
+        region:   document.getElementById('ptRegion')?.value  || '',
+        status:   document.getElementById('ptStatus')?.value  || '',
+        sort_by:  document.getElementById('ptSortBy')?.value  || 'date',
+        sort_dir: document.getElementById('ptSortDir')?.value || 'desc',
+    });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+
+    const loadingBar = document.getElementById('ptLoadingBar');
+    const tableEl   = document.getElementById('ptTable');
+    const emptyEl   = document.getElementById('ptEmpty');
+    const pagination = document.getElementById('ptPagination');
+    const kpiRow    = document.getElementById('ptKpiRow');
+
+    if (loadingBar) loadingBar.style.display = 'block';
+    if (tableEl)   tableEl.style.display   = 'none';
+    if (emptyEl)   emptyEl.style.display   = 'none';
+    if (pagination) pagination.style.display = 'none';
+    if (kpiRow)    kpiRow.style.display    = 'none';
+
+    try {
+        const resp = await fetch('/api/points/records?' + params.toString());
+        if (!resp.ok) throw new Error('API error ' + resp.status);
+        const data = await resp.json();
+        ptAllData = data.records || [];
+
+        if (loadingBar) loadingBar.style.display = 'none';
+
+        if (!ptAllData.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+
+        // KPI row
+        if (kpiRow && data.totals) {
+            document.getElementById('ptKpiTotal').textContent   = (data.totals.total_points||0).toLocaleString();
+            document.getElementById('ptKpiUsed').textContent    = (data.totals.used_points||0).toLocaleString();
+            document.getElementById('ptKpiBalance').textContent = (data.totals.point_balance||0).toLocaleString();
+            kpiRow.style.display = 'grid';
+        }
+
+        // Build rows
+        const tbody = document.getElementById('ptTbody');
+        const tfoot = document.getElementById('ptTfoot');
+        if (tbody) tbody.innerHTML = ptAllData.map((r,i) => {
+            const rowBg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
+            const healthCol = (r.health_score||0) >= 80 ? 'var(--accent-green)' : (r.health_score||0) >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+            const balCol = (r.point_balance||0) > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
+            return `<tr style="${rowBg};border-bottom:1px solid var(--border)"
+                        onmouseover="this.style.background='var(--surface-hover)'"
+                        onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">
+                <td style="padding:9px 12px">${escHtml(r.agency_id||'—')}</td>
+                <td style="padding:9px 12px;font-weight:500">${escHtml(r.agency_name||'—')}</td>
+                <td style="padding:9px 12px;text-transform:uppercase;font-size:.8rem;color:var(--text-muted)">${escHtml(r.region||'—')}</td>
+                <td style="padding:9px 12px">${escHtml(r.acm||'—')}</td>
+                <td style="padding:9px 12px;text-align:right">${(r.total_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(r.used_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;font-weight:700;color:${balCol}">${(r.point_balance||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:center;font-weight:700;color:${healthCol}">${r.health_score||0}</td>
+                <td style="padding:9px 12px;font-size:.82rem">${escHtml(r.status||'—')}</td>
+                <td style="padding:9px 12px;font-size:.82rem;color:var(--text-muted)">${escHtml(r.date||'—')}</td>
+            </tr>`;
+        }).join('');
+
+        // Totals footer
+        if (tfoot && data.totals) {
+            tfoot.innerHTML = `<tr style="border-top:2px solid var(--border);font-weight:700">
+                <td style="padding:9px 12px;color:var(--text-muted)">TOTALS</td>
+                <td></td><td></td><td></td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>
+                <td></td><td></td><td></td>
+            </tr>`;
+        }
+
+        if (tableEl) tableEl.style.display = '';
+
+        // Pagination
+        document.getElementById('ptPageNum').textContent    = data.page;
+        document.getElementById('ptTotalPages').textContent = data.total_pages;
+        document.getElementById('ptTotalCount').textContent = data.total.toLocaleString();
+        const prevBtn = document.getElementById('ptPrevBtn');
+        const nextBtn = document.getElementById('ptNextBtn');
+        if (prevBtn) prevBtn.disabled = data.page <= 1;
+        if (nextBtn) nextBtn.disabled = data.page >= data.total_pages;
+        if (pagination) { pagination.style.display = 'flex'; }
+
+    } catch (e) {
+        if (loadingBar) loadingBar.style.display = 'none';
+        ToastManager.show('Failed to load table: ' + e.message, 'error');
+    }
+}
+
+function ptExportCsv() {
+    if (!ptAllData.length) { ToastManager.show('Load the table first.','warning'); return; }
+    const cols = ['agency_id','agency_name','owner_id','owner_name','region','acm','status',
+                  'agency_level','month','total_points','used_points','point_balance','health_score','date'];
+    const rows = [cols.join(','), ...ptAllData.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
+    const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'xena_point_table.csv'; a.click();
+    ToastManager.show('CSV exported!', 'success');
+}
+
+function ptExportExcel() {
+    if (!ptAllData.length || !window.XLSX) { ToastManager.show('Load table first or XLSX library not loaded.','warning'); return; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ptAllData), 'Point Table');
+    XLSX.writeFile(wb, 'xena_point_table.xlsx');
+    ToastManager.show('Excel exported!', 'success');
+}
+
 </script>
 </body>
 </html>
