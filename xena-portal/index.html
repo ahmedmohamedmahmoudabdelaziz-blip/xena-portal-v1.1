@@ -380,6 +380,8 @@
         <h1>🚀 Xena Portal</h1>
         <p>Secure Analytics Dashboard</p>
         <button class="btn btn-primary" onclick="window.location.href='/api/login'">Login with Feishu</button>
+        <p id="loginErrMsg" style="display:none;color:#ff6b8a;font-size:.82rem;margin-top:14px;max-width:320px;text-align:center;line-height:1.5"></p>
+        <p style="color:#555a78;font-size:.72rem;margin-top:16px">Secure SSO via Feishu</p>
     </div>
 </div>
 
@@ -1273,17 +1275,31 @@ let activeFilters={};           // 1.2 cross-filter state
 let sparkCharts={};             // 1.3 sparkline chart instances
 let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg;
 
-// Restore from URL (8.2 deep linking)
+// ── Restore session from URL params (set by /api/callback after OAuth) ────
+// FIX-2: URLSearchParams.get() automatically decodes percent-encoding, so
+//         the URL-encoded uat from the fixed callback is read correctly here.
 const urlParams=new URLSearchParams(window.location.search);
-if (urlParams.get('user')&&urlParams.get('uat')) {
-    loggedUser=decodeURIComponent(urlParams.get('user'));
-    loggedEmail=decodeURIComponent(urlParams.get('email')||'');
-    loggedUat=urlParams.get('uat');
-    localStorage.setItem('xenaUser',loggedUser);
-    localStorage.setItem('xenaEmail',loggedEmail);
-    localStorage.setItem('xenaUat',loggedUat);
-    localStorage.setItem('xenaLoginTimestamp',Date.now().toString());
+
+// FIX-3: surface auth_error from the callback as a visible toast
+if (urlParams.get('auth_error')) {
+    const authErr = urlParams.get('auth_error');
+    setTimeout(()=>{
+        ToastManager.show('⚠️ '+authErr,'error',12000);
+        const errEl=document.getElementById('loginErrMsg');
+        if(errEl){errEl.textContent=authErr;errEl.style.display='block';}
+    }, 200);
     window.history.replaceState({},'','/');
+}
+
+if (urlParams.get('user') && urlParams.get('uat')) {
+    loggedUser  = urlParams.get('user');   // URLSearchParams decodes % escapes
+    loggedEmail = urlParams.get('email') || '';
+    loggedUat   = urlParams.get('uat');    // FIX-2: token is now properly encoded/decoded
+    localStorage.setItem('xenaUser',  loggedUser);
+    localStorage.setItem('xenaEmail', loggedEmail);
+    localStorage.setItem('xenaUat',   loggedUat);
+    localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
+    window.history.replaceState({},'','/');   // clean URL so token isn't in browser history
 }
 
 // Restore from URL hash (8.2)
