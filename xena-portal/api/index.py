@@ -832,40 +832,19 @@ def callback():
         return redirect("/?auth_error=" + urllib.parse.quote(
             "Authorization failed: no code returned from Feishu.", safe=''))
 
-            # [FIXED] The OIDC exchange endpoint does NOT use a Bearer token. 
-            # It requires app_id and app_secret inside the request body.
-            token_resp = http_requests.post(
-                "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "grant_type": "authorization_code",
-                    "code":        code,
-                    "redirect_uri": REDIRECT_URI,
-                    "app_id":      APP_ID,
-                    "app_secret":  APP_SECRET
-                },
-                timeout=15
-            ).json()
+    try:
+        tat     = get_tenant_access_token()
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-            # ... (Keep your existing uat extraction logic here) ...
-
-            if not uat:
-                # [FIXED] Legacy endpoint also requires app_id and app_secret in the body.
-                logger.warn("oidc_exchange_failed_trying_legacy",
-                            feishu_code=token_resp.get("code"),
-                            feishu_msg=token_resp.get("msg", ""))
-                legacy_resp = http_requests.post(
-                    "https://open.feishu.cn/open-apis/authen/v1/access_token",
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "grant_type": "authorization_code",
-                        "code": code,
-                        "app_id": APP_ID,
-                        "app_secret": APP_SECRET
-                    },
-                    timeout=15
-                ).json()
-                uat = (legacy_resp.get("data") or {}).get("access_token") or legacy_resp.get("access_token")
+        # FIX-1: include redirect_uri — Feishu OIDC requires it in the exchange
+        token_resp = http_requests.post(
+            "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token",
+            headers=headers,
+            json={"grant_type": "authorization_code",
+                  "code":        code,
+                  "redirect_uri": REDIRECT_URI},   # <─ was missing
+            timeout=15
+        ).json()
 
         logger.info("token_exchange",
                     feishu_code=token_resp.get("code"),
@@ -883,7 +862,12 @@ def callback():
             logger.warn("oidc_exchange_failed_trying_legacy",
                         feishu_code=token_resp.get("code"),
                         feishu_msg=token_resp.get("msg", ""))
-            
+            legacy_resp = http_requests.post(
+                "https://open.feishu.cn/open-apis/authen/v1/access_token",
+                headers=headers,
+                json={"grant_type": "authorization_code", "code": code},
+                timeout=15
+            ).json()
             uat = (legacy_resp.get("data") or {}).get("access_token") or                   legacy_resp.get("access_token")
             if uat:
                 logger.info("legacy_token_ok")
