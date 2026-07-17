@@ -198,20 +198,20 @@
         .score-bar{height:6px;border-radius:3px;background:var(--border);position:relative;min-width:60px;display:inline-block;vertical-align:middle}
         .score-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent-green),var(--accent-cyan));transition:width .6s ease}
 
-        /* ── 1.6  HEATMAP ───────────────────────────────────────────────── */
+        /* ── 1.6  HEATMAP REDESIGNED ────────────────────────────────────── */
         .heatmap-outer{display:flex;gap:6px;margin-top:12px}
-        .heatmap-day-labels{display:grid;grid-template-rows:repeat(7,16px);gap:4px;padding-top:22px}
-        .heatmap-day-label{font-size:.65rem;color:var(--text-muted);line-height:16px;width:28px;text-align:right;padding-right:4px}
+        .heatmap-day-labels{display:grid;grid-template-rows:repeat(7,22px);gap:4px;padding-top:22px}
+        .heatmap-day-label{font-size:.7rem;color:var(--text-muted);line-height:22px;width:32px;text-align:right;padding-right:6px}
         .heatmap-right{display:flex;flex-direction:column;flex:1;min-width:0}
         .heatmap-month-row{display:flex;gap:0;margin-bottom:4px;height:18px;position:relative}
-        .heatmap-month-label{font-size:.65rem;color:var(--text-muted);position:absolute;white-space:nowrap}
+        .heatmap-month-label{font-size:.7rem;color:var(--text-muted);position:absolute;white-space:nowrap}
         .heatmap-scroll{overflow-x:auto;padding-bottom:10px}
-        .heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,16px);gap:4px;width:max-content}
-        .heatmap-cell{width:16px;height:16px;border-radius:4px;background:rgba(255,255,255,.06);position:relative;cursor:crosshair;transition:transform .12s,box-shadow .12s}
+        .heatmap-grid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,22px);gap:4px;width:max-content}
+        .heatmap-cell{width:22px;height:22px;border-radius:4px;background:rgba(255,255,255,.04);position:relative;cursor:crosshair;transition:transform .12s,box-shadow .12s}
         .heatmap-cell:hover{transform:scale(1.35);z-index:2;box-shadow:0 0 8px rgba(0,212,255,.5)}
         .heatmap-tooltip{position:fixed;background:rgba(0,0,0,.9);color:#fff;padding:5px 10px;border-radius:6px;font-size:.75rem;white-space:nowrap;z-index:9999;pointer-events:none;border:1px solid rgba(0,212,255,.3);display:none}
         .heatmap-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:.75rem;color:var(--text-muted)}
-        .heatmap-legend-cell{width:16px;height:16px;border-radius:4px}
+        .heatmap-legend-cell{width:22px;height:22px;border-radius:4px}
 
         /* ── 1.1  COMPARISON ────────────────────────────────────────────── */
         .compare-section{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.15);border-radius:12px;padding:16px;margin-bottom:20px}
@@ -515,7 +515,10 @@
                         <label>Compare With (optional, comma-separated codes)</label>
                         <input type="text" id="compareAgencyCodes" placeholder="e.g., 40776, 40777" aria-label="Comparison codes">
                     </div>
-                    <button class="btn btn-primary" onclick="fetchAgencyData()">🔍 Search</button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-primary" onclick="fetchAgencyData()" style="flex:1">🔍 Search</button>
+                        <button class="btn btn-outline" onclick="window._nocache=true;fetchAgencyData()" style="border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh</button>
+                    </div>
                 </div>
             </div>
 
@@ -780,6 +783,7 @@
 
                 <div style="display:flex;gap:12px;flex-wrap:wrap">
                     <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()" style="flex:1;min-width:200px">Generate Analytics Report</button>
+                    <button class="btn btn-outline" id="btnRefreshAna" onclick="window._nocache=true;generateAnalytics()" style="background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh Data</button>
                     <button class="btn-outline" id="exportCsvBtn" style="display:none" onclick="exportCSV()">📥 CSV</button>
                     <button class="btn-outline" id="exportXlsBtn" style="display:none" onclick="exportExcel()">📊 Excel</button>
                     <button class="btn-outline" id="exportPdfBtn" style="display:none" onclick="window.print()">🖨️ PDF</button>
@@ -913,11 +917,11 @@
                     </div>
                     <div class="heatmap-legend">
                         <span>Less</span>
-                        <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.06)"></div>
-                        <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.2)"></div>
-                        <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.45)"></div>
-                        <div class="heatmap-legend-cell" style="background:rgba(0,212,255,.75)"></div>
-                        <div class="heatmap-legend-cell" style="background:#00d4ff"></div>
+                        <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.04)"></div>
+                        <div class="heatmap-legend-cell" style="background:#ffeb3b"></div>
+                        <div class="heatmap-legend-cell" style="background:#ff9800"></div>
+                        <div class="heatmap-legend-cell" style="background:#f44336"></div>
+                        <div class="heatmap-legend-cell" style="background:#b71c1c"></div>
                         <span>More</span>
                     </div>
                 </div>
@@ -1307,9 +1311,18 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 }
 
 // Restore from URL hash (8.2)
+const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
+const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
 function logout() { localStorage.clear(); location.reload(); }
 function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+// [IMP] FORMAT COINS BEAUTIFULLY
+function formatCoins(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return num.toLocaleString();
+}
 
 // ════════════════════════════════════════════════════════════════════
 // NAVIGATION (sidebar-based)
@@ -1318,7 +1331,7 @@ let userModules=[], isAdmin=false;
 
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
 function hideAllPages(){
-    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';document.getElementById('pg-points-records').style.display='none';document.getElementById('pg-points-table').style.display='none';});
+    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
     document.querySelectorAll('.nav-group-header.nav-direct').forEach(el=>el.classList.remove('active'));
 }
@@ -2100,7 +2113,7 @@ function switchAcmView(view,btn) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 1.6  HEATMAP
+// 1.6  HEATMAP REDESIGN
 // ════════════════════════════════════════════════════════════════════
 function renderHeatmap(dataObj) {
     const container=document.getElementById('heatmapGrid');
@@ -2140,7 +2153,6 @@ function renderHeatmap(dataObj) {
     let monthLabels={}; // weekColIndex → month string
     let weekCol=0;
     let cur=new Date(startSun);
-    const cells=[];
     while(cur<=endSat) {
         const colStart=new Date(cur);
         // Week start = Sunday
@@ -2156,12 +2168,18 @@ function renderHeatmap(dataObj) {
             const inRange=cur>=firstDate&&cur<=lastDate;
             const cell=document.createElement('div');
             cell.className='heatmap-cell';
-            if (!inRange||v===0) {
-                cell.style.background='rgba(255,255,255,.06)';
+            
+            // 🔥 HEATMAP COLOR LOGIC REDESIGN
+            if (!inRange || v === 0) {
+                cell.style.background = 'rgba(255,255,255,.04)';
             } else {
-                const intensity=0.18+(v/maxVal)*0.82;
-                cell.style.background=`rgba(0,212,255,${intensity.toFixed(2)})`;
+                const ratio = v / maxVal;
+                if (ratio <= 0.25) cell.style.background = '#ffeb3b'; // Yellow
+                else if (ratio <= 0.50) cell.style.background = '#ff9800'; // Orange
+                else if (ratio <= 0.75) cell.style.background = '#f44336'; // Red
+                else cell.style.background = '#b71c1c'; // Dark Red
             }
+            
             const dayLabel=cur.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
             const tooltip=inRange?`${dayLabel}: ${v} creation${v!==1?'s':''}`:`${dayLabel}`;
             cell.addEventListener('mouseenter',e=>{
@@ -2184,7 +2202,7 @@ function renderHeatmap(dataObj) {
     // Render month labels above
     if (monthRow) {
         const totalWeeks=weekCol;
-        const cellW=20; // 16px cell + 4px gap
+        const cellW=26; // 22px cell + 4px gap
         Object.entries(monthLabels).forEach(([wc,label])=>{
             const lbl=document.createElement('div');
             lbl.className='heatmap-month-label';
@@ -2194,14 +2212,6 @@ function renderHeatmap(dataObj) {
         });
         monthRow.style.width=(totalWeeks*cellW)+'px';
     }
-}
-
-// ════════════════════════════════════════════════════════════════════
-// ACM VIEW SWITCH
-// ════════════════════════════════════════════════════════════════════
-function switchAdminTabBtn(tab,btn) {
-    document.querySelectorAll('.acm-tab-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2264,9 +2274,12 @@ async function fetchAgencyData() {
     document.getElementById('agencyEmptyState').style.display='none';
     document.getElementById('loadingOverlay').style.display='flex';
 
+    const nocache = window._nocache ? '&nocache=true' : '';
+    window._nocache = false;
+
     try {
         const currentType=document.getElementById('queryType').value;
-        const res=await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=${currentType}`);
+        const res=await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=${currentType}${nocache}`);
         const data=await res.json();
         if (!res.ok) throw new Error(data.error);
         currentAgencyData=data;
@@ -2288,7 +2301,9 @@ async function fetchAgencyData() {
         if (currentType==='target') {
             const bp=data.base_points||0;
             document.getElementById('displayTargetTitle').innerText='Current Month Target';
-            document.getElementById('displayTargetCoins').innerText=(bp*100000).toLocaleString()+' Coins';
+            // 🔥 TARGET MULTIPLIER & FORMATTER FIX
+            const targetCoins = bp * 100000;
+            document.getElementById('displayTargetCoins').innerText=formatCoins(targetCoins) + ' Coins';
             document.getElementById('displayTargetCoins').style.color='var(--text)';
             document.getElementById('privilegeArea').style.display='block';
             updatePrivilegeGrid();
@@ -2363,13 +2378,25 @@ function updatePrivilegeGrid() {
     else if (priv==="30 Mics") { if(bp>=1000)total=4;else if(bp>=500)total=2;else if(bp>=300)total=1; }
     else if (priv==="20 Mics") total=Math.floor(bp/150);
     else total=Math.floor(bp/20);
+    
     let claimed=0,pending=0,rejected=0;
     (currentAgencyData.requests||[]).forEach(req=>{
-        let p=req['Privilege'];if(p&&typeof p==='object')p=p.text||p.name||"";
-        if(String(p).includes(priv)){
-            let s=req['Status'];if(s&&typeof s==='object')s=s.text||s.name||"";
-            let c=parseInt(req['# Counter']||req['Counter']||1);
-            if(String(s).trim()==="Done")claimed+=c;else if(String(s).trim()==="Rejected")rejected+=c;else pending+=c;
+        // 🔥 RESTORED V1.1 PRIVILEGE CHECKING LOGIC
+        let p = req['Agency Point Privilege'] || req['Privilege'] || req['Agency Privilege'] || req['Priv'] || req['Request Type'] || req['Type'];
+        if(p && typeof p==='object') p = p.text || p.name || "";
+        if(Array.isArray(p)) p = p.map(x => x.text || x.name || x).join(',');
+        
+        if(String(p).toLowerCase().includes(priv.toLowerCase())){
+            let s = req['Status'] || req['Request Status'] || req['Agency Status'] || req['Order Action'];
+            if(s && typeof s==='object') s = s.text || s.name || "";
+            let statusStr = String(s).trim().toLowerCase();
+            
+            let c = parseInt(req['# Counter'] || req['Counter'] || req['Quantities Input'] || 1);
+            if(isNaN(c)) c = 1;
+
+            if(statusStr === "done" || statusStr === "completed" || statusStr === "approved" || statusStr === "confirm") claimed+=c;
+            else if(statusStr === "rejected" || statusStr === "failed" || statusStr === "declined") rejected+=c;
+            else pending+=c;
         }
     });
     document.getElementById('valTotal').innerText=total;
@@ -2833,15 +2860,7 @@ function ptExportExcel() {
     ToastManager.show('Excel exported!', 'success');
 }
 
-function ptExportExcel() {
-    if (!ptAllData.length || !window.XLSX) { ToastManager.show('Load table first or XLSX library not loaded.','warning'); return; }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ptAllData), 'Point Table');
-    XLSX.writeFile(wb, 'xena_point_table.xlsx');
-    ToastManager.show('Excel exported!', 'success');
-}
-
-/* ⬇️ PASTE THE BLOCK HERE ⬇️ */
+/* ⬇️ INITIALIZATION BLOCK ⬇️ */
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
     document.querySelector('.app-shell').style.display='flex';
@@ -2871,7 +2890,6 @@ if (loggedUser&&loggedUat) {
     initPills();
     renderPresetBar();
 
-    // Restore hash state (deep-link to analytics)
     if (hashRegion) {
         const sel=document.getElementById('anaRegion');
         if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
@@ -2883,7 +2901,7 @@ if (loggedUser&&loggedUat) {
         navTo('analytics');
     }
 }
-/* ⬆️ END OF PASTED BLOCK ⬆️ */
+/* ⬆️ END OF INITIALIZATION BLOCK ⬆️ */
 
 </script>
 </body>
