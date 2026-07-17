@@ -115,6 +115,42 @@ def get_tenant_access_token():
     return token
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 7.1b  APP ACCESS TOKEN (needed for user-auth token exchange)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_app_token_cache: dict = {"token": None, "expires_at": 0.0, "lock": threading.Lock()}
+
+def get_app_access_token() -> str:
+    """
+    Returns a valid *app* access token (different from tenant access token).
+
+    Feishu's user-OAuth token exchange endpoint (/authen/v1/access_token)
+    requires an app_access_token in the Authorization header, NOT a
+    tenant_access_token.  Using the wrong token type causes a silent
+    rejection and uat comes back None.
+
+    Both tokens use the same credentials (app_id + app_secret) but come
+    from different Feishu endpoints and have independent lifetimes.
+    """
+    with _app_token_cache["lock"]:
+        if _app_token_cache["token"] and time.time() < _app_token_cache["expires_at"]:
+            return _app_token_cache["token"]
+
+    url  = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal"
+    resp = http_requests.post(url,
+                              json={"app_id": APP_ID, "app_secret": APP_SECRET},
+                              timeout=10).json()
+    token  = resp.get("app_access_token")
+    expire = resp.get("expire", 7200)
+
+    with _app_token_cache["lock"]:
+        _app_token_cache["token"]      = token
+        _app_token_cache["expires_at"] = time.time() + max(expire - 300, 60)
+
+    return token
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 7.2  STRUCTURED LOGGING
 # ──────────────────────────────────────────────────────────────────────────────
 class StructuredLogger:
@@ -799,6 +835,11 @@ def home():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_file(os.path.join(root_dir, 'index.html'))
 
+@app.route('/api/version', methods=['GET'])
+def version():
+    """Quick check: hit /api/version to confirm new code is deployed."""
+    return jsonify({"version": "1.3", "fix": "app-credentials-in-body"})
+
 @app.route('/api/login', methods=['GET'])
 def login():
     safe_redirect = urllib.parse.quote(REDIRECT_URI)
@@ -833,16 +874,19 @@ def callback():
             "Authorization failed: no code returned from Feishu.", safe=''))
 
     try:
-        tat     = get_tenant_access_token()
-        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-
-        # FIX-1: include redirect_uri — Feishu OIDC requires it in the exchange
+        # Feishu /authen/v1/access_token ignores the Authorization header
+        # and requires app_id + app_secret in the JSON body alongside the code.
+        # Using only a header token (tenant or app) causes error 99991663 /
+        # invalid_grant and returns uat=None.
         token_resp = http_requests.post(
-            "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token",
-            headers=headers,
-            json={"grant_type": "authorization_code",
-                  "code":        code,
-                  "redirect_uri": REDIRECT_URI},   # <─ was missing
+            "https://open.feishu.cn/open-apis/authen/v1/access_token",
+            headers={"Content-Type": "application/json"},
+            json={
+                "app_id":     APP_ID,
+                "app_secret": APP_SECRET,
+                "grant_type": "authorization_code",
+                "code":       code,
+            },
             timeout=15
         ).json()
 
@@ -851,26 +895,8 @@ def callback():
                     has_data=bool(token_resp.get("data")))
 
         uat = (token_resp.get("data") or {}).get("access_token")
-
-        # Some Feishu app configs return the token at the top level
         if not uat:
             uat = token_resp.get("access_token")
-
-        # Fallback: retry with the older (non-OIDC) endpoint — handles apps
-        # that were created before Feishu migrated to OIDC
-        if not uat:
-            logger.warn("oidc_exchange_failed_trying_legacy",
-                        feishu_code=token_resp.get("code"),
-                        feishu_msg=token_resp.get("msg", ""))
-            legacy_resp = http_requests.post(
-                "https://open.feishu.cn/open-apis/authen/v1/access_token",
-                headers=headers,
-                json={"grant_type": "authorization_code", "code": code},
-                timeout=15
-            ).json()
-            uat = (legacy_resp.get("data") or {}).get("access_token") or                   legacy_resp.get("access_token")
-            if uat:
-                logger.info("legacy_token_ok")
 
         if not uat:
             err = token_resp.get("msg") or token_resp.get("error_description")                   or f"Token exchange failed (code={token_resp.get('code')})"
