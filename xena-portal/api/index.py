@@ -36,10 +36,11 @@ IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
 CACHE_TTL_REALTIME   = 300    # 5 min for recent data
 CACHE_TTL_HISTORICAL = 3600   # 1 hr for older ranges
 
+# AFTER MODIFICATION
 # 7.1  Rate limits
-RATE_LIMIT_SEARCH    = (20, 60)
-RATE_LIMIT_ANALYTICS = (4, 60)
-RATE_LIMIT_RECORDS   = (30, 60)
+RATE_LIMIT_SEARCH    = (50, 60)
+RATE_LIMIT_ANALYTICS = (30, 60)
+RATE_LIMIT_RECORDS   = (50, 60)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TENANT ACCESS TOKEN CACHE (Speed Enhancement)
