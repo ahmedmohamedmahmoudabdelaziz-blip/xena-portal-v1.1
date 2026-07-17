@@ -1114,7 +1114,6 @@
 // ════════════════════════════════════════════════════════════════════
 // 3.1  TOAST NOTIFICATION SYSTEM
 // ════════════════════════════════════════════════════════════════════
-// Replace the ToastManager object definition:
 const ToastManager = {
     show(msg, type='info', duration=5000) {
         const icons = {success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
@@ -1123,7 +1122,6 @@ const ToastManager = {
         el.className = `toast-item toast-${type}`;
         el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><span class="toast-body">${msg}</span><button class="toast-close" aria-label="Dismiss">×</button>`;
         el.style.setProperty('--duration', duration+'ms');
-        el.querySelector('.toast-after, .toast-close').onclick = () => this.dismiss(el);
         el.querySelector('.toast-close').onclick = () => this.dismiss(el);
         el.onclick = () => this.dismiss(el);
         container.appendChild(el);
@@ -1357,7 +1355,6 @@ function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padSta
 let userModules=[], isAdmin=false;
 
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
-// Replace the hideAllPages function:
 function hideAllPages(){
     ALL_PAGES.forEach(id=>{
         const el=document.getElementById(id);
@@ -1515,7 +1512,6 @@ function updateAcmDropdown() {
 // ════════════════════════════════════════════════════════════════════
 // 1.4  FILTER PRESETS
 // ════════════════════════════════════════════════════════════════════
-// AFTER MODIFICATION
 function saveFilterPreset() {
     const name=prompt("Name for this filter preset:");
     if (!name) return;
@@ -2670,7 +2666,6 @@ async function prFetch(page) {
 
         if (thead) thead.innerHTML = '<tr>' + cols.map(c=>`<th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">${labels[c]||c}</th>`).join('') + '</tr>';
 
-        // AFTER MODIFICATION
         if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
             const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
             return `<tr style="${rowStyle};border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
