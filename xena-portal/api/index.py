@@ -524,10 +524,12 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     if query_type == "points":
         latest = fields_list[-1]
         
-        # RESTORED v1.1 Robust Fields & Health Logic
-        total_pts = parse_float_safe(extract_field_text(get_field_local(latest, '# Total Points', 'Total Points', 'Total', 'Total points')))
-        used_pts  = parse_float_safe(extract_field_text(get_field_local(latest, 'Used Points', 'Used', 'Used points')))
-        balance   = parse_float_safe(extract_field_text(get_field_local(latest, 'Point Balance', 'Balance', 'Point balance')))
+        # AFTER MODIFICATION 
+    if query_type == "points":
+        # We must use the first record (first) exactly like your working code did
+        total_pts = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total', 'Total points')))
+        used_pts  = parse_float_safe(extract_field_text(get_field_local(first, 'Used Points', 'Used', 'Used points')))
+        balance   = parse_float_safe(extract_field_text(get_field_local(first, 'Point Balance', 'Balance', 'Point balance')))
         
         if balance == 0 and total_pts > 0:
             balance = total_pts - used_pts
