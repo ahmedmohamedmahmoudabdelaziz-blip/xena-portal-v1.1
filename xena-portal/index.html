@@ -963,7 +963,7 @@
                     <div class="control-group">
                         <label>Sort By</label>
                         <select id="ptSortBy" onchange="ptFetch(1)">
-                            <option value="point_balance">Balance</option>
+                            <option value="point_balance" selected>Balance</option>
                             <option value="total_points">Total Pts</option>
                             <option value="used_points">Used Pts</option>
                             <option value="agency_name">Name</option>
@@ -1532,6 +1532,7 @@ async function fetchAdminUsers() {
             let badge=u.modules.includes('admin')?'<span style="background:var(--accent-amber);color:#000;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px">ADMIN</span>':'';
             const row=document.createElement('div'); row.className='user-row';
             
+            // Safe JSON escaping to prevent SyntaxError in inline HTML
             const safeEmail = escapeJSArgs(dispEmail);
             const safeModules = escapeJSArgs(u.modules);
             const safeAcms = escapeJSArgs(u.acms_raw);
@@ -2682,8 +2683,15 @@ async function prFetch(page) {
 
     try {
         const resp = await fetch('/api/points/records?' + params.toString());
-        if (!resp.ok) throw new Error('API error ' + resp.status);
-        const data = await resp.json();
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            throw new Error('Server took too long to respond. Please wait a moment and refresh.');
+        }
+
+        if (!resp.ok) throw new Error(data.error || 'API error ' + resp.status);
+        
         prAllData = data.records || [];
 
         if (spinner)  spinner.style.display = 'none';
@@ -2821,8 +2829,15 @@ async function ptFetch(page) {
 
     try {
         const resp = await fetch('/api/points/records?' + params.toString());
-        if (!resp.ok) throw new Error('API error ' + resp.status);
-        const data = await resp.json();
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            throw new Error('Server took too long to respond. Please wait a moment and refresh.');
+        }
+
+        if (!resp.ok) throw new Error(data.error || 'API error ' + resp.status);
+        
         ptAllData = data.records || [];
 
         if (loadingBar) loadingBar.style.display = 'none';
@@ -2954,7 +2969,13 @@ async function runQuery(){
             field, value, user: loggedUser || '', email: loggedEmail || ''
         });
         const resp = await fetch('/api/query?' + params.toString());
-        const data = await resp.json();
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            throw new Error('Server returned invalid data or took too long. Background sync is running, try again in a moment.');
+        }
+
         if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
 
         if (spinner) spinner.style.display = 'none';
