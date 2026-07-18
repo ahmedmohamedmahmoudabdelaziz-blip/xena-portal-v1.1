@@ -1541,7 +1541,8 @@ def health():
     with _bg_sync_lock:
         bg_info = {
             "record_count": len(_bg_sync["requests_items"]),
-            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None
+            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
+            "syncing": _bg_sync.get("syncing", False)
         }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
@@ -1551,6 +1552,8 @@ def health():
         "background_sync": bg_info
     })
 
+# Kick off the background sync thread at import time
+ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
