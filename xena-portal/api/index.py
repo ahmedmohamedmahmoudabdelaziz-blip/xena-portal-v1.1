@@ -343,13 +343,13 @@ def compute_allocator_status(usage_dict):
     return status
 
 def parse_granular_string(raw_str):
-    default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
+    default = {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}
     if not raw_str or str(raw_str).strip() == "": return default
     if "=" not in raw_str:
         parts = [x.strip().lower() for x in raw_str.split(",") if x.strip()]
         if not parts: parts = ["all"]
-        return {"target": parts, "points": parts, "analytics": parts}
-    res = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
+        return {"target": parts, "points": parts, "analytics": parts, "query": parts}
+    res = {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}
     for chunk in raw_str.split(";"):
         if "=" in chunk:
             mod, vals = chunk.split("=", 1)
@@ -367,8 +367,8 @@ def get_user_permissions(email, name):
     if any(admin == name_clean for admin in ADMIN_USERS):
         return {
             "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query"], 
-            "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"]},
-                            "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"]}}
+            "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
+                            "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
 
     if not email_clean and not name_clean: 
@@ -963,7 +963,8 @@ def search():
 
     perms = get_user_permissions(email, user)
     
-    if not perms.get("is_super_admin") and qtype not in perms.get("modules", []):
+    # Sub-Module Check Support (e.g. allows if user has "target_check" or "target_timeline" etc)
+    if not perms.get("is_super_admin") and not any(qtype in m for m in perms.get("modules", [])):
         return jsonify({"found": False, "error": f"Access Denied: You do not have permission to view {qtype.title()}."}), 403
 
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
@@ -1013,12 +1014,15 @@ def manage_users():
     elif request.method == 'POST':
         data = request.json or {}
         email_to_check = sanitize_text(data.get("email",""))
+        # Added 'query' to ACM/Region formatting support
         acms_formatted = (f"target={data.get('acms',{}).get('target','all')};"
                           f"points={data.get('acms',{}).get('points','all')};"
-                          f"analytics={data.get('acms',{}).get('analytics','all')}")
+                          f"analytics={data.get('acms',{}).get('analytics','all')};"
+                          f"query={data.get('acms',{}).get('query','all')}")
         regs_formatted = (f"target={data.get('regions',{}).get('target','all')};"
                           f"points={data.get('regions',{}).get('points','all')};"
-                          f"analytics={data.get('regions',{}).get('analytics','all')}")
+                          f"analytics={data.get('regions',{}).get('analytics','all')};"
+                          f"query={data.get('regions',{}).get('query','all')}")
                           
         payload_fields = {"Email":email_to_check,"Modules":data.get("modules",""),
                           "ACMs":acms_formatted,"Regions":regs_formatted}
@@ -1071,7 +1075,8 @@ def points_records():
     email  = sanitize_text(request.args.get('email',''))
     perms  = get_user_permissions(email, user)
 
-    if not perms.get("is_super_admin") and "points" not in perms.get("modules",[]):
+    # Sub-Module Check Support
+    if not perms.get("is_super_admin") and not any("points" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("points",["all"])
@@ -1181,7 +1186,7 @@ def sync_refresh():
     user  = sanitize_text(request.args.get('user', request.headers.get('X-User-Name','')))
     email = sanitize_text(request.args.get('email',''))
     perms = get_user_permissions(email, user)
-    if not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
+    if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
     _background_sync_requests_table()
@@ -1217,11 +1222,13 @@ def query_records():
         return jsonify({"error": "Please enter a value to search."}), 400
 
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not ({"analytics", "query"} & set(perms.get("modules", []))):
+    # Check specifically for "query" module
+    if not perms.get("is_super_admin") and not any("query" in m for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
-    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("analytics",["all"])
-    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("analytics",["all"])
+    # Use "query" granular permissions
+    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("query",["all"])
+    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
     allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
     allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
 
@@ -1351,7 +1358,8 @@ def analytics():
         except ValueError: pass
 
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and "analytics" not in perms.get("modules",[]):
+    # Sub-Module Check Support
+    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
     region_filter = region.lower() if region.lower() != "all" else "all"
