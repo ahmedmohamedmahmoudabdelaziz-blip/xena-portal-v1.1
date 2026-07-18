@@ -46,7 +46,7 @@ COINS_MULTIPLIER = 100000
 QUERY_FIELD_ALIASES = {
     "user_id":     ["User ID"],
     "numbering":   ["Numbering"],
-    "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID"],
+    "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID", "Other App Name"],
     "nid_number":  ["NID Number", "NID"],
     "bd_code":     ["Bd Code", "BD Code"],
 }
@@ -398,7 +398,8 @@ def get_user_permissions(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
     
-    if any(admin in name_clean for admin in ADMIN_USERS):
+    # 1. FIX: Exact Match for Super Admin to prevent partial matches like "Fayeol" hijacking "Ahmed Samurai"
+    if any(admin == name_clean for admin in ADMIN_USERS):
         return {
             "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query"], 
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"]},
@@ -420,10 +421,11 @@ def get_user_permissions(email, name):
         res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
-            db_email = extract_field_text(fields.get("Email", "")).lower()
-            db_person = extract_field_text(fields.get("Person", "")).lower()
+            db_email = extract_field_text(fields.get("Email", "")).lower().strip()
+            db_person = extract_field_text(fields.get("Person", "")).lower().strip()
             
-            if (email_clean and email_clean in db_email) or (name_clean and name_clean in db_person):
+            # 2. FIX: Hardened exact match (`==`) to prevent unauthorized users from sneaking in via string overlaps
+            if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
                 modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
                 parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
                 parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
@@ -440,79 +442,79 @@ def get_user_permissions(email, name):
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
-    
     all_items = []
     seen_ids  = set()
     master_keys = set()
     fetch_complete = True
     stop_reason = ""
-    consecutive_old_pages = 0
 
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     
-    # FIX: Reverted back to the bulletproof GET /records endpoint from the old version
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
-
     page_token = None
-    for _ in range(200):
-        params = {"page_size": 500, "automatic_fields": "true"}
-        
-        # FIX: Only sort by Numbering on the Requests table to prevent Points table crashes
-        if table_id == REQUESTS_TABLE_ID:
-            params["sort"] = '["Numbering DESC"]'
-            
-        if page_token: params["page_token"] = page_token
-        
-        try:
-            # 45 seconds timeout exactly like the old version
-            resp = session.get(url, params=params, timeout=45) 
-            if resp.status_code != 200:
-                fetch_complete = False
-                stop_reason = f"HTTP {resp.status_code}: {resp.text}"
-                break
-                
-            data = resp.json()
-            if data.get("code") != 0:
-                fetch_complete = False
-                stop_reason = f"Feishu Error Code {data.get('code')}: {data.get('msg')}"
-                break
-            
-            block = data.get("data", {})
-            items = block.get("items", [])
-            if not items: break
+    MAX_PAGE_RETRIES = 4 
 
-            page_old_count = 0
-            valid_dates_in_page = 0
-            for item in items:
-                rid = item.get("record_id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    master_keys.update(item.get("fields", {}).keys())
+    for _ in range(200):  
+        payload = {"page_size": 500} 
+        if page_token: payload["page_token"] = page_token
+        
+        if table_id == REQUESTS_TABLE_ID:
+            payload["sort"] = [{"field_name": "Numbering", "desc": True}]
+        
+        page_data = None
+        last_err = ""
+        for attempt in range(MAX_PAGE_RETRIES):
+            try:
+                resp = session.post(url, json=payload, timeout=20)
+                if resp.status_code != 200:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:300]}"
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+
+                data = resp.json()
+                if data.get("code") != 0:
+                    last_err = f"Feishu Error {data.get('code')}: {data.get('msg')}"
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+
+                page_data = data
+                last_err = ""
+                break
+            except Exception as e:
+                last_err = str(e)
+                time.sleep(0.5 * (attempt + 1))
+
+        if page_data is None:
+            fetch_complete = False
+            stop_reason = last_err or "Unknown fetch error"
+            break
+
+        block = page_data.get("data", {})
+        items = block.get("items", [])
+        if not items: break
+
+        page_old_count = 0
+
+        for item in items:
+            rid = item.get("record_id")
+            if rid not in seen_ids:
+                seen_ids.add(rid)
+                all_items.append(item)
+                master_keys.update(item.get("fields", {}).keys())
+                
+                if from_dt:
                     raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
                     record_dt = parse_feishu_date(raw_date)
-                    if record_dt:
-                        valid_dates_in_page += 1
-                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
-                            page_old_count += 1
-            
-            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                consecutive_old_pages += 1
-            else:
-                consecutive_old_pages = 0
+                    if record_dt and record_dt < (from_dt - timedelta(days=1)):
+                        page_old_count += 1
+        
+        if from_dt and page_old_count >= 50:
+            stop_reason = "Safely reached date boundary."
+            break
 
-            if consecutive_old_pages >= 3:
-                stop_reason = "Safely reached pages with all older records."
-                break
-
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False):
-                break
-
-        except Exception as e:
-            fetch_complete = False
-            stop_reason = str(e)
+        page_token = block.get("page_token")
+        if not page_token or not block.get("has_more", False):
             break
 
     return all_items, master_keys, fetch_complete, stop_reason
@@ -587,7 +589,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 # --- TARGET PRIVILEGE TIMELINE LOGIC ---
                 if "target" in req_type_lower:
                     privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
-                    # FIX 3: Accurately extracts Counter column
                     raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
                     qty = 1
                     if raw_counter:
@@ -603,13 +604,11 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                         "quantities_input": str(qty) 
                     })
 
-                    # Calculate correctly scaled Claims
                     if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
                         privileges_claimed[privilege_val] += qty
 
                 # --- AGENCY POINTS TIMELINE LOGIC ---
                 else:
-                    # FIX 4: Explicitly parse Latest Usage Tracker for Points Timeline items
                     latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
                     parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
                     
@@ -629,7 +628,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                         "quantities_input": extract_field_text(get_field_local(hf, "Quantities Input")).strip()
                     })
 
-                    # Calculate precise Monthly Limits for Allocator exclusively using Latest Usage Tracker
                     if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
                         for item_name, item_qty in parsed_items:
                             name_clean = item_name.strip().lower()
@@ -874,60 +872,17 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP & BACKGROUND SYNC THREAD
+# FLASK APP
 # ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
     "updated_at": 0, "fetch_complete": True, "stop_reason": "",
-    "syncing": False,
 }
 _bg_sync_lock = threading.Lock()
-_bg_thread_started = False
-_bg_thread_lock = threading.Lock()
-
-def _background_sync_requests_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing"]: return
-        _bg_sync["syncing"] = True
-    try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        with _bg_sync_lock:
-            _bg_sync["requests_items"]  = items
-            _bg_sync["requests_keys"]   = keys
-            _bg_sync["updated_at"]      = time.time()
-            _bg_sync["fetch_complete"]  = complete
-            _bg_sync["stop_reason"]     = reason
-        
-        if _KV_ENABLED and items:
-            kv_set_json("requests_snapshot", {
-                "items": items, "fetch_complete": complete, "stop_reason": reason, "updated_at": time.time()
-            })
-        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
-    except Exception as e:
-        logger.error("background_sync_failed", table="grand_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing"] = False
-
-def _background_sync_loop():
-    while True:
-        _background_sync_requests_table()
-        time.sleep(BACKGROUND_SYNC_INTERVAL)
-
-def ensure_background_sync_started():
-    global _bg_thread_started
-    with _bg_thread_lock:
-        if not _bg_thread_started:
-            threading.Thread(target=_background_sync_loop, daemon=True).start()
-            _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
-    # Fix: Ensure background loop starts exactly like in v1.1
-    ensure_background_sync_started()
-    
     with _bg_sync_lock:
         items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
         updated_at   = _bg_sync["updated_at"]
@@ -1046,6 +1001,11 @@ def search():
     if not code: return jsonify({"found":False,"error":"Invalid or missing agency code."}), 400
 
     perms = get_user_permissions(email, user)
+    
+    # FIX: Block unauthorized users attempting to access endpoints directly
+    if not perms.get("is_super_admin") and qtype not in perms.get("modules", []):
+        return jsonify({"found": False, "error": f"Access Denied: You do not have permission to view {qtype.title()}."}), 403
+
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
@@ -1065,7 +1025,7 @@ def search():
 @app.route('/api/admin/users', methods=['GET','POST','DELETE'])
 def manage_users():
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
-    is_authorized = any(a in admin_name for a in ADMIN_USERS)
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
     if not is_authorized:
         perms = get_user_permissions("", admin_name)
         if perms.get("is_super_admin"): is_authorized = True
@@ -1138,7 +1098,7 @@ def manage_users():
 @app.route('/api/admin/audit-logs', methods=['GET'])
 def audit_logs():
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
-    is_authorized = any(a in admin_name for a in ADMIN_USERS)
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
     if not is_authorized:
         perms = get_user_permissions("", admin_name)
         if not perms.get("is_super_admin"): return jsonify({"error":"Unauthorized"}), 403
@@ -1278,15 +1238,15 @@ def sync_refresh():
     if not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    # Fix: Re-use the background thread logic for a manual refresh
-    _background_sync_requests_table()
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
     with _bg_sync_lock:
-        count = len(_bg_sync["requests_items"])
-        updated_at = _bg_sync["updated_at"]
-        complete = _bg_sync["fetch_complete"]
+        _bg_sync["requests_items"]  = items
+        _bg_sync["requests_keys"]   = keys
+        _bg_sync["updated_at"]      = time.time()
+        _bg_sync["fetch_complete"]  = complete
         
     audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
-    return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
+    return jsonify({"success": True, "record_count": len(items), "updated_at": time.time(), "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1326,62 +1286,57 @@ def query_records():
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
+    all_items = []
+    fetch_complete = False
+    stop_reason = ""
+    success = False
+
     aliases = QUERY_FIELD_ALIASES[field]
     
-    # We use "contains" to find the target anywhere it exists across the aliases
-    conditions = [{"field_name": alias, "operator": "contains", "value": [value]} for alias in aliases]
-    
-    payload = {
-        "page_size": 500,
-        "filter": {
-            "conjunction": "or",
-            "conditions": conditions
-        }
-    }
-
-    all_items = []
-    fetch_complete = True
-    stop_reason = ""
-
-    try:
-        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=30).json()
-        if resp.get("code") == 0:
-            all_items = resp.get("data", {}).get("items", [])
-            page_token = resp.get("data", {}).get("page_token")
-            has_more = resp.get("data", {}).get("has_more", False)
+    # 3. FIX: Intelligent API Payload Fallback. 
+    # Feishu crashes (InvalidFilter) if you query an Auto-Number column using "Text Contains" or a String using "=". 
+    # We silently rotate through `contains`, `is`, and `=` until Feishu successfully accepts the query.
+    for alias in aliases:
+        for op in ["contains", "is", "="]:
+            val_array = [value]
             
-            # Fetch additional pages if the user query triggers massive results
-            while has_more and page_token and len(all_items) < 2000:
-                payload["page_token"] = page_token
-                next_resp = http_requests.post(search_url, headers=headers, json=payload, timeout=30).json()
-                if next_resp.get("code") == 0:
-                    all_items.extend(next_resp.get("data", {}).get("items", []))
-                    page_token = next_resp.get("data", {}).get("page_token")
-                    has_more = next_resp.get("data", {}).get("has_more", False)
-                else:
+            # If checking using '=', Feishu demands strict types, so map strings to integers securely
+            if op == "=":
+                if value.isdigit(): val_array = [int(value)]
+                else: continue
+
+            payload = {
+                "page_size": 500,
+                "filter": {
+                    "conjunction": "and",
+                    "conditions": [{"field_name": alias, "operator": op, "value": val_array}]
+                }
+            }
+            
+            try:
+                resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
+                data = resp.json()
+                if data.get("code") == 0:
+                    all_items = data.get("data", {}).get("items", [])
+                    success = True
+                    fetch_complete = True
                     break
-        else:
-            fetch_complete = False
-            stop_reason = f"Feishu API Error: {resp.get('msg')}"
-    except Exception as e:
-        fetch_complete = False
-        stop_reason = f"Search error: {str(e)}"
+                elif data.get("code") not in (1254011, 1254402, 1254010): # 125xxxx are Feishu's InvalidFilter errors
+                    stop_reason = data.get("msg")
+                    if data.get("code") == 99991663: break # Fatal auth error
+            except Exception as e:
+                stop_reason = str(e)
+        
+        if success: break
 
-    if not fetch_complete and not all_items:
-        return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+    if not success:
+        return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter for this column type.'}"}), 502
 
-    target = _norm_query_val(value)
     results = []
-
+    
     for item in all_items:
         fields = item.get("fields", {})
         
-        # Double check match using strict logic to avoid Feishu false positives
-        raw_val = get_field_local(fields, *aliases)
-        cell = extract_field_text(raw_val)
-        if not cell or target not in _norm_query_val(cell):
-            continue
-
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
         acm_in = clean(get_field_local(fields, "Acm Name (IN)"))
@@ -1405,7 +1360,7 @@ def query_records():
             "submitted_on":     submitted_dt.strftime("%Y-%m-%d") if submitted_dt else extract_field_text(submitted_raw),
             "respondents":      extract_field_text(get_field_local(fields, "Respondents")),
             "user_id":          extract_field_text(get_field_local(fields, "User ID")),
-            "otherapp_id":      extract_field_text(get_field_local(fields, "Otherapp ID", "Otherapp Name")),
+            "otherapp_id":      extract_field_text(get_field_local(fields, "Otherapp ID", "Otherapp Name", "Other App Name")),
             "acm":              acm.title() if acm else "",
             "region":           region.upper() if region else "",
             "bd_code":          extract_field_text(get_field_local(fields, "Bd Code", "BD Code")),
@@ -1526,7 +1481,7 @@ def analytics():
 @app.route('/api/cache/clear', methods=['POST'])
 def clear_cache():
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
-    is_authorized = any(a in admin_name for a in ADMIN_USERS)
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
     if not is_authorized: return jsonify({"error":"Unauthorized"}), 403
     cache_invalidate()
     audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""))
@@ -1596,10 +1551,6 @@ def health():
         "background_sync": bg_info
     })
 
-
-# Kick off the background sync thread at import time to ensure the RAM 
-# cache populates instantly, exactly like in the v1.1 code.
-ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
