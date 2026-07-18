@@ -68,6 +68,8 @@
         .welcome-card-icon{font-size:2rem;margin-bottom:10px}
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
+
+        /* ── NEW: QUERY PAGE STYLING ── */
         .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
         .qy-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .2s}
         .qy-card:hover{border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,212,255,.08)}
@@ -83,6 +85,10 @@
         .qy-row-val{color:var(--text);text-align:right;font-weight:500;word-break:break-word}
         .qy-note-block{margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;font-size:.8rem;color:var(--text-muted)}
         .qy-note-block b{color:var(--text)}
+
+        .compare-mode-toggle{display:flex;gap:8px;margin-bottom:20px}
+        .compare-mode-btn{flex:1;padding:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.9rem;transition:all .2s;text-align:center}
+        .compare-mode-btn.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:700}
 
         .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
         .btn-primary{background:linear-gradient(135deg,var(--accent-cyan),#3a7bd5);color:#000}
@@ -101,6 +107,10 @@
 
         .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);transition:border-color .2s;margin-bottom:24px}
         .card:hover{border-color:var(--border-hover)}
+        .page-header{text-align:center;margin-bottom:32px}
+        .page-header h1{font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+        .page-header p{color:var(--text-muted);font-size:1.05rem}
+
         .centered-search-box{max-width:450px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
         .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
@@ -767,6 +777,7 @@
                     </div>
                 </div>
 
+                <!-- KPI cards -->
                 <div class="kpi-grid">
                     <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
                         <div class="kpi-label">Creations</div>
@@ -788,21 +799,25 @@
                     </div>
                 </div>
 
+                <!-- Row 1: 3 Status Donuts -->
                 <div class="chart-grid-3">
                     <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
                     <div class="chart-box"><h3>BD-Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
                     <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
                 </div>
 
+                <!-- Row 2: Rejection Reasons -->
                 <div class="chart-grid-1" style="margin-bottom:24px">
                     <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
                 </div>
 
+                <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
                 <div class="chart-grid-2">
                     <div class="chart-box"><h3>Closing Reasons</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
                     <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div></div>
                 </div>
 
+                <!-- Row 4: ACM Performance -->
                 <div class="chart-box full-width" style="margin-bottom:24px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                         <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
@@ -822,20 +837,24 @@
                     </div>
                 </div>
 
+                <!-- Row 5: Guardian Types + Agency Types -->
                 <div class="chart-grid-2">
                     <div class="chart-box"><h3>Guardian Types</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
                     <div class="chart-box"><h3>Agency Types</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
                 </div>
 
+                <!-- Row 6: Other Apps Hosted -->
                 <div class="chart-grid-1" style="margin-bottom:24px">
                     <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div></div>
                 </div>
 
+                <!-- Row 7: Daily Trend lines -->
                 <div class="chart-grid-2">
                     <div class="chart-box"><h3>Daily Agency Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div></div>
                     <div class="chart-box"><h3>Daily BD Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div></div>
                 </div>
 
+                <!-- Row 8: Activity Heatmap -->
                 <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
                     <h3>Activity Heatmap</h3>
                     <div class="heatmap-outer">
@@ -1408,6 +1427,9 @@ function toggleCompareDates(){
     document.getElementById('compareDatesRow').style.display=on?'grid':'none';
 }
 
+// ════════════════════════════════════════════════════════════════════
+// DATE PRESETS
+// ════════════════════════════════════════════════════════════════════
 function updateCustomDateVisibility() {
     const isSpec=document.getElementById('anaDatePreset').value==='specific';
     document.getElementById('customFromDiv').style.display=isSpec?'block':'none';
@@ -2332,26 +2354,20 @@ function updatePrivilegeGrid() {
     const cy = now.getFullYear();
 
     // Sum strictly from raw requests array using correct month to match Excel Counter logic perfectly
-    const allReqs = currentAgencyData.requests || [];
+    const history = currentAgencyData.history || [];
     
-    allReqs.forEach(r => {
-        const reqType = String(r['Request Type'] || r['Request type'] || '').toLowerCase().trim();
-        if (reqType !== 'agency target privilege') return;
-        
-        const recPriv = String(r['Agency Point Privilege'] || r['Privilege'] || '').toLowerCase();
-        if (!recPriv.includes(priv.toLowerCase())) return;
-
-        const dateVal = r['Submitted on Copy'] || r['Submitted on'] || r['Created Time'];
-        if (!dateVal) return;
-        
-        let d = new Date(typeof dateVal === 'number' ? dateVal : dateVal);
-        if (isNaN(d.getTime())) return;
-        
-        // STRICT CURRENT MONTH FILTER
+    history.forEach(r => {
+        // Safe string parsing for date comparisons
+        let d = r.date ? new Date(r.date) : null;
+        if (!d || isNaN(d.getTime())) return;
         if (d.getMonth() !== cm || d.getFullYear() !== cy) return; 
 
-        const status = String(r['Status'] || r['Request Status'] || '').toLowerCase().trim();
-        const qtyStr = String(r['Quantities Input'] || r['Counter'] || '1');
+        // Target Privilege Validation
+        const reqPriv = String(r.privilege || '').toLowerCase();
+        if (!reqPriv.includes(priv.toLowerCase())) return;
+
+        const status = String(r.status || '').toLowerCase().trim();
+        const qtyStr = String(r.quantities_input || '1');
         const qtyMatch = qtyStr.match(/\d+/);
         const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : 1;
 
@@ -2375,38 +2391,8 @@ function buildTargetTimeline() {
     const tl = document.getElementById('targetTimeline');
     if (!tl) return;
     
-    const allReqs = currentAgencyData.requests || [];
-    let history = [];
-    
-    allReqs.forEach(r => {
-        const reqType = String(r['Request Type'] || r['Request type'] || '').toLowerCase().trim();
-        if (reqType !== 'agency target privilege') return;
-        
-        const dateVal = r['Submitted on Copy'] || r['Submitted on'] || r['Created Time'];
-        if (!dateVal) return;
-        let d = new Date(typeof dateVal === 'number' ? dateVal : dateVal);
-        if (isNaN(d.getTime())) return;
-
-        const status = String(r['Status'] || r['Request Status'] || 'Pending').trim();
-        const priv = String(r['Agency Point Privilege'] || r['Privilege'] || '').trim();
-        
-        history.push({
-            _dt: d,
-            date: d.toISOString().split('T')[0],
-            request_type: reqType,
-            status: status,
-            privilege: priv
-        });
-    });
-    
-    // Ensure chronological order
-    history.sort((a,b) => b._dt - a._dt);
-    
-    // Strict current month filter
-    const now = new Date();
-    const cm = now.getMonth();
-    const cy = now.getFullYear();
-    history = history.filter(h => h._dt.getMonth() === cm && h._dt.getFullYear() === cy);
+    // Uses the pre-filtered current month target history sent by backend
+    const history = currentAgencyData.history || [];
 
     if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No target activity this month.</div>'; return; }
     
@@ -2477,34 +2463,37 @@ function buildPointsTimeline(history) {
     const tl=document.getElementById('agencyTimeline');
     if (!tl) return;
     
-    // Strict current month filter for Points Activity Timeline
-    const now = new Date();
-    const cm = String(now.getMonth() + 1).padStart(2, '0');
-    const cy = String(now.getFullYear());
+    if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No points activity this month.</div>'; return; }
     
-    const cmHistory = history.filter(req => {
-        if (!req.date) return false;
-        const [y, m] = req.date.split('-');
-        return y === cy && m === cm;
-    });
-
-    if (!cmHistory.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No points activity this month.</div>'; return; }
-    
-    tl.innerHTML=cmHistory.slice(0,15).map(req=>{
+    tl.innerHTML=history.slice(0,15).map(req=>{
         const dateStr=req.date||'Unknown';
         const type=(req.request_type||'Request').toLowerCase();
         const status=req.status||'';
         const statusColor=status.toLowerCase().includes('done')?'var(--accent-green)':status.toLowerCase().includes('reject')?'var(--accent-rose)':'var(--accent-amber)';
+        
         let dotClass='tl-privilege';
-        if (type.includes('creation')) dotClass='tl-creation';
-        else if (type.includes('bd')) dotClass='tl-creation';
+        if (type.includes('creation') || type.includes('bd')) dotClass='tl-creation';
         else if (type.includes('point')) dotClass='tl-points';
         else if (type.includes('reject')) dotClass='tl-rejection';
+
+        // Advanced Timeline Sub-label constructor
+        let title = (req.request_type || 'Request').replace(/\b\w/g, c => c.toUpperCase());
+        let subDetails = [];
+        
+        if (req.privilege) subDetails.push(req.privilege); 
+        if (req.target_type) subDetails.push(req.target_type);
+        if (req.quantities_input && !req.privilege) subDetails.push(`Qty: ${req.quantities_input}`);
+
+        let titleHtml = `<div class="timeline-title">${escHtml(title)}</div>`;
+        if (subDetails.length > 0) {
+             titleHtml += `<div style="font-size: 0.8rem; color: var(--text); margin-top: 2px;">🔹 ${escHtml(subDetails.join(' | '))}</div>`;
+        }
+
         return `<div class="timeline-item">
             <div class="timeline-dot ${dotClass}"></div>
             <div class="timeline-date">${dateStr}</div>
-            <div class="timeline-title">${req.privilege||req.target_type||req.request_type.replace(/\b\w/g,c=>c.toUpperCase())||'Request'}</div>
-            <div class="timeline-sub" style="color:${statusColor}">${status||'Pending'}</div>
+            ${titleHtml}
+            <div class="timeline-sub" style="color:${statusColor}">${escHtml(status||'Pending')}</div>
         </div>`;
     }).join('');
 }
@@ -2512,19 +2501,8 @@ function buildPointsTimeline(history) {
 function buildPointsHistory(history) {
     const wrap=document.getElementById('pointsHistoryWrap');
     if (!wrap) return;
-    
-    // Strict current month filter for Points Monthly History list
-    const now = new Date();
-    const cm = String(now.getMonth() + 1).padStart(2, '0');
-    const cy = String(now.getFullYear());
-    
-    const cmHistory = history.filter(req => {
-        if (!req.date) return false;
-        const [y, m] = req.date.split('-');
-        return y === cy && m === cm;
-    });
 
-    const pointReqs=cmHistory.filter(r=>r.privilege||r.quantities_input||r.target_type);
+    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
     if (!pointReqs.length) { wrap.innerHTML=''; return; }
     
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
@@ -2652,7 +2630,104 @@ function runAllocator() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// SEARCH RECORDS PAGE 
+// UNIVERSAL QUERY (search any request by User ID / Numbering / Otherapp ID / NID / Bd Code)
+// ════════════════════════════════════════════════════════════════════
+const QY_FIELD_LABELS = {
+    user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
+    nid_number: 'NID Number', bd_code: 'Bd Code'
+};
+
+(function initQyFieldLabel(){
+    const sel = document.getElementById('qySearchField');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+        const lbl = document.getElementById('qyValueLabel');
+        if (lbl) lbl.textContent = (QY_FIELD_LABELS[sel.value] || 'Value') + ' Value';
+    });
+})();
+
+function qyStatusClass(status){
+    const s = (status||'').toLowerCase();
+    if (s.includes('done') || s.includes('complet') || s.includes('approv')) return 'qy-status-done';
+    if (s.includes('reject') || s.includes('fail') || s.includes('decline')) return 'qy-status-rejected';
+    return 'qy-status-pending';
+}
+
+function qyRow(label, value){
+    if (value === undefined || value === null || value === '') return '';
+    return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
+}
+
+async function runQuery(){
+    const field = document.getElementById('qySearchField')?.value || 'user_id';
+    const value = (document.getElementById('qySearchValue')?.value || '').trim();
+
+    if (!value) { ToastManager.show('Enter a value to search first.', 'warning'); return; }
+
+    const spinner  = document.getElementById('qyLoadingSpinner');
+    const countEl  = document.getElementById('qyResultCount');
+    const resultsEl= document.getElementById('qyResults');
+    const emptyEl  = document.getElementById('qyEmpty');
+
+    if (spinner)   spinner.style.display = 'inline';
+    if (emptyEl)   emptyEl.style.display = 'none';
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    try {
+        const params = new URLSearchParams({
+            field, value, user: loggedUser || '', email: loggedEmail || ''
+        });
+        const resp = await fetch('/api/query?' + params.toString());
+        let data;
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('The server took too long to respond (this usually means the full history scan hit the platform time limit). Please try again — it often succeeds once the background cache is warm.'); }
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
+
+        if (spinner) spinner.style.display = 'none';
+
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Note: full history scan hit a snag (${data.stop_reason||'unknown'}). Results shown may be partial — try again.`, 'warning', 8000);
+        }
+
+        const results = data.results || [];
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (countEl) countEl.textContent = `0 requests found for ${QY_FIELD_LABELS[field]} "${value}"`;
+            return;
+        }
+
+        if (countEl) countEl.textContent = `${results.length} request${results.length===1?'':'s'} found for ${QY_FIELD_LABELS[field]} "${value}"`;
+
+        if (resultsEl) resultsEl.innerHTML = results.map(r => `
+            <div class="qy-card">
+                <div class="qy-card-head">
+                    <div>
+                        <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
+                        <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
+                    </div>
+                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
+                </div>
+                ${qyRow('Submitted on', r.submitted_on)}
+                ${qyRow('Respondents', r.respondents)}
+                ${qyRow('User ID', r.user_id)}
+                ${qyRow('Otherapp ID', r.otherapp_id)}
+                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                ${qyRow('Bd Code', r.bd_code)}
+                ${qyRow('Duplicated Check', r.duplicated_check)}
+                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+            </div>
+        `).join('');
+
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Query failed: ' + e.message, 'error', 8000);
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SEARCH RECORDS PAGE (pg-points-records)
 // ════════════════════════════════════════════════════════════════════
 let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
 
@@ -2690,7 +2765,7 @@ async function prFetch(page) {
 
     try {
         const resp = await fetch('/api/points/records?' + params.toString());
-        if (!resp.ok && resp.status !== 200) { /* still try to parse for error detail below */ }
+        if (!resp.ok && resp.status !== 200) { }
         let data;
         try { data = await resp.json(); }
         catch(e) { throw new Error('Server took too long to respond (platform time limit reached). Try again in a moment.'); }
@@ -2927,103 +3002,6 @@ function ptExportExcel() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ptAllData), 'Point Table');
     XLSX.writeFile(wb, 'xena_point_table.xlsx');
     ToastManager.show('Excel exported!', 'success');
-}
-
-// ════════════════════════════════════════════════════════════════════
-// UNIVERSAL QUERY (search any request by User ID / Numbering / Otherapp ID / NID / Bd Code)
-// ════════════════════════════════════════════════════════════════════
-const QY_FIELD_LABELS = {
-    user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
-    nid_number: 'NID Number', bd_code: 'Bd Code'
-};
-
-(function initQyFieldLabel(){
-    const sel = document.getElementById('qySearchField');
-    if (!sel) return;
-    sel.addEventListener('change', () => {
-        const lbl = document.getElementById('qyValueLabel');
-        if (lbl) lbl.textContent = (QY_FIELD_LABELS[sel.value] || 'Value') + ' Value';
-    });
-})();
-
-function qyStatusClass(status){
-    const s = (status||'').toLowerCase();
-    if (s.includes('done') || s.includes('complet') || s.includes('approv')) return 'qy-status-done';
-    if (s.includes('reject') || s.includes('fail') || s.includes('decline')) return 'qy-status-rejected';
-    return 'qy-status-pending';
-}
-
-function qyRow(label, value){
-    if (value === undefined || value === null || value === '') return '';
-    return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
-}
-
-async function runQuery(){
-    const field = document.getElementById('qySearchField')?.value || 'user_id';
-    const value = (document.getElementById('qySearchValue')?.value || '').trim();
-
-    if (!value) { ToastManager.show('Enter a value to search first.', 'warning'); return; }
-
-    const spinner  = document.getElementById('qyLoadingSpinner');
-    const countEl  = document.getElementById('qyResultCount');
-    const resultsEl= document.getElementById('qyResults');
-    const emptyEl  = document.getElementById('qyEmpty');
-
-    if (spinner)   spinner.style.display = 'inline';
-    if (emptyEl)   emptyEl.style.display = 'none';
-    if (resultsEl) resultsEl.innerHTML = '';
-
-    try {
-        const params = new URLSearchParams({
-            field, value, user: loggedUser || '', email: loggedEmail || ''
-        });
-        const resp = await fetch('/api/query?' + params.toString());
-        let data;
-        try { data = await resp.json(); }
-        catch(e) { throw new Error('The server took too long to respond (this usually means the full history scan hit the platform time limit). Please try again — it often succeeds once the background cache is warm.'); }
-        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
-
-        if (spinner) spinner.style.display = 'none';
-
-        if (data.fetch_complete === false) {
-            ToastManager.show(`Note: full history scan hit a snag (${data.stop_reason||'unknown'}). Results shown may be partial — try again.`, 'warning', 8000);
-        }
-
-        const results = data.results || [];
-        if (!results.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
-            if (countEl) countEl.textContent = `0 requests found for ${QY_FIELD_LABELS[field]} "${value}"`;
-            return;
-        }
-
-        if (countEl) countEl.textContent = `${results.length} request${results.length===1?'':'s'} found for ${QY_FIELD_LABELS[field]} "${value}"`;
-
-        if (resultsEl) resultsEl.innerHTML = results.map(r => `
-            <div class="qy-card">
-                <div class="qy-card-head">
-                    <div>
-                        <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
-                        <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
-                    </div>
-                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
-                </div>
-                ${qyRow('Submitted on', r.submitted_on)}
-                ${qyRow('Respondents', r.respondents)}
-                ${qyRow('User ID', r.user_id)}
-                ${qyRow('Otherapp ID', r.otherapp_id)}
-                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
-                ${qyRow('Bd Code', r.bd_code)}
-                ${qyRow('Duplicated Check', r.duplicated_check)}
-                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
-                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
-            </div>
-        `).join('');
-
-    } catch (e) {
-        if (spinner) spinner.style.display = 'none';
-        if (countEl) countEl.textContent = 'Error: ' + e.message;
-        ToastManager.show('Query failed: ' + e.message, 'error', 8000);
-    }
 }
 
 /* ⬇️ INITIALIZATION BLOCK ⬇️ */
