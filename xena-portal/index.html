@@ -312,16 +312,12 @@
 </head>
 <body>
 
-<!-- ── TOAST CONTAINER ───────────────────────────────────────────────────── -->
 <div id="toastContainer"></div>
-
-<!-- ── LOADING OVERLAY ──────────────────────────────────────────────────── -->
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
     <div style="color:var(--text-muted);font-weight:500;" id="loadingText">Crunching Feishu data...</div>
 </div>
 
-<!-- ── LOGIN OVERLAY ─────────────────────────────────────────────────────── -->
 <div id="loginOverlay">
     <div class="login-card">
         <h1>🚀 Xena Portal</h1>
@@ -332,9 +328,7 @@
     </div>
 </div>
 
-<!-- ── MAIN APP ───────────────────────────────────────────────────────────── -->
 <div class="app-shell" id="mainApp">
-
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
             <span style="font-size:1.3rem">🚀</span>
@@ -366,7 +360,6 @@
                 </div>
             </div>
             
-            <!-- FIXED: Split Target Menu into Target + Target Timeline -->
             <div class="nav-group" id="navGrpTarget">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpTarget','navBodyTarget')">
                     <span>🎯 Agency Target</span><span class="nav-arr" id="navArrTarget">›</span>
@@ -396,9 +389,7 @@
 
     <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 
-    <!-- ── MAIN CONTENT ─────────────────────────────────────────────────────── -->
     <div class="main-content">
-
         <div class="page-top-bar">
             <div style="display:flex;align-items:center;gap:10px">
                 <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">☰</button>
@@ -505,7 +496,6 @@
                     </div>
                 </div>
 
-                <!-- FIXED: Dedicated area for Target Timeline -->
                 <div class="card" id="targetTimelineArea" style="display:none">
                     <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⏱ Target Privilege Timeline (Current Month)</h3>
                     <div class="timeline" id="targetTimeline"></div>
@@ -539,7 +529,6 @@
             </div>
         </div>
 
-        <!-- ══ PAGE: SMART ALLOCATOR ═══════════════════════════════════════ -->
         <div id="pg-allocator" style="display:none">
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                 <div class="card">
@@ -594,7 +583,6 @@
             </div>
         </div>
 
-        <!-- ══ PAGE: ADMIN — MANAGE AGENTS ══════════════════════════════════ -->
         <div id="pg-admin-agents" style="display:none">
             <div class="card">
                 <h3 style="color:var(--accent-cyan);margin-bottom:20px">⚙️ Manage Agents</h3>
@@ -657,7 +645,6 @@
             </div>
         </div>
 
-        <!-- ══ PAGE: ANALYTICS ══════════════════════════════════════════════ -->
         <div id="pg-analytics" style="display:none">
             <div class="card">
                 <div class="preset-bar" id="presetBar">
@@ -730,7 +717,6 @@
                 </div>
             </div>
 
-            <!-- ANALYTICS CONTAINER -->
             <div id="analyticsContainer" style="display:none">
                 <div id="activeFiltersBar" style="display:none;margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
                     <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Active Filters:</span>
@@ -866,7 +852,6 @@
             </div>
         </div>
 
-        <!-- ══ PAGE: SEARCH RECORDS ════════════════════════════════════════ -->
         <div id="pg-points-records" style="display:none">
             <div class="card" style="margin-bottom:20px">
                 <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔎 Search Point Records</h3>
@@ -930,7 +915,6 @@
             </div>
         </div>
 
-        <!-- ══ PAGE: POINT TABLE ════════════════════════════════════════════ -->
         <div id="pg-points-table" style="display:none">
             <div class="card" style="margin-bottom:20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
@@ -1177,6 +1161,10 @@ const allAcms=[...pkAcms,...inAcms].sort();
 const allRegs=["pk","in","all"];
 
 function escHtml(s){const d=document.createElement('div');d.appendChild(document.createTextNode(String(s||'')));return d.innerHTML;}
+function escapeJSArgs(str) {
+    if (!str) return '';
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
 
 function _expandNavGroup(bodyId,arrId){
     const body=document.getElementById(bodyId);const arr=document.getElementById(arrId);
@@ -1268,8 +1256,8 @@ function navTo(page){
         document.getElementById('resultsContainer').style.display='none';
         _expandNavGroup('navBodyTarget','navArrTarget');
         
-        window.currentTargetView = page; // Store whether we are on base target or timeline view
-        if(currentAgencyData) showTargetViewElements(); // If data exists, swap views immediately
+        window.currentTargetView = page; 
+        if(currentAgencyData) showTargetViewElements(); 
     } else if(page==='points'){
         document.getElementById('pg-agency').style.display='block';
         document.getElementById('queryType').value='points';
@@ -1359,6 +1347,9 @@ function toggleCompareDates(){
     document.getElementById('compareDatesRow').style.display=on?'grid':'none';
 }
 
+// ════════════════════════════════════════════════════════════════════
+// DATE PRESETS
+// ════════════════════════════════════════════════════════════════════
 function updateCustomDateVisibility() {
     const isSpec=document.getElementById('anaDatePreset').value==='specific';
     document.getElementById('customFromDiv').style.display=isSpec?'block':'none';
@@ -1387,6 +1378,9 @@ function updateAcmDropdown() {
     list.forEach(n=>sel.add(new Option(n,n.toLowerCase())));
 }
 
+// ════════════════════════════════════════════════════════════════════
+// FILTER PRESETS
+// ════════════════════════════════════════════════════════════════════
 function saveFilterPreset() {
     const name=prompt("Name for this filter preset:");
     if (!name) return;
@@ -1489,7 +1483,25 @@ async function fetchAdminUsers() {
             let dispEmail=u.email||u.person;
             let badge=u.modules.includes('admin')?'<span style="background:var(--accent-amber);color:#000;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px">ADMIN</span>':'';
             const row=document.createElement('div'); row.className='user-row';
-            row.innerHTML=`<div class="user-info"><span class="user-email">${escHtml(dispEmail)}${badge}</span><div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${escHtml(u.modules||'none')}</span></div></div><div class="action-btns"><button class="edit-btn" onclick="editAgent(${JSON.stringify(dispEmail)},${JSON.stringify(u.modules||'')},${JSON.stringify(u.acms_raw||'')},${JSON.stringify(u.regions_raw||'')})">Edit</button><button class="del-btn" onclick="deleteAgent(${JSON.stringify(u.id)})">Remove</button></div>`; listDiv.appendChild(row);
+            
+            // Safe JSON escaping to prevent SyntaxError in inline HTML
+            const safeEmail = escapeJSArgs(dispEmail);
+            const safeModules = escapeJSArgs(u.modules);
+            const safeAcms = escapeJSArgs(u.acms_raw);
+            const safeRegs = escapeJSArgs(u.regions_raw);
+            const safeId = escapeJSArgs(u.id);
+
+            row.innerHTML=`
+                <div class="user-info">
+                    <span class="user-email">${escHtml(dispEmail)}${badge}</span>
+                    <div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${escHtml(u.modules||'none')}</span></div>
+                </div>
+                <div class="action-btns">
+                    <button class="edit-btn" onclick="editAgent('${safeEmail}','${safeModules}','${safeAcms}','${safeRegs}')">Edit</button>
+                    <button class="del-btn" onclick="deleteAgent('${safeId}')">Remove</button>
+                </div>
+            `;
+            listDiv.appendChild(row);
         });
     } catch(e) { listDiv.innerHTML='<div style="color:var(--accent-rose)">Failed to load agents.</div>'; }
 }
@@ -1741,7 +1753,7 @@ async function generateAnalytics() {
             document.getElementById('comparisonKpisSection').style.display='none';
         }
 
-        const urlP=new URLSearchParams({region,acm,type,from:fromDate,to:toDate});
+        const urlP=newSearchParams({region,acm,type,from:fromDate,to:toDate});
         window.history.replaceState(null,null,`#analyze?${urlP.toString()}`);
 
         document.getElementById('analyticsContainer').style.display='block';
@@ -2079,51 +2091,6 @@ function renderHeatmap(dataObj) {
     }
 }
 
-function exportCSV() {
-    if (!latestAnalyticsData || !latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
-    const data=latestAnalyticsData;
-    const rows=[['Metric','Value'],
-        ['Creations',data.kpis.creations],['BDs',data.kpis.bds],['Closings',data.kpis.closings],
-        [''],['ACM','Creations'],...Object.entries(data.acm_performance||{}),
-        [''],['Date','Creations','BDs'],...Object.keys(data.daily_trend_creation||{}).map(d=>[d,data.daily_trend_creation[d],data.daily_trend_bd?.[d]||0])
-    ];
-    const csv=rows.map(r=>r.map(v=>JSON.stringify(v===undefined?'':v)).join(',')).join('\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-    const a=document.createElement('a');
-    const region=document.getElementById('anaRegion').value;
-    const from=document.getElementById('anaFrom').value;
-    const to=document.getElementById('anaTo').value;
-    a.href=URL.createObjectURL(blob);
-    a.download=`xena_analytics_${region}_${from}_${to}.csv`;
-    a.click();
-    ToastManager.show('CSV exported successfully!','success');
-}
-
-function exportExcel() {
-    if (!latestAnalyticsData||!latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
-    if (!window.XLSX) { ToastManager.show('Excel library not loaded.','warning'); return; }
-    const data=latestAnalyticsData;
-    const wb=XLSX.utils.book_new();
-    
-    const kpiData=[['Metric','Value'],['Creations',data.kpis.creations],['BDs',data.kpis.bds],['Closings',data.kpis.closings]];
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(kpiData),'KPIs');
-    
-    const acmData=[['ACM','Creations'],...Object.entries(data.acm_performance||{})];
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(acmData),'ACM Performance');
-    
-    const trendData=[['Date','Creations','BDs'],...Object.keys(data.daily_trend_creation||{}).map(d=>[d,data.daily_trend_creation[d],data.daily_trend_bd?.[d]||0])];
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(trendData),'Daily Trends');
-    
-    const rejData=[['Reason','Count'],...Object.entries(data.reject_reasons||{})];
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rejData),'Rejection Reasons');
-
-    const region=document.getElementById('anaRegion').value;
-    const from=document.getElementById('anaFrom').value;
-    const to=document.getElementById('anaTo').value;
-    XLSX.writeFile(wb,`xena_analytics_${region}_${from}_${to}.xlsx`);
-    ToastManager.show('Excel file exported!','success');
-}
-
 // ════════════════════════════════════════════════════════════════════
 // SEARCH / AGENCY DATA
 // ════════════════════════════════════════════════════════════════════
@@ -2260,31 +2227,17 @@ function updatePrivilegeGrid() {
     else if (priv === "Game room") { total = bp >= 20 ? 1 : 0; }
 
     let claimed = 0, pending = 0, rejected = 0;
-    const now = new Date();
-    const cm = now.getMonth();
-    const cy = now.getFullYear();
-
-    // Sum strictly from raw requests array using correct month to match Excel Counter logic perfectly
-    const allReqs = currentAgencyData.requests || [];
     
-    allReqs.forEach(r => {
-        const reqType = String(r['Request Type'] || r['Request type'] || '').toLowerCase().trim();
-        if (reqType !== 'agency target privilege') return;
-        
-        const recPriv = String(r['Agency Point Privilege'] || r['Privilege'] || '').toLowerCase();
-        if (!recPriv.includes(priv.toLowerCase())) return;
+    // Sum strictly from raw requests array matching Excel Counter logic exactly
+    const history = currentAgencyData.history || [];
+    
+    history.forEach(r => {
+        // Target Privilege Validation
+        const reqPriv = String(r.privilege || '').toLowerCase();
+        if (!reqPriv.includes(priv.toLowerCase())) return;
 
-        const dateVal = r['Submitted on Copy'] || r['Submitted on'] || r['Created Time'];
-        if (!dateVal) return;
-        
-        let d = new Date(typeof dateVal === 'number' ? dateVal : dateVal);
-        if (isNaN(d.getTime())) return;
-        
-        // STRICT CURRENT MONTH FILTER
-        if (d.getMonth() !== cm || d.getFullYear() !== cy) return; 
-
-        const status = String(r['Status'] || r['Request Status'] || '').toLowerCase().trim();
-        const qtyStr = String(r['Quantities Input'] || r['Counter'] || '1');
+        const status = String(r.status || '').toLowerCase().trim();
+        const qtyStr = String(r.quantities_input || '1');
         const qtyMatch = qtyStr.match(/\d+/);
         const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : 1;
 
@@ -2308,38 +2261,8 @@ function buildTargetTimeline() {
     const tl = document.getElementById('targetTimeline');
     if (!tl) return;
     
-    const allReqs = currentAgencyData.requests || [];
-    let history = [];
-    
-    allReqs.forEach(r => {
-        const reqType = String(r['Request Type'] || r['Request type'] || '').toLowerCase().trim();
-        if (reqType !== 'agency target privilege') return;
-        
-        const dateVal = r['Submitted on Copy'] || r['Submitted on'] || r['Created Time'];
-        if (!dateVal) return;
-        let d = new Date(typeof dateVal === 'number' ? dateVal : dateVal);
-        if (isNaN(d.getTime())) return;
-
-        const status = String(r['Status'] || r['Request Status'] || 'Pending').trim();
-        const priv = String(r['Agency Point Privilege'] || r['Privilege'] || '').trim();
-        
-        history.push({
-            _dt: d,
-            date: d.toISOString().split('T')[0],
-            request_type: reqType,
-            status: status,
-            privilege: priv
-        });
-    });
-    
-    // Ensure chronological order
-    history.sort((a,b) => b._dt - a._dt);
-    
-    // Strict current month filter
-    const now = new Date();
-    const cm = now.getMonth();
-    const cy = now.getFullYear();
-    history = history.filter(h => h._dt.getMonth() === cm && h._dt.getFullYear() === cy);
+    // Uses the pre-filtered current month target history sent by backend
+    const history = currentAgencyData.history || [];
 
     if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No target activity this month.</div>'; return; }
     
@@ -2380,7 +2303,16 @@ function updatePointsGrid() {
 function buildAllocatorStatus(status) {
     const wrap=document.getElementById('allocatorStatusWrap');
     if (!wrap) return;
-    const items=Object.keys(status);
+    
+    // Front-end Filtering: Drop target privileges that accidentally crept into points usage limit tracker
+    const items = Object.keys(status).filter(name => {
+        const n = name.toLowerCase();
+        if (n.includes('dynamic') || n.includes('avatar') || n.includes('20 mic') || n === '30 mics' || n.includes('welcome room') || n.includes('game room')) {
+            return false;
+        }
+        return true;
+    });
+
     if (!items.length) { wrap.innerHTML=''; return; }
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month's Usage vs Limits</h4>
         <div style="display:flex;flex-wrap:wrap;gap:10px">`+
@@ -2401,20 +2333,9 @@ function buildPointsTimeline(history) {
     const tl=document.getElementById('agencyTimeline');
     if (!tl) return;
     
-    // Strict current month filter for Points Activity Timeline
-    const now = new Date();
-    const cm = String(now.getMonth() + 1).padStart(2, '0');
-    const cy = String(now.getFullYear());
+    if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No points activity this month.</div>'; return; }
     
-    const cmHistory = history.filter(req => {
-        if (!req.date) return false;
-        const [y, m] = req.date.split('-');
-        return y === cy && m === cm;
-    });
-
-    if (!cmHistory.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No points activity this month.</div>'; return; }
-    
-    tl.innerHTML=cmHistory.slice(0,15).map(req=>{
+    tl.innerHTML=history.slice(0,15).map(req=>{
         const dateStr=req.date||'Unknown';
         const type=(req.request_type||'Request').toLowerCase();
         const status=req.status||'';
@@ -2436,19 +2357,8 @@ function buildPointsTimeline(history) {
 function buildPointsHistory(history) {
     const wrap=document.getElementById('pointsHistoryWrap');
     if (!wrap) return;
-    
-    // Strict current month filter for Points Monthly History list
-    const now = new Date();
-    const cm = String(now.getMonth() + 1).padStart(2, '0');
-    const cy = String(now.getFullYear());
-    
-    const cmHistory = history.filter(req => {
-        if (!req.date) return false;
-        const [y, m] = req.date.split('-');
-        return y === cy && m === cm;
-    });
 
-    const pointReqs=cmHistory.filter(r=>r.privilege||r.quantities_input||r.target_type);
+    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
     if (!pointReqs.length) { wrap.innerHTML=''; return; }
     
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
@@ -2466,7 +2376,6 @@ function buildPointsHistory(history) {
         }).join('');
 }
 
-// ── Smart Allocator helpers ──────────────────────────────────────────────────
 function allocSelectAll() {
     document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
         el.classList.add('active');
