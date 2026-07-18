@@ -440,81 +440,79 @@ def get_user_permissions(email, name):
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
+    
     all_items = []
     seen_ids  = set()
     master_keys = set()
     fetch_complete = True
     stop_reason = ""
+    consecutive_old_pages = 0
 
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     
+    # FIX: Reverted back to the bulletproof GET /records endpoint from the old version
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+
     page_token = None
-    MAX_PAGE_RETRIES = 4 
-
-    for _ in range(200):  
-        payload = {"page_size": 500} 
-        if page_token: payload["page_token"] = page_token
+    for _ in range(200):
+        params = {"page_size": 500, "automatic_fields": "true"}
         
-        # 1. FIX: Removed fields_to_return to solve FieldNameNotFound 502 crash permanently.
+        # FIX: Only sort by Numbering on the Requests table to prevent Points table crashes
         if table_id == REQUESTS_TABLE_ID:
-            payload["sort"] = [{"field_name": "Numbering", "desc": True}]
+            params["sort"] = '["Numbering DESC"]'
+            
+        if page_token: params["page_token"] = page_token
         
-        page_data = None
-        last_err = ""
-        for attempt in range(MAX_PAGE_RETRIES):
-            try:
-                resp = session.post(url, json=payload, timeout=20)
-                if resp.status_code != 200:
-                    last_err = f"HTTP {resp.status_code}: {resp.text[:300]}"
-                    time.sleep(0.5 * (attempt + 1))
-                    continue
-
-                data = resp.json()
-                if data.get("code") != 0:
-                    last_err = f"Feishu Error {data.get('code')}: {data.get('msg')}"
-                    time.sleep(0.5 * (attempt + 1))
-                    continue
-
-                page_data = data
-                last_err = ""
+        try:
+            # 45 seconds timeout exactly like the old version
+            resp = session.get(url, params=params, timeout=45) 
+            if resp.status_code != 200:
+                fetch_complete = False
+                stop_reason = f"HTTP {resp.status_code}: {resp.text}"
                 break
-            except Exception as e:
-                last_err = str(e)
-                time.sleep(0.5 * (attempt + 1))
-
-        if page_data is None:
-            fetch_complete = False
-            stop_reason = last_err or "Unknown fetch error"
-            break
-
-        block = page_data.get("data", {})
-        items = block.get("items", [])
-        if not items: break
-
-        page_old_count = 0
-
-        for item in items:
-            rid = item.get("record_id")
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_items.append(item)
-                master_keys.update(item.get("fields", {}).keys())
                 
-                if from_dt:
+            data = resp.json()
+            if data.get("code") != 0:
+                fetch_complete = False
+                stop_reason = f"Feishu Error Code {data.get('code')}: {data.get('msg')}"
+                break
+            
+            block = data.get("data", {})
+            items = block.get("items", [])
+            if not items: break
+
+            page_old_count = 0
+            valid_dates_in_page = 0
+            for item in items:
+                rid = item.get("record_id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_items.append(item)
+                    master_keys.update(item.get("fields", {}).keys())
                     raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
                     record_dt = parse_feishu_date(raw_date)
-                    if record_dt and record_dt < (from_dt - timedelta(days=1)):
-                        page_old_count += 1
-        
-        # 2. FIX: Aggressive Analytics Timeout Guard. Stop fetching exactly when dates are met.
-        if from_dt and page_old_count >= 50:
-            stop_reason = "Safely reached date boundary."
-            break
+                    if record_dt:
+                        valid_dates_in_page += 1
+                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
+                            page_old_count += 1
+            
+            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                consecutive_old_pages += 1
+            else:
+                consecutive_old_pages = 0
 
-        page_token = block.get("page_token")
-        if not page_token or not block.get("has_more", False):
+            if consecutive_old_pages >= 3:
+                stop_reason = "Safely reached pages with all older records."
+                break
+
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False):
+                break
+
+        except Exception as e:
+            fetch_complete = False
+            stop_reason = str(e)
             break
 
     return all_items, master_keys, fetch_complete, stop_reason
