@@ -1322,20 +1322,64 @@ def query_records():
     allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
     allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
 
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot()
+    tat = get_tenant_access_token()
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    aliases = QUERY_FIELD_ALIASES[field]
+    
+    # We use "contains" to find the target anywhere it exists across the aliases
+    conditions = [{"field_name": alias, "operator": "contains", "value": [value]} for alias in aliases]
+    
+    payload = {
+        "page_size": 500,
+        "filter": {
+            "conjunction": "or",
+            "conditions": conditions
+        }
+    }
+
+    all_items = []
+    fetch_complete = True
+    stop_reason = ""
+
+    try:
+        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=30).json()
+        if resp.get("code") == 0:
+            all_items = resp.get("data", {}).get("items", [])
+            page_token = resp.get("data", {}).get("page_token")
+            has_more = resp.get("data", {}).get("has_more", False)
+            
+            # Fetch additional pages if the user query triggers massive results
+            while has_more and page_token and len(all_items) < 2000:
+                payload["page_token"] = page_token
+                next_resp = http_requests.post(search_url, headers=headers, json=payload, timeout=30).json()
+                if next_resp.get("code") == 0:
+                    all_items.extend(next_resp.get("data", {}).get("items", []))
+                    page_token = next_resp.get("data", {}).get("page_token")
+                    has_more = next_resp.get("data", {}).get("has_more", False)
+                else:
+                    break
+        else:
+            fetch_complete = False
+            stop_reason = f"Feishu API Error: {resp.get('msg')}"
+    except Exception as e:
+        fetch_complete = False
+        stop_reason = f"Search error: {str(e)}"
 
     if not fetch_complete and not all_items:
         return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
-    aliases = QUERY_FIELD_ALIASES[field]
     target = _norm_query_val(value)
     results = []
 
     for item in all_items:
         fields = item.get("fields", {})
+        
+        # Double check match using strict logic to avoid Feishu false positives
         raw_val = get_field_local(fields, *aliases)
         cell = extract_field_text(raw_val)
-        if not cell or _norm_query_val(cell) != target:
+        if not cell or target not in _norm_query_val(cell):
             continue
 
         region = clean(get_field_local(fields, "Region", "Agency Region"))
@@ -1382,7 +1426,7 @@ def query_records():
         "results": results, "count": len(results),
         "field": field, "value": value,
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": from_bg_cache
+        "served_from_background_cache": False
     })
 
 @app.route('/api/analytics', methods=['GET', 'POST'])
