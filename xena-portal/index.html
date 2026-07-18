@@ -68,6 +68,21 @@
         .welcome-card-icon{font-size:2rem;margin-bottom:10px}
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
+        .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+        .qy-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .2s}
+        .qy-card:hover{border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,212,255,.08)}
+        .qy-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+        .qy-card-num{font-size:1rem;font-weight:700;color:var(--accent-cyan)}
+        .qy-card-type{font-size:.75rem;color:var(--text-muted);margin-top:2px}
+        .qy-status-pill{font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;text-transform:capitalize}
+        .qy-status-done{background:rgba(0,230,118,.12);color:var(--accent-green)}
+        .qy-status-rejected{background:rgba(255,77,109,.12);color:var(--accent-rose)}
+        .qy-status-pending{background:rgba(255,171,0,.12);color:var(--accent-amber)}
+        .qy-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:.83rem}
+        .qy-row-label{color:var(--text-muted);white-space:nowrap}
+        .qy-row-val{color:var(--text);text-align:right;font-weight:500;word-break:break-word}
+        .qy-note-block{margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;font-size:.8rem;color:var(--text-muted)}
+        .qy-note-block b{color:var(--text)}
 
         .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
         .btn-primary{background:linear-gradient(135deg,var(--accent-cyan),#3a7bd5);color:#000}
@@ -367,6 +382,15 @@
                 <div class="nav-group-body" id="navBodyTarget">
                     <div class="nav-item" id="nav-target" onclick="navTo('target')">Check Agency Target</div>
                     <div class="nav-item" id="nav-target-timeline" onclick="navTo('target-timeline')">Target Timeline</div>
+                </div>
+            </div>
+
+            <div class="nav-group" id="navGrpQuery">
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpQuery','navBodyQuery')">
+                    <span>🔍 Universal Query</span><span class="nav-arr" id="navArrQuery">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyQuery">
+                    <div class="nav-item" id="nav-query" onclick="navTo('query')">Query Requests</div>
                 </div>
             </div>
 
@@ -1005,6 +1029,48 @@
             </div>
         </div>
 
+        <div id="pg-query" style="display:none">
+            <div class="card" style="margin-bottom:20px">
+                <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔍 Universal Request Query</h3>
+                <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+                    <div class="control-group">
+                        <label>Search By</label>
+                        <select id="qySearchField">
+                            <option value="user_id">User ID</option>
+                            <option value="numbering">Numbering</option>
+                            <option value="otherapp_id">Otherapp ID</option>
+                            <option value="nid_number">NID Number</option>
+                            <option value="bd_code">Bd Code</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="grid-column:span 2">
+                        <label id="qyValueLabel">User ID Value</label>
+                        <input type="text" id="qySearchValue" placeholder="Type the value to search…" onkeydown="if(event.key==='Enter')runQuery()">
+                    </div>
+                    <div class="control-group" style="display:flex;align-items:flex-end">
+                        <button class="btn btn-primary" onclick="runQuery()" style="width:100%">🔍 Search</button>
+                    </div>
+                </div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:-6px">
+                    Searches every request ever submitted for this value — no date limit. Every matching request is shown as its own card below.
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                    <span id="qyResultCount" style="font-size:.9rem;color:var(--text-muted)">Choose a field and enter a value to search</span>
+                    <span id="qyLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Searching full history…</span>
+                </div>
+
+                <div id="qyResults" class="qy-grid"></div>
+
+                <div id="qyEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
+                    <div style="font-size:2rem;margin-bottom:12px">🔍</div>
+                    <p>No requests found for that value.</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1213,7 +1279,7 @@ function formatCoins(num) {
 // NAVIGATION 
 // ════════════════════════════════════════════════════════════════════
 let userModules=[], isAdmin=false;
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query'];
 
 function hideAllPages(){
     ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
@@ -1228,7 +1294,8 @@ function navTo(page){
         points:'Check Agency Points',allocator:'Smart Allocator',target:'Agency Target',
         'target-timeline': 'Target Privilege Timeline',
         'admin-agents':'Manage Agents','admin-audit':'Audit Log',
-        'points-records':'Search Point Records','points-table':'Agency Point Table'};
+        'points-records':'Search Point Records','points-table':'Agency Point Table',
+        'query':'Universal Request Query'};
     document.getElementById('pageTitle').textContent=titles[page]||'Xena Portal';
 
     document.querySelectorAll('.nav-item,.nav-group-header.nav-direct').forEach(n=>n.classList.remove('active','active-nav'));
@@ -1253,15 +1320,8 @@ function navTo(page){
         document.getElementById('pg-agency').style.display='block';
         document.getElementById('queryType').value='points';
         document.getElementById('agencyLookupTitle').textContent='🪙 Check Agency Points';
-        // If points data is already loaded, re-show it immediately (same pattern as target page)
-        if (currentAgencyData && currentAgencyData.point_balance != null) {
-            document.getElementById('agencyEmptyState').style.display='none';
-            document.getElementById('resultsContainer').style.display='block';
-            updatePointsGrid();
-        } else {
-            document.getElementById('agencyEmptyState').style.display='block';
-            document.getElementById('resultsContainer').style.display='none';
-        }
+        document.getElementById('agencyEmptyState').style.display='block';
+        document.getElementById('resultsContainer').style.display='none';
     } else if(page==='allocator'){
         document.getElementById('pg-allocator').style.display='block';
         if(currentAgencyData&&currentAgencyData.point_balance!=null){
@@ -1286,6 +1346,9 @@ function navTo(page){
     } else if(page==='points-table'){
         document.getElementById('pg-points-table').style.display='block';
         _expandNavGroup('navBodyPoints','navArrPoints');
+    } else if(page==='query'){
+        document.getElementById('pg-query').style.display='block';
+        _expandNavGroup('navBodyQuery','navArrQuery');
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
@@ -1667,10 +1730,6 @@ async function generateAnalytics() {
     const type=document.getElementById('anaType').value;
     const fromDate=document.getElementById('anaFrom').value;
     const toDate=document.getElementById('anaTo').value;
-    // Warn if no date range selected — fetches all records and will be slow
-    if (!fromDate && document.getElementById('anaDatePreset').value === 'all') {
-        ToastManager.show('Tip: Select a date range for faster results. "All" fetches every record.','info',5000);
-    }
     const cmpOn=document.getElementById('compareToggle').checked;
     const cmpFrom=cmpOn?document.getElementById('cmpFrom').value:'';
     const cmpTo=cmpOn?document.getElementById('cmpTo').value:'';
@@ -2195,8 +2254,6 @@ async function fetchAgencyData() {
         }
     } catch(err) {
         ToastManager.show(err.message,'error',8000);
-        // Re-show empty state so screen isn't blank after an error
-        document.getElementById('agencyEmptyState').style.display='block';
     }
     document.getElementById('loadingOverlay').style.display='none';
 }
@@ -2859,6 +2916,101 @@ function ptExportExcel() {
     ToastManager.show('Excel exported!', 'success');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// UNIVERSAL QUERY (search any request by User ID / Numbering / Otherapp ID / NID / Bd Code)
+// ════════════════════════════════════════════════════════════════════
+const QY_FIELD_LABELS = {
+    user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
+    nid_number: 'NID Number', bd_code: 'Bd Code'
+};
+
+(function initQyFieldLabel(){
+    const sel = document.getElementById('qySearchField');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+        const lbl = document.getElementById('qyValueLabel');
+        if (lbl) lbl.textContent = (QY_FIELD_LABELS[sel.value] || 'Value') + ' Value';
+    });
+})();
+
+function qyStatusClass(status){
+    const s = (status||'').toLowerCase();
+    if (s.includes('done') || s.includes('complet') || s.includes('approv')) return 'qy-status-done';
+    if (s.includes('reject') || s.includes('fail') || s.includes('decline')) return 'qy-status-rejected';
+    return 'qy-status-pending';
+}
+
+function qyRow(label, value){
+    if (value === undefined || value === null || value === '') return '';
+    return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
+}
+
+async function runQuery(){
+    const field = document.getElementById('qySearchField')?.value || 'user_id';
+    const value = (document.getElementById('qySearchValue')?.value || '').trim();
+
+    if (!value) { ToastManager.show('Enter a value to search first.', 'warning'); return; }
+
+    const spinner  = document.getElementById('qyLoadingSpinner');
+    const countEl  = document.getElementById('qyResultCount');
+    const resultsEl= document.getElementById('qyResults');
+    const emptyEl  = document.getElementById('qyEmpty');
+
+    if (spinner)   spinner.style.display = 'inline';
+    if (emptyEl)   emptyEl.style.display = 'none';
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    try {
+        const params = new URLSearchParams({
+            field, value, user: loggedUser || '', email: loggedEmail || ''
+        });
+        const resp = await fetch('/api/query?' + params.toString());
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
+
+        if (spinner) spinner.style.display = 'none';
+
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Note: full history scan hit a snag (${data.stop_reason||'unknown'}). Results shown may be partial — try again.`, 'warning', 8000);
+        }
+
+        const results = data.results || [];
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (countEl) countEl.textContent = `0 requests found for ${QY_FIELD_LABELS[field]} "${value}"`;
+            return;
+        }
+
+        if (countEl) countEl.textContent = `${results.length} request${results.length===1?'':'s'} found for ${QY_FIELD_LABELS[field]} "${value}"`;
+
+        if (resultsEl) resultsEl.innerHTML = results.map(r => `
+            <div class="qy-card">
+                <div class="qy-card-head">
+                    <div>
+                        <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
+                        <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
+                    </div>
+                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
+                </div>
+                ${qyRow('Submitted on', r.submitted_on)}
+                ${qyRow('Respondents', r.respondents)}
+                ${qyRow('User ID', r.user_id)}
+                ${qyRow('Otherapp ID', r.otherapp_id)}
+                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                ${qyRow('Bd Code', r.bd_code)}
+                ${qyRow('Duplicated Check', r.duplicated_check)}
+                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+            </div>
+        `).join('');
+
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Query failed: ' + e.message, 'error', 8000);
+    }
+}
+
 /* ⬇️ INITIALIZATION BLOCK ⬇️ */
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
@@ -2880,6 +3032,7 @@ if (loggedUser&&loggedUat) {
                 if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
                 if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
                 if (isAdmin||userModules.includes('target'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+                if (isAdmin||userModules.includes('analytics')||userModules.includes('query')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('query')"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
                 if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
             }
         }).catch(e=>console.error(e));
