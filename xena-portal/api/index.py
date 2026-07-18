@@ -42,6 +42,15 @@ RATE_LIMIT_RECORDS   = (50, 60)
 
 COINS_MULTIPLIER = 100000
 
+# Universal Query — maps a frontend "search by" key to the real Feishu column name(s)
+QUERY_FIELD_ALIASES = {
+    "user_id":     ["User ID"],
+    "numbering":   ["Numbering"],
+    "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID"],
+    "nid_number":  ["NID Number", "NID"],
+    "bd_code":     ["Bd Code", "BD Code"],
+}
+
 MONTHLY_ALLOCATOR_LIMITS = {
     "trend card": 10,
     "traffic card": 10, 
@@ -409,7 +418,7 @@ def get_user_permissions(email, name):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING (Fixing Analytics 5-min Timeout)
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None, deadline=None):
+def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
     all_items = []
     seen_ids  = set()
@@ -424,6 +433,8 @@ def fetch_feishu_records(table_id, from_dt=None, deadline=None):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     
     page_token = None
+    MAX_PAGE_RETRIES = 4  # per-page retry budget — absorbs transient "deadline_exceeded" style errors
+
     for _ in range(200):
         payload = {"page_size": 500} 
         if page_token: payload["page_token"] = page_token
@@ -431,58 +442,70 @@ def fetch_feishu_records(table_id, from_dt=None, deadline=None):
         # By sorting DESC, we encounter newest dates first. Once we hit old dates, we break immediately.
         if table_id == REQUESTS_TABLE_ID:
             payload["sort"] = [{"field_name": "Numbering", "desc": True}]
-        
-        try:
-            resp = session.post(url, json=payload, timeout=25)
-            if resp.status_code != 200:
-                fetch_complete = False
-                stop_reason = f"HTTP {resp.status_code}: {resp.text}"
-                break
-                
-            data = resp.json()
-            if data.get("code") != 0:
-                fetch_complete = False
-                stop_reason = f"Feishu Error {data.get('code')}: {data.get('msg')}"
-                break
-            
-            block = data.get("data", {})
-            items = block.get("items", [])
-            if not items: break
 
-            page_old_count = 0
-            for item in items:
-                rid = item.get("record_id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    master_keys.update(item.get("fields", {}).keys())
-                    
-                    if from_dt:
-                        raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
-                        record_dt = parse_feishu_date(raw_date)
-                        if record_dt and record_dt < (from_dt - timedelta(days=1)):
-                            page_old_count += 1
-            
-            # AGGRESSIVE DATE BOUNDARY GUARD: Eliminates the 5 minute Analytics wait.
-            # Since the table is sorted descending, if we find 25 old records on a single page,
-            # we have 100% crossed the date threshold and can safely kill the Feishu API loop.
-            if from_dt and page_old_count >= 25:
-                stop_reason = "Safely reached date boundary."
-                break
+        # ── RETRY THIS PAGE UP TO MAX_PAGE_RETRIES TIMES BEFORE GIVING UP ──
+        # A single transient Feishu error (deadline_exceeded, 5xx, network blip) used to
+        # kill the ENTIRE fetch after just one page. Now we retry the *same page* with
+        # backoff, and only stop the whole loop if it truly can't recover.
+        page_data = None
+        last_err = ""
+        for attempt in range(MAX_PAGE_RETRIES):
+            try:
+                resp = session.post(url, json=payload, timeout=25)
+                if resp.status_code != 200:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:300]}"
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
 
-            # Hard deadline — return partial results instead of timing out at Vercel's limit
-            if deadline and time.time() > deadline:
-                fetch_complete = False
-                stop_reason = "deadline_exceeded"
-                break
+                data = resp.json()
+                if data.get("code") != 0:
+                    last_err = f"Feishu Error {data.get('code')}: {data.get('msg')}"
+                    # Feishu's own "deadline_exceeded"/internal errors are almost always
+                    # transient on heavy/sorted tables — back off and retry same page.
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
 
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False):
+                page_data = data
+                last_err = ""
                 break
+            except Exception as e:
+                last_err = str(e)
+                time.sleep(0.5 * (attempt + 1))
 
-        except Exception as e:
+        if page_data is None:
+            # Exhausted retries for this page. Stop here but KEEP everything already
+            # fetched (previously this returned only whatever page was in-flight, often 500 rows).
             fetch_complete = False
-            stop_reason = str(e)
+            stop_reason = last_err or "Unknown fetch error"
+            break
+
+        block = page_data.get("data", {})
+        items = block.get("items", [])
+        if not items: break
+
+        page_old_count = 0
+        for item in items:
+            rid = item.get("record_id")
+            if rid and rid not in seen_ids:
+                seen_ids.add(rid)
+                all_items.append(item)
+                master_keys.update(item.get("fields", {}).keys())
+                
+                if from_dt:
+                    raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
+                    record_dt = parse_feishu_date(raw_date)
+                    if record_dt and record_dt < (from_dt - timedelta(days=1)):
+                        page_old_count += 1
+        
+        # AGGRESSIVE DATE BOUNDARY GUARD: Eliminates the 5 minute Analytics wait.
+        # Since the table is sorted descending, if we find 25 old records on a single page,
+        # we have 100% crossed the date threshold and can safely kill the Feishu API loop.
+        if from_dt and page_old_count >= 25:
+            stop_reason = "Safely reached date boundary."
+            break
+
+        page_token = block.get("page_token")
+        if not page_token or not block.get("has_more", False):
             break
 
     return all_items, master_keys, fetch_complete, stop_reason
@@ -856,12 +879,7 @@ def get_requests_table_snapshot(from_dt=None):
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
         
-    # When no date filter is set, still give the fetcher a 90-day boundary so
-    # the aggressive date guard can fire. Without this, from_dt=None skips the
-    # guard entirely and causes a 5-minute full-table scan on Vercel.
-    fetch_from_dt = from_dt if from_dt else (datetime.utcnow() - timedelta(days=90))
-    deadline = time.time() + 25   # 25 s hard limit — return partial data rather than timing out
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=fetch_from_dt, deadline=deadline)
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
     
     with _bg_sync_lock:
         _bg_sync["requests_items"]  = items
@@ -1071,14 +1089,20 @@ def points_records():
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
     raw_points_cache_key = "points_table_raw_items"
-    all_items = cache_get(raw_points_cache_key)
+    cached_bundle = cache_get(raw_points_cache_key)
 
-    if all_items is None:
-        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID) 
+    if cached_bundle is not None:
+        all_items      = cached_bundle["items"]
+        fetch_complete = cached_bundle["fetch_complete"]
+        stop_reason    = cached_bundle["stop_reason"]
+    else:
+        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
         if not fetch_complete and not all_items:
             return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
-            
-        cache_set(raw_points_cache_key, all_items, ttl=300)
+
+        cache_set(raw_points_cache_key,
+                  {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
+                  ttl=300)
 
     filtered = []
     for item in all_items:
@@ -1145,7 +1169,8 @@ def points_records():
     return jsonify({
         "records": page_records, "total": total_count, "page": page, "page_size": page_size,
         "total_pages": max(1, -(-total_count // page_size)),
-        "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum}
+        "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
+        "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason)
     })
 
 @app.route('/api/sync/refresh', methods=['POST'])
@@ -1175,6 +1200,96 @@ def points_search():
         args['search'] = args.pop('q')
         request.environ['QUERY_STRING'] = urllib.parse.urlencode(args, doseq=True)
     return points_records()
+
+def _norm_query_val(v):
+    return re.sub(r'\s+', '', str(v).strip().lower())
+
+@app.route('/api/query', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def query_records():
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    field = sanitize_text(request.args.get('field','')).strip().lower()
+    value = sanitize_text(request.args.get('value',''), 200).strip()
+
+    if field not in QUERY_FIELD_ALIASES:
+        return jsonify({"error": "Invalid search field."}), 400
+    if not value:
+        return jsonify({"error": "Please enter a value to search."}), 400
+
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not ({"analytics", "query"} & set(perms.get("modules", []))):
+        return jsonify({"error": "Access denied"}), 403
+
+    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("analytics",["all"])
+    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("analytics",["all"])
+    allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
+    allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
+
+    # No date bound at all — scans the FULL table snapshot, exactly like the plain-text request:
+    # "no limit time". Reuses the same background-refreshed cache as Analytics for speed.
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot()
+
+    if not fetch_complete and not all_items:
+        return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+
+    aliases = QUERY_FIELD_ALIASES[field]
+    target = _norm_query_val(value)
+    results = []
+
+    for item in all_items:
+        fields = item.get("fields", {})
+        raw_val = get_field_local(fields, *aliases)
+        cell = extract_field_text(raw_val)
+        if not cell or _norm_query_val(cell) != target:
+            continue
+
+        region = clean(get_field_local(fields, "Region", "Agency Region"))
+        acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
+        acm_in = clean(get_field_local(fields, "Acm Name (IN)"))
+        acm_fb = clean(get_field_local(fields, "Acm", "Assigned Member"))
+        if region in ("", "none"):
+            if acm_pk in PK_ACMS or acm_fb in PK_ACMS: region = "pk"
+            elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
+        acm = (acm_in if region == "in" else acm_pk) or acm_fb
+
+        if "all" not in allowed_acms_set and acm.lower().strip() not in allowed_acms_set:
+            continue
+        if "all" not in allowed_regs_set and region not in allowed_regs_set:
+            continue
+
+        submitted_raw = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
+        submitted_dt  = parse_feishu_date(submitted_raw)
+
+        results.append({
+            "numbering":        extract_field_text(get_field_local(fields, "Numbering")),
+            "request_type":     extract_field_text(get_field_local(fields, "Request Type", "Type")),
+            "submitted_on":     submitted_dt.strftime("%Y-%m-%d") if submitted_dt else extract_field_text(submitted_raw),
+            "respondents":      extract_field_text(get_field_local(fields, "Respondents")),
+            "user_id":          extract_field_text(get_field_local(fields, "User ID")),
+            "otherapp_id":      extract_field_text(get_field_local(fields, "Otherapp ID", "Otherapp Name")),
+            "acm":              acm.title() if acm else "",
+            "region":           region.upper() if region else "",
+            "bd_code":          extract_field_text(get_field_local(fields, "Bd Code", "BD Code")),
+            "status":           extract_field_text(get_field_local(fields, "Status", "Request Status")),
+            "reject_reason":    extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason")),
+            "audition_note":    extract_field_text(get_field_local(fields, "Audition note", "Audition Note")),
+            "duplicated_check": extract_field_text(get_field_local(fields, "Duplicated Check")),
+            "_sort_ts": submitted_dt.timestamp() if submitted_dt else 0,
+        })
+
+    results.sort(key=lambda r: r["_sort_ts"], reverse=True)
+    for r in results:
+        r.pop("_sort_ts", None)
+
+    audit.log(user.lower(), "QUERY_SEARCH", f"{field}={value}", ip=request.headers.get("X-Forwarded-For",""))
+
+    return jsonify({
+        "results": results, "count": len(results),
+        "field": field, "value": value,
+        "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
+        "served_from_background_cache": from_bg_cache
+    })
 
 @app.route('/api/analytics', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
