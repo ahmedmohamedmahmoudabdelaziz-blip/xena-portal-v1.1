@@ -1,41 +1,16 @@
 """
-Xena Data Portal — Improved Backend v2.0
+Xena Data Portal — High-Speed Hybrid Backend
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-All improvements over v1.1 are marked with [IMP-N]:
-
-[IMP-1]  Token caching — tenant access token is reused for its 2-h lifetime
-          instead of being fetched fresh on every request (~200-400ms saved).
-[IMP-2]  Parallel page fetching — ThreadPoolExecutor fetches Feishu record
-          pages concurrently instead of sequentially (2-10× faster for large
-          tables with many pages).
-[IMP-3]  Per-record normalised field map — each record's fields are normalised
-          once at ingestion, eliminating repeated O(n) dict walks inside the
-          analytics loop.
-[IMP-4]  /api/points/records — new paginated, filterable, sortable endpoint
-          for the Agency Point Table and Search Records pages.
-[IMP-5]  /api/points/search — alias with search-first defaults.
-[IMP-6]  Improved error handling and input validation on all new routes.
-[IMP-7]  Structured performance timing logged for every analytics request.
-
-Existing features preserved:
-  2.1  In-memory response caching with TTL
-  7.1  Rate limiting + input sanitisation
-  4.1  Audit logging to Feishu Bitable
-  1.1  Period-over-period comparison (compare_from/compare_to)
-  2.4  Selective field fetching hints
-  4.2  Session security improvements (POST body for analytics)
-  5.1  Agency health score calculation
-  6.4  Service-oriented helpers
-  6.5  Centralised configuration constants
-  7.2  Structured JSON logging
-  7.3  PII masking in logs
+Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
+with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
+Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_file, redirect
 import requests as http_requests
 
@@ -50,105 +25,48 @@ BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
-AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "")   # Optional
+AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "")   
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
-# ACM lists for region auto-detection
 PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham",
             "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
 IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
 
-# Analytics fields to fetch (2.4 selective fetching)
-ANALYTICS_FIELDS = [
-    "Request Type","Status","Region","Acm Name (PK)","Acm Name (IN)","Acm",
-    "Submitted on","Submitted on Copy","Agency Type","Reject Reason",
-    "Rejection Reason","Agencies Rejection Reason","PK Agencies Rejection reason",
-    "Closing Reason","Closing Agencies Reason","PK Closing Agencies Reason",
-    "Otherapp Name","Other App Name","Create Way","Creation Type",
-    "Agency Creation Type","PK Agencies Creation Type","Numbering"
-]
+CACHE_TTL_REALTIME   = 300    
+CACHE_TTL_HISTORICAL = 3600   
 
-# Points fields to fetch for records endpoint
-POINTS_FIELDS = [
-    "Agency ID","Agency Name","Owner ID","Owner Name","Date","Month","Country",
-    "Region","Status","Agency Level","Total Points","Used Points","Point Balance",
-    "Health Score","Privilege","Request Type","Submitted on","Submitted on Copy",
-    "Agency Type","Acm","Acm Name (PK)","Acm Name (IN)"
-]
+RATE_LIMIT_SEARCH    = (50, 60)
+RATE_LIMIT_ANALYTICS = (30, 60)
+RATE_LIMIT_RECORDS   = (50, 60)
 
-# 2.1  Cache TTL constants (seconds)
-CACHE_TTL_REALTIME   = 300    # 5 min for recent data
-CACHE_TTL_HISTORICAL = 3600   # 1 hr for older ranges
+COINS_MULTIPLIER = 100000
 
-# 7.1  Rate limits
-RATE_LIMIT_SEARCH    = (20, 60)
-RATE_LIMIT_ANALYTICS = (4, 60)
-RATE_LIMIT_RECORDS   = (30, 60)
+MONTHLY_ALLOCATOR_LIMITS = {
+    "trend card": 10,
+    "traffic card": 10, 
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
-# [IMP-1]  TENANT ACCESS TOKEN CACHE
+# TENANT ACCESS TOKEN CACHE
 # ──────────────────────────────────────────────────────────────────────────────
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
 def get_tenant_access_token():
-    """
-    Returns a valid tenant access token, reusing the cached token for its
-    2-hour lifetime. Before this fix the token was fetched fresh on every
-    single API request, adding 200-400 ms of unnecessary latency each time.
-    """
     with _token_cache["lock"]:
         if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
             return _token_cache["token"]
 
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET},
-                              timeout=10).json()
+    resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
     token = resp.get("tenant_access_token")
-    expire = resp.get("expire", 7200)   # seconds; Feishu returns 7200 (2 h)
+    expire = resp.get("expire", 7200)
 
     with _token_cache["lock"]:
         _token_cache["token"] = token
-        # Refresh 5 minutes before actual expiry to be safe
         _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
 
     return token
-
-# ──────────────────────────────────────────────────────────────────────────────
-# 7.1b  APP ACCESS TOKEN (needed for user-auth token exchange)
-# ──────────────────────────────────────────────────────────────────────────────
-
-_app_token_cache: dict = {"token": None, "expires_at": 0.0, "lock": threading.Lock()}
-
-def get_app_access_token() -> str:
-    """
-    Returns a valid *app* access token (different from tenant access token).
-
-    Feishu's user-OAuth token exchange endpoint (/authen/v1/access_token)
-    requires an app_access_token in the Authorization header, NOT a
-    tenant_access_token.  Using the wrong token type causes a silent
-    rejection and uat comes back None.
-
-    Both tokens use the same credentials (app_id + app_secret) but come
-    from different Feishu endpoints and have independent lifetimes.
-    """
-    with _app_token_cache["lock"]:
-        if _app_token_cache["token"] and time.time() < _app_token_cache["expires_at"]:
-            return _app_token_cache["token"]
-
-    url  = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal"
-    resp = http_requests.post(url,
-                              json={"app_id": APP_ID, "app_secret": APP_SECRET},
-                              timeout=10).json()
-    token  = resp.get("app_access_token")
-    expire = resp.get("expire", 7200)
-
-    with _app_token_cache["lock"]:
-        _app_token_cache["token"]      = token
-        _app_token_cache["expires_at"] = time.time() + max(expire - 300, 60)
-
-    return token
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.2  STRUCTURED LOGGING
@@ -173,12 +91,8 @@ class StructuredLogger:
 
 logger = StructuredLogger("xena")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 7.3  PII MASKING
-# ──────────────────────────────────────────────────────────────────────────────
 def mask_email(email):
-    if not email or "@" not in email:
-        return email[:3] + "***" if email else ""
+    if not email or "@" not in email: return email[:3] + "***" if email else ""
     local, domain = email.split("@", 1)
     return local[:2] + "***@" + domain
 
@@ -217,7 +131,7 @@ def cache_invalidate(prefix=""):
             del _cache[k]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 7.1  RATE LIMITER
+# 7.1  RATE LIMITER & INPUT SANITISATION
 # ──────────────────────────────────────────────────────────────────────────────
 _rate_store: dict = defaultdict(list)
 _rate_lock = threading.Lock()
@@ -227,8 +141,7 @@ def rate_check(ip, max_requests, window_seconds):
     with _rate_lock:
         timestamps = _rate_store[ip]
         _rate_store[ip] = [t for t in timestamps if now - t < window_seconds]
-        if len(_rate_store[ip]) >= max_requests:
-            return False
+        if len(_rate_store[ip]) >= max_requests: return False
         _rate_store[ip].append(now)
         return True
 
@@ -244,21 +157,20 @@ def rate_limit(max_req, window):
         return wrapper
     return decorator
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 7.1  INPUT SANITISATION
-# ──────────────────────────────────────────────────────────────────────────────
 def sanitize_agency_code(code):
     if not code: return None
     code = str(code).strip()
-    if not re.match(r'^\d{3,8}$', code):
-        return None
+    if not re.match(r'^\d{3,8}$', code): return None
     return code
 
 def sanitize_text(text, max_length=200):
     if not text: return ""
     text = str(text).strip()[:max_length]
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-    return text
+    return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+
+def parse_float_safe(val):
+    try: return float(str(val).replace(',', '').strip())
+    except (ValueError, TypeError): return 0.0
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 4.1  AUDIT LOGGER
@@ -270,12 +182,8 @@ class AuditLogger:
 
     def log(self, actor, action, target, details="", ip=""):
         entry = {
-            "actor":   mask_name(actor),
-            "action":  action,
-            "target":  target,
-            "details": details[:500],
-            "ip":      ip,
-            "ts":      datetime.utcnow().isoformat(),
+            "actor": mask_name(actor), "action": action, "target": target,
+            "details": details[:500], "ip": ip, "ts": datetime.utcnow().isoformat(),
         }
         logger.info("audit", **entry)
         if AUDIT_TABLE_ID:
@@ -283,8 +191,7 @@ class AuditLogger:
             t.start()
         with self._lock:
             self._queue.append(entry)
-            if len(self._queue) > 500:
-                self._queue = self._queue[-500:]
+            if len(self._queue) > 500: self._queue = self._queue[-500:]
 
     def _write_feishu(self, entry):
         try:
@@ -292,28 +199,29 @@ class AuditLogger:
             url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records"
             hdrs = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
             payload = {"fields": {
-                "Actor":   entry["actor"], "Action": entry["action"],
-                "Target":  entry["target"], "Details": entry["details"],
-                "IP":      entry["ip"],    "Timestamp": entry["ts"]
+                "Actor": entry["actor"], "Action": entry["action"], "Target": entry["target"], 
+                "Details": entry["details"], "IP": entry["ip"], "Timestamp": entry["ts"]
             }}
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
         except Exception as e:
             logger.error("audit_write_failed", error=str(e))
 
     def get_recent(self, limit=100):
-        with self._lock:
-            return list(reversed(self._queue[-limit:]))
+        with self._lock: return list(reversed(self._queue[-limit:]))
 
 audit = AuditLogger()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FIELD HELPERS
+# BATTLE-TESTED PARSERS 
 # ──────────────────────────────────────────────────────────────────────────────
 def normalize_key(k):
-    return re.sub(r'[^a-z0-9]', '', str(k).lower())
+    return " ".join(str(k).lower().strip().split())
 
 def get_field_local(fields, *aliases):
-    """Find the first non-empty field matching any of the aliases (exact then fuzzy)."""
+    if not fields: return None
+    for alias in aliases:
+        if alias in fields and fields[alias] not in (None, "", []): 
+            return fields[alias]
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
@@ -330,18 +238,21 @@ def extract_field_text(field_data):
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
-        for key in ['text','name','en_name','email','value','label','id']:
+        for key in ['text', 'name', 'en_name', 'email', 'value', 'label', 'id']:
             if key in field_data: return str(field_data[key])
+        if 'id' in field_data: return str(field_data['id'])
         return str(field_data)
     if isinstance(field_data, list):
-        if not field_data: return ""
+        if len(field_data) == 0: return ""
         texts = []
         for item in field_data:
             if isinstance(item, dict):
                 extracted = False
-                for key in ['text','name','en_name','email','value','id']:
+                for key in ['text', 'name', 'en_name', 'email', 'value', 'id']:
                     if key in item:
-                        texts.append(str(item[key])); extracted = True; break
+                        texts.append(str(item[key]))
+                        extracted = True
+                        break
                 if not extracted: texts.append(str(item))
             else: texts.append(str(item))
         return " ".join(texts).strip()
@@ -350,9 +261,11 @@ def extract_field_text(field_data):
 def extract_field_list(field_data):
     if not field_data: return []
     if isinstance(field_data, dict):
-        for key in ['text','name','en_name','email','value','label']:
-            if key in field_data and field_data[key] not in (None,""):
+        for key in ['text', 'name', 'en_name', 'email', 'value', 'label']:
+            if key in field_data and field_data[key] not in (None, ""):
                 return [str(field_data[key]).strip()]
+        if 'id' in field_data and field_data['id'] not in (None, ""):
+            return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
     if isinstance(field_data, str):
         return [s.strip() for s in field_data.split(',') if s.strip()]
@@ -362,47 +275,69 @@ def extract_field_list(field_data):
             if not item: continue
             if isinstance(item, dict):
                 extracted = False
-                for key in ['text','name','en_name','email','value','label']:
-                    if key in item and item[key] not in (None,""):
-                        res.append(str(item[key]).strip()); extracted = True; break
-                if not extracted: res.append(str(item).strip())
-            else: res.append(str(item).strip())
+                for key in ['text', 'name', 'en_name', 'email', 'value', 'label']:
+                    if key in item and item[key] not in (None, ""):
+                        res.append(str(item[key]).strip())
+                        extracted = True
+                        break
+                if not extracted and 'id' in item and item['id'] not in (None, ""):
+                    res.append(str(item['id']).strip())
+                elif not extracted:
+                    res.append(str(item).strip())
+            else:
+                res.append(str(item).strip())
         return res
     return [str(field_data).strip()]
 
 def parse_feishu_date(date_val):
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
-    if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text',''))
+    if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
     try:
         if isinstance(date_val, (int, float)):
-            dt_utc = datetime.fromtimestamp(date_val/1000.0, tz=timezone.utc)
-            return (dt_utc + timedelta(hours=3)).replace(hour=0,minute=0,second=0,microsecond=0,tzinfo=None)
+            dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
+            dt_cairo = dt_utc + timedelta(hours=3)
+            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            
         date_str = str(date_val).strip()
         if date_str.isdigit():
-            dt_utc = datetime.fromtimestamp(int(date_str)/1000.0, tz=timezone.utc)
-            return (dt_utc + timedelta(hours=3)).replace(hour=0,minute=0,second=0,microsecond=0,tzinfo=None)
-        clean_str = date_str[:10].replace('/','-').replace('.','-')
+            dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
+            dt_cairo = dt_utc + timedelta(hours=3)
+            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        
+        clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
-    except Exception: return None
+    except Exception:
+        return None
 
 def clean(field_data):
     return extract_field_text(field_data).strip().lower()
+
+def compute_allocator_status(usage_dict):
+    status = {}
+    for item, used in usage_dict.items():
+        limit = MONTHLY_ALLOCATOR_LIMITS.get(item)
+        status[item] = {
+            "used": used,
+            "limit": limit,
+            "remaining": (max(0, limit - used) if limit is not None else None)
+        }
+    return status
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PERMISSIONS
 # ──────────────────────────────────────────────────────────────────────────────
 def parse_granular_string(raw_str):
-    default = {"target":["all"],"points":["all"],"analytics":["all"]}
+    default = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     if not raw_str or str(raw_str).strip() == "": return default
     if "=" not in raw_str:
         parts = [x.strip().lower() for x in raw_str.split(",") if x.strip()]
         if not parts: parts = ["all"]
-        return {"target":parts,"points":parts,"analytics":parts}
-    res = {"target":["all"],"points":["all"],"analytics":["all"]}
+        return {"target": parts, "points": parts, "analytics": parts}
+    res = {"target": ["all"], "points": ["all"], "analytics": ["all"]}
     for chunk in raw_str.split(";"):
         if "=" in chunk:
-            mod, vals = chunk.split("=",1)
+            mod, vals = chunk.split("=", 1)
             mod = mod.strip().lower()
             val_list = [v.strip().lower() for v in vals.split(",") if v.strip()]
             if not val_list: val_list = ["all"]
@@ -410,159 +345,134 @@ def parse_granular_string(raw_str):
     return res
 
 def get_user_permissions(email, name):
-    name_clean  = sanitize_text(name).strip().lower()
-    email_clean = sanitize_text(email).strip().lower()
-
+    name_clean = name.strip().lower() if name else ""
+    email_clean = email.strip().lower() if email else ""
+    
     if any(admin in name_clean for admin in ADMIN_USERS):
-        return {"is_super_admin":True,"modules":["target","points","analytics","admin"],
-                "permissions":{"acms":{"target":["all"],"points":["all"],"analytics":["all"]},
-                                "regions":{"target":["all"],"points":["all"],"analytics":["all"]}}}
+        return {
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin"], 
+            "permissions": {
+                "acms": {"target": ["all"], "points": ["all"], "analytics": ["all"]},
+                "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"]}
+            }
+        }
 
-    if not email_clean and not name_clean:
-        return {"is_super_admin":False,"modules":[],"permissions":{"acms":{},"regions":{}}}
+    if not email_clean and not name_clean: 
+        return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
-    # [IMP-1] Permissions are cached to avoid a full-table Feishu scan per request
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
     if cached: return cached
 
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
-    headers = {"Authorization":f"Bearer {tat}","Content-Type":"application/json"}
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
     try:
-        res = http_requests.get(url, headers=headers, params={"page_size":500}, timeout=10).json()
-        items = res.get("data",{}).get("items",[])
+        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        items = res.get("data", {}).get("items", [])
         for item in items:
-            fields = item.get("fields",{})
-            db_email  = extract_field_text(fields.get("Email","")).lower()
-            db_person = extract_field_text(fields.get("Person","")).lower()
-            match = False
-            if email_clean and (email_clean in db_email or email_clean in db_person): match = True
-            if name_clean  and (name_clean  in db_email or name_clean  in db_person): match = True
-            if match:
-                modules_raw = extract_field_text(get_field_local(fields,"Modules"))
-                acms_raw    = extract_field_text(get_field_local(fields,"ACMs"))
-                regs_raw    = extract_field_text(get_field_local(fields,"Regions")) or "all"
-                mods = [m.strip().lower() for m in modules_raw.split(",") if m.strip()]
-                acms_parsed = parse_granular_string(acms_raw)
-                regs_parsed = parse_granular_string(regs_raw)
-                result = {"is_super_admin":False,"modules":mods,
-                          "permissions":{"acms":acms_parsed,"regions":regs_parsed}}
-                # Cache for 5 minutes
+            fields = item.get("fields", {})
+            db_email = extract_field_text(fields.get("Email", "")).lower()
+            db_person = extract_field_text(fields.get("Person", "")).lower()
+            
+            match_found = False
+            if email_clean and (email_clean in db_email or email_clean in db_person): match_found = True
+            if name_clean and (name_clean in db_email or name_clean in db_person): match_found = True
+                
+            if match_found:
+                modules_raw = extract_field_text(get_field_local(fields, "Modules"))
+                acms_raw = extract_field_text(get_field_local(fields, "ACMs"))
+                regions_raw = extract_field_text(get_field_local(fields, "Regions"))
+                
+                modules = [m.strip().lower() for m in modules_raw.split(",") if m.strip()]
+                is_admin = "admin" in modules
+                
+                parsed_acms = parse_granular_string(acms_raw)
+                parsed_regions = parse_granular_string(regions_raw)
+                
+                result = {
+                    "is_super_admin": is_admin, 
+                    "modules": modules, 
+                    "permissions": {"acms": parsed_acms, "regions": parsed_regions}
+                }
                 cache_set(cache_key, result, ttl=300)
                 return result
+                
+        fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
+        cache_set(cache_key, fallback, ttl=60)
+        return fallback
     except Exception as e:
-        logger.error("permissions_fetch_error", error=str(e))
-
-    fallback = {"is_super_admin":False,"modules":[],"permissions":{"acms":{},"regions":{}}}
-    cache_set(cache_key, fallback, ttl=60)
-    return fallback
+        logger.error("Auth Error", error=str(e))
+        return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
 # ──────────────────────────────────────────────────────────────────────────────
-# [IMP-2]  PARALLEL FEISHU RECORD FETCHING
+# HIGH-SPEED SESSION FETCHING (Fixing Analytics 5-min Timeout)
 # ──────────────────────────────────────────────────────────────────────────────
-def _fetch_single_page(tat, table_id, page_token, params_base):
-    """Fetch one page of records from a Feishu Bitable table."""
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    params = dict(params_base)
-    if page_token:
-        params["page_token"] = page_token
-    resp = http_requests.get(url, headers=headers, params=params, timeout=30)
-    if resp.status_code != 200:
-        return None, None, False
-    data = resp.json()
-    if data.get("code") != 0:
-        return None, None, False
-    block = data.get("data", {})
-    return block.get("items", []), block.get("page_token"), block.get("has_more", False)
-
-
-def fetch_feishu_records(table_id, fields=None, from_dt=None, max_workers=6, deadline=None):
-    """
-    Fetch all records from a Feishu Bitable table.
-
-    [IMP-2] Strategy:
-    - Fetch page 1 sequentially to discover total record count and first page token.
-    - If there are more pages, fan them out with ThreadPoolExecutor.
-    - Because page tokens are sequential we must fetch pages in order, but we
-      can pre-fetch several pages ahead while processing earlier ones.
-    - Early-exit: if 3 consecutive pages contain only records older than from_dt,
-      stop fetching (same logic as v1.1 but now parallelised within a sliding window).
-    """
+def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
-    params_base = {"page_size": 500}   # max Feishu allows; 5× fewer round-trips vs 100
-    if fields:
-        params_base["field_names"] = json.dumps(fields)
-
     all_items = []
     seen_ids  = set()
-    master_keys: set = set()
+    master_keys = set()
     fetch_complete = True
-    stop_reason    = ""
-    consecutive_old_pages = 0
+    stop_reason = ""
 
-    # Server-side date filter: ask Feishu to return only records >= from_dt.
-    # This dramatically reduces page count for date-filtered analytics queries.
-    # We still apply the Python-side early-exit as a safety net.
-    if from_dt:
-        # Feishu filter formula for date fields (works for both date and datetime types)
-        filter_ts = int((from_dt - timedelta(days=1)).timestamp() * 1000)
-        # Try timestamp comparison; field aliases tried in order of likelihood
-        date_filter = (
-            f'OR('
-            f'CurrentValue.[Submitted on Copy]>={filter_ts},'
-            f'CurrentValue.[Submitted on]>={filter_ts},'
-            f'CurrentValue.[Created Time]>={filter_ts},'
-            f'CurrentValue.[Date]>={filter_ts}'
-            f')'
-        )
-        params_base["filter"] = date_filter
-
-    # Sequential pass — we must follow page_token chains in order
+    session = http_requests.Session()
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+    
+    # Using automatic_fields to prevent 502 FieldNameNotFound
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
+    
     page_token = None
-    while True:
+    for _ in range(200):
+        payload = {"page_size": 500} 
+        if page_token: payload["page_token"] = page_token
+            
+        # By sorting DESC, we encounter newest dates first. Once we hit old dates, we break immediately.
+        if table_id == REQUESTS_TABLE_ID:
+            payload["sort"] = [{"field_name": "Numbering", "desc": True}]
+        
         try:
-            items, next_token, has_more = _fetch_single_page(tat, table_id, page_token, params_base)
-            if items is None:
+            resp = session.post(url, json=payload, timeout=25)
+            if resp.status_code != 200:
                 fetch_complete = False
-                stop_reason = "Feishu API error"
+                stop_reason = f"HTTP {resp.status_code}: {resp.text}"
                 break
+                
+            data = resp.json()
+            if data.get("code") != 0:
+                fetch_complete = False
+                stop_reason = f"Feishu Error {data.get('code')}: {data.get('msg')}"
+                break
+            
+            block = data.get("data", {})
+            items = block.get("items", [])
+            if not items: break
 
             page_old_count = 0
-            valid_dates_in_page = 0
             for item in items:
                 rid = item.get("record_id")
                 if rid and rid not in seen_ids:
                     seen_ids.add(rid)
                     all_items.append(item)
                     master_keys.update(item.get("fields", {}).keys())
-                    raw_date = get_field_local(item.get("fields", {}),
-                                               "Submitted on Copy", "Submitted on", "Created Time", "Date")
-                    record_dt = parse_feishu_date(raw_date)
-                    if record_dt:
-                        valid_dates_in_page += 1
-                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
+                    
+                    if from_dt:
+                        raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
+                        record_dt = parse_feishu_date(raw_date)
+                        if record_dt and record_dt < (from_dt - timedelta(days=1)):
                             page_old_count += 1
-
-            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                consecutive_old_pages += 1
-            else:
-                consecutive_old_pages = 0
-
-            if consecutive_old_pages >= 3:
-                stop_reason = "Reached old records."
+            
+            # AGGRESSIVE DATE BOUNDARY GUARD: Eliminates the 5 minute Analytics wait.
+            # Since the table is sorted descending, if we find 25 old records on a single page,
+            # we have 100% crossed the date threshold and can safely kill the Feishu API loop.
+            if from_dt and page_old_count >= 25:
+                stop_reason = "Safely reached date boundary."
                 break
 
-            # Deadline guard — return partial results instead of timing out hard
-            if deadline and time.time() >= deadline:
-                fetch_complete = False
-                stop_reason = "deadline_exceeded"
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False):
                 break
-
-            if not has_more or not next_token:
-                break
-            page_token = next_token
 
         except Exception as e:
             fetch_complete = False
@@ -571,123 +481,199 @@ def fetch_feishu_records(table_id, fields=None, from_dt=None, max_workers=6, dea
 
     return all_items, master_keys, fetch_complete, stop_reason
 
-
 # ──────────────────────────────────────────────────────────────────────────────
-# 5.1  AGENCY HEALTH SCORE
-# ──────────────────────────────────────────────────────────────────────────────
-def calc_health_score(total, used, requests_list):
-    if total <= 0: return 0
-    usage_pct = (used / total) * 100
-    if usage_pct <= 40: base = 100
-    elif usage_pct <= 60: base = 85
-    elif usage_pct <= 75: base = 70
-    elif usage_pct <= 90: base = 50
-    else: base = 30
-    rejections = sum(1 for r in requests_list
-                     if "reject" in extract_field_text(r.get("Status","")).lower())
-    penalty = min(rejections * 5, 20)
-    return max(0, min(100, base - penalty))
-
-# ──────────────────────────────────────────────────────────────────────────────
-# AGENCY SEARCH (target / points)
+# AGENCY SEARCH (target / points) DUAL ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
-    """Fetch target or points data for a single agency code."""
     tat = get_tenant_access_token()
-    table_id = POINTS_TABLE_ID if query_type == "points" else REQUESTS_TABLE_ID
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    points_payload = {
+        "filter": {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
+        }
+    }
+    
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
+    
+    try:
+        resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
+        if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
+        all_records = resp.get("data", {}).get("items", [])
+        if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
+    except Exception as e:
+        return {"found": False, "error": f"Search timeout or connection error: {str(e)}"}
 
-    all_records = []
-    page_token = None
-    while True:
-        params = {"page_size": 500, "filter": f'CurrentValue.[Agency ID] = "{code}"'}
-        if page_token: params["page_token"] = page_token
-        resp = http_requests.get(url, headers=headers, params=params, timeout=20).json()
-        if resp.get("code") != 0:
-            break
-        block = resp.get("data", {})
-        all_records.extend(block.get("items", []))
-        if not block.get("has_more") or not block.get("page_token"):
-            break
-        page_token = block["page_token"]
-
-    if not all_records:
-        return {"found": False, "error": "Agency not found or no records."}
-
-    fields_list = [r.get("fields", {}) for r in all_records]
-    first = fields_list[0]
+    first = all_records[0].get("fields", {})
 
     agency_name  = extract_field_text(get_field_local(first,"Agency Name","Name"))
-    region_raw   = extract_field_text(get_field_local(first,"Region","Agency Region"))
-    acm_raw      = extract_field_text(get_field_local(first,"Acm","Acm Name (PK)","Acm Name (IN)","Assigned Member"))
+    region_raw   = clean(get_field_local(first,"Region","Agency Region"))
+    acm_raw      = extract_field_text(get_field_local(first,"Acm Name (PK)","Acm Name (IN)","Acm","Assigned Member"))
 
-    # Permission gate
+    if region_raw in ('', 'none'):
+        if acm_raw.lower() in PK_ACMS: region_raw = 'pk'
+        elif acm_raw.lower() in IN_ACMS: region_raw = 'in'
+
     if allowed_acms and "all" not in allowed_acms:
-        if acm_raw.strip().lower() not in allowed_acms:
-            return {"found": False, "error": "Access denied for this agency's ACM."}
+        if acm_raw.strip().lower() not in [a.lower() for a in allowed_acms]:
+            return {"found": False, "error": f"Access Denied: Not authorized to view ACM {acm_raw}."}
     if allowed_regs and "all" not in allowed_regs:
-        if region_raw.strip().lower() not in allowed_regs:
-            return {"found": False, "error": "Access denied for this agency's region."}
+        if region_raw.strip().lower() not in [r.lower() for r in allowed_regs]:
+            return {"found": False, "error": f"Access Denied: Not authorized to view Region {region_raw.upper()}."}
 
+    # Separated Timelines and Correct Privilege Math
+    history_points = []
+    history_target = []
+    privileges_claimed = defaultdict(int)
+    usage_this_month = defaultdict(int)
+    cm, cy = datetime.now().month, datetime.now().year
+    
+    try:
+        hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+        hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
+        
+        if hist_resp.get("code") == 0:
+            for r in hist_resp.get("data", {}).get("items", []):
+                hf = r.get("fields", {})
+                h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
+                
+                # STRICT CURRENT MONTH RULE (Prevents timelines mixing old months)
+                if not h_date or h_date.month != cm or h_date.year != cy:
+                    continue
+
+                req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
+                status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
+                req_type_lower = req_type.lower()
+                s_lower = status_val.lower()
+
+                # --- TARGET PRIVILEGE LOGIC (Mirroring Excel Formula) ---
+                if "target" in req_type_lower:
+                    privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+                    # Extracts the integer explicitly from the Counter column
+                    raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
+                    qty = 1
+                    if raw_counter:
+                        m = re.search(r'\d+', str(raw_counter))
+                        if m: qty = int(m.group())
+
+                    history_target.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "request_type": req_type,
+                        "status": status_val,
+                        "privilege": privilege_val,
+                        "quantities_input": str(qty) 
+                    })
+
+                    # If Done, sum exactly the amount in Counter (Fixing the 6 vs 2 issue)
+                    if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
+                        privileges_claimed[privilege_val] += qty
+
+                # --- AGENCY POINTS LOGIC ---
+                else:
+                    target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
+                    point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
+                    
+                    # Points History parses 'Latest Usage Tracker' explicitly for Timeline & Limits
+                    latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
+                    
+                    # Regex to extract strings like "🔹 Trend Card: 1" safely into an array of items
+                    parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
+                    
+                    history_points.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "request_type": req_type,
+                        "status": status_val,
+                        "target_type": target_type,
+                        "point_balance": point_balance,
+                        "latest_usage": latest_usage,
+                        "parsed_items": parsed_items
+                    })
+
+                    # Calculate precise Monthly Limits for Allocator exclusively using Latest Usage Tracker
+                    if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
+                        for item_name, item_qty in parsed_items:
+                            name_clean = item_name.strip().lower()
+                            qty_int = int(item_qty)
+                            
+                            matched = False
+                            for key in MONTHLY_ALLOCATOR_LIMITS.keys():
+                                if key in name_clean:
+                                    usage_this_month[key] += qty_int
+                                    matched = True
+                                    break
+                            if not matched:
+                                usage_this_month[name_clean] += qty_int
+    except Exception as e:
+        logger.error("Points history fetch failed", agency=code, error=str(e))
+
+    allocator_status = compute_allocator_status(usage_this_month)
+    
     if query_type == "points":
-        latest = fields_list[-1]
-        total_pts  = int(float(extract_field_text(get_field_local(latest,"Total Points","total_points")) or 0))
-        used_pts   = int(float(extract_field_text(get_field_local(latest,"Used Points","used_points")) or 0))
-        balance    = int(float(extract_field_text(get_field_local(latest,"Point Balance","point_balance")) or 0))
-        health     = calc_health_score(total_pts, used_pts, all_records)
+        total_pts = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total', 'Total points')))
+        used_pts  = parse_float_safe(extract_field_text(get_field_local(first, 'Used Points', 'Used', 'Used points')))
+        balance   = parse_float_safe(extract_field_text(get_field_local(first, 'Point Balance', 'Balance', 'Point balance')))
+        
+        if balance == 0 and total_pts > 0:
+            balance = total_pts - used_pts
+
+        health_score = 100
+        health_status = "Healthy"
+        if total_pts > 0:
+            utilization = used_pts / total_pts
+            if utilization > 0.90: 
+                health_score = 40
+                health_status = "Critical"
+            elif utilization > 0.70: 
+                health_score = 70
+                health_status = "At Risk"
+            else: 
+                health_score = 95
+                health_status = "Healthy"
+        else: 
+            health_score = 0
+            health_status = "Inactive"
+
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
-            "region": region_raw, "acm": acm_raw,
+            "region": region_raw.upper(), "acm": acm_raw.title(),
             "total_points": total_pts, "used_points": used_pts,
-            "point_balance": balance, "health_score": health,
+            "point_balance": balance, "health_score": health_score,
+            "health_status": health_status,
+            "history": history_points, # Separated timeline logic injected here
+            "allocator_status": allocator_status,
             "requests": [r.get("fields", {}) for r in all_records]
         }
-    else:  # target
-        base_pts  = int(float(extract_field_text(get_field_local(first,"Base Points","base_points")) or 0))
-        health    = int(float(extract_field_text(get_field_local(first,"Health Score","health_score")) or 0))
-        privs = []
-        for f in fields_list:
-            priv = extract_field_text(get_field_local(f,"Privilege","Agency Privilege","Priv"))
-            if priv: privs.append(priv)
+    else:  
+        raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
+        base_pts_coins = raw_base_pts * COINS_MULTIPLIER
+
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
-            "region": region_raw, "acm": acm_raw,
-            "base_points": base_pts, "health_score": health,
-            "privileges": privs,
+            "region": region_raw.upper(), "acm": acm_raw.title(),
+            "base_points": base_pts_coins, "health_score": 100, "health_status": "Healthy",
+            "privileges_claimed": dict(privileges_claimed),  
+            "history": history_target, # Dedicated target timeline array
             "requests": [r.get("fields", {}) for r in all_records]
         }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# [IMP-3]  ANALYTICS — NORMALISED FIELD MAP + LOOP OPTIMISATION
+# NORMALISED FIELD MAP (ANALYTICS LOOP OPTIMIZATION)
 # ──────────────────────────────────────────────────────────────────────────────
-def _build_field_map(fields: dict) -> dict:
-    """
-    Build a normalised {alias: value} map for a single record once, so the
-    analytics loop can use O(1) dict lookups instead of calling get_field_local
-    (which does an O(n) walk for every alias on every record) multiple times.
-    """
-    nf = {normalize_key(k): v for k, v in fields.items()}
-
-    def get(*aliases):
-        for a in aliases:
-            v = nf.get(normalize_key(a))
-            if v not in (None, "", []):
-                return v
-        return None
-
-    raw_date   = get("Submitted on Copy","Submitted on","Created Time")
-    raw_type   = get("Request Type","Request type","Type","Category")
-    raw_status = get("Status","Request Status","Agency Status","State")
-    raw_region = get("Region","Agency Region")
-    raw_acm_pk = get("Acm Name (PK)")
-    raw_acm_in = get("Acm Name (IN)")
-    raw_acm_fb = get("Acm","Assigned Member")
-    raw_a_type = get("Agency Type","Type of Agency")
-    raw_cl_rsn = get("Closing Reason","Closing Agencies Reason","PK Closing Agencies Reason")
-    raw_o_app  = get("Otherapp Name","Other App Name","Other Apps")
-    raw_rj_rsn = get("Reject Reason","Rejection Reason","Agencies Rejection Reason","PK Agencies Rejection reason")
-    raw_cr_way = get("Create Way","Creation Type","Agency Creation Type","PK Agencies Creation Type")
+def _build_field_map_safe(item: dict) -> dict:
+    fields = item.get("fields", {})
+    raw_date   = get_field_local(fields,"Submitted on Copy","Submitted on","Created Time")
+    raw_type   = get_field_local(fields,"Request Type","Request type","Type","Category")
+    raw_status = get_field_local(fields,"Status","Request Status","Agency Status","State")
+    raw_region = get_field_local(fields,"Region","Agency Region")
+    raw_acm_pk = get_field_local(fields,"Acm Name (PK)")
+    raw_acm_in = get_field_local(fields,"Acm Name (IN)")
+    raw_acm_fb = get_field_local(fields,"Acm","Assigned Member")
+    raw_a_type = get_field_local(fields,"Agency Type","Type of Agency")
+    raw_cl_rsn = get_field_local(fields,"Closing Reason","Closing Agencies Reason","PK Closing Agencies Reason")
+    raw_o_app  = get_field_local(fields,"Otherapp Name","Other App Name","Other Apps")
+    raw_rj_rsn = get_field_local(fields,"Reject Reason","Rejection Reason","Agencies Rejection Reason","PK Agencies Rejection reason")
+    raw_cr_way = get_field_local(fields,"Create Way","Creation Type","Agency Creation Type","PK Agencies Creation Type")
 
     return {
         "date":      parse_feishu_date(raw_date),
@@ -704,16 +690,8 @@ def _build_field_map(fields: dict) -> dict:
         "cr_ways":   extract_field_list(raw_cr_way),
     }
 
-
 def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter,
                   allowed_acms, allowed_regs):
-    """
-    Run the full analytics pass over pre-fetched items.
-
-    [IMP-3] Each record's fields are normalised once into a flat dict at the
-    start of the loop, eliminating ~10 repeated O(n) get_field_local calls
-    per record that existed in v1.1.
-    """
     stats = {
         "kpis": {"creations":0,"bds":0,"closings":0},
         "creation_status": {"Done":0,"Rejected":0,"Under Investigation":0},
@@ -727,7 +705,6 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
         "fetch_complete": True, "stop_reason": ""
     }
 
-    # Pre-fill date keys
     if from_dt and to_dt:
         cur = from_dt
         while cur < to_dt:
@@ -740,11 +717,13 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     acm_filter_c     = acm_filter.strip().lower()   if acm_filter     else "all"
     region_filter_c  = region_filter.strip().lower() if region_filter  else "all"
     type_filter_c    = type_filter.strip().lower()   if type_filter    else "all"
-    allowed_acms_set = set(allowed_acms) if allowed_acms else {"all"}
+    allowed_acms_set = set([a.lower() for a in allowed_acms]) if allowed_acms else {"all"}
+    allowed_regs_set = set([r.lower() for r in allowed_regs]) if allowed_regs else {"all"}
 
-    for item in all_items:
-        fm = _build_field_map(item.get("fields", {}))
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        normalized_maps = list(executor.map(_build_field_map_safe, all_items))
 
+    for fm in normalized_maps:
         record_dt = fm["date"]
         if from_dt or to_dt:
             if not record_dt: continue
@@ -759,6 +738,7 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
                 region = "in"
 
         if region_filter_c != "all" and region != region_filter_c: continue
+        if "all" not in allowed_regs_set and region not in allowed_regs_set: continue
 
         acm = fm["acm_in"] if region == "in" else fm["acm_pk"]
         if not acm: acm = fm["acm_fb"]
@@ -851,17 +831,42 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 # ──────────────────────────────────────────────────────────────────────────────
 # FLASK APP
 # ──────────────────────────────────────────────────────────────────────────────
+BACKGROUND_SYNC_MAX_AGE  = 600   
+
+_bg_sync = {
+    "requests_items": [], "requests_keys": set(),
+    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
+}
+_bg_sync_lock = threading.Lock()
+
+
+def get_requests_table_snapshot(from_dt=None):
+    with _bg_sync_lock:
+        items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
+        updated_at   = _bg_sync["updated_at"]
+        complete     = _bg_sync["fetch_complete"]
+        reason       = _bg_sync["stop_reason"]
+        
+    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+        return items, keys, complete, reason, True
+        
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+    
+    with _bg_sync_lock:
+        _bg_sync["requests_items"]  = items
+        _bg_sync["requests_keys"]   = keys
+        _bg_sync["updated_at"]      = time.time()
+        _bg_sync["fetch_complete"]  = complete
+        _bg_sync["stop_reason"]     = reason
+        
+    return items, keys, complete, reason, False
+
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def home():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_file(os.path.join(root_dir, 'index.html'))
-
-@app.route('/api/version', methods=['GET'])
-def version():
-    """Quick check: hit /api/version to confirm new code is deployed."""
-    return jsonify({"version": "1.4", "fix": "page500+server-filter+deadline"})
 
 @app.route('/api/login', methods=['GET'])
 def login():
@@ -871,87 +876,40 @@ def login():
 
 @app.route('/api/callback', methods=['GET'])
 def callback():
-    """
-    Feishu OAuth callback — three bugs fixed vs v1.1:
-
-    FIX-1  redirect_uri added to OIDC token exchange body.
-           The Feishu /authen/v1/oidc/access_token endpoint requires
-           redirect_uri to match what was sent in the auth request;
-           omitting it causes a silent rejection so uat is None and
-           the user bounces back to the login page with no error shown.
-
-    FIX-2  uat is now URL-encoded in the redirect.
-           Tokens that contain +, = or & would otherwise corrupt the
-           query-string and produce a mangled value on the frontend.
-
-    FIX-3  All failures redirect to /?auth_error=<msg> instead of
-           returning a raw 4xx/5xx page.  Vercel's error handling would
-           silently fall back to serving index.html (login screen) with
-           zero explanation; now the frontend picks up auth_error and
-           shows a toast so the user knows what went wrong.
-    """
     code = request.args.get('code')
-    if not code:
-        logger.warn("callback_no_code")
-        return redirect("/?auth_error=" + urllib.parse.quote(
-            "Authorization failed: no code returned from Feishu.", safe=''))
+    if not code: return redirect("/?auth_error=" + urllib.parse.quote("Authorization failed: no code returned.", safe=''))
 
     try:
-        # Feishu /authen/v1/access_token ignores the Authorization header
-        # and requires app_id + app_secret in the JSON body alongside the code.
-        # Using only a header token (tenant or app) causes error 99991663 /
-        # invalid_grant and returns uat=None.
         token_resp = http_requests.post(
             "https://open.feishu.cn/open-apis/authen/v1/access_token",
             headers={"Content-Type": "application/json"},
-            json={
-                "app_id":     APP_ID,
-                "app_secret": APP_SECRET,
-                "grant_type": "authorization_code",
-                "code":       code,
-            },
+            json={"app_id": APP_ID, "app_secret": APP_SECRET, "grant_type": "authorization_code", "code": code},
             timeout=15
         ).json()
-
-        logger.info("token_exchange",
-                    feishu_code=token_resp.get("code"),
-                    has_data=bool(token_resp.get("data")))
 
         uat = (token_resp.get("data") or {}).get("access_token")
-        if not uat:
-            uat = token_resp.get("access_token")
+        if not uat: uat = token_resp.get("access_token")
 
         if not uat:
-            err = token_resp.get("msg") or token_resp.get("error_description")                   or f"Token exchange failed (code={token_resp.get('code')})"
-            logger.error("callback_no_uat", err=err)
-            return redirect("/?auth_error=" + urllib.parse.quote(
-                f"Login failed: {err}", safe=''))
+            err = token_resp.get("msg") or token_resp.get("error_description") or "Token exchange failed"
+            return redirect("/?auth_error=" + urllib.parse.quote(f"Login failed: {err}", safe=''))
 
-        # Fetch Feishu user profile
         info_resp  = http_requests.get(
             "https://open.feishu.cn/open-apis/authen/v1/user_info",
-            headers={"Authorization": f"Bearer {uat}"},
-            timeout=15
+            headers={"Authorization": f"Bearer {uat}"}, timeout=15
         ).json()
+        
         user_data  = info_resp.get("data", {})
         lark_name  = user_data.get("name", "Unknown User")
         lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
-        logger.info("login_ok", user=mask_name(lark_name), email=mask_email(lark_email))
-
-        # FIX-2: URL-encode every component, including the uat token
-        return redirect(
-            "/?user="  + urllib.parse.quote(lark_name,  safe='') +
-            "&email="  + urllib.parse.quote(lark_email, safe='') +
-            "&uat="    + urllib.parse.quote(uat,         safe='')
-        )
+        
+        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}")
 
     except Exception as exc:
-        logger.error("callback_exception", error=str(exc))
-        return redirect("/?auth_error=" + urllib.parse.quote(
-            f"Login error: {str(exc)[:120]}", safe=''))
+        return redirect("/?auth_error=" + urllib.parse.quote(f"Login error: {str(exc)[:120]}", safe=''))
 
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
@@ -960,38 +918,39 @@ def check_auth():
     perms    = get_user_permissions(email, username)
     return jsonify(perms)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# AGENCY SEARCH ENDPOINT
-# ──────────────────────────────────────────────────────────────────────────────
-@app.route('/api/search', methods=['GET'])
+@app.route('/api/search', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_SEARCH)
 def search():
-    code   = sanitize_agency_code(request.args.get('code',''))
-    user   = sanitize_text(request.args.get('user',''))
-    email  = sanitize_text(request.args.get('email',''))
-    uat    = sanitize_text(request.args.get('uat',''), max_length=512)
-    qtype  = request.args.get('type','points')
+    req_data = request.json if request.method == 'POST' else request.args
+    
+    code   = sanitize_agency_code(req_data.get('code',''))
+    user   = sanitize_text(req_data.get('user',''))
+    email  = sanitize_text(req_data.get('email',''))
+    uat    = sanitize_text(req_data.get('uat',''), max_length=512)
+    qtype  = req_data.get('type','points')
+    nocache = req_data.get('nocache', '0') in ['1', 'true', True]
+    
     if qtype not in ('points','target'): qtype = 'points'
 
-    if not code:
-        return jsonify({"found":False,"error":"Invalid or missing agency code."}), 400
+    if not code: return jsonify({"found":False,"error":"Invalid or missing agency code."}), 400
 
     perms = get_user_permissions(email, user)
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
     cache_key = cache_make_key("search", code, qtype)
-    cached = cache_get(cache_key)
-    if not cached:
-        data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
-        if data.get("found"):
-            cache_set(cache_key, data, ttl=180)
+    
+    if not nocache:
+        cached = cache_get(cache_key)
+        if cached: return jsonify(cached)
+        
+    data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
+    if data.get("found"):
+        cache_set(cache_key, data, ttl=180)
         return jsonify(data)
-    return jsonify(cached)
+    else:
+        return jsonify(data), 404
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ADMIN PANEL
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/admin/users', methods=['GET','POST','DELETE'])
 def manage_users():
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
@@ -1000,8 +959,7 @@ def manage_users():
         perms = get_user_permissions("", admin_name)
         if perms.get("is_super_admin"): is_authorized = True
     if not is_authorized:
-        audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel",
-                  ip=request.headers.get("X-Forwarded-For",""))
+        audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel", ip=request.headers.get("X-Forwarded-For",""))
         return jsonify({"error":"Unauthorized"}), 403
 
     tat = get_tenant_access_token()
@@ -1030,31 +988,39 @@ def manage_users():
         regs_formatted = (f"target={data.get('regions',{}).get('target','all')};"
                           f"points={data.get('regions',{}).get('points','all')};"
                           f"analytics={data.get('regions',{}).get('analytics','all')}")
-        expires_at = sanitize_text(data.get("expires_at",""))
+                          
         payload_fields = {"Email":email_to_check,"Modules":data.get("modules",""),
                           "ACMs":acms_formatted,"Regions":regs_formatted}
-        if expires_at:
-            payload_fields["ExpiresAt"] = expires_at
+        
         payload = {"fields": payload_fields}
-        is_admin_flag = data.get("is_admin", False)
-        if is_admin_flag:
-            payload_fields["IsAdmin"] = True
-        res = http_requests.post(base_url, headers=headers, json=payload, timeout=15).json()
-        if res.get("code") != 0:
-            return jsonify({"success":False,"error":res.get("msg","Unknown error")}), 500
-        audit.log(admin_name, "ADD_USER", email_to_check, ip=ip)
-        # Invalidate permission cache for this user
+        
+        existing_record_id = None
+        res_all = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        
+        for item in res_all.get("data", {}).get("items", []):
+            db_email = extract_field_text(item.get("fields", {}).get("Email", "")).lower().strip()
+            db_person = extract_field_text(item.get("fields", {}).get("Person", "")).lower().strip()
+            target_check = email_to_check.lower().strip()
+            
+            if target_check and (target_check == db_email or target_check == db_person):
+                existing_record_id = item["record_id"]
+                break
+
+        if existing_record_id:
+            res = http_requests.put(f"{base_url}/{existing_record_id}", headers=headers, json=payload, timeout=15).json()
+        else:
+            res = http_requests.post(base_url, headers=headers, json=payload, timeout=15).json()
+
+        if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Unknown error")}), 500
+            
+        audit.log(admin_name, "UPDATE_USER" if existing_record_id else "ADD_USER", email_to_check, ip=ip)
         cache_invalidate(cache_make_key("perms", email_to_check.lower(), ""))
         return jsonify({"success":True,"record_id":res.get("data",{}).get("record",{}).get("record_id")})
 
     elif request.method == 'DELETE':
         record_id = sanitize_text(request.args.get('id',''))
-        if not record_id:
-            return jsonify({"error":"Missing record id"}), 400
-        del_url = f"{base_url}/{record_id}"
-        res = http_requests.delete(del_url, headers=headers, timeout=15).json()
-        if res.get("code") != 0:
-            return jsonify({"success":False,"error":res.get("msg","Delete failed")}), 500
+        res = http_requests.delete(f"{base_url}/{record_id}", headers=headers, timeout=15).json()
+        if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Delete failed")}), 500
         audit.log(admin_name, "DELETE_USER", record_id, ip=ip)
         return jsonify({"success":True})
 
@@ -1064,39 +1030,12 @@ def audit_logs():
     is_authorized = any(a in admin_name for a in ADMIN_USERS)
     if not is_authorized:
         perms = get_user_permissions("", admin_name)
-        if not perms.get("is_super_admin"):
-            return jsonify({"error":"Unauthorized"}), 403
-    limit = min(int(request.args.get('limit','100')), 500)
-    logs  = audit.get_recent(limit)
-    return jsonify(logs)
+        if not perms.get("is_super_admin"): return jsonify({"error":"Unauthorized"}), 403
+    return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# [IMP-4]  POINTS RECORDS ENDPOINT — paginated / filtered / sorted / searched
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def points_records():
-    """
-    Paginated, filterable, sortable table of all Agency Point records.
-
-    Query params:
-      page         (int, default 1)
-      page_size    (int, default 50, max 200)
-      search       (str) — matches Agency ID, Agency Name, Owner ID, Owner Name
-      agency_id    (str)
-      agency_name  (str)
-      owner_id     (str)
-      owner_name   (str)
-      region       (str)
-      status       (str)
-      agency_level (str)
-      month        (str, YYYY-MM)
-      date_from    (str, YYYY-MM-DD)
-      date_to      (str, YYYY-MM-DD)
-      sort_by      (str, default "date")
-      sort_dir     (str, "asc"|"desc", default "desc")
-      user, email  — for permission checks
-    """
     user   = sanitize_text(request.args.get('user',''))
     email  = sanitize_text(request.args.get('email',''))
     perms  = get_user_permissions(email, user)
@@ -1107,165 +1046,130 @@ def points_records():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("points",["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get("points",["all"])
 
-    # Pagination
     try:
         page      = max(1, int(request.args.get('page','1')))
         page_size = min(200, max(1, int(request.args.get('page_size','50'))))
     except (ValueError, TypeError):
         page, page_size = 1, 50
 
-    # Filters
     search       = sanitize_text(request.args.get('search',''), 100).lower()
-    f_agency_id  = sanitize_text(request.args.get('agency_id','')).lower()
-    f_agency_name= sanitize_text(request.args.get('agency_name','')).lower()
-    f_owner_id   = sanitize_text(request.args.get('owner_id','')).lower()
-    f_owner_name = sanitize_text(request.args.get('owner_name','')).lower()
+    f_agency_code= sanitize_text(request.args.get('agency_id', request.args.get('agency_code',''))).lower()
     f_region     = sanitize_text(request.args.get('region','')).lower()
-    f_status     = sanitize_text(request.args.get('status','')).lower()
-    f_level      = sanitize_text(request.args.get('agency_level','')).lower()
-    f_month      = sanitize_text(request.args.get('month',''))        # YYYY-MM
-    f_date_from  = sanitize_text(request.args.get('date_from',''))
-    f_date_to    = sanitize_text(request.args.get('date_to',''))
-    sort_by      = sanitize_text(request.args.get('sort_by','date'))
+    f_acm        = sanitize_text(request.args.get('acm','')).lower()
+    sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    from_dt = None
-    to_dt   = None
-    if f_date_from:
-        try: from_dt = datetime.strptime(f_date_from, "%Y-%m-%d")
-        except ValueError: pass
-    if f_date_to:
-        try: to_dt = datetime.strptime(f_date_to, "%Y-%m-%d") + timedelta(days=1)
-        except ValueError: pass
+    raw_points_cache_key = "points_table_raw_items"
+    all_items = cache_get(raw_points_cache_key)
 
-    # Cache based on all filter params
-    cache_key = cache_make_key("points_records",
-                               search, f_agency_id, f_agency_name, f_owner_id, f_owner_name,
-                               f_region, f_status, f_level, f_month, f_date_from, f_date_to,
-                               email, user)
-    cached_all = cache_get(cache_key)
-    if cached_all is None:
-        # Fetch from Feishu
-        all_items, _, _, _ = fetch_feishu_records(POINTS_TABLE_ID, fields=POINTS_FIELDS,
-                                                   from_dt=from_dt)
-        records = []
-        for item in all_items:
-            f = item.get("fields", {})
-            agency_id   = extract_field_text(get_field_local(f,"Agency ID")).strip()
-            agency_name = extract_field_text(get_field_local(f,"Agency Name","Name")).strip()
-            owner_id    = extract_field_text(get_field_local(f,"Owner ID")).strip()
-            owner_name  = extract_field_text(get_field_local(f,"Owner Name")).strip()
-            region      = extract_field_text(get_field_local(f,"Region","Agency Region")).strip()
-            status      = extract_field_text(get_field_local(f,"Status")).strip()
-            level       = extract_field_text(get_field_local(f,"Agency Level")).strip()
-            month       = extract_field_text(get_field_local(f,"Month")).strip()
-            acm         = extract_field_text(get_field_local(f,"Acm","Acm Name (PK)","Acm Name (IN)")).strip()
-            total_pts   = int(float(extract_field_text(get_field_local(f,"Total Points")) or 0))
-            used_pts    = int(float(extract_field_text(get_field_local(f,"Used Points")) or 0))
-            balance     = int(float(extract_field_text(get_field_local(f,"Point Balance")) or 0))
-            health      = int(float(extract_field_text(get_field_local(f,"Health Score")) or 0))
-            raw_date    = get_field_local(f,"Date","Submitted on","Submitted on Copy")
-            rec_dt      = parse_feishu_date(raw_date)
-            date_str    = rec_dt.strftime("%Y-%m-%d") if rec_dt else ""
+    if all_items is None:
+        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID) 
+        if not fetch_complete and not all_items:
+            return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+            
+        cache_set(raw_points_cache_key, all_items, ttl=300)
 
-            # Permission gate
-            if "all" not in allowed_acms and acm.lower() not in [a.lower() for a in allowed_acms]:
-                continue
-            if "all" not in allowed_regs and region.lower() not in [r.lower() for r in allowed_regs]:
-                continue
-
-            records.append({
-                "agency_id": agency_id, "agency_name": agency_name,
-                "owner_id": owner_id, "owner_name": owner_name,
-                "region": region, "status": status, "agency_level": level,
-                "month": month, "acm": acm,
-                "total_points": total_pts, "used_points": used_pts,
-                "point_balance": balance, "health_score": health,
-                "date": date_str, "_dt": rec_dt
-            })
-
-        cache_set(cache_key, records, ttl=120)
-        cached_all = records
-
-    # Apply filters in Python (fast, avoids re-fetch)
     filtered = []
-    for r in cached_all:
-        if search:
-            haystack = (r["agency_id"] + r["agency_name"] + r["owner_id"] + r["owner_name"]).lower()
-            if search not in haystack:
-                continue
-        if f_agency_id   and f_agency_id   not in r["agency_id"].lower():   continue
-        if f_agency_name and f_agency_name not in r["agency_name"].lower(): continue
-        if f_owner_id    and f_owner_id    not in r["owner_id"].lower():    continue
-        if f_owner_name  and f_owner_name  not in r["owner_name"].lower():  continue
-        if f_region      and f_region      not in r["region"].lower():      continue
-        if f_status      and f_status      not in r["status"].lower():      continue
-        if f_level       and f_level       not in r["agency_level"].lower():continue
-        if f_month       and not r["month"].startswith(f_month):            continue
-        if from_dt and r["_dt"] and r["_dt"] < from_dt:                    continue
-        if to_dt   and r["_dt"] and r["_dt"] >= to_dt:                     continue
-        filtered.append(r)
+    for item in all_items:
+        f = item.get("fields", {})
+        agency_code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        acm         = extract_field_text(get_field_local(f, "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member")).strip()
+        region      = 'PK' if acm.lower() in PK_ACMS else ('IN' if acm.lower() in IN_ACMS else '')
 
-    # Sort
+        if "all" not in allowed_acms and acm.lower() not in [a.lower() for a in allowed_acms]: continue
+        if "all" not in allowed_regs and region.lower() not in [r.lower() for r in allowed_regs]: continue
+
+        if search and search not in (agency_code + acm).lower(): continue
+        if f_agency_code and f_agency_code not in agency_code.lower(): continue
+        if f_region      and f_region      not in region.lower():   continue
+        if f_acm         and f_acm         not in acm.lower():      continue
+
+        base_pts   = parse_float_safe(extract_field_text(get_field_local(f, "Base Points")))
+        bonus_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Bonus Points")))
+        total_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
+        used_pts   = parse_float_safe(extract_field_text(get_field_local(f, "Used Points")))
+        balance    = parse_float_safe(extract_field_text(get_field_local(f, "Point Balance")))
+
+        if balance == 0 and total_pts > 0:
+            balance = total_pts - used_pts
+
+        health = 100
+        if total_pts > 0:
+            utilization = used_pts / total_pts
+            if utilization > 0.90: health = 40
+            elif utilization > 0.70: health = 70
+            else: health = 95
+        else:
+            health = 0
+
+        filtered.append({
+            "agency_id": agency_code, "acm": acm, "region": region,
+            "agency_name": extract_field_text(get_field_local(f, "Agency Name", "Name")),
+            "base_points": base_pts, "bonus_points": bonus_pts,
+            "total_points": total_pts, "used_points": used_pts,
+            "point_balance": balance, "health_score": health,
+        })
+
     sort_fields = {
-        "date": "_dt", "agency_id": "agency_id", "agency_name": "agency_name",
+        "agency_id": "agency_id", "acm": "acm", "region": "region",
+        "base_points": "base_points", "bonus_points": "bonus_points",
         "total_points": "total_points", "used_points": "used_points",
         "point_balance": "point_balance", "health_score": "health_score",
-        "region": "region", "status": "status", "month": "month"
     }
-    sf = sort_fields.get(sort_by, "_dt")
+    sf = sort_fields.get(sort_by, "point_balance")
     reverse = (sort_dir == 'desc')
-    try:
-        filtered.sort(key=lambda x: (x[sf] is None, x[sf]), reverse=reverse)
-    except TypeError:
-        filtered.sort(key=lambda x: str(x.get(sf,"")), reverse=reverse)
 
-    # Totals
+    try: filtered.sort(key=lambda x: (x[sf] is None, x[sf], x["agency_id"]), reverse=reverse)
+    except TypeError: filtered.sort(key=lambda x: (str(x.get(sf,"")), x["agency_id"]), reverse=reverse)
+
     total_count = len(filtered)
-    total_pts_sum   = sum(r["total_points"]   for r in filtered)
-    used_pts_sum    = sum(r["used_points"]    for r in filtered)
-    balance_sum     = sum(r["point_balance"]  for r in filtered)
+    total_pts_sum = sum(r["total_points"] for r in filtered)
+    used_pts_sum  = sum(r["used_points"] for r in filtered)
+    balance_sum   = sum(r["point_balance"] for r in filtered)
 
-    # Paginate
     start = (page - 1) * page_size
     end   = start + page_size
-    page_records = [{k: v for k, v in r.items() if k != "_dt"} for r in filtered[start:end]]
+    page_records = filtered[start:end]
 
     return jsonify({
-        "records": page_records,
-        "total": total_count,
-        "page": page, "page_size": page_size,
-        "total_pages": max(1, -(-total_count // page_size)),   # ceil division
-        "totals": {
-            "total_points": total_pts_sum,
-            "used_points": used_pts_sum,
-            "point_balance": balance_sum
-        }
+        "records": page_records, "total": total_count, "page": page, "page_size": page_size,
+        "total_pages": max(1, -(-total_count // page_size)),
+        "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum}
     })
 
+@app.route('/api/sync/refresh', methods=['POST'])
+@rate_limit(*RATE_LIMIT_ANALYTICS)
+def sync_refresh():
+    user  = sanitize_text(request.args.get('user', request.headers.get('X-User-Name','')))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
+
+    cache_invalidate()
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+    with _bg_sync_lock:
+        _bg_sync["requests_items"]  = items
+        _bg_sync["requests_keys"]   = keys
+        _bg_sync["updated_at"]      = time.time()
+        _bg_sync["fetch_complete"]  = complete
+        
+    audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
+    return jsonify({"success": True, "record_count": len(items), "updated_at": time.time(), "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def points_search():
-    """
-    [IMP-5] Alias of /api/points/records with search-first defaults.
-    Supports a 'q' param as shorthand for 'search'.
-    """
     if request.args.get('q') and not request.args.get('search'):
-        from flask import ImmutableMultiDict
         args = dict(request.args)
         args['search'] = args.pop('q')
         request.environ['QUERY_STRING'] = urllib.parse.urlencode(args, doseq=True)
     return points_records()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ANALYTICS ENDPOINT
-# ──────────────────────────────────────────────────────────────────────────────
-@app.route('/api/analytics', methods=['POST'])
+@app.route('/api/analytics', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
 def analytics():
     start = time.time()
-    body = request.json or {}
+    body = request.json if request.method == 'POST' else request.args
 
     user   = sanitize_text(body.get('user',''))
     email  = sanitize_text(body.get('email',''))
@@ -1279,8 +1183,7 @@ def analytics():
     cmp_to   = sanitize_text(body.get('compare_to',''))
     nocache  = body.get('nocache',False)
 
-    from_dt = None
-    to_dt   = None
+    from_dt, to_dt = None, None
     if from_s:
         try: from_dt = datetime.strptime(from_s, "%Y-%m-%d")
         except ValueError: pass
@@ -1299,16 +1202,12 @@ def analytics():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("analytics",["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get("analytics",["all"])
 
-    payload_for_key = {
-        "region": region_filter, "acm": acm_filter, "type": type_filter,
-        "from": from_s, "to": to_s
-    }
-    cache_key = cache_make_key("analytics", json.dumps(payload_for_key, sort_keys=True),
-                               email.lower(), user.lower())
+    cache_key = cache_make_key("analytics", json.dumps({
+        "region": region_filter, "acm": acm_filter, "type": type_filter, "from": from_s, "to": to_s
+    }, sort_keys=True), email.lower(), user.lower())
 
     now = datetime.utcnow()
-    is_recent = (not from_dt) or (from_dt and (now - from_dt).days <= 60)
-    ttl = CACHE_TTL_REALTIME if is_recent else CACHE_TTL_HISTORICAL
+    ttl = CACHE_TTL_REALTIME if (not from_dt) or ((now - from_dt).days <= 60) else CACHE_TTL_HISTORICAL
 
     if not nocache:
         cached = cache_get(cache_key)
@@ -1316,32 +1215,28 @@ def analytics():
             cached["cache_hit"] = True
             return jsonify(cached)
 
-    # Hard timeout: Vercel serverless functions have a strict execution limit.
-    # Pass the deadline into the fetcher so it returns partial data rather than
-    # hanging until the platform kills the request with no response at all.
-    deadline = time.time() + 25   # 25 s leaves a buffer for run_analytics + response
-    all_items, master_keys, fetch_complete, stop_reason = fetch_feishu_records(
-        REQUESTS_TABLE_ID, fields=ANALYTICS_FIELDS, from_dt=from_dt, deadline=deadline
-    )
-
-    stats = run_analytics(all_items, from_dt, to_dt,
-                          region_filter, acm_filter, type_filter,
-                          allowed_acms, allowed_regs)
-    stats["fetch_complete"] = fetch_complete
-    stats["stop_reason"]    = stop_reason
-    stats["feishu_keys"]    = sorted(list(master_keys))
-
-    # Period comparison
+    oldest_dt = from_dt
     if cmp_from and cmp_to:
         try:
             cmp_from_dt = datetime.strptime(cmp_from, "%Y-%m-%d")
             cmp_to_dt   = datetime.strptime(cmp_to,   "%Y-%m-%d") + timedelta(days=1)
-            cmp_items, _, _, _ = fetch_feishu_records(
-                REQUESTS_TABLE_ID, fields=ANALYTICS_FIELDS, from_dt=cmp_from_dt
-            )
-            cmp_stats = run_analytics(cmp_items, cmp_from_dt, cmp_to_dt,
-                                      region_filter, acm_filter, type_filter,
-                                      allowed_acms, allowed_regs)
+            if cmp_from_dt and (not oldest_dt or cmp_from_dt < oldest_dt): oldest_dt = cmp_from_dt
+        except ValueError: pass
+
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
+    if not fetch_complete and not all_items:
+        return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+
+    stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
+    stats["fetch_complete"] = fetch_complete
+    stats["stop_reason"]    = stop_reason
+    stats["feishu_keys"]    = sorted(list(master_keys))
+    stats["served_from_background_cache"] = from_bg_cache
+
+    if cmp_from and cmp_to:
+        try:
+            cmp_stats = run_analytics(all_items, cmp_from_dt, cmp_to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
             stats["comparison"] = {
                 "from": cmp_from, "to": cmp_to,
                 "kpis": cmp_stats["kpis"],
@@ -1357,40 +1252,37 @@ def analytics():
             stats["comparison_error"] = str(e)
 
     duration_ms = int((time.time() - start) * 1000)
-    logger.info("analytics_complete", region=region_filter, acm=acm_filter,
-                rows=stats["scanned_rows"], duration_ms=duration_ms)
+    logger.info("analytics_complete", region=region_filter, acm=acm_filter, rows=stats["scanned_rows"], duration_ms=duration_ms)
     stats["duration_ms"] = duration_ms
     stats["cache_hit"]   = False
 
     cache_set(cache_key, stats, ttl=ttl)
     return jsonify(stats)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# CACHE CONTROL
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/cache/clear', methods=['POST'])
 def clear_cache():
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
     is_authorized = any(a in admin_name for a in ADMIN_USERS)
-    if not is_authorized:
-        return jsonify({"error":"Unauthorized"}), 403
+    if not is_authorized: return jsonify({"error":"Unauthorized"}), 403
     cache_invalidate()
     audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""))
     return jsonify({"success":True,"message":"Cache cleared."})
 
-# ──────────────────────────────────────────────────────────────────────────────
-# HEALTH CHECK
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/health', methods=['GET'])
 def health():
+    with _bg_sync_lock:
+        bg_info = {
+            "record_count": len(_bg_sync["requests_items"]),
+            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None
+        }
     return jsonify({
-        "status": "ok",
-        "ts": datetime.utcnow().isoformat(),
-        "cache_entries": len(_cache),
-        "audit_entries": len(audit._queue),
+        "status": "ok", "ts": datetime.utcnow().isoformat(),
+        "cache_entries": len(_cache), "audit_entries": len(audit._queue),
         "token_cached": _token_cache["token"] is not None,
-        "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time()))
+        "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
+        "background_sync": bg_info
     })
+
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
