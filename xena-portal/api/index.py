@@ -876,18 +876,60 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP
+# FLASK APP & BACKGROUND SYNC THREAD
 # ──────────────────────────────────────────────────────────────────────────────
+BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
     "updated_at": 0, "fetch_complete": True, "stop_reason": "",
+    "syncing": False,
 }
 _bg_sync_lock = threading.Lock()
+_bg_thread_started = False
+_bg_thread_lock = threading.Lock()
 
+def _background_sync_requests_table():
+    with _bg_sync_lock:
+        if _bg_sync["syncing"]: return
+        _bg_sync["syncing"] = True
+    try:
+        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+        with _bg_sync_lock:
+            _bg_sync["requests_items"]  = items
+            _bg_sync["requests_keys"]   = keys
+            _bg_sync["updated_at"]      = time.time()
+            _bg_sync["fetch_complete"]  = complete
+            _bg_sync["stop_reason"]     = reason
+        
+        if _KV_ENABLED and items:
+            kv_set_json("requests_snapshot", {
+                "items": items, "fetch_complete": complete, "stop_reason": reason, "updated_at": time.time()
+            })
+        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
+    except Exception as e:
+        logger.error("background_sync_failed", table="grand_table", error=str(e))
+    finally:
+        with _bg_sync_lock:
+            _bg_sync["syncing"] = False
+
+def _background_sync_loop():
+    while True:
+        _background_sync_requests_table()
+        time.sleep(BACKGROUND_SYNC_INTERVAL)
+
+def ensure_background_sync_started():
+    global _bg_thread_started
+    with _bg_thread_lock:
+        if not _bg_thread_started:
+            threading.Thread(target=_background_sync_loop, daemon=True).start()
+            _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
+    # Fix: Ensure background loop starts exactly like in v1.1
+    ensure_background_sync_started()
+    
     with _bg_sync_lock:
         items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
         updated_at   = _bg_sync["updated_at"]
@@ -1238,15 +1280,15 @@ def sync_refresh():
     if not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+    # Fix: Re-use the background thread logic for a manual refresh
+    _background_sync_requests_table()
     with _bg_sync_lock:
-        _bg_sync["requests_items"]  = items
-        _bg_sync["requests_keys"]   = keys
-        _bg_sync["updated_at"]      = time.time()
-        _bg_sync["fetch_complete"]  = complete
+        count = len(_bg_sync["requests_items"])
+        updated_at = _bg_sync["updated_at"]
+        complete = _bg_sync["fetch_complete"]
         
     audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
-    return jsonify({"success": True, "record_count": len(items), "updated_at": time.time(), "fetch_complete": complete})
+    return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1512,6 +1554,10 @@ def health():
         "background_sync": bg_info
     })
 
+
+# Kick off the background sync thread at import time to ensure the RAM 
+# cache populates instantly, exactly like in the v1.1 code.
+ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
