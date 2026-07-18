@@ -6,7 +6,7 @@ with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Healt
 Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
 """
 
-import os, time, re, json, hashlib, logging, urllib.parse, threading, gzip, base64
+import os, time, re, json, hashlib, logging, urllib.parse, threading
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from functools import wraps
@@ -46,7 +46,7 @@ COINS_MULTIPLIER = 100000
 QUERY_FIELD_ALIASES = {
     "user_id":     ["User ID"],
     "numbering":   ["Numbering"],
-    "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID", "Other App Name"],
+    "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID"],
     "nid_number":  ["NID Number", "NID"],
     "bd_code":     ["Bd Code", "BD Code"],
 }
@@ -138,41 +138,6 @@ def cache_invalidate(prefix=""):
         keys = [k for k in list(_cache.keys()) if not prefix or k.startswith(prefix)]
         for k in keys:
             del _cache[k]
-
-# ──────────────────────────────────────────────────────────────────────────────
-# PERSISTENT CACHE (Vercel KV / Upstash Redis REST API)
-# ──────────────────────────────────────────────────────────────────────────────
-_KV_URL   = os.environ.get("KV_REST_API_URL")   or os.environ.get("UPSTASH_REDIS_REST_URL")
-_KV_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-_KV_ENABLED = bool(_KV_URL and _KV_TOKEN)
-
-def _kv_headers():
-    return {"Authorization": f"Bearer {_KV_TOKEN}"}
-
-def kv_get_json(key):
-    if not _KV_ENABLED: return None
-    try:
-        r = http_requests.get(f"{_KV_URL}/get/{key}", headers=_kv_headers(), timeout=8)
-        if r.status_code != 200: return None
-        raw = r.json().get("result")
-        if not raw: return None
-        compressed = base64.b64decode(raw)
-        return json.loads(gzip.decompress(compressed).decode('utf-8'))
-    except Exception as e:
-        logger.error("kv_get_failed", key=key, error=str(e))
-        return None
-
-def kv_set_json(key, obj, ttl_seconds=None):
-    if not _KV_ENABLED: return False
-    try:
-        blob = base64.b64encode(gzip.compress(json.dumps(obj, default=str).encode('utf-8'))).decode('ascii')
-        url = f"{_KV_URL}/set/{key}"
-        if ttl_seconds: url += f"?EX={ttl_seconds}"
-        r = http_requests.post(url, headers=_kv_headers(), data=blob.encode('utf-8'), timeout=20)
-        return r.status_code == 200
-    except Exception as e:
-        logger.error("kv_set_failed", key=key, error=str(e))
-        return False
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.1  RATE LIMITER & INPUT SANITISATION
@@ -398,7 +363,7 @@ def get_user_permissions(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
     
-    # 1. FIX: Exact Match for Super Admin to prevent partial matches like "Fayeol" hijacking "Ahmed Samurai"
+    # EXACT MATCH CHECK for Super Admins
     if any(admin == name_clean for admin in ADMIN_USERS):
         return {
             "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query"], 
@@ -424,7 +389,7 @@ def get_user_permissions(email, name):
             db_email = extract_field_text(fields.get("Email", "")).lower().strip()
             db_person = extract_field_text(fields.get("Person", "")).lower().strip()
             
-            # 2. FIX: Hardened exact match (`==`) to prevent unauthorized users from sneaking in via string overlaps
+            # EXACT MATCH CHECK for standard users
             if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
                 modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
                 parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
@@ -438,83 +403,79 @@ def get_user_permissions(email, name):
     return fallback
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING (VERCEL OPTIMIZED)
+# HIGH-SPEED SESSION FETCHING (Using Fast GET Method)
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
+    
     all_items = []
     seen_ids  = set()
     master_keys = set()
     fetch_complete = True
     stop_reason = ""
+    consecutive_old_pages = 0
 
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
-    
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+
     page_token = None
-    MAX_PAGE_RETRIES = 4 
-
-    for _ in range(200):  
-        payload = {"page_size": 500} 
-        if page_token: payload["page_token"] = page_token
-        
+    for _ in range(200):
+        # Using GET params, avoiding InvalidFilter crashes 
+        params = {"page_size": 500, "automatic_fields": "true"} 
         if table_id == REQUESTS_TABLE_ID:
-            payload["sort"] = [{"field_name": "Numbering", "desc": True}]
+            params["sort"] = '["Numbering DESC"]'
         
-        page_data = None
-        last_err = ""
-        for attempt in range(MAX_PAGE_RETRIES):
-            try:
-                resp = session.post(url, json=payload, timeout=20)
-                if resp.status_code != 200:
-                    last_err = f"HTTP {resp.status_code}: {resp.text[:300]}"
-                    time.sleep(0.5 * (attempt + 1))
-                    continue
-
-                data = resp.json()
-                if data.get("code") != 0:
-                    last_err = f"Feishu Error {data.get('code')}: {data.get('msg')}"
-                    time.sleep(0.5 * (attempt + 1))
-                    continue
-
-                page_data = data
-                last_err = ""
+        if page_token: params["page_token"] = page_token
+        
+        try:
+            resp = session.get(url, params=params, timeout=45) 
+            if resp.status_code != 200:
+                fetch_complete = False
+                stop_reason = f"HTTP {resp.status_code}: {resp.text}"
                 break
-            except Exception as e:
-                last_err = str(e)
-                time.sleep(0.5 * (attempt + 1))
-
-        if page_data is None:
-            fetch_complete = False
-            stop_reason = last_err or "Unknown fetch error"
-            break
-
-        block = page_data.get("data", {})
-        items = block.get("items", [])
-        if not items: break
-
-        page_old_count = 0
-
-        for item in items:
-            rid = item.get("record_id")
-            if rid not in seen_ids:
-                seen_ids.add(rid)
-                all_items.append(item)
-                master_keys.update(item.get("fields", {}).keys())
                 
-                if from_dt:
+            data = resp.json()
+            if data.get("code") != 0:
+                fetch_complete = False
+                stop_reason = f"Feishu Error Code {data.get('code')}: {data.get('msg')}"
+                break
+            
+            block = data.get("data", {})
+            items = block.get("items", [])
+            if not items: break
+
+            page_old_count = 0
+            valid_dates_in_page = 0
+            for item in items:
+                rid = item.get("record_id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_items.append(item)
+                    master_keys.update(item.get("fields", {}).keys())
                     raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
                     record_dt = parse_feishu_date(raw_date)
-                    if record_dt and record_dt < (from_dt - timedelta(days=1)):
-                        page_old_count += 1
-        
-        if from_dt and page_old_count >= 50:
-            stop_reason = "Safely reached date boundary."
-            break
+                    if record_dt:
+                        valid_dates_in_page += 1
+                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
+                            page_old_count += 1
+            
+            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                consecutive_old_pages += 1
+            else:
+                consecutive_old_pages = 0
 
-        page_token = block.get("page_token")
-        if not page_token or not block.get("has_more", False):
+            if consecutive_old_pages >= 3:
+                stop_reason = "Safely reached pages with all older records."
+                break
+
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False):
+                break
+
+        except Exception as e:
+            fetch_complete = False
+            stop_reason = str(e)
             break
 
     return all_items, master_keys, fetch_complete, stop_reason
@@ -575,7 +536,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 hf = r.get("fields", {})
                 h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
                 
-                # Filter to Current Month
                 if not h_date or h_date.month != cm or h_date.year != cy: continue
 
                 req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
@@ -586,7 +546,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
                 point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
 
-                # --- TARGET PRIVILEGE TIMELINE LOGIC ---
                 if "target" in req_type_lower:
                     privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
                     raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
@@ -607,7 +566,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                     if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
                         privileges_claimed[privilege_val] += qty
 
-                # --- AGENCY POINTS TIMELINE LOGIC ---
                 else:
                     latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
                     parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
@@ -872,59 +830,62 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP
+# FLASK APP & BACKGROUND CACHE LOOP
 # ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_MAX_AGE  = 600   
+BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
+BACKGROUND_SYNC_MAX_AGE  = 600   # snapshot considered "fresh enough" for 10 minutes
 
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
     "updated_at": 0, "fetch_complete": True, "stop_reason": "",
+    "syncing": False,
 }
 _bg_sync_lock = threading.Lock()
+_bg_thread_started = False
+_bg_thread_lock = threading.Lock()
+
+def _background_sync_requests_table():
+    with _bg_sync_lock:
+        if _bg_sync["syncing"]: return
+        _bg_sync["syncing"] = True
+    try:
+        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+        with _bg_sync_lock:
+            _bg_sync["requests_items"]  = items
+            _bg_sync["requests_keys"]   = keys
+            _bg_sync["updated_at"]      = time.time()
+            _bg_sync["fetch_complete"]  = complete
+            _bg_sync["stop_reason"]     = reason
+        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
+    except Exception as e:
+        logger.error("background_sync_failed", table="grand_table", error=str(e))
+    finally:
+        with _bg_sync_lock:
+            _bg_sync["syncing"] = False
+
+def _background_sync_loop():
+    while True:
+        _background_sync_requests_table()
+        time.sleep(BACKGROUND_SYNC_INTERVAL)
+
+def ensure_background_sync_started():
+    global _bg_thread_started
+    with _bg_thread_lock:
+        if not _bg_thread_started:
+            threading.Thread(target=_background_sync_loop, daemon=True).start()
+            _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
+    """Serves the Grand Table from the warm in-memory snapshot when it's fresh enough."""
+    ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
         updated_at   = _bg_sync["updated_at"]
         complete     = _bg_sync["fetch_complete"]
         reason       = _bg_sync["stop_reason"]
-        
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
-
-    if _KV_ENABLED:
-        kv_snap = kv_get_json("requests_snapshot")
-        if kv_snap and kv_snap.get("items"):
-            age = time.time() - kv_snap.get("updated_at", 0)
-            if age < BACKGROUND_SYNC_MAX_AGE * 6:
-                kv_items = kv_snap["items"]
-                kv_keys = set()
-                for it in kv_items:
-                    kv_keys.update(it.get("fields", {}).keys())
-                kv_complete = kv_snap.get("fetch_complete", True)
-                kv_reason   = kv_snap.get("stop_reason", "")
-                with _bg_sync_lock:
-                    _bg_sync["requests_items"]  = kv_items
-                    _bg_sync["requests_keys"]   = kv_keys
-                    _bg_sync["updated_at"]      = time.time()
-                    _bg_sync["fetch_complete"]  = kv_complete
-                    _bg_sync["stop_reason"]     = kv_reason
-                return kv_items, kv_keys, kv_complete, kv_reason, True
-
     items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
-    
-    with _bg_sync_lock:
-        _bg_sync["requests_items"]  = items
-        _bg_sync["requests_keys"]   = keys
-        _bg_sync["updated_at"]      = time.time()
-        _bg_sync["fetch_complete"]  = complete
-        _bg_sync["stop_reason"]     = reason
-
-    if _KV_ENABLED and items:
-        kv_set_json("requests_snapshot", {
-            "items": items, "fetch_complete": complete, "stop_reason": reason, "updated_at": time.time()
-        })
-        
     return items, keys, complete, reason, False
 
 app = Flask(__name__)
@@ -1002,7 +963,6 @@ def search():
 
     perms = get_user_permissions(email, user)
     
-    # FIX: Block unauthorized users attempting to access endpoints directly
     if not perms.get("is_super_admin") and qtype not in perms.get("modules", []):
         return jsonify({"found": False, "error": f"Access Denied: You do not have permission to view {qtype.title()}."}), 403
 
@@ -1138,27 +1098,13 @@ def points_records():
         fetch_complete = cached_bundle["fetch_complete"]
         stop_reason    = cached_bundle["stop_reason"]
     else:
-        kv_bundle = kv_get_json("points_snapshot") if _KV_ENABLED else None
-        if kv_bundle and kv_bundle.get("items") and (time.time() - kv_bundle.get("updated_at", 0)) < CACHE_TTL_HISTORICAL:
-            all_items      = kv_bundle["items"]
-            fetch_complete = kv_bundle.get("fetch_complete", True)
-            stop_reason    = kv_bundle.get("stop_reason", "")
-            cache_set(raw_points_cache_key,
-                      {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
-                      ttl=300)
-        else:
-            all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
+        if not fetch_complete and not all_items:
+            return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
-            cache_set(raw_points_cache_key,
-                      {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
-                      ttl=300)
-            if _KV_ENABLED and all_items:
-                kv_set_json("points_snapshot", {
-                    "items": all_items, "fetch_complete": fetch_complete,
-                    "stop_reason": stop_reason, "updated_at": time.time()
-                })
+        cache_set(raw_points_cache_key,
+                  {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
+                  ttl=300)
 
     filtered = []
     for item in all_items:
@@ -1238,15 +1184,12 @@ def sync_refresh():
     if not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+    _background_sync_requests_table()
     with _bg_sync_lock:
-        _bg_sync["requests_items"]  = items
-        _bg_sync["requests_keys"]   = keys
-        _bg_sync["updated_at"]      = time.time()
-        _bg_sync["fetch_complete"]  = complete
+        count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
         
     audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
-    return jsonify({"success": True, "record_count": len(items), "updated_at": time.time(), "fetch_complete": complete})
+    return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1293,14 +1236,11 @@ def query_records():
 
     aliases = QUERY_FIELD_ALIASES[field]
     
-    # 3. FIX: Intelligent API Payload Fallback. 
-    # Feishu crashes (InvalidFilter) if you query an Auto-Number column using "Text Contains" or a String using "=". 
-    # We silently rotate through `contains`, `is`, and `=` until Feishu successfully accepts the query.
+    # Intelligent API Payload Fallback Loop (prevents InvalidFilter crashes on Number columns)
     for alias in aliases:
         for op in ["contains", "is", "="]:
             val_array = [value]
             
-            # If checking using '=', Feishu demands strict types, so map strings to integers securely
             if op == "=":
                 if value.isdigit(): val_array = [int(value)]
                 else: continue
@@ -1321,9 +1261,9 @@ def query_records():
                     success = True
                     fetch_complete = True
                     break
-                elif data.get("code") not in (1254011, 1254402, 1254010): # 125xxxx are Feishu's InvalidFilter errors
+                elif data.get("code") not in (1254011, 1254402, 1254010): 
                     stop_reason = data.get("msg")
-                    if data.get("code") == 99991663: break # Fatal auth error
+                    if data.get("code") == 99991663: break 
             except Exception as e:
                 stop_reason = str(e)
         
@@ -1487,61 +1427,13 @@ def clear_cache():
     audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""))
     return jsonify({"success":True,"message":"Cache cleared."})
 
-def _cron_authorized():
-    secret = os.environ.get("CRON_SECRET", "")
-    if not secret:
-        return True 
-    auth_header = request.headers.get("Authorization", "")
-    return auth_header == f"Bearer {secret}" or request.args.get("secret") == secret
-
-@app.route('/api/cron/warm-requests', methods=['GET', 'POST'])
-def cron_warm_requests():
-    if not _cron_authorized():
-        return jsonify({"error": "Unauthorized"}), 401
-
-    start = time.time()
-    try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        with _bg_sync_lock:
-            _bg_sync["requests_items"]  = items
-            _bg_sync["requests_keys"]   = keys
-            _bg_sync["updated_at"]      = time.time()
-            _bg_sync["fetch_complete"]  = complete
-            _bg_sync["stop_reason"]     = reason
-        if _KV_ENABLED and items:
-            kv_set_json("requests_snapshot", {
-                "items": items, "fetch_complete": complete, "stop_reason": reason, "updated_at": time.time()
-            })
-        return jsonify({"success": True, "count": len(items), "complete": complete, "reason": reason,
-                         "kv_enabled": _KV_ENABLED, "duration_s": round(time.time() - start, 1)})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e), "duration_s": round(time.time() - start, 1)}), 500
-
-@app.route('/api/cron/warm-points', methods=['GET', 'POST'])
-def cron_warm_points():
-    if not _cron_authorized():
-        return jsonify({"error": "Unauthorized"}), 401
-
-    start = time.time()
-    try:
-        p_items, _, p_complete, p_reason = fetch_feishu_records(POINTS_TABLE_ID)
-        cache_set("points_table_raw_items",
-                  {"items": p_items, "fetch_complete": p_complete, "stop_reason": p_reason}, ttl=600)
-        if _KV_ENABLED and p_items:
-            kv_set_json("points_snapshot", {
-                "items": p_items, "fetch_complete": p_complete, "stop_reason": p_reason, "updated_at": time.time()
-            })
-        return jsonify({"success": True, "count": len(p_items), "complete": p_complete, "reason": p_reason,
-                         "kv_enabled": _KV_ENABLED, "duration_s": round(time.time() - start, 1)})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e), "duration_s": round(time.time() - start, 1)}), 500
-
 @app.route('/api/health', methods=['GET'])
 def health():
     with _bg_sync_lock:
         bg_info = {
             "record_count": len(_bg_sync["requests_items"]),
-            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None
+            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
+            "syncing": _bg_sync["syncing"],
         }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
@@ -1551,6 +1443,8 @@ def health():
         "background_sync": bg_info
     })
 
+# Start the background sync thread right at boot time
+ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
