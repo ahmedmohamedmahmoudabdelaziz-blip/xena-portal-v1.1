@@ -4,10 +4,9 @@ Xena Data Portal — High-Speed Hybrid Backend
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
 with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
 Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
-Restored Background Sync to prevent 502/Gateway Timeouts on heavy endpoints.
 """
 
-import os, time, re, json, hashlib, logging, urllib.parse, threading
+import os, time, re, json, hashlib, logging, urllib.parse, threading, gzip, base64
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from functools import wraps
@@ -139,6 +138,49 @@ def cache_invalidate(prefix=""):
         keys = [k for k in list(_cache.keys()) if not prefix or k.startswith(prefix)]
         for k in keys:
             del _cache[k]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PERSISTENT CACHE (Vercel KV / Upstash Redis REST API)
+# ──────────────────────────────────────────────────────────────────────────────
+# WHY THIS EXISTS: on Vercel, each serverless invocation can land on a cold/different
+# instance — the in-memory _cache / _bg_sync dicts above do NOT reliably survive
+# between requests. That's the real reason full-table fetches keep happening live
+# (and hitting the platform's execution time limit). This layer stores the big
+# table snapshots in an external KV store so ANY instance can read them instantly.
+# It activates automatically once KV_REST_API_URL/TOKEN (Vercel KV) or
+# UPSTASH_REDIS_REST_URL/TOKEN (Upstash) are set as environment variables.
+# Values are gzip+base64 compressed before storage to stay under REST payload limits.
+_KV_URL   = os.environ.get("KV_REST_API_URL")   or os.environ.get("UPSTASH_REDIS_REST_URL")
+_KV_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+_KV_ENABLED = bool(_KV_URL and _KV_TOKEN)
+
+def _kv_headers():
+    return {"Authorization": f"Bearer {_KV_TOKEN}"}
+
+def kv_get_json(key):
+    if not _KV_ENABLED: return None
+    try:
+        r = http_requests.get(f"{_KV_URL}/get/{key}", headers=_kv_headers(), timeout=8)
+        if r.status_code != 200: return None
+        raw = r.json().get("result")
+        if not raw: return None
+        compressed = base64.b64decode(raw)
+        return json.loads(gzip.decompress(compressed).decode('utf-8'))
+    except Exception as e:
+        logger.error("kv_get_failed", key=key, error=str(e))
+        return None
+
+def kv_set_json(key, obj, ttl_seconds=None):
+    if not _KV_ENABLED: return False
+    try:
+        blob = base64.b64encode(gzip.compress(json.dumps(obj, default=str).encode('utf-8'))).decode('ascii')
+        url = f"{_KV_URL}/set/{key}"
+        if ttl_seconds: url += f"?EX={ttl_seconds}"
+        r = http_requests.post(url, headers=_kv_headers(), data=blob.encode('utf-8'), timeout=20)
+        return r.status_code == 200
+    except Exception as e:
+        logger.error("kv_set_failed", key=key, error=str(e))
+        return False
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.1  RATE LIMITER & INPUT SANITISATION
@@ -416,9 +458,8 @@ def get_user_permissions(email, name):
         logger.error("Auth Error", error=str(e))
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
-
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING (With Fallback Protection)
+# HIGH-SPEED SESSION FETCHING (Fixing Analytics 5-min Timeout)
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
@@ -431,18 +472,24 @@ def fetch_feishu_records(table_id, from_dt=None):
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     
+    # Using automatic_fields to prevent 502 FieldNameNotFound
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     
     page_token = None
-    MAX_PAGE_RETRIES = 4
+    MAX_PAGE_RETRIES = 4  # per-page retry budget — absorbs transient "deadline_exceeded" style errors
 
     for _ in range(200):
         payload = {"page_size": 500} 
         if page_token: payload["page_token"] = page_token
             
+        # By sorting DESC, we encounter newest dates first. Once we hit old dates, we break immediately.
         if table_id == REQUESTS_TABLE_ID:
             payload["sort"] = [{"field_name": "Numbering", "desc": True}]
 
+        # ── RETRY THIS PAGE UP TO MAX_PAGE_RETRIES TIMES BEFORE GIVING UP ──
+        # A single transient Feishu error (deadline_exceeded, 5xx, network blip) used to
+        # kill the ENTIRE fetch after just one page. Now we retry the *same page* with
+        # backoff, and only stop the whole loop if it truly can't recover.
         page_data = None
         last_err = ""
         for attempt in range(MAX_PAGE_RETRIES):
@@ -456,6 +503,8 @@ def fetch_feishu_records(table_id, from_dt=None):
                 data = resp.json()
                 if data.get("code") != 0:
                     last_err = f"Feishu Error {data.get('code')}: {data.get('msg')}"
+                    # Feishu's own "deadline_exceeded"/internal errors are almost always
+                    # transient on heavy/sorted tables — back off and retry same page.
                     time.sleep(0.5 * (attempt + 1))
                     continue
 
@@ -467,6 +516,8 @@ def fetch_feishu_records(table_id, from_dt=None):
                 time.sleep(0.5 * (attempt + 1))
 
         if page_data is None:
+            # Exhausted retries for this page. Stop here but KEEP everything already
+            # fetched (previously this returned only whatever page was in-flight, often 500 rows).
             fetch_complete = False
             stop_reason = last_err or "Unknown fetch error"
             break
@@ -489,6 +540,9 @@ def fetch_feishu_records(table_id, from_dt=None):
                     if record_dt and record_dt < (from_dt - timedelta(days=1)):
                         page_old_count += 1
         
+        # AGGRESSIVE DATE BOUNDARY GUARD: Eliminates the 5 minute Analytics wait.
+        # Since the table is sorted descending, if we find 25 old records on a single page,
+        # we have 100% crossed the date threshold and can safely kill the Feishu API loop.
         if from_dt and page_old_count >= 25:
             stop_reason = "Safely reached date boundary."
             break
@@ -499,70 +553,6 @@ def fetch_feishu_records(table_id, from_dt=None):
 
     return all_items, master_keys, fetch_complete, stop_reason
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# RESTORED: BACKGROUND THREADING (Prevents 502 Timeouts for Analytics & Query)
-# ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
-BACKGROUND_SYNC_MAX_AGE  = 600   # snapshot considered "fresh enough" for 10 minutes
-
-_bg_sync = {
-    "requests_items": [], "requests_keys": set(),
-    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
-    "syncing": False,
-}
-_bg_sync_lock = threading.Lock()
-_bg_thread_started = False
-_bg_thread_lock = threading.Lock()
-
-def _background_sync_requests_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing"]: return
-        _bg_sync["syncing"] = True
-    try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        with _bg_sync_lock:
-            _bg_sync["requests_items"]  = items
-            _bg_sync["requests_keys"]   = keys
-            _bg_sync["updated_at"]      = time.time()
-            _bg_sync["fetch_complete"]  = complete
-            _bg_sync["stop_reason"]     = reason
-        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
-    except Exception as e:
-        logger.error("background_sync_failed", table="grand_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing"] = False
-
-def _background_sync_loop():
-    while True:
-        _background_sync_requests_table()
-        time.sleep(BACKGROUND_SYNC_INTERVAL)
-
-def ensure_background_sync_started():
-    global _bg_thread_started
-    with _bg_thread_lock:
-        if not _bg_thread_started:
-            threading.Thread(target=_background_sync_loop, daemon=True).start()
-            _bg_thread_started = True
-
-def get_requests_table_snapshot(from_dt=None):
-    """Serves the Grand Table from the warm in-memory snapshot when fresh,
-    preventing massive API delays and solving the Gateway Timeout Error."""
-    ensure_background_sync_started()
-    with _bg_sync_lock:
-        items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
-        updated_at   = _bg_sync["updated_at"]
-        complete     = _bg_sync["fetch_complete"]
-        reason       = _bg_sync["stop_reason"]
-    
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-        return items, keys, complete, reason, True
-    
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
-    return items, keys, complete, reason, False
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # AGENCY SEARCH (target / points) DUAL ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
@@ -570,29 +560,24 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # RESTORED FIX: Dynamically target the correct table based on Query Type!
-    # Target requires REQUESTS_TABLE_ID. Points requires POINTS_TABLE_ID.
-    table_id = POINTS_TABLE_ID if query_type == "points" else REQUESTS_TABLE_ID
-    
-    payload = {
+    points_payload = {
         "filter": {
             "conjunction": "and",
             "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
         }
     }
     
-    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
     
     try:
-        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=30).json()
+        resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
         if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
         all_records = resp.get("data", {}).get("items", [])
         if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
     except Exception as e:
         return {"found": False, "error": f"Search timeout or connection error: {str(e)}"}
 
-    fields_list = [r.get("fields", {}) for r in all_records]
-    first = fields_list[0]
+    first = all_records[0].get("fields", {})
 
     agency_name  = extract_field_text(get_field_local(first,"Agency Name","Name"))
     region_raw   = clean(get_field_local(first,"Region","Agency Region"))
@@ -609,6 +594,93 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         if region_raw.strip().lower() not in [r.lower() for r in allowed_regs]:
             return {"found": False, "error": f"Access Denied: Not authorized to view Region {region_raw.upper()}."}
 
+    # Separated Timelines and Correct Privilege Math
+    history_points = []
+    history_target = []
+    privileges_claimed = defaultdict(int)
+    usage_this_month = defaultdict(int)
+    cm, cy = datetime.now().month, datetime.now().year
+    
+    try:
+        hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+        hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
+        
+        if hist_resp.get("code") == 0:
+            for r in hist_resp.get("data", {}).get("items", []):
+                hf = r.get("fields", {})
+                h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
+                
+                # STRICT CURRENT MONTH RULE (Prevents timelines mixing old months)
+                if not h_date or h_date.month != cm or h_date.year != cy:
+                    continue
+
+                req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
+                status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
+                req_type_lower = req_type.lower()
+                s_lower = status_val.lower()
+
+                # --- TARGET PRIVILEGE LOGIC (Mirroring Excel Formula) ---
+                if "target" in req_type_lower:
+                    privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+                    # Extracts the integer explicitly from the Counter column
+                    raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
+                    qty = 1
+                    if raw_counter:
+                        m = re.search(r'\d+', str(raw_counter))
+                        if m: qty = int(m.group())
+
+                    history_target.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "request_type": req_type,
+                        "status": status_val,
+                        "privilege": privilege_val,
+                        "quantities_input": str(qty) 
+                    })
+
+                    # If Done, sum exactly the amount in Counter (Fixing the 6 vs 2 issue)
+                    if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
+                        privileges_claimed[privilege_val] += qty
+
+                # --- AGENCY POINTS LOGIC ---
+                else:
+                    target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
+                    point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
+                    
+                    # Points History parses 'Latest Usage Tracker' explicitly for Timeline & Limits
+                    latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
+                    
+                    # Regex to extract strings like "🔹 Trend Card: 1" safely into an array of items
+                    parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
+                    
+                    history_points.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "request_type": req_type,
+                        "status": status_val,
+                        "target_type": target_type,
+                        "point_balance": point_balance,
+                        "latest_usage": latest_usage,
+                        "parsed_items": parsed_items
+                    })
+
+                    # Calculate precise Monthly Limits for Allocator exclusively using Latest Usage Tracker
+                    if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
+                        for item_name, item_qty in parsed_items:
+                            name_clean = item_name.strip().lower()
+                            qty_int = int(item_qty)
+                            
+                            matched = False
+                            for key in MONTHLY_ALLOCATOR_LIMITS.keys():
+                                if key in name_clean:
+                                    usage_this_month[key] += qty_int
+                                    matched = True
+                                    break
+                            if not matched:
+                                usage_this_month[name_clean] += qty_int
+    except Exception as e:
+        logger.error("Points history fetch failed", agency=code, error=str(e))
+
+    allocator_status = compute_allocator_status(usage_this_month)
+    
     if query_type == "points":
         total_pts = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total', 'Total points')))
         used_pts  = parse_float_safe(extract_field_text(get_field_local(first, 'Used Points', 'Used', 'Used points')))
@@ -634,106 +706,28 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             health_score = 0
             health_status = "Inactive"
 
-        # Timeline logic depends on REQUESTS_TABLE_ID. Query directly for this single agency
-        history_points = []
-        try:
-            hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-            hist_resp = http_requests.post(hist_url, headers=headers, json=payload, timeout=30).json()
-            
-            if hist_resp.get("code") == 0:
-                for r in hist_resp.get("data", {}).get("items", []):
-                    hf = r.get("fields", {})
-                    h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
-                    
-                    history_points.append({
-                        "_dt": h_date,
-                        "date": h_date.strftime("%Y-%m-%d") if h_date else "",
-                        "request_type": extract_field_text(get_field_local(hf, "Request Type", "Type")).strip(),
-                        "status": extract_field_text(get_field_local(hf, "Status", "Request Status")).strip(),
-                        "target_type": extract_field_text(get_field_local(hf, "Target Type")).strip(),
-                        "point_balance": extract_field_text(get_field_local(hf, "Point Balance")).strip(),
-                        "privilege": extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip(),
-                        "quantities_input": extract_field_text(get_field_local(hf, "Quantities Input", "Counter", "Qty")).strip(),
-                    })
-                history_points.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
-                for h in history_points: h.pop("_dt", None)
-        except Exception as e:
-            logger.error("Points history fetch failed", agency=code, error=str(e))
-
-        # Re-introduce Monthly Tracker for Allocator (Only on Points Table)
-        monthly_usage_raw = extract_field_text(get_field_local(first, "Monthly Usage Tracker"))
-        usage_this_month = defaultdict(int)
-        if monthly_usage_raw:
-            for item_name, qty in re.findall(r'([A-Za-z][A-Za-z0-9 /\-]*?)\s*:\s*(\d+)', monthly_usage_raw):
-                usage_this_month[item_name.strip().lower()] += int(qty)
-
-        allocator_status = compute_allocator_status(usage_this_month)
-        
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "total_points": total_pts, "used_points": used_pts,
             "point_balance": balance, "health_score": health_score,
             "health_status": health_status,
-            "history": history_points, 
+            "history": history_points, # Separated timeline logic injected here
             "allocator_status": allocator_status,
-            "requests": fields_list
+            "requests": [r.get("fields", {}) for r in all_records]
         }
-
-    else:  # target
-        target_rows = [f for f in fields_list
-                       if extract_field_text(get_field_local(f, "Request Type", "Type")).strip().lower() == "agency target privilege"]
-        raw_base_pts = 0.0
-        for f in target_rows:
-            bp = parse_float_safe(extract_field_text(get_field_local(f, "Base Points", "base_points")))
-            if bp > 0:
-                raw_base_pts = bp
-                break
-        if raw_base_pts == 0.0:
-            raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
+    else:  
+        raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
         base_pts_coins = raw_base_pts * COINS_MULTIPLIER
-
-        privileges_claimed = defaultdict(int)
-        history_target = []
-        cm, cy = datetime.now().month, datetime.now().year
-
-        for f in target_rows:
-            priv = extract_field_text(get_field_local(f, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
-            if not priv: continue
-            status = extract_field_text(get_field_local(f, "Status", "Request Status")).strip()
-            
-            raw_counter = extract_field_text(get_field_local(f, "Counter", "Qty", "Quantities Input")).strip()
-            qty = 1
-            if raw_counter:
-                m = re.search(r'\d+', str(raw_counter))
-                if m: qty = int(m.group())
-
-            h_date = parse_feishu_date(get_field_local(f, "Submitted on Copy", "Submitted on", "Created Time"))
-            
-            if h_date and h_date.month == cm and h_date.year == cy:
-                history_target.append({
-                    "_dt": h_date,
-                    "date": h_date.strftime("%Y-%m-%d"),
-                    "request_type": extract_field_text(get_field_local(f, "Request Type", "Type")).strip(),
-                    "status": status,
-                    "privilege": priv,
-                    "quantities_input": str(qty) 
-                })
-                if status.lower() in ("done", "done ", "completed", "approved", "confirm"):
-                    privileges_claimed[priv] += qty
-
-        history_target.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
-        for h in history_target: h.pop("_dt", None)
 
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "base_points": base_pts_coins, "health_score": 100, "health_status": "Healthy",
             "privileges_claimed": dict(privileges_claimed),  
-            "history": history_target, 
-            "requests": fields_list
+            "history": history_target, # Dedicated target timeline array
+            "requests": [r.get("fields", {}) for r in all_records]
         }
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # NORMALISED FIELD MAP (ANALYTICS LOOP OPTIMIZATION)
@@ -906,10 +900,66 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
     return stats
 
+# ──────────────────────────────────────────────────────────────────────────────
+# FLASK APP
+# ──────────────────────────────────────────────────────────────────────────────
+BACKGROUND_SYNC_MAX_AGE  = 600   
 
-# ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP & ROUTING
-# ──────────────────────────────────────────────────────────────────────────────
+_bg_sync = {
+    "requests_items": [], "requests_keys": set(),
+    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
+}
+_bg_sync_lock = threading.Lock()
+
+
+def get_requests_table_snapshot(from_dt=None):
+    with _bg_sync_lock:
+        items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
+        updated_at   = _bg_sync["updated_at"]
+        complete     = _bg_sync["fetch_complete"]
+        reason       = _bg_sync["stop_reason"]
+        
+    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+        return items, keys, complete, reason, True
+
+    # In-memory cache is empty/stale — likely a cold serverless instance.
+    # Try the persistent KV snapshot (kept fresh by /api/cron/warm-cache) before
+    # falling back to a live, potentially slow, full Feishu crawl.
+    if _KV_ENABLED:
+        kv_snap = kv_get_json("requests_snapshot")
+        if kv_snap and kv_snap.get("items"):
+            age = time.time() - kv_snap.get("updated_at", 0)
+            if age < BACKGROUND_SYNC_MAX_AGE * 6:
+                kv_items = kv_snap["items"]
+                kv_keys = set()
+                for it in kv_items:
+                    kv_keys.update(it.get("fields", {}).keys())
+                kv_complete = kv_snap.get("fetch_complete", True)
+                kv_reason   = kv_snap.get("stop_reason", "")
+                with _bg_sync_lock:
+                    _bg_sync["requests_items"]  = kv_items
+                    _bg_sync["requests_keys"]   = kv_keys
+                    _bg_sync["updated_at"]      = time.time()
+                    _bg_sync["fetch_complete"]  = kv_complete
+                    _bg_sync["stop_reason"]     = kv_reason
+                return kv_items, kv_keys, kv_complete, kv_reason, True
+
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+    
+    with _bg_sync_lock:
+        _bg_sync["requests_items"]  = items
+        _bg_sync["requests_keys"]   = keys
+        _bg_sync["updated_at"]      = time.time()
+        _bg_sync["fetch_complete"]  = complete
+        _bg_sync["stop_reason"]     = reason
+
+    if _KV_ENABLED and items:
+        kv_set_json("requests_snapshot", {
+            "items": items, "fetch_complete": complete, "stop_reason": reason, "updated_at": time.time()
+        })
+        
+    return items, keys, complete, reason, False
+
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
@@ -1116,14 +1166,27 @@ def points_records():
         fetch_complete = cached_bundle["fetch_complete"]
         stop_reason    = cached_bundle["stop_reason"]
     else:
-        # Feishu call strictly for Points Table (tbl6LYUxGi8tlkJH)
-        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
-        if not fetch_complete and not all_items:
-            return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+        kv_bundle = kv_get_json("points_snapshot") if _KV_ENABLED else None
+        if kv_bundle and kv_bundle.get("items") and (time.time() - kv_bundle.get("updated_at", 0)) < CACHE_TTL_HISTORICAL:
+            all_items      = kv_bundle["items"]
+            fetch_complete = kv_bundle.get("fetch_complete", True)
+            stop_reason    = kv_bundle.get("stop_reason", "")
+            cache_set(raw_points_cache_key,
+                      {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
+                      ttl=300)
+        else:
+            all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
+            if not fetch_complete and not all_items:
+                return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
-        cache_set(raw_points_cache_key,
-                  {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
-                  ttl=300)
+            cache_set(raw_points_cache_key,
+                      {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
+                      ttl=300)
+            if _KV_ENABLED and all_items:
+                kv_set_json("points_snapshot", {
+                    "items": all_items, "fetch_complete": fetch_complete,
+                    "stop_reason": stop_reason, "updated_at": time.time()
+                })
 
     filtered = []
     for item in all_items:
@@ -1247,7 +1310,8 @@ def query_records():
     allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
     allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
 
-    # Utitilizing restored ultra-fast Background Synchronization
+    # No date bound at all — scans the FULL table snapshot, exactly like the plain-text request:
+    # "no limit time". Reuses the same background-refreshed cache as Analytics for speed.
     all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot()
 
     if not fetch_complete and not all_items:
@@ -1369,7 +1433,6 @@ def analytics():
             if cmp_from_dt and (not oldest_dt or cmp_from_dt < oldest_dt): oldest_dt = cmp_from_dt
         except ValueError: pass
 
-    # Utitilizing restored ultra-fast Background Synchronization
     all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
 
     if not fetch_complete and not all_items:
@@ -1415,13 +1478,61 @@ def clear_cache():
     audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""))
     return jsonify({"success":True,"message":"Cache cleared."})
 
+def _cron_authorized():
+    secret = os.environ.get("CRON_SECRET", "")
+    if not secret:
+        return True  # no secret configured — allow (set CRON_SECRET to lock this down)
+    auth_header = request.headers.get("Authorization", "")
+    return auth_header == f"Bearer {secret}" or request.args.get("secret") == secret
+
+@app.route('/api/cron/warm-requests', methods=['GET', 'POST'])
+def cron_warm_requests():
+    if not _cron_authorized():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    start = time.time()
+    try:
+        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+        with _bg_sync_lock:
+            _bg_sync["requests_items"]  = items
+            _bg_sync["requests_keys"]   = keys
+            _bg_sync["updated_at"]      = time.time()
+            _bg_sync["fetch_complete"]  = complete
+            _bg_sync["stop_reason"]     = reason
+        if _KV_ENABLED and items:
+            kv_set_json("requests_snapshot", {
+                "items": items, "fetch_complete": complete, "stop_reason": reason, "updated_at": time.time()
+            })
+        return jsonify({"success": True, "count": len(items), "complete": complete, "reason": reason,
+                         "kv_enabled": _KV_ENABLED, "duration_s": round(time.time() - start, 1)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "duration_s": round(time.time() - start, 1)}), 500
+
+@app.route('/api/cron/warm-points', methods=['GET', 'POST'])
+def cron_warm_points():
+    if not _cron_authorized():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    start = time.time()
+    try:
+        p_items, _, p_complete, p_reason = fetch_feishu_records(POINTS_TABLE_ID)
+        cache_set("points_table_raw_items",
+                  {"items": p_items, "fetch_complete": p_complete, "stop_reason": p_reason}, ttl=600)
+        if _KV_ENABLED and p_items:
+            kv_set_json("points_snapshot", {
+                "items": p_items, "fetch_complete": p_complete, "stop_reason": p_reason, "updated_at": time.time()
+            })
+        return jsonify({"success": True, "count": len(p_items), "complete": p_complete, "reason": p_reason,
+                         "kv_enabled": _KV_ENABLED, "duration_s": round(time.time() - start, 1)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "duration_s": round(time.time() - start, 1)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health():
     with _bg_sync_lock:
         bg_info = {
             "record_count": len(_bg_sync["requests_items"]),
-            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
-            "syncing": _bg_sync["syncing"],
+            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None
         }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
@@ -1431,8 +1542,6 @@ def health():
         "background_sync": bg_info
     })
 
-# Initialize Background Sync Cache automatically
-ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
