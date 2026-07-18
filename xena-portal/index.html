@@ -1253,8 +1253,15 @@ function navTo(page){
         document.getElementById('pg-agency').style.display='block';
         document.getElementById('queryType').value='points';
         document.getElementById('agencyLookupTitle').textContent='🪙 Check Agency Points';
-        document.getElementById('agencyEmptyState').style.display='block';
-        document.getElementById('resultsContainer').style.display='none';
+        // If points data is already loaded, re-show it immediately (same pattern as target page)
+        if (currentAgencyData && currentAgencyData.point_balance != null) {
+            document.getElementById('agencyEmptyState').style.display='none';
+            document.getElementById('resultsContainer').style.display='block';
+            updatePointsGrid();
+        } else {
+            document.getElementById('agencyEmptyState').style.display='block';
+            document.getElementById('resultsContainer').style.display='none';
+        }
     } else if(page==='allocator'){
         document.getElementById('pg-allocator').style.display='block';
         if(currentAgencyData&&currentAgencyData.point_balance!=null){
@@ -1660,6 +1667,10 @@ async function generateAnalytics() {
     const type=document.getElementById('anaType').value;
     const fromDate=document.getElementById('anaFrom').value;
     const toDate=document.getElementById('anaTo').value;
+    // Warn if no date range selected — fetches all records and will be slow
+    if (!fromDate && document.getElementById('anaDatePreset').value === 'all') {
+        ToastManager.show('Tip: Select a date range for faster results. "All" fetches every record.','info',5000);
+    }
     const cmpOn=document.getElementById('compareToggle').checked;
     const cmpFrom=cmpOn?document.getElementById('cmpFrom').value:'';
     const cmpTo=cmpOn?document.getElementById('cmpTo').value:'';
@@ -2184,6 +2195,8 @@ async function fetchAgencyData() {
         }
     } catch(err) {
         ToastManager.show(err.message,'error',8000);
+        // Re-show empty state so screen isn't blank after an error
+        document.getElementById('agencyEmptyState').style.display='block';
     }
     document.getElementById('loadingOverlay').style.display='none';
 }
