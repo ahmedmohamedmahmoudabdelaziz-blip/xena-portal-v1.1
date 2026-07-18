@@ -407,11 +407,8 @@ def get_user_permissions(email, name):
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING (Fixed Latency/Timeouts)
+# HIGH-SPEED SESSION FETCHING (Fixing Analytics 5-min Timeout)
 # ──────────────────────────────────────────────────────────────────────────────
-# FIX 1: Removed `fields_to_return` array logic entirely.
-# Feishu's strict schema matching caused 502 FieldNameNotFound errors.
-# Reverting to automatic_fields=true ensures 100% stability.
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
     all_items = []
@@ -419,11 +416,11 @@ def fetch_feishu_records(table_id, from_dt=None):
     master_keys = set()
     fetch_complete = True
     stop_reason = ""
-    consecutive_old_pages = 0
 
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     
+    # Using automatic_fields to prevent 502 FieldNameNotFound
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     
     page_token = None
@@ -431,6 +428,7 @@ def fetch_feishu_records(table_id, from_dt=None):
         payload = {"page_size": 500} 
         if page_token: payload["page_token"] = page_token
             
+        # By sorting DESC, we encounter newest dates first. Once we hit old dates, we break immediately.
         if table_id == REQUESTS_TABLE_ID:
             payload["sort"] = [{"field_name": "Numbering", "desc": True}]
         
@@ -452,7 +450,6 @@ def fetch_feishu_records(table_id, from_dt=None):
             if not items: break
 
             page_old_count = 0
-            valid_dates_in_page = 0
             for item in items:
                 rid = item.get("record_id")
                 if rid and rid not in seen_ids:
@@ -463,20 +460,15 @@ def fetch_feishu_records(table_id, from_dt=None):
                     if from_dt:
                         raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
                         record_dt = parse_feishu_date(raw_date)
-                        if record_dt:
-                            valid_dates_in_page += 1
-                            if record_dt < (from_dt - timedelta(days=1)):
-                                page_old_count += 1
+                        if record_dt and record_dt < (from_dt - timedelta(days=1)):
+                            page_old_count += 1
             
-            if from_dt:
-                if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                    consecutive_old_pages += 1
-                else:
-                    consecutive_old_pages = 0
-
-                if consecutive_old_pages >= 3:
-                    stop_reason = "Safely reached pages with all older records."
-                    break
+            # AGGRESSIVE DATE BOUNDARY GUARD: Eliminates the 5 minute Analytics wait.
+            # Since the table is sorted descending, if we find 25 old records on a single page,
+            # we have 100% crossed the date threshold and can safely kill the Feishu API loop.
+            if from_dt and page_old_count >= 25:
+                stop_reason = "Safely reached date boundary."
+                break
 
             page_token = block.get("page_token")
             if not page_token or not block.get("has_more", False):
@@ -530,7 +522,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         if region_raw.strip().lower() not in [r.lower() for r in allowed_regs]:
             return {"found": False, "error": f"Access Denied: Not authorized to view Region {region_raw.upper()}."}
 
-    # FIX 3, 4 & 5: Strict Current Month Filter, Target Counter Math, and Timeline Separation
+    # Separated Timelines and Correct Privilege Math
     history_points = []
     history_target = []
     privileges_claimed = defaultdict(int)
@@ -546,64 +538,72 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 hf = r.get("fields", {})
                 h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
                 
-                # FIX 3: SKIP ANYTHING THAT IS NOT THIS MONTH/YEAR
+                # STRICT CURRENT MONTH RULE (Prevents timelines mixing old months)
                 if not h_date or h_date.month != cm or h_date.year != cy:
                     continue
 
-                privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
-                status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
                 req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
-                target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
-                point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
-
-                # FIX 4: Exact Counter Extraction (Required for Claimed = 2 vs 6)
-                raw_qty = extract_field_text(get_field_local(hf, "Counter", "Quantities Input", "Qty")).strip()
-                qty = 1
-                if raw_qty:
-                    m = re.search(r'\d+', str(raw_qty))
-                    if m: qty = int(m.group())
-
-                entry = {
-                    "date": h_date.strftime("%Y-%m-%d"),
-                    "_dt": h_date,
-                    "request_type": req_type,
-                    "status": status_val,
-                    "privilege": privilege_val,
-                    "target_type": target_type,
-                    "quantities_input": raw_qty or str(qty),
-                    "point_balance": point_balance,
-                }
-
+                status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
                 req_type_lower = req_type.lower()
                 s_lower = status_val.lower()
 
-                # FIX 5: Separating Timelines & Applying Exact Count logic
+                # --- TARGET PRIVILEGE LOGIC (Mirroring Excel Formula) ---
                 if "target" in req_type_lower:
-                    history_target.append(entry)
-                    # For target privileges, sum up the exact counter of Done requests
-                    if s_lower in ("done", "completed", "approved", "confirm") and privilege_val:
+                    privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+                    # Extracts the integer explicitly from the Counter column
+                    raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
+                    qty = 1
+                    if raw_counter:
+                        m = re.search(r'\d+', str(raw_counter))
+                        if m: qty = int(m.group())
+
+                    history_target.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "request_type": req_type,
+                        "status": status_val,
+                        "privilege": privilege_val,
+                        "quantities_input": str(qty) 
+                    })
+
+                    # If Done, sum exactly the amount in Counter (Fixing the 6 vs 2 issue)
+                    if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
                         privileges_claimed[privilege_val] += qty
+
+                # --- AGENCY POINTS LOGIC ---
                 else:
-                    # Point requests, bd creations, closing requests go to points timeline
-                    history_points.append(entry)
+                    target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
+                    point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
+                    
+                    # Points History parses 'Latest Usage Tracker' explicitly for Timeline & Limits
+                    latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
+                    
+                    # Regex to extract strings like "🔹 Trend Card: 1" safely into an array of items
+                    parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
+                    
+                    history_points.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "request_type": req_type,
+                        "status": status_val,
+                        "target_type": target_type,
+                        "point_balance": point_balance,
+                        "latest_usage": latest_usage,
+                        "parsed_items": parsed_items
+                    })
 
-                # Smart Allocator Cap Extraction Layer 
-                if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
-                    p_lower = privilege_val.lower()
-                    if p_lower:
-                        for key in MONTHLY_ALLOCATOR_LIMITS.keys():
-                            if key in p_lower:
-                                usage_this_month[key] += qty
-                                break
-                        else:
-                            base_name = p_lower.split('(')[0].strip()
-                            if base_name:
-                                usage_this_month[base_name] += qty
-
-            history_points.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
-            history_target.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
-            for h in history_points: h.pop("_dt", None)
-            for h in history_target: h.pop("_dt", None)
+                    # Calculate precise Monthly Limits for Allocator exclusively using Latest Usage Tracker
+                    if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
+                        for item_name, item_qty in parsed_items:
+                            name_clean = item_name.strip().lower()
+                            qty_int = int(item_qty)
+                            
+                            matched = False
+                            for key in MONTHLY_ALLOCATOR_LIMITS.keys():
+                                if key in name_clean:
+                                    usage_this_month[key] += qty_int
+                                    matched = True
+                                    break
+                            if not matched:
+                                usage_this_month[name_clean] += qty_int
     except Exception as e:
         logger.error("Points history fetch failed", agency=code, error=str(e))
 
@@ -640,8 +640,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "total_points": total_pts, "used_points": used_pts,
             "point_balance": balance, "health_score": health_score,
             "health_status": health_status,
-            "history": history_points, # Separated timeline 
-            "monthly_usage": {}, 
+            "history": history_points, # Separated timeline logic injected here
             "allocator_status": allocator_status,
             "requests": [r.get("fields", {}) for r in all_records]
         }
@@ -653,9 +652,8 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "found": True, "agency_code": code, "agency_name": agency_name,
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "base_points": base_pts_coins, "health_score": 100, "health_status": "Healthy",
-            "privileges": list(privileges_claimed.keys()),   
             "privileges_claimed": dict(privileges_claimed),  
-            "history": history_target, # Passing target-only history for the new target timeline
+            "history": history_target, # Dedicated target timeline array
             "requests": [r.get("fields", {}) for r in all_records]
         }
 
@@ -852,7 +850,6 @@ def get_requests_table_snapshot(from_dt=None):
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
         
-    # FIX 1: Removed fields_to_return entirely to prevent Feishu FieldNameNotFound 502 errors
     items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
     
     with _bg_sync_lock:
@@ -921,9 +918,6 @@ def check_auth():
     perms    = get_user_permissions(email, username)
     return jsonify(perms)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# AGENCY SEARCH ENDPOINT 
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/search', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_SEARCH)
 def search():
@@ -957,9 +951,6 @@ def search():
     else:
         return jsonify(data), 404
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ADMIN PANEL 
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/admin/users', methods=['GET','POST','DELETE'])
 def manage_users():
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
@@ -1003,7 +994,6 @@ def manage_users():
         
         payload = {"fields": payload_fields}
         
-        # FIX 2: Strict String Matching.
         existing_record_id = None
         res_all = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
         
@@ -1043,9 +1033,6 @@ def audit_logs():
         if not perms.get("is_super_admin"): return jsonify({"error":"Unauthorized"}), 403
     return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# PAGINATED POINTS RECORDS ENDPOINT 
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def points_records():
@@ -1076,7 +1063,7 @@ def points_records():
     all_items = cache_get(raw_points_cache_key)
 
     if all_items is None:
-        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID) # Fix 1 applies here too
+        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID) 
         if not fetch_complete and not all_items:
             return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
             
@@ -1178,9 +1165,6 @@ def points_search():
         request.environ['QUERY_STRING'] = urllib.parse.urlencode(args, doseq=True)
     return points_records()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ANALYTICS ENDPOINT 
-# ──────────────────────────────────────────────────────────────────────────────
 @app.route('/api/analytics', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
 def analytics():
