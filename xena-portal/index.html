@@ -36,12 +36,13 @@
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
         .sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
-        .main-content{margin-left:240px;padding:24px;flex:1;min-width:0;box-sizing:border-box}
+        .main-content{margin-left:240px;padding:24px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s;}
         .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
         .sidebar-brand{font-size:1.05rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
         .sidebar-user-area{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
         .sidebar-username{font-size:.84rem;font-weight:600;color:var(--accent-cyan);display:flex;align-items:center;gap:7px;line-height:1.5;word-break:break-word}
         .sidebar-username::before{content:'';width:7px;height:7px;background:var(--accent-green);border-radius:50%;flex-shrink:0;box-shadow:0 0 6px var(--accent-green)}
+        
         .sidebar-nav{flex:1;padding:8px 0;overflow-y:auto}
         .nav-group{margin-bottom:1px}
         .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
@@ -69,7 +70,6 @@
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
 
-        /* ── NEW: QUERY PAGE STYLING ── */
         .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
         .qy-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .2s}
         .qy-card:hover{border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,212,255,.08)}
@@ -116,6 +116,7 @@
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
         .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email],.control-group input[type=number]{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
         .control-group select:focus,.control-group input:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+        
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(4px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
@@ -219,6 +220,11 @@
         .module-card:hover{border-color:var(--border-hover);background:rgba(255,255,255,.03)}
         .module-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:12px}
         .module-header h4{margin:0;font-size:1rem;color:var(--accent-cyan);display:flex;align-items:center;gap:8px}
+        
+        .sub-opts { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; padding:12px 16px; background:rgba(0,0,0,.2); border-radius:8px; border:1px solid var(--border); }
+        .sub-opt-lbl { display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--text); cursor:pointer; font-weight:500; }
+        .sub-opt-lbl input { accent-color: var(--accent-cyan); width:16px; height:16px; cursor:pointer; margin:0; }
+
         .switch{position:relative;display:inline-block;width:44px;height:24px}
         .switch input{opacity:0;width:0;height:0}
         .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);transition:.3s;border-radius:34px}
@@ -437,7 +443,7 @@
             <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
                 You do not have access to any modules. Please contact an administrator.
             </div>
-            <div style="text-align:center;padding:32px 24px 24px">
+            <div style="text-align:center;padding:32px 24px 24px" id="welcomeHero">
                 <div style="font-size:2.5rem;margin-bottom:12px">🚀</div>
                 <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">Xena Live Data Portal</h2>
                 <p style="color:var(--text-muted);margin-bottom:32px">Agency Privilege &amp; Operational Analytics</p>
@@ -480,7 +486,7 @@
         <div id="pg-agency" style="display:none">
             <div class="card" style="margin-bottom:24px">
                 <h3 id="agencyLookupTitle" style="margin-bottom:16px;color:var(--accent-cyan)">🔍 Agency Lookup</h3>
-                <div class="centered-search-box">
+                <div class="centered-search-box" id="standardSearchParams">
                     <div class="control-group">
                         <label>Agency Code</label>
                         <input type="text" id="agencyCode" placeholder="e.g., 40775" aria-label="Agency code" onkeydown="if(event.key==='Enter')fetchAgencyData()">
@@ -628,14 +634,17 @@
                     <div class="admin-toggle">
                         <div>
                             <h4>👑 Grant Admin Privileges</h4>
-                            <span style="font-size:.8rem;color:var(--text-muted)">Allows user to manage other agents.</span>
+                            <span style="font-size:.8rem;color:var(--text-muted)">Allows user to manage other agents and bypass restrictions.</span>
                         </div>
                         <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
                     </div>
                     <div class="module-card">
                         <div class="module-header">
                             <h4>🎯 Target Module</h4>
-                            <label class="switch"><input type="checkbox" id="modTarget" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="sub-opts">
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_check"> Check Agency Target</label>
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_timeline"> Target Timeline</label>
                         </div>
                         <div class="control-grid" style="margin-bottom:0">
                             <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
@@ -645,7 +654,12 @@
                     <div class="module-card">
                         <div class="module-header">
                             <h4>🪙 Points Module</h4>
-                            <label class="switch"><input type="checkbox" id="modPoints" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="sub-opts">
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_check"> Check Agency Points</label>
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_allocator"> Smart Allocator</label>
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_records"> Search Records</label>
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_table"> Point Table</label>
                         </div>
                         <div class="control-grid" style="margin-bottom:0">
                             <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="pointsAcmSelect"></div></div>
@@ -655,11 +669,26 @@
                     <div class="module-card">
                         <div class="module-header">
                             <h4>📊 Analytics Module</h4>
-                            <label class="switch"><input type="checkbox" id="modAnalytics" checked><span class="slider"></span></label>
+                        </div>
+                        <div class="sub-opts">
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_report"> Analytics Report</label>
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_compare"> Compare ACMs / Periods</label>
                         </div>
                         <div class="control-grid" style="margin-bottom:0">
                             <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
                             <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
+                        </div>
+                    </div>
+                    <div class="module-card">
+                        <div class="module-header">
+                            <h4>🔍 Universal Query Module</h4>
+                        </div>
+                        <div class="sub-opts">
+                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
+                        </div>
+                        <div class="control-grid" style="margin-bottom:0">
+                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
+                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="queryRegSelect"></div></div>
                         </div>
                     </div>
                     <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
@@ -1251,13 +1280,14 @@ function _expandNavGroup(bodyId,arrId){
 // STATE
 // ════════════════════════════════════════════════════════════════════
 let currentAgencyData=null, latestAnalyticsData=null, charts={};
+let userPermissions=null; 
 let loggedUser=localStorage.getItem('xenaUser');
 let loggedEmail=localStorage.getItem('xenaEmail');
 let loggedUat=localStorage.getItem('xenaUat');
 let pendingRequests=new Map();  
 let activeFilters={};           
 let sparkCharts={};             
-let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg;
+let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQueryAcm,pQueryReg;
 
 const urlParams=new URLSearchParams(window.location.search);
 
@@ -1428,7 +1458,7 @@ function toggleCompareDates(){
 }
 
 // ════════════════════════════════════════════════════════════════════
-// DATE PRESETS
+// DATE PRESETS AND LOCKDOWNS
 // ════════════════════════════════════════════════════════════════════
 function updateCustomDateVisibility() {
     const isSpec=document.getElementById('anaDatePreset').value==='specific';
@@ -1450,12 +1480,39 @@ function setDatePresets() {
     if (from) fi.value=fmtDate(from);
     if (to)   ti.value=fmtDate(to);
 }
+
 function updateAcmDropdown() {
     const region=document.getElementById('anaRegion').value;
     const sel=document.getElementById('anaAcm');
-    sel.innerHTML='<option value="All">All ACMs</option>';
-    const list=region==='IN'?inAcms:region==='PK'?pkAcms:[...pkAcms,...inAcms].sort();
-    list.forEach(n=>sel.add(new Option(n,n.toLowerCase())));
+    if (!sel) return;
+    sel.innerHTML='';
+    
+    let list=region==='IN'?inAcms:region==='PK'?pkAcms:[...pkAcms,...inAcms].sort();
+    
+    // Front-end lock using backend permissions payload
+    if (!isAdmin && userPermissions?.permissions?.acms?.analytics) {
+        const allowed = userPermissions.permissions.acms.analytics;
+        if (!allowed.includes('all')) {
+            list = list.filter(a => allowed.includes(a.toLowerCase()));
+        }
+    }
+    
+    const hasAllPerm = isAdmin || (userPermissions?.permissions?.acms?.analytics || ['all']).includes('all');
+    if (list.length > 1 || hasAllPerm) {
+        sel.add(new Option("All ACMs", "All"));
+    }
+    
+    list.forEach(n=>sel.add(new Option(n, n.toLowerCase())));
+    
+    // Lock dropdown if only 1 choice and no 'all' permission
+    if (list.length === 1 && !hasAllPerm) {
+        sel.value = list[0].toLowerCase();
+        sel.style.pointerEvents = 'none';
+        sel.style.opacity = '0.7';
+    } else {
+        sel.style.pointerEvents = 'auto';
+        sel.style.opacity = '1';
+    }
 }
 
 function saveFilterPreset() {
@@ -1526,16 +1583,30 @@ function parseGranular(str,module) {
 
 function editAgent(email,modulesStr,acmsRaw,regRaw) {
     document.getElementById('newAgentEmail').value=email;
-    document.getElementById('modAdmin').checked=modulesStr.includes('admin');
-    document.getElementById('modTarget').checked=modulesStr.includes('target');
-    document.getElementById('modPoints').checked=modulesStr.includes('points');
-    document.getElementById('modAnalytics').checked=modulesStr.includes('analytics');
+    const m = modulesStr.toLowerCase();
+    
+    ['target_check','target_timeline',
+     'points_check','points_allocator','points_records','points_table',
+     'analytics_report','analytics_compare',
+     'query_requests'].forEach(key => {
+        const master = key.split('_')[0];
+        // Support legacy users with just "target", "points" etc
+        const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
+        const cb = document.getElementById(`mod_${key}`);
+        if (cb) cb.checked = hasAccess;
+    });
+
+    document.getElementById('modAdmin').checked=m.includes('admin');
+
     pTargetAcm.setValues(parseGranular(acmsRaw,'target'));
     pTargetReg.setValues(parseGranular(regRaw,'target'));
     pPointsAcm.setValues(parseGranular(acmsRaw,'points'));
     pPointsReg.setValues(parseGranular(regRaw,'points'));
     pAnalyticsAcm.setValues(parseGranular(acmsRaw,'analytics'));
     pAnalyticsReg.setValues(parseGranular(regRaw,'analytics'));
+    pQueryAcm.setValues(parseGranular(acmsRaw,'query'));
+    pQueryReg.setValues(parseGranular(regRaw,'query'));
+    
     document.getElementById('adminBtnSubmit').innerText='💾 Save Configuration';
     navTo('admin-agents');
     setTimeout(()=>document.getElementById('newAgentEmail').focus(),120);
@@ -1561,7 +1632,6 @@ async function fetchAdminUsers() {
             let badge=u.modules.includes('admin')?'<span style="background:var(--accent-amber);color:#000;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px">ADMIN</span>':'';
             const row=document.createElement('div'); row.className='user-row';
             
-            // Safe JSON escaping to prevent SyntaxError in inline HTML
             const safeEmail = escapeJSArgs(dispEmail);
             const safeModules = escapeJSArgs(u.modules);
             const safeAcms = escapeJSArgs(u.acms_raw);
@@ -1586,17 +1656,32 @@ async function fetchAdminUsers() {
 async function addAgent() {
     const email=document.getElementById('newAgentEmail').value.trim();
     if (!email) { ToastManager.show('Please enter an Agent Identity.','warning'); return; }
+    
     let modules=[];
-    if (document.getElementById('modTarget').checked) modules.push('target');
-    if (document.getElementById('modPoints').checked) modules.push('points');
-    if (document.getElementById('modAnalytics').checked) modules.push('analytics');
+    ['target_check','target_timeline',
+     'points_check','points_allocator','points_records','points_table',
+     'analytics_report','analytics_compare',
+     'query_requests'].forEach(m => {
+        if(document.getElementById(`mod_${m}`).checked) modules.push(m);
+    });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
+    
     document.getElementById('adminBtnSubmit').innerText='Saving...';
     
     const payload={
         email,modules:modules.join(', '),
-        acms:{target:pTargetAcm.getValues().join(','),points:pPointsAcm.getValues().join(','),analytics:pAnalyticsAcm.getValues().join(',')},
-        regions:{target:pTargetReg.getValues().join(','),points:pPointsReg.getValues().join(','),analytics:pAnalyticsReg.getValues().join(',')}
+        acms:{
+            target:pTargetAcm.getValues().join(','),
+            points:pPointsAcm.getValues().join(','),
+            analytics:pAnalyticsAcm.getValues().join(','),
+            query:pQueryAcm.getValues().join(',')
+        },
+        regions:{
+            target:pTargetReg.getValues().join(','),
+            points:pPointsReg.getValues().join(','),
+            analytics:pAnalyticsReg.getValues().join(','),
+            query:pQueryReg.getValues().join(',')
+        }
     };
     
     try {
@@ -1708,6 +1793,8 @@ function initPills() {
     pPointsReg=new PillSelect('pointsRegSelect',allRegs);
     pAnalyticsAcm=new PillSelect('analyticsAcmSelect',allAcms);
     pAnalyticsReg=new PillSelect('analyticsRegSelect',allRegs);
+    pQueryAcm=new PillSelect('queryAcmSelect',allAcms);
+    pQueryReg=new PillSelect('queryRegSelect',allRegs);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2520,7 +2607,6 @@ function buildPointsHistory(history) {
         }).join('');
 }
 
-// ── Smart Allocator helpers ──────────────────────────────────────────────────
 function allocSelectAll() {
     document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
         el.classList.add('active');
@@ -2536,10 +2622,18 @@ function copyAllocatorReceipt() {
     if (!pre || !pre.textContent.trim()) {
         ToastManager.show('Run the allocator first to generate a receipt.','warning'); return;
     }
-    navigator.clipboard.writeText(pre.textContent).then(()=>{
+    document.execCommand('copy');
+    navigator.clipboard?.writeText(pre.textContent).then(()=>{
         ToastManager.show('Receipt copied to clipboard!','success');
     }).catch(()=>{
-        ToastManager.show('Could not copy — try selecting the text manually.','warning');
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('copy');
+        selection.removeAllRanges();
+        ToastManager.show('Receipt copied!','success');
     });
 }
 
@@ -3004,7 +3098,103 @@ function ptExportExcel() {
     ToastManager.show('Excel exported!', 'success');
 }
 
-/* ⬇️ INITIALIZATION BLOCK ⬇️ */
+// ════════════════════════════════════════════════════════════════════
+// ENFORCE LOCKS & INITIALIZATION 
+// ════════════════════════════════════════════════════════════════════
+function enforceLocks() {
+    if (isAdmin) return;
+    const p = userPermissions?.permissions || {};
+
+    // 1. Analytics Region
+    const anaReg = p.regions?.analytics || ['all'];
+    if (!anaReg.includes('all')) {
+        const sel = document.getElementById('anaRegion');
+        if (sel) {
+            sel.innerHTML = '';
+            ['PK','IN'].filter(r => anaReg.includes(r.toLowerCase())).forEach(r => sel.add(new Option(r, r)));
+            if (sel.options.length === 1) {
+                sel.value = sel.options[0].value;
+                sel.style.pointerEvents = 'none';
+                sel.style.opacity = '0.7';
+            }
+        }
+    }
+
+    // 2. Points Regions
+    const ptReg = p.regions?.points || ['all'];
+    if (!ptReg.includes('all')) {
+        ['prRegion', 'ptRegion'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            sel.innerHTML = '';
+            ['pk','in'].filter(r => ptReg.includes(r)).forEach(r => sel.add(new Option(r.toUpperCase(), r)));
+            if (sel.options.length === 1) {
+                sel.value = sel.options[0].value;
+                sel.style.pointerEvents = 'none';
+                sel.style.opacity = '0.7';
+            }
+        });
+    }
+
+    // 3. Points ACM Text Input Lock
+    const ptAcm = p.acms?.points || ['all'];
+    if (!ptAcm.includes('all')) {
+        const prAcm = document.getElementById('prAcm');
+        if (prAcm) {
+            prAcm.value = ptAcm.map(a => a.charAt(0).toUpperCase() + a.slice(1)).join(', ');
+            prAcm.readOnly = true;
+            prAcm.style.opacity = '0.7';
+        }
+    }
+    
+    // 4. Trigger Analytics ACM logic based on regions
+    updateAcmDropdown();
+}
+
+function hasMod(m) { return isAdmin || userModules.some(um => um.includes(m)); }
+function hasExactMod(m) { return isAdmin || userModules.includes(m); }
+
+function configureSidebarAndCards() {
+    // Hide unauthorized groups and specific sub-items
+    if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
+    else {
+        if (!hasExactMod('target_check') && !hasExactMod('target')) document.getElementById('nav-target').style.display = 'none';
+        if (!hasExactMod('target_timeline') && !hasExactMod('target')) document.getElementById('nav-target-timeline').style.display = 'none';
+    }
+
+    if (!hasMod('points')) document.getElementById('navGrpPoints').style.display = 'none';
+    else {
+        if (!hasExactMod('points_check') && !hasExactMod('points')) document.getElementById('nav-points').style.display = 'none';
+        if (!hasExactMod('points_allocator') && !hasExactMod('points')) document.getElementById('nav-allocator').style.display = 'none';
+        if (!hasExactMod('points_records') && !hasExactMod('points')) document.getElementById('nav-points-records').style.display = 'none';
+        if (!hasExactMod('points_table') && !hasExactMod('points')) document.getElementById('nav-points-table').style.display = 'none';
+    }
+
+    if (!hasMod('analytics')) document.getElementById('navGrpAnalytics').style.display = 'none';
+    else {
+        if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
+        if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
+    }
+
+    if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
+    else {
+        if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
+    }
+
+    if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
+
+    // Build Welcome Cards Dynamically Based on Exact Access
+    const wc = document.getElementById('welcomeCards');
+    wc.innerHTML = '';
+    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
+    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
+    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
+    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
+    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('query')"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+}
+
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
     document.querySelector('.app-shell').style.display='flex';
@@ -3013,21 +3203,34 @@ if (loggedUser&&loggedUat) {
     fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
         .then(r=>r.json())
         .then(d=>{
-            userModules=d.modules||[];
-            isAdmin=!!d.is_super_admin;
-            if (isAdmin) document.getElementById('navGrpAdmin').style.display='block';
-            if (!isAdmin&&userModules.length===0) {
-                document.getElementById('noAccessMsg').style.display='block';
-            } else {
-                const wc=document.getElementById('welcomeCards');
-                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
-                if (isAdmin||userModules.includes('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
-                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
-                if (isAdmin||userModules.includes('points'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
-                if (isAdmin||userModules.includes('target'))    wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
-                if (isAdmin||userModules.includes('analytics')||userModules.includes('query')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('query')"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
-                if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+            userPermissions = d;
+            userModules = d.modules || [];
+            isAdmin = !!d.is_super_admin;
+            
+            if (!isAdmin && userModules.length === 0) {
+                // HARD LOCK: ZERO ACCESS
+                document.getElementById('sidebar').style.display = 'none';
+                document.querySelector('.main-content').style.marginLeft = '0';
+                hideAllPages();
+                document.getElementById('pg-welcome').style.display = 'block';
+                document.getElementById('welcomeHero').style.display = 'none'; // Hide the default hero
+                document.getElementById('noAccessMsg').style.display = 'none'; // Hide the small inline message
+                
+                document.getElementById('pg-welcome').innerHTML = `
+                    <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;text-align:center">
+                        <div style="font-size:4rem;margin-bottom:16px">🔒</div>
+                        <h2 style="font-size:2.5rem;color:var(--accent-rose);margin-bottom:12px">Access Denied</h2>
+                        <p style="color:var(--text-muted);font-size:1.1rem;max-width:450px;margin-bottom:32px">You do not have permission to view any modules. Please contact your administrator to request access.</p>
+                        <button class="btn btn-outline" style="border-color:var(--border);color:var(--text);padding:12px 24px" onclick="logout()">Back to Login</button>
+                    </div>
+                `;
+                document.querySelector('.page-top-bar').style.display = 'none';
+                return;
             }
+
+            enforceLocks();
+            configureSidebarAndCards();
+
         }).catch(e=>console.error(e));
 
     updateAcmDropdown();
