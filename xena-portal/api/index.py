@@ -409,7 +409,7 @@ def get_user_permissions(email, name):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING (Fixing Analytics 5-min Timeout)
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None):
+def fetch_feishu_records(table_id, from_dt=None, deadline=None):
     tat = get_tenant_access_token()
     all_items = []
     seen_ids  = set()
@@ -468,6 +468,12 @@ def fetch_feishu_records(table_id, from_dt=None):
             # we have 100% crossed the date threshold and can safely kill the Feishu API loop.
             if from_dt and page_old_count >= 25:
                 stop_reason = "Safely reached date boundary."
+                break
+
+            # Hard deadline — return partial results instead of timing out at Vercel's limit
+            if deadline and time.time() > deadline:
+                fetch_complete = False
+                stop_reason = "deadline_exceeded"
                 break
 
             page_token = block.get("page_token")
@@ -850,7 +856,12 @@ def get_requests_table_snapshot(from_dt=None):
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
         
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+    # When no date filter is set, still give the fetcher a 90-day boundary so
+    # the aggressive date guard can fire. Without this, from_dt=None skips the
+    # guard entirely and causes a 5-minute full-table scan on Vercel.
+    fetch_from_dt = from_dt if from_dt else (datetime.utcnow() - timedelta(days=90))
+    deadline = time.time() + 25   # 25 s hard limit — return partial data rather than timing out
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=fetch_from_dt, deadline=deadline)
     
     with _bg_sync_lock:
         _bg_sync["requests_items"]  = items
