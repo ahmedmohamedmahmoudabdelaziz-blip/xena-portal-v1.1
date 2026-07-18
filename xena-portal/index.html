@@ -961,9 +961,14 @@
                         </select>
                     </div>
                     <div class="control-group">
+                        <label>Status</label>
+                        <input type="text" id="ptStatus" placeholder="e.g. Active" oninput="ptDebounce()">
+                    </div>
+                    <div class="control-group">
                         <label>Sort By</label>
                         <select id="ptSortBy" onchange="ptFetch(1)">
-                            <option value="point_balance" selected>Balance</option>
+                            <option value="date">Date</option>
+                            <option value="point_balance">Balance</option>
                             <option value="total_points">Total Pts</option>
                             <option value="used_points">Used Pts</option>
                             <option value="agency_name">Name</option>
@@ -998,6 +1003,8 @@
                                 <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Used Pts</th>
                                 <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Balance</th>
                                 <th style="padding:10px 12px;text-align:center;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Health</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Status</th>
+                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Date</th>
                             </tr>
                         </thead>
                         <tbody id="ptTbody"></tbody>
@@ -2683,18 +2690,18 @@ async function prFetch(page) {
 
     try {
         const resp = await fetch('/api/points/records?' + params.toString());
+        if (!resp.ok && resp.status !== 200) { /* still try to parse for error detail below */ }
         let data;
-        try {
-            data = await resp.json();
-        } catch (e) {
-            throw new Error('Server took too long to respond. Please wait a moment and refresh.');
-        }
-
-        if (!resp.ok) throw new Error(data.error || 'API error ' + resp.status);
-        
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('Server took too long to respond (platform time limit reached). Try again in a moment.'); }
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
         prAllData = data.records || [];
 
         if (spinner)  spinner.style.display = 'none';
+
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}. Click Search again to retry.`,'warning',8000);
+        }
 
         if (!prAllData.length) {
             if (emptyEl) emptyEl.style.display = 'block';
@@ -2810,7 +2817,8 @@ async function ptFetch(page) {
         email:    loggedEmail || '',
         search:   document.getElementById('ptSearch')?.value  || '',
         region:   document.getElementById('ptRegion')?.value  || '',
-        sort_by:  document.getElementById('ptSortBy')?.value  || 'point_balance',
+        status:   document.getElementById('ptStatus')?.value  || '',
+        sort_by:  document.getElementById('ptSortBy')?.value  || 'date',
         sort_dir: document.getElementById('ptSortDir')?.value || 'desc',
     });
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
@@ -2830,15 +2838,14 @@ async function ptFetch(page) {
     try {
         const resp = await fetch('/api/points/records?' + params.toString());
         let data;
-        try {
-            data = await resp.json();
-        } catch (e) {
-            throw new Error('Server took too long to respond. Please wait a moment and refresh.');
-        }
-
-        if (!resp.ok) throw new Error(data.error || 'API error ' + resp.status);
-        
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('Server took too long to respond (platform time limit reached). Try again in a moment.'); }
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
         ptAllData = data.records || [];
+
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}. Click Refresh to retry.`,'warning',8000);
+        }
 
         if (loadingBar) loadingBar.style.display = 'none';
 
@@ -2871,6 +2878,8 @@ async function ptFetch(page) {
                 <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(r.used_points||0).toLocaleString()}</td>
                 <td style="padding:9px 12px;text-align:right;font-weight:700;color:${balCol}">${(r.point_balance||0).toLocaleString()}</td>
                 <td style="padding:9px 12px;text-align:center;font-weight:700;color:${healthCol}">${r.health_score||0}</td>
+                <td style="padding:9px 12px;font-size:.82rem">${escHtml(r.status||'—')}</td>
+                <td style="padding:9px 12px;font-size:.82rem;color:var(--text-muted)">${escHtml(r.date||'—')}</td>
             </tr>`;
         }).join('');
 
@@ -2881,7 +2890,7 @@ async function ptFetch(page) {
                 <td style="padding:9px 12px;text-align:right;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>
                 <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>
                 <td style="padding:9px 12px;text-align:right;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>
-                <td></td>
+                <td></td><td></td><td></td>
             </tr>`;
         }
 
@@ -2970,12 +2979,8 @@ async function runQuery(){
         });
         const resp = await fetch('/api/query?' + params.toString());
         let data;
-        try {
-            data = await resp.json();
-        } catch (e) {
-            throw new Error('Server returned invalid data or took too long. Background sync is running, try again in a moment.');
-        }
-
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('The server took too long to respond (this usually means the full history scan hit the platform time limit). Please try again — it often succeeds once the background cache is warm.'); }
         if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
 
         if (spinner) spinner.style.display = 'none';
