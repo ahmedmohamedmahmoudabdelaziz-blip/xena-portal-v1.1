@@ -71,23 +71,33 @@ def redis_get(key):
         return None
     try:
         url = f"{REDIS_URL}/"
-        # Using root pipeline POST array syntax avoids all URL constraints
-        resp = http_requests.post(
-            url, 
-            headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
-            json=["GET", key], 
-            timeout=15
-        )
+        headers = {"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"}
+        resp = http_requests.post(url, headers=headers, json=["GET", key], timeout=15)
         if resp.status_code != 200:
             return None
         
-        data = resp.json()
-        result = data.get("result")
+        result = resp.json().get("result")
         if not result:
             return None
             
-        # Decompress data if we stored it compressed
-        if isinstance(result, str) and result.startswith("ZIP:"):
+        # Handle Chunked Data (Avoids 1MB Limit)
+        if isinstance(result, str) and result.startswith("CHK:"):
+            num_chunks = int(result[4:])
+            compressed = ""
+            # Fetch chunks sequentially
+            for i in range(num_chunks):
+                c_resp = http_requests.post(url, headers=headers, json=["GET", f"{key}:chk:{i}"], timeout=15)
+                if c_resp.status_code != 200: return None
+                c_result = c_resp.json().get("result")
+                if not c_result: return None
+                compressed += c_result
+                
+            compressed_bytes = base64.b64decode(compressed)
+            json_str = zlib.decompress(compressed_bytes).decode('utf-8')
+            return json.loads(json_str)
+
+        # Handle Standard ZIP Data
+        elif isinstance(result, str) and result.startswith("ZIP:"):
             try:
                 compressed_bytes = base64.b64decode(result[4:])
                 json_str = zlib.decompress(compressed_bytes).decode('utf-8')
@@ -109,23 +119,36 @@ def redis_set(key, value, ttl_seconds=None):
         return
     try:
         json_str = json.dumps(value, default=str)
-        # Compress the cache: A 9MB Feishu payload shrinks to ~800KB, preventing HTTP 413 Payload Too Large limits
         compressed = base64.b64encode(zlib.compress(json_str.encode('utf-8'))).decode('ascii')
-        val_str = f"ZIP:{compressed}"
         
+        chunk_size = 500 * 1024 # 500KB chunks safely avoid the Upstash 1MB REST Limit
         url = f"{REDIS_URL}/"
-        payload = ["SET", key, val_str]
-        if ttl_seconds is not None:
-            payload.extend(["EX", int(ttl_seconds)])
+        headers = {"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"}
+        
+        if len(compressed) <= chunk_size:
+            val_str = f"ZIP:{compressed}"
+            payload = ["SET", key, val_str]
+            if ttl_seconds is not None:
+                payload.extend(["EX", int(ttl_seconds)])
+            resp = http_requests.post(url, headers=headers, json=payload, timeout=15)
+            if resp.status_code != 200:
+                logger.error("redis_set_rejected", key=key, status=resp.status_code, response=resp.text[:200])
+        else:
+            chunks = [compressed[i:i+chunk_size] for i in range(0, len(compressed), chunk_size)]
+            # Set chunks first
+            for i, chunk in enumerate(chunks):
+                c_payload = ["SET", f"{key}:chk:{i}", chunk]
+                if ttl_seconds is not None:
+                    c_payload.extend(["EX", int(ttl_seconds)])
+                http_requests.post(url, headers=headers, json=c_payload, timeout=15)
+                
+            # Set pointer key last
+            val_str = f"CHK:{len(chunks)}"
+            m_payload = ["SET", key, val_str]
+            if ttl_seconds is not None:
+                m_payload.extend(["EX", int(ttl_seconds)])
+            http_requests.post(url, headers=headers, json=m_payload, timeout=15)
             
-        resp = http_requests.post(
-            url, 
-            headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
-            json=payload, 
-            timeout=15
-        )
-        if resp.status_code != 200:
-            logger.error("redis_set_rejected", key=key, status=resp.status_code, response=resp.text[:200])
     except Exception as e:
         logger.error("redis_set_error", key=key, error=str(e))
 
@@ -205,13 +228,21 @@ def mask_name(name):
 # ──────────────────────────────────────────────────────────────────────────────
 # 2.1  CACHE WITH TTL (Redis-backed, versioned)
 # ──────────────────────────────────────────────────────────────────────────────
+_local_version_cache = {"v": 0, "ts": 0}
+
 def _get_cache_version():
     """Get current cache version from Redis; fallback to 0 if unavailable."""
+    now = time.time()
+    # 15-second micro-cache prevents thousands of unnecessary Redis network hits
+    if now - _local_version_cache["ts"] < 15:
+        return _local_version_cache["v"]
+        
     try:
         v = redis_get("cache_version")
-        if v is None:
-            return 0
-        return int(v)
+        val = int(v) if v is not None else 0
+        _local_version_cache["v"] = val
+        _local_version_cache["ts"] = now
+        return val
     except:
         return 0
 
@@ -233,7 +264,10 @@ def cache_invalidate(prefix=""):
     else:
         try:
             cur = _get_cache_version()
-            redis_set("cache_version", cur + 1)
+            new_val = cur + 1
+            redis_set("cache_version", new_val)
+            _local_version_cache["v"] = new_val
+            _local_version_cache["ts"] = time.time()
         except:
             pass
 
