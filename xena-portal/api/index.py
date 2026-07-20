@@ -4,7 +4,6 @@ Xena Data Portal — High-Speed Hybrid Backend
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
 with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
 Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
-Now backed by Upstash Redis for serverless deployment scalability.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading
@@ -18,9 +17,6 @@ import requests as http_requests
 # ──────────────────────────────────────────────────────────────────────────────
 # 6.5  CENTRALISED CONFIGURATION
 # ──────────────────────────────────────────────────────────────────────────────
-REDIS_URL = os.environ.get("UPSTASH_REDIS_REST_URL")
-REDIS_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
@@ -61,135 +57,23 @@ MONTHLY_ALLOCATOR_LIMITS = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# UPSTASH REDIS HELPERS (REST API, no redis-py)
+# TENANT ACCESS TOKEN CACHE
 # ──────────────────────────────────────────────────────────────────────────────
-import base64
-import zlib
-
-def redis_get(key):
-    if not REDIS_URL or not REDIS_TOKEN:
-        return None
-    try:
-        url = f"{REDIS_URL}/"
-        headers = {"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"}
-        resp = http_requests.post(url, headers=headers, json=["GET", key], timeout=15)
-        if resp.status_code != 200:
-            return None
-        
-        result = resp.json().get("result")
-        if not result:
-            return None
-            
-        # Handle Chunked Data (Avoids 1MB Limit)
-        if isinstance(result, str) and result.startswith("CHK:"):
-            num_chunks = int(result[4:])
-            compressed_bytes = bytearray()
-            # Fetch and decode each chunk individually
-            for i in range(num_chunks):
-                c_resp = http_requests.post(url, headers=headers, json=["GET", f"{key}:chk:{i}"], timeout=15)
-                if c_resp.status_code != 200: return None
-                c_result = c_resp.json().get("result")
-                if not c_result: return None
-                # Decode base64 chunk and append raw bytes
-                compressed_bytes.extend(base64.b64decode(c_result))
-                
-            json_str = zlib.decompress(compressed_bytes).decode('utf-8')
-            return json.loads(json_str)
-
-        # Handle Standard ZIP Data
-        elif isinstance(result, str) and result.startswith("ZIP:"):
-            try:
-                compressed_bytes = base64.b64decode(result[4:])
-                json_str = zlib.decompress(compressed_bytes).decode('utf-8')
-                return json.loads(json_str)
-            except Exception as dec_err:
-                logger.error("redis_decompress_error", key=key, error=str(dec_err))
-                return None
-        else:
-            try:
-                return json.loads(result)
-            except:
-                return result
-    except Exception as e:
-        logger.error("redis_get_error", key=key, error=str(e))
-        return None
-
-def redis_set(key, value, ttl_seconds=None):
-    if not REDIS_URL or not REDIS_TOKEN:
-        return
-    try:
-        json_str = json.dumps(value, default=str)
-        compressed = base64.b64encode(zlib.compress(json_str.encode('utf-8'))).decode('ascii')
-        
-        chunk_size = 500 * 1024 # 500 KB chunks (well below 1 MB limit)
-        url = f"{REDIS_URL}/"
-        headers = {"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"}
-        
-        if len(compressed) <= chunk_size:
-            # Single chunk – store as ZIP:
-            val_str = f"ZIP:{compressed}"
-            payload = ["SET", key, val_str]
-            if ttl_seconds is not None:
-                payload.extend(["EX", int(ttl_seconds)])
-            resp = http_requests.post(url, headers=headers, json=payload, timeout=15)
-            if resp.status_code != 200:
-                logger.error("redis_set_rejected", key=key, status=resp.status_code, response=resp.text[:200])
-        else:
-            # Split into multiple chunks
-            chunks = [compressed[i:i+chunk_size] for i in range(0, len(compressed), chunk_size)]
-            # Store each chunk with the same TTL
-            for i, chunk in enumerate(chunks):
-                c_payload = ["SET", f"{key}:chk:{i}", chunk]
-                if ttl_seconds is not None:
-                    c_payload.extend(["EX", int(ttl_seconds)])
-                http_requests.post(url, headers=headers, json=c_payload, timeout=15)
-                
-            # Store the pointer key (CHK:)
-            m_payload = ["SET", key, f"CHK:{len(chunks)}"]
-            if ttl_seconds is not None:
-                m_payload.extend(["EX", int(ttl_seconds)])
-            http_requests.post(url, headers=headers, json=m_payload, timeout=15)
-            
-    except Exception as e:
-        logger.error("redis_set_error", key=key, error=str(e))
-
-def redis_delete(key):
-    if not REDIS_URL or not REDIS_TOKEN:
-        return
-    try:
-        url = f"{REDIS_URL}/"
-        http_requests.post(
-            url, 
-            headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
-            json=["DEL", key], 
-            timeout=5
-        )
-    except Exception:
-        pass
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TENANT ACCESS TOKEN CACHE (Redis-backed)
-# ──────────────────────────────────────────────────────────────────────────────
-TOKEN_REDIS_KEY = "feishu_tenant_token"
+_token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
 def get_tenant_access_token():
-    # Try Redis first
-    cached = redis_get(TOKEN_REDIS_KEY)
-    if cached and isinstance(cached, dict):
-        token = cached.get("token")
-        expires_at = cached.get("expires_at")
-        if token and expires_at and time.time() < expires_at:
-            return token
+    with _token_cache["lock"]:
+        if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
+            return _token_cache["token"]
 
-    # Fetch new token
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
     token = resp.get("tenant_access_token")
     expire = resp.get("expire", 7200)
-    expires_at = time.time() + max(expire - 300, 60)
 
-    # Store in Redis
-    redis_set(TOKEN_REDIS_KEY, {"token": token, "expires_at": expires_at}, ttl_seconds=expire)
+    with _token_cache["lock"]:
+        _token_cache["token"] = token
+        _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
 
     return token
 
@@ -227,50 +111,33 @@ def mask_name(name):
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 2.1  CACHE WITH TTL (Redis-backed, versioned)
+# 2.1  IN-MEMORY CACHE WITH TTL
 # ──────────────────────────────────────────────────────────────────────────────
-_local_version_cache = {"v": 0, "ts": 0}
-
-def _get_cache_version():
-    """Get current cache version from Redis; fallback to 0 if unavailable."""
-    now = time.time()
-    # 15-second micro-cache prevents thousands of unnecessary Redis network hits
-    if now - _local_version_cache["ts"] < 15:
-        return _local_version_cache["v"]
-        
-    try:
-        v = redis_get("cache_version")
-        val = int(v) if v is not None else 0
-        _local_version_cache["v"] = val
-        _local_version_cache["ts"] = now
-        return val
-    except:
-        return 0
-
-def cache_make_key(*parts):
-    version = _get_cache_version()
-    raw = f"{version}:{'|'.join(str(p) for p in parts)}"
-    return hashlib.md5(raw.encode()).hexdigest()
+_cache: dict = {}
+_cache_lock = threading.Lock()
 
 def cache_get(key):
-    return redis_get(key)
+    with _cache_lock:
+        entry = _cache.get(key)
+        if entry and time.time() < entry["expires"]:
+            return entry["data"]
+        if entry:
+            del _cache[key]
+        return None
 
 def cache_set(key, data, ttl=CACHE_TTL_REALTIME):
-    redis_set(key, data, ttl_seconds=ttl)
+    with _cache_lock:
+        _cache[key] = {"data": data, "expires": time.time() + ttl}
+
+def cache_make_key(*parts):
+    raw = ":".join(str(p) for p in parts)
+    return hashlib.md5(raw.encode()).hexdigest()
 
 def cache_invalidate(prefix=""):
-    """Increment cache version to invalidate all keys or delete a specific key."""
-    if prefix:
-        redis_delete(prefix)
-    else:
-        try:
-            cur = _get_cache_version()
-            new_val = cur + 1
-            redis_set("cache_version", new_val)
-            _local_version_cache["v"] = new_val
-            _local_version_cache["ts"] = time.time()
-        except:
-            pass
+    with _cache_lock:
+        keys = [k for k in list(_cache.keys()) if not prefix or k.startswith(prefix)]
+        for k in keys:
+            del _cache[k]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.1  RATE LIMITER & INPUT SANITISATION
@@ -538,7 +405,7 @@ def get_user_permissions(email, name):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING (Using Fast GET Method)
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None, filter_region=None, filter_from_dt=None, filter_to_dt=None):
+def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
     
     all_items = []
@@ -552,50 +419,17 @@ def fetch_feishu_records(table_id, from_dt=None, filter_region=None, filter_from
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
 
-    # --- NEW: Build API-Level Filter if specific region or dates are requested ---
-    filter_conditions = []
-    if filter_region and filter_region != "all":
-        filter_conditions.append({"field_name": "Region", "operator": "contains", "value": [filter_region.upper()]})
-    if filter_from_dt:
-        filter_conditions.append({"field_name": "Submitted on Copy", "operator": "isGreaterEqual", "value": [filter_from_dt.strftime("%Y-%m-%d")]})
-    if filter_to_dt:
-        filter_conditions.append({"field_name": "Submitted on Copy", "operator": "isLessEqual", "value": [filter_to_dt.strftime("%Y-%m-%d")]})
-
-    # If filters exist, we use POST /search instead of GET. It returns exactly the rows we need (huge speedup).
-        use_search = len(filter_conditions) > 0
-
     page_token = None
     for _ in range(200):
-        if use_search:
-            # POST /search with structured filters
-            # REMOVED sort: Feishu /search does not support sorting.
-            payload = {
-                "page_size": 500, 
-                "automatic_fields": True,
-                "filter": {"conjunction": "and", "conditions": filter_conditions}
-            }
-            if page_token: payload["page_token"] = page_token
-            
-            try:
-                resp = session.post(url + "/search", json=payload, timeout=45)
-                # Check for Feishu specific error codes
-                if resp.status_code == 200 and resp.json().get("code") != 0:
-                    # Fallback to GET if the search filter is rejected
-                    use_search = False
-                    continue
-            except Exception:
-                use_search = False
-                continue
-        else:
-            # Original fast GET (used for unfiltered full snapshots)
-            params = {"page_size": 500, "automatic_fields": "true"} 
-            if table_id == REQUESTS_TABLE_ID:
-                params["sort"] = '["Numbering DESC"]'
-            
-            if page_token: params["page_token"] = page_token
-            resp = session.get(url, params=params, timeout=45) 
+        # Using GET params, avoiding InvalidFilter crashes 
+        params = {"page_size": 500, "automatic_fields": "true"} 
+        if table_id == REQUESTS_TABLE_ID:
+            params["sort"] = '["Numbering DESC"]'
+        
+        if page_token: params["page_token"] = page_token
         
         try:
+            resp = session.get(url, params=params, timeout=45) 
             if resp.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP {resp.status_code}: {resp.text}"
@@ -647,53 +481,411 @@ def fetch_feishu_records(table_id, from_dt=None, filter_region=None, filter_from
     return all_items, master_keys, fetch_complete, stop_reason
 
 # ──────────────────────────────────────────────────────────────────────────────
-# BACKGROUND SYNC (Redis-backed, no thread)
+# AGENCY SEARCH (target / points) DUAL ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes (cron)
-BACKGROUND_SYNC_MAX_AGE  = 3600  # Increased to 1 hour to avoid unnecessary expiry
-BG_SYNC_REDIS_KEY = "bg_sync:requests_table"
-
-def get_requests_table_snapshot(from_dt=None, filter_region=None, filter_from_dt=None, filter_to_dt=None):
-    """
-    Returns records.
-    - If filters are provided, fetches directly from Feishu (fast, 2-3 seconds) and does NOT cache.
-    - If NO filters, uses the Redis snapshot for full table performance.
-    """
+def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # 1. If specific filters are applied, do a targeted live fetch (bypasses Redis, takes ~2 secs)
-    if filter_region or filter_from_dt or filter_to_dt:
-        items, keys, complete, reason = fetch_feishu_records(
-            REQUESTS_TABLE_ID, 
-            from_dt=from_dt, 
-            filter_region=filter_region,
-            filter_from_dt=filter_from_dt,
-            filter_to_dt=filter_to_dt
-        )
-        return items, keys, complete, reason, False
+    points_payload = {
+        "filter": {
+            "conjunction": "and",
+            "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
+        }
+    }
+    
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
+    
+    try:
+        resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
+        if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
+        all_records = resp.get("data", {}).get("items", [])
+        if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
+    except Exception as e:
+        return {"found": False, "error": f"Search timeout or connection error: {str(e)}"}
 
-    # Try Redis first
-    cached = redis_get(BG_SYNC_REDIS_KEY)
-    if cached:
-        items = cached.get("items", [])
-        keys = cached.get("keys", [])
-        updated_at = cached.get("updated_at", 0)
-        complete = cached.get("fetch_complete", True)
-        reason = cached.get("stop_reason", "")
-        if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-            return items, keys, complete, reason, True
+    first = all_records[0].get("fields", {})
 
-    # Fallback: live fetch
+    agency_name  = extract_field_text(get_field_local(first,"Agency Name","Name"))
+    region_raw   = clean(get_field_local(first,"Region","Agency Region"))
+    acm_raw      = extract_field_text(get_field_local(first,"Acm Name (PK)","Acm Name (IN)","Acm","Assigned Member"))
+
+    if region_raw in ('', 'none'):
+        if acm_raw.lower() in PK_ACMS: region_raw = 'pk'
+        elif acm_raw.lower() in IN_ACMS: region_raw = 'in'
+
+    if allowed_acms and "all" not in allowed_acms:
+        if acm_raw.strip().lower() not in [a.lower() for a in allowed_acms]:
+            return {"found": False, "error": f"Access Denied: Not authorized to view ACM {acm_raw}."}
+    if allowed_regs and "all" not in allowed_regs:
+        if region_raw.strip().lower() not in [r.lower() for r in allowed_regs]:
+            return {"found": False, "error": f"Access Denied: Not authorized to view Region {region_raw.upper()}."}
+
+    history_points = []
+    history_target = []
+    privileges_claimed = defaultdict(int)
+    usage_this_month = defaultdict(int)
+    cm, cy = datetime.now().month, datetime.now().year
+    
+    try:
+        hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+        hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
+        
+        if hist_resp.get("code") == 0:
+            for r in hist_resp.get("data", {}).get("items", []):
+                hf = r.get("fields", {})
+                h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
+                
+                if not h_date or h_date.month != cm or h_date.year != cy: continue
+
+                req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
+                status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
+                req_type_lower = req_type.lower()
+                s_lower = status_val.lower()
+
+                target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
+                point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
+
+                if "target" in req_type_lower:
+                    privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+                    raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
+                    qty = 1
+                    if raw_counter:
+                        m = re.search(r'\d+', str(raw_counter))
+                        if m: qty = int(m.group())
+
+                    history_target.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "_dt": h_date,
+                        "request_type": req_type,
+                        "status": status_val,
+                        "privilege": privilege_val,
+                        "quantities_input": str(qty) 
+                    })
+
+                    if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
+                        privileges_claimed[privilege_val] += qty
+
+                else:
+                    latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
+                    parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
+                    
+                    if parsed_items:
+                        privilege_val = " + ".join([f"{k.strip()} ({v})" for k, v in parsed_items])
+                    else:
+                        privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+
+                    history_points.append({
+                        "date": h_date.strftime("%Y-%m-%d"),
+                        "_dt": h_date,
+                        "request_type": req_type,
+                        "status": status_val,
+                        "target_type": target_type,
+                        "point_balance": point_balance,
+                        "privilege": privilege_val,
+                        "quantities_input": extract_field_text(get_field_local(hf, "Quantities Input")).strip()
+                    })
+
+                    if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
+                        for item_name, item_qty in parsed_items:
+                            name_clean = item_name.strip().lower()
+                            qty_int = int(item_qty)
+                            
+                            matched = False
+                            for key in MONTHLY_ALLOCATOR_LIMITS.keys():
+                                if key in name_clean:
+                                    usage_this_month[key] += qty_int
+                                    matched = True
+                                    break
+                            if not matched:
+                                usage_this_month[name_clean] += qty_int
+
+            history_points.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
+            history_target.sort(key=lambda x: (x["_dt"] is None, x["_dt"]), reverse=True)
+            for h in history_points: h.pop("_dt", None)
+            for h in history_target: h.pop("_dt", None)
+    except Exception as e:
+        logger.error("Points history fetch failed", agency=code, error=str(e))
+
+    allocator_status = compute_allocator_status(usage_this_month)
+    
+    if query_type == "points":
+        total_pts = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total', 'Total points')))
+        used_pts  = parse_float_safe(extract_field_text(get_field_local(first, 'Used Points', 'Used', 'Used points')))
+        balance   = parse_float_safe(extract_field_text(get_field_local(first, 'Point Balance', 'Balance', 'Point balance')))
+        
+        if balance == 0 and total_pts > 0:
+            balance = total_pts - used_pts
+
+        health_score = 100
+        health_status = "Healthy"
+        if total_pts > 0:
+            utilization = used_pts / total_pts
+            if utilization > 0.90: 
+                health_score = 40
+                health_status = "Critical"
+            elif utilization > 0.70: 
+                health_score = 70
+                health_status = "At Risk"
+            else: 
+                health_score = 95
+                health_status = "Healthy"
+        else: 
+            health_score = 0
+            health_status = "Inactive"
+
+        return {
+            "found": True, "agency_code": code, "agency_name": agency_name,
+            "region": region_raw.upper(), "acm": acm_raw.title(),
+            "total_points": total_pts, "used_points": used_pts,
+            "point_balance": balance, "health_score": health_score,
+            "health_status": health_status,
+            "history": history_points, 
+            "monthly_usage": {}, 
+            "allocator_status": allocator_status,
+            "requests": [r.get("fields", {}) for r in all_records]
+        }
+    else:  
+        raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
+        base_pts_coins = raw_base_pts * COINS_MULTIPLIER
+
+        return {
+            "found": True, "agency_code": code, "agency_name": agency_name,
+            "region": region_raw.upper(), "acm": acm_raw.title(),
+            "base_points": base_pts_coins, "health_score": 100, "health_status": "Healthy",
+            "privileges_claimed": dict(privileges_claimed),  
+            "history": history_target, 
+            "requests": [r.get("fields", {}) for r in all_records]
+        }
+
+# ──────────────────────────────────────────────────────────────────────────────
+# NORMALISED FIELD MAP (ANALYTICS LOOP OPTIMIZATION)
+# ──────────────────────────────────────────────────────────────────────────────
+def _build_field_map_safe(item: dict) -> dict:
+    fields = item.get("fields", {})
+    raw_date   = get_field_local(fields,"Submitted on Copy","Submitted on","Created Time")
+    raw_type   = get_field_local(fields,"Request Type","Request type","Type","Category")
+    raw_status = get_field_local(fields,"Status","Request Status","Agency Status","State")
+    raw_region = get_field_local(fields,"Region","Agency Region")
+    raw_acm_pk = get_field_local(fields,"Acm Name (PK)")
+    raw_acm_in = get_field_local(fields,"Acm Name (IN)")
+    raw_acm_fb = get_field_local(fields,"Acm","Assigned Member")
+    raw_a_type = get_field_local(fields,"Agency Type","Type of Agency")
+    raw_cl_rsn = get_field_local(fields,"Closing Reason","Closing Agencies Reason","PK Closing Agencies Reason")
+    raw_o_app  = get_field_local(fields,"Otherapp Name","Other App Name","Other Apps")
+    raw_rj_rsn = get_field_local(fields,"Reject Reason","Rejection Reason","Agencies Rejection Reason","PK Agencies Rejection reason")
+    raw_cr_way = get_field_local(fields,"Create Way","Creation Type","Agency Creation Type","PK Agencies Creation Type")
+
+    return {
+        "date":      parse_feishu_date(raw_date),
+        "req_type":  clean(raw_type),
+        "status":    clean(raw_status),
+        "region":    clean(raw_region),
+        "acm_pk":    clean(raw_acm_pk),
+        "acm_in":    clean(raw_acm_in),
+        "acm_fb":    clean(raw_acm_fb),
+        "a_type":    clean(raw_a_type),
+        "cl_rsn":    clean(raw_cl_rsn),
+        "o_app":     clean(raw_o_app),
+        "rj_rsns":   extract_field_list(raw_rj_rsn),
+        "cr_ways":   extract_field_list(raw_cr_way),
+    }
+
+def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter,
+                  allowed_acms, allowed_regs):
+    stats = {
+        "kpis": {"creations":0,"bds":0,"closings":0},
+        "creation_status": {"Done":0,"Rejected":0,"Under Investigation":0},
+        "bd_status":       {"Done":0,"Rejected":0,"Under Investigation":0},
+        "closing_status":  {"Done":0,"Rejected":0,"Under Investigation":0},
+        "acm_performance":{}, "creation_types":{}, "agency_types":{},
+        "other_apps":{}, "reject_reasons":{}, "closing_reasons_pie":{},
+        "acm_closing_reasons":{},
+        "daily_trend_creation":{}, "daily_trend_bd":{}, "daily_trend_closing":{},
+        "other_request_types":{}, "scanned_rows": len(all_items),
+        "fetch_complete": True, "stop_reason": ""
+    }
+
+    if from_dt and to_dt:
+        cur = from_dt
+        while cur < to_dt:
+            ds = cur.strftime("%Y-%m-%d")
+            stats["daily_trend_creation"][ds] = 0
+            stats["daily_trend_bd"][ds]        = 0
+            stats["daily_trend_closing"][ds]   = 0
+            cur += timedelta(days=1)
+
+    acm_filter_c     = acm_filter.strip().lower()   if acm_filter     else "all"
+    region_filter_c  = region_filter.strip().lower() if region_filter  else "all"
+    type_filter_c    = type_filter.strip().lower()   if type_filter    else "all"
+    allowed_acms_set = set([a.lower() for a in allowed_acms]) if allowed_acms else {"all"}
+    allowed_regs_set = set([r.lower() for r in allowed_regs]) if allowed_regs else {"all"}
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        normalized_maps = list(executor.map(_build_field_map_safe, all_items))
+
+    for fm in normalized_maps:
+        record_dt = fm["date"]
+        if from_dt or to_dt:
+            if not record_dt: continue
+            if from_dt and record_dt < from_dt: continue
+            if to_dt   and record_dt >= to_dt:  continue
+
+        region = fm["region"]
+        if region in ("", "none"):
+            if fm["acm_pk"] in PK_ACMS or fm["acm_fb"] in PK_ACMS:
+                region = "pk"
+            elif fm["acm_in"] in IN_ACMS or fm["acm_fb"] in IN_ACMS:
+                region = "in"
+
+        if region_filter_c != "all" and region != region_filter_c: continue
+        if "all" not in allowed_regs_set and region not in allowed_regs_set: continue
+
+        acm = fm["acm_in"] if region == "in" else fm["acm_pk"]
+        if not acm: acm = fm["acm_fb"]
+
+        if "all" not in allowed_acms_set and acm.lower().strip() not in allowed_acms_set: continue
+        if acm_filter_c != "all" and acm_filter_c != acm: continue
+
+        req_type      = fm["req_type"]
+        status        = fm["status"]
+        agency_type   = fm["a_type"]
+        closing_reason= fm["cl_rsn"]
+        other_app     = fm["o_app"]
+
+        if type_filter_c != "all" and type_filter_c != agency_type: continue
+
+        is_done     = "done" in status or "complet" in status or "approv" in status
+        is_rejected = "reject" in status or "fail" in status or "decline" in status
+
+        is_bd_kpi      = "bd creation" in req_type
+        is_closing_kpi = "closing agency" in req_type
+        is_creation_kpi= any(p in req_type for p in [
+            "agency creation","agency applied already by acm or bd link ( follow-up )",
+            "agency applied already","follow-up","follow up"])
+
+        agency_type_title = agency_type.title() if agency_type else "Unknown"
+        date_str = record_dt.strftime("%Y-%m-%d") if record_dt else None
+
+        if is_done and date_str:
+            if is_creation_kpi and date_str in stats["daily_trend_creation"]:
+                stats["daily_trend_creation"][date_str] += 1
+            if is_bd_kpi and date_str in stats["daily_trend_bd"]:
+                stats["daily_trend_bd"][date_str] += 1
+            if is_closing_kpi and date_str in stats["daily_trend_closing"]:
+                stats["daily_trend_closing"][date_str] += 1
+
+        if is_closing_kpi:
+            stats["kpis"]["closings"] += 1
+            if is_done: stats["closing_status"]["Done"] += 1
+            elif is_rejected: stats["closing_status"]["Rejected"] += 1
+            else: stats["closing_status"]["Under Investigation"] += 1
+            if closing_reason:
+                cr_title = closing_reason.title()
+                stats["closing_reasons_pie"][cr_title] = stats["closing_reasons_pie"].get(cr_title,0)+1
+                if acm:
+                    ca = acm.title()
+                    if ca not in stats["acm_closing_reasons"]:
+                        stats["acm_closing_reasons"][ca] = {"User Request":0,"Duplicated Hosting":0}
+                    if "user" in closing_reason:
+                        stats["acm_closing_reasons"][ca]["User Request"] += 1
+                    elif "dup" in closing_reason:
+                        stats["acm_closing_reasons"][ca]["Duplicated Hosting"] += 1
+        elif is_bd_kpi:
+            stats["kpis"]["bds"] += 1
+            if is_done: stats["bd_status"]["Done"] += 1
+            elif is_rejected: stats["bd_status"]["Rejected"] += 1
+            else: stats["bd_status"]["Under Investigation"] += 1
+        elif is_creation_kpi:
+            stats["kpis"]["creations"] += 1
+            if is_done: stats["creation_status"]["Done"] += 1
+            elif is_rejected: stats["creation_status"]["Rejected"] += 1
+            else: stats["creation_status"]["Under Investigation"] += 1
+            if is_done and acm:
+                ca = acm.title()
+                stats["acm_performance"][ca] = stats["acm_performance"].get(ca,0)+1
+            if is_done and other_app:
+                oa = other_app.title()
+                stats["other_apps"][oa] = stats["other_apps"].get(oa,0)+1
+            if agency_type_title != "Unknown":
+                stats["agency_types"][agency_type_title] = stats["agency_types"].get(agency_type_title,0)+1
+            for ct in fm["cr_ways"]:
+                if ct:
+                    ct_title = ct.title()
+                    stats["creation_types"][ct_title] = stats["creation_types"].get(ct_title,0)+1
+            if is_rejected:
+                for rr in fm["rj_rsns"]:
+                    if rr:
+                        rr_title = rr.title()
+                        stats["reject_reasons"][rr_title] = stats["reject_reasons"].get(rr_title,0)+1
+        elif req_type:
+            label = req_type.title()
+            stats["other_request_types"][label] = stats["other_request_types"].get(label,0)+1
+
+    for k in ["acm_performance","reject_reasons","closing_reasons_pie","other_apps","creation_types","agency_types","other_request_types"]:
+        stats[k] = dict(sorted(stats[k].items(), key=lambda x:x[1], reverse=True))
+    for k in ["daily_trend_creation","daily_trend_bd","daily_trend_closing"]:
+        stats[k] = dict(sorted(stats[k].items()))
+
+    return stats
+
+# ──────────────────────────────────────────────────────────────────────────────
+# FLASK APP & BACKGROUND CACHE LOOP
+# ──────────────────────────────────────────────────────────────────────────────
+BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
+BACKGROUND_SYNC_MAX_AGE  = 600   # snapshot considered "fresh enough" for 10 minutes
+
+_bg_sync = {
+    "requests_items": [], "requests_keys": set(),
+    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
+    "syncing": False,
+}
+_bg_sync_lock = threading.Lock()
+_bg_thread_started = False
+_bg_thread_lock = threading.Lock()
+
+def _background_sync_requests_table():
+    with _bg_sync_lock:
+        if _bg_sync["syncing"]: return
+        _bg_sync["syncing"] = True
+    try:
+        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+        with _bg_sync_lock:
+            _bg_sync["requests_items"]  = items
+            _bg_sync["requests_keys"]   = keys
+            _bg_sync["updated_at"]      = time.time()
+            _bg_sync["fetch_complete"]  = complete
+            _bg_sync["stop_reason"]     = reason
+        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
+    except Exception as e:
+        logger.error("background_sync_failed", table="grand_table", error=str(e))
+    finally:
+        with _bg_sync_lock:
+            _bg_sync["syncing"] = False
+
+def _background_sync_loop():
+    while True:
+        _background_sync_requests_table()
+        time.sleep(BACKGROUND_SYNC_INTERVAL)
+
+def ensure_background_sync_started():
+    global _bg_thread_started
+    with _bg_thread_lock:
+        if not _bg_thread_started:
+            threading.Thread(target=_background_sync_loop, daemon=True).start()
+            _bg_thread_started = True
+
+def get_requests_table_snapshot(from_dt=None):
+    """Serves the Grand Table from the warm in-memory snapshot when it's fresh enough."""
+    ensure_background_sync_started()
+    with _bg_sync_lock:
+        items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
+        updated_at   = _bg_sync["updated_at"]
+        complete     = _bg_sync["fetch_complete"]
+        reason       = _bg_sync["stop_reason"]
+    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+        return items, keys, complete, reason, True
     items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
-    # Store in Redis (do not overwrite if we failed)
-    if items:
-        redis_set(BG_SYNC_REDIS_KEY, {
-            "items": items,
-            "keys": list(keys), # set is not JSON serializable, converted to list
-            "updated_at": time.time(),
-            "fetch_complete": complete,
-            "stop_reason": reason
-        }, ttl_seconds=BACKGROUND_SYNC_MAX_AGE)
-        logger.info("bg_sync_stored", key=BG_SYNC_REDIS_KEY, count=len(items))
     return items, keys, complete, reason, False
 
 app = Flask(__name__)
@@ -997,12 +1189,9 @@ def sync_refresh():
     if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    # Force a fresh data pull by wiping the Redis key and requesting it
-    redis_delete(BG_SYNC_REDIS_KEY) 
-    items, keys, complete, reason, _ = get_requests_table_snapshot()
-    
-    count = len(items)
-    updated_at = time.time()
+    _background_sync_requests_table()
+    with _bg_sync_lock:
+        count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
         
     audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
     return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
@@ -1201,25 +1390,7 @@ def analytics():
             if cmp_from_dt and (not oldest_dt or cmp_from_dt < oldest_dt): oldest_dt = cmp_from_dt
         except ValueError: pass
 
-    # Pass the region and date filters to the fetcher. 
-    # If region_filter != "all", it will do a lightning-fast live query from Feishu.
-    # We ensure the comparison date ranges are included by using the outermost bounds.
-    fetch_from = oldest_dt
-    fetch_to = to_dt
-    if cmp_from and cmp_to:
-        if to_dt and 'cmp_to_dt' in locals():
-            fetch_to = max(to_dt, cmp_to_dt)
-        else:
-            fetch_to = None
-
-    api_filter_region = region_filter.upper() if region_filter != "all" else None
-
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(
-        from_dt=oldest_dt,
-        filter_region=api_filter_region,
-        filter_from_dt=fetch_from,
-        filter_to_dt=fetch_to
-    )
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
 
     if not fetch_complete and not all_items:
         return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
@@ -1266,20 +1437,22 @@ def clear_cache():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    bg_info = {"record_count": 0, "age_seconds": None, "syncing": False}
-    cached = redis_get(BG_SYNC_REDIS_KEY)
-    if cached:
-        bg_info["record_count"] = len(cached.get("items", []))
-        bg_info["age_seconds"] = (time.time() - cached.get("updated_at", 0)) if cached.get("updated_at") else None
-        
+    with _bg_sync_lock:
+        bg_info = {
+            "record_count": len(_bg_sync["requests_items"]),
+            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
+            "syncing": _bg_sync["syncing"],
+        }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
-        "cache_entries": 0, "audit_entries": len(audit._queue),
-        "token_cached": bool(redis_get(TOKEN_REDIS_KEY)),
-        "token_expires_in_s": 0,
+        "cache_entries": len(_cache), "audit_entries": len(audit._queue),
+        "token_cached": _token_cache["token"] is not None,
+        "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
         "background_sync": bg_info
     })
 
+# Start the background sync thread right at boot time
+ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
