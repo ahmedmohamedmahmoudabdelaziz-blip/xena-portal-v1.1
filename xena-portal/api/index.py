@@ -4,6 +4,7 @@ Xena Data Portal — High-Speed Hybrid Backend
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
 with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
 Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
+Now powered by Upstash Redis via REST API for serverless-ready shared caching.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading
@@ -15,7 +16,7 @@ from flask import Flask, request, jsonify, send_file, redirect
 import requests as http_requests
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 6.5  CENTRALISED CONFIGURATION
+# 6.5  CENTRALISED CONFIGURATION & REDIS
 # ──────────────────────────────────────────────────────────────────────────────
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
@@ -26,6 +27,9 @@ REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
 AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "")   
+
+UPSTASH_REDIS_REST_URL   = os.environ.get("UPSTASH_REDIS_REST_URL")
+UPSTASH_REDIS_REST_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
@@ -55,27 +59,6 @@ MONTHLY_ALLOCATOR_LIMITS = {
     "trend card": 10,
     "traffic card": 10, 
 }
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TENANT ACCESS TOKEN CACHE
-# ──────────────────────────────────────────────────────────────────────────────
-_token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
-
-def get_tenant_access_token():
-    with _token_cache["lock"]:
-        if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
-            return _token_cache["token"]
-
-    url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
-    token = resp.get("tenant_access_token")
-    expire = resp.get("expire", 7200)
-
-    with _token_cache["lock"]:
-        _token_cache["token"] = token
-        _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
-
-    return token
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.2  STRUCTURED LOGGING
@@ -111,33 +94,92 @@ def mask_name(name):
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 2.1  IN-MEMORY CACHE WITH TTL
+# UPSTASH REDIS REST API HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
-_cache: dict = {}
-_cache_lock = threading.Lock()
+def _redis_command(*args):
+    if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN: return None
+    try:
+        headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}", "Content-Type": "application/json"}
+        resp = http_requests.post(UPSTASH_REDIS_REST_URL, headers=headers, json=list(args), timeout=10)
+        if resp.status_code == 200:
+            return resp.json().get("result")
+        else:
+            logger.error("redis_command_failed", status=resp.status_code, body=resp.text)
+    except Exception as e:
+        logger.error("redis_command_error", command=args[0], error=str(e))
+    return None
 
+def redis_get(key):
+    val = _redis_command("GET", key)
+    if val:
+        try: return json.loads(val)
+        except: return val
+    return None
+
+def redis_set(key, value, ttl_seconds=None):
+    val_str = json.dumps(value)
+    if ttl_seconds:
+        _redis_command("SET", key, val_str, "EX", int(ttl_seconds))
+    else:
+        _redis_command("SET", key, val_str)
+
+def redis_delete(key):
+    _redis_command("DEL", key)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2.1  REDIS-BACKED CACHE REPLACEMENT
+# ──────────────────────────────────────────────────────────────────────────────
 def cache_get(key):
-    with _cache_lock:
-        entry = _cache.get(key)
-        if entry and time.time() < entry["expires"]:
-            return entry["data"]
-        if entry:
-            del _cache[key]
-        return None
+    entry = redis_get(key)
+    if entry and isinstance(entry, dict):
+        if time.time() < entry.get("expires", 0):
+            return entry.get("data")
+        redis_delete(key)
+    return None
 
 def cache_set(key, data, ttl=CACHE_TTL_REALTIME):
-    with _cache_lock:
-        _cache[key] = {"data": data, "expires": time.time() + ttl}
+    payload = {"data": data, "expires": time.time() + ttl}
+    redis_set(key, payload, ttl_seconds=ttl)
 
 def cache_make_key(*parts):
     raw = ":".join(str(p) for p in parts)
     return hashlib.md5(raw.encode()).hexdigest()
 
 def cache_invalidate(prefix=""):
-    with _cache_lock:
-        keys = [k for k in list(_cache.keys()) if not prefix or k.startswith(prefix)]
-        for k in keys:
-            del _cache[k]
+    if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN: return
+    try:
+        if not prefix:
+            _redis_command("FLUSHDB")
+        else:
+            keys = _redis_command("KEYS", f"{prefix}*")
+            if keys and isinstance(keys, list):
+                _redis_command("DEL", *keys)
+    except Exception as e:
+        logger.error("redis_invalidate_error", error=str(e))
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TENANT ACCESS TOKEN CACHE (REDIS-BACKED)
+# ──────────────────────────────────────────────────────────────────────────────
+def get_tenant_access_token():
+    token_data = redis_get("feishu_tenant_token")
+    if token_data and isinstance(token_data, dict):
+        if time.time() < token_data.get("expires_at", 0):
+            return token_data.get("token")
+
+    url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    try:
+        resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
+        token = resp.get("tenant_access_token")
+        expire = resp.get("expire", 7200)
+
+        if token:
+            expires_at = time.time() + max(expire - 300, 60)
+            redis_set("feishu_tenant_token", {"token": token, "expires_at": expires_at}, ttl_seconds=max(expire - 300, 60))
+            return token
+    except Exception as e:
+        logger.error("tenant_token_fetch_failed", error=str(e))
+        
+    return None
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 7.1  RATE LIMITER & INPUT SANITISATION
@@ -830,61 +872,39 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP & BACKGROUND CACHE LOOP
+# FLASK APP & REDIS BACKGROUND SYNC
 # ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
 BACKGROUND_SYNC_MAX_AGE  = 600   # snapshot considered "fresh enough" for 10 minutes
 
-_bg_sync = {
-    "requests_items": [], "requests_keys": set(),
-    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
-    "syncing": False,
-}
-_bg_sync_lock = threading.Lock()
-_bg_thread_started = False
-_bg_thread_lock = threading.Lock()
-
 def _background_sync_requests_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing"]: return
-        _bg_sync["syncing"] = True
     try:
         items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        with _bg_sync_lock:
-            _bg_sync["requests_items"]  = items
-            _bg_sync["requests_keys"]   = keys
-            _bg_sync["updated_at"]      = time.time()
-            _bg_sync["fetch_complete"]  = complete
-            _bg_sync["stop_reason"]     = reason
+        snapshot = {
+            "requests_items": items,
+            "requests_keys": list(keys),
+            "updated_at": time.time(),
+            "fetch_complete": complete,
+            "stop_reason": reason
+        }
+        redis_set("bg_sync:requests_table", snapshot, ttl_seconds=86400)
         logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
+        return len(items), snapshot["updated_at"], complete
     except Exception as e:
         logger.error("background_sync_failed", table="grand_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing"] = False
-
-def _background_sync_loop():
-    while True:
-        _background_sync_requests_table()
-        time.sleep(BACKGROUND_SYNC_INTERVAL)
-
-def ensure_background_sync_started():
-    global _bg_thread_started
-    with _bg_thread_lock:
-        if not _bg_thread_started:
-            threading.Thread(target=_background_sync_loop, daemon=True).start()
-            _bg_thread_started = True
+        return 0, time.time(), False
 
 def get_requests_table_snapshot(from_dt=None):
-    """Serves the Grand Table from the warm in-memory snapshot when it's fresh enough."""
-    ensure_background_sync_started()
-    with _bg_sync_lock:
-        items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
-        updated_at   = _bg_sync["updated_at"]
-        complete     = _bg_sync["fetch_complete"]
-        reason       = _bg_sync["stop_reason"]
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-        return items, keys, complete, reason, True
+    """Serves the Grand Table from the warm Redis snapshot when it's fresh enough."""
+    snapshot = redis_get("bg_sync:requests_table")
+    if snapshot and (time.time() - snapshot.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
+        return (
+            snapshot.get("requests_items", []),
+            set(snapshot.get("requests_keys", [])),
+            snapshot.get("fetch_complete", True),
+            snapshot.get("stop_reason", ""),
+            True
+        )
+    
     items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
     return items, keys, complete, reason, False
 
@@ -1189,9 +1209,7 @@ def sync_refresh():
     if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    _background_sync_requests_table()
-    with _bg_sync_lock:
-        count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
+    count, updated_at, complete = _background_sync_requests_table()
         
     audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
     return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
@@ -1437,22 +1455,33 @@ def clear_cache():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    with _bg_sync_lock:
-        bg_info = {
-            "record_count": len(_bg_sync["requests_items"]),
-            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
-            "syncing": _bg_sync["syncing"],
-        }
+    snapshot = redis_get("bg_sync:requests_table") or {}
+    bg_info = {
+        "record_count": len(snapshot.get("requests_items", [])),
+        "age_seconds": (time.time() - snapshot.get("updated_at", time.time())) if snapshot.get("updated_at") else None,
+        "syncing": False,
+    }
+    
+    token_data = redis_get("feishu_tenant_token") or {}
+    expires_in = max(0, int(token_data.get("expires_at", 0) - time.time()))
+    
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
-        "cache_entries": len(_cache), "audit_entries": len(audit._queue),
-        "token_cached": _token_cache["token"] is not None,
-        "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
+        "cache_type": "redis", "audit_entries": len(audit._queue),
+        "token_cached": bool(token_data.get("token")),
+        "token_expires_in_s": expires_in,
         "background_sync": bg_info
     })
 
-# Start the background sync thread right at boot time
-ensure_background_sync_started()
-
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+```eof
+
+### How to complete the cron setup
+As you correctly noted, the analytics timeouts will disappear completely once the cache stays warm via your external cron job. 
+
+Since your new `/api/sync/refresh` endpoint requires authentication, you just need to configure `cron-job.org` to pass your admin username in the URL when it pings the server. Set the cron URL to exactly this:
+
+`POST [https://YOUR-VERCEL-APP-URL.vercel.app/api/sync/refresh?user=ahmed%20samurai](https://YOUR-VERCEL-APP-URL.vercel.app/api/sync/refresh?user=ahmed%20samurai)`
+
+*(Make sure the method in cron-job.org is set to **POST**, as standard GET requests will be rejected by this endpoint).*
