@@ -63,43 +63,83 @@ MONTHLY_ALLOCATOR_LIMITS = {
 # ──────────────────────────────────────────────────────────────────────────────
 # UPSTASH REDIS HELPERS (REST API, no redis-py)
 # ──────────────────────────────────────────────────────────────────────────────
+import base64
+import zlib
+
 def redis_get(key):
     if not REDIS_URL or not REDIS_TOKEN:
         return None
     try:
-        url = f"{REDIS_URL}/get/{key}"
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {REDIS_TOKEN}"}, timeout=3)
+        url = f"{REDIS_URL}/"
+        # Using root pipeline POST array syntax avoids all URL constraints
+        resp = http_requests.post(
+            url, 
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
+            json=["GET", key], 
+            timeout=15
+        )
         if resp.status_code != 200:
             return None
+        
         data = resp.json()
-        if data.get("result") is None:
+        result = data.get("result")
+        if not result:
             return None
-        try:
-            return json.loads(data["result"])
-        except:
-            return data["result"]
-    except Exception:
+            
+        # Decompress data if we stored it compressed
+        if isinstance(result, str) and result.startswith("ZIP:"):
+            try:
+                compressed_bytes = base64.b64decode(result[4:])
+                json_str = zlib.decompress(compressed_bytes).decode('utf-8')
+                return json.loads(json_str)
+            except Exception as dec_err:
+                logger.error("redis_decompress_error", key=key, error=str(dec_err))
+                return None
+        else:
+            try:
+                return json.loads(result)
+            except:
+                return result
+    except Exception as e:
+        logger.error("redis_get_error", key=key, error=str(e))
         return None
 
 def redis_set(key, value, ttl_seconds=None):
     if not REDIS_URL or not REDIS_TOKEN:
         return
     try:
-        val_str = json.dumps(value, default=str)
-        url = f"{REDIS_URL}/set/{key}"
-        params = {"value": val_str}
+        json_str = json.dumps(value, default=str)
+        # Compress the cache: A 9MB Feishu payload shrinks to ~800KB, preventing HTTP 413 Payload Too Large limits
+        compressed = base64.b64encode(zlib.compress(json_str.encode('utf-8'))).decode('ascii')
+        val_str = f"ZIP:{compressed}"
+        
+        url = f"{REDIS_URL}/"
+        payload = ["SET", key, val_str]
         if ttl_seconds is not None:
-            params["ex"] = ttl_seconds
-        http_requests.post(url, headers={"Authorization": f"Bearer {REDIS_TOKEN}"}, params=params, timeout=3)
-    except Exception:
-        pass
+            payload.extend(["EX", int(ttl_seconds)])
+            
+        resp = http_requests.post(
+            url, 
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
+            json=payload, 
+            timeout=15
+        )
+        if resp.status_code != 200:
+            logger.error("redis_set_rejected", key=key, status=resp.status_code, response=resp.text[:200])
+    except Exception as e:
+        logger.error("redis_set_error", key=key, error=str(e))
 
 def redis_delete(key):
     if not REDIS_URL or not REDIS_TOKEN:
         return
     try:
-        url = f"{REDIS_URL}/del/{key}"
-        http_requests.post(url, headers={"Authorization": f"Bearer {REDIS_TOKEN}"}, timeout=3)
+        url = f"{REDIS_URL}/"
+        http_requests.post(
+            url, 
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"},
+            json=["DEL", key], 
+            timeout=5
+        )
     except Exception:
         pass
 
