@@ -1,10 +1,9 @@
-"""
 Xena Data Portal — High-Speed Hybrid Backend
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
 with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
 Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
-Now powered by Upstash Redis via REST API for serverless-ready shared caching.
+Powered by Upstash Redis via REST API Pipeline for Serverless-ready caching.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading
@@ -100,7 +99,9 @@ def _redis_command(*args):
     if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN: return None
     try:
         headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}", "Content-Type": "application/json"}
-        resp = http_requests.post(UPSTASH_REDIS_REST_URL, headers=headers, json=list(args), timeout=10)
+        url = UPSTASH_REDIS_REST_URL.rstrip('/')
+        # 3 second timeout prevents Vercel cold starts from hanging indefinitely
+        resp = http_requests.post(url, headers=headers, json=list(args), timeout=3)
         if resp.status_code == 200:
             return resp.json().get("result")
         else:
@@ -421,11 +422,13 @@ def get_user_permissions(email, name):
     if cached: return cached
 
     tat = get_tenant_access_token()
+    if not tat: return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
+
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=10).json()
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
             db_email = extract_field_text(fields.get("Email", "")).lower().strip()
@@ -872,39 +875,73 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP & REDIS BACKGROUND SYNC
+# FLASK APP & REDIS BACKGROUND SYNC (PIPELINE CHUNKING)
 # ──────────────────────────────────────────────────────────────────────────────
 BACKGROUND_SYNC_MAX_AGE  = 600   # snapshot considered "fresh enough" for 10 minutes
 
 def _background_sync_requests_table():
+    """Fetches the Grand Table and saves it to Redis in tiny chunks via HTTP Pipeline to bypass the 1MB payload limit."""
     try:
         items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        snapshot = {
-            "requests_items": items,
+        
+        # Slice into chunks to dodge Upstash 1MB REST payload rejection limits
+        chunk_size = 250
+        chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+        
+        meta = {
             "requests_keys": list(keys),
             "updated_at": time.time(),
             "fetch_complete": complete,
-            "stop_reason": reason
+            "stop_reason": reason,
+            "chunk_count": len(chunks)
         }
-        redis_set("bg_sync:requests_table", snapshot, ttl_seconds=86400)
-        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
-        return len(items), snapshot["updated_at"], complete
+        
+        # Batch all commands into ONE HTTP POST request for blazing fast saving
+        commands = [["SET", "bg_sync:requests_meta", json.dumps(meta), "EX", 86400]]
+        for i, chunk in enumerate(chunks):
+            commands.append(["SET", f"bg_sync:requests_chunk:{i}", json.dumps(chunk), "EX", 86400])
+            
+        if UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN:
+            headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}", "Content-Type": "application/json"}
+            pipeline_url = UPSTASH_REDIS_REST_URL.rstrip('/') + "/pipeline"
+            http_requests.post(pipeline_url, headers=headers, json=commands, timeout=5)
+            
+        logger.info("background_sync_complete", table="grand_table", count=len(items), chunks=len(chunks))
+        return len(items), meta["updated_at"], complete
     except Exception as e:
         logger.error("background_sync_failed", table="grand_table", error=str(e))
         return 0, time.time(), False
 
 def get_requests_table_snapshot(from_dt=None):
-    """Serves the Grand Table from the warm Redis snapshot when it's fresh enough."""
-    snapshot = redis_get("bg_sync:requests_table")
-    if snapshot and (time.time() - snapshot.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
-        return (
-            snapshot.get("requests_items", []),
-            set(snapshot.get("requests_keys", [])),
-            snapshot.get("fetch_complete", True),
-            snapshot.get("stop_reason", ""),
-            True
-        )
+    """Loads the Grand Table snapshot back from Redis via HTTP Pipeline chunking."""
+    meta = redis_get("bg_sync:requests_meta")
     
+    if meta and (time.time() - meta.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
+        chunk_count = meta.get("chunk_count", 0)
+        
+        if chunk_count > 0 and UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN:
+            commands = [["GET", f"bg_sync:requests_chunk:{i}"] for i in range(chunk_count)]
+            try:
+                headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}", "Content-Type": "application/json"}
+                pipeline_url = UPSTASH_REDIS_REST_URL.rstrip('/') + "/pipeline"
+                # Bulk pull all chunks at once
+                resp = http_requests.post(pipeline_url, headers=headers, json=commands, timeout=5)
+                
+                if resp.status_code == 200:
+                    items = []
+                    for res in resp.json():
+                        if res.get("result"):
+                            try: items.extend(json.loads(res["result"]))
+                            except: pass
+                    
+                    if len(items) > 0:
+                        return items, set(meta.get("requests_keys", [])), meta.get("fetch_complete", True), meta.get("stop_reason", ""), True
+            except Exception as e:
+                logger.error("redis_pipeline_read_error", error=str(e))
+        elif chunk_count == 0:
+            return [], set(meta.get("requests_keys", [])), True, "", True
+            
+    # Fallback entirely bypassing Cache if metadata is dead or missing
     items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
     return items, keys, complete, reason, False
 
@@ -960,10 +997,15 @@ def callback():
 
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
-    username = sanitize_text(request.args.get('user',''))
-    email    = sanitize_text(request.args.get('email',''))
-    perms    = get_user_permissions(email, username)
-    return jsonify(perms)
+    # Safely wrapped so this route NEVER returns a 500 server error, which prevents the frontend UI from breaking
+    try:
+        username = sanitize_text(request.args.get('user',''))
+        email    = sanitize_text(request.args.get('email',''))
+        perms    = get_user_permissions(email, username)
+        return jsonify(perms)
+    except Exception as e:
+        logger.error("auth_check_failed", error=str(e))
+        return jsonify({"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}})
 
 @app.route('/api/search', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_SEARCH)
@@ -1455,10 +1497,10 @@ def clear_cache():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    snapshot = redis_get("bg_sync:requests_table") or {}
+    meta = redis_get("bg_sync:requests_meta") or {}
     bg_info = {
-        "record_count": len(snapshot.get("requests_items", [])),
-        "age_seconds": (time.time() - snapshot.get("updated_at", time.time())) if snapshot.get("updated_at") else None,
+        "chunk_count": meta.get("chunk_count", 0),
+        "age_seconds": (time.time() - meta.get("updated_at", time.time())) if meta.get("updated_at") else None,
         "syncing": False,
     }
     
@@ -1467,7 +1509,7 @@ def health():
     
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
-        "cache_type": "redis", "audit_entries": len(audit._queue),
+        "cache_type": "redis_pipeline", "audit_entries": len(audit._queue),
         "token_cached": bool(token_data.get("token")),
         "token_expires_in_s": expires_in,
         "background_sync": bg_info
@@ -1476,12 +1518,3 @@ def health():
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
 ```eof
-
-### How to complete the cron setup
-As you correctly noted, the analytics timeouts will disappear completely once the cache stays warm via your external cron job. 
-
-Since your new `/api/sync/refresh` endpoint requires authentication, you just need to configure `cron-job.org` to pass your admin username in the URL when it pings the server. Set the cron URL to exactly this:
-
-`POST [https://YOUR-VERCEL-APP-URL.vercel.app/api/sync/refresh?user=ahmed%20samurai](https://YOUR-VERCEL-APP-URL.vercel.app/api/sync/refresh?user=ahmed%20samurai)`
-
-*(Make sure the method in cron-job.org is set to **POST**, as standard GET requests will be rejected by this endpoint).*
