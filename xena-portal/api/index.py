@@ -562,29 +562,28 @@ def fetch_feishu_records(table_id, from_dt=None, filter_region=None, filter_from
         filter_conditions.append({"field_name": "Submitted on Copy", "operator": "isLessEqual", "value": [filter_to_dt.strftime("%Y-%m-%d")]})
 
     # If filters exist, we use POST /search instead of GET. It returns exactly the rows we need (huge speedup).
-    use_search = len(filter_conditions) > 0
+        use_search = len(filter_conditions) > 0
 
     page_token = None
     for _ in range(200):
         if use_search:
             # POST /search with structured filters
+            # REMOVED sort: Feishu /search does not support sorting.
             payload = {
                 "page_size": 500, 
                 "automatic_fields": True,
                 "filter": {"conjunction": "and", "conditions": filter_conditions}
             }
-            if table_id == REQUESTS_TABLE_ID:
-                payload["sort"] = ['["Numbering DESC"]']
             if page_token: payload["page_token"] = page_token
             
             try:
                 resp = session.post(url + "/search", json=payload, timeout=45)
-                # Safe fallback if the filter structure is rejected by Feishu (e.g. InvalidFilter)
+                # Check for Feishu specific error codes
                 if resp.status_code == 200 and resp.json().get("code") != 0:
+                    # Fallback to GET if the search filter is rejected
                     use_search = False
                     continue
             except Exception:
-                # Fallback to GET if POST fails
                 use_search = False
                 continue
         else:
