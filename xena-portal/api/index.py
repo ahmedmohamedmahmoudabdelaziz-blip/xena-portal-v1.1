@@ -403,7 +403,7 @@ def get_user_permissions(email, name):
     return fallback
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING (Using Fast GET Method)
+# HIGH-SPEED SESSION FETCHING (Using Fast POST Method for 100% Accuracy)
 # ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     tat = get_tenant_access_token()
@@ -417,25 +417,45 @@ def fetch_feishu_records(table_id, from_dt=None):
 
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+    
+    # NEW: Using POST /search for 100% data accuracy just like Query and Target modules
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
 
     page_token = None
+    use_sort = (table_id == REQUESTS_TABLE_ID)
+
     for _ in range(200):
-        # Using GET params, avoiding InvalidFilter crashes 
-        params = {"page_size": 500, "automatic_fields": "true"} 
-        if table_id == REQUESTS_TABLE_ID:
-            params["sort"] = '["Numbering DESC"]'
-        
-        if page_token: params["page_token"] = page_token
+        payload = {"page_size": 500} 
+        if page_token: 
+            payload["page_token"] = page_token
+            
+        if use_sort:
+            payload["sort"] = [{"field_name": "Numbering", "desc": True}]
         
         try:
-            resp = session.get(url, params=params, timeout=45) 
+            resp = session.post(url, json=payload, timeout=45) 
+            
+            # Intelligent Fallback: if sort causes InvalidFilter, drop it and retry instantly
+            if resp.status_code == 200 and resp.json().get("code") in [1254011, 1254402, 1254010, 1254431]:
+                use_sort = False
+                if "sort" in payload: del payload["sort"]
+                resp = session.post(url, json=payload, timeout=45)
+
             if resp.status_code != 200:
                 fetch_complete = False
                 stop_reason = f"HTTP {resp.status_code}: {resp.text}"
                 break
                 
             data = resp.json()
+            
+            if data.get("code") != 0:
+                # One final safety net for InvalidFilter messages
+                if use_sort and "InvalidFilter" in str(data.get("msg", "")):
+                    use_sort = False
+                    if "sort" in payload: del payload["sort"]
+                    resp = session.post(url, json=payload, timeout=45)
+                    data = resp.json()
+                    
             if data.get("code") != 0:
                 fetch_complete = False
                 stop_reason = f"Feishu Error Code {data.get('code')}: {data.get('msg')}"
