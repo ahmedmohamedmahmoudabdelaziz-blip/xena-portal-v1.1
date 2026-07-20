@@ -83,16 +83,16 @@ def redis_get(key):
         # Handle Chunked Data (Avoids 1MB Limit)
         if isinstance(result, str) and result.startswith("CHK:"):
             num_chunks = int(result[4:])
-            compressed = ""
-            # Fetch chunks sequentially
+            compressed_bytes = bytearray()
+            # Fetch and decode each chunk individually
             for i in range(num_chunks):
                 c_resp = http_requests.post(url, headers=headers, json=["GET", f"{key}:chk:{i}"], timeout=15)
                 if c_resp.status_code != 200: return None
                 c_result = c_resp.json().get("result")
                 if not c_result: return None
-                compressed += c_result
+                # Decode base64 chunk and append raw bytes
+                compressed_bytes.extend(base64.b64decode(c_result))
                 
-            compressed_bytes = base64.b64decode(compressed)
             json_str = zlib.decompress(compressed_bytes).decode('utf-8')
             return json.loads(json_str)
 
@@ -121,11 +121,12 @@ def redis_set(key, value, ttl_seconds=None):
         json_str = json.dumps(value, default=str)
         compressed = base64.b64encode(zlib.compress(json_str.encode('utf-8'))).decode('ascii')
         
-        chunk_size = 500 * 1024 # 500KB chunks safely avoid the Upstash 1MB REST Limit
+        chunk_size = 500 * 1024 # 500 KB chunks (well below 1 MB limit)
         url = f"{REDIS_URL}/"
         headers = {"Authorization": f"Bearer {REDIS_TOKEN}", "Content-Type": "application/json"}
         
         if len(compressed) <= chunk_size:
+            # Single chunk – store as ZIP:
             val_str = f"ZIP:{compressed}"
             payload = ["SET", key, val_str]
             if ttl_seconds is not None:
@@ -134,17 +135,17 @@ def redis_set(key, value, ttl_seconds=None):
             if resp.status_code != 200:
                 logger.error("redis_set_rejected", key=key, status=resp.status_code, response=resp.text[:200])
         else:
+            # Split into multiple chunks
             chunks = [compressed[i:i+chunk_size] for i in range(0, len(compressed), chunk_size)]
-            # Set chunks first
+            # Store each chunk with the same TTL
             for i, chunk in enumerate(chunks):
                 c_payload = ["SET", f"{key}:chk:{i}", chunk]
                 if ttl_seconds is not None:
                     c_payload.extend(["EX", int(ttl_seconds)])
                 http_requests.post(url, headers=headers, json=c_payload, timeout=15)
                 
-            # Set pointer key last
-            val_str = f"CHK:{len(chunks)}"
-            m_payload = ["SET", key, val_str]
+            # Store the pointer key (CHK:)
+            m_payload = ["SET", key, f"CHK:{len(chunks)}"]
             if ttl_seconds is not None:
                 m_payload.extend(["EX", int(ttl_seconds)])
             http_requests.post(url, headers=headers, json=m_payload, timeout=15)
