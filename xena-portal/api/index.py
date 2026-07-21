@@ -4,6 +4,7 @@ Xena Data Portal — High-Speed Hybrid Backend
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
 with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
 Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
+Includes dual-table background syncing for instant Points Table loads.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading
@@ -401,6 +402,36 @@ def get_user_permissions(email, name):
     
     fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
     return fallback
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LARK LIST FIELDS API (SCHEMA FETCHING)
+# ──────────────────────────────────────────────────────────────────────────────
+def get_table_fields(table_id):
+    """Fetches all field names for a table in 1 lightweight call using List fields API."""
+    cache_key = cache_make_key("table_fields", table_id)
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/fields"
+    headers = {
+        "Authorization": f"Bearer {tat}",
+        "Content-Type": "application/json; charset=utf-8"
+    }
+
+    try:
+        resp = http_requests.get(url, headers=headers, params={"page_size": 100}, timeout=10)
+        data = resp.json()
+        if data.get("code") == 0:
+            items = data.get("data", {}).get("items", [])
+            field_names = [item.get("field_name") for item in items if item.get("field_name")]
+            cache_set(cache_key, field_names, ttl=CACHE_TTL_HISTORICAL)
+            return field_names
+    except Exception as e:
+        logger.error("get_table_fields_failed", table_id=table_id, error=str(e))
+    
+    return []
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING (Using Fast GET Method)
@@ -830,15 +861,18 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP & BACKGROUND CACHE LOOP
+# BACKGROUND SYNC FOR REQUESTS & POINTS TABLES
 # ──────────────────────────────────────────────────────────────────────────────
 BACKGROUND_SYNC_INTERVAL = 180   # re-sync every 3 minutes
 BACKGROUND_SYNC_MAX_AGE  = 600   # snapshot considered "fresh enough" for 10 minutes
 
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
-    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
-    "syncing": False,
+    "points_items": [],   "points_keys": set(),
+    "requests_updated_at": 0, "points_updated_at": 0,
+    "requests_complete": True, "points_complete": True,
+    "requests_stop_reason": "", "points_stop_reason": "",
+    "syncing_requests": False, "syncing_points": False,
 }
 _bg_sync_lock = threading.Lock()
 _bg_thread_started = False
@@ -846,26 +880,48 @@ _bg_thread_lock = threading.Lock()
 
 def _background_sync_requests_table():
     with _bg_sync_lock:
-        if _bg_sync["syncing"]: return
-        _bg_sync["syncing"] = True
+        if _bg_sync["syncing_requests"]: return
+        _bg_sync["syncing_requests"] = True
     try:
+        schema_keys = set(get_table_fields(REQUESTS_TABLE_ID))
         items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
         with _bg_sync_lock:
-            _bg_sync["requests_items"]  = items
-            _bg_sync["requests_keys"]   = keys
-            _bg_sync["updated_at"]      = time.time()
-            _bg_sync["fetch_complete"]  = complete
-            _bg_sync["stop_reason"]     = reason
-        logger.info("background_sync_complete", table="grand_table", count=len(items), complete=complete)
+            _bg_sync["requests_items"] = items
+            _bg_sync["requests_keys"]  = schema_keys or keys
+            _bg_sync["requests_updated_at"] = time.time()
+            _bg_sync["requests_complete"]   = complete
+            _bg_sync["requests_stop_reason"] = reason
+        logger.info("background_sync_complete", table="requests_table", count=len(items), complete=complete)
     except Exception as e:
-        logger.error("background_sync_failed", table="grand_table", error=str(e))
+        logger.error("background_sync_failed", table="requests_table", error=str(e))
     finally:
         with _bg_sync_lock:
-            _bg_sync["syncing"] = False
+            _bg_sync["syncing_requests"] = False
+
+def _background_sync_points_table():
+    with _bg_sync_lock:
+        if _bg_sync["syncing_points"]: return
+        _bg_sync["syncing_points"] = True
+    try:
+        schema_keys = set(get_table_fields(POINTS_TABLE_ID))
+        items, keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+        with _bg_sync_lock:
+            _bg_sync["points_items"] = items
+            _bg_sync["points_keys"]  = schema_keys or keys
+            _bg_sync["points_updated_at"] = time.time()
+            _bg_sync["points_complete"]   = complete
+            _bg_sync["points_stop_reason"] = reason
+        logger.info("background_sync_complete", table="points_table", count=len(items), complete=complete)
+    except Exception as e:
+        logger.error("background_sync_failed", table="points_table", error=str(e))
+    finally:
+        with _bg_sync_lock:
+            _bg_sync["syncing_points"] = False
 
 def _background_sync_loop():
     while True:
         _background_sync_requests_table()
+        _background_sync_points_table()
         time.sleep(BACKGROUND_SYNC_INTERVAL)
 
 def ensure_background_sync_started():
@@ -880,13 +936,28 @@ def get_requests_table_snapshot(from_dt=None):
     ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
-        updated_at   = _bg_sync["updated_at"]
-        complete     = _bg_sync["fetch_complete"]
-        reason       = _bg_sync["stop_reason"]
+        updated_at   = _bg_sync["requests_updated_at"]
+        complete     = _bg_sync["requests_complete"]
+        reason       = _bg_sync["requests_stop_reason"]
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
     items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
     return items, keys, complete, reason, False
+
+def get_points_table_snapshot():
+    """Serves the Points Table instantly from background memory snapshot."""
+    ensure_background_sync_started()
+    with _bg_sync_lock:
+        items = _bg_sync["points_items"]
+        updated_at = _bg_sync["points_updated_at"]
+        complete = _bg_sync["points_complete"]
+        reason = _bg_sync["points_stop_reason"]
+        
+    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+        return items, complete, reason, True
+        
+    items, _, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+    return items, complete, reason, False
 
 app = Flask(__name__)
 
@@ -1071,11 +1142,10 @@ def audit_logs():
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def points_records():
-    user   = sanitize_text(request.args.get('user',''))
-    email  = sanitize_text(request.args.get('email',''))
-    perms  = get_user_permissions(email, user)
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
 
-    # Sub-Module Check Support
     if not perms.get("is_super_admin") and not any("points" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
@@ -1088,28 +1158,15 @@ def points_records():
     except (ValueError, TypeError):
         page, page_size = 1, 50
 
-    search       = sanitize_text(request.args.get('search',''), 100).lower()
-    f_agency_code= sanitize_text(request.args.get('agency_id', request.args.get('agency_code',''))).lower()
-    f_region     = sanitize_text(request.args.get('region','')).lower()
-    f_acm        = sanitize_text(request.args.get('acm','')).lower()
-    sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
-    sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
+    search        = sanitize_text(request.args.get('search',''), 100).lower()
+    f_agency_code = sanitize_text(request.args.get('agency_id', request.args.get('agency_code',''))).lower()
+    f_region      = sanitize_text(request.args.get('region','')).lower()
+    f_acm         = sanitize_text(request.args.get('acm','')).lower()
+    sort_by       = sanitize_text(request.args.get('sort_by','point_balance'))
+    sort_dir      = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    raw_points_cache_key = "points_table_raw_items"
-    cached_bundle = cache_get(raw_points_cache_key)
-
-    if cached_bundle is not None:
-        all_items      = cached_bundle["items"]
-        fetch_complete = cached_bundle["fetch_complete"]
-        stop_reason    = cached_bundle["stop_reason"]
-    else:
-        all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
-        if not fetch_complete and not all_items:
-            return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
-
-        cache_set(raw_points_cache_key,
-                  {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason},
-                  ttl=300)
+    # Instant response from warm snapshot
+    all_items, fetch_complete, stop_reason, served_from_bg = get_points_table_snapshot()
 
     filtered = []
     for item in all_items:
@@ -1126,11 +1183,11 @@ def points_records():
         if f_region      and f_region      not in region.lower():   continue
         if f_acm         and f_acm         not in acm.lower():      continue
 
-        base_pts   = parse_float_safe(extract_field_text(get_field_local(f, "Base Points")))
-        bonus_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Bonus Points")))
-        total_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
-        used_pts   = parse_float_safe(extract_field_text(get_field_local(f, "Used Points")))
-        balance    = parse_float_safe(extract_field_text(get_field_local(f, "Point Balance")))
+        base_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Base Points")))
+        bonus_pts = parse_float_safe(extract_field_text(get_field_local(f, "Bonus Points")))
+        total_pts = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
+        used_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Used Points")))
+        balance   = parse_float_safe(extract_field_text(get_field_local(f, "Point Balance")))
 
         if balance == 0 and total_pts > 0:
             balance = total_pts - used_pts
@@ -1164,7 +1221,7 @@ def points_records():
     try: filtered.sort(key=lambda x: (x[sf] is None, x[sf], x["agency_id"]), reverse=reverse)
     except TypeError: filtered.sort(key=lambda x: (str(x.get(sf,"")), x["agency_id"]), reverse=reverse)
 
-    total_count = len(filtered)
+    total_count   = len(filtered)
     total_pts_sum = sum(r["total_points"] for r in filtered)
     used_pts_sum  = sum(r["used_points"] for r in filtered)
     balance_sum   = sum(r["point_balance"] for r in filtered)
@@ -1177,7 +1234,8 @@ def points_records():
         "records": page_records, "total": total_count, "page": page, "page_size": page_size,
         "total_pages": max(1, -(-total_count // page_size)),
         "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
-        "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason)
+        "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
+        "served_from_background_cache": served_from_bg
     })
 
 @app.route('/api/sync/refresh', methods=['POST'])
@@ -1190,10 +1248,11 @@ def sync_refresh():
 
     cache_invalidate()
     _background_sync_requests_table()
+    _background_sync_points_table()
     with _bg_sync_lock:
-        count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
+        count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["requests_updated_at"], _bg_sync["requests_complete"]
         
-    audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
+    audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "all_tables", ip=request.headers.get("X-Forwarded-For",""))
     return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
@@ -1439,9 +1498,12 @@ def clear_cache():
 def health():
     with _bg_sync_lock:
         bg_info = {
-            "record_count": len(_bg_sync["requests_items"]),
-            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
-            "syncing": _bg_sync["syncing"],
+            "requests_record_count": len(_bg_sync["requests_items"]),
+            "requests_age_seconds": (time.time() - _bg_sync["requests_updated_at"]) if _bg_sync["requests_updated_at"] else None,
+            "syncing_requests": _bg_sync["syncing_requests"],
+            "points_record_count": len(_bg_sync["points_items"]),
+            "points_age_seconds": (time.time() - _bg_sync["points_updated_at"]) if _bg_sync["points_updated_at"] else None,
+            "syncing_points": _bg_sync["syncing_points"],
         }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
