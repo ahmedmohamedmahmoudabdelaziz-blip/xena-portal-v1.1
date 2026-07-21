@@ -227,21 +227,42 @@ audit = AuditLogger()
 def normalize_key(k):
     return " ".join(str(k).lower().strip().split())
 
+_global_alias_map = {}
+
 def get_field_local(fields, *aliases):
     if not fields: return None
+    
+    # 1. Check O(1) Global Alias Cache (Ultra Fast)
     for alias in aliases:
-        if alias in fields and fields[alias] not in (None, "", []): 
+        if alias in _global_alias_map:
+            real_key = _global_alias_map[alias]
+            if real_key in fields and fields[real_key] not in (None, "", []):
+                return fields[real_key]
+
+    # 2. Exact Match (Cache it if found)
+    for alias in aliases:
+        if alias in fields and fields[alias] not in (None, "", []):
+            _global_alias_map[alias] = alias
             return fields[alias]
+
+    # 3. Fuzzy Match - Pass 1 (Cache it if found)
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
-            if normalize_key(k) == tgt and v not in (None, "", []):
-                return v
+            if normalize_key(k) == tgt:
+                _global_alias_map[alias] = k
+                if v not in (None, "", []):
+                    return v
+
+    # 4. Fuzzy Match - Pass 2 (Cache it if found)
     for alias in aliases:
         tgt = normalize_key(alias)
         for k, v in fields.items():
-            if tgt in normalize_key(k) and v not in (None, "", []):
-                return v
+            if tgt in normalize_key(k):
+                _global_alias_map[alias] = k
+                if v not in (None, "", []):
+                    return v
+                    
     return None
 
 def extract_field_text(field_data):
@@ -872,81 +893,39 @@ _bg_sync = {
     "requests_updated_at": 0, "points_updated_at": 0,
     "requests_complete": True, "points_complete": True,
     "requests_stop_reason": "", "points_stop_reason": "",
-    "syncing_requests": False, "syncing_points": False,
 }
 _bg_sync_lock = threading.Lock()
-_bg_thread_started = False
-_bg_thread_lock = threading.Lock()
-
-def _background_sync_requests_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing_requests"]: return
-        _bg_sync["syncing_requests"] = True
-    try:
-        schema_keys = set(get_table_fields(REQUESTS_TABLE_ID))
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        with _bg_sync_lock:
-            _bg_sync["requests_items"] = items
-            _bg_sync["requests_keys"]  = schema_keys or keys
-            _bg_sync["requests_updated_at"] = time.time()
-            _bg_sync["requests_complete"]   = complete
-            _bg_sync["requests_stop_reason"] = reason
-        logger.info("background_sync_complete", table="requests_table", count=len(items), complete=complete)
-    except Exception as e:
-        logger.error("background_sync_failed", table="requests_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing_requests"] = False
-
-def _background_sync_points_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing_points"]: return
-        _bg_sync["syncing_points"] = True
-    try:
-        schema_keys = set(get_table_fields(POINTS_TABLE_ID))
-        items, keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
-        with _bg_sync_lock:
-            _bg_sync["points_items"] = items
-            _bg_sync["points_keys"]  = schema_keys or keys
-            _bg_sync["points_updated_at"] = time.time()
-            _bg_sync["points_complete"]   = complete
-            _bg_sync["points_stop_reason"] = reason
-        logger.info("background_sync_complete", table="points_table", count=len(items), complete=complete)
-    except Exception as e:
-        logger.error("background_sync_failed", table="points_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing_points"] = False
-
-def _background_sync_loop():
-    while True:
-        _background_sync_requests_table()
-        _background_sync_points_table()
-        time.sleep(BACKGROUND_SYNC_INTERVAL)
-
-def ensure_background_sync_started():
-    global _bg_thread_started
-    with _bg_thread_lock:
-        if not _bg_thread_started:
-            threading.Thread(target=_background_sync_loop, daemon=True).start()
-            _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
-    """Serves the Grand Table from the warm in-memory snapshot when it's fresh enough."""
-    ensure_background_sync_started()
+    """Serves the Grand Table safely, heavily optimized for Vercel Serverless."""
     with _bg_sync_lock:
-        items, keys = _bg_sync["requests_items"], _bg_sync["requests_keys"]
-        updated_at   = _bg_sync["requests_updated_at"]
-        complete     = _bg_sync["requests_complete"]
-        reason       = _bg_sync["requests_stop_reason"]
+        items = _bg_sync["requests_items"]
+        keys = _bg_sync["requests_keys"]
+        updated_at = _bg_sync["requests_updated_at"]
+        complete = _bg_sync["requests_complete"]
+        reason = _bg_sync["requests_stop_reason"]
+        
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
-    return items, keys, complete, reason, False
+
+    with _bg_sync_lock:
+        # Double check in case another request just finished fetching
+        if _bg_sync["requests_items"] and (time.time() - _bg_sync["requests_updated_at"]) < BACKGROUND_SYNC_MAX_AGE:
+            return _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["requests_complete"], _bg_sync["requests_stop_reason"], True
+
+        schema_keys = set(get_table_fields(REQUESTS_TABLE_ID))
+        new_items, new_keys, new_complete, new_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+        
+        _bg_sync["requests_items"] = new_items
+        _bg_sync["requests_keys"] = schema_keys or new_keys
+        _bg_sync["requests_updated_at"] = time.time()
+        _bg_sync["requests_complete"] = new_complete
+        _bg_sync["requests_stop_reason"] = new_reason
+        
+        return new_items, _bg_sync["requests_keys"], new_complete, new_reason, False
 
 def get_points_table_snapshot():
-    """Serves the Points Table instantly from background memory snapshot."""
-    ensure_background_sync_started()
+    """Serves the Points Table safely, heavily optimized for Vercel Serverless."""
     with _bg_sync_lock:
         items = _bg_sync["points_items"]
         updated_at = _bg_sync["points_updated_at"]
@@ -956,8 +935,19 @@ def get_points_table_snapshot():
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, complete, reason, True
         
-    items, _, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
-    return items, complete, reason, False
+    with _bg_sync_lock:
+        # Double check in case another request just finished fetching
+        if _bg_sync["points_items"] and (time.time() - _bg_sync["points_updated_at"]) < BACKGROUND_SYNC_MAX_AGE:
+            return _bg_sync["points_items"], _bg_sync["points_complete"], _bg_sync["points_stop_reason"], True
+
+        new_items, _, new_complete, new_reason = fetch_feishu_records(POINTS_TABLE_ID)
+        
+        _bg_sync["points_items"] = new_items
+        _bg_sync["points_updated_at"] = time.time()
+        _bg_sync["points_complete"] = new_complete
+        _bg_sync["points_stop_reason"] = new_reason
+        
+        return new_items, new_complete, new_reason, False
 
 app = Flask(__name__)
 
@@ -1247,8 +1237,16 @@ def sync_refresh():
     if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    _background_sync_requests_table()
-    _background_sync_points_table()
+    
+    # Force a synchronous fetch via the snapshot functions by resetting the timestamps
+    with _bg_sync_lock:
+        _bg_sync["requests_updated_at"] = 0
+        _bg_sync["points_updated_at"] = 0
+        
+    # Trigger fetch safely
+    get_requests_table_snapshot()
+    get_points_table_snapshot()
+
     with _bg_sync_lock:
         count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["requests_updated_at"], _bg_sync["requests_complete"]
         
@@ -1500,10 +1498,8 @@ def health():
         bg_info = {
             "requests_record_count": len(_bg_sync["requests_items"]),
             "requests_age_seconds": (time.time() - _bg_sync["requests_updated_at"]) if _bg_sync["requests_updated_at"] else None,
-            "syncing_requests": _bg_sync["syncing_requests"],
             "points_record_count": len(_bg_sync["points_items"]),
             "points_age_seconds": (time.time() - _bg_sync["points_updated_at"]) if _bg_sync["points_updated_at"] else None,
-            "syncing_points": _bg_sync["syncing_points"],
         }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
@@ -1512,9 +1508,6 @@ def health():
         "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
         "background_sync": bg_info
     })
-
-# Start the background sync thread right at boot time
-ensure_background_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
