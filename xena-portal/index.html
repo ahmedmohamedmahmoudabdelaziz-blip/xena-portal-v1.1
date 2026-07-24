@@ -16,6 +16,7 @@
             --accent-cyan:#00d4ff;--accent-green:#00e676;
             --accent-rose:#ff4d6d;--accent-amber:#ffb800;--accent-purple:#b967ff;
             --shadow:0 8px 32px rgba(0,0,0,.4);--radius:16px;
+            --sidebar-bg: #101623;
         }
         [data-theme="light"] {
             --bg:#f0f2f8;--surface:#fff;--surface-hover:#f5f7ff;
@@ -24,6 +25,7 @@
             --accent-cyan:#0099cc;--accent-green:#00b84a;
             --accent-rose:#d63050;--accent-amber:#c88a00;--accent-purple:#8a44cc;
             --shadow:0 4px 20px rgba(0,0,0,.08);
+            --sidebar-bg: #1d232e;
         }
         
         *{margin:0;padding:0;box-sizing:border-box}
@@ -35,34 +37,64 @@
         .login-card p{color:var(--text-muted);margin-bottom:32px}
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
-        .sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
-        .main-content{margin-left:240px;padding:24px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s;}
-        .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
-        .sidebar-brand{font-size:1.05rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
-        .sidebar-user-area{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
-        .sidebar-username{font-size:.84rem;font-weight:600;color:var(--accent-cyan);display:flex;align-items:center;gap:7px;line-height:1.5;word-break:break-word}
-        .sidebar-username::before{content:'';width:7px;height:7px;background:var(--accent-green);border-radius:50%;flex-shrink:0;box-shadow:0 0 6px var(--accent-green)}
         
+        .sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
+        .sidebar * { color: #a0a5b5; } /* Unified sidebar text color */
+        .main-content{margin-left:240px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s; display:flex; flex-direction:column; height: 100vh; overflow: hidden;}
+        
+        .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:10px;flex-shrink:0}
+        .sidebar-brand{font-size:1.05rem;font-weight:700;color:#fff!important;white-space:nowrap}
+        
+        .sidebar-search-area { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+        .sidebar-search-box { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem; outline: none; transition: border-color 0.2s; }
+        .sidebar-search-box:focus { border-color: var(--accent-cyan); }
+        .sidebar-search-box::placeholder { color: #6b7280; }
+
         .sidebar-nav{flex:1;padding:8px 0;overflow-y:auto}
         .nav-group{margin-bottom:1px}
-        .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
-        .nav-group-header:hover{color:var(--text);background:rgba(255,255,255,.04)}
+        .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
+        .nav-group-header:hover{color:#fff;background:rgba(255,255,255,.04)}
         .nav-group-header.grp-active{color:var(--accent-cyan)}
         .nav-direct{cursor:pointer}
         .nav-arr{font-size:.7rem;transition:transform .25s;flex-shrink:0}
         .nav-arr.open{transform:rotate(90deg)}
         .nav-group-body{overflow:hidden;max-height:0;transition:max-height .35s ease}
         .nav-group-body.open{max-height:500px}
-        .nav-item{display:block;padding:9px 16px 9px 32px;font-size:.875rem;color:var(--text-muted);cursor:pointer;transition:all .2s;border-left:3px solid transparent}
-        .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
-        .nav-item.active{color:var(--accent-cyan);border-left-color:var(--accent-cyan);background:rgba(0,212,255,.07);font-weight:600}
-        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0}
+        .nav-item{display:block;padding:9px 16px 9px 32px;font-size:.875rem;cursor:pointer;transition:all .2s;border-left:3px solid transparent}
+        .nav-item:hover{color:#fff;background:rgba(255,255,255,.04)}
+        .nav-item.active{color:var(--accent-cyan)!important;border-left-color:var(--accent-cyan);background:rgba(0,212,255,.07);font-weight:600}
+        .sidebar-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.05);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0}
         .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:150}
         
-        .page-top-bar{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 20px;margin-bottom:24px}
-        .page-title-txt{font-size:.95rem;font-weight:700;color:var(--text)}
+        .page-top-bar{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px; flex-shrink: 0; z-index: 100;}
+        .top-bar-left { display: flex; align-items: center; gap: 10px; }
+        .top-bar-right { display: flex; align-items: center; gap: 16px; }
+        
         .hamburger{display:none;background:none;border:none;color:var(--text);font-size:1.25rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1}
         .hamburger:hover{background:rgba(255,255,255,.06)}
+        
+        .utility-icon-btn { background: transparent; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; padding: 6px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .utility-icon-btn:hover { background: var(--surface-hover); color: var(--accent-cyan); }
+        
+        .lang-select { background: var(--surface-hover); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer; outline: none; }
+        
+        .user-profile-btn { display: flex; align-items: center; gap: 10px; background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
+        .user-profile-btn:hover { background: var(--surface-hover); }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
+        .user-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+
+        .multi-tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px 0 16px; gap: 4px; overflow-x: auto; flex-shrink: 0; }
+        .multi-tab-bar::-webkit-scrollbar { height: 4px; }
+        .multi-tab-bar::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+        .tab-item { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--surface-hover); border: 1px solid var(--border); border-bottom: none; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.85rem; color: var(--text-muted); transition: all 0.2s; min-width: max-content; }
+        .tab-item:hover { background: var(--border); color: var(--text); }
+        .tab-item.active { background: var(--bg); color: var(--accent-cyan); border-color: var(--border); font-weight: 600; position: relative; }
+        .tab-item.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 1px; background: var(--bg); }
+        .tab-close { background: transparent; border: none; color: inherit; opacity: 0.6; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px; border-radius: 50%; }
+        .tab-close:hover { opacity: 1; color: var(--accent-rose); background: rgba(255,77,109,0.1); }
+
+        .page-content-wrapper { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
+
         .welcome-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:920px;margin:0 auto}
         .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .25s;box-shadow:var(--shadow);text-align:center}
         .welcome-card:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:0 12px 40px rgba(0,212,255,.12)}
@@ -97,14 +129,12 @@
         .btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,230,118,.25)}
         .btn-outline{background:transparent;border:1px solid var(--border-hover);color:var(--text);padding:8px 16px;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:500;font-size:.9rem;white-space:nowrap}
         .btn-outline:hover{border-color:var(--accent-cyan);color:var(--accent-cyan)}
-        .logout-btn{background:transparent;border:1px solid var(--accent-rose);color:var(--accent-rose);padding:8px 16px;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:500;font-size:.9rem;white-space:nowrap}
+        .logout-btn{background:transparent;border:1px solid var(--accent-rose);color:var(--accent-rose);padding:8px 16px;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:500;font-size:.9rem;white-space:nowrap; width: 100%; margin-top: 10px;}
         .logout-btn:hover{background:rgba(255,77,109,.1)}
         .btn-allocator{background:transparent;border:1px solid var(--accent-purple);color:var(--accent-purple);box-shadow:0 0 10px rgba(185,103,255,.1);width:100%;padding:14px;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s;font-family:inherit;margin-top:10px}
         .btn-allocator:hover{background:var(--accent-purple);color:#000;box-shadow:0 8px 25px rgba(185,103,255,.4);transform:translateY(-2px)}
         .btn-sm{padding:6px 12px;border-radius:6px;font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
-        .theme-btn{background:transparent;border:1px solid var(--border-hover);color:var(--text-muted);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:1rem;transition:all .2s;line-height:1}
-        .theme-btn:hover{border-color:var(--accent-amber);color:var(--accent-amber)}
-
+        
         .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);transition:border-color .2s;margin-bottom:24px}
         .card:hover{border-color:var(--border-hover)}
         .page-header{text-align:center;margin-bottom:32px}
@@ -124,7 +154,7 @@
         @keyframes spin{to{transform:rotate(360deg)}}
 
         #toastContainer{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:380px}
-        .toast-item{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid transparent;animation:toast-in .3s ease;cursor:pointer;position:relative;overflow:hidden}
+        .toast-item{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid transparent;animation:toast-in .3s ease;cursor:pointer;position:relative;overflow:hidden;background:var(--surface);color:var(--text)}
         .toast-item::after{content:'';position:absolute;bottom:0;left:0;height:3px;background:currentColor;opacity:.4;animation:toast-progress linear forwards}
         @keyframes toast-in{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
         @keyframes toast-progress{from{width:100%}to{width:0%}}
@@ -323,9 +353,11 @@
             .sidebar-backdrop.visible{display:block}
             .main-content{margin-left:0;max-width:100vw}
             .hamburger{display:block}
+            .top-bar-right { gap: 8px; }
+            .user-name { display: none; }
         }
         @media(max-width:600px){
-            .main-content{padding:12px}
+            .page-content-wrapper{padding:12px}
             .kpi-grid{grid-template-columns:1fr}
             .chart-grid-3,.chart-grid-2{grid-template-columns:1fr}
             .chart-wrapper-pie-large{height:380px}
@@ -334,9 +366,10 @@
             .user-row{flex-direction:column;align-items:flex-start}
         }
         @media print{
-            .sidebar,.page-top-bar,#pg-analytics .card,.loading-overlay,#toastContainer,.btn,.tab-bar,
+            .sidebar,.page-top-bar,.multi-tab-bar,#pg-analytics .card,.loading-overlay,#toastContainer,.btn,.tab-bar,
             #activeFiltersBar,.preset-bar,.filter-chip{display:none!important}
             body{background:#fff;color:#000}
+            .main-content{margin-left: 0;}
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
         }
     </style>
@@ -346,7 +379,7 @@
 <div id="toastContainer"></div>
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
-    <div style="color:var(--text-muted);font-weight:500;" id="loadingText">Crunching Feishu data...</div>
+    <div style="color:var(--text-muted);font-weight:500;" id="loadingText" data-i18n="crunching">Crunching Feishu data...</div>
 </div>
 
 <div id="loginOverlay">
@@ -365,65 +398,65 @@
             <span style="font-size:1.3rem">🚀</span>
             <span class="sidebar-brand">Xena Portal</span>
         </div>
-        <div class="sidebar-user-area">
-            <div class="sidebar-username" id="sidebarUsername">Loading…</div>
-            <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">Live Data Portal</div>
+        
+        <div class="sidebar-search-area">
+            <input type="text" id="sidebarSearch" class="sidebar-search-box" placeholder="Search menu..." data-i18n-placeholder="searchMenu" oninput="filterSidebar()">
         </div>
+
         <nav class="sidebar-nav">
             <div class="nav-group" id="navGrpAnalytics">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAnalytics','navBodyAnalytics')">
-                    <span>📊 Agency Analysis</span><span class="nav-arr" id="navArrAnalytics">›</span>
+                    <span data-i18n="agencyAnalysis">📊 Agency Analysis</span><span class="nav-arr" id="navArrAnalytics">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyAnalytics">
-                    <div class="nav-item" id="nav-analytics" onclick="navTo('analytics')">Analytics Report</div>
-                    <div class="nav-item" id="nav-compare"   onclick="navTo('compare')">Compare ACMs / Periods</div>
+                    <div class="nav-item" id="nav-analytics" onclick="openInTab('analytics')"><span data-i18n="analyticsReport">Analytics Report</span></div>
+                    <div class="nav-item" id="nav-compare"   onclick="openInTab('compare')"><span data-i18n="compareAcm">Compare ACMs / Periods</span></div>
                 </div>
             </div>
             <div class="nav-group" id="navGrpPoints">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpPoints','navBodyPoints')">
-                    <span>🪙 Agency Points</span><span class="nav-arr" id="navArrPoints">›</span>
+                    <span data-i18n="agencyPoints">🪙 Agency Points</span><span class="nav-arr" id="navArrPoints">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyPoints">
-                    <div class="nav-item" id="nav-points"         onclick="navTo('points')">Check Agency Points</div>
-                    <div class="nav-item" id="nav-allocator"      onclick="navTo('allocator')">Smart Allocator</div>
-                    <div class="nav-item" id="nav-points-records" onclick="navTo('points-records')">Search Records</div>
-                    <div class="nav-item" id="nav-points-table"   onclick="navTo('points-table')">Point Table</div>
+                    <div class="nav-item" id="nav-points"         onclick="openInTab('points')"><span data-i18n="checkAgencyPoints">Check Agency Points</span></div>
+                    <div class="nav-item" id="nav-allocator"      onclick="openInTab('allocator')"><span data-i18n="smartAllocator">Smart Allocator</span></div>
+                    <div class="nav-item" id="nav-points-records" onclick="openInTab('points-records')"><span data-i18n="searchRecords">Search Records</span></div>
+                    <div class="nav-item" id="nav-points-table"   onclick="openInTab('points-table')"><span data-i18n="pointTable">Point Table</span></div>
                 </div>
             </div>
             
             <div class="nav-group" id="navGrpTarget">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpTarget','navBodyTarget')">
-                    <span>🎯 Agency Target</span><span class="nav-arr" id="navArrTarget">›</span>
+                    <span data-i18n="agencyTarget">🎯 Agency Target</span><span class="nav-arr" id="navArrTarget">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyTarget">
-                    <div class="nav-item" id="nav-target" onclick="navTo('target')">Check Agency Target</div>
-                    <div class="nav-item" id="nav-target-timeline" onclick="navTo('target-timeline')">Target Timeline</div>
+                    <div class="nav-item" id="nav-target" onclick="openInTab('target')"><span data-i18n="checkAgencyTarget">Check Agency Target</span></div>
+                    <div class="nav-item" id="nav-target-timeline" onclick="openInTab('target-timeline')"><span data-i18n="targetTimeline">Target Timeline</span></div>
                 </div>
             </div>
 
             <div class="nav-group" id="navGrpQuery">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpQuery','navBodyQuery')">
-                    <span>🔍 Universal Query</span><span class="nav-arr" id="navArrQuery">›</span>
+                    <span data-i18n="universalQuery">🔍 Universal Query</span><span class="nav-arr" id="navArrQuery">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyQuery">
-                    <div class="nav-item" id="nav-query" onclick="navTo('query')">Query Requests</div>
+                    <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
                 </div>
             </div>
 
             <div class="nav-group" id="navGrpAdmin" style="display:none">
-                <div style="height:1px;background:var(--border);margin:8px 16px 4px"></div>
+                <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
-                    <span>⚙️ Access Management</span><span class="nav-arr" id="navArrAdmin">›</span>
+                    <span data-i18n="accessManagement">⚙️ Access Management</span><span class="nav-arr" id="navArrAdmin">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyAdmin">
-                    <div class="nav-item" id="nav-admin-agents" onclick="navTo('admin-agents')">Manage Agents</div>
-                    <div class="nav-item" id="nav-admin-audit"  onclick="navTo('admin-audit')">Audit Log</div>
+                    <div class="nav-item" id="nav-admin-agents" onclick="openInTab('admin-agents')"><span data-i18n="manageAgents">Manage Agents</span></div>
+                    <div class="nav-item" id="nav-admin-audit"  onclick="openInTab('admin-audit')"><span data-i18n="auditLog">Audit Log</span></div>
                 </div>
             </div>
         </nav>
         <div class="sidebar-footer">
-            <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">🌙</button>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <button class="logout-btn" onclick="logout()" data-i18n="logout">Logout</button>
         </div>
     </aside>
 
@@ -431,698 +464,1000 @@
 
     <div class="main-content">
         <div class="page-top-bar">
-            <div style="display:flex;align-items:center;gap:10px">
+            <div class="top-bar-left">
                 <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">☰</button>
-                <span class="page-title-txt" id="pageTitle">Xena Live Data Portal</span>
+                <!-- Removed Page Title from here as tabs represent open pages now -->
             </div>
+            
+            <div class="top-bar-right">
+                <!-- Theme Toggle -->
+                <button class="utility-icon-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">🌙</button>
+                
+                <!-- Language Selector -->
+                <select class="lang-select" id="langSelect" onchange="changeLanguage(this.value)">
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                </select>
+                
+                <!-- User Profile -->
+                <button class="user-profile-btn" onclick="alert('Profile Settings coming soon!')">
+                    <img id="userAvatar" class="user-avatar" src="" alt="User Avatar">
+                    <span class="user-name" id="sidebarUsername">Loading…</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Tabs Row -->
+        <div class="multi-tab-bar" id="multiTabBar">
+            <!-- Tabs injected by JS -->
         </div>
 
         <input type="hidden" id="queryType" value="points">
 
-        <div id="pg-welcome" style="display:block">
-            <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
-                You do not have access to any modules. Please contact an administrator.
-            </div>
-            <div style="text-align:center;padding:32px 24px 24px" id="welcomeHero">
-                <div style="font-size:2.5rem;margin-bottom:12px">🚀</div>
-                <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">Xena Live Data Portal</h2>
-                <p style="color:var(--text-muted);margin-bottom:32px">Agency Privilege &amp; Operational Analytics</p>
-            </div>
-            <div class="welcome-cards" id="welcomeCards"></div>
-        </div>
-
-        <div id="pg-compare" style="display:none">
-            <div class="card">
-                <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Agency Comparison</h3>
-                <div class="compare-mode-toggle">
-                    <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">👥 ACM Side-by-Side</div>
-                    <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">📅 Period Compare → Analytics</div>
+        <div class="page-content-wrapper">
+            <!-- Content Divs go here -->
+            <div id="pg-welcome" style="display:block">
+                <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
+                    You do not have access to any modules. Please contact an administrator.
                 </div>
-                <div id="cmpModeAcm">
-                    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Enter 2–3 agency codes to compare data side by side.</p>
-                    <div class="control-grid">
-                        <div class="control-group"><label>Primary Agency Code</label><input type="text" id="cmpCode1" placeholder="e.g., 40775"></div>
-                        <div class="control-group"><label>Agency Code 2</label><input type="text" id="cmpCode2" placeholder="e.g., 40776"></div>
-                        <div class="control-group"><label>Agency Code 3 (optional)</label><input type="text" id="cmpCode3" placeholder="e.g., 40777"></div>
-                        <div class="control-group">
-                            <label>Module</label>
-                            <select id="cmpModule"><option value="points">Agency Points</option><option value="target">Agency Target</option></select>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmCompare()">⚖️ Compare Agencies</button>
-                    <div id="cmpAcmResults" style="margin-top:24px;overflow-x:auto"></div>
+                <div style="text-align:center;padding:32px 24px 24px" id="welcomeHero">
+                    <div style="font-size:2.5rem;margin-bottom:12px">🚀</div>
+                    <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px" data-i18n="portalWelcome">Xena Live Data Portal</h2>
+                    <p style="color:var(--text-muted);margin-bottom:32px" data-i18n="portalSub">Agency Privilege &amp; Operational Analytics</p>
                 </div>
-                <div id="cmpModePeriod" style="display:none">
-                    <div class="empty-state" style="padding:40px 0">
-                        <div style="font-size:2.5rem;margin-bottom:12px">📅</div>
-                        <h3>Period Comparison</h3>
-                        <p>Period comparison is built into Analytics Report — enable the "Period Comparison" toggle there.</p>
-                        <button class="empty-state-action" onclick="navTo('analytics');setTimeout(()=>{document.getElementById('compareToggle').checked=true;toggleCompareDates();},100)">Go to Analytics Report</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="pg-agency" style="display:none">
-            <div class="card" style="margin-bottom:24px">
-                <h3 id="agencyLookupTitle" style="margin-bottom:16px;color:var(--accent-cyan)">🔍 Agency Lookup</h3>
-                <div class="centered-search-box" id="standardSearchParams">
-                    <div class="control-group">
-                        <label>Agency Code</label>
-                        <input type="text" id="agencyCode" placeholder="e.g., 40775" aria-label="Agency code" onkeydown="if(event.key==='Enter')fetchAgencyData()">
-                    </div>
-                    <div class="control-group">
-                        <label>Compare With (optional, comma-separated codes)</label>
-                        <input type="text" id="compareAgencyCodes" placeholder="e.g., 40776, 40777" aria-label="Comparison codes">
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn btn-primary" onclick="fetchAgencyData()" style="flex:1">🔍 Search</button>
-                        <button class="btn btn-outline" onclick="window._nocache=true;fetchAgencyData()" style="border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh</button>
-                    </div>
-                </div>
+                <div class="welcome-cards" id="welcomeCards"></div>
             </div>
 
-            <div id="agencyEmptyState" class="empty-state">
-                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                <h3>Search for an Agency</h3>
-                <p>Enter an agency code above to view data.</p>
-            </div>
-
-            <div id="resultsContainer" style="display:none">
-                <div class="target-banner">
-                    <div class="health-badge health-Healthy" id="displayHealth" style="display:none">🟢 Healthy</div>
-                    <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
-                    <div id="displayTargetTitle" style="color:var(--text-muted);font-size:.9rem;text-transform:uppercase;letter-spacing:1px">Current Month Target</div>
-                    <h2 id="displayTargetCoins">0 Coins</h2>
-                </div>
-
-                <div class="card" id="privilegeArea" style="display:none">
-                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">Available Target Privilege</h3>
-                    <div class="control-group" style="max-width:300px;margin-bottom:16px">
-                        <select id="specificPrivilege" onchange="updatePrivilegeGrid()" aria-label="Privilege type">
-                            <option value="Dynamic Avatar">Dynamic Avatar</option>
-                            <option value="30 Mics">30 Mics</option>
-                            <option value="20 Mics">20 Mics</option>
-                            <option value="New User Welcome Room">New User Welcome Room</option>
-                            <option value="Game room">Game room</option>
-                        </select>
-                    </div>
-                    <div class="stat-grid">
-                        <div class="stat-box"><div class="stat-label">Total</div><div class="stat-value" id="valTotal" style="color:var(--accent-green)">0</div></div>
-                        <div class="stat-box"><div class="stat-label">Claimed</div><div class="stat-value" id="valClaimed">0</div></div>
-                        <div class="stat-box"><div class="stat-label">Remaining</div><div class="stat-value" id="valRemaining" style="color:var(--accent-amber)">0</div></div>
-                        <div class="stat-box"><div class="stat-label">Pending</div><div class="stat-value" id="valPending" style="color:#ffaa00">0</div></div>
-                        <div class="stat-box"><div class="stat-label">Rejected</div><div class="stat-value" id="valRejected" style="color:var(--accent-rose)">0</div></div>
-                    </div>
-                </div>
-
-                <div class="card" id="targetTimelineArea" style="display:none">
-                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⏱ Target Privilege Timeline (Current Month)</h3>
-                    <div class="timeline" id="targetTimeline"></div>
-                </div>
-
-                <div class="card" id="pointsArea" style="display:none">
-                    <h3 style="margin-bottom:16px;color:var(--accent-purple)">🪙 Agency Points System</h3>
-                    <div class="stat-grid" style="margin-bottom:24px">
-                        <div class="stat-box"><div class="stat-label">Total Points</div><div class="stat-value" id="ptTotal" style="color:var(--accent-green)">0</div></div>
-                        <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color:var(--accent-rose)">0</div></div>
-                        <div class="stat-box"><div class="stat-label">Balance</div><div class="stat-value" id="ptBalance" style="color:var(--accent-cyan)">0</div></div>
-                    </div>
-                    <div style="margin-bottom:16px">
-                        <button class="btn-outline" style="font-size:.85rem;padding:8px 16px" onclick="navTo('allocator')">🤖 Open Smart Allocator with this balance →</button>
-                    </div>
-                    
-                    <div style="margin-top:8px">
-                        <h4 style="color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px">
-                            <span style="color:var(--accent-amber)">⏱</span> Activity Timeline (Current Month)
-                        </h4>
-                        <div class="timeline" id="agencyTimeline"></div>
-                    </div>
-                    <div id="allocatorStatusWrap" style="margin-top:24px"></div>
-                    <div id="pointsHistoryWrap" style="margin-top:24px"></div>
-                </div>
-            </div>
-
-            <div id="comparisonArea" class="card" style="display:none;overflow-x:auto">
-                <h3 style="color:var(--accent-cyan);margin-bottom:16px">⚖️ Agency Comparison Engine</h3>
-                <div id="comparisonTableContainer"></div>
-            </div>
-        </div>
-
-        <div id="pg-allocator" style="display:none">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+            <div id="pg-compare" style="display:none">
                 <div class="card">
-                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">🤖 Smart Allocator</h3>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-                        <div class="control-group" style="margin-bottom:0">
-                            <label>Available Points Balance</label>
-                            <input type="number" id="allocatorBalance" min="0" value="0" placeholder="Enter points balance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;transition:.2s;box-sizing:border-box">
+                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Agency Comparison</h3>
+                    <div class="compare-mode-toggle">
+                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">👥 ACM Side-by-Side</div>
+                        <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">📅 Period Compare → Analytics</div>
+                    </div>
+                    <div id="cmpModeAcm">
+                        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Enter 2–3 agency codes to compare data side by side.</p>
+                        <div class="control-grid">
+                            <div class="control-group"><label>Primary Agency Code</label><input type="text" id="cmpCode1" placeholder="e.g., 40775"></div>
+                            <div class="control-group"><label>Agency Code 2</label><input type="text" id="cmpCode2" placeholder="e.g., 40776"></div>
+                            <div class="control-group"><label>Agency Code 3 (optional)</label><input type="text" id="cmpCode3" placeholder="e.g., 40777"></div>
+                            <div class="control-group">
+                                <label>Module</label>
+                                <select id="cmpModule"><option value="points">Agency Points</option><option value="target">Agency Target</option></select>
+                            </div>
                         </div>
-                        <div class="control-group" style="margin-bottom:0">
-                            <label>Pricing Region</label>
-                            <select id="allocatorRegion" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;cursor:pointer">
-                                <option value="same">Same Region (Lower Rate)</option>
-                                <option value="other">Other Region (Higher Rate)</option>
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmCompare()">⚖️ Compare Agencies</button>
+                        <div id="cmpAcmResults" style="margin-top:24px;overflow-x:auto"></div>
+                    </div>
+                    <div id="cmpModePeriod" style="display:none">
+                        <div class="empty-state" style="padding:40px 0">
+                            <div style="font-size:2.5rem;margin-bottom:12px">📅</div>
+                            <h3>Period Comparison</h3>
+                            <p>Period comparison is built into Analytics Report — enable the "Period Comparison" toggle there.</p>
+                            <button class="empty-state-action" onclick="openInTab('analytics');setTimeout(()=>{document.getElementById('compareToggle').checked=true;toggleCompareDates();},100)">Go to Analytics Report</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pg-agency" style="display:none">
+                <div class="card" style="margin-bottom:24px">
+                    <h3 id="agencyLookupTitle" style="margin-bottom:16px;color:var(--accent-cyan)">🔍 Agency Lookup</h3>
+                    <div class="centered-search-box" id="standardSearchParams">
+                        <div class="control-group">
+                            <label>Agency Code</label>
+                            <input type="text" id="agencyCode" placeholder="e.g., 40775" aria-label="Agency code" onkeydown="if(event.key==='Enter')fetchAgencyData()">
+                        </div>
+                        <div class="control-group">
+                            <label>Compare With (optional, comma-separated codes)</label>
+                            <input type="text" id="compareAgencyCodes" placeholder="e.g., 40776, 40777" aria-label="Comparison codes">
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-primary" onclick="fetchAgencyData()" style="flex:1">🔍 Search</button>
+                            <button class="btn btn-outline" onclick="window._nocache=true;fetchAgencyData()" style="border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="agencyEmptyState" class="empty-state">
+                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    <h3>Search for an Agency</h3>
+                    <p>Enter an agency code above to view data.</p>
+                </div>
+
+                <div id="resultsContainer" style="display:none">
+                    <div class="target-banner">
+                        <div class="health-badge health-Healthy" id="displayHealth" style="display:none">🟢 Healthy</div>
+                        <div class="acm-badge" id="displayAcm">ACM: Unknown</div>
+                        <div id="displayTargetTitle" style="color:var(--text-muted);font-size:.9rem;text-transform:uppercase;letter-spacing:1px">Current Month Target</div>
+                        <h2 id="displayTargetCoins">0 Coins</h2>
+                    </div>
+
+                    <div class="card" id="privilegeArea" style="display:none">
+                        <h3 style="margin-bottom:16px;color:var(--accent-cyan)">Available Target Privilege</h3>
+                        <div class="control-group" style="max-width:300px;margin-bottom:16px">
+                            <select id="specificPrivilege" onchange="updatePrivilegeGrid()" aria-label="Privilege type">
+                                <option value="Dynamic Avatar">Dynamic Avatar</option>
+                                <option value="30 Mics">30 Mics</option>
+                                <option value="20 Mics">20 Mics</option>
+                                <option value="New User Welcome Room">New User Welcome Room</option>
+                                <option value="Game room">Game room</option>
+                            </select>
+                        </div>
+                        <div class="stat-grid">
+                            <div class="stat-box"><div class="stat-label">Total</div><div class="stat-value" id="valTotal" style="color:var(--accent-green)">0</div></div>
+                            <div class="stat-box"><div class="stat-label">Claimed</div><div class="stat-value" id="valClaimed">0</div></div>
+                            <div class="stat-box"><div class="stat-label">Remaining</div><div class="stat-value" id="valRemaining" style="color:var(--accent-amber)">0</div></div>
+                            <div class="stat-box"><div class="stat-label">Pending</div><div class="stat-value" id="valPending" style="color:#ffaa00">0</div></div>
+                            <div class="stat-box"><div class="stat-label">Rejected</div><div class="stat-value" id="valRejected" style="color:var(--accent-rose)">0</div></div>
+                        </div>
+                    </div>
+
+                    <div class="card" id="targetTimelineArea" style="display:none">
+                        <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⏱ Target Privilege Timeline (Current Month)</h3>
+                        <div class="timeline" id="targetTimeline"></div>
+                    </div>
+
+                    <div class="card" id="pointsArea" style="display:none">
+                        <h3 style="margin-bottom:16px;color:var(--accent-purple)">🪙 Agency Points System</h3>
+                        <div class="stat-grid" style="margin-bottom:24px">
+                            <div class="stat-box"><div class="stat-label">Total Points</div><div class="stat-value" id="ptTotal" style="color:var(--accent-green)">0</div></div>
+                            <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color:var(--accent-rose)">0</div></div>
+                            <div class="stat-box"><div class="stat-label">Balance</div><div class="stat-value" id="ptBalance" style="color:var(--accent-cyan)">0</div></div>
+                        </div>
+                        <div style="margin-bottom:16px">
+                            <button class="btn-outline" style="font-size:.85rem;padding:8px 16px" onclick="openInTab('allocator')">🤖 Open Smart Allocator with this balance →</button>
+                        </div>
+                        
+                        <div style="margin-top:8px">
+                            <h4 style="color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px">
+                                <span style="color:var(--accent-amber)">⏱</span> Activity Timeline (Current Month)
+                            </h4>
+                            <div class="timeline" id="agencyTimeline"></div>
+                        </div>
+                        <div id="allocatorStatusWrap" style="margin-top:24px"></div>
+                        <div id="pointsHistoryWrap" style="margin-top:24px"></div>
+                    </div>
+                </div>
+
+                <div id="comparisonArea" class="card" style="display:none;overflow-x:auto">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:16px">⚖️ Agency Comparison Engine</h3>
+                    <div id="comparisonTableContainer"></div>
+                </div>
+            </div>
+
+            <div id="pg-allocator" style="display:none">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+                    <div class="card">
+                        <h3 style="margin-bottom:16px;color:var(--accent-cyan)">🤖 Smart Allocator</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                            <div class="control-group" style="margin-bottom:0">
+                                <label>Available Points Balance</label>
+                                <input type="number" id="allocatorBalance" min="0" value="0" placeholder="Enter points balance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;transition:.2s;box-sizing:border-box">
+                            </div>
+                            <div class="control-group" style="margin-bottom:0">
+                                <label>Pricing Region</label>
+                                <select id="allocatorRegion" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;cursor:pointer">
+                                    <option value="same">Same Region (Lower Rate)</option>
+                                    <option value="other">Other Region (Higher Rate)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px" id="allocBalHint">Balance auto-fills after agency search, or enter manually. <a href="#" onclick="openInTab('points');return false" style="color:var(--accent-cyan)">Search an agency ›</a></div>
+                        <div class="control-group">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <label style="margin-bottom:0">Select Privileges &amp; Quantities</label>
+                                <div style="display:flex;gap:8px">
+                                    <button onclick="allocSelectAll()" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Select All</button>
+                                    <button onclick="allocClearAll()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Clear All</button>
+                                </div>
+                            </div>
+                            <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+                                <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap">
+                            <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
+                            <button onclick="copyAllocatorReceipt()" style="background:rgba(185,103,255,.12);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:10px 18px;border-radius:10px;font-size:.9rem;cursor:pointer">📋 Copy Receipt</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4 style="color:var(--accent-purple);margin-bottom:12px">📜 Allocation Preview</h4>
+                        <pre id="allocatorOutput" style="font-family:monospace;font-size:.82rem;white-space:pre-wrap;color:var(--text);line-height:1.6;max-height:420px;overflow-y:auto"><span style="color:var(--text-muted)">Select privileges and click Run to preview allocation.</span></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pg-admin-agents" style="display:none">
+                <div class="card">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:20px">⚙️ Manage Agents</h3>
+                    <div class="admin-form">
+                        <div class="control-group">
+                            <label>Agent Identity (Exact Lark Name OR Email)</label>
+                            <input type="text" id="newAgentEmail" placeholder="e.g., Muhammad Usman" aria-label="Agent identity">
+                        </div>
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>👑 Grant Admin Privileges</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Allows user to manage other agents and bypass restrictions.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
+                        </div>
+                        <div class="module-card">
+                            <div class="module-header">
+                                <h4>🎯 Target Module</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_check"> Check Agency Target</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_timeline"> Target Timeline</label>
+                            </div>
+                            <div class="control-grid" style="margin-bottom:0">
+                                <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
+                                <div class="control-group"><label>Regions</label><div class="pill-select-container" id="targetRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <div class="module-card">
+                            <div class="module-header">
+                                <h4>🪙 Points Module</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_check"> Check Agency Points</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_allocator"> Smart Allocator</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_records"> Search Records</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_table"> Point Table</label>
+                            </div>
+                            <div class="control-grid" style="margin-bottom:0">
+                                <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="pointsAcmSelect"></div></div>
+                                <div class="control-group"><label>Regions</label><div class="pill-select-container" id="pointsRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <div class="module-card">
+                            <div class="module-header">
+                                <h4>📊 Analytics Module</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_report"> Analytics Report</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_compare"> Compare ACMs / Periods</label>
+                            </div>
+                            <div class="control-grid" style="margin-bottom:0">
+                                <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
+                                <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <div class="module-card">
+                            <div class="module-header">
+                                <h4>🔍 Universal Query Module</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
+                            </div>
+                            <div class="control-grid" style="margin-bottom:0">
+                                <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
+                                <div class="control-group"><label>Regions</label><div class="pill-select-container" id="queryRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
+                    </div>
+                    <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">Current Active Agents</h3>
+                    <div class="user-list" id="adminUserList"></div>
+                </div>
+            </div>
+
+            <div id="pg-admin-audit" style="display:none">
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                        <h3 style="color:var(--accent-cyan)">📋 Audit Log</h3>
+                        <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
+                    </div>
+                    <div id="auditLogList"><div class="empty-state" style="padding:40px 0"><p>Loading audit log…</p></div></div>
+                </div>
+            </div>
+
+            <div id="pg-analytics" style="display:none">
+                <div class="card">
+                    <div class="preset-bar" id="presetBar">
+                        <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Quick Filters:</span>
+                        <button class="preset-save-btn" onclick="saveFilterPreset()">+ Save Current</button>
+                    </div>
+
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label>Date Filter</label>
+                            <select id="anaDatePreset" onchange="updateCustomDateVisibility()" aria-label="Date preset">
+                                <option value="this_month" selected>Current Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_week">Current Week</option>
+                                <option value="last_week">Last Week</option>
+                                <option value="specific">Specific Date</option>
+                                <option value="all">All Time</option>
+                            </select>
+                        </div>
+                        <div class="control-group" id="customFromDiv" style="display:none">
+                            <label>From Date</label>
+                            <input type="date" id="anaFrom" aria-label="From date">
+                        </div>
+                        <div class="control-group" id="customToDiv" style="display:none">
+                            <label>To Date</label>
+                            <input type="date" id="anaTo" aria-label="To date">
+                        </div>
+                        <div class="control-group">
+                            <label>Region</label>
+                            <select id="anaRegion" onchange="updateAcmDropdown()" aria-label="Region">
+                                <option value="PK" selected>PK</option>
+                                <option value="IN">IN</option>
+                                <option value="All">All Regions</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Assigned ACM</label>
+                            <select id="anaAcm" aria-label="ACM"><option value="All">All ACMs</option></select>
+                        </div>
+                        <div class="control-group">
+                            <label>Agency Type</label>
+                            <select id="anaType" aria-label="Agency type">
+                                <option value="All">All Types</option>
+                                <option value="Acm hunting">ACM Hunting</option>
+                                <option value="BD hunting">BD Hunting</option>
+                                <option value="Walkin">Walk-in</option>
+                                <option value="New BD Hunting">New BD Hunting</option>
+                                <option value="Walkin sub-agency">Walkin sub-agency</option>
                             </select>
                         </div>
                     </div>
-                    <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px" id="allocBalHint">Balance auto-fills after agency search, or enter manually. <a href="#" onclick="navTo('points');return false" style="color:var(--accent-cyan)">Search an agency ›</a></div>
-                    <div class="control-group">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                            <label style="margin-bottom:0">Select Privileges &amp; Quantities</label>
-                            <div style="display:flex;gap:8px">
-                                <button onclick="allocSelectAll()" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Select All</button>
-                                <button onclick="allocClearAll()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Clear All</button>
+
+                    <div style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                            <span style="font-size:.85rem;font-weight:600;color:var(--accent-purple)">📊 Period Comparison (optional)</span>
+                            <label class="switch" style="transform:scale(.8)"><input type="checkbox" id="compareToggle" onchange="toggleCompareDates()"><span class="slider"></span></label>
+                        </div>
+                        <div id="compareDatesRow" style="display:none;grid-template-columns:1fr 1fr;gap:12px" class="control-grid">
+                            <div class="control-group" style="margin-bottom:0"><label>Compare From</label><input type="date" id="cmpFrom" aria-label="Compare from"></div>
+                            <div class="control-group" style="margin-bottom:0"><label>Compare To</label><input type="date" id="cmpTo" aria-label="Compare to"></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:12px;flex-wrap:wrap">
+                        <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()" style="flex:1;min-width:200px">Generate Analytics Report</button>
+                        <button class="btn btn-outline" id="btnRefreshAna" onclick="window._nocache=true;generateAnalytics()" style="background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh Data</button>
+                        <button class="btn-outline" id="exportCsvBtn" style="display:none" onclick="exportCSV()">📥 CSV</button>
+                        <button class="btn-outline" id="exportXlsBtn" style="display:none" onclick="exportExcel()">📊 Excel</button>
+                        <button class="btn-outline" id="exportPdfBtn" style="display:none" onclick="window.print()">🖨️ PDF</button>
+                    </div>
+                </div>
+
+                <div id="analyticsContainer" style="display:none">
+                    <div id="activeFiltersBar" style="display:none;margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
+                        <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Active Filters:</span>
+                        <div id="filterChips"></div>
+                        <button class="btn-sm" onclick="clearActiveFilters()" style="background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3)">✕ Clear All</button>
+                    </div>
+
+                    <div id="insightsPanel">
+                        <h4>🧠 Auto-Generated Insights</h4>
+                        <ul id="insightsList"></ul>
+                    </div>
+
+                    <div id="comparisonKpisSection" style="display:none;margin-bottom:24px">
+                        <div class="compare-section">
+                            <h5>📊 Period Comparison: Current vs Previous</h5>
+                            <div class="compare-kpi-row">
+                                <div class="compare-kpi"><div class="compare-kpi-label">Current Creations</div><div class="compare-kpi-val" id="cmpCurCreations">—</div></div>
+                                <div class="compare-kpi"><div class="compare-kpi-label">Previous Creations</div><div class="compare-kpi-val" id="cmpPrevCreations">—</div></div>
+                                <div class="compare-kpi"><div class="compare-kpi-label">Current BDs</div><div class="compare-kpi-val" id="cmpCurBds">—</div></div>
+                                <div class="compare-kpi"><div class="compare-kpi-label">Previous BDs</div><div class="compare-kpi-val" id="cmpPrevBds">—</div></div>
+                                <div class="compare-kpi"><div class="compare-kpi-label">Current Closings</div><div class="compare-kpi-val" id="cmpCurClosings">—</div></div>
+                                <div class="compare-kpi"><div class="compare-kpi-label">Previous Closings</div><div class="compare-kpi-val" id="cmpPrevClosings">—</div></div>
                             </div>
                         </div>
-                        <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-                            <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                            <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                    </div>
+
+                    <!-- KPI cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
+                            <div class="kpi-label">Creations</div>
+                            <div class="kpi-value" id="kpiCreations">0</div>
+                            <div class="delta-badge delta-neutral" id="deltaCreations">&nbsp;—&nbsp;</div>
+                            <div class="sparkline-wrap"><canvas id="sparkCreations" height="40"></canvas></div>
+                        </div>
+                        <div class="kpi-card" data-metric="bds">
+                            <div class="kpi-label">BD Creations</div>
+                            <div class="kpi-value" id="kpiBds">0</div>
+                            <div class="delta-badge delta-neutral" id="deltaBds">&nbsp;—&nbsp;</div>
+                            <div class="sparkline-wrap"><canvas id="sparkBds" height="40"></canvas></div>
+                        </div>
+                        <div class="kpi-card" data-metric="closings">
+                            <div class="kpi-label">Closings</div>
+                            <div class="kpi-value" id="kpiClosings">0</div>
+                            <div class="delta-badge delta-neutral" id="deltaClosings">&nbsp;—&nbsp;</div>
+                            <div class="sparkline-wrap"><canvas id="sparkClosings" height="40"></canvas></div>
                         </div>
                     </div>
-                    <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
-                        <button onclick="copyAllocatorReceipt()" style="background:rgba(185,103,255,.12);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:10px 18px;border-radius:10px;font-size:.9rem;cursor:pointer">📋 Copy Receipt</button>
+
+                    <!-- Row 1: 3 Status Donuts -->
+                    <div class="chart-grid-3">
+                        <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
+                        <div class="chart-box"><h3>BD-Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
+                        <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
+                    </div>
+
+                    <!-- Row 2: Rejection Reasons -->
+                    <div class="chart-grid-1" style="margin-bottom:24px">
+                        <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
+                    </div>
+
+                    <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
+                    <div class="chart-grid-2">
+                        <div class="chart-box"><h3>Closing Reasons</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
+                        <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div></div>
+                    </div>
+
+                    <!-- Row 4: ACM Performance -->
+                    <div class="chart-box full-width" style="margin-bottom:24px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                            <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
+                            <div class="tab-bar" style="margin-bottom:0;max-width:280px">
+                                <button class="tab-btn active" onclick="switchAcmView('chart',this)">📊 Chart</button>
+                                <button class="tab-btn" onclick="switchAcmView('leaderboard',this)">🏆 Leaderboard</button>
+                            </div>
+                        </div>
+                        <div id="acmChartView"><div class="chart-wrapper-bar-acm"><canvas id="cAcm"></canvas></div></div>
+                        <div id="acmLeaderboardView" style="display:none">
+                            <div style="overflow-x:auto">
+                                <table class="leaderboard-table" id="leaderboardTable">
+                                    <thead><tr><th>Rank</th><th>ACM</th><th>Creations</th><th>Score</th><th>Performance</th></tr></thead>
+                                    <tbody id="leaderboardBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 5: Guardian Types + Agency Types -->
+                    <div class="chart-grid-2">
+                        <div class="chart-box"><h3>Guardian Types</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
+                        <div class="chart-box"><h3>Agency Types</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
+                    </div>
+
+                    <!-- Row 6: Other Apps Hosted -->
+                    <div class="chart-grid-1" style="margin-bottom:24px">
+                        <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div></div>
+                    </div>
+
+                    <!-- Row 7: Daily Trend lines -->
+                    <div class="chart-grid-2">
+                        <div class="chart-box"><h3>Daily Agency Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div></div>
+                        <div class="chart-box"><h3>Daily BD Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div></div>
+                    </div>
+
+                    <!-- Row 8: Activity Heatmap -->
+                    <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
+                        <h3>Activity Heatmap</h3>
+                        <div class="heatmap-outer">
+                            <div class="heatmap-day-labels">
+                                <div class="heatmap-day-label"></div>
+                                <div class="heatmap-day-label">Mon</div>
+                                <div class="heatmap-day-label"></div>
+                                <div class="heatmap-day-label">Wed</div>
+                                <div class="heatmap-day-label"></div>
+                                <div class="heatmap-day-label">Fri</div>
+                                <div class="heatmap-day-label"></div>
+                            </div>
+                            <div class="heatmap-right">
+                                <div class="heatmap-month-row" id="heatmapMonths"></div>
+                                <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
+                            </div>
+                        </div>
+                        <div class="heatmap-legend">
+                            <span>Less</span>
+                            <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.04)"></div>
+                            <div class="heatmap-legend-cell" style="background:#ffeb3b"></div>
+                            <div class="heatmap-legend-cell" style="background:#ff9800"></div>
+                            <div class="heatmap-legend-cell" style="background:#f44336"></div>
+                            <div class="heatmap-legend-cell" style="background:#b71c1c"></div>
+                            <span>More</span>
+                        </div>
+                    </div>
+                    <div class="heatmap-tooltip" id="heatmapTooltip"></div>
+                </div>
+            </div>
+
+            <div id="pg-points-records" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔎 Search Point Records</h3>
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+                        <div class="control-group">
+                            <label>Quick Search</label>
+                            <input type="text" id="prSearch" placeholder="Agency Code or ACM…" oninput="prDebounce()">
+                        </div>
+                        <div class="control-group">
+                            <label>Region</label>
+                            <select id="prRegion">
+                                <option value="">All Regions</option>
+                                <option value="pk">PK</option>
+                                <option value="in">IN</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>ACM</label>
+                            <input type="text" id="prAcm" placeholder="e.g. Enzo, Haseeb">
+                        </div>
+                        <div class="control-group" style="display:flex;align-items:flex-end">
+                            <button class="btn btn-primary" onclick="prFetch(1)" style="width:100%">🔎 Search</button>
+                        </div>
                     </div>
                 </div>
+
                 <div class="card">
-                    <h4 style="color:var(--accent-purple);margin-bottom:12px">📜 Allocation Preview</h4>
-                    <pre id="allocatorOutput" style="font-family:monospace;font-size:.82rem;white-space:pre-wrap;color:var(--text);line-height:1.6;max-height:420px;overflow-y:auto"><span style="color:var(--text-muted)">Select privileges and click Run to preview allocation.</span></pre>
-                </div>
-            </div>
-        </div>
-
-        <div id="pg-admin-agents" style="display:none">
-            <div class="card">
-                <h3 style="color:var(--accent-cyan);margin-bottom:20px">⚙️ Manage Agents</h3>
-                <div class="admin-form">
-                    <div class="control-group">
-                        <label>Agent Identity (Exact Lark Name OR Email)</label>
-                        <input type="text" id="newAgentEmail" placeholder="e.g., Muhammad Usman" aria-label="Agent identity">
-                    </div>
-                    <div class="admin-toggle">
-                        <div>
-                            <h4>👑 Grant Admin Privileges</h4>
-                            <span style="font-size:.8rem;color:var(--text-muted)">Allows user to manage other agents and bypass restrictions.</span>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <span id="prResultCount" style="font-size:.9rem;color:var(--text-muted)">Enter criteria and search</span>
+                            <span id="prLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
                         </div>
-                        <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
-                    </div>
-                    <div class="module-card">
-                        <div class="module-header">
-                            <h4>🎯 Target Module</h4>
-                        </div>
-                        <div class="sub-opts">
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_check"> Check Agency Target</label>
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_timeline"> Target Timeline</label>
-                        </div>
-                        <div class="control-grid" style="margin-bottom:0">
-                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
-                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="targetRegSelect"></div></div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                            <button onclick="prExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
+                            <button onclick="prExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
                         </div>
                     </div>
-                    <div class="module-card">
-                        <div class="module-header">
-                            <h4>🪙 Points Module</h4>
-                        </div>
-                        <div class="sub-opts">
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_check"> Check Agency Points</label>
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_allocator"> Smart Allocator</label>
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_records"> Search Records</label>
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_points_table"> Point Table</label>
-                        </div>
-                        <div class="control-grid" style="margin-bottom:0">
-                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="pointsAcmSelect"></div></div>
-                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="pointsRegSelect"></div></div>
+
+                    <div style="overflow-x:auto">
+                        <table id="prTable" style="width:100%;border-collapse:collapse;font-size:.87rem;display:none">
+                            <thead id="prThead"></thead>
+                            <tbody id="prTbody"></tbody>
+                            <tfoot id="prTfoot" style="font-weight:700;border-top:2px solid var(--border)"></tfoot>
+                        </table>
+                        <div id="prEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
+                            <div style="font-size:2rem;margin-bottom:12px">🔍</div>
+                            <p>No records found matching your criteria.</p>
                         </div>
                     </div>
-                    <div class="module-card">
-                        <div class="module-header">
-                            <h4>📊 Analytics Module</h4>
+
+                    <div id="prPagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;display:none">
+                        <div style="font-size:.85rem;color:var(--text-muted)">
+                            Page <span id="prPageNum">1</span> of <span id="prTotalPages">1</span>
+                            &nbsp;·&nbsp; <span id="prTotalCount">0</span> total records
                         </div>
-                        <div class="sub-opts">
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_report"> Analytics Report</label>
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_compare"> Compare ACMs / Periods</label>
+                        <div style="display:flex;gap:6px">
+                            <button onclick="prFetch(prCurrentPage-1)" id="prPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
+                            <button onclick="prFetch(prCurrentPage+1)" id="prNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
                         </div>
-                        <div class="control-grid" style="margin-bottom:0">
-                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
-                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
-                        </div>
-                    </div>
-                    <div class="module-card">
-                        <div class="module-header">
-                            <h4>🔍 Universal Query Module</h4>
-                        </div>
-                        <div class="sub-opts">
-                            <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
-                        </div>
-                        <div class="control-grid" style="margin-bottom:0">
-                            <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
-                            <div class="control-group"><label>Regions</label><div class="pill-select-container" id="queryRegSelect"></div></div>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
-                </div>
-                <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">Current Active Agents</h3>
-                <div class="user-list" id="adminUserList"></div>
-            </div>
-        </div>
-
-        <div id="pg-admin-audit" style="display:none">
-            <div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                    <h3 style="color:var(--accent-cyan)">📋 Audit Log</h3>
-                    <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
-                </div>
-                <div id="auditLogList"><div class="empty-state" style="padding:40px 0"><p>Loading audit log…</p></div></div>
-            </div>
-        </div>
-
-        <div id="pg-analytics" style="display:none">
-            <div class="card">
-                <div class="preset-bar" id="presetBar">
-                    <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Quick Filters:</span>
-                    <button class="preset-save-btn" onclick="saveFilterPreset()">+ Save Current</button>
-                </div>
-
-                <div class="control-grid">
-                    <div class="control-group">
-                        <label>Date Filter</label>
-                        <select id="anaDatePreset" onchange="updateCustomDateVisibility()" aria-label="Date preset">
-                            <option value="this_month" selected>Current Month</option>
-                            <option value="last_month">Last Month</option>
-                            <option value="this_week">Current Week</option>
-                            <option value="last_week">Last Week</option>
-                            <option value="specific">Specific Date</option>
-                            <option value="all">All Time</option>
-                        </select>
-                    </div>
-                    <div class="control-group" id="customFromDiv" style="display:none">
-                        <label>From Date</label>
-                        <input type="date" id="anaFrom" aria-label="From date">
-                    </div>
-                    <div class="control-group" id="customToDiv" style="display:none">
-                        <label>To Date</label>
-                        <input type="date" id="anaTo" aria-label="To date">
-                    </div>
-                    <div class="control-group">
-                        <label>Region</label>
-                        <select id="anaRegion" onchange="updateAcmDropdown()" aria-label="Region">
-                            <option value="PK" selected>PK</option>
-                            <option value="IN">IN</option>
-                            <option value="All">All Regions</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Assigned ACM</label>
-                        <select id="anaAcm" aria-label="ACM"><option value="All">All ACMs</option></select>
-                    </div>
-                    <div class="control-group">
-                        <label>Agency Type</label>
-                        <select id="anaType" aria-label="Agency type">
-                            <option value="All">All Types</option>
-                            <option value="Acm hunting">ACM Hunting</option>
-                            <option value="BD hunting">BD Hunting</option>
-                            <option value="Walkin">Walk-in</option>
-                            <option value="New BD Hunting">New BD Hunting</option>
-                            <option value="Walkin sub-agency">Walkin sub-agency</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                        <span style="font-size:.85rem;font-weight:600;color:var(--accent-purple)">📊 Period Comparison (optional)</span>
-                        <label class="switch" style="transform:scale(.8)"><input type="checkbox" id="compareToggle" onchange="toggleCompareDates()"><span class="slider"></span></label>
-                    </div>
-                    <div id="compareDatesRow" style="display:none;grid-template-columns:1fr 1fr;gap:12px" class="control-grid">
-                        <div class="control-group" style="margin-bottom:0"><label>Compare From</label><input type="date" id="cmpFrom" aria-label="Compare from"></div>
-                        <div class="control-group" style="margin-bottom:0"><label>Compare To</label><input type="date" id="cmpTo" aria-label="Compare to"></div>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:12px;flex-wrap:wrap">
-                    <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()" style="flex:1;min-width:200px">Generate Analytics Report</button>
-                    <button class="btn btn-outline" id="btnRefreshAna" onclick="window._nocache=true;generateAnalytics()" style="background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh Data</button>
-                    <button class="btn-outline" id="exportCsvBtn" style="display:none" onclick="exportCSV()">📥 CSV</button>
-                    <button class="btn-outline" id="exportXlsBtn" style="display:none" onclick="exportExcel()">📊 Excel</button>
-                    <button class="btn-outline" id="exportPdfBtn" style="display:none" onclick="window.print()">🖨️ PDF</button>
-                </div>
-            </div>
-
-            <div id="analyticsContainer" style="display:none">
-                <div id="activeFiltersBar" style="display:none;margin-bottom:16px;flex-wrap:wrap;gap:8px;align-items:center">
-                    <span style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Active Filters:</span>
-                    <div id="filterChips"></div>
-                    <button class="btn-sm" onclick="clearActiveFilters()" style="background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3)">✕ Clear All</button>
-                </div>
-
-                <div id="insightsPanel">
-                    <h4>🧠 Auto-Generated Insights</h4>
-                    <ul id="insightsList"></ul>
-                </div>
-
-                <div id="comparisonKpisSection" style="display:none;margin-bottom:24px">
-                    <div class="compare-section">
-                        <h5>📊 Period Comparison: Current vs Previous</h5>
-                        <div class="compare-kpi-row">
-                            <div class="compare-kpi"><div class="compare-kpi-label">Current Creations</div><div class="compare-kpi-val" id="cmpCurCreations">—</div></div>
-                            <div class="compare-kpi"><div class="compare-kpi-label">Previous Creations</div><div class="compare-kpi-val" id="cmpPrevCreations">—</div></div>
-                            <div class="compare-kpi"><div class="compare-kpi-label">Current BDs</div><div class="compare-kpi-val" id="cmpCurBds">—</div></div>
-                            <div class="compare-kpi"><div class="compare-kpi-label">Previous BDs</div><div class="compare-kpi-val" id="cmpPrevBds">—</div></div>
-                            <div class="compare-kpi"><div class="compare-kpi-label">Current Closings</div><div class="compare-kpi-val" id="cmpCurClosings">—</div></div>
-                            <div class="compare-kpi"><div class="compare-kpi-label">Previous Closings</div><div class="compare-kpi-val" id="cmpPrevClosings">—</div></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- KPI cards -->
-                <div class="kpi-grid">
-                    <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
-                        <div class="kpi-label">Creations</div>
-                        <div class="kpi-value" id="kpiCreations">0</div>
-                        <div class="delta-badge delta-neutral" id="deltaCreations">&nbsp;—&nbsp;</div>
-                        <div class="sparkline-wrap"><canvas id="sparkCreations" height="40"></canvas></div>
-                    </div>
-                    <div class="kpi-card" data-metric="bds">
-                        <div class="kpi-label">BD Creations</div>
-                        <div class="kpi-value" id="kpiBds">0</div>
-                        <div class="delta-badge delta-neutral" id="deltaBds">&nbsp;—&nbsp;</div>
-                        <div class="sparkline-wrap"><canvas id="sparkBds" height="40"></canvas></div>
-                    </div>
-                    <div class="kpi-card" data-metric="closings">
-                        <div class="kpi-label">Closings</div>
-                        <div class="kpi-value" id="kpiClosings">0</div>
-                        <div class="delta-badge delta-neutral" id="deltaClosings">&nbsp;—&nbsp;</div>
-                        <div class="sparkline-wrap"><canvas id="sparkClosings" height="40"></canvas></div>
-                    </div>
-                </div>
-
-                <!-- Row 1: 3 Status Donuts -->
-                <div class="chart-grid-3">
-                    <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
-                    <div class="chart-box"><h3>BD-Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
-                    <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
-                </div>
-
-                <!-- Row 2: Rejection Reasons -->
-                <div class="chart-grid-1" style="margin-bottom:24px">
-                    <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
-                </div>
-
-                <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
-                <div class="chart-grid-2">
-                    <div class="chart-box"><h3>Closing Reasons</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
-                    <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div></div>
-                </div>
-
-                <!-- Row 4: ACM Performance -->
-                <div class="chart-box full-width" style="margin-bottom:24px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                        <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
-                        <div class="tab-bar" style="margin-bottom:0;max-width:280px">
-                            <button class="tab-btn active" onclick="switchAcmView('chart',this)">📊 Chart</button>
-                            <button class="tab-btn" onclick="switchAcmView('leaderboard',this)">🏆 Leaderboard</button>
-                        </div>
-                    </div>
-                    <div id="acmChartView"><div class="chart-wrapper-bar-acm"><canvas id="cAcm"></canvas></div></div>
-                    <div id="acmLeaderboardView" style="display:none">
-                        <div style="overflow-x:auto">
-                            <table class="leaderboard-table" id="leaderboardTable">
-                                <thead><tr><th>Rank</th><th>ACM</th><th>Creations</th><th>Score</th><th>Performance</th></tr></thead>
-                                <tbody id="leaderboardBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Row 5: Guardian Types + Agency Types -->
-                <div class="chart-grid-2">
-                    <div class="chart-box"><h3>Guardian Types</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
-                    <div class="chart-box"><h3>Agency Types</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
-                </div>
-
-                <!-- Row 6: Other Apps Hosted -->
-                <div class="chart-grid-1" style="margin-bottom:24px">
-                    <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div></div>
-                </div>
-
-                <!-- Row 7: Daily Trend lines -->
-                <div class="chart-grid-2">
-                    <div class="chart-box"><h3>Daily Agency Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div></div>
-                    <div class="chart-box"><h3>Daily BD Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div></div>
-                </div>
-
-                <!-- Row 8: Activity Heatmap -->
-                <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
-                    <h3>Activity Heatmap</h3>
-                    <div class="heatmap-outer">
-                        <div class="heatmap-day-labels">
-                            <div class="heatmap-day-label"></div>
-                            <div class="heatmap-day-label">Mon</div>
-                            <div class="heatmap-day-label"></div>
-                            <div class="heatmap-day-label">Wed</div>
-                            <div class="heatmap-day-label"></div>
-                            <div class="heatmap-day-label">Fri</div>
-                            <div class="heatmap-day-label"></div>
-                        </div>
-                        <div class="heatmap-right">
-                            <div class="heatmap-month-row" id="heatmapMonths"></div>
-                            <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmapGrid"></div></div>
-                        </div>
-                    </div>
-                    <div class="heatmap-legend">
-                        <span>Less</span>
-                        <div class="heatmap-legend-cell" style="background:rgba(255,255,255,.04)"></div>
-                        <div class="heatmap-legend-cell" style="background:#ffeb3b"></div>
-                        <div class="heatmap-legend-cell" style="background:#ff9800"></div>
-                        <div class="heatmap-legend-cell" style="background:#f44336"></div>
-                        <div class="heatmap-legend-cell" style="background:#b71c1c"></div>
-                        <span>More</span>
-                    </div>
-                </div>
-                <div class="heatmap-tooltip" id="heatmapTooltip"></div>
-            </div>
-        </div>
-
-        <div id="pg-points-records" style="display:none">
-            <div class="card" style="margin-bottom:20px">
-                <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔎 Search Point Records</h3>
-                <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-                    <div class="control-group">
-                        <label>Quick Search</label>
-                        <input type="text" id="prSearch" placeholder="Agency Code or ACM…" oninput="prDebounce()">
-                    </div>
-                    <div class="control-group">
-                        <label>Region</label>
-                        <select id="prRegion">
-                            <option value="">All Regions</option>
-                            <option value="pk">PK</option>
-                            <option value="in">IN</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>ACM</label>
-                        <input type="text" id="prAcm" placeholder="e.g. Enzo, Haseeb">
-                    </div>
-                    <div class="control-group" style="display:flex;align-items:flex-end">
-                        <button class="btn btn-primary" onclick="prFetch(1)" style="width:100%">🔎 Search</button>
                     </div>
                 </div>
             </div>
 
-            <div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-                    <div style="display:flex;align-items:center;gap:12px">
-                        <span id="prResultCount" style="font-size:.9rem;color:var(--text-muted)">Enter criteria and search</span>
-                        <span id="prLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
+            <div id="pg-points-table" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                        <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Agency Point Table</h3>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                            <select id="ptPageSize" onchange="ptFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
+                                <option value="25">25 / page</option>
+                                <option value="50" selected>50 / page</option>
+                                <option value="100">100 / page</option>
+                                <option value="200">200 / page</option>
+                            </select>
+                            <button onclick="ptExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
+                            <button onclick="ptExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
+                            <button onclick="ptFetch(1)" style="background:rgba(185,103,255,.1);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">🔄 Refresh</button>
+                        </div>
                     </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        <button onclick="prExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
-                        <button onclick="prExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
+
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px">
+                        <div class="control-group">
+                            <label>Search</label>
+                            <input type="text" id="ptSearch" placeholder="Agency ID or name…" oninput="ptDebounce()">
+                        </div>
+                        <div class="control-group">
+                            <label>Region</label>
+                            <select id="ptRegion" onchange="ptFetch(1)">
+                                <option value="">All</option>
+                                <option value="pk">PK</option>
+                                <option value="in">IN</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Status</label>
+                            <input type="text" id="ptStatus" placeholder="e.g. Active" oninput="ptDebounce()">
+                        </div>
+                        <div class="control-group">
+                            <label>Sort By</label>
+                            <select id="ptSortBy" onchange="ptFetch(1)">
+                                <option value="date">Date</option>
+                                <option value="point_balance">Balance</option>
+                                <option value="total_points">Total Pts</option>
+                                <option value="used_points">Used Pts</option>
+                                <option value="agency_name">Name</option>
+                                <option value="region">Region</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Direction</label>
+                            <select id="ptSortDir" onchange="ptFetch(1)">
+                                <option value="desc">Descending</option>
+                                <option value="asc">Ascending</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="ptKpiRow" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px" class="stat-grid">
+                        <div class="stat-box"><div class="stat-label">Total Points (filtered)</div><div class="stat-value" id="ptKpiTotal" style="color:var(--accent-cyan)">—</div></div>
+                        <div class="stat-box"><div class="stat-label">Used Points (filtered)</div><div class="stat-value" id="ptKpiUsed" style="color:var(--accent-amber)">—</div></div>
+                        <div class="stat-box"><div class="stat-label">Balance (filtered)</div><div class="stat-value" id="ptKpiBalance" style="color:var(--accent-green)">—</div></div>
+                    </div>
+
+                    <div id="ptLoadingBar" style="display:none;text-align:center;padding:24px;color:var(--text-muted)">⏳ Loading point table…</div>
+                    <div style="overflow-x:auto">
+                        <table id="ptTable" style="width:100%;border-collapse:collapse;font-size:.85rem;display:none">
+                            <thead>
+                                <tr style="border-bottom:2px solid var(--border)">
+                                    <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Agency ID</th>
+                                    <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Agency Name</th>
+                                    <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Region</th>
+                                    <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">ACM</th>
+                                    <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Total Pts</th>
+                                    <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Used Pts</th>
+                                    <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Balance</th>
+                                    <th style="padding:10px 12px;text-align:center;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Health</th>
+                                    <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Status</th>
+                                    <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ptTbody"></tbody>
+                            <tfoot id="ptTfoot"></tfoot>
+                        </table>
+                        <div id="ptEmpty" style="display:none;text-align:center;padding:48px;color:var(--text-muted)">
+                            <div style="font-size:2rem;margin-bottom:12px">📋</div>
+                            <p>No records to display. Try adjusting your filters.</p>
+                        </div>
+                    </div>
+
+                    <div id="ptPagination" style="display:none;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px">
+                        <div style="font-size:.85rem;color:var(--text-muted)">
+                            Page <span id="ptPageNum">1</span> of <span id="ptTotalPages">1</span>
+                            &nbsp;·&nbsp; <span id="ptTotalCount">0</span> records
+                        </div>
+                        <div style="display:flex;gap:6px">
+                            <button onclick="ptFetch(ptCurrentPage-1)" id="ptPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
+                            <button onclick="ptFetch(ptCurrentPage+1)" id="ptNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pg-query" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔍 Universal Request Query</h3>
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+                        <div class="control-group">
+                            <label>Search By</label>
+                            <select id="qySearchField">
+                                <option value="user_id">User ID</option>
+                                <option value="numbering">Numbering</option>
+                                <option value="otherapp_id">Otherapp ID</option>
+                                <option value="nid_number">NID Number</option>
+                                <option value="bd_code">Bd Code</option>
+                            </select>
+                        </div>
+                        <div class="control-group" style="grid-column:span 2">
+                            <label id="qyValueLabel">User ID Value</label>
+                            <input type="text" id="qySearchValue" placeholder="Type the value to search…" onkeydown="if(event.key==='Enter')runQuery()">
+                        </div>
+                        <div class="control-group" style="display:flex;align-items:flex-end">
+                            <button class="btn btn-primary" onclick="runQuery()" style="width:100%">🔍 Search</button>
+                        </div>
+                    </div>
+                    <div style="font-size:.78rem;color:var(--text-muted);margin-top:-6px">
+                        Searches every request ever submitted for this value — no date limit. Every matching request is shown as its own card below.
                     </div>
                 </div>
 
-                <div style="overflow-x:auto">
-                    <table id="prTable" style="width:100%;border-collapse:collapse;font-size:.87rem;display:none">
-                        <thead id="prThead"></thead>
-                        <tbody id="prTbody"></tbody>
-                        <tfoot id="prTfoot" style="font-weight:700;border-top:2px solid var(--border)"></tfoot>
-                    </table>
-                    <div id="prEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                        <span id="qyResultCount" style="font-size:.9rem;color:var(--text-muted)">Choose a field and enter a value to search</span>
+                        <span id="qyLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Searching full history…</span>
+                    </div>
+
+                    <div id="qyResults" class="qy-grid"></div>
+
+                    <div id="qyEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
                         <div style="font-size:2rem;margin-bottom:12px">🔍</div>
-                        <p>No records found matching your criteria.</p>
-                    </div>
-                </div>
-
-                <div id="prPagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;display:none">
-                    <div style="font-size:.85rem;color:var(--text-muted)">
-                        Page <span id="prPageNum">1</span> of <span id="prTotalPages">1</span>
-                        &nbsp;·&nbsp; <span id="prTotalCount">0</span> total records
-                    </div>
-                    <div style="display:flex;gap:6px">
-                        <button onclick="prFetch(prCurrentPage-1)" id="prPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
-                        <button onclick="prFetch(prCurrentPage+1)" id="prNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
+                        <p>No requests found for that value.</p>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div id="pg-points-table" style="display:none">
-            <div class="card" style="margin-bottom:20px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Agency Point Table</h3>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap">
-                        <select id="ptPageSize" onchange="ptFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
-                            <option value="25">25 / page</option>
-                            <option value="50" selected>50 / page</option>
-                            <option value="100">100 / page</option>
-                            <option value="200">200 / page</option>
-                        </select>
-                        <button onclick="ptExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
-                        <button onclick="ptExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
-                        <button onclick="ptFetch(1)" style="background:rgba(185,103,255,.1);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">🔄 Refresh</button>
-                    </div>
-                </div>
-
-                <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px">
-                    <div class="control-group">
-                        <label>Search</label>
-                        <input type="text" id="ptSearch" placeholder="Agency ID or name…" oninput="ptDebounce()">
-                    </div>
-                    <div class="control-group">
-                        <label>Region</label>
-                        <select id="ptRegion" onchange="ptFetch(1)">
-                            <option value="">All</option>
-                            <option value="pk">PK</option>
-                            <option value="in">IN</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Status</label>
-                        <input type="text" id="ptStatus" placeholder="e.g. Active" oninput="ptDebounce()">
-                    </div>
-                    <div class="control-group">
-                        <label>Sort By</label>
-                        <select id="ptSortBy" onchange="ptFetch(1)">
-                            <option value="date">Date</option>
-                            <option value="point_balance">Balance</option>
-                            <option value="total_points">Total Pts</option>
-                            <option value="used_points">Used Pts</option>
-                            <option value="agency_name">Name</option>
-                            <option value="region">Region</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Direction</label>
-                        <select id="ptSortDir" onchange="ptFetch(1)">
-                            <option value="desc">Descending</option>
-                            <option value="asc">Ascending</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div id="ptKpiRow" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px" class="stat-grid">
-                    <div class="stat-box"><div class="stat-label">Total Points (filtered)</div><div class="stat-value" id="ptKpiTotal" style="color:var(--accent-cyan)">—</div></div>
-                    <div class="stat-box"><div class="stat-label">Used Points (filtered)</div><div class="stat-value" id="ptKpiUsed" style="color:var(--accent-amber)">—</div></div>
-                    <div class="stat-box"><div class="stat-label">Balance (filtered)</div><div class="stat-value" id="ptKpiBalance" style="color:var(--accent-green)">—</div></div>
-                </div>
-
-                <div id="ptLoadingBar" style="display:none;text-align:center;padding:24px;color:var(--text-muted)">⏳ Loading point table…</div>
-                <div style="overflow-x:auto">
-                    <table id="ptTable" style="width:100%;border-collapse:collapse;font-size:.85rem;display:none">
-                        <thead>
-                            <tr style="border-bottom:2px solid var(--border)">
-                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Agency ID</th>
-                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Agency Name</th>
-                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Region</th>
-                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">ACM</th>
-                                <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Total Pts</th>
-                                <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Used Pts</th>
-                                <th style="padding:10px 12px;text-align:right;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Balance</th>
-                                <th style="padding:10px 12px;text-align:center;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Health</th>
-                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Status</th>
-                                <th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ptTbody"></tbody>
-                        <tfoot id="ptTfoot"></tfoot>
-                    </table>
-                    <div id="ptEmpty" style="display:none;text-align:center;padding:48px;color:var(--text-muted)">
-                        <div style="font-size:2rem;margin-bottom:12px">📋</div>
-                        <p>No records to display. Try adjusting your filters.</p>
-                    </div>
-                </div>
-
-                <div id="ptPagination" style="display:none;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px">
-                    <div style="font-size:.85rem;color:var(--text-muted)">
-                        Page <span id="ptPageNum">1</span> of <span id="ptTotalPages">1</span>
-                        &nbsp;·&nbsp; <span id="ptTotalCount">0</span> records
-                    </div>
-                    <div style="display:flex;gap:6px">
-                        <button onclick="ptFetch(ptCurrentPage-1)" id="ptPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
-                        <button onclick="ptFetch(ptCurrentPage+1)" id="ptNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="pg-query" style="display:none">
-            <div class="card" style="margin-bottom:20px">
-                <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔍 Universal Request Query</h3>
-                <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
-                    <div class="control-group">
-                        <label>Search By</label>
-                        <select id="qySearchField">
-                            <option value="user_id">User ID</option>
-                            <option value="numbering">Numbering</option>
-                            <option value="otherapp_id">Otherapp ID</option>
-                            <option value="nid_number">NID Number</option>
-                            <option value="bd_code">Bd Code</option>
-                        </select>
-                    </div>
-                    <div class="control-group" style="grid-column:span 2">
-                        <label id="qyValueLabel">User ID Value</label>
-                        <input type="text" id="qySearchValue" placeholder="Type the value to search…" onkeydown="if(event.key==='Enter')runQuery()">
-                    </div>
-                    <div class="control-group" style="display:flex;align-items:flex-end">
-                        <button class="btn btn-primary" onclick="runQuery()" style="width:100%">🔍 Search</button>
-                    </div>
-                </div>
-                <div style="font-size:.78rem;color:var(--text-muted);margin-top:-6px">
-                    Searches every request ever submitted for this value — no date limit. Every matching request is shown as its own card below.
-                </div>
-            </div>
-
-            <div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-                    <span id="qyResultCount" style="font-size:.9rem;color:var(--text-muted)">Choose a field and enter a value to search</span>
-                    <span id="qyLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Searching full history…</span>
-                </div>
-
-                <div id="qyResults" class="qy-grid"></div>
-
-                <div id="qyEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
-                    <div style="font-size:2rem;margin-bottom:12px">🔍</div>
-                    <p>No requests found for that value.</p>
-                </div>
-            </div>
-        </div>
-
-    </div>
+        </div> <!-- /page-content-wrapper -->
+    </div> <!-- /main-content -->
 </div>
 
 <script>
+// ════════════════════════════════════════════════════════════════════
+// GLOBALS & STATE
+// ════════════════════════════════════════════════════════════════════
+let currentAgencyData=null, latestAnalyticsData=null, charts={};
+let userPermissions=null; 
+let loggedUser=localStorage.getItem('xenaUser') || 'Ahmed Saleh';
+let loggedEmail=localStorage.getItem('xenaEmail') || 'ahmed@example.com';
+let loggedUat=localStorage.getItem('xenaUat');
+let pendingRequests=new Map();  
+let activeFilters={};           
+let sparkCharts={};             
+let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQueryAcm,pQueryReg;
+
+const urlParams=new URLSearchParams(window.location.search);
+
+// ════════════════════════════════════════════════════════════════════
+// TRANSLATION ENGINE
+// ════════════════════════════════════════════════════════════════════
+const translations = {
+    en: {
+        agencyAnalysis: "📊 Agency Analysis",
+        analyticsReport: "Analytics Report",
+        compareAcm: "Compare ACMs / Periods",
+        agencyPoints: "🪙 Agency Points",
+        checkAgencyPoints: "Check Agency Points",
+        smartAllocator: "Smart Allocator",
+        searchRecords: "Search Records",
+        pointTable: "Point Table",
+        agencyTarget: "🎯 Agency Target",
+        checkAgencyTarget: "Check Agency Target",
+        targetTimeline: "Target Timeline",
+        universalQuery: "🔍 Universal Query",
+        queryRequests: "Query Requests",
+        accessManagement: "⚙️ Access Management",
+        manageAgents: "Manage Agents",
+        auditLog: "Audit Log",
+        logout: "Logout",
+        searchMenu: "Search menu...",
+        portalWelcome: "Xena Live Data Portal",
+        portalSub: "Agency Privilege & Operational Analytics",
+        crunching: "Crunching Feishu data..."
+    },
+    zh: {
+        agencyAnalysis: "📊 机构分析",
+        analyticsReport: "分析报告",
+        compareAcm: "比较 ACMs / 周期",
+        agencyPoints: "🪙 机构积分",
+        checkAgencyPoints: "查看机构积分",
+        smartAllocator: "智能分配器",
+        searchRecords: "搜索记录",
+        pointTable: "积分表",
+        agencyTarget: "🎯 机构目标",
+        checkAgencyTarget: "查看机构目标",
+        targetTimeline: "目标时间表",
+        universalQuery: "🔍 通用查询",
+        queryRequests: "查询请求",
+        accessManagement: "⚙️ 权限管理",
+        manageAgents: "管理代理",
+        auditLog: "审计日志",
+        logout: "退出登录",
+        searchMenu: "搜索菜单...",
+        portalWelcome: "Xena 实时数据门户",
+        portalSub: "机构特权与运营分析",
+        crunching: "处理飞书数据..."
+    }
+};
+
+let currentLang = 'en';
+
+function changeLanguage(lang) {
+    currentLang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+            el.innerHTML = translations[lang][key];
+        }
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (translations[lang][key]) {
+            el.placeholder = translations[lang][key];
+        }
+    });
+    renderTabs(); // Re-render tabs to update their titles
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MULTI-TAB SYSTEM
+// ════════════════════════════════════════════════════════════════════
+const pageTitlesMap = {
+    'welcome': 'Welcome',
+    'analytics': 'Analytics Report',
+    'compare': 'Compare Agencies',
+    'points': 'Check Agency Points',
+    'allocator': 'Smart Allocator',
+    'target': 'Agency Target',
+    'target-timeline': 'Target Timeline',
+    'admin-agents': 'Manage Agents',
+    'admin-audit': 'Audit Log',
+    'points-records': 'Search Point Records',
+    'points-table': 'Agency Point Table',
+    'query': 'Universal Query'
+};
+
+const zhPageTitlesMap = {
+    'welcome': '欢迎',
+    'analytics': '分析报告',
+    'compare': '比较机构',
+    'points': '查看机构积分',
+    'allocator': '智能分配器',
+    'target': '机构目标',
+    'target-timeline': '目标时间表',
+    'admin-agents': '管理代理',
+    'admin-audit': '审计日志',
+    'points-records': '搜索记录',
+    'points-table': '积分表',
+    'query': '通用查询'
+};
+
+let openTabs = ['welcome'];
+let activeTabId = 'welcome';
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query'];
+
+function openInTab(page) {
+    if (!openTabs.includes(page)) {
+        openTabs.push(page);
+    }
+    setActiveTab(page);
+}
+
+function setActiveTab(page) {
+    activeTabId = page;
+    renderTabs();
+    
+    // Deactivate all sidebar items first
+    document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
+    const navEl = document.getElementById('nav-' + page);
+    if(navEl) navEl.classList.add('active', 'active-nav');
+    
+    // Execute original nav logic to map logical page to physical div
+    executePageLogic(page);
+}
+
+function closeTab(page, event) {
+    if(event) event.stopPropagation();
+    if(page === 'welcome') return; // Cannot close welcome tab
+
+    openTabs = openTabs.filter(t => t !== page);
+    
+    if (activeTabId === page) {
+        // Switch to the previous tab
+        activeTabId = openTabs[openTabs.length - 1];
+    }
+    
+    setActiveTab(activeTabId);
+}
+
+function renderTabs() {
+    const container = document.getElementById('multiTabBar');
+    container.innerHTML = '';
+    
+    const titlesMap = currentLang === 'zh' ? zhPageTitlesMap : pageTitlesMap;
+
+    openTabs.forEach(page => {
+        const title = titlesMap[page] || page;
+        const isActive = page === activeTabId;
+        
+        const tabEl = document.createElement('div');
+        tabEl.className = `tab-item ${isActive ? 'active' : ''}`;
+        tabEl.onclick = () => setActiveTab(page);
+        
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = title;
+        tabEl.appendChild(titleSpan);
+        
+        if (page !== 'welcome') {
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'tab-close';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = (e) => closeTab(page, e);
+            tabEl.appendChild(closeBtn);
+        }
+        
+        container.appendChild(tabEl);
+    });
+}
+
+function executePageLogic(page) {
+    // Hide all
+    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+    closeSidebar();
+
+    if(page==='analytics'){
+        document.getElementById('pg-analytics').style.display='block';
+        document.getElementById('queryType').value='analytics';
+        _expandNavGroup('navBodyAnalytics','navArrAnalytics');
+    } else if(page==='target' || page==='target-timeline'){
+        document.getElementById('pg-agency').style.display='block';
+        document.getElementById('queryType').value='target';
+        document.getElementById('agencyLookupTitle').textContent='🎯 Agency Target Lookup';
+        document.getElementById('agencyEmptyState').style.display='block';
+        document.getElementById('resultsContainer').style.display='none';
+        _expandNavGroup('navBodyTarget','navArrTarget');
+        
+        window.currentTargetView = page; 
+        if(currentAgencyData) showTargetViewElements(); 
+    } else if(page==='points'){
+        document.getElementById('pg-agency').style.display='block';
+        document.getElementById('queryType').value='points';
+        document.getElementById('agencyLookupTitle').textContent='🪙 Check Agency Points';
+        document.getElementById('agencyEmptyState').style.display='block';
+        document.getElementById('resultsContainer').style.display='none';
+    } else if(page==='allocator'){
+        document.getElementById('pg-allocator').style.display='block';
+        if(currentAgencyData&&currentAgencyData.point_balance!=null){
+            document.getElementById('allocatorBalance').value=currentAgencyData.point_balance;
+            const code=document.getElementById('agencyCode')?.value||'';
+            document.getElementById('allocBalHint').innerHTML=`Auto-filled from last search (${code}). Edit if needed.`;
+        }
+    } else if(page==='admin-agents'){
+        document.getElementById('pg-admin-agents').style.display='block';
+        _expandNavGroup('navBodyAdmin','navArrAdmin');
+        fetchAdminUsers();
+    } else if(page==='admin-audit'){
+        document.getElementById('pg-admin-audit').style.display='block';
+        _expandNavGroup('navBodyAdmin','navArrAdmin');
+        loadAuditLog();
+    } else if(page==='compare'){
+        document.getElementById('pg-compare').style.display='block';
+        _expandNavGroup('navBodyAnalytics','navArrAnalytics');
+    } else if(page==='points-records'){
+        document.getElementById('pg-points-records').style.display='block';
+        _expandNavGroup('navBodyPoints','navArrPoints');
+    } else if(page==='points-table'){
+        document.getElementById('pg-points-table').style.display='block';
+        _expandNavGroup('navBodyPoints','navArrPoints');
+    } else if(page==='query'){
+        document.getElementById('pg-query').style.display='block';
+        _expandNavGroup('navBodyQuery','navArrQuery');
+    } else {
+        document.getElementById('pg-welcome').style.display='block';
+    }
+}
+
+function filterSidebar() {
+    const term = document.getElementById('sidebarSearch').value.toLowerCase();
+    
+    // If empty, reset visibility and collapse states
+    if (!term) {
+        document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'block');
+        return;
+    }
+
+    document.querySelectorAll('.nav-group').forEach(group => {
+        let hasVisibleChild = false;
+        const items = group.querySelectorAll('.nav-item');
+        
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (text.includes(term)) {
+                item.style.display = 'block';
+                hasVisibleChild = true;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        
+        // Auto-expand group if it has matching children
+        const body = group.querySelector('.nav-group-body');
+        const arr = group.querySelector('.nav-arr');
+        if (hasVisibleChild) {
+            body.classList.add('open');
+            if(arr) arr.classList.add('open');
+        }
+    });
+}
+
 // ════════════════════════════════════════════════════════════════════
 // TOAST NOTIFICATION SYSTEM
 // ════════════════════════════════════════════════════════════════════
@@ -1177,6 +1512,8 @@ document.addEventListener('keydown', e => {
         const ac = document.getElementById('agencyCode');
         if (ac && ac.closest('#standardSearchParams')?.style.display !== 'none') {
             ac.focus(); ac.select();
+        } else {
+            document.getElementById('sidebarSearch').focus();
         }
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
@@ -1201,9 +1538,6 @@ function toggleTheme() {
     }
 })();
 
-// ════════════════════════════════════════════════════════════════════
-// CHART.JS SETUP
-// ════════════════════════════════════════════════════════════════════
 const leaderLinePlugin = {
     id:'leaderLine',
     afterDraw(chart,_,options) {
@@ -1277,19 +1611,8 @@ function _expandNavGroup(bodyId,arrId){
 }
 
 // ════════════════════════════════════════════════════════════════════
-// STATE
+// URL AND INITIALIZATION HANDLING
 // ════════════════════════════════════════════════════════════════════
-let currentAgencyData=null, latestAnalyticsData=null, charts={};
-let userPermissions=null; 
-let loggedUser=localStorage.getItem('xenaUser');
-let loggedEmail=localStorage.getItem('xenaEmail');
-let loggedUat=localStorage.getItem('xenaUat');
-let pendingRequests=new Map();  
-let activeFilters={};           
-let sparkCharts={};             
-let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQueryAcm,pQueryReg;
-
-const urlParams=new URLSearchParams(window.location.search);
 
 if (urlParams.get('auth_error')) {
     const authErr = urlParams.get('auth_error');
@@ -1322,85 +1645,6 @@ function formatCoins(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
     return num.toLocaleString();
-}
-
-// ════════════════════════════════════════════════════════════════════
-// NAVIGATION 
-// ════════════════════════════════════════════════════════════════════
-let userModules=[], isAdmin=false;
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query'];
-
-function hideAllPages(){
-    ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-    document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-    document.querySelectorAll('.nav-group-header.nav-direct').forEach(el=>el.classList.remove('active'));
-}
-
-function navTo(page){
-    hideAllPages();
-    closeSidebar();
-    const titles={welcome:'Xena Live Data Portal',analytics:'Analytics Report',compare:'Compare Agencies',
-        points:'Check Agency Points',allocator:'Smart Allocator',target:'Agency Target',
-        'target-timeline': 'Target Privilege Timeline',
-        'admin-agents':'Manage Agents','admin-audit':'Audit Log',
-        'points-records':'Search Point Records','points-table':'Agency Point Table',
-        'query':'Universal Request Query'};
-    document.getElementById('pageTitle').textContent=titles[page]||'Xena Portal';
-
-    document.querySelectorAll('.nav-item,.nav-group-header.nav-direct').forEach(n=>n.classList.remove('active','active-nav'));
-    const navEl=document.getElementById('nav-'+page);
-    if(navEl){ navEl.classList.add('active'); navEl.classList.add('active-nav'); }
-
-    if(page==='analytics'){
-        document.getElementById('pg-analytics').style.display='block';
-        document.getElementById('queryType').value='analytics';
-        _expandNavGroup('navBodyAnalytics','navArrAnalytics');
-    } else if(page==='target' || page==='target-timeline'){
-        document.getElementById('pg-agency').style.display='block';
-        document.getElementById('queryType').value='target';
-        document.getElementById('agencyLookupTitle').textContent='🎯 Agency Target Lookup';
-        document.getElementById('agencyEmptyState').style.display='block';
-        document.getElementById('resultsContainer').style.display='none';
-        _expandNavGroup('navBodyTarget','navArrTarget');
-        
-        window.currentTargetView = page; 
-        if(currentAgencyData) showTargetViewElements(); 
-    } else if(page==='points'){
-        document.getElementById('pg-agency').style.display='block';
-        document.getElementById('queryType').value='points';
-        document.getElementById('agencyLookupTitle').textContent='🪙 Check Agency Points';
-        document.getElementById('agencyEmptyState').style.display='block';
-        document.getElementById('resultsContainer').style.display='none';
-    } else if(page==='allocator'){
-        document.getElementById('pg-allocator').style.display='block';
-        if(currentAgencyData&&currentAgencyData.point_balance!=null){
-            document.getElementById('allocatorBalance').value=currentAgencyData.point_balance;
-            const code=document.getElementById('agencyCode')?.value||'';
-            document.getElementById('allocBalHint').innerHTML=`Auto-filled from last search (${code}). Edit if needed.`;
-        }
-    } else if(page==='admin-agents'){
-        document.getElementById('pg-admin-agents').style.display='block';
-        _expandNavGroup('navBodyAdmin','navArrAdmin');
-        fetchAdminUsers();
-    } else if(page==='admin-audit'){
-        document.getElementById('pg-admin-audit').style.display='block';
-        _expandNavGroup('navBodyAdmin','navArrAdmin');
-        loadAuditLog();
-    } else if(page==='compare'){
-        document.getElementById('pg-compare').style.display='block';
-        _expandNavGroup('navBodyAnalytics','navArrAnalytics');
-    } else if(page==='points-records'){
-        document.getElementById('pg-points-records').style.display='block';
-        _expandNavGroup('navBodyPoints','navArrPoints');
-    } else if(page==='points-table'){
-        document.getElementById('pg-points-table').style.display='block';
-        _expandNavGroup('navBodyPoints','navArrPoints');
-    } else if(page==='query'){
-        document.getElementById('pg-query').style.display='block';
-        _expandNavGroup('navBodyQuery','navArrQuery');
-    } else {
-        document.getElementById('pg-welcome').style.display='block';
-    }
 }
 
 function toggleNavGroup(grpId,bodyId){
@@ -1457,9 +1701,6 @@ function toggleCompareDates(){
     document.getElementById('compareDatesRow').style.display=on?'grid':'none';
 }
 
-// ════════════════════════════════════════════════════════════════════
-// DATE PRESETS AND LOCKDOWNS
-// ════════════════════════════════════════════════════════════════════
 function updateCustomDateVisibility() {
     const isSpec=document.getElementById('anaDatePreset').value==='specific';
     document.getElementById('customFromDiv').style.display=isSpec?'block':'none';
@@ -1504,7 +1745,6 @@ function updateAcmDropdown() {
     
     list.forEach(n=>sel.add(new Option(n, n.toLowerCase())));
     
-    // Lock dropdown if only 1 choice and no 'all' permission
     if (list.length === 1 && !hasAllPerm) {
         sel.value = list[0].toLowerCase();
         sel.style.pointerEvents = 'none';
@@ -1561,12 +1801,6 @@ function loadPreset(p) {
     ToastManager.show('Filter preset loaded!','info',2500);
 }
 
-// ════════════════════════════════════════════════════════════════════
-// ADMIN
-// ════════════════════════════════════════════════════════════════════
-function openAdmin(){ navTo('admin-agents'); }
-function closeAdmin(){ navTo('welcome'); }
-
 function parseGranular(str,module) {
     if (!str||str.indexOf('=')===-1) {
         let p=str?str.split(',').map(x=>x.trim()):['all'];
@@ -1590,7 +1824,6 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
      'analytics_report','analytics_compare',
      'query_requests'].forEach(key => {
         const master = key.split('_')[0];
-        // Support legacy users with just "target", "points" etc
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
         if (cb) cb.checked = hasAccess;
@@ -1608,7 +1841,7 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
     pQueryReg.setValues(parseGranular(regRaw,'query'));
     
     document.getElementById('adminBtnSubmit').innerText='💾 Save Configuration';
-    navTo('admin-agents');
+    openInTab('admin-agents');
     setTimeout(()=>document.getElementById('newAgentEmail').focus(),120);
 }
 
@@ -1726,9 +1959,6 @@ async function loadAuditLog() {
     } catch(e) { el.innerHTML='<div style="color:var(--accent-rose)">Failed to load audit log.</div>'; }
 }
 
-// ════════════════════════════════════════════════════════════════════
-// PILL SELECT CLASS
-// ════════════════════════════════════════════════════════════════════
 class PillSelect {
     constructor(containerId, options) {
         this.container=document.getElementById(containerId);
@@ -1797,9 +2027,6 @@ function initPills() {
     pQueryReg=new PillSelect('queryRegSelect',allRegs);
 }
 
-// ════════════════════════════════════════════════════════════════════
-// CROSS-FILTERING
-// ════════════════════════════════════════════════════════════════════
 function crossFilter(dimension, value) {
     if (!latestAnalyticsData) return;
     if (value === null) { activeFilters = {}; }
@@ -1829,9 +2056,6 @@ function applyFiltersAndRedraw() {
     drawCharts(latestAnalyticsData);
 }
 
-// ════════════════════════════════════════════════════════════════════
-// ANALYTICS GENERATION
-// ════════════════════════════════════════════════════════════════════
 async function generateAnalytics() {
     if (document.getElementById('anaDatePreset').value!=='specific') setDatePresets();
     const region=document.getElementById('anaRegion').value;
@@ -1887,9 +2111,6 @@ async function generateAnalytics() {
         }
         if (data.cache_hit) {
             ToastManager.show('Serving cached data. Click "🔄 Refresh" to get fresh results.','info',3000);
-        }
-        if (data.duration_ms) {
-            console.log(`Analytics completed in ${data.duration_ms}ms`);
         }
 
         document.getElementById('kpiCreations').innerText=data.kpis.creations.toLocaleString();
@@ -2300,9 +2521,6 @@ function exportExcel() {
     ToastManager.show('Excel file exported!','success');
 }
 
-// ════════════════════════════════════════════════════════════════════
-// SEARCH / AGENCY DATA
-// ════════════════════════════════════════════════════════════════════
 async function fetchAgencyData() {
     const code=document.getElementById('agencyCode').value.trim();
     if (!code) { ToastManager.show('Please enter an agency code.','warning'); return; }
@@ -2413,9 +2631,6 @@ function renderComparisonTable(agencies,type) {
     area.style.display='block';
 }
 
-// ════════════════════════════════════════════════════════════════════
-// TARGET PRIVILEGE (Exact Formula Replication & Direct Array Summation)
-// ════════════════════════════════════════════════════════════════════
 function updatePrivilegeGrid() {
     if (!currentAgencyData) return;
     const priv = document.getElementById('specificPrivilege').value;
@@ -2494,9 +2709,6 @@ function buildTargetTimeline() {
     }).join('');
 }
 
-// ════════════════════════════════════════════════════════════════════
-// POINTS SYSTEM
-// ════════════════════════════════════════════════════════════════════
 const pointPriceDB=[
     {key:"trend card",same:40,other:50},{key:"traffic card",same:30,other:40},
     {key:"30 mic 15 days",same:150,other:175},{key:"30 mic 30 days",same:300,other:350},
@@ -3098,14 +3310,10 @@ function ptExportExcel() {
     ToastManager.show('Excel exported!', 'success');
 }
 
-// ════════════════════════════════════════════════════════════════════
-// ENFORCE LOCKS & INITIALIZATION 
-// ════════════════════════════════════════════════════════════════════
 function enforceLocks() {
     if (isAdmin) return;
     const p = userPermissions?.permissions || {};
 
-    // 1. Analytics Region
     const anaReg = p.regions?.analytics || ['all'];
     if (!anaReg.includes('all')) {
         const sel = document.getElementById('anaRegion');
@@ -3120,7 +3328,6 @@ function enforceLocks() {
         }
     }
 
-    // 2. Points Regions
     const ptReg = p.regions?.points || ['all'];
     if (!ptReg.includes('all')) {
         ['prRegion', 'ptRegion'].forEach(id => {
@@ -3136,7 +3343,6 @@ function enforceLocks() {
         });
     }
 
-    // 3. Points ACM Text Input Lock
     const ptAcm = p.acms?.points || ['all'];
     if (!ptAcm.includes('all')) {
         const prAcm = document.getElementById('prAcm');
@@ -3147,7 +3353,6 @@ function enforceLocks() {
         }
     }
     
-    // 4. Trigger Analytics ACM logic based on regions
     updateAcmDropdown();
 }
 
@@ -3155,7 +3360,6 @@ function hasMod(m) { return isAdmin || userModules.some(um => um.includes(m)); }
 function hasExactMod(m) { return isAdmin || userModules.includes(m); }
 
 function configureSidebarAndCards() {
-    // Hide unauthorized groups and specific sub-items
     if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
     else {
         if (!hasExactMod('target_check') && !hasExactMod('target')) document.getElementById('nav-target').style.display = 'none';
@@ -3183,22 +3387,30 @@ function configureSidebarAndCards() {
 
     if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
 
-    // Build Welcome Cards Dynamically Based on Exact Access
     const wc = document.getElementById('welcomeCards');
     wc.innerHTML = '';
-    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
-    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
-    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
-    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
-    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
-    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('query')"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
-    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="navTo('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title" data-i18n="analyticsReport">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
+    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
+    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
+    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
+    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+
+    // Apply translation to newly added cards immediately if needed
+    if (currentLang !== 'en') changeLanguage(currentLang);
 }
 
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
     document.querySelector('.app-shell').style.display='flex';
-    document.getElementById('sidebarUsername').textContent=loggedUser+(loggedEmail?` (${loggedEmail})`:'');
+    
+    // Set Header UI Properties
+    document.getElementById('sidebarUsername').textContent = loggedUser;
+    
+    // Create an elegant fallback avatar using UI-Avatars based on User Name
+    const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
+    document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
 
     fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
         .then(r=>r.json())
@@ -3208,13 +3420,13 @@ if (loggedUser&&loggedUat) {
             isAdmin = !!d.is_super_admin;
             
             if (!isAdmin && userModules.length === 0) {
-                // HARD LOCK: ZERO ACCESS
                 document.getElementById('sidebar').style.display = 'none';
                 document.querySelector('.main-content').style.marginLeft = '0';
-                hideAllPages();
+                
+                ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
                 document.getElementById('pg-welcome').style.display = 'block';
-                document.getElementById('welcomeHero').style.display = 'none'; // Hide the default hero
-                document.getElementById('noAccessMsg').style.display = 'none'; // Hide the small inline message
+                document.getElementById('welcomeHero').style.display = 'none'; 
+                document.getElementById('noAccessMsg').style.display = 'none'; 
                 
                 document.getElementById('pg-welcome').innerHTML = `
                     <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;text-align:center">
@@ -3225,11 +3437,13 @@ if (loggedUser&&loggedUat) {
                     </div>
                 `;
                 document.querySelector('.page-top-bar').style.display = 'none';
+                document.getElementById('multiTabBar').style.display = 'none';
                 return;
             }
 
             enforceLocks();
             configureSidebarAndCards();
+            renderTabs(); // Init tabs immediately
 
         }).catch(e=>console.error(e));
 
@@ -3246,7 +3460,9 @@ if (loggedUser&&loggedUat) {
             const acmSel=document.getElementById('anaAcm');
             if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
         }
-        navTo('analytics');
+        openInTab('analytics');
+    } else {
+        openInTab('welcome'); // Open default Welcome tab
     }
 }
 </script>
