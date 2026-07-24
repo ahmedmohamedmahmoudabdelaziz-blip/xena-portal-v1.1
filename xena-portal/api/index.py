@@ -25,6 +25,7 @@ BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
+# Hardcoded to the specific Audit Log table ID provided
 AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")   
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
@@ -189,10 +190,11 @@ class AuditLogger:
         self._queue = []
         self._lock  = threading.Lock()
 
-    def log(self, actor, action, target, details="", ip=""):
+    def log(self, actor, action, target, details="", ip="", severity="Info"):
+        full_target = f"{target} | {details}" if details else target
         entry = {
-            "actor": mask_name(actor), "action": action, "target": target,
-            "details": details[:500], "ip": ip, "ts": datetime.utcnow().isoformat(),
+            "actor": mask_name(actor) or "Unknown", "action": action, "target": full_target,
+            "ip": ip, "severity": severity, "ts": datetime.utcnow().isoformat(),
         }
         logger.info("audit", **entry)
         if AUDIT_TABLE_ID:
@@ -208,8 +210,12 @@ class AuditLogger:
             url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records"
             hdrs = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
             payload = {"fields": {
-                "Actor": entry["actor"], "Action": entry["action"], "Target": entry["target"], 
-                "Details": entry["details"], "IP": entry["ip"], "Timestamp": entry["ts"]
+                "Timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "Agent": entry["actor"],
+                "Action": entry["action"],
+                "Target": entry["target"],
+                "IP Address": entry["ip"],
+                "Severity": entry["severity"]
             }}
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
         except Exception as e:
@@ -366,7 +372,7 @@ def get_user_permissions(email, name):
     # EXACT MATCH CHECK for Super Admins
     if any(admin == name_clean for admin in ADMIN_USERS):
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "export"], 
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
@@ -929,12 +935,11 @@ def callback():
         user_data  = info_resp.get("data", {})
         lark_name  = user_data.get("name", "Unknown User")
         lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
-        avatar_url = user_data.get("avatar_url", "")
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
         
-        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}&avatar={urllib.parse.quote(avatar_url, safe='')}")
+        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}")
 
     except Exception as exc:
         return redirect("/?auth_error=" + urllib.parse.quote(f"Login error: {str(exc)[:120]}", safe=''))
@@ -964,7 +969,7 @@ def search():
 
     perms = get_user_permissions(email, user)
     
-    # Sub-Module Check Support (e.g. allows if user has "target_check" or "target_timeline" etc)
+    # Sub-Module Check Support
     if not perms.get("is_super_admin") and not any(qtype in m for m in perms.get("modules", [])):
         return jsonify({"found": False, "error": f"Access Denied: You do not have permission to view {qtype.title()}."}), 403
 
@@ -992,7 +997,7 @@ def manage_users():
         perms = get_user_permissions("", admin_name)
         if perms.get("is_super_admin"): is_authorized = True
     if not is_authorized:
-        audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel", ip=request.headers.get("X-Forwarded-For",""))
+        audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel", ip=request.headers.get("X-Forwarded-For",""), severity="Critical")
         return jsonify({"error":"Unauthorized"}), 403
 
     tat = get_tenant_access_token()
@@ -1015,7 +1020,6 @@ def manage_users():
     elif request.method == 'POST':
         data = request.json or {}
         email_to_check = sanitize_text(data.get("email",""))
-        # Added 'query' to ACM/Region formatting support
         acms_formatted = (f"target={data.get('acms',{}).get('target','all')};"
                           f"points={data.get('acms',{}).get('points','all')};"
                           f"analytics={data.get('acms',{}).get('analytics','all')};"
@@ -1049,7 +1053,7 @@ def manage_users():
 
         if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Unknown error")}), 500
             
-        audit.log(admin_name, "UPDATE_USER" if existing_record_id else "ADD_USER", email_to_check, ip=ip)
+        audit.log(admin_name, "UPDATE_USER" if existing_record_id else "ADD_USER", email_to_check, ip=ip, severity="Info")
         cache_invalidate(cache_make_key("perms", email_to_check.lower(), ""))
         return jsonify({"success":True,"record_id":res.get("data",{}).get("record",{}).get("record_id")})
 
@@ -1057,7 +1061,7 @@ def manage_users():
         record_id = sanitize_text(request.args.get('id',''))
         res = http_requests.delete(f"{base_url}/{record_id}", headers=headers, timeout=15).json()
         if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Delete failed")}), 500
-        audit.log(admin_name, "DELETE_USER", record_id, ip=ip)
+        audit.log(admin_name, "DELETE_USER", record_id, ip=ip, severity="Warning")
         return jsonify({"success":True})
 
 @app.route('/api/admin/audit-logs', methods=['GET'])
@@ -1067,7 +1071,40 @@ def audit_logs():
     if not is_authorized:
         perms = get_user_permissions("", admin_name)
         if not perms.get("is_super_admin"): return jsonify({"error":"Unauthorized"}), 403
-    return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
+        
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    payload = {
+        "page_size": min(int(request.args.get('limit','100')), 500)
+    }
+    try:
+        res = http_requests.post(url, headers=headers, json=payload, timeout=10).json()
+        if res.get("code") != 0:
+            raise Exception(res.get("msg", "Feishu API Error"))
+        
+        logs = []
+        for item in res.get("data", {}).get("items", []):
+            f = item.get("fields", {})
+            ts_val = f.get("Timestamp")
+            if isinstance(ts_val, (int, float)):
+                dt_str = datetime.fromtimestamp(ts_val/1000.0).isoformat()
+            else:
+                dt_str = str(ts_val)
+                
+            logs.append({
+                "ts": dt_str,
+                "actor": extract_field_text(f.get("Agent", "")),
+                "action": extract_field_text(f.get("Action", "")),
+                "target": extract_field_text(f.get("Target", "")),
+                "ip": extract_field_text(f.get("IP Address", "")),
+                "severity": extract_field_text(f.get("Severity", "Info"))
+            })
+        logs.sort(key=lambda x: x["ts"], reverse=True)
+        return jsonify(logs)
+    except Exception as e:
+        logger.error("audit_log_fetch_failed", error=str(e))
+        return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
 
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1076,7 +1113,6 @@ def points_records():
     email  = sanitize_text(request.args.get('email',''))
     perms  = get_user_permissions(email, user)
 
-    # Sub-Module Check Support
     if not perms.get("is_super_admin") and not any("points" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
@@ -1170,6 +1206,21 @@ def points_records():
     used_pts_sum  = sum(r["used_points"] for r in filtered)
     balance_sum   = sum(r["point_balance"] for r in filtered)
 
+    # Allow bypassing pagination if an export is requested
+    is_export = request.args.get('export', 'false').lower() == 'true'
+    if is_export:
+        if not perms.get("is_super_admin") and not any("export" in m for m in perms.get("modules",[])):
+            audit.log(user.lower(), "UNAUTHORIZED_EXPORT", "Point Records", ip=request.headers.get("X-Forwarded-For",""), severity="Critical")
+            return jsonify({"error":"Export access denied. You lack the necessary permissions."}), 403
+        
+        audit.log(user.lower(), "EXPORT_DATA", f"Point Records ({total_count} rows)", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
+        return jsonify({
+            "records": filtered[:5000], "total": total_count, "page": 1, "page_size": total_count,
+            "total_pages": 1,
+            "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
+            "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason)
+        })
+
     start = (page - 1) * page_size
     end   = start + page_size
     page_records = filtered[start:end]
@@ -1180,6 +1231,23 @@ def points_records():
         "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason)
     })
+
+@app.route('/api/audit/log', methods=['POST'])
+def client_audit_log():
+    data = request.json or {}
+    user = sanitize_text(data.get('user', ''))
+    email = sanitize_text(data.get('email', ''))
+    action = sanitize_text(data.get('action', ''))
+    target = sanitize_text(data.get('target', ''))
+    severity = sanitize_text(data.get('severity', 'Info'))
+    
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not perms.get("modules"):
+        return jsonify({"error":"Unauthorized"}), 403
+        
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    audit.log(user, action, target, ip=ip, severity=severity)
+    return jsonify({"success": True})
 
 @app.route('/api/sync/refresh', methods=['POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
@@ -1194,7 +1262,7 @@ def sync_refresh():
     with _bg_sync_lock:
         count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
         
-    audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""))
+    audit.log(user.lower(), "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
     return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
@@ -1223,11 +1291,9 @@ def query_records():
         return jsonify({"error": "Please enter a value to search."}), 400
 
     perms = get_user_permissions(email, user)
-    # Check specifically for "query" module
     if not perms.get("is_super_admin") and not any("query" in m for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
-    # Use "query" granular permissions
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("query",["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
     allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
@@ -1244,7 +1310,6 @@ def query_records():
 
     aliases = QUERY_FIELD_ALIASES[field]
     
-    # Intelligent API Payload Fallback Loop (prevents InvalidFilter crashes on Number columns)
     for alias in aliases:
         for op in ["contains", "is", "="]:
             val_array = [value]
@@ -1323,7 +1388,7 @@ def query_records():
     for r in results:
         r.pop("_sort_ts", None)
 
-    audit.log(user.lower(), "QUERY_SEARCH", f"{field}={value}", ip=request.headers.get("X-Forwarded-For",""))
+    audit.log(user.lower(), "QUERY_SEARCH", f"{field}={value}", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
 
     return jsonify({
         "results": results, "count": len(results),
@@ -1359,7 +1424,6 @@ def analytics():
         except ValueError: pass
 
     perms = get_user_permissions(email, user)
-    # Sub-Module Check Support
     if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
@@ -1433,7 +1497,7 @@ def clear_cache():
     is_authorized = any(a == admin_name for a in ADMIN_USERS)
     if not is_authorized: return jsonify({"error":"Unauthorized"}), 403
     cache_invalidate()
-    audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""))
+    audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""), severity="Warning")
     return jsonify({"success":True,"message":"Cache cleared."})
 
 @app.route('/api/health', methods=['GET'])
