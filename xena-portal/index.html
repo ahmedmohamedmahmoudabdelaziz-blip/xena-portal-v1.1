@@ -3348,9 +3348,14 @@ function enforceLocks() {
     if (!ptAcm.includes('all')) {
         const prAcm = document.getElementById('prAcm');
         if (prAcm) {
-            prAcm.value = ptAcm.map(a => a.charAt(0).toUpperCase() + a.slice(1)).join(', ');
-            prAcm.readOnly = true;
-            prAcm.style.opacity = '0.7';
+            prAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
+            ptAcm.forEach(a => prAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+        }
+    } else {
+        const prAcm = document.getElementById('prAcm');
+        if(prAcm) {
+            prAcm.innerHTML = '<option value="">All ACMs</option>';
+            allAcms.forEach(a => prAcm.add(new Option(a, a.toLowerCase())));
         }
     }
     
