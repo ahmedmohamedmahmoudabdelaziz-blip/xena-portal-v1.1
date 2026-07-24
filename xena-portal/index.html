@@ -118,8 +118,8 @@
         .qy-note-block{margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;font-size:.8rem;color:var(--text-muted)}
         .qy-note-block b{color:var(--text)}
 
-        .compare-mode-toggle{display:flex;gap:8px;margin-bottom:20px}
-        .compare-mode-btn{flex:1;padding:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.9rem;transition:all .2s;text-align:center}
+        .compare-mode-toggle{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+        .compare-mode-btn{flex:1;min-width:160px;padding:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.9rem;transition:all .2s;text-align:center}
         .compare-mode-btn.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:700}
 
         .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
@@ -510,10 +510,11 @@
 
             <div id="pg-compare" style="display:none">
                 <div class="card">
-                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Agency Comparison</h3>
+                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Advanced Compare Engine</h3>
                     <div class="compare-mode-toggle">
-                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">👥 ACM Side-by-Side</div>
-                        <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">📅 Period Compare → Analytics</div>
+                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">👥 Agency Comparison</div>
+                        <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">📅 Period Comparison</div>
+                        <div class="compare-mode-btn" id="cmpBtnAcmRadar" onclick="setCompareMode('radar',this)">🎯 ACM Radar</div>
                     </div>
                     <div id="cmpModeAcm">
                         <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Enter 2–3 agency codes to compare data side by side.</p>
@@ -530,11 +531,26 @@
                         <div id="cmpAcmResults" style="margin-top:24px;overflow-x:auto"></div>
                     </div>
                     <div id="cmpModePeriod" style="display:none">
-                        <div class="empty-state" style="padding:40px 0">
-                            <div style="font-size:2.5rem;margin-bottom:12px">📅</div>
-                            <h3>Period Comparison</h3>
-                            <p>Period comparison is built into Analytics Report — enable the "Period Comparison" toggle there.</p>
-                            <button class="empty-state-action" onclick="openInTab('analytics');setTimeout(()=>{document.getElementById('compareToggle').checked=true;toggleCompareDates();},100)">Go to Analytics Report</button>
+                        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Select two periods to compare overall performance trends (real data, pulled live from Feishu).</p>
+                        <div class="control-grid">
+                            <div class="control-group"><label>Period 1 (Start)</label><input type="date" id="cmpP1Start"></div>
+                            <div class="control-group"><label>Period 1 (End)</label><input type="date" id="cmpP1End"></div>
+                            <div class="control-group"><label>Period 2 (Start)</label><input type="date" id="cmpP2Start"></div>
+                            <div class="control-group"><label>Period 2 (End)</label><input type="date" id="cmpP2End"></div>
+                        </div>
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runPeriodCompare()">📅 Compare Periods</button>
+                        <div id="cmpPeriodResults" style="margin-top:24px;"></div>
+                    </div>
+                    <div id="cmpModeRadar" style="display:none">
+                        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Select up to 3 ACMs to compare Creations, Closings and Closing Efficiency. Run an Analytics Report first so real numbers are available.</p>
+                        <div class="control-grid">
+                            <div class="control-group"><label>ACM 1</label><select id="cmpAcm1"></select></div>
+                            <div class="control-group"><label>ACM 2</label><select id="cmpAcm2"></select></div>
+                            <div class="control-group"><label>ACM 3 (optional)</label><select id="cmpAcm3"><option value="">None</option></select></div>
+                        </div>
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmRadar()">🎯 Generate Radar</button>
+                        <div class="chart-wrapper-pie-large" style="margin-top:24px; max-width:600px; margin-left:auto; margin-right:auto;">
+                            <canvas id="cmpRadarChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -630,47 +646,58 @@
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                     <div class="card">
                         <h3 style="margin-bottom:16px;color:var(--accent-cyan)">🤖 Smart Allocator</h3>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-                            <div class="control-group" style="margin-bottom:0">
-                                <label>Available Points Balance</label>
-                                <input type="number" id="allocatorBalance" min="0" value="0" placeholder="Enter points balance" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;transition:.2s;box-sizing:border-box">
+
+                        <div style="background:var(--surface-hover); border:1px solid var(--border); padding:16px; border-radius:12px; margin-bottom:20px;">
+                            <label style="display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">1. Load Agency Data</label>
+                            <div style="display:flex;gap:10px;">
+                                <input type="text" id="allocAgencyCodeSearch" placeholder="Agency Code (e.g. 40775)" style="flex:1;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;" onkeydown="if(event.key==='Enter')loadAgencyForAllocator()">
+                                <button class="btn btn-primary" style="width:auto;padding:10px 20px" onclick="loadAgencyForAllocator()">🔍 Load Data</button>
                             </div>
-                            <div class="control-group" style="margin-bottom:0">
-                                <label>Pricing Region</label>
-                                <select id="allocatorRegion" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;cursor:pointer">
-                                    <option value="same">Same Region (Lower Rate)</option>
-                                    <option value="other">Other Region (Higher Rate)</option>
-                                </select>
-                            </div>
+                            <div id="allocatorLockMsg" style="margin-top:10px;font-size:.85rem;color:var(--accent-amber);">⚠️ Load an agency to enforce accurate monthly-limit calculations, or open this page via "Open Smart Allocator with this balance" from Check Agency Points.</div>
                         </div>
-                        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px" id="allocBalHint">Balance auto-fills after agency search, or enter manually. <a href="#" onclick="openInTab('points');return false" style="color:var(--accent-cyan)">Search an agency ›</a></div>
-                        <div class="control-group">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                                <label style="margin-bottom:0">Select Privileges &amp; Quantities</label>
-                                <div style="display:flex;gap:8px">
-                                    <button onclick="allocSelectAll()" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Select All</button>
-                                    <button onclick="allocClearAll()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Clear All</button>
+
+                        <div id="allocatorControls" style="opacity:0.4; pointer-events:none; transition: opacity 0.3s;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                                <div class="control-group" style="margin-bottom:0">
+                                    <label>Available Points Balance (auto-filled)</label>
+                                    <input type="number" id="allocatorBalance" min="0" value="0" readonly style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;opacity:0.85">
+                                </div>
+                                <div class="control-group" style="margin-bottom:0">
+                                    <label>Pricing Region</label>
+                                    <select id="allocatorRegion" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;cursor:pointer">
+                                        <option value="same">Same Region (Lower Rate)</option>
+                                        <option value="other">Other Region (Higher Rate)</option>
+                                    </select>
                                 </div>
                             </div>
-                            <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-                                <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                            <div class="control-group">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                    <label style="margin-bottom:0">2. Select Privileges &amp; Quantities</label>
+                                    <div style="display:flex;gap:8px">
+                                        <button onclick="allocSelectAll()" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Select All</button>
+                                        <button onclick="allocClearAll()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:4px 10px;border-radius:6px;font-size:.78rem;cursor:pointer">Clear All</button>
+                                    </div>
+                                </div>
+                                <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+                                    <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                </div>
                             </div>
-                        </div>
-                        <div style="display:flex;gap:10px;flex-wrap:wrap">
-                            <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
-                            <button onclick="copyAllocatorReceipt()" style="background:rgba(185,103,255,.12);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:10px 18px;border-radius:10px;font-size:.9rem;cursor:pointer">📋 Copy Receipt</button>
+                            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                                <button class="btn btn-allocator" onclick="runAllocator()">⚡ Run Smart Allocator</button>
+                                <button onclick="copyAllocatorReceipt()" style="background:rgba(185,103,255,.12);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:10px 18px;border-radius:10px;font-size:.9rem;cursor:pointer">📋 Copy Receipt</button>
+                            </div>
                         </div>
                     </div>
                     <div class="card">
@@ -746,6 +773,14 @@
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
                                 <div class="control-group"><label>Regions</label><div class="pill-select-container" id="queryRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <div class="module-card" style="border-color:var(--accent-purple)">
+                            <div class="module-header">
+                                <h4 style="color:var(--accent-purple)">💾 Global Settings</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_export_data" checked> Allow Data Export (CSV / Excel / PDF)</label>
                             </div>
                         </div>
                         <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
@@ -982,7 +1017,7 @@
                         </div>
                         <div class="control-group">
                             <label>Region</label>
-                            <select id="prRegion">
+                            <select id="prRegion" onchange="prFetch(1)">
                                 <option value="">All Regions</option>
                                 <option value="pk">PK</option>
                                 <option value="in">IN</option>
@@ -990,7 +1025,9 @@
                         </div>
                         <div class="control-group">
                             <label>ACM</label>
-                            <input type="text" id="prAcm" placeholder="e.g. Enzo, Haseeb">
+                            <select id="prAcm" onchange="prFetch(1)">
+                                <option value="">All ACMs</option>
+                            </select>
                         </div>
                         <div class="control-group" style="display:flex;align-items:flex-end">
                             <button class="btn btn-primary" onclick="prFetch(1)" style="width:100%">🔎 Search</button>
@@ -1399,7 +1436,12 @@ function executePageLogic(page) {
         if(currentAgencyData&&currentAgencyData.point_balance!=null){
             document.getElementById('allocatorBalance').value=currentAgencyData.point_balance;
             const code=document.getElementById('agencyCode')?.value||'';
-            document.getElementById('allocBalHint').innerHTML=`Auto-filled from last search (${code}). Edit if needed.`;
+            const codeSearchEl=document.getElementById('allocAgencyCodeSearch');
+            if(codeSearchEl && code) codeSearchEl.value=code;
+            const msgEl=document.getElementById('allocatorLockMsg');
+            if(msgEl){ msgEl.innerHTML=`✅ Using balance auto-filled from last search${code?' ('+escHtml(code)+')':''}. Edit the code above and click "Load Data" to switch agencies.`; msgEl.style.color='var(--accent-green)'; }
+            const controlsEl=document.getElementById('allocatorControls');
+            if(controlsEl){ controlsEl.style.opacity='1'; controlsEl.style.pointerEvents='auto'; }
         }
     } else if(page==='admin-agents'){
         document.getElementById('pg-admin-agents').style.display='block';
@@ -1671,6 +1713,85 @@ function setCompareMode(mode,btn){
     btn.classList.add('active');
     document.getElementById('cmpModeAcm').style.display=mode==='acm'?'block':'none';
     document.getElementById('cmpModePeriod').style.display=mode==='period'?'block':'none';
+    document.getElementById('cmpModeRadar').style.display=mode==='radar'?'block':'none';
+
+    // Auto-populate ACM dropdowns for the radar tool the first time it's opened
+    if (mode==='radar') {
+        const sel1=document.getElementById('cmpAcm1'), sel2=document.getElementById('cmpAcm2'), sel3=document.getElementById('cmpAcm3');
+        if (sel1 && sel1.options.length===0) {
+            allAcms.forEach(a=>{ sel1.add(new Option(a,a.toLowerCase())); sel2.add(new Option(a,a.toLowerCase())); sel3.add(new Option(a,a.toLowerCase())); });
+        }
+    }
+}
+
+async function runPeriodCompare() {
+    const p1s=document.getElementById('cmpP1Start').value, p1e=document.getElementById('cmpP1End').value;
+    const p2s=document.getElementById('cmpP2Start').value, p2e=document.getElementById('cmpP2End').value;
+    if (!p1s||!p1e||!p2s||!p2e) { ToastManager.show('Please fill in both period date ranges.','warning'); return; }
+    const container=document.getElementById('cmpPeriodResults');
+    container.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-muted)">Loading comparison…</div>';
+    document.getElementById('loadingOverlay').style.display='flex';
+    try {
+        const payload={user:loggedUser,email:loggedEmail,uat:loggedUat,region:'All',acm:'All',type:'All',from:p1s,to:p1e,compare_from:p2s,compare_to:p2e};
+        const res=await fetch('/api/analytics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const data=await res.json();
+        if (!res.ok) throw new Error(data.error||'Failed to fetch comparison.');
+        const c=data.comparison||{kpis:{creations:0,bds:0,closings:0}};
+        const deltaPct=(a,b)=> b>0 ? Math.round(((a-b)/b)*100) : (a>0?100:0);
+        const deltaHtml=(a,b)=>{ const d=deltaPct(a,b); const col=d>=0?'var(--accent-green)':'var(--accent-rose)'; return `<span style="color:${col};font-size:.78rem;font-weight:700">${d>=0?'▲ +':'▼ '}${d}%</span>`; };
+        container.innerHTML=`
+            <div class="compare-section">
+                <h5>📅 Period 1 (${p1s} → ${p1e}) vs Period 2 (${p2s} → ${p2e})</h5>
+                <div class="compare-kpi-row">
+                    <div class="compare-kpi"><div class="compare-kpi-label">P1 Creations</div><div class="compare-kpi-val">${data.kpis.creations}</div></div>
+                    <div class="compare-kpi"><div class="compare-kpi-label">P2 Creations</div><div class="compare-kpi-val">${c.kpis.creations}</div>${deltaHtml(data.kpis.creations,c.kpis.creations)}</div>
+                    <div class="compare-kpi"><div class="compare-kpi-label">P1 BDs</div><div class="compare-kpi-val">${data.kpis.bds}</div></div>
+                    <div class="compare-kpi"><div class="compare-kpi-label">P2 BDs</div><div class="compare-kpi-val">${c.kpis.bds}</div>${deltaHtml(data.kpis.bds,c.kpis.bds)}</div>
+                    <div class="compare-kpi"><div class="compare-kpi-label">P1 Closings</div><div class="compare-kpi-val">${data.kpis.closings}</div></div>
+                    <div class="compare-kpi"><div class="compare-kpi-label">P2 Closings</div><div class="compare-kpi-val">${c.kpis.closings}</div>${deltaHtml(data.kpis.closings,c.kpis.closings)}</div>
+                </div>
+            </div>`;
+    } catch(e) {
+        container.innerHTML=`<div style="color:var(--accent-rose);padding:20px">Comparison failed: ${e.message}</div>`;
+    }
+    document.getElementById('loadingOverlay').style.display='none';
+}
+
+async function runAcmRadar() {
+    const a1=document.getElementById('cmpAcm1').value, a2=document.getElementById('cmpAcm2').value, a3=document.getElementById('cmpAcm3').value;
+    if (!a1||!a2) { ToastManager.show('Select at least 2 ACMs.','warning'); return; }
+    if (!latestAnalyticsData) { ToastManager.show('Run an Analytics Report first so real ACM numbers are available.','warning'); return; }
+
+    const perf=latestAnalyticsData.acm_performance||{};
+    const closeMap=latestAnalyticsData.acm_closing_reasons||{};
+    const findKey=acm=>Object.keys(perf).find(k=>k.toLowerCase()===acm.toLowerCase())||acm;
+    const closingsFor=acm=>{ const key=Object.keys(closeMap).find(k=>k.toLowerCase()===acm.toLowerCase()); return key?Object.values(closeMap[key]).reduce((a,b)=>a+b,0):0; };
+    const buildStats=acm=>{
+        const creations=perf[findKey(acm)]||0;
+        const closings=closingsFor(acm);
+        const efficiency=creations>0?Math.round((closings/creations)*100):0;
+        return [creations,closings,efficiency];
+    };
+    const s1=buildStats(a1), s2=buildStats(a2), s3=a3?buildStats(a3):null;
+
+    const ctx=document.getElementById('cmpRadarChart');
+    if (charts['cmpRadarChart']) charts['cmpRadarChart'].destroy();
+    charts['cmpRadarChart']=new Chart(ctx,{
+        type:'radar',
+        data:{
+            labels:['Creations','Closings','Closing Efficiency %'],
+            datasets:[
+                {label:a1.toUpperCase(),data:s1,backgroundColor:'rgba(0,212,255,.2)',borderColor:'#00d4ff',pointBackgroundColor:'#00d4ff'},
+                {label:a2.toUpperCase(),data:s2,backgroundColor:'rgba(0,230,118,.2)',borderColor:'#00e676',pointBackgroundColor:'#00e676'},
+                ...(s3?[{label:a3.toUpperCase(),data:s3,backgroundColor:'rgba(185,103,255,.2)',borderColor:'#b967ff',pointBackgroundColor:'#b967ff'}]:[])
+            ]
+        },
+        options:{
+            responsive:true,maintainAspectRatio:false,
+            scales:{r:{angleLines:{color:'rgba(255,255,255,0.1)'},grid:{color:'rgba(255,255,255,0.1)'},pointLabels:{color:'#8b8fa3',font:{size:12}},ticks:{display:false}}},
+            plugins:{legend:{position:'bottom',labels:{color:'#8b8fa3'}},datalabels:{display:false}}
+        }
+    });
 }
 
 async function runAcmCompare(){
@@ -1830,6 +1951,9 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
         if (cb) cb.checked = hasAccess;
     });
 
+    const exportCb=document.getElementById('mod_export_data');
+    if (exportCb) exportCb.checked = m.includes('export_data') || m.includes('admin');
+
     document.getElementById('modAdmin').checked=m.includes('admin');
 
     pTargetAcm.setValues(parseGranular(acmsRaw,'target'));
@@ -1899,6 +2023,7 @@ async function addAgent() {
         if(document.getElementById(`mod_${m}`).checked) modules.push(m);
     });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
+    if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
     
     document.getElementById('adminBtnSubmit').innerText='Saving...';
     
@@ -1950,13 +2075,16 @@ async function loadAuditLog() {
         const res=await fetch('/api/admin/audit-logs?limit=100',{headers:{'X-User-Name':loggedUser}});
         const logs=await res.json();
         if (!logs.length) { el.innerHTML='<div class="empty-state" style="padding:30px 0"><p>No audit events recorded yet.</p></div>'; return; }
-        el.innerHTML=logs.map(l=>`<div class="audit-row">
+        el.innerHTML=logs.map(l=>{
+            const sevColor = l.severity==='Critical' ? 'var(--accent-rose)' : l.severity==='Warning' ? 'var(--accent-amber)' : 'var(--accent-cyan)';
+            return `<div class="audit-row" style="border-left:3px solid ${sevColor};padding-left:10px">
             <span class="audit-ts">${l.ts?.substring(0,19)||''}</span>
             <span class="audit-actor">${l.actor||''}</span>
-            <span class="audit-action">${l.action||''}</span>
+            <span class="audit-action" style="color:${sevColor};background:rgba(255,255,255,.05)">${l.action||''}</span>
             <span class="audit-target">${l.target||''}</span>
             ${l.ip?`<span style="color:var(--text-muted);font-size:.75rem">${l.ip}</span>`:''}
-        </div>`).join('');
+        </div>`;
+        }).join('');
     } catch(e) { el.innerHTML='<div style="color:var(--accent-rose)">Failed to load audit log.</div>'; }
 }
 
@@ -2144,6 +2272,7 @@ async function generateAnalytics() {
 
         document.getElementById('analyticsContainer').style.display='block';
         ['exportCsvBtn','exportXlsBtn','exportPdfBtn'].forEach(id=>document.getElementById(id).style.display='inline-block');
+        enforceExportLocks();
 
         setTimeout(()=>drawCharts(data),50);
         setTimeout(()=>generateInsights(data),200);
@@ -2868,7 +2997,7 @@ function findAllocatorLimit(key) {
 function runAllocator() {
     const balance=parseInt(document.getElementById('allocatorBalance')?.value||'0',10)||0;
     if (balance<=0) {
-        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Enter a points balance above to run the allocator.</span>';
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Load an agency above (or enter a balance) to run the allocator.</span>';
         return;
     }
     const activeToggles=Array.from(document.querySelectorAll('#calcPrivGrid .priv-toggle.active'));
@@ -2936,6 +3065,37 @@ function runAllocator() {
     }).join('\n');
 }
 
+async function loadAgencyForAllocator() {
+    const code = document.getElementById('allocAgencyCodeSearch').value.trim();
+    if (!code) { ToastManager.show('Please enter an agency code first.', 'warning'); return; }
+
+    const msgEl=document.getElementById('allocatorLockMsg');
+    document.getElementById('loadingOverlay').style.display='flex';
+    try {
+        const res = await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=points`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        currentAgencyData = data;
+        document.getElementById('allocatorBalance').value = data.point_balance || 0;
+
+        if (msgEl) { msgEl.innerHTML = `✅ Loaded Agency <strong>${escHtml(code)}</strong> — balance ${(data.point_balance||0).toLocaleString()} pts. Monthly limits from this agency's usage will now be enforced.`; msgEl.style.color = 'var(--accent-green)'; }
+
+        const controls = document.getElementById('allocatorControls');
+        controls.style.opacity = '1';
+        controls.style.pointerEvents = 'auto';
+
+    } catch(err) {
+        ToastManager.show(err.message, 'error');
+        if (msgEl) { msgEl.innerHTML = `❌ Failed to load agency: ${escHtml(err.message)}`; msgEl.style.color = 'var(--accent-rose)'; }
+
+        const controls = document.getElementById('allocatorControls');
+        controls.style.opacity = '0.4';
+        controls.style.pointerEvents = 'none';
+    }
+    document.getElementById('loadingOverlay').style.display='none';
+}
+
 // ════════════════════════════════════════════════════════════════════
 // UNIVERSAL QUERY (search any request by User ID / Numbering / Otherapp ID / NID / Bd Code)
 // ════════════════════════════════════════════════════════════════════
@@ -2960,8 +3120,25 @@ function qyStatusClass(status){
     return 'qy-status-pending';
 }
 
+function parseDuplicatedCheck(val) {
+    if (!val) return '—';
+    try {
+        let str = val.replace(/'/g, '"');
+        let arr = JSON.parse(str);
+        if (Array.isArray(arr)) {
+            return arr.map(item => {
+                let text = item.text || item;
+                let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
+                return `<span style="display:inline-block;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.08);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;">${escHtml(text)}</span>`;
+            }).join('');
+        }
+    } catch(e) {}
+    return `<span style="font-size:0.8rem;color:var(--text);">${escHtml(val)}</span>`;
+}
+
 function qyRow(label, value){
     if (value === undefined || value === null || value === '') return '';
+    if (label === 'Duplicated Check') return `<div class="qy-row" style="flex-direction:column;align-items:flex-start"><span class="qy-row-label" style="margin-bottom:4px">${escHtml(label)}</span><span class="qy-row-val" style="text-align:left">${parseDuplicatedCheck(value)}</span></div>`;
     return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
 }
 
@@ -3311,7 +3488,26 @@ function ptExportExcel() {
     ToastManager.show('Excel exported!', 'success');
 }
 
+function enforceExportLocks() {
+    if (isAdmin) return;
+    const exportAllowed = userModules.includes('export_data');
+    if (!exportAllowed) {
+        document.querySelectorAll('button[onclick*="Export"], button[id*="export"]').forEach(btn => btn.style.display = 'none');
+    }
+}
+
+function populateAcmFilterSelect() {
+    const prAcmSel = document.getElementById('prAcm');
+    if (prAcmSel) {
+        prAcmSel.innerHTML = '<option value="">All ACMs</option>';
+        allAcms.forEach(a => prAcmSel.add(new Option(a, a.toLowerCase())));
+    }
+}
+
 function enforceLocks() {
+    // Always start from the full ACM list, then narrow below for non-admins.
+    populateAcmFilterSelect();
+    enforceExportLocks();
     if (isAdmin) return;
     const p = userPermissions?.permissions || {};
 
@@ -3350,12 +3546,6 @@ function enforceLocks() {
         if (prAcm) {
             prAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
             ptAcm.forEach(a => prAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
-        }
-    } else {
-        const prAcm = document.getElementById('prAcm');
-        if(prAcm) {
-            prAcm.innerHTML = '<option value="">All ACMs</option>';
-            allAcms.forEach(a => prAcm.add(new Option(a, a.toLowerCase())));
         }
     }
     
@@ -3406,7 +3596,7 @@ function configureSidebarAndCards() {
     const wc = document.getElementById('welcomeCards');
     wc.innerHTML = '';
     if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('analytics')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.analytics}</div><div class="welcome-card-title" data-i18n="analyticsReport">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
-    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.compare}</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
+    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.compare}</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM, period or radar comparison</div></div>`;
     if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon" style="color:var(--accent-amber)">${icons.points}</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
     if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
     if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
@@ -3414,38 +3604,6 @@ function configureSidebarAndCards() {
     if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
 
     if (currentLang !== 'en') changeLanguage(currentLang);
-}
-
-async function loadAgencyForAllocator() {
-    const code = document.getElementById('allocAgencyCodeSearch').value.trim();
-    if (!code) { ToastManager.show('Please enter an agency code first.', 'warning'); return; }
-    
-    document.getElementById('loadingOverlay').style.display='flex';
-    try {
-        const res = await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=points`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        
-        currentAgencyData = data;
-        document.getElementById('allocatorBalance').value = data.point_balance || 0;
-        
-        document.getElementById('allocatorLockMsg').innerHTML = `✅ Successfully loaded data for Agency <strong>${code}</strong>. You may now plan allocations.`;
-        document.getElementById('allocatorLockMsg').style.color = 'var(--accent-green)';
-        
-        const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '1';
-        controls.style.pointerEvents = 'auto';
-        
-    } catch(err) {
-        ToastManager.show(err.message, 'error');
-        document.getElementById('allocatorLockMsg').innerHTML = `❌ Failed to load agency: ${err.message}`;
-        document.getElementById('allocatorLockMsg').style.color = 'var(--accent-rose)';
-        
-        const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '0.4';
-        controls.style.pointerEvents = 'none';
-    }
-    document.getElementById('loadingOverlay').style.display='none';
 }
 
 if (loggedUser&&loggedUat) {
@@ -3498,6 +3656,7 @@ if (loggedUser&&loggedUat) {
     setDatePresets();
     initPills();
     renderPresetBar();
+    populateAcmFilterSelect();
 
     if (hashRegion) {
         const sel=document.getElementById('anaRegion');
