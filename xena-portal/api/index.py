@@ -568,10 +568,11 @@ def fetch_feishu_records(table_id, from_dt=None, field_names=None):
     # also lets us pass a structured sort object instead of a raw query string.
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search"
 
+    use_field_names = bool(field_names)
     page_token = None
     for _ in range(200):
         payload = {"page_size": 500, "automatic_fields": True}
-        if field_names: payload["field_names"] = field_names
+        if use_field_names: payload["field_names"] = field_names
         if table_id == REQUESTS_TABLE_ID: payload["sort"] = [{"field_name": "Numbering", "desc": True}]
         if page_token: payload["page_token"] = page_token
 
@@ -582,6 +583,13 @@ def fetch_feishu_records(table_id, from_dt=None, field_names=None):
                 break
                 
             data = resp.json()
+            if data.get("code") == 1254045 and use_field_names:
+                # One or more names in our field_names projection don't exist
+                # verbatim in this table's real schema. Drop the projection and
+                # retry the SAME page with all columns instead of failing outright.
+                use_field_names = False
+                logger.warn("field_names_rejected_falling_back", table=table_id, requested=field_names)
+                continue
             if data.get("code") != 0:
                 fetch_complete, stop_reason = False, f"Feishu Error {data.get('code')}: {data.get('msg')}"
                 break
@@ -624,6 +632,17 @@ def fetch_feishu_records(table_id, from_dt=None, field_names=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # AGENCY SEARCH DUAL ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
+def _post_json_with_field_fallback(url, headers, payload, timeout):
+    """POST helper: if Feishu rejects our field_names projection because a name
+    doesn't exist in this table's real schema (code 1254045), drop the
+    projection and retry once with full columns instead of failing outright."""
+    resp = http_requests.post(url, headers=headers, json=payload, timeout=timeout).json()
+    if resp.get("code") == 1254045 and "field_names" in payload:
+        logger.warn("field_names_rejected_falling_back", url=url, requested=payload.get("field_names"))
+        payload2 = {k: v for k, v in payload.items() if k != "field_names"}
+        resp = http_requests.post(url, headers=headers, json=payload2, timeout=timeout).json()
+    return resp
+
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
         all_records = MockFeishuDB.generate_agency(code)
@@ -640,7 +659,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
         
         try:
-            resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
+            resp = _post_json_with_field_fallback(search_url, headers, points_payload, 30)
             if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
             all_records = resp.get("data", {}).get("items", [])
             if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
@@ -680,7 +699,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                     "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
                 }
             }
-            hist_resp = http_requests.post(hist_url, headers=headers, json=hist_payload, timeout=30).json()
+            hist_resp = _post_json_with_field_fallback(hist_url, headers, hist_payload, 30)
             hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
         except: hist_items = []
 
@@ -1446,6 +1465,12 @@ def query_records():
                 try:
                     resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
                     data = resp.json()
+                    if data.get("code") == 1254045:
+                        # field_names projection doesn't match this table's real
+                        # schema; retry the same condition with full columns.
+                        payload.pop("field_names", None)
+                        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
+                        data = resp.json()
                     if data.get("code") == 0:
                         all_items = data.get("data", {}).get("items", [])
                         success, fetch_complete = True, True
