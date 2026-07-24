@@ -1599,11 +1599,13 @@ if (urlParams.get('user') && urlParams.get('uat')) {
     loggedUser  = urlParams.get('user');   
     loggedEmail = urlParams.get('email') || '';
     loggedUat   = urlParams.get('uat');    
-    loggedAvatar = urlParams.get('avatar') || '';
+    const avatar = urlParams.get('avatar');
+    
     localStorage.setItem('xenaUser',  loggedUser);
     localStorage.setItem('xenaEmail', loggedEmail);
     localStorage.setItem('xenaUat',   loggedUat);
-    localStorage.setItem('xenaAvatar', loggedAvatar);
+    if (avatar) localStorage.setItem('xenaAvatar', avatar);
+    
     localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
     window.history.replaceState({},'','/');   
 }
