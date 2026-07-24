@@ -929,12 +929,12 @@ def callback():
         user_data  = info_resp.get("data", {})
         lark_name  = user_data.get("name", "Unknown User")
         lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
-        lark_avatar = user_data.get("avatar_url", "")
+        avatar_url = user_data.get("avatar_url", "")
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
         
-        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}&avatar={urllib.parse.quote(lark_avatar, safe='')}")
+        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}&avatar={urllib.parse.quote(avatar_url, safe='')}")
 
     except Exception as exc:
         return redirect("/?auth_error=" + urllib.parse.quote(f"Login error: {str(exc)[:120]}", safe=''))
