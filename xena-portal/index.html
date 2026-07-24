@@ -1178,10 +1178,10 @@
 <script>
 let currentAgencyData=null, latestAnalyticsData=null, charts={};
 let userPermissions=null; 
+let userModules=[], isAdmin=false; 
 let loggedUser=localStorage.getItem('xenaUser') || 'Ahmed Saleh';
 let loggedEmail=localStorage.getItem('xenaEmail') || 'ahmed@example.com';
 let loggedUat=localStorage.getItem('xenaUat');
-let loggedAvatar=localStorage.getItem('xenaAvatar');
 let pendingRequests=new Map();  
 let activeFilters={};           
 let sparkCharts={};             
