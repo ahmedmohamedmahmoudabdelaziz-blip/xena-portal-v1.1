@@ -33,13 +33,13 @@
 
         #loginOverlay{position:fixed;inset:0;background:radial-gradient(circle at 50% 0%,#1a1c2e 0%,var(--bg) 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000}
         .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:48px 40px;width:100%;max-width:400px;text-align:center;box-shadow:var(--shadow)}
-        .login-card h1{font-size:2rem;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+        .login-card h1{font-size:2rem;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px; display:flex; align-items:center; justify-content:center; gap:10px;}
         .login-card p{color:var(--text-muted);margin-bottom:32px}
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
         
         .sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
-        .sidebar * { color: #a0a5b5; } /* Unified sidebar text color */
+        .sidebar * { color: #a0a5b5; }
         .main-content{margin-left:240px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s; display:flex; flex-direction:column; height: 100vh; overflow: hidden;}
         
         .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:10px;flex-shrink:0}
@@ -55,12 +55,13 @@
         .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
         .nav-group-header:hover{color:#fff;background:rgba(255,255,255,.04)}
         .nav-group-header.grp-active{color:var(--accent-cyan)}
+        .nav-icon { width:16px; height:16px; margin-right:8px; vertical-align:middle; display:inline-block; }
         .nav-direct{cursor:pointer}
         .nav-arr{font-size:.7rem;transition:transform .25s;flex-shrink:0}
         .nav-arr.open{transform:rotate(90deg)}
         .nav-group-body{overflow:hidden;max-height:0;transition:max-height .35s ease}
         .nav-group-body.open{max-height:500px}
-        .nav-item{display:block;padding:9px 16px 9px 32px;font-size:.875rem;cursor:pointer;transition:all .2s;border-left:3px solid transparent}
+        .nav-item{display:block;padding:9px 16px 9px 40px;font-size:.875rem;cursor:pointer;transition:all .2s;border-left:3px solid transparent}
         .nav-item:hover{color:#fff;background:rgba(255,255,255,.04)}
         .nav-item.active{color:var(--accent-cyan)!important;border-left-color:var(--accent-cyan);background:rgba(0,212,255,.07);font-weight:600}
         .sidebar-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.05);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0}
@@ -80,7 +81,7 @@
         
         .user-profile-btn { display: flex; align-items: center; gap: 10px; background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
         .user-profile-btn:hover { background: var(--surface-hover); }
-        .user-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); background:var(--surface-hover); }
         .user-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
 
         .multi-tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px 0 16px; gap: 4px; overflow-x: auto; flex-shrink: 0; }
@@ -96,9 +97,10 @@
         .page-content-wrapper { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
 
         .welcome-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:920px;margin:0 auto}
-        .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .25s;box-shadow:var(--shadow);text-align:center}
+        .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .25s;box-shadow:var(--shadow);text-align:center; display:flex; flex-direction:column; align-items:center;}
         .welcome-card:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:0 12px 40px rgba(0,212,255,.12)}
-        .welcome-card-icon{font-size:2rem;margin-bottom:10px}
+        .welcome-card-icon{margin-bottom:12px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.03);}
+        .welcome-card-icon svg { width:24px; height:24px; }
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
 
@@ -137,10 +139,7 @@
         
         .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);transition:border-color .2s;margin-bottom:24px}
         .card:hover{border-color:var(--border-hover)}
-        .page-header{text-align:center;margin-bottom:32px}
-        .page-header h1{font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
-        .page-header p{color:var(--text-muted);font-size:1.05rem}
-
+        
         .centered-search-box{max-width:450px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
         .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
@@ -202,10 +201,11 @@
         .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;background:rgba(0,212,255,.15);color:var(--accent-cyan);border:1px solid rgba(0,212,255,.3);cursor:pointer;transition:all .2s}
         .filter-chip:hover{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
         .filter-chip-label{font-size:.7rem;opacity:.7}
+        
         #insightsPanel{background:linear-gradient(135deg,rgba(0,212,255,.06),rgba(185,103,255,.06));border:1px solid rgba(0,212,255,.15);border-radius:var(--radius);padding:20px;margin-bottom:24px;display:none}
         #insightsPanel h4{color:var(--accent-cyan);font-size:.9rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
         #insightsList{list-style:none;display:flex;flex-direction:column;gap:8px}
-        #insightsList li{font-size:.88rem;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+        #insightsList li{font-size:.88rem;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04); display:flex; gap:8px;}
         #insightsList li:last-child{border-bottom:none}
 
         .leaderboard-table{width:100%;border-collapse:collapse}
@@ -263,6 +263,7 @@
         input:checked+.slider:before{transform:translateX(20px)}
         .admin-toggle{background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
         .admin-toggle h4{color:var(--accent-amber);margin:0;font-size:1rem}
+        
         .user-list{display:flex;flex-direction:column;gap:10px}
         .user-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:.2s;flex-wrap:wrap;gap:8px}
         .user-row:hover{border-color:var(--accent-cyan)}
@@ -298,8 +299,9 @@
         .priv-toggle.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:600}
         .priv-toggle-label{flex:1;pointer-events:none}
         .priv-toggle-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
-        .priv-qty{width:46px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-hover);background:var(--surface);color:var(--text);font-size:.82rem;text-align:center;cursor:default}
+        .priv-qty{width:46px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-hover);background:var(--surface);color:var(--text);font-size:.82rem;text-align:center; transition: border-color 0.2s;}
         .priv-toggle.active .priv-qty{border-color:var(--accent-cyan)}
+        .priv-qty:disabled { opacity: 0.7; cursor: not-allowed; }
         .priv-check{font-size:.85rem;color:var(--accent-cyan);opacity:0;width:14px;text-align:center}
         .priv-toggle.active .priv-check{opacity:1}
 
@@ -329,7 +331,7 @@
         .worst-val{color:var(--accent-rose)}
 
         .empty-state{text-align:center;padding:60px 24px;color:var(--text-muted)}
-        .empty-state svg{width:56px;height:56px;fill:var(--border-hover);margin-bottom:16px}
+        .empty-state svg{width:56px;height:56px;fill:none;stroke:var(--border-hover);stroke-width:1.5;margin-bottom:16px}
         .empty-state h3{font-size:1.1rem;color:var(--text);margin-bottom:8px}
         .empty-state p{font-size:.9rem;margin-bottom:20px}
         .empty-state-action{background:transparent;border:1px solid var(--accent-cyan);color:var(--accent-cyan);padding:10px 24px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:.9rem;transition:all .2s}
@@ -376,6 +378,19 @@
 </head>
 <body>
 
+<!-- SVG ICONS -->
+<svg style="display:none;">
+    <defs>
+        <g id="icon-analytics"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
+        <g id="icon-compare"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></g>
+        <g id="icon-points"><circle cx="12" cy="12" r="8"/><path d="M12 16v-4"/><path d="M12 8h.01"/></g>
+        <g id="icon-allocator"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></g>
+        <g id="icon-target"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></g>
+        <g id="icon-query"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+        <g id="icon-admin"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g>
+    </defs>
+</svg>
+
 <div id="toastContainer"></div>
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
@@ -384,7 +399,10 @@
 
 <div id="loginOverlay">
     <div class="login-card">
-        <h1>🚀 Xena Portal</h1>
+        <h1>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            Xena Portal
+        </h1>
         <p>Secure Analytics Dashboard</p>
         <button class="btn btn-primary" onclick="window.location.href='/api/login'">Login with Feishu</button>
         <p id="loginErrMsg" style="display:none;color:#ff6b8a;font-size:.82rem;margin-top:14px;max-width:320px;text-align:center;line-height:1.5"></p>
@@ -395,7 +413,7 @@
 <div class="app-shell" id="mainApp">
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
-            <span style="font-size:1.3rem">🚀</span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
             <span class="sidebar-brand">Xena Portal</span>
         </div>
         
@@ -406,7 +424,11 @@
         <nav class="sidebar-nav">
             <div class="nav-group" id="navGrpAnalytics">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAnalytics','navBodyAnalytics')">
-                    <span data-i18n="agencyAnalysis">📊 Agency Analysis</span><span class="nav-arr" id="navArrAnalytics">›</span>
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-analytics"></use></svg>
+                        <span data-i18n="agencyAnalysis">Agency Analysis</span>
+                    </span>
+                    <span class="nav-arr" id="navArrAnalytics">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyAnalytics">
                     <div class="nav-item" id="nav-analytics" onclick="openInTab('analytics')"><span data-i18n="analyticsReport">Analytics Report</span></div>
@@ -415,7 +437,11 @@
             </div>
             <div class="nav-group" id="navGrpPoints">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpPoints','navBodyPoints')">
-                    <span data-i18n="agencyPoints">🪙 Agency Points</span><span class="nav-arr" id="navArrPoints">›</span>
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-points"></use></svg>
+                        <span data-i18n="agencyPoints">Agency Points</span>
+                    </span>
+                    <span class="nav-arr" id="navArrPoints">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyPoints">
                     <div class="nav-item" id="nav-points"         onclick="openInTab('points')"><span data-i18n="checkAgencyPoints">Check Agency Points</span></div>
@@ -427,7 +453,11 @@
             
             <div class="nav-group" id="navGrpTarget">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpTarget','navBodyTarget')">
-                    <span data-i18n="agencyTarget">🎯 Agency Target</span><span class="nav-arr" id="navArrTarget">›</span>
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-target"></use></svg>
+                        <span data-i18n="agencyTarget">Agency Target</span>
+                    </span>
+                    <span class="nav-arr" id="navArrTarget">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyTarget">
                     <div class="nav-item" id="nav-target" onclick="openInTab('target')"><span data-i18n="checkAgencyTarget">Check Agency Target</span></div>
@@ -437,7 +467,11 @@
 
             <div class="nav-group" id="navGrpQuery">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpQuery','navBodyQuery')">
-                    <span data-i18n="universalQuery">🔍 Universal Query</span><span class="nav-arr" id="navArrQuery">›</span>
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-query"></use></svg>
+                        <span data-i18n="universalQuery">Universal Query</span>
+                    </span>
+                    <span class="nav-arr" id="navArrQuery">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyQuery">
                     <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
@@ -447,7 +481,11 @@
             <div class="nav-group" id="navGrpAdmin" style="display:none">
                 <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
-                    <span data-i18n="accessManagement">⚙️ Access Management</span><span class="nav-arr" id="navArrAdmin">›</span>
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-admin"></use></svg>
+                        <span data-i18n="accessManagement">Access Management</span>
+                    </span>
+                    <span class="nav-arr" id="navArrAdmin">›</span>
                 </div>
                 <div class="nav-group-body" id="navBodyAdmin">
                     <div class="nav-item" id="nav-admin-agents" onclick="openInTab('admin-agents')"><span data-i18n="manageAgents">Manage Agents</span></div>
@@ -466,7 +504,6 @@
         <div class="page-top-bar">
             <div class="top-bar-left">
                 <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">☰</button>
-                <!-- Removed Page Title from here as tabs represent open pages now -->
             </div>
             
             <div class="top-bar-right">
@@ -501,7 +538,9 @@
                     You do not have access to any modules. Please contact an administrator.
                 </div>
                 <div style="text-align:center;padding:32px 24px 24px" id="welcomeHero">
-                    <div style="font-size:2.5rem;margin-bottom:12px">🚀</div>
+                    <div style="margin-bottom:12px; display:flex; justify-content:center;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    </div>
                     <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px" data-i18n="portalWelcome">Xena Live Data Portal</h2>
                     <p style="color:var(--text-muted);margin-bottom:32px" data-i18n="portalSub">Agency Privilege &amp; Operational Analytics</p>
                 </div>
@@ -510,12 +549,16 @@
 
             <div id="pg-compare" style="display:none">
                 <div class="card">
-                    <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Advanced Compare Engine</h3>
+                    <h3 style="margin-bottom:16px;color:var(--accent-cyan); display:flex; align-items:center; gap:8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-compare"></use></svg>
+                        Advanced Compare Engine
+                    </h3>
                     <div class="compare-mode-toggle">
-                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">👥 Agency Comparison</div>
-                        <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">📅 Period Comparison</div>
-                        <div class="compare-mode-btn" id="cmpBtnAcmRadar" onclick="setCompareMode('radar',this)">🎯 ACM Radar</div>
+                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">Side-by-Side (ACMs)</div>
+                        <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">Period Comparison</div>
+                        <div class="compare-mode-btn" id="cmpBtnAcmRadar" onclick="setCompareMode('radar',this)">ACM Radar</div>
                     </div>
+                    
                     <div id="cmpModeAcm">
                         <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Enter 2–3 agency codes to compare data side by side.</p>
                         <div class="control-grid">
@@ -527,9 +570,10 @@
                                 <select id="cmpModule"><option value="points">Agency Points</option><option value="target">Agency Target</option></select>
                             </div>
                         </div>
-                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmCompare()">⚖️ Compare Agencies</button>
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmCompare()">Compare Agencies</button>
                         <div id="cmpAcmResults" style="margin-top:24px;overflow-x:auto"></div>
                     </div>
+                    
                     <div id="cmpModePeriod" style="display:none">
                         <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Select two periods to compare overall performance trends (real data, pulled live from Feishu).</p>
                         <div class="control-grid">
@@ -538,9 +582,13 @@
                             <div class="control-group"><label>Period 2 (Start)</label><input type="date" id="cmpP2Start"></div>
                             <div class="control-group"><label>Period 2 (End)</label><input type="date" id="cmpP2End"></div>
                         </div>
-                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runPeriodCompare()">📅 Compare Periods</button>
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runPeriodCompare()">Compare Periods</button>
                         <div id="cmpPeriodResults" style="margin-top:24px;"></div>
+                        <div class="chart-wrapper-bar" style="margin-top:24px; display:none;" id="cmpPeriodChartWrapper">
+                            <canvas id="cmpPeriodChart"></canvas>
+                        </div>
                     </div>
+                    
                     <div id="cmpModeRadar" style="display:none">
                         <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Select up to 3 ACMs to compare Creations, Closings and Closing Efficiency. Run an Analytics Report first so real numbers are available.</p>
                         <div class="control-grid">
@@ -548,7 +596,7 @@
                             <div class="control-group"><label>ACM 2</label><select id="cmpAcm2"></select></div>
                             <div class="control-group"><label>ACM 3 (optional)</label><select id="cmpAcm3"><option value="">None</option></select></div>
                         </div>
-                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmRadar()">🎯 Generate Radar</button>
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmRadar()">Generate Radar</button>
                         <div class="chart-wrapper-pie-large" style="margin-top:24px; max-width:600px; margin-left:auto; margin-right:auto;">
                             <canvas id="cmpRadarChart"></canvas>
                         </div>
@@ -564,7 +612,7 @@
                             <label>Agency Code</label>
                             <input type="text" id="agencyCode" placeholder="e.g., 40775" aria-label="Agency code" onkeydown="if(event.key==='Enter')fetchAgencyData()">
                         </div>
-                        <div class="control-group">
+                        <div class="control-group" id="optCompareGroup">
                             <label>Compare With (optional, comma-separated codes)</label>
                             <input type="text" id="compareAgencyCodes" placeholder="e.g., 40776, 40777" aria-label="Comparison codes">
                         </div>
@@ -615,7 +663,10 @@
                     </div>
 
                     <div class="card" id="pointsArea" style="display:none">
-                        <h3 style="margin-bottom:16px;color:var(--accent-purple)">🪙 Agency Points System</h3>
+                        <h3 style="margin-bottom:16px;color:var(--accent-purple); display:flex; align-items:center; gap:8px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-points"></use></svg>
+                            Agency Points System
+                        </h3>
                         <div class="stat-grid" style="margin-bottom:24px">
                             <div class="stat-box"><div class="stat-label">Total Points</div><div class="stat-value" id="ptTotal" style="color:var(--accent-green)">0</div></div>
                             <div class="stat-box"><div class="stat-label">Points Used</div><div class="stat-value" id="ptUsed" style="color:var(--accent-rose)">0</div></div>
@@ -645,7 +696,10 @@
             <div id="pg-allocator" style="display:none">
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                     <div class="card">
-                        <h3 style="margin-bottom:16px;color:var(--accent-cyan)">🤖 Smart Allocator</h3>
+                        <h3 style="margin-bottom:16px;color:var(--accent-cyan); display:flex; align-items:center; gap:8px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-allocator"></use></svg>
+                            Smart Allocator
+                        </h3>
 
                         <div style="background:var(--surface-hover); border:1px solid var(--border); padding:16px; border-radius:12px; margin-bottom:20px;">
                             <label style="display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">1. Load Agency Data</label>
@@ -653,20 +707,20 @@
                                 <input type="text" id="allocAgencyCodeSearch" placeholder="Agency Code (e.g. 40775)" style="flex:1;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;" onkeydown="if(event.key==='Enter')loadAgencyForAllocator()">
                                 <button class="btn btn-primary" style="width:auto;padding:10px 20px" onclick="loadAgencyForAllocator()">🔍 Load Data</button>
                             </div>
-                            <div id="allocatorLockMsg" style="margin-top:10px;font-size:.85rem;color:var(--accent-amber);">⚠️ Load an agency to enforce accurate monthly-limit calculations, or open this page via "Open Smart Allocator with this balance" from Check Agency Points.</div>
+                            <div id="allocatorLockMsg" style="margin-top:10px;font-size:.85rem;color:var(--accent-amber);">⚠️ Load an agency to enforce accurate monthly-limit calculations, or open this page via "Open Smart Allocator" from Check Agency Points.</div>
                         </div>
 
                         <div id="allocatorControls" style="opacity:0.4; pointer-events:none; transition: opacity 0.3s;">
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
                                 <div class="control-group" style="margin-bottom:0">
-                                    <label>Available Points Balance (auto-filled)</label>
-                                    <input type="number" id="allocatorBalance" min="0" value="0" readonly style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;opacity:0.85">
+                                    <label>Available Points Balance</label>
+                                    <input type="number" id="allocatorBalance" min="0" value="0" readonly style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:10px;color:var(--accent-cyan);font-weight:bold;font-size:1.1rem;font-family:inherit; cursor:not-allowed;">
                                 </div>
                                 <div class="control-group" style="margin-bottom:0">
                                     <label>Pricing Region</label>
                                     <select id="allocatorRegion" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1rem;font-family:inherit;cursor:pointer">
-                                        <option value="same">Same Region (Lower Rate)</option>
-                                        <option value="other">Other Region (Higher Rate)</option>
+                                        <option value="same">Same Agency ID (Lower Rate)</option>
+                                        <option value="other">Other Agency ID (Higher Rate)</option>
                                     </select>
                                 </div>
                             </div>
@@ -679,19 +733,19 @@
                                     </div>
                                 </div>
                                 <div id="calcPrivGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-                                    <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
-                                    <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="trend card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Trend Card (40-50)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'trend card')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="traffic card" onclick="privToggle(this,event)"><span class="priv-toggle-label">Traffic Card (30-40)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'traffic card')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="30 mic 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 15 Days (150-175)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, '30 mic 15 days')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="30 mic 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">30 Mic 30 Days (300-350)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, '30 mic 30 days')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="normal short id" onclick="privToggle(this,event)"><span class="priv-toggle-label">Normal Short ID</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'normal short id')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="customized short id 15 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 15D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'customized short id 15 days')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="customized short id 30 days" onclick="privToggle(this,event)"><span class="priv-toggle-label">Custom Short ID 30D</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'customized short id 30 days')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="room pin-up" onclick="privToggle(this,event)"><span class="priv-toggle-label">Room Pin-up (100-150)</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'room pin-up')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="welcome package 3" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 3</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'welcome package 3')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="welcome package 2" onclick="privToggle(this,event)"><span class="priv-toggle-label">Welcome Package 2</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'welcome package 2')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="main page banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Main Page Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'main page banner')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="news banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">News Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'news banner')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
+                                    <div class="priv-toggle" data-val="live banner" onclick="privToggle(this,event)"><span class="priv-toggle-label">Live Banner</span><div class="priv-toggle-right"><input type="number" class="priv-qty" min="1" max="99" value="1" onclick="event.stopPropagation()" oninput="handleQtyChange(this, 'live banner')" onmousedown="event.stopPropagation()"><span class="priv-check">✓</span></div></div>
                                 </div>
                             </div>
                             <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -709,7 +763,10 @@
 
             <div id="pg-admin-agents" style="display:none">
                 <div class="card">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:20px">⚙️ Manage Agents</h3>
+                    <h3 style="color:var(--accent-cyan);margin-bottom:20px; display:flex; align-items:center; gap:8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-admin"></use></svg>
+                        Manage Agents
+                    </h3>
                     <div class="admin-form">
                         <div class="control-group">
                             <label>Agent Identity (Exact Lark Name OR Email)</label>
@@ -756,7 +813,7 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_report"> Analytics Report</label>
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_compare"> Compare ACMs / Periods</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_analytics_compare"> Compare Module</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
@@ -780,7 +837,7 @@
                                 <h4 style="color:var(--accent-purple)">💾 Global Settings</h4>
                             </div>
                             <div class="sub-opts">
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_export_data" checked> Allow Data Export (CSV / Excel / PDF)</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_export_data" checked> Allow Data Export (CSV / Excel)</label>
                             </div>
                         </div>
                         <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
@@ -852,23 +909,11 @@
                         </div>
                     </div>
 
-                    <div style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                            <span style="font-size:.85rem;font-weight:600;color:var(--accent-purple)">📊 Period Comparison (optional)</span>
-                            <label class="switch" style="transform:scale(.8)"><input type="checkbox" id="compareToggle" onchange="toggleCompareDates()"><span class="slider"></span></label>
-                        </div>
-                        <div id="compareDatesRow" style="display:none;grid-template-columns:1fr 1fr;gap:12px" class="control-grid">
-                            <div class="control-group" style="margin-bottom:0"><label>Compare From</label><input type="date" id="cmpFrom" aria-label="Compare from"></div>
-                            <div class="control-group" style="margin-bottom:0"><label>Compare To</label><input type="date" id="cmpTo" aria-label="Compare to"></div>
-                        </div>
-                    </div>
-
                     <div style="display:flex;gap:12px;flex-wrap:wrap">
                         <button class="btn btn-success" id="btnGenAna" onclick="generateAnalytics()" style="flex:1;min-width:200px">Generate Analytics Report</button>
                         <button class="btn btn-outline" id="btnRefreshAna" onclick="window._nocache=true;generateAnalytics()" style="background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan)">🔄 Refresh Data</button>
                         <button class="btn-outline" id="exportCsvBtn" style="display:none" onclick="exportCSV()">📥 CSV</button>
                         <button class="btn-outline" id="exportXlsBtn" style="display:none" onclick="exportExcel()">📊 Excel</button>
-                        <button class="btn-outline" id="exportPdfBtn" style="display:none" onclick="window.print()">🖨️ PDF</button>
                     </div>
                 </div>
 
@@ -880,22 +925,8 @@
                     </div>
 
                     <div id="insightsPanel">
-                        <h4>🧠 Auto-Generated Insights</h4>
+                        <h4>🧠 Executive Intelligence</h4>
                         <ul id="insightsList"></ul>
-                    </div>
-
-                    <div id="comparisonKpisSection" style="display:none;margin-bottom:24px">
-                        <div class="compare-section">
-                            <h5>📊 Period Comparison: Current vs Previous</h5>
-                            <div class="compare-kpi-row">
-                                <div class="compare-kpi"><div class="compare-kpi-label">Current Creations</div><div class="compare-kpi-val" id="cmpCurCreations">—</div></div>
-                                <div class="compare-kpi"><div class="compare-kpi-label">Previous Creations</div><div class="compare-kpi-val" id="cmpPrevCreations">—</div></div>
-                                <div class="compare-kpi"><div class="compare-kpi-label">Current BDs</div><div class="compare-kpi-val" id="cmpCurBds">—</div></div>
-                                <div class="compare-kpi"><div class="compare-kpi-label">Previous BDs</div><div class="compare-kpi-val" id="cmpPrevBds">—</div></div>
-                                <div class="compare-kpi"><div class="compare-kpi-label">Current Closings</div><div class="compare-kpi-val" id="cmpCurClosings">—</div></div>
-                                <div class="compare-kpi"><div class="compare-kpi-label">Previous Closings</div><div class="compare-kpi-val" id="cmpPrevClosings">—</div></div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- KPI cards -->
@@ -1009,7 +1040,10 @@
 
             <div id="pg-points-records" style="display:none">
                 <div class="card" style="margin-bottom:20px">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔎 Search Point Records</h3>
+                    <h3 style="color:var(--accent-cyan);margin-bottom:20px; display:flex; align-items:center; gap:8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        Search Point Records
+                    </h3>
                     <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
                         <div class="control-group">
                             <label>Quick Search</label>
@@ -1042,8 +1076,8 @@
                             <span id="prLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap">
-                            <button onclick="prExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
-                            <button onclick="prExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
+                            <button id="prExportCsvBtn" onclick="prExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 Export CSV</button>
+                            <button id="prExportXlsBtn" onclick="prExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Export Excel</button>
                         </div>
                     </div>
 
@@ -1054,7 +1088,9 @@
                             <tfoot id="prTfoot" style="font-weight:700;border-top:2px solid var(--border)"></tfoot>
                         </table>
                         <div id="prEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
-                            <div style="font-size:2rem;margin-bottom:12px">🔍</div>
+                            <div style="font-size:2rem;margin-bottom:12px">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-hover)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            </div>
                             <p>No records found matching your criteria.</p>
                         </div>
                     </div>
@@ -1075,7 +1111,10 @@
             <div id="pg-points-table" style="display:none">
                 <div class="card" style="margin-bottom:20px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-                        <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Agency Point Table</h3>
+                        <h3 style="color:var(--accent-cyan);margin-bottom:0; display:flex; align-items:center; gap:8px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8h.01"/><path d="M12 16v-4"/><circle cx="12" cy="12" r="8"/></svg>
+                            Agency Point Table
+                        </h3>
                         <div style="display:flex;gap:8px;flex-wrap:wrap">
                             <select id="ptPageSize" onchange="ptFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
                                 <option value="25">25 / page</option>
@@ -1083,8 +1122,8 @@
                                 <option value="100">100 / page</option>
                                 <option value="200">200 / page</option>
                             </select>
-                            <button onclick="ptExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 CSV</button>
-                            <button onclick="ptExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Excel</button>
+                            <button id="ptExportCsvBtn" onclick="ptExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 Export CSV</button>
+                            <button id="ptExportXlsBtn" onclick="ptExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Export Excel</button>
                             <button onclick="ptFetch(1)" style="background:rgba(185,103,255,.1);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">🔄 Refresh</button>
                         </div>
                     </div>
@@ -1103,8 +1142,10 @@
                             </select>
                         </div>
                         <div class="control-group">
-                            <label>Status</label>
-                            <input type="text" id="ptStatus" placeholder="e.g. Active" oninput="ptDebounce()">
+                            <label>ACM</label>
+                            <select id="ptAcm" onchange="ptFetch(1)">
+                                <option value="">All ACMs</option>
+                            </select>
                         </div>
                         <div class="control-group">
                             <label>Sort By</label>
@@ -1153,7 +1194,9 @@
                             <tfoot id="ptTfoot"></tfoot>
                         </table>
                         <div id="ptEmpty" style="display:none;text-align:center;padding:48px;color:var(--text-muted)">
-                            <div style="font-size:2rem;margin-bottom:12px">📋</div>
+                            <div style="font-size:2rem;margin-bottom:12px">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-hover)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8h.01"/><path d="M12 16v-4"/><circle cx="12" cy="12" r="8"/></svg>
+                            </div>
                             <p>No records to display. Try adjusting your filters.</p>
                         </div>
                     </div>
@@ -1173,7 +1216,10 @@
 
             <div id="pg-query" style="display:none">
                 <div class="card" style="margin-bottom:20px">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:20px">🔍 Universal Request Query</h3>
+                    <h3 style="color:var(--accent-cyan);margin-bottom:20px; display:flex; align-items:center; gap:8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        Universal Request Query
+                    </h3>
                     <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
                         <div class="control-group">
                             <label>Search By</label>
@@ -1207,14 +1253,16 @@
                     <div id="qyResults" class="qy-grid"></div>
 
                     <div id="qyEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
-                        <div style="font-size:2rem;margin-bottom:12px">🔍</div>
+                        <div style="font-size:2rem;margin-bottom:12px">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-hover)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
                         <p>No requests found for that value.</p>
                     </div>
                 </div>
             </div>
 
-        </div> <!-- /page-content-wrapper -->
-    </div> <!-- /main-content -->
+        </div> 
+    </div> 
 </div>
 
 <script>
@@ -1224,8 +1272,8 @@
 let currentAgencyData=null, latestAnalyticsData=null, charts={};
 let userPermissions=null; 
 let isAdmin=false, userModules=[];
-let loggedUser=localStorage.getItem('xenaUser') || 'Ahmed Saleh';
-let loggedEmail=localStorage.getItem('xenaEmail') || 'ahmed@example.com';
+let loggedUser=localStorage.getItem('xenaUser') || 'Unknown';
+let loggedEmail=localStorage.getItem('xenaEmail') || 'unknown@example.com';
 let loggedUat=localStorage.getItem('xenaUat');
 let pendingRequests=new Map();  
 let activeFilters={};           
@@ -1235,24 +1283,35 @@ let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQue
 const urlParams=new URLSearchParams(window.location.search);
 
 // ════════════════════════════════════════════════════════════════════
+// CLIENT-SIDE AUDIT LOGGING
+// ════════════════════════════════════════════════════════════════════
+function logFrontendAction(action, target, severity="Info") {
+    fetch('/api/audit/log-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: loggedUser, email: loggedEmail, action, target, severity })
+    }).catch(e => console.error('Audit fail', e));
+}
+
+// ════════════════════════════════════════════════════════════════════
 // TRANSLATION ENGINE
 // ════════════════════════════════════════════════════════════════════
 const translations = {
     en: {
-        agencyAnalysis: "📊 Agency Analysis",
+        agencyAnalysis: "Agency Analysis",
         analyticsReport: "Analytics Report",
-        compareAcm: "Compare ACMs / Periods",
-        agencyPoints: "🪙 Agency Points",
+        compareAcm: "Compare Module",
+        agencyPoints: "Agency Points",
         checkAgencyPoints: "Check Agency Points",
         smartAllocator: "Smart Allocator",
         searchRecords: "Search Records",
         pointTable: "Point Table",
-        agencyTarget: "🎯 Agency Target",
+        agencyTarget: "Agency Target",
         checkAgencyTarget: "Check Agency Target",
         targetTimeline: "Target Timeline",
-        universalQuery: "🔍 Universal Query",
+        universalQuery: "Universal Query",
         queryRequests: "Query Requests",
-        accessManagement: "⚙️ Access Management",
+        accessManagement: "Access Management",
         manageAgents: "Manage Agents",
         auditLog: "Audit Log",
         logout: "Logout",
@@ -1262,20 +1321,20 @@ const translations = {
         crunching: "Crunching Feishu data..."
     },
     zh: {
-        agencyAnalysis: "📊 机构分析",
+        agencyAnalysis: "机构分析",
         analyticsReport: "分析报告",
-        compareAcm: "比较 ACMs / 周期",
-        agencyPoints: "🪙 机构积分",
+        compareAcm: "比较模块",
+        agencyPoints: "机构积分",
         checkAgencyPoints: "查看机构积分",
         smartAllocator: "智能分配器",
         searchRecords: "搜索记录",
         pointTable: "积分表",
-        agencyTarget: "🎯 机构目标",
+        agencyTarget: "机构目标",
         checkAgencyTarget: "查看机构目标",
         targetTimeline: "目标时间表",
-        universalQuery: "🔍 通用查询",
+        universalQuery: "通用查询",
         queryRequests: "查询请求",
-        accessManagement: "⚙️ 权限管理",
+        accessManagement: "权限管理",
         manageAgents: "管理代理",
         auditLog: "审计日志",
         logout: "退出登录",
@@ -1302,7 +1361,7 @@ function changeLanguage(lang) {
             el.placeholder = translations[lang][key];
         }
     });
-    renderTabs(); // Re-render tabs to update their titles
+    renderTabs(); 
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1311,7 +1370,7 @@ function changeLanguage(lang) {
 const pageTitlesMap = {
     'welcome': 'Welcome',
     'analytics': 'Analytics Report',
-    'compare': 'Compare Agencies',
+    'compare': 'Compare Module',
     'points': 'Check Agency Points',
     'allocator': 'Smart Allocator',
     'target': 'Agency Target',
@@ -1326,7 +1385,7 @@ const pageTitlesMap = {
 const zhPageTitlesMap = {
     'welcome': '欢迎',
     'analytics': '分析报告',
-    'compare': '比较机构',
+    'compare': '比较模块',
     'points': '查看机构积分',
     'allocator': '智能分配器',
     'target': '机构目标',
@@ -1353,23 +1412,20 @@ function setActiveTab(page) {
     activeTabId = page;
     renderTabs();
     
-    // Deactivate all sidebar items first
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
     const navEl = document.getElementById('nav-' + page);
     if(navEl) navEl.classList.add('active', 'active-nav');
     
-    // Execute original nav logic to map logical page to physical div
     executePageLogic(page);
 }
 
 function closeTab(page, event) {
     if(event) event.stopPropagation();
-    if(page === 'welcome') return; // Cannot close welcome tab
+    if(page === 'welcome') return; 
 
     openTabs = openTabs.filter(t => t !== page);
     
     if (activeTabId === page) {
-        // Switch to the previous tab
         activeTabId = openTabs[openTabs.length - 1];
     }
     
@@ -1407,7 +1463,6 @@ function renderTabs() {
 }
 
 function executePageLogic(page) {
-    // Hide all
     ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
     closeSidebar();
 
@@ -1442,6 +1497,8 @@ function executePageLogic(page) {
             if(msgEl){ msgEl.innerHTML=`✅ Using balance auto-filled from last search${code?' ('+escHtml(code)+')':''}. Edit the code above and click "Load Data" to switch agencies.`; msgEl.style.color='var(--accent-green)'; }
             const controlsEl=document.getElementById('allocatorControls');
             if(controlsEl){ controlsEl.style.opacity='1'; controlsEl.style.pointerEvents='auto'; }
+            // Force re-render of caps based on loaded agency
+            allocClearAll();
         }
     } else if(page==='admin-agents'){
         document.getElementById('pg-admin-agents').style.display='block';
@@ -1471,7 +1528,6 @@ function executePageLogic(page) {
 function filterSidebar() {
     const term = document.getElementById('sidebarSearch').value.toLowerCase();
     
-    // If empty, reset visibility and collapse states
     if (!term) {
         document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'block');
         return;
@@ -1491,7 +1547,6 @@ function filterSidebar() {
             }
         });
         
-        // Auto-expand group if it has matching children
         const body = group.querySelector('.nav-group-body');
         const arr = group.querySelector('.nav-arr');
         if (hasVisibleChild) {
@@ -1664,24 +1719,33 @@ if (urlParams.get('auth_error')) {
         const errEl=document.getElementById('loginErrMsg');
         if(errEl){errEl.textContent=authErr;errEl.style.display='block';}
     }, 200);
-    window.history.replaceState({},'',window.location.href.split('?')[0]);
+    window.history.replaceState({},'',window.location.href.split('?')[0].split('#')[0]);
 }
 
 if (urlParams.get('user') && urlParams.get('uat')) {
     loggedUser  = urlParams.get('user');   
     loggedEmail = urlParams.get('email') || '';
     loggedUat   = urlParams.get('uat');    
+    const avatar = urlParams.get('avatar');
+    
     localStorage.setItem('xenaUser',  loggedUser);
     localStorage.setItem('xenaEmail', loggedEmail);
     localStorage.setItem('xenaUat',   loggedUat);
+    if(avatar) localStorage.setItem('xenaAvatar', avatar);
+    
     localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
-    window.history.replaceState({},'',window.location.href.split('?')[0]);   
+    window.history.replaceState({},'',window.location.href.split('?')[0].split('#')[0]);   
 }
 
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
-function logout() { localStorage.clear(); location.reload(); }
+function logout() { 
+    logFrontendAction("LOGOUT", "User Session");
+    localStorage.clear(); 
+    location.reload(); 
+}
+
 function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 function formatCoins(num) {
@@ -1708,6 +1772,9 @@ function closeSidebar(){
     document.getElementById('sidebarBackdrop').classList.remove('visible');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// COMPARE ENGINE (Dedicated Module)
+// ════════════════════════════════════════════════════════════════════
 function setCompareMode(mode,btn){
     document.querySelectorAll('.compare-mode-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
@@ -1715,7 +1782,6 @@ function setCompareMode(mode,btn){
     document.getElementById('cmpModePeriod').style.display=mode==='period'?'block':'none';
     document.getElementById('cmpModeRadar').style.display=mode==='radar'?'block':'none';
 
-    // Auto-populate ACM dropdowns for the radar tool the first time it's opened
     if (mode==='radar') {
         const sel1=document.getElementById('cmpAcm1'), sel2=document.getElementById('cmpAcm2'), sel3=document.getElementById('cmpAcm3');
         if (sel1 && sel1.options.length===0) {
@@ -1728,8 +1794,13 @@ async function runPeriodCompare() {
     const p1s=document.getElementById('cmpP1Start').value, p1e=document.getElementById('cmpP1End').value;
     const p2s=document.getElementById('cmpP2Start').value, p2e=document.getElementById('cmpP2End').value;
     if (!p1s||!p1e||!p2s||!p2e) { ToastManager.show('Please fill in both period date ranges.','warning'); return; }
+    
+    logFrontendAction("PERIOD_COMPARE", `${p1s} to ${p1e} vs ${p2s} to ${p2e}`);
+    
     const container=document.getElementById('cmpPeriodResults');
+    const chartWrapper = document.getElementById('cmpPeriodChartWrapper');
     container.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-muted)">Loading comparison…</div>';
+    chartWrapper.style.display = 'none';
     document.getElementById('loadingOverlay').style.display='flex';
     try {
         const payload={user:loggedUser,email:loggedEmail,uat:loggedUat,region:'All',acm:'All',type:'All',from:p1s,to:p1e,compare_from:p2s,compare_to:p2e};
@@ -1739,6 +1810,7 @@ async function runPeriodCompare() {
         const c=data.comparison||{kpis:{creations:0,bds:0,closings:0}};
         const deltaPct=(a,b)=> b>0 ? Math.round(((a-b)/b)*100) : (a>0?100:0);
         const deltaHtml=(a,b)=>{ const d=deltaPct(a,b); const col=d>=0?'var(--accent-green)':'var(--accent-rose)'; return `<span style="color:${col};font-size:.78rem;font-weight:700">${d>=0?'▲ +':'▼ '}${d}%</span>`; };
+        
         container.innerHTML=`
             <div class="compare-section">
                 <h5>📅 Period 1 (${p1s} → ${p1e}) vs Period 2 (${p2s} → ${p2e})</h5>
@@ -1751,6 +1823,26 @@ async function runPeriodCompare() {
                     <div class="compare-kpi"><div class="compare-kpi-label">P2 Closings</div><div class="compare-kpi-val">${c.kpis.closings}</div>${deltaHtml(data.kpis.closings,c.kpis.closings)}</div>
                 </div>
             </div>`;
+            
+        chartWrapper.style.display = 'block';
+        const ctx = document.getElementById('cmpPeriodChart');
+        if(charts['cmpPeriodChart']) charts['cmpPeriodChart'].destroy();
+        charts['cmpPeriodChart'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Creations', 'BD Creations', 'Closings'],
+                datasets: [
+                    { label: 'Period 1', data: [data.kpis.creations, data.kpis.bds, data.kpis.closings], backgroundColor: 'rgba(0, 212, 255, 0.8)', borderRadius: 4 },
+                    { label: 'Period 2', data: [c.kpis.creations, c.kpis.bds, c.kpis.closings], backgroundColor: 'rgba(185, 103, 255, 0.8)', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { color: '#8b8fa3' } }, datalabels: { color: '#fff', font: { weight: 'bold' } } },
+                scales: { x: { grid: { display: false } }, y: { grid: { color: '#2a2c3f' } } }
+            }
+        });
+            
     } catch(e) {
         container.innerHTML=`<div style="color:var(--accent-rose);padding:20px">Comparison failed: ${e.message}</div>`;
     }
@@ -1761,6 +1853,8 @@ async function runAcmRadar() {
     const a1=document.getElementById('cmpAcm1').value, a2=document.getElementById('cmpAcm2').value, a3=document.getElementById('cmpAcm3').value;
     if (!a1||!a2) { ToastManager.show('Select at least 2 ACMs.','warning'); return; }
     if (!latestAnalyticsData) { ToastManager.show('Run an Analytics Report first so real ACM numbers are available.','warning'); return; }
+
+    logFrontendAction("ACM_RADAR", `${a1} vs ${a2} ${a3?'vs '+a3:''}`);
 
     const perf=latestAnalyticsData.acm_performance||{};
     const closeMap=latestAnalyticsData.acm_closing_reasons||{};
@@ -1802,6 +1896,9 @@ async function runAcmCompare(){
     ].filter(Boolean);
     if(codes.length<2){ToastManager.show('Enter at least 2 agency codes to compare.','warning');return;}
     const type=document.getElementById('cmpModule').value;
+    
+    logFrontendAction("AGENCY_COMPARE", `Codes: ${codes.join(', ')} | Type: ${type}`);
+    
     const container=document.getElementById('cmpAcmResults');
     container.innerHTML='<div style="color:var(--text-muted)">Loading comparison…</div>';
     document.getElementById('loadingOverlay').style.display='flex';
@@ -1818,11 +1915,10 @@ async function runAcmCompare(){
     document.getElementById('loadingOverlay').style.display='none';
 }
 
-function toggleCompareDates(){
-    const on=document.getElementById('compareToggle').checked;
-    document.getElementById('compareDatesRow').style.display=on?'grid':'none';
-}
 
+// ════════════════════════════════════════════════════════════════════
+// ANALYTICS FILTERS
+// ════════════════════════════════════════════════════════════════════
 function updateCustomDateVisibility() {
     const isSpec=document.getElementById('anaDatePreset').value==='specific';
     document.getElementById('customFromDiv').style.display=isSpec?'block':'none';
@@ -1852,7 +1948,6 @@ function updateAcmDropdown() {
     
     let list=region==='IN'?inAcms:region==='PK'?pkAcms:[...pkAcms,...inAcms].sort();
     
-    // Front-end lock using backend permissions payload
     if (!isAdmin && userPermissions?.permissions?.acms?.analytics) {
         const allowed = userPermissions.permissions.acms.analytics;
         if (!allowed.includes('all')) {
@@ -1937,6 +2032,9 @@ function parseGranular(str,module) {
     return ['all'];
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ADMIN ACTIONS
+// ════════════════════════════════════════════════════════════════════
 function editAgent(email,modulesStr,acmsRaw,regRaw) {
     document.getElementById('newAgentEmail').value=email;
     const m = modulesStr.toLowerCase();
@@ -1979,7 +2077,7 @@ async function fetchAdminUsers() {
         listDiv.innerHTML='';
         if (!users.length) {
             listDiv.innerHTML=`<div class="empty-state" style="padding:40px 0">
-                <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                 <h3>No agents configured yet</h3>
                 <p>Add an agent above to grant access to the portal.</p>
             </div>`;
@@ -2078,7 +2176,7 @@ async function loadAuditLog() {
         el.innerHTML=logs.map(l=>{
             const sevColor = l.severity==='Critical' ? 'var(--accent-rose)' : l.severity==='Warning' ? 'var(--accent-amber)' : 'var(--accent-cyan)';
             return `<div class="audit-row" style="border-left:3px solid ${sevColor};padding-left:10px">
-            <span class="audit-ts">${l.ts?.substring(0,19)||''}</span>
+            <span class="audit-ts">${l.ts?.substring(0,19).replace('T',' ')||''}</span>
             <span class="audit-actor">${l.actor||''}</span>
             <span class="audit-action" style="color:${sevColor};background:rgba(255,255,255,.05)">${l.action||''}</span>
             <span class="audit-target">${l.target||''}</span>
@@ -2185,6 +2283,9 @@ function applyFiltersAndRedraw() {
     drawCharts(latestAnalyticsData);
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ANALYTICS CORE
+// ════════════════════════════════════════════════════════════════════
 async function generateAnalytics() {
     if (document.getElementById('anaDatePreset').value!=='specific') setDatePresets();
     const region=document.getElementById('anaRegion').value;
@@ -2192,22 +2293,18 @@ async function generateAnalytics() {
     const type=document.getElementById('anaType').value;
     const fromDate=document.getElementById('anaFrom').value;
     const toDate=document.getElementById('anaTo').value;
-    const cmpOn=document.getElementById('compareToggle').checked;
-    const cmpFrom=cmpOn?document.getElementById('cmpFrom').value:'';
-    const cmpTo=cmpOn?document.getElementById('cmpTo').value:'';
 
     const nocache=window._nocache?'1':'0';
     window._nocache=false;
 
     const payload={user:loggedUser,email:loggedEmail,uat:loggedUat,region,acm,type,from:fromDate,to:toDate};
-    if (cmpFrom&&cmpTo) { payload.compare_from=cmpFrom; payload.compare_to=cmpTo; }
 
     const cacheKey=JSON.stringify(payload);
     if (pendingRequests.has(cacheKey)) return pendingRequests.get(cacheKey); 
 
     document.getElementById('loadingOverlay').style.display='flex';
     document.getElementById('analyticsContainer').style.display='none';
-    ['exportCsvBtn','exportXlsBtn','exportPdfBtn'].forEach(id=>document.getElementById(id).style.display='none');
+    ['exportCsvBtn','exportXlsBtn'].forEach(id=>document.getElementById(id).style.display='none');
     document.getElementById('insightsPanel').style.display='none';
 
     const kpiCards=document.querySelectorAll('.kpi-card');
@@ -2254,24 +2351,11 @@ async function generateAnalytics() {
         drawSparkline('sparkBds',data.daily_trend_bd,'#00e676');
         drawSparkline('sparkClosings',data.daily_trend_closing,'#ff4d6d');
 
-        if (data.comparison) {
-            const c=data.comparison;
-            document.getElementById('cmpCurCreations').innerText=data.kpis.creations;
-            document.getElementById('cmpPrevCreations').innerText=c.kpis.creations;
-            document.getElementById('cmpCurBds').innerText=data.kpis.bds;
-            document.getElementById('cmpPrevBds').innerText=c.kpis.bds;
-            document.getElementById('cmpCurClosings').innerText=data.kpis.closings;
-            document.getElementById('cmpPrevClosings').innerText=c.kpis.closings;
-            document.getElementById('comparisonKpisSection').style.display='block';
-        } else {
-            document.getElementById('comparisonKpisSection').style.display='none';
-        }
-
         const urlP=new URLSearchParams({region,acm,type,from:fromDate,to:toDate});
-        window.history.replaceState(null,null,window.location.href.split('#')[0] + `#analyze?${urlP.toString()}`);
+        window.history.replaceState(null,null,window.location.href.split('?')[0].split('#')[0] + `#analyze?${urlP.toString()}`);
 
         document.getElementById('analyticsContainer').style.display='block';
-        ['exportCsvBtn','exportXlsBtn','exportPdfBtn'].forEach(id=>document.getElementById(id).style.display='inline-block');
+        ['exportCsvBtn','exportXlsBtn'].forEach(id=>document.getElementById(id).style.display='inline-block');
         enforceExportLocks();
 
         setTimeout(()=>drawCharts(data),50);
@@ -2320,60 +2404,25 @@ function calculateDelta(obj,elementId) {
 }
 
 function generateInsights(data) {
-    const insights=[];
-    const kpis=data.kpis||{};
-    const acmPerf=data.acm_performance||{};
-    const rejReasons=data.reject_reasons||{};
-    const creStatus=data.creation_status||{};
-
-    const topAcm=Object.entries(acmPerf).sort((a,b)=>b[1]-a[1])[0];
-    if (topAcm) {
-        const total=Object.values(acmPerf).reduce((a,b)=>a+b,0);
-        const share=total>0?((topAcm[1]/total)*100).toFixed(0):0;
-        insights.push(`📈 <strong>${topAcm[0]}</strong> leads creations with <strong>${topAcm[1]}</strong> onboarded (${share}% share).`);
-    }
+    const insights = data.executive_insights || [];
+    const panel = document.getElementById('insightsPanel');
+    const list = document.getElementById('insightsList');
     
-    const total=kpis.creations||0;
-    const rejected=creStatus.Rejected||0;
-    if (total>0) {
-        const rejRate=((rejected/total)*100).toFixed(1);
-        if (parseFloat(rejRate)>20) {
-            insights.push(`⚠️ Rejection rate is <strong style="color:var(--accent-rose)">${rejRate}%</strong> — review top rejection reasons below.`);
-        } else {
-            insights.push(`✅ Rejection rate is healthy at <strong style="color:var(--accent-green)">${rejRate}%</strong>.`);
-        }
+    // Add icon to insights securely via backend output parsing in frontend
+    if (insights.length) {
+        list.innerHTML = insights.map(i => {
+            let icon = '💡';
+            if(i.includes('Pipeline')) icon = '⚡';
+            else if (i.includes('Closing Efficiency')) icon = '🎯';
+            else if (i.includes('Leadership')) icon = '🏆';
+            else if (i.includes('Momentum')) icon = i.includes('decline') ? '📉' : '📈';
+            
+            return `<li><span style="font-size:1.1rem">${icon}</span> <span>${escHtml(i).replace(/:/g, ':<br><strong style="color:var(--text)">').replace(/</g, '<')}</span></li>`;
+        }).join('');
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
     }
-    
-    const topRej=Object.entries(rejReasons).sort((a,b)=>b[1]-a[1])[0];
-    if (topRej) insights.push(`🔍 Most common rejection reason: <strong>${topRej[0]}</strong> (${topRej[1]} cases).`);
-
-    if (kpis.creations>0&&kpis.bds>0) {
-        const ratio=(kpis.creations/kpis.bds).toFixed(1);
-        insights.push(`📊 Creation-to-BD ratio is <strong>${ratio}x</strong> — ${ratio>2?'strong organic pipeline':'BD-driven growth'}.`);
-    }
-    
-    const trendVals=Object.values(data.daily_trend_creation||{});
-    if (trendVals.length>=4) {
-        const firstHalf=trendVals.slice(0,Math.floor(trendVals.length/2)).reduce((a,b)=>a+b,0);
-        const secondHalf=trendVals.slice(Math.floor(trendVals.length/2)).reduce((a,b)=>a+b,0);
-        if (secondHalf>firstHalf*1.1) insights.push(`📈 Trend is <strong style="color:var(--accent-green)">accelerating</strong> — second half of period outperforms first half.`);
-        else if (secondHalf<firstHalf*0.9) insights.push(`📉 Trend is <strong style="color:var(--accent-rose)">decelerating</strong> — second half of period underperforms first half.`);
-    }
-    
-    if (data.comparison) {
-        const c=data.comparison;
-        if (c.kpis.creations>0) {
-            const delta=Math.round(((kpis.creations-c.kpis.creations)/c.kpis.creations)*100);
-            const icon=delta>=0?'📈':'📉';
-            const col=delta>=0?'var(--accent-green)':'var(--accent-rose)';
-            insights.push(`${icon} vs comparison period: creations changed by <strong style="color:${col}">${delta>0?'+':''}${delta}%</strong>.`);
-        }
-    }
-
-    const panel=document.getElementById('insightsPanel');
-    const list=document.getElementById('insightsList');
-    list.innerHTML=insights.map(i=>`<li>${i}</li>`).join('');
-    panel.style.display=insights.length?'block':'none';
 }
 
 function drawCharts(data) {
@@ -2463,16 +2512,6 @@ function drawCharts(data) {
         charts[id]=new Chart(ctx,{type:'line',data:{labels:filteredLabels,datasets:[{data:filteredVals,borderColor:chartColor,backgroundColor:grad,fill:true,tension:.4,borderWidth:2,pointRadius:3,pointHoverRadius:6}]},
             options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}},
                 scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10}},y:{grid:{color:'#2a2c3f'},beginAtZero:true}}}});
-        
-        if (data.comparison) {
-            const cmpKey=id==='cTrendCreation'?'daily_trend_creation':id==='cTrendBd'?'daily_trend_bd':'daily_trend_closing';
-            const cmpData=data.comparison[cmpKey]||{};
-            if (Object.keys(cmpData).length>0&&charts[id]) {
-                const cmpVals=Object.values(cmpData).slice(0,filteredLabels.length);
-                charts[id].data.datasets.push({data:cmpVals,borderColor:'rgba(185,103,255,.7)',borderWidth:2,borderDash:[5,5],pointRadius:2,fill:false,tension:.4,label:'Previous'});
-                charts[id].update();
-            }
-        }
     };
     buildTrend('cTrendCreation',data.daily_trend_creation,'#00d4ff','rgba(0,212,255,.3)');
     buildTrend('cTrendBd',data.daily_trend_bd,'#00e676','rgba(0,230,118,.3)');
@@ -2608,6 +2647,8 @@ function renderHeatmap(dataObj) {
 
 function exportCSV() {
     if (!latestAnalyticsData || !latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
+    logFrontendAction("EXPORT_CSV", "Analytics Report");
+    
     const data=latestAnalyticsData;
     const rows=[['Metric','Value'],
         ['Creations',data.kpis.creations],['BDs',data.kpis.bds],['Closings',data.kpis.closings],
@@ -2629,6 +2670,9 @@ function exportCSV() {
 function exportExcel() {
     if (!latestAnalyticsData||!latestAnalyticsData.kpis) { ToastManager.show('Generate analytics first before exporting.','warning'); return; }
     if (!window.XLSX) { ToastManager.show('Excel library not loaded.','warning'); return; }
+    
+    logFrontendAction("EXPORT_EXCEL", "Analytics Report");
+
     const data=latestAnalyticsData;
     const wb=XLSX.utils.book_new();
     
@@ -2681,7 +2725,6 @@ async function fetchAgencyData() {
             healthEl.style.display='block';
         }
 
-        // Hide all areas initially
         document.getElementById('privilegeArea').style.display='none';
         document.getElementById('pointsArea').style.display='none';
         document.getElementById('targetTimelineArea').style.display='none';
@@ -2765,10 +2808,8 @@ function updatePrivilegeGrid() {
     if (!currentAgencyData) return;
     const priv = document.getElementById('specificPrivilege').value;
     
-    // Scale Down fix: Revert pre-multiplied coins back to Base Points integer.
     const bp = (currentAgencyData.base_points || 0) / 100000;
     
-    // Exact Excel math mappings
     let total = 0;
     if (priv === "Dynamic Avatar") total = Math.floor(bp / 100);
     else if (priv === "30 Mics") {
@@ -2785,16 +2826,13 @@ function updatePrivilegeGrid() {
     const cm = now.getMonth();
     const cy = now.getFullYear();
 
-    // Sum strictly from raw requests array using correct month to match Excel Counter logic perfectly
     const history = currentAgencyData.history || [];
     
     history.forEach(r => {
-        // Safe string parsing for date comparisons
         let d = r.date ? new Date(r.date) : null;
         if (!d || isNaN(d.getTime())) return;
         if (d.getMonth() !== cm || d.getFullYear() !== cy) return; 
 
-        // Target Privilege Validation
         const reqPriv = String(r.privilege || '').toLowerCase();
         if (!reqPriv.includes(priv.toLowerCase())) return;
 
@@ -2823,7 +2861,6 @@ function buildTargetTimeline() {
     const tl = document.getElementById('targetTimeline');
     if (!tl) return;
     
-    // Uses the pre-filtered current month target history sent by backend
     const history = currentAgencyData.history || [];
 
     if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No target activity this month.</div>'; return; }
@@ -2863,7 +2900,6 @@ function buildAllocatorStatus(status) {
     const wrap=document.getElementById('allocatorStatusWrap');
     if (!wrap) return;
     
-    // Front-end Filtering: Drop target privileges that accidentally crept into points usage limit tracker
     const items = Object.keys(status).filter(name => {
         const n = name.toLowerCase();
         if (n.includes('dynamic') || n.includes('avatar') || n.includes('20 mic') || n === '30 mics' || n.includes('welcome room') || n.includes('game room')) {
@@ -2905,7 +2941,6 @@ function buildPointsTimeline(history) {
         else if (type.includes('point')) dotClass='tl-points';
         else if (type.includes('reject')) dotClass='tl-rejection';
 
-        // Advanced Timeline Sub-label constructor
         let title = (req.request_type || 'Request').replace(/\b\w/g, c => c.toUpperCase());
         let subDetails = [];
         
@@ -2949,14 +2984,24 @@ function buildPointsHistory(history) {
         }).join('');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SMART ALLOCATOR
+// ════════════════════════════════════════════════════════════════════
 function allocSelectAll() {
     document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
         el.classList.add('active');
+        const input = el.querySelector('.priv-qty');
+        if(input && !input.disabled) handleQtyChange(input, el.getAttribute('data-val'));
     });
 }
 function allocClearAll() {
     document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
         el.classList.remove('active');
+        const input = el.querySelector('.priv-qty');
+        if(input) {
+            input.value = 1;
+            input.disabled = false;
+        }
     });
 }
 function copyAllocatorReceipt() {
@@ -2964,6 +3009,9 @@ function copyAllocatorReceipt() {
     if (!pre || !pre.textContent.trim()) {
         ToastManager.show('Run the allocator first to generate a receipt.','warning'); return;
     }
+    
+    logFrontendAction("COPY_RECEIPT", "Smart Allocator");
+
     document.execCommand('copy');
     navigator.clipboard?.writeText(pre.textContent).then(()=>{
         ToastManager.show('Receipt copied to clipboard!','success');
@@ -2981,6 +3029,7 @@ function copyAllocatorReceipt() {
 
 function privToggle(el, e) {
     if (e && e.target && e.target.tagName==='INPUT') return;
+    if (el.querySelector('.priv-qty').disabled) return; 
     el.classList.toggle('active');
 }
 
@@ -2994,10 +3043,32 @@ function findAllocatorLimit(key) {
     return match ? status[match] : null;
 }
 
+function handleQtyChange(inputEl, privKey) {
+    const limitInfo = findAllocatorLimit(privKey);
+    if(limitInfo && limitInfo.limit !== null && limitInfo.limit !== undefined) {
+        const maxAllowed = Math.max(0, limitInfo.limit - limitInfo.used);
+        let val = parseInt(inputEl.value) || 1;
+        
+        if (maxAllowed <= 0) {
+            inputEl.value = 0;
+            inputEl.disabled = true;
+            inputEl.closest('.priv-toggle').classList.remove('active');
+            ToastManager.show(`Monthly limit reached for ${privKey}.`, 'warning');
+        } else if (val > maxAllowed) {
+            inputEl.value = maxAllowed;
+            ToastManager.show(`Limit reached. Auto-capped at ${maxAllowed} for ${privKey}.`, 'warning');
+        } else if (val <= 0) {
+            inputEl.value = 1;
+        }
+    } else {
+        if(parseInt(inputEl.value) <= 0) inputEl.value = 1;
+    }
+}
+
 function runAllocator() {
     const balance=parseInt(document.getElementById('allocatorBalance')?.value||'0',10)||0;
     if (balance<=0) {
-        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Load an agency above (or enter a balance) to run the allocator.</span>';
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Load an agency above to run the allocator.</span>';
         return;
     }
     const activeToggles=Array.from(document.querySelectorAll('#calcPrivGrid .priv-toggle.active'));
@@ -3006,6 +3077,8 @@ function runAllocator() {
         return;
     }
     
+    logFrontendAction("RUN_ALLOCATOR", `Balance: ${balance}`);
+
     const regionMode = document.getElementById('allocatorRegion')?.value || 'same';
     let remaining=balance, receiptLines=[], totalCost=0, approvedCount=0, rejectedCount=0;
 
@@ -3030,7 +3103,7 @@ function runAllocator() {
         }
         const grantQty = Math.min(qty, allowedQty);
         const lineCost = unitPrice*grantQty;
-        const cappedNote = grantQty<qty ? ` (capped to ${grantQty}: monthly limit ${limitInfo.used}/${limitInfo.limit})` : '';
+        const cappedNote = grantQty<qty ? ` (capped to ${grantQty}: limit ${limitInfo.used}/${limitInfo.limit})` : '';
 
         if (remaining>=lineCost) {
             receiptLines.push(`✅ APPROVED: ${grantQty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts${cappedNote}`);
@@ -3043,10 +3116,11 @@ function runAllocator() {
             rejectedCount+=qty;
         }
     });
-    const regionLabel = regionMode==='other' ? '(Other Region Rates)' : '(Same Region Rates)';
+    
+    const regionLabel = regionMode==='other' ? '(Other Agency ID Rate)' : '(Same Agency ID Rate)';
     const out=receiptLines.join('\n')+
         `\n\n─────────────────────────────\n`+
-        `📍 REGION     : ${regionLabel}\n`+
+        `📍 PRICING    : ${regionLabel}\n`+
         `✅ APPROVED   : ${approvedCount} item(s)\n`+
         `❌ REJECTED   : ${rejectedCount} item(s)\n`+
         `💰 TOTAL COST : ${totalCost.toLocaleString()} pts\n`+
@@ -3084,6 +3158,8 @@ async function loadAgencyForAllocator() {
         const controls = document.getElementById('allocatorControls');
         controls.style.opacity = '1';
         controls.style.pointerEvents = 'auto';
+        
+        allocClearAll(); 
 
     } catch(err) {
         ToastManager.show(err.message, 'error');
@@ -3097,7 +3173,7 @@ async function loadAgencyForAllocator() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// UNIVERSAL QUERY (search any request by User ID / Numbering / Otherapp ID / NID / Bd Code)
+// UNIVERSAL QUERY
 // ════════════════════════════════════════════════════════════════════
 const QY_FIELD_LABELS = {
     user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
@@ -3121,15 +3197,24 @@ function qyStatusClass(status){
 }
 
 function parseDuplicatedCheck(val) {
-    if (!val) return '—';
+    if (!val || val === '[]') return '—';
     try {
+        let matches = [...val.matchAll(/'text':\s*'([^']+)'/g)];
+        if (matches.length > 0) {
+            return matches.map(m => {
+                let text = m[1];
+                let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
+                return `<span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;font-weight:600;">${escHtml(text)}</span>`;
+            }).join('');
+        }
+        
         let str = val.replace(/'/g, '"');
         let arr = JSON.parse(str);
         if (Array.isArray(arr)) {
             return arr.map(item => {
                 let text = item.text || item;
                 let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
-                return `<span style="display:inline-block;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.08);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;">${escHtml(text)}</span>`;
+                return `<span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;font-weight:600;">${escHtml(text)}</span>`;
             }).join('');
         }
     } catch(e) {}
@@ -3211,7 +3296,7 @@ async function runQuery(){
 }
 
 // ════════════════════════════════════════════════════════════════════
-// SEARCH RECORDS PAGE (pg-points-records)
+// SEARCH RECORDS PAGE
 // ════════════════════════════════════════════════════════════════════
 let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
 
@@ -3266,11 +3351,7 @@ async function prFetch(page) {
             if (emptyEl) emptyEl.style.display = 'block';
             if (countEl) countEl.textContent = '0 records found';
             return;
-        }
-
-        if (countEl) countEl.textContent = `${data.total.toLocaleString()} records found`;
-
-        const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
+        } const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
         const labels = {
             agency_id:'Agency Code', acm:'ACM', region:'Region',
             base_points:'Base Pts', bonus_points:'Bonus Pts', total_points:'Total Pts',
@@ -3334,24 +3415,52 @@ async function prFetch(page) {
 }
 
 function prExportCsv() {
-    if (!prAllData.length) { ToastManager.show('Search first to get records.', 'warning'); return; }
-    const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
-    const header = cols.join(',');
-    const rows = prAllData.map(r => cols.map(c => JSON.stringify(r[c] ?? '')).join(','));
-    const blob = new Blob([header + '\n' + rows.join('\n')], {type:'text/csv;charset=utf-8;'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'xena_point_records.csv'; a.click();
-    ToastManager.show('CSV exported!', 'success');
+    const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', false);
 }
 
 function prExportExcel() {
-    if (!prAllData.length || !window.XLSX) { ToastManager.show('Search first or XLSX library not loaded.','warning'); return; }
-    const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
-    const ws = XLSX.utils.json_to_sheet(prAllData, {header: cols});
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Point Records');
-    XLSX.writeFile(wb, 'xena_point_records.xlsx');
-    ToastManager.show('Excel exported!', 'success');
+    const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', true);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// BULK EXPORT ENGINE
+// ════════════════════════════════════════════════════════════════════
+async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel) {
+    params.set('export', 'true');
+    logFrontendAction(isExcel ? "EXPORT_EXCEL_BULK" : "EXPORT_CSV_BULK", endpoint);
+    ToastManager.show('Preparing bulk export. This might take a few moments...', 'info', 8000);
+    document.getElementById('loadingOverlay').style.display='flex';
+    
+    try {
+        const res = await fetch(`${endpoint}?${params.toString()}`);
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error);
+        
+        const records = data.records || [];
+        if(!records.length) { ToastManager.show('No data found to export.', 'warning'); document.getElementById('loadingOverlay').style.display='none'; return; }
+        
+        const cols = ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
+        
+        if (isExcel && window.XLSX) {
+            const ws = XLSX.utils.json_to_sheet(records, {header: cols});
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Export");
+            XLSX.writeFile(wb, `${fileNamePrefix}.xlsx`);
+        } else {
+            const rows = [cols.join(','), ...records.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
+            const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `${fileNamePrefix}.csv`; a.click();
+        }
+        ToastManager.show('Bulk export successful!', 'success');
+    } catch(e) {
+        ToastManager.show('Export failed: ' + e.message, 'error', 8000);
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3398,7 +3507,7 @@ async function ptFetch(page) {
         const resp = await fetch('/api/points/records?' + params.toString());
         let data;
         try { data = await resp.json(); }
-        catch(e) { throw new Error('Server took too long to respond (platform time limit reached). Try again in a moment.'); }
+        catch(e) { throw new Error('Server took too long to respond. Try again in a moment.'); }
         if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
         ptAllData = data.records || [];
 
@@ -3471,41 +3580,36 @@ async function ptFetch(page) {
 }
 
 function ptExportCsv() {
-    if (!ptAllData.length) { ToastManager.show('Load the table first.','warning'); return; }
-    const cols = ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
-    const rows = [cols.join(','), ...ptAllData.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
-    const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'xena_point_table.csv'; a.click();
-    ToastManager.show('CSV exported!', 'success');
+    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', false);
 }
 
 function ptExportExcel() {
-    if (!ptAllData.length || !window.XLSX) { ToastManager.show('Load table first or XLSX library not loaded.','warning'); return; }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ptAllData), 'Point Table');
-    XLSX.writeFile(wb, 'xena_point_table.xlsx');
-    ToastManager.show('Excel exported!', 'success');
+    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', true);
 }
 
 function enforceExportLocks() {
     if (isAdmin) return;
     const exportAllowed = userModules.includes('export_data');
     if (!exportAllowed) {
-        document.querySelectorAll('button[onclick*="Export"], button[id*="export"]').forEach(btn => btn.style.display = 'none');
+        document.querySelectorAll('.bulk-export-btn, button[onclick*="Export"], button[id*="export"]').forEach(btn => btn.style.display = 'none');
     }
 }
 
 function populateAcmFilterSelect() {
-    const prAcmSel = document.getElementById('prAcm');
-    if (prAcmSel) {
-        prAcmSel.innerHTML = '<option value="">All ACMs</option>';
-        allAcms.forEach(a => prAcmSel.add(new Option(a, a.toLowerCase())));
-    }
+    ['prAcm', 'ptAcm'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) {
+            sel.innerHTML = '<option value="">All ACMs</option>';
+            allAcms.forEach(a => sel.add(new Option(a, a.toLowerCase())));
+        }
+    });
 }
 
 function enforceLocks() {
-    // Always start from the full ACM list, then narrow below for non-admins.
     populateAcmFilterSelect();
     enforceExportLocks();
     if (isAdmin) return;
@@ -3517,11 +3621,7 @@ function enforceLocks() {
         if (sel) {
             sel.innerHTML = '';
             ['PK','IN'].filter(r => anaReg.includes(r.toLowerCase())).forEach(r => sel.add(new Option(r, r)));
-            if (sel.options.length === 1) {
-                sel.value = sel.options[0].value;
-                sel.style.pointerEvents = 'none';
-                sel.style.opacity = '0.7';
-            }
+            if (sel.options.length === 1) { sel.value = sel.options[0].value; sel.style.pointerEvents = 'none'; sel.style.opacity = '0.7'; }
         }
     }
 
@@ -3532,23 +3632,20 @@ function enforceLocks() {
             if (!sel) return;
             sel.innerHTML = '';
             ['pk','in'].filter(r => ptReg.includes(r)).forEach(r => sel.add(new Option(r.toUpperCase(), r)));
-            if (sel.options.length === 1) {
-                sel.value = sel.options[0].value;
-                sel.style.pointerEvents = 'none';
-                sel.style.opacity = '0.7';
-            }
+            if (sel.options.length === 1) { sel.value = sel.options[0].value; sel.style.pointerEvents = 'none'; sel.style.opacity = '0.7'; }
         });
     }
 
     const ptAcm = p.acms?.points || ['all'];
     if (!ptAcm.includes('all')) {
-        const prAcm = document.getElementById('prAcm');
-        if (prAcm) {
-            prAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
-            ptAcm.forEach(a => prAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
-        }
+        ['prAcm', 'ptAcm'].forEach(id => {
+            const prAcm = document.getElementById(id);
+            if (prAcm) {
+                prAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
+                ptAcm.forEach(a => prAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+            }
+        });
     }
-    
     updateAcmDropdown();
 }
 
@@ -3590,7 +3687,7 @@ function configureSidebarAndCards() {
         allocator: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></svg>`,
         target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
         query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
-        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
+        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
     };
 
     const wc = document.getElementById('welcomeCards');
@@ -3610,12 +3707,15 @@ if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
     document.querySelector('.app-shell').style.display='flex';
     
-    // Set Header UI Properties
     document.getElementById('sidebarUsername').textContent = loggedUser;
     
-    // Create an elegant fallback avatar using UI-Avatars based on User Name
-    const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
-    document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
+    const avatarUrl = localStorage.getItem('xenaAvatar');
+    if (avatarUrl && avatarUrl.startsWith('http')) {
+        document.getElementById('userAvatar').src = avatarUrl;
+    } else {
+        const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
+        document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
+    }
 
     fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
         .then(r=>r.json())
@@ -3648,7 +3748,7 @@ if (loggedUser&&loggedUat) {
 
             enforceLocks();
             configureSidebarAndCards();
-            renderTabs(); // Init tabs immediately
+            renderTabs();
 
         }).catch(e=>console.error(e));
 
@@ -3668,9 +3768,19 @@ if (loggedUser&&loggedUat) {
         }
         openInTab('analytics');
     } else {
-        openInTab('welcome'); // Open default Welcome tab
+        openInTab('welcome'); 
     }
 }
 </script>
 </body>
 </html>
+
+        if (countEl) countEl.textContent = `${data.total.toLocaleString()} records found`;
+
+        const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
+        const labels = {
+            agency_id:'Agency Code', acm:'ACM', region:'Region',
+            base_points:'Base Pts', bonus_points:'Bonus Pts', total_points:'Total Pts',
+            used_points:'Used Pts', point_balance:'Balance', health_score:'Health'
+        };
+    
