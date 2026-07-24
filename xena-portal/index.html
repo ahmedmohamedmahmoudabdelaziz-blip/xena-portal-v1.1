@@ -3388,18 +3388,59 @@ function configureSidebarAndCards() {
 
     if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
 
+    const icons = {
+        analytics: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+        compare: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
+        points: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
+        allocator: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></svg>`,
+        target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+        query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
+    };
+
     const wc = document.getElementById('welcomeCards');
     wc.innerHTML = '';
-    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('analytics')"><div class="welcome-card-icon">📊</div><div class="welcome-card-title" data-i18n="analyticsReport">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
-    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon">⚖️</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
-    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon">🪙</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
-    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon">🤖</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
-    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon">🎯</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
-    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
-    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon">⚙️</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('analytics')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.analytics}</div><div class="welcome-card-title" data-i18n="analyticsReport">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
+    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.compare}</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM or period comparison</div></div>`;
+    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon" style="color:var(--accent-amber)">${icons.points}</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
+    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
+    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
 
-    // Apply translation to newly added cards immediately if needed
     if (currentLang !== 'en') changeLanguage(currentLang);
+}
+
+async function loadAgencyForAllocator() {
+    const code = document.getElementById('allocAgencyCodeSearch').value.trim();
+    if (!code) { ToastManager.show('Please enter an agency code first.', 'warning'); return; }
+    
+    document.getElementById('loadingOverlay').style.display='flex';
+    try {
+        const res = await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=points`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        currentAgencyData = data;
+        document.getElementById('allocatorBalance').value = data.point_balance || 0;
+        
+        document.getElementById('allocatorLockMsg').innerHTML = `✅ Successfully loaded data for Agency <strong>${code}</strong>. You may now plan allocations.`;
+        document.getElementById('allocatorLockMsg').style.color = 'var(--accent-green)';
+        
+        const controls = document.getElementById('allocatorControls');
+        controls.style.opacity = '1';
+        controls.style.pointerEvents = 'auto';
+        
+    } catch(err) {
+        ToastManager.show(err.message, 'error');
+        document.getElementById('allocatorLockMsg').innerHTML = `❌ Failed to load agency: ${err.message}`;
+        document.getElementById('allocatorLockMsg').style.color = 'var(--accent-rose)';
+        
+        const controls = document.getElementById('allocatorControls');
+        controls.style.opacity = '0.4';
+        controls.style.pointerEvents = 'none';
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 if (loggedUser&&loggedUat) {
