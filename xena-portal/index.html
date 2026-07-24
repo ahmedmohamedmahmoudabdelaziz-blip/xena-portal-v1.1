@@ -3364,9 +3364,14 @@ if (loggedUser&&loggedUat) {
     // Set Header UI Properties
     document.getElementById('sidebarUsername').textContent = loggedUser;
     
-    // Create an elegant fallback avatar using UI-Avatars based on User Name
-    const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
-    document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
+    const savedAvatar = localStorage.getItem('xenaAvatar');
+    if (savedAvatar) {
+        document.getElementById('userAvatar').src = savedAvatar;
+    } else {
+        // Create an elegant fallback avatar using UI-Avatars based on User Name
+        const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
+        document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
+    }
 
     fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
         .then(r=>r.json())
