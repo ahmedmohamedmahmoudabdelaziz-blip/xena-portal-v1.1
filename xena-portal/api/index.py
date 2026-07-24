@@ -67,40 +67,6 @@ MONTHLY_ALLOCATOR_LIMITS = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SLIM FIELD PROJECTIONS (speed optimization)
-# Only ask Feishu for the columns each feature actually consumes, instead of
-# pulling every column on every table for every row. This is what "field_names"
-# does on the /records/search endpoint. Keep BOTH lists in sync with anything
-# get_field_local()/extract_field_text() looks up for that table, otherwise a
-# field will silently come back empty.
-# ──────────────────────────────────────────────────────────────────────────────
-REQUESTS_FIELDS = [
-    "Numbering", "Request Type", "Request type", "Type", "Category",
-    "Status", "Request Status", "Agency Status", "State",
-    "Region", "Agency Region",
-    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
-    "Agency Type", "Type of Agency",
-    "Closing Reason", "Closing Agencies Reason",
-    "Otherapp Name", "Other App Name", "Other Apps", "Otherapp ID", "Other App ID",
-    "Reject Reason", "Rejection Reason",
-    "Create Way", "Creation Type",
-    "Submitted on Copy", "Submitted on", "Created Time", "Date",
-    "Respondents", "User ID", "Bd Code", "BD Code", "NID Number", "NID",
-    "Audition note", "Audition Note", "Duplicated Check",
-    "Agency Code", "Target Type",
-    "Agency Point Privilege", "Privilege", "Agency Privilege",
-    "Counter", "Qty", "Latest Usage Tracker", "Quantities Input", "Point Balance",
-]
-
-POINTS_FIELDS = [
-    "Agency Code", "Agency Name", "Name",
-    "Region", "Agency Region",
-    "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member",
-    "Base Points", "base_points", "Bonus Points",
-    "Total Points", "# Total Points", "Used Points", "Point Balance", "Balance",
-]
-
-# ──────────────────────────────────────────────────────────────────────────────
 # TENANT ACCESS TOKEN CACHE
 # ──────────────────────────────────────────────────────────────────────────────
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
@@ -551,7 +517,7 @@ def generate_executive_insights(stats, cmp_stats=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None, field_names=None):
+def fetch_feishu_records(table_id, from_dt=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -563,33 +529,21 @@ def fetch_feishu_records(table_id, from_dt=None, field_names=None):
 
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    # Use the /records/search endpoint (POST) instead of the plain GET /records
-    # endpoint. This is what lets us pass field_names to trim the payload, and
-    # also lets us pass a structured sort object instead of a raw query string.
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search"
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
 
-    use_field_names = bool(field_names)
     page_token = None
     for _ in range(200):
-        payload = {"page_size": 500, "automatic_fields": True}
-        if use_field_names: payload["field_names"] = field_names
-        if table_id == REQUESTS_TABLE_ID: payload["sort"] = [{"field_name": "Numbering", "desc": True}]
-        if page_token: payload["page_token"] = page_token
-
+        params = {"page_size": 500, "automatic_fields": "true"} 
+        if table_id == REQUESTS_TABLE_ID: params["sort"] = '["Numbering DESC"]'
+        if page_token: params["page_token"] = page_token
+        
         try:
-            resp = session.post(url, json=payload, timeout=45)
+            resp = session.get(url, params=params, timeout=45) 
             if resp.status_code != 200:
                 fetch_complete, stop_reason = False, f"HTTP {resp.status_code}: {resp.text}"
                 break
                 
             data = resp.json()
-            if data.get("code") == 1254045 and use_field_names:
-                # One or more names in our field_names projection don't exist
-                # verbatim in this table's real schema. Drop the projection and
-                # retry the SAME page with all columns instead of failing outright.
-                use_field_names = False
-                logger.warn("field_names_rejected_falling_back", table=table_id, requested=field_names)
-                continue
             if data.get("code") != 0:
                 fetch_complete, stop_reason = False, f"Feishu Error {data.get('code')}: {data.get('msg')}"
                 break
@@ -632,17 +586,6 @@ def fetch_feishu_records(table_id, from_dt=None, field_names=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # AGENCY SEARCH DUAL ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
-def _post_json_with_field_fallback(url, headers, payload, timeout):
-    """POST helper: if Feishu rejects our field_names projection because a name
-    doesn't exist in this table's real schema (code 1254045), drop the
-    projection and retry once with full columns instead of failing outright."""
-    resp = http_requests.post(url, headers=headers, json=payload, timeout=timeout).json()
-    if resp.get("code") == 1254045 and "field_names" in payload:
-        logger.warn("field_names_rejected_falling_back", url=url, requested=payload.get("field_names"))
-        payload2 = {k: v for k, v in payload.items() if k != "field_names"}
-        resp = http_requests.post(url, headers=headers, json=payload2, timeout=timeout).json()
-    return resp
-
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
         all_records = MockFeishuDB.generate_agency(code)
@@ -650,7 +593,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         tat = get_tenant_access_token()
         headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
         points_payload = {
-            "field_names": POINTS_FIELDS,
             "filter": {
                 "conjunction": "and",
                 "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
@@ -659,7 +601,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
         
         try:
-            resp = _post_json_with_field_fallback(search_url, headers, points_payload, 30)
+            resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
             if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
             all_records = resp.get("data", {}).get("items", [])
             if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
@@ -692,14 +634,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     else:
         try:
             hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-            hist_payload = {
-                "field_names": REQUESTS_FIELDS,
-                "filter": {
-                    "conjunction": "and",
-                    "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
-                }
-            }
-            hist_resp = _post_json_with_field_fallback(hist_url, headers, hist_payload, 30)
+            hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
             hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
         except: hist_items = []
 
@@ -965,9 +900,6 @@ _bg_sync = {
     "requests_items": [], "requests_keys": set(),
     "updated_at": 0, "fetch_complete": True, "stop_reason": "",
     "syncing": False,
-    "points_items": [], "points_keys": set(),
-    "points_updated_at": 0, "points_fetch_complete": True, "points_stop_reason": "",
-    "syncing_points": False,
 }
 _bg_sync_lock = threading.Lock()
 _bg_thread_started = False
@@ -978,7 +910,7 @@ def _background_sync_requests_table():
         if _bg_sync["syncing"]: return
         _bg_sync["syncing"] = True
     try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, field_names=REQUESTS_FIELDS)
+        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
         with _bg_sync_lock:
             _bg_sync["requests_items"]  = items
             _bg_sync["requests_keys"]   = keys
@@ -991,28 +923,9 @@ def _background_sync_requests_table():
         with _bg_sync_lock:
             _bg_sync["syncing"] = False
 
-def _background_sync_points_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing_points"]: return
-        _bg_sync["syncing_points"] = True
-    try:
-        items, keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID, field_names=POINTS_FIELDS)
-        with _bg_sync_lock:
-            _bg_sync["points_items"]         = items
-            _bg_sync["points_keys"]          = keys
-            _bg_sync["points_updated_at"]    = time.time()
-            _bg_sync["points_fetch_complete"]= complete
-            _bg_sync["points_stop_reason"]   = reason
-    except Exception as e:
-        logger.error("background_sync_failed", table="points_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing_points"] = False
-
 def _background_sync_loop():
     while True:
         _background_sync_requests_table()
-        _background_sync_points_table()
         time.sleep(BACKGROUND_SYNC_INTERVAL)
 
 def ensure_background_sync_started():
@@ -1029,20 +942,7 @@ def get_requests_table_snapshot(from_dt=None):
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
-    return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt, field_names=REQUESTS_FIELDS) + (False,)
-
-def get_points_table_snapshot():
-    ensure_background_sync_started()
-    with _bg_sync_lock:
-        items, keys      = _bg_sync["points_items"], _bg_sync["points_keys"]
-        updated_at        = _bg_sync["points_updated_at"]
-        complete, reason = _bg_sync["points_fetch_complete"], _bg_sync["points_stop_reason"]
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-        return items, keys, complete, reason, True
-    # Cold cache (first request after a cold start, or cache aged out): fall
-    # back to a live fetch so the user still gets data, just slower this once.
-    items, keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID, field_names=POINTS_FIELDS)
-    return items, keys, complete, reason, False
+    return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt) + (False,)
 
 app = Flask(__name__)
 
@@ -1280,13 +1180,22 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    if MOCK_MODE:
-        all_items = MockFeishuDB.generate_agency("All") * 10
-        fetch_complete, stop_reason, served_from_bg = True, "", False
-    else:
-        all_items, _, fetch_complete, stop_reason, served_from_bg = get_points_table_snapshot()
+    raw_points_cache_key = "points_table_raw_items"
+    cached_bundle = cache_get(raw_points_cache_key)
 
-    if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+    if cached_bundle is not None:
+        all_items      = cached_bundle["items"]
+        fetch_complete = cached_bundle["fetch_complete"]
+        stop_reason    = cached_bundle["stop_reason"]
+    else:
+        if MOCK_MODE:
+            all_items = MockFeishuDB.generate_agency("All") * 10
+            fetch_complete, stop_reason = True, ""
+        else:
+            all_items, _, fetch_complete, stop_reason = fetch_feishu_records(POINTS_TABLE_ID)
+            
+        if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+        cache_set(raw_points_cache_key, {"items": all_items, "fetch_complete": fetch_complete, "stop_reason": stop_reason}, ttl=300)
 
     filtered = []
     for item in all_items:
@@ -1355,8 +1264,7 @@ def points_records():
             "records": filtered[:5000], "total": total_count, "page": 1, "page_size": total_count,
             "total_pages": 1,
             "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
-            "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
-            "served_from_background_cache": served_from_bg
+            "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason)
         })
 
     start, end = (page - 1) * page_size, (page - 1) * page_size + page_size
@@ -1366,8 +1274,7 @@ def points_records():
         "records": page_records, "total": total_count, "page": page, "page_size": page_size,
         "total_pages": max(1, -(-total_count // page_size)),
         "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
-        "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": served_from_bg
+        "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason)
     })
 
 @app.route('/api/audit/log-action', methods=['POST'])
@@ -1397,19 +1304,11 @@ def sync_refresh():
 
     cache_invalidate()
     _background_sync_requests_table()
-    _background_sync_points_table()
     with _bg_sync_lock:
         count, updated_at, complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
-        points_count, points_updated_at, points_complete = (
-            len(_bg_sync["points_items"]), _bg_sync["points_updated_at"], _bg_sync["points_fetch_complete"]
-        )
-
-    audit.log(user, "MANUAL_SYNC_REFRESH", "grand_table+points_table", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
-    return jsonify({
-        "success": True,
-        "record_count": count, "updated_at": updated_at, "fetch_complete": complete,
-        "points_record_count": points_count, "points_updated_at": points_updated_at, "points_fetch_complete": points_complete
-    })
+        
+    audit.log(user, "MANUAL_SYNC_REFRESH", "grand_table", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
+    return jsonify({"success": True, "record_count": count, "updated_at": updated_at, "fetch_complete": complete})
 
 @app.route('/api/points/search', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1461,16 +1360,10 @@ def query_records():
                     if value.isdigit(): val_array = [int(value)]
                     else: continue
 
-                payload = {"page_size": 500, "field_names": REQUESTS_FIELDS, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
+                payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
                 try:
                     resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
                     data = resp.json()
-                    if data.get("code") == 1254045:
-                        # field_names projection doesn't match this table's real
-                        # schema; retry the same condition with full columns.
-                        payload.pop("field_names", None)
-                        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
-                        data = resp.json()
                     if data.get("code") == 0:
                         all_items = data.get("data", {}).get("items", [])
                         success, fetch_complete = True, True
@@ -1640,18 +1533,12 @@ def health():
             "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
             "syncing": _bg_sync["syncing"],
         }
-        points_bg_info = {
-            "record_count": len(_bg_sync["points_items"]),
-            "age_seconds": (time.time() - _bg_sync["points_updated_at"]) if _bg_sync["points_updated_at"] else None,
-            "syncing": _bg_sync["syncing_points"],
-        }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(),
         "cache_entries": len(_cache), "audit_entries": len(audit._queue),
         "token_cached": _token_cache["token"] is not None,
         "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
         "background_sync": bg_info,
-        "points_background_sync": points_bg_info,
         "mock_mode_active": MOCK_MODE
     })
 
