@@ -16,6 +16,7 @@
             --accent-cyan:#00d4ff;--accent-green:#00e676;
             --accent-rose:#ff4d6d;--accent-amber:#ffb800;--accent-purple:#b967ff;
             --shadow:0 8px 32px rgba(0,0,0,.4);--radius:16px;
+            --sidebar-bg: #101623;
         }
         [data-theme="light"] {
             --bg:#f0f2f8;--surface:#fff;--surface-hover:#f5f7ff;
@@ -24,6 +25,7 @@
             --accent-cyan:#0099cc;--accent-green:#00b84a;
             --accent-rose:#d63050;--accent-amber:#c88a00;--accent-purple:#8a44cc;
             --shadow:0 4px 20px rgba(0,0,0,.08);
+            --sidebar-bg: #1d232e;
         }
         
         *{margin:0;padding:0;box-sizing:border-box}
@@ -35,29 +37,33 @@
         .login-card p{color:var(--text-muted);margin-bottom:32px}
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
-        .sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
+        
+        .sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
+        .sidebar * { color: #a0a5b5; } /* Unified sidebar text color */
         .main-content{margin-left:240px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s; display:flex; flex-direction:column; height: 100vh; overflow: hidden;}
-        .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
-        .sidebar-brand{font-size:1.05rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
         
-        .sidebar-search-area { padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-        .sidebar-search-box { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none; transition: border-color 0.2s; }
+        .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:10px;flex-shrink:0}
+        .sidebar-brand{font-size:1.05rem;font-weight:700;color:#fff!important;white-space:nowrap}
+        
+        .sidebar-search-area { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+        .sidebar-search-box { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 0.85rem; outline: none; transition: border-color 0.2s; }
         .sidebar-search-box:focus { border-color: var(--accent-cyan); }
-        
+        .sidebar-search-box::placeholder { color: #6b7280; }
+
         .sidebar-nav{flex:1;padding:8px 0;overflow-y:auto}
         .nav-group{margin-bottom:1px}
-        .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
-        .nav-group-header:hover{color:var(--text);background:rgba(255,255,255,.04)}
+        .nav-group-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;cursor:pointer;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;transition:all .2s;user-select:none}
+        .nav-group-header:hover{color:#fff;background:rgba(255,255,255,.04)}
         .nav-group-header.grp-active{color:var(--accent-cyan)}
         .nav-direct{cursor:pointer}
         .nav-arr{font-size:.7rem;transition:transform .25s;flex-shrink:0}
         .nav-arr.open{transform:rotate(90deg)}
         .nav-group-body{overflow:hidden;max-height:0;transition:max-height .35s ease}
         .nav-group-body.open{max-height:500px}
-        .nav-item{display:block;padding:9px 16px 9px 32px;font-size:.875rem;color:var(--text-muted);cursor:pointer;transition:all .2s;border-left:3px solid transparent}
-        .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
+        .nav-item{display:block;padding:9px 16px 9px 32px;font-size:.875rem;cursor:pointer;transition:all .2s;border-left:3px solid transparent}
+        .nav-item:hover{color:#fff;background:rgba(255,255,255,.04)}
         .nav-item.active{color:var(--accent-cyan)!important;border-left-color:var(--accent-cyan);background:rgba(0,212,255,.07);font-weight:600}
-        .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0}
+        .sidebar-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.05);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0}
         .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:150}
         
         .page-top-bar{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px; flex-shrink: 0; z-index: 100;}
@@ -74,7 +80,7 @@
         
         .user-profile-btn { display: flex; align-items: center; gap: 10px; background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
         .user-profile-btn:hover { background: var(--surface-hover); }
-        .user-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-cyan); }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
         .user-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
 
         .multi-tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px 0 16px; gap: 4px; overflow-x: auto; flex-shrink: 0; }
@@ -131,7 +137,10 @@
         
         .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);transition:border-color .2s;margin-bottom:24px}
         .card:hover{border-color:var(--border-hover)}
-        
+        .page-header{text-align:center;margin-bottom:32px}
+        .page-header h1{font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+        .page-header p{color:var(--text-muted);font-size:1.05rem}
+
         .centered-search-box{max-width:450px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
         .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
@@ -457,6 +466,7 @@
         <div class="page-top-bar">
             <div class="top-bar-left">
                 <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">☰</button>
+                <!-- Removed Page Title from here as tabs represent open pages now -->
             </div>
             
             <div class="top-bar-right">
@@ -469,10 +479,10 @@
                     <option value="zh">中文</option>
                 </select>
                 
-                <!-- User Profile w/ Dynamic Avatar Support -->
+                <!-- User Profile -->
                 <button class="user-profile-btn" onclick="alert('Profile Settings coming soon!')">
+                    <img id="userAvatar" class="user-avatar" alt="User Avatar">
                     <span class="user-name" id="sidebarUsername">Loading…</span>
-                    <img id="userAvatar" class="user-avatar" src="" alt="User Avatar">
                 </button>
             </div>
         </div>
@@ -485,6 +495,7 @@
         <input type="hidden" id="queryType" value="points">
 
         <div class="page-content-wrapper">
+            <!-- Content Divs go here -->
             <div id="pg-welcome" style="display:block">
                 <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
                     You do not have access to any modules. Please contact an administrator.
@@ -497,7 +508,6 @@
                 <div class="welcome-cards" id="welcomeCards"></div>
             </div>
 
-            <!-- Compare Tab -->
             <div id="pg-compare" style="display:none">
                 <div class="card">
                     <h3 style="margin-bottom:16px;color:var(--accent-cyan)">⚖️ Agency Comparison</h3>
@@ -530,7 +540,6 @@
                 </div>
             </div>
 
-            <!-- Lookup/Target Tab -->
             <div id="pg-agency" style="display:none">
                 <div class="card" style="margin-bottom:24px">
                     <h3 id="agencyLookupTitle" style="margin-bottom:16px;color:var(--accent-cyan)">🔍 Agency Lookup</h3>
@@ -617,7 +626,6 @@
                 </div>
             </div>
 
-            <!-- Allocator Tab -->
             <div id="pg-allocator" style="display:none">
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                     <div class="card">
@@ -672,7 +680,6 @@
                 </div>
             </div>
 
-            <!-- Admin Tab -->
             <div id="pg-admin-agents" style="display:none">
                 <div class="card">
                     <h3 style="color:var(--accent-cyan);margin-bottom:20px">⚙️ Manage Agents</h3>
@@ -748,7 +755,6 @@
                 </div>
             </div>
 
-            <!-- Audit Tab -->
             <div id="pg-admin-audit" style="display:none">
                 <div class="card">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -759,7 +765,6 @@
                 </div>
             </div>
 
-            <!-- Analytics Tab -->
             <div id="pg-analytics" style="display:none">
                 <div class="card">
                     <div class="preset-bar" id="presetBar">
@@ -1176,9 +1181,12 @@
 </div>
 
 <script>
+// ════════════════════════════════════════════════════════════════════
+// GLOBALS & STATE
+// ════════════════════════════════════════════════════════════════════
 let currentAgencyData=null, latestAnalyticsData=null, charts={};
 let userPermissions=null; 
-let userModules=[], isAdmin=false; 
+let isAdmin=false, userModules=[];
 let loggedUser=localStorage.getItem('xenaUser') || 'Ahmed Saleh';
 let loggedEmail=localStorage.getItem('xenaEmail') || 'ahmed@example.com';
 let loggedUat=localStorage.getItem('xenaUat');
@@ -1189,6 +1197,9 @@ let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQue
 
 const urlParams=new URLSearchParams(window.location.search);
 
+// ════════════════════════════════════════════════════════════════════
+// TRANSLATION ENGINE
+// ════════════════════════════════════════════════════════════════════
 const translations = {
     en: {
         agencyAnalysis: "📊 Agency Analysis",
@@ -1254,9 +1265,12 @@ function changeLanguage(lang) {
             el.placeholder = translations[lang][key];
         }
     });
-    renderTabs(); 
+    renderTabs(); // Re-render tabs to update their titles
 }
 
+// ════════════════════════════════════════════════════════════════════
+// MULTI-TAB SYSTEM
+// ════════════════════════════════════════════════════════════════════
 const pageTitlesMap = {
     'welcome': 'Welcome',
     'analytics': 'Analytics Report',
@@ -1302,20 +1316,23 @@ function setActiveTab(page) {
     activeTabId = page;
     renderTabs();
     
+    // Deactivate all sidebar items first
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
     const navEl = document.getElementById('nav-' + page);
     if(navEl) navEl.classList.add('active', 'active-nav');
     
+    // Execute original nav logic to map logical page to physical div
     executePageLogic(page);
 }
 
 function closeTab(page, event) {
     if(event) event.stopPropagation();
-    if(page === 'welcome') return; 
+    if(page === 'welcome') return; // Cannot close welcome tab
 
     openTabs = openTabs.filter(t => t !== page);
     
     if (activeTabId === page) {
+        // Switch to the previous tab
         activeTabId = openTabs[openTabs.length - 1];
     }
     
@@ -1353,6 +1370,7 @@ function renderTabs() {
 }
 
 function executePageLogic(page) {
+    // Hide all
     ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
     closeSidebar();
 
@@ -1411,6 +1429,7 @@ function executePageLogic(page) {
 function filterSidebar() {
     const term = document.getElementById('sidebarSearch').value.toLowerCase();
     
+    // If empty, reset visibility and collapse states
     if (!term) {
         document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'block');
         return;
@@ -1430,6 +1449,7 @@ function filterSidebar() {
             }
         });
         
+        // Auto-expand group if it has matching children
         const body = group.querySelector('.nav-group-body');
         const arr = group.querySelector('.nav-arr');
         if (hasVisibleChild) {
@@ -1439,6 +1459,9 @@ function filterSidebar() {
     });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// TOAST NOTIFICATION SYSTEM
+// ════════════════════════════════════════════════════════════════════
 const ToastManager = {
     show(msg, type='info', duration=5000) {
         const icons = {success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
@@ -1471,6 +1494,9 @@ const ToastManager = {
     }
 };
 
+// ════════════════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS & THEMES
+// ════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
@@ -1585,6 +1611,10 @@ function _expandNavGroup(bodyId,arrId){
     if(body&&!body.classList.contains('open')){body.classList.add('open');if(arr)arr.classList.add('open');}
 }
 
+// ════════════════════════════════════════════════════════════════════
+// URL AND INITIALIZATION HANDLING
+// ════════════════════════════════════════════════════════════════════
+
 if (urlParams.get('auth_error')) {
     const authErr = urlParams.get('auth_error');
     setTimeout(()=>{
@@ -1592,22 +1622,18 @@ if (urlParams.get('auth_error')) {
         const errEl=document.getElementById('loginErrMsg');
         if(errEl){errEl.textContent=authErr;errEl.style.display='block';}
     }, 200);
-    window.history.replaceState({},'','/');
+    window.history.replaceState({},'',window.location.href.split('?')[0]);
 }
 
 if (urlParams.get('user') && urlParams.get('uat')) {
     loggedUser  = urlParams.get('user');   
     loggedEmail = urlParams.get('email') || '';
     loggedUat   = urlParams.get('uat');    
-    const avatar = urlParams.get('avatar');
-    
     localStorage.setItem('xenaUser',  loggedUser);
     localStorage.setItem('xenaEmail', loggedEmail);
     localStorage.setItem('xenaUat',   loggedUat);
-    if (avatar) localStorage.setItem('xenaAvatar', avatar);
-    
     localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
-    window.history.replaceState({},'','/');   
+    window.history.replaceState({},'',window.location.href.split('?')[0]);   
 }
 
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
@@ -1705,6 +1731,7 @@ function updateAcmDropdown() {
     
     let list=region==='IN'?inAcms:region==='PK'?pkAcms:[...pkAcms,...inAcms].sort();
     
+    // Front-end lock using backend permissions payload
     if (!isAdmin && userPermissions?.permissions?.acms?.analytics) {
         const allowed = userPermissions.permissions.acms.analytics;
         if (!allowed.includes('all')) {
@@ -2113,7 +2140,7 @@ async function generateAnalytics() {
         }
 
         const urlP=new URLSearchParams({region,acm,type,from:fromDate,to:toDate});
-        window.history.replaceState(null,null,`#analyze?${urlP.toString()}`);
+        window.history.replaceState(null,null,window.location.href.split('#')[0] + `#analyze?${urlP.toString()}`);
 
         document.getElementById('analyticsContainer').style.display='block';
         ['exportCsvBtn','exportXlsBtn','exportPdfBtn'].forEach(id=>document.getElementById(id).style.display='inline-block');
@@ -2525,6 +2552,7 @@ async function fetchAgencyData() {
             healthEl.style.display='block';
         }
 
+        // Hide all areas initially
         document.getElementById('privilegeArea').style.display='none';
         document.getElementById('pointsArea').style.display='none';
         document.getElementById('targetTimelineArea').style.display='none';
@@ -2608,8 +2636,10 @@ function updatePrivilegeGrid() {
     if (!currentAgencyData) return;
     const priv = document.getElementById('specificPrivilege').value;
     
+    // Scale Down fix: Revert pre-multiplied coins back to Base Points integer.
     const bp = (currentAgencyData.base_points || 0) / 100000;
     
+    // Exact Excel math mappings
     let total = 0;
     if (priv === "Dynamic Avatar") total = Math.floor(bp / 100);
     else if (priv === "30 Mics") {
@@ -2626,13 +2656,16 @@ function updatePrivilegeGrid() {
     const cm = now.getMonth();
     const cy = now.getFullYear();
 
+    // Sum strictly from raw requests array using correct month to match Excel Counter logic perfectly
     const history = currentAgencyData.history || [];
     
     history.forEach(r => {
+        // Safe string parsing for date comparisons
         let d = r.date ? new Date(r.date) : null;
         if (!d || isNaN(d.getTime())) return;
         if (d.getMonth() !== cm || d.getFullYear() !== cy) return; 
 
+        // Target Privilege Validation
         const reqPriv = String(r.privilege || '').toLowerCase();
         if (!reqPriv.includes(priv.toLowerCase())) return;
 
@@ -2661,6 +2694,7 @@ function buildTargetTimeline() {
     const tl = document.getElementById('targetTimeline');
     if (!tl) return;
     
+    // Uses the pre-filtered current month target history sent by backend
     const history = currentAgencyData.history || [];
 
     if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No target activity this month.</div>'; return; }
@@ -2700,6 +2734,7 @@ function buildAllocatorStatus(status) {
     const wrap=document.getElementById('allocatorStatusWrap');
     if (!wrap) return;
     
+    // Front-end Filtering: Drop target privileges that accidentally crept into points usage limit tracker
     const items = Object.keys(status).filter(name => {
         const n = name.toLowerCase();
         if (n.includes('dynamic') || n.includes('avatar') || n.includes('20 mic') || n === '30 mics' || n.includes('welcome room') || n.includes('game room')) {
@@ -2741,6 +2776,7 @@ function buildPointsTimeline(history) {
         else if (type.includes('point')) dotClass='tl-points';
         else if (type.includes('reject')) dotClass='tl-rejection';
 
+        // Advanced Timeline Sub-label constructor
         let title = (req.request_type || 'Request').replace(/\b\w/g, c => c.toUpperCase());
         let subDetails = [];
         
@@ -2900,6 +2936,9 @@ function runAllocator() {
     }).join('\n');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// UNIVERSAL QUERY (search any request by User ID / Numbering / Otherapp ID / NID / Bd Code)
+// ════════════════════════════════════════════════════════════════════
 const QY_FIELD_LABELS = {
     user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
     nid_number: 'NID Number', bd_code: 'Bd Code'
@@ -2994,6 +3033,9 @@ async function runQuery(){
     }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SEARCH RECORDS PAGE (pg-points-records)
+// ════════════════════════════════════════════════════════════════════
 let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
 
 function prDebounce() {
@@ -3135,6 +3177,9 @@ function prExportExcel() {
     ToastManager.show('Excel exported!', 'success');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// POINT TABLE PAGE 
+// ════════════════════════════════════════════════════════════════════
 let ptCurrentPage = 1, ptAllData = [], ptDebounceTimer = null;
 
 function ptDebounce() {
@@ -3298,7 +3343,7 @@ function enforceLocks() {
             }
         });
     }
-    
+
     const ptAcm = p.acms?.points || ['all'];
     if (!ptAcm.includes('all')) {
         const prAcm = document.getElementById('prAcm');
@@ -3364,14 +3409,9 @@ if (loggedUser&&loggedUat) {
     // Set Header UI Properties
     document.getElementById('sidebarUsername').textContent = loggedUser;
     
-    const savedAvatar = localStorage.getItem('xenaAvatar');
-    if (savedAvatar) {
-        document.getElementById('userAvatar').src = savedAvatar;
-    } else {
-        // Create an elegant fallback avatar using UI-Avatars based on User Name
-        const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
-        document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
-    }
+    // Create an elegant fallback avatar using UI-Avatars based on User Name
+    const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
+    document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
 
     fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
         .then(r=>r.json())
