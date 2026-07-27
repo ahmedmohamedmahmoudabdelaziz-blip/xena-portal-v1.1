@@ -565,92 +565,79 @@ def generate_executive_insights(stats, cmp_stats=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING
 # ──────────────────────────────────────────────────────────────────────────────
-def _fetch_page(table_id, filter_conditions, page_token=None):
-    tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    params = {"page_size": 500, "automatic_fields": "true"}
-    
-    if table_id == REQUESTS_TABLE_ID:
-        params["sort"] = '["Numbering DESC"]'
-    if page_token:
-        params["page_token"] = page_token
-
-    if filter_conditions:
-        search_url = f"{url}/search?automatic_fields=true&page_size=500"
-        if page_token:
-            search_url += f"&page_token={page_token}"
-        try:
-            resp = http_requests.post(search_url, headers=headers, json={"filter": filter_conditions}, timeout=45)
-            return resp.json()
-        except Exception:
-            return None
-    else:
-        try:
-            resp = http_requests.get(url, headers=headers, params=params, timeout=45)
-            return resp.json()
-        except Exception:
-            return None
-
-def fetch_feishu_records(table_id, filter_conditions=None, from_dt=None):
+def fetch_feishu_records(table_id, from_dt=None, filter_conditions=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
         return items, keys, True, ""
 
-    first_page = _fetch_page(table_id, filter_conditions)
-    if not first_page or first_page.get("code") != 0:
-        msg = first_page.get("msg", "First page fetch failed") if first_page else "First page fetch failed"
-        return [], set(), False, msg
+    tat = get_tenant_access_token()
+    all_items, seen_ids, master_keys = [], set(), set()
+    fetch_complete, stop_reason, consecutive_old_pages = True, "", 0
 
-    all_items = first_page.get("data", {}).get("items", [])
-    master_keys = set()
-    for item in all_items:
-        master_keys.update(item.get("fields", {}).keys())
+    session = http_requests.Session()
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+    
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+    
+    page_token = None
+    for _ in range(200):
+        params = {"page_size": 500, "automatic_fields": "true"} 
+        if not filter_conditions and table_id == REQUESTS_TABLE_ID: 
+            params["sort"] = '["Numbering DESC"]'
+        if page_token: 
+            params["page_token"] = page_token
+        
+        try:
+            if filter_conditions:
+                search_url = f"{base_url}/search"
+                resp = session.post(search_url, params=params, json={"filter": filter_conditions}, timeout=45)
+            else:
+                resp = session.get(base_url, params=params, timeout=45) 
+                
+            if resp.status_code != 200:
+                fetch_complete, stop_reason = False, f"HTTP {resp.status_code}: {resp.text}"
+                break
+                
+            data = resp.json()
+            if data.get("code") != 0:
+                fetch_complete, stop_reason = False, f"Feishu Error {data.get('code')}: {data.get('msg')}"
+                break
+            
+            block = data.get("data", {})
+            items = block.get("items", [])
+            if not items: break
 
-    page_token = first_page.get("data", {}).get("page_token")
-    consecutive_old_pages = 0
+            page_old_count, valid_dates_in_page = 0, 0
+            for item in items:
+                rid = item.get("record_id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    all_items.append(item)
+                    master_keys.update(item.get("fields", {}).keys())
+                    raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
+                    record_dt = parse_feishu_date(raw_date)
+                    if record_dt:
+                        valid_dates_in_page += 1
+                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
+                            page_old_count += 1
+            
+            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                consecutive_old_pages += 1
+            else: consecutive_old_pages = 0
 
-    while page_token:
-        # Utilizing concurrent executor safely to map fetch operations on successive tokens
-        tokens = [page_token]
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            futures = [executor.submit(_fetch_page, table_id, filter_conditions, tok) for tok in tokens]
-            for f in futures:
-                try:
-                    page_data = f.result()
-                    if page_data and page_data.get("code") == 0:
-                        items = page_data.get("data", {}).get("items", [])
-                        all_items.extend(items)
-                        
-                        page_old_count, valid_dates_in_page = 0, 0
-                        for item in items:
-                            master_keys.update(item.get("fields", {}).keys())
-                            if from_dt:
-                                raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
-                                record_dt = parse_feishu_date(raw_date)
-                                if record_dt:
-                                    valid_dates_in_page += 1
-                                    if record_dt < (from_dt - timedelta(days=1)):
-                                        page_old_count += 1
-                                        
-                        if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                            consecutive_old_pages += 1
-                        else:
-                            consecutive_old_pages = 0
+            if consecutive_old_pages >= 3:
+                stop_reason = "Safely reached pages with all older records."
+                break
 
-                        page_token = page_data.get("data", {}).get("page_token")
-                        if not page_token or not page_data.get("data", {}).get("has_more", False):
-                            page_token = None
-                    else:
-                        page_token = None
-                except Exception:
-                    page_token = None
-                    
-        if consecutive_old_pages >= 3:
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False): break
+
+        except Exception as e:
+            fetch_complete, stop_reason = False, str(e)
             break
 
-    return all_items, master_keys, True, ""
+    return all_items, master_keys, fetch_complete, stop_reason
 
 # ──────────────────────────────────────────────────────────────────────────────
 # AGENCY SEARCH DUAL ENGINE
@@ -962,7 +949,7 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 # ──────────────────────────────────────────────────────────────────────────────
 # FLASK APP & BACKGROUND CACHE LOOP
 # ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_INTERVAL = 60   
+BACKGROUND_SYNC_INTERVAL = 180   
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
 _bg_sync = {
@@ -1018,27 +1005,30 @@ def get_requests_table_snapshot(from_dt=None):
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
-    # If we have any data (even stale), return it immediately.
+    # 1. Return INSTANTLY if we have any items in memory
     if items:
-        # Kick a background refresh if data is too old
         if (time.time() - updated_at) > BACKGROUND_SYNC_MAX_AGE:
             threading.Thread(target=_background_sync_requests_table, daemon=True).start()
         return items, keys, complete, reason, True
 
-    # No data at all – try Redis
+    # 2. Try Redis if memory is empty
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
         if cached and cached.get("items"):
+            r_items, r_keys = cached["items"], set(cached.get("keys", []))
             with _bg_sync_lock:
-                _bg_sync["requests_items"] = cached["items"]
-                _bg_sync["requests_keys"]  = set(cached.get("keys", []))
+                _bg_sync["requests_items"] = r_items
+                _bg_sync["requests_keys"]  = r_keys
                 _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
-            return cached["items"], set(cached.get("keys", [])), cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
+            
+            if (time.time() - cached.get("updated_at", 0)) > BACKGROUND_SYNC_MAX_AGE:
+                threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+            
+            return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    # Absolute last resort - synchronously fetch (only on first cold start)
+    # 3. First cold start fallback (synchronous)
     filter_conditions = None
     if from_dt:
         ts_ms = int(from_dt.timestamp() * 1000)
@@ -1049,7 +1039,7 @@ def get_requests_table_snapshot(from_dt=None):
             ]
         }
 
-    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, filter_conditions=filter_conditions, from_dt=from_dt)
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt, filter_conditions=filter_conditions)
     with _bg_sync_lock:
         _bg_sync["requests_items"] = items
         _bg_sync["requests_keys"]  = keys
@@ -1124,7 +1114,10 @@ def get_points_table_snapshot(filter_conditions=None):
                 _bg_points_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_points_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_points_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_points_table, daemon=True).start()
+            
+            if (time.time() - cached.get("updated_at", 0)) > BACKGROUND_SYNC_MAX_AGE:
+                threading.Thread(target=_background_sync_points_table, daemon=True).start()
+                
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
     items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
