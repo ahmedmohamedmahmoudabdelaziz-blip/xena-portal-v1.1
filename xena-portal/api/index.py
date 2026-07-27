@@ -1035,7 +1035,7 @@ def get_requests_table_snapshot(from_dt=None):
         filter_conditions = {
             "conjunction": "and",
             "conditions": [
-                {"field_name": "Submitted on Copy", "operator": ">=", "value": [ts_ms]}
+                {"field_name": "Submitted on Copy", "operator": "isGreaterEqual", "value": [ts_ms]}
             ]
         }
 
@@ -1564,12 +1564,12 @@ def query_records():
         for alias in QUERY_FIELD_ALIASES[field]:
             for op in ["contains", "is", "="]:
                 if op == "=" and not value.isdigit(): continue
-                val_array = [int(value)] if op == "=" else [value]
+                val_array = tuple([int(value)] if op == "=" else [value])
                 combos.append((alias, op, val_array))
 
         def try_combo(combo):
             alias, op, val_array = combo
-            payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
+            payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": list(val_array)}]}}
             try:
                 resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
                 data = resp.json()
