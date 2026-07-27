@@ -63,7 +63,25 @@ QUERY_FIELD_ALIASES = {
 
 MONTHLY_ALLOCATOR_LIMITS = {
     "trend card": 10,
-    "traffic card": 10, 
+    "traffic card": 50,
+    "30 mic 15 days": 999,
+    "30 mic 30 days": 999,
+    "normal short id ( 2 levels above ) 15 days": 999,
+    "normal short id ( 2 levels above ) 30 days": 999,
+    "customized short id 15 days": 999,
+    "customized short id 30 days": 999,
+    "room pin-up": 999,
+    "welcome package 3": 15,
+    "welcome package 2": 50,
+}
+# "Order" type privileges (banners, splash) are capped PER REQUEST, not monthly,
+# so they are intentionally NOT tracked in MONTHLY_ALLOCATOR_LIMITS. The frontend
+# enforces their per-request cap locally (see pointPriceDB in index.html).
+ORDER_TYPE_LIMITS = {
+    "main page banner": 3,
+    "news banner": 5,
+    "live banner": 5,
+    "splash": 10,
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
