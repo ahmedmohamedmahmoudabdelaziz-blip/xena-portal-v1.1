@@ -556,9 +556,8 @@
                         Advanced Compare Engine
                     </h3>
                     <div class="compare-mode-toggle">
-                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">Side-by-Side (ACMs)</div>
-                        <div class="compare-mode-btn" id="cmpBtnPeriod" onclick="setCompareMode('period',this)">Period Comparison</div>
-                        <div class="compare-mode-btn" id="cmpBtnAcmRadar" onclick="setCompareMode('radar',this)">ACM Radar</div>
+                        <div class="compare-mode-btn active" id="cmpBtnAcm" onclick="setCompareMode('acm',this)">Side-by-Side (Agency Codes)</div>
+                        <div class="compare-mode-btn" id="cmpBtnAdvanced" onclick="setCompareMode('advanced',this)">ACM / Period Analytics Compare</div>
                     </div>
                     
                     <div id="cmpModeAcm">
@@ -575,32 +574,59 @@
                         <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmCompare()">Compare Agencies</button>
                         <div id="cmpAcmResults" style="margin-top:24px;overflow-x:auto"></div>
                     </div>
-                    
-                    <div id="cmpModePeriod" style="display:none">
-                        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Select two periods to compare overall performance trends (real data, pulled live from Feishu).</p>
-                        <div class="control-grid">
-                            <div class="control-group"><label>Period 1 (Start)</label><input type="date" id="cmpP1Start"></div>
-                            <div class="control-group"><label>Period 1 (End)</label><input type="date" id="cmpP1End"></div>
-                            <div class="control-group"><label>Period 2 (Start)</label><input type="date" id="cmpP2Start"></div>
-                            <div class="control-group"><label>Period 2 (End)</label><input type="date" id="cmpP2End"></div>
+
+                    <div id="cmpModeAdvanced" style="display:none">
+                        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Compares real operational data pulled directly from Feishu — no need to run an Analytics Report first.</p>
+
+                        <div class="compare-mode-toggle" style="margin-bottom:16px">
+                            <div class="compare-mode-btn active" id="cmpAdvBtnAcm" onclick="setAdvancedCompareSubMode('acm',this)">Compare ACMs (same period)</div>
+                            <div class="compare-mode-btn" id="cmpAdvBtnPeriod" onclick="setAdvancedCompareSubMode('period',this)">Compare Periods</div>
                         </div>
-                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runPeriodCompare()">Compare Periods</button>
-                        <div id="cmpPeriodResults" style="margin-top:24px;"></div>
-                        <div class="chart-wrapper-bar" style="margin-top:24px; display:none;" id="cmpPeriodChartWrapper">
-                            <canvas id="cmpPeriodChart"></canvas>
+
+                        <div id="cmpAdvAcmControls">
+                            <div class="control-grid">
+                                <div class="control-group"><label>ACM 1</label><select id="cmpAcm1"></select></div>
+                                <div class="control-group"><label>ACM 2</label><select id="cmpAcm2"></select></div>
+                                <div class="control-group"><label>ACM 3 (optional)</label><select id="cmpAcm3"><option value="">None</option></select></div>
+                                <div class="control-group"><label>ACM 4 (optional)</label><select id="cmpAcm4"><option value="">None</option></select></div>
+                                <div class="control-group"><label>From (optional)</label><input type="date" id="cmpAdvFrom"></div>
+                                <div class="control-group"><label>To (optional)</label><input type="date" id="cmpAdvTo"></div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div id="cmpModeRadar" style="display:none">
-                        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Select up to 3 ACMs to compare Creations, Closings and Closing Efficiency. Run an Analytics Report first so real numbers are available.</p>
-                        <div class="control-grid">
-                            <div class="control-group"><label>ACM 1</label><select id="cmpAcm1"></select></div>
-                            <div class="control-group"><label>ACM 2</label><select id="cmpAcm2"></select></div>
-                            <div class="control-group"><label>ACM 3 (optional)</label><select id="cmpAcm3"><option value="">None</option></select></div>
+
+                        <div id="cmpAdvPeriodControls" style="display:none">
+                            <div class="control-grid">
+                                <div class="control-group"><label>ACM (or All)</label><select id="cmpAdvPeriodAcm"><option value="All">All ACMs</option></select></div>
+                            </div>
+                            <div id="cmpPeriodRows" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+                            <div style="display:flex;gap:8px;margin-bottom:12px">
+                                <button onclick="addComparePeriodRow()" style="background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:6px 12px;border-radius:8px;font-size:.82rem;cursor:pointer">+ Add Period</button>
+                            </div>
                         </div>
-                        <button class="btn btn-primary" style="max-width:220px;margin-top:12px" onclick="runAcmRadar()">Generate Radar</button>
-                        <div class="chart-wrapper-pie-large" style="margin-top:24px; max-width:600px; margin-left:auto; margin-right:auto;">
-                            <canvas id="cmpRadarChart"></canvas>
+
+                        <button class="btn btn-primary" style="max-width:220px;margin-top:4px" onclick="runAdvancedCompare()">⚡ Run Comparison</button>
+
+                        <div id="cmpAdvSummary" style="margin-top:20px"></div>
+
+                        <div id="cmpAdvChartsWrap" style="display:none;margin-top:24px">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px">
+                                <div class="card" style="padding:16px">
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">📊 KPIs by Group</h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvBarChart"></canvas></div>
+                                </div>
+                                <div class="card" style="padding:16px">
+                                    <h4 style="color:var(--accent-purple);margin-bottom:12px;font-size:.9rem">🎯 Performance Radar</h4>
+                                    <div class="chart-wrapper-pie-large" style="max-width:none"><canvas id="cmpAdvRadarChart"></canvas></div>
+                                </div>
+                                <div class="card" style="padding:16px;grid-column:1/-1">
+                                    <h4 style="color:var(--accent-green);margin-bottom:12px;font-size:.9rem">📈 Daily Trend (Creations, per group)</h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvLineChart"></canvas></div>
+                                </div>
+                                <div class="card" style="padding:16px;grid-column:1/-1">
+                                    <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🧭 Status Mix by Group</h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvStatusChart"></canvas></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1805,116 +1831,185 @@ function closeSidebar(){
 // ════════════════════════════════════════════════════════════════════
 // COMPARE ENGINE (Dedicated Module)
 // ════════════════════════════════════════════════════════════════════
+const COMPARE_GROUP_COLORS = ['#00d4ff','#00e676','#b967ff','#ffb800'];
+
 function setCompareMode(mode,btn){
-    document.querySelectorAll('.compare-mode-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#pg-compare > .card > .compare-mode-toggle:first-of-type .compare-mode-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('cmpModeAcm').style.display=mode==='acm'?'block':'none';
-    document.getElementById('cmpModePeriod').style.display=mode==='period'?'block':'none';
-    document.getElementById('cmpModeRadar').style.display=mode==='radar'?'block':'none';
+    document.getElementById('cmpModeAdvanced').style.display=mode==='advanced'?'block':'none';
 
-    if (mode==='radar') {
-        const sel1=document.getElementById('cmpAcm1'), sel2=document.getElementById('cmpAcm2'), sel3=document.getElementById('cmpAcm3');
-        if (sel1 && sel1.options.length===0) {
-            allAcms.forEach(a=>{ sel1.add(new Option(a,a.toLowerCase())); sel2.add(new Option(a,a.toLowerCase())); sel3.add(new Option(a,a.toLowerCase())); });
-        }
+    if (mode==='advanced') populateAdvancedCompareAcmSelects();
+}
+
+function populateAdvancedCompareAcmSelects() {
+    const selects = ['cmpAcm1','cmpAcm2','cmpAcm3','cmpAcm4'].map(id=>document.getElementById(id));
+    if (selects[0] && selects[0].options.length===0) {
+        allAcms.forEach(a=> selects.forEach(sel=> sel.add(new Option(a, a.toLowerCase()))));
+    }
+    const periodAcmSel = document.getElementById('cmpAdvPeriodAcm');
+    if (periodAcmSel && periodAcmSel.options.length===1) {
+        allAcms.forEach(a=> periodAcmSel.add(new Option(a, a.toLowerCase())));
+    }
+    if (!document.getElementById('cmpPeriodRows').children.length) {
+        addComparePeriodRow('This Month');
+        addComparePeriodRow('Last Month');
     }
 }
 
-async function runPeriodCompare() {
-    const p1s=document.getElementById('cmpP1Start').value, p1e=document.getElementById('cmpP1End').value;
-    const p2s=document.getElementById('cmpP2Start').value, p2e=document.getElementById('cmpP2End').value;
-    if (!p1s||!p1e||!p2s||!p2e) { ToastManager.show('Please fill in both period date ranges.','warning'); return; }
-    
-    logFrontendAction("PERIOD_COMPARE", `${p1s} to ${p1e} vs ${p2s} to ${p2e}`);
-    
-    const container=document.getElementById('cmpPeriodResults');
-    const chartWrapper = document.getElementById('cmpPeriodChartWrapper');
-    container.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-muted)">Loading comparison…</div>';
-    chartWrapper.style.display = 'none';
-    document.getElementById('loadingOverlay').style.display='flex';
+function setAdvancedCompareSubMode(sub, btn) {
+    btn.parentElement.querySelectorAll('.compare-mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('cmpAdvAcmControls').style.display = sub==='acm' ? 'block':'none';
+    document.getElementById('cmpAdvPeriodControls').style.display = sub==='period' ? 'block':'none';
+    window.__cmpAdvSubMode = sub;
+}
+window.__cmpAdvSubMode = 'acm';
+
+let __cmpPeriodRowSeq = 0;
+function addComparePeriodRow(defaultLabel) {
+    const wrap = document.getElementById('cmpPeriodRows');
+    if (wrap.children.length >= 4) { ToastManager.show('You can compare up to 4 periods at once.','warning'); return; }
+    const rowId = `cmpPeriodRow${__cmpPeriodRowSeq++}`;
+    const row = document.createElement('div');
+    row.id = rowId;
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end';
+    row.innerHTML = `
+        <div class="control-group" style="margin-bottom:0"><label>Label</label><input type="text" class="cmp-period-label" value="${defaultLabel||('Period '+(wrap.children.length+1))}"></div>
+        <div class="control-group" style="margin-bottom:0"><label>From</label><input type="date" class="cmp-period-from"></div>
+        <div class="control-group" style="margin-bottom:0"><label>To</label><input type="date" class="cmp-period-to"></div>
+        <button onclick="document.getElementById('${rowId}').remove()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:8px 12px;border-radius:8px;cursor:pointer;height:38px">✕</button>`;
+    wrap.appendChild(row);
+
+    // Sensible default ranges for the two built-in presets so "Run" works with zero typing.
+    const now = new Date();
+    if (defaultLabel === 'This Month') {
+        row.querySelector('.cmp-period-from').value = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
+        row.querySelector('.cmp-period-to').value = fmtDate(now);
+    } else if (defaultLabel === 'Last Month') {
+        row.querySelector('.cmp-period-from').value = fmtDate(new Date(now.getFullYear(), now.getMonth()-1, 1));
+        row.querySelector('.cmp-period-to').value = fmtDate(new Date(now.getFullYear(), now.getMonth(), 0));
+    }
+}
+
+async function runAdvancedCompare() {
+    const summary = document.getElementById('cmpAdvSummary');
+    const chartsWrap = document.getElementById('cmpAdvChartsWrap');
+    const region = 'All', type = 'All';
+    let payload;
+
+    if (window.__cmpAdvSubMode === 'period') {
+        const rows = Array.from(document.querySelectorAll('#cmpPeriodRows > div'));
+        const periods = rows.map(r => ({
+            label: r.querySelector('.cmp-period-label').value.trim() || 'Period',
+            from: r.querySelector('.cmp-period-from').value,
+            to: r.querySelector('.cmp-period-to').value,
+        })).filter(p => p.from && p.to);
+        if (periods.length < 2) { ToastManager.show('Add at least 2 periods with both dates filled in.','warning'); return; }
+        payload = { user:loggedUser, email:loggedEmail, uat:loggedUat, mode:'period', region, type,
+                    acm: document.getElementById('cmpAdvPeriodAcm').value, periods: JSON.stringify(periods) };
+        logFrontendAction("COMPARE_PERIODS", periods.map(p=>p.label).join(' vs '));
+    } else {
+        const acms = ['cmpAcm1','cmpAcm2','cmpAcm3','cmpAcm4'].map(id=>document.getElementById(id).value).filter(Boolean);
+        if (acms.length < 2) { ToastManager.show('Select at least 2 ACMs.','warning'); return; }
+        payload = { user:loggedUser, email:loggedEmail, uat:loggedUat, mode:'acm', region, type,
+                    acms: acms.join(','), from: document.getElementById('cmpAdvFrom').value, to: document.getElementById('cmpAdvTo').value };
+        logFrontendAction("COMPARE_ACMS", acms.join(' vs '));
+    }
+
+    summary.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">Loading comparison…</div>';
+    chartsWrap.style.display = 'none';
+    document.getElementById('loadingOverlay').style.display = 'flex';
     try {
-        const payload={user:loggedUser,email:loggedEmail,uat:loggedUat,region:'All',acm:'All',type:'All',from:p1s,to:p1e,compare_from:p2s,compare_to:p2e};
-        const res=await fetch('/api/analytics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        const data=await res.json();
-        if (!res.ok) throw new Error(data.error||'Failed to fetch comparison.');
-        const c=data.comparison||{kpis:{creations:0,bds:0,closings:0}};
-        const deltaPct=(a,b)=> b>0 ? Math.round(((a-b)/b)*100) : (a>0?100:0);
-        const deltaHtml=(a,b)=>{ const d=deltaPct(a,b); const col=d>=0?'var(--accent-green)':'var(--accent-rose)'; return `<span style="color:${col};font-size:.78rem;font-weight:700">${d>=0?'▲ +':'▼ '}${d}%</span>`; };
-        
-        container.innerHTML=`
-            <div class="compare-section">
-                <h5>📅 Period 1 (${p1s} → ${p1e}) vs Period 2 (${p2s} → ${p2e})</h5>
-                <div class="compare-kpi-row">
-                    <div class="compare-kpi"><div class="compare-kpi-label">P1 Creations</div><div class="compare-kpi-val">${data.kpis.creations}</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">P2 Creations</div><div class="compare-kpi-val">${c.kpis.creations}</div>${deltaHtml(data.kpis.creations,c.kpis.creations)}</div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">P1 BDs</div><div class="compare-kpi-val">${data.kpis.bds}</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">P2 BDs</div><div class="compare-kpi-val">${c.kpis.bds}</div>${deltaHtml(data.kpis.bds,c.kpis.bds)}</div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">P1 Closings</div><div class="compare-kpi-val">${data.kpis.closings}</div></div>
-                    <div class="compare-kpi"><div class="compare-kpi-label">P2 Closings</div><div class="compare-kpi-val">${c.kpis.closings}</div>${deltaHtml(data.kpis.closings,c.kpis.closings)}</div>
-                </div>
-            </div>`;
-            
-        chartWrapper.style.display = 'block';
-        const ctx = document.getElementById('cmpPeriodChart');
-        if(charts['cmpPeriodChart']) charts['cmpPeriodChart'].destroy();
-        charts['cmpPeriodChart'] = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Creations', 'BD Creations', 'Closings'],
-                datasets: [
-                    { label: 'Period 1', data: [data.kpis.creations, data.kpis.bds, data.kpis.closings], backgroundColor: 'rgba(0, 212, 255, 0.8)', borderRadius: 4 },
-                    { label: 'Period 2', data: [c.kpis.creations, c.kpis.bds, c.kpis.closings], backgroundColor: 'rgba(185, 103, 255, 0.8)', borderRadius: 4 }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'top', labels: { color: '#8b8fa3' } }, datalabels: { color: '#fff', font: { weight: 'bold' } } },
-                scales: { x: { grid: { display: false } }, y: { grid: { color: '#2a2c3f' } } }
-            }
-        });
-            
-    } catch(e) {
-        container.innerHTML=`<div style="color:var(--accent-rose);padding:20px">Comparison failed: ${e.message}</div>`;
+        const res = await fetch('/api/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Comparison failed.');
+        renderCompareSummary(data.groups);
+        renderCompareCharts(data.groups);
+        chartsWrap.style.display = 'block';
+    } catch (e) {
+        summary.innerHTML = `<div style="color:var(--accent-rose);padding:20px">Comparison failed: ${escHtml(e.message)}</div>`;
     }
-    document.getElementById('loadingOverlay').style.display='none';
+    document.getElementById('loadingOverlay').style.display = 'none';
 }
 
-async function runAcmRadar() {
-    const a1=document.getElementById('cmpAcm1').value, a2=document.getElementById('cmpAcm2').value, a3=document.getElementById('cmpAcm3').value;
-    if (!a1||!a2) { ToastManager.show('Select at least 2 ACMs.','warning'); return; }
-    if (!latestAnalyticsData) { ToastManager.show('Run an Analytics Report first so real ACM numbers are available.','warning'); return; }
+function renderCompareSummary(groups) {
+    const summary = document.getElementById('cmpAdvSummary');
+    summary.innerHTML = `<div class="compare-kpi-row">` + groups.map((g,i)=>`
+        <div class="compare-kpi" style="border-left:3px solid ${COMPARE_GROUP_COLORS[i]}">
+            <div class="compare-kpi-label">${escHtml(g.label.toUpperCase())}</div>
+            <div class="compare-kpi-val">${g.kpis.creations} <span style="font-size:.65rem;color:var(--text-muted)">creations</span></div>
+            <div style="font-size:.78rem;color:var(--text-muted)">${g.kpis.bds} BDs · ${g.kpis.closings} closings · ${g.closing_efficiency_pct}% eff.</div>
+        </div>`).join('') + `</div>`;
+}
 
-    logFrontendAction("ACM_RADAR", `${a1} vs ${a2} ${a3?'vs '+a3:''}`);
-
-    const perf=latestAnalyticsData.acm_performance||{};
-    const closeMap=latestAnalyticsData.acm_closing_reasons||{};
-    const findKey=acm=>Object.keys(perf).find(k=>k.toLowerCase()===acm.toLowerCase())||acm;
-    const closingsFor=acm=>{ const key=Object.keys(closeMap).find(k=>k.toLowerCase()===acm.toLowerCase()); return key?Object.values(closeMap[key]).reduce((a,b)=>a+b,0):0; };
-    const buildStats=acm=>{
-        const creations=perf[findKey(acm)]||0;
-        const closings=closingsFor(acm);
-        const efficiency=creations>0?Math.round((closings/creations)*100):0;
-        return [creations,closings,efficiency];
-    };
-    const s1=buildStats(a1), s2=buildStats(a2), s3=a3?buildStats(a3):null;
-
-    const ctx=document.getElementById('cmpRadarChart');
-    if (charts['cmpRadarChart']) charts['cmpRadarChart'].destroy();
-    charts['cmpRadarChart']=new Chart(ctx,{
-        type:'radar',
-        data:{
-            labels:['Creations','Closings','Closing Efficiency %'],
-            datasets:[
-                {label:a1.toUpperCase(),data:s1,backgroundColor:'rgba(0,212,255,.2)',borderColor:'#00d4ff',pointBackgroundColor:'#00d4ff'},
-                {label:a2.toUpperCase(),data:s2,backgroundColor:'rgba(0,230,118,.2)',borderColor:'#00e676',pointBackgroundColor:'#00e676'},
-                ...(s3?[{label:a3.toUpperCase(),data:s3,backgroundColor:'rgba(185,103,255,.2)',borderColor:'#b967ff',pointBackgroundColor:'#b967ff'}]:[])
-            ]
+function renderCompareCharts(groups) {
+    // 1. Grouped bar — KPIs per group
+    const barCtx = document.getElementById('cmpAdvBarChart');
+    if (charts['cmpAdvBarChart']) charts['cmpAdvBarChart'].destroy();
+    charts['cmpAdvBarChart'] = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Creations','BD Creations','Closings'],
+            datasets: groups.map((g,i)=>({ label:g.label, data:[g.kpis.creations,g.kpis.bds,g.kpis.closings], backgroundColor: COMPARE_GROUP_COLORS[i]+'cc', borderRadius:4 }))
         },
-        options:{
-            responsive:true,maintainAspectRatio:false,
-            scales:{r:{angleLines:{color:'rgba(255,255,255,0.1)'},grid:{color:'rgba(255,255,255,0.1)'},pointLabels:{color:'#8b8fa3',font:{size:12}},ticks:{display:false}}},
-            plugins:{legend:{position:'bottom',labels:{color:'#8b8fa3'}},datalabels:{display:false}}
-        }
+        options: { responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{color:'#fff',font:{weight:'bold'}} },
+            scales:{ x:{grid:{display:false}}, y:{grid:{color:'#2a2c3f'}} } }
+    });
+
+    // 2. Radar — quick shape comparison across 3 normalized metrics
+    const radarCtx = document.getElementById('cmpAdvRadarChart');
+    if (charts['cmpAdvRadarChart']) charts['cmpAdvRadarChart'].destroy();
+    charts['cmpAdvRadarChart'] = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: ['Creations','Closings','Closing Efficiency %'],
+            datasets: groups.map((g,i)=>({ label:g.label, data:[g.kpis.creations,g.kpis.closings,g.closing_efficiency_pct],
+                backgroundColor: COMPARE_GROUP_COLORS[i]+'33', borderColor: COMPARE_GROUP_COLORS[i], pointBackgroundColor: COMPARE_GROUP_COLORS[i] }))
+        },
+        options: { responsive:true, maintainAspectRatio:false,
+            scales:{ r:{ angleLines:{color:'rgba(255,255,255,0.1)'}, grid:{color:'rgba(255,255,255,0.1)'}, pointLabels:{color:'#8b8fa3',font:{size:11}}, ticks:{display:false} } },
+            plugins:{ legend:{position:'bottom',labels:{color:'#8b8fa3'}}, datalabels:{display:false} } }
+    });
+
+    // 3. Line — daily creations trend, one line per group, aligned on relative day index
+    // (periods being compared rarely share the same calendar dates, so we plot "day 1, day 2…"
+    // of each group's own range — this is the actual "each one with a different line" trend view).
+    const lineCtx = document.getElementById('cmpAdvLineChart');
+    if (charts['cmpAdvLineChart']) charts['cmpAdvLineChart'].destroy();
+    const maxLen = Math.max(1, ...groups.map(g=>g.daily_trend.length));
+    const dayLabels = Array.from({length:maxLen}, (_,i)=>`Day ${i+1}`);
+    charts['cmpAdvLineChart'] = new Chart(lineCtx, {
+        type: 'line',
+        data: {
+            labels: dayLabels,
+            datasets: groups.map((g,i)=>({
+                label: g.label,
+                data: g.daily_trend.map(d=>d.creations),
+                borderColor: COMPARE_GROUP_COLORS[i], backgroundColor: COMPARE_GROUP_COLORS[i]+'22',
+                tension: 0.3, fill: false, pointRadius: 2,
+            }))
+        },
+        options: { responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{display:false} },
+            scales:{ x:{grid:{display:false},ticks:{color:'#8b8fa3',maxTicksLimit:12}}, y:{grid:{color:'#2a2c3f'},ticks:{color:'#8b8fa3'}} } }
+    });
+
+    // 4. Stacked status mix — Done / Rejected / Under Investigation per group
+    const statusCtx = document.getElementById('cmpAdvStatusChart');
+    if (charts['cmpAdvStatusChart']) charts['cmpAdvStatusChart'].destroy();
+    const statusKeys = ['Done','Rejected','Under Investigation'];
+    const statusColors = {'Done':'#00e676','Rejected':'#ff4d6d','Under Investigation':'#ffb800'};
+    charts['cmpAdvStatusChart'] = new Chart(statusCtx, {
+        type: 'bar',
+        data: {
+            labels: groups.map(g=>g.label),
+            datasets: statusKeys.map(sk=>({ label:sk, data: groups.map(g=>g.status_mix[sk]||0), backgroundColor: statusColors[sk], borderRadius:4 }))
+        },
+        options: { responsive:true, maintainAspectRatio:false, indexAxis:'y',
+            plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{color:'#fff',font:{weight:'bold',size:10}} },
+            scales:{ x:{stacked:true,grid:{color:'#2a2c3f'}}, y:{stacked:true,grid:{display:false}} } }
     });
 }
 
