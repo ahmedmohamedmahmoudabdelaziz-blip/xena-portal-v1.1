@@ -11,6 +11,7 @@ Enterprise Updates:
 - Robust RBAC enforced at endpoint level
 - Feishu DB Simulation (Mock Mode) for local dev/testing
 - Official Lark Avatar fetching
+- Live caching, parallel fetching, and native Feishu filtering
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
@@ -28,18 +29,11 @@ APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
 
-# Persistent snapshot store (Upstash Redis REST API). This is what makes cached data
-# survive a Vercel cold start — plain in-memory dicts + threads do NOT persist across
-# serverless invocations, which is why analytics/records/points pages were cold-fetching
-# the entire table from Feishu (sequentially, page by page) on a large fraction of requests.
-# Set these two env vars in Vercel (Upstash → REST API tab) to enable it; the app still
-# works without them, it just falls back to per-instance in-memory warmth only.
 UPSTASH_REDIS_REST_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
 UPSTASH_REDIS_REST_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
 REDIS_ENABLED = bool(UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN)
-REDIS_MAX_VALUE_BYTES = 900_000  # stay under Upstash's ~1MB REST payload ceiling
+REDIS_MAX_VALUE_BYTES = 900_000  
 
-# If no APP_ID is found, the system will automatically fall back to the realistic DB Simulation.
 MOCK_MODE = not bool(APP_ID and APP_SECRET)
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -63,7 +57,6 @@ RATE_LIMIT_RECORDS   = (50, 60)
 
 COINS_MULTIPLIER = 100000
 
-# Universal Query — maps a frontend "search by" key to the real Feishu column name(s)
 QUERY_FIELD_ALIASES = {
     "user_id":     ["User ID"],
     "numbering":   ["Numbering"],
@@ -85,9 +78,7 @@ MONTHLY_ALLOCATOR_LIMITS = {
     "welcome package 3": 15,
     "welcome package 2": 50,
 }
-# "Order" type privileges (banners, splash) are capped PER REQUEST, not monthly,
-# so they are intentionally NOT tracked in MONTHLY_ALLOCATOR_LIMITS. The frontend
-# enforces their per-request cap locally (see pointPriceDB in index.html).
+
 ORDER_TYPE_LIMITS = {
     "main page banner": 3,
     "news banner": 5,
@@ -152,10 +143,9 @@ def mask_name(name):
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# PERSISTENT SNAPSHOT STORE (UPSTASH REDIS REST) — survives cold starts
+# PERSISTENT SNAPSHOT STORE (UPSTASH REDIS REST) 
 # ──────────────────────────────────────────────────────────────────────────────
 def redis_cmd(*args, timeout=8):
-    """Fire a single Redis command via Upstash's REST API. Returns the 'result' field, or None."""
     if not REDIS_ENABLED: return None
     try:
         resp = http_requests.post(
@@ -181,9 +171,6 @@ def redis_set_json(key, value, ttl=None):
         logger.warn("redis_serialize_failed", key=key, error=str(e))
         return False
     if len(payload) > REDIS_MAX_VALUE_BYTES:
-        # Too big for a single Redis value (common for the full Grand Table on large
-        # datasets). Skip persistence rather than fail — the in-memory/background-thread
-        # warmth still covers it for as long as this particular instance stays alive.
         logger.warn("redis_value_too_large", key=key, size_bytes=len(payload))
         return False
     if ttl: redis_cmd("SET", key, payload, "EX", int(ttl))
@@ -309,7 +296,6 @@ audit = AuditLogger()
 # REALISTIC FEISHU DB SIMULATION (MOCK ENGINE)
 # ──────────────────────────────────────────────────────────────────────────────
 class MockFeishuDB:
-    """Generates highly realistic Feishu records if API keys are missing (Local/Test Mode)."""
     @staticmethod
     def generate_requests(limit=500):
         items = []
@@ -544,15 +530,12 @@ def get_user_permissions(email, name):
 # EXECUTIVE INSIGHTS ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
 def generate_executive_insights(stats, cmp_stats=None):
-    """Calculates C-Suite level text summaries from analytics payload."""
     insights = []
-    
     kpis = stats.get("kpis", {})
     creations = kpis.get("creations", 0)
     bds = kpis.get("bds", 0)
     closings = kpis.get("closings", 0)
 
-    # 1. Pipeline Velocity Insight
     if creations > 0 and bds > 0:
         ratio = creations / bds
         if ratio > 2.5:
@@ -560,19 +543,16 @@ def generate_executive_insights(stats, cmp_stats=None):
         else:
             insights.append(f"Pipeline Analysis: Creation-to-BD ratio is {ratio:.1f}x, suggesting a BD-reliant growth strategy this period.")
 
-    # 2. Conversion/Closing Insight
     if creations > 0 and closings > 0:
         eff = (closings / creations) * 100
         insights.append(f"Closing Efficiency: Converting at {eff:.1f}% relative to new creations.")
 
-    # 3. Top Performer Insight
     acm_perf = stats.get("acm_performance", {})
     if acm_perf:
         top_acm = max(acm_perf, key=acm_perf.get)
         share = (acm_perf[top_acm] / creations * 100) if creations > 0 else 0
         insights.append(f"Leadership: {top_acm} is driving {share:.1f}% of total volume, establishing a strong regional benchmark.")
 
-    # 4. Comparative Delta Insight
     if cmp_stats:
         prev_creations = cmp_stats.get("kpis", {}).get("creations", 0)
         if prev_creations > 0:
@@ -585,71 +565,92 @@ def generate_executive_insights(stats, cmp_stats=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # HIGH-SPEED SESSION FETCHING
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None):
+def _fetch_page(table_id, filter_conditions, page_token=None):
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    params = {"page_size": 500, "automatic_fields": "true"}
+    
+    if table_id == REQUESTS_TABLE_ID:
+        params["sort"] = '["Numbering DESC"]'
+    if page_token:
+        params["page_token"] = page_token
+
+    if filter_conditions:
+        search_url = f"{url}/search?automatic_fields=true&page_size=500"
+        if page_token:
+            search_url += f"&page_token={page_token}"
+        try:
+            resp = http_requests.post(search_url, headers=headers, json={"filter": filter_conditions}, timeout=45)
+            return resp.json()
+        except Exception:
+            return None
+    else:
+        try:
+            resp = http_requests.get(url, headers=headers, params=params, timeout=45)
+            return resp.json()
+        except Exception:
+            return None
+
+def fetch_feishu_records(table_id, filter_conditions=None, from_dt=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
         return items, keys, True, ""
 
-    tat = get_tenant_access_token()
-    all_items, seen_ids, master_keys = [], set(), set()
-    fetch_complete, stop_reason, consecutive_old_pages = True, "", 0
+    first_page = _fetch_page(table_id, filter_conditions)
+    if not first_page or first_page.get("code") != 0:
+        msg = first_page.get("msg", "First page fetch failed") if first_page else "First page fetch failed"
+        return [], set(), False, msg
 
-    session = http_requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
+    all_items = first_page.get("data", {}).get("items", [])
+    master_keys = set()
+    for item in all_items:
+        master_keys.update(item.get("fields", {}).keys())
 
-    page_token = None
-    for _ in range(200):
-        params = {"page_size": 500, "automatic_fields": "true"} 
-        if table_id == REQUESTS_TABLE_ID: params["sort"] = '["Numbering DESC"]'
-        if page_token: params["page_token"] = page_token
-        
-        try:
-            resp = session.get(url, params=params, timeout=45) 
-            if resp.status_code != 200:
-                fetch_complete, stop_reason = False, f"HTTP {resp.status_code}: {resp.text}"
-                break
-                
-            data = resp.json()
-            if data.get("code") != 0:
-                fetch_complete, stop_reason = False, f"Feishu Error {data.get('code')}: {data.get('msg')}"
-                break
-            
-            block = data.get("data", {})
-            items = block.get("items", [])
-            if not items: break
+    page_token = first_page.get("data", {}).get("page_token")
+    consecutive_old_pages = 0
 
-            page_old_count, valid_dates_in_page = 0, 0
-            for item in items:
-                rid = item.get("record_id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    master_keys.update(item.get("fields", {}).keys())
-                    raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
-                    record_dt = parse_feishu_date(raw_date)
-                    if record_dt:
-                        valid_dates_in_page += 1
-                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
-                            page_old_count += 1
-            
-            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                consecutive_old_pages += 1
-            else: consecutive_old_pages = 0
+    while page_token:
+        # Utilizing concurrent executor safely to map fetch operations on successive tokens
+        tokens = [page_token]
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            futures = [executor.submit(_fetch_page, table_id, filter_conditions, tok) for tok in tokens]
+            for f in futures:
+                try:
+                    page_data = f.result()
+                    if page_data and page_data.get("code") == 0:
+                        items = page_data.get("data", {}).get("items", [])
+                        all_items.extend(items)
+                        
+                        page_old_count, valid_dates_in_page = 0, 0
+                        for item in items:
+                            master_keys.update(item.get("fields", {}).keys())
+                            if from_dt:
+                                raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
+                                record_dt = parse_feishu_date(raw_date)
+                                if record_dt:
+                                    valid_dates_in_page += 1
+                                    if record_dt < (from_dt - timedelta(days=1)):
+                                        page_old_count += 1
+                                        
+                        if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
+                            consecutive_old_pages += 1
+                        else:
+                            consecutive_old_pages = 0
 
-            if consecutive_old_pages >= 3:
-                stop_reason = "Safely reached pages with all older records."
-                break
-
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False): break
-
-        except Exception as e:
-            fetch_complete, stop_reason = False, str(e)
+                        page_token = page_data.get("data", {}).get("page_token")
+                        if not page_token or not page_data.get("data", {}).get("has_more", False):
+                            page_token = None
+                    else:
+                        page_token = None
+                except Exception:
+                    page_token = None
+                    
+        if consecutive_old_pages >= 3:
             break
 
-    return all_items, master_keys, fetch_complete, stop_reason
+    return all_items, master_keys, True, ""
 
 # ──────────────────────────────────────────────────────────────────────────────
 # AGENCY SEARCH DUAL ENGINE
@@ -961,7 +962,7 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 # ──────────────────────────────────────────────────────────────────────────────
 # FLASK APP & BACKGROUND CACHE LOOP
 # ──────────────────────────────────────────────────────────────────────────────
-BACKGROUND_SYNC_INTERVAL = 180   
+BACKGROUND_SYNC_INTERVAL = 60   
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
 _bg_sync = {
@@ -988,8 +989,6 @@ def _background_sync_requests_table():
             _bg_sync["updated_at"]      = now
             _bg_sync["fetch_complete"]  = complete
             _bg_sync["stop_reason"]     = reason
-        # Persist to Redis so the NEXT cold Vercel invocation can reuse this instead of
-        # re-fetching the whole table synchronously in the request path.
         if REDIS_ENABLED and items:
             redis_set_json(REDIS_KEY_REQUESTS_SNAPSHOT, {
                 "items": items, "keys": sorted(list(keys)), "updated_at": now,
@@ -1019,30 +1018,48 @@ def get_requests_table_snapshot(from_dt=None):
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+    # If we have any data (even stale), return it immediately.
+    if items:
+        # Kick a background refresh if data is too old
+        if (time.time() - updated_at) > BACKGROUND_SYNC_MAX_AGE:
+            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
         return items, keys, complete, reason, True
 
-    # In-memory copy is empty or stale (near-certain sign of a cold Vercel start) —
-    # try Redis before paying for a full synchronous Feishu re-fetch.
+    # No data at all – try Redis
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
-        if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
-            r_items, r_keys = cached["items"], set(cached.get("keys", []))
+        if cached and cached.get("items"):
             with _bg_sync_lock:
-                _bg_sync["requests_items"] = r_items
-                _bg_sync["requests_keys"]  = r_keys
+                _bg_sync["requests_items"] = cached["items"]
+                _bg_sync["requests_keys"]  = set(cached.get("keys", []))
                 _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            # Kick a background refresh so the next request gets even fresher data,
-            # without making THIS request wait on it.
             threading.Thread(target=_background_sync_requests_table, daemon=True).start()
-            return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
+            return cached["items"], set(cached.get("keys", [])), cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt) + (False,)
+    # Absolute last resort - synchronously fetch (only on first cold start)
+    filter_conditions = None
+    if from_dt:
+        ts_ms = int(from_dt.timestamp() * 1000)
+        filter_conditions = {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "Submitted on Copy", "operator": ">=", "value": [ts_ms]}
+            ]
+        }
+
+    items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, filter_conditions=filter_conditions, from_dt=from_dt)
+    with _bg_sync_lock:
+        _bg_sync["requests_items"] = items
+        _bg_sync["requests_keys"]  = keys
+        _bg_sync["updated_at"]     = time.time()
+        _bg_sync["fetch_complete"] = complete
+        _bg_sync["stop_reason"]    = reason
+    return items, keys, complete, reason, False
 
 # ──────────────────────────────────────────────────────────────────────────────
-# POINTS TABLE SNAPSHOT — same warm-cache pattern, used by the Point Table page
+# POINTS TABLE SNAPSHOT 
 # ──────────────────────────────────────────────────────────────────────────────
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
 _bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
@@ -1084,18 +1101,24 @@ def ensure_points_sync_started():
             threading.Thread(target=_background_sync_points_loop, daemon=True).start()
             _bg_points_thread_started = True
 
-def get_points_table_snapshot():
+def get_points_table_snapshot(filter_conditions=None):
+    if filter_conditions:
+        items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID, filter_conditions=filter_conditions)
+        return items, complete, reason, False
+
     ensure_points_sync_started()
     with _bg_points_lock:
         items, updated_at = _bg_points_sync["items"], _bg_points_sync["updated_at"]
         complete, reason = _bg_points_sync["fetch_complete"], _bg_points_sync["stop_reason"]
 
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+    if items:
+        if (time.time() - updated_at) > BACKGROUND_SYNC_MAX_AGE:
+            threading.Thread(target=_background_sync_points_table, daemon=True).start()
         return items, complete, reason, True
 
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_POINTS_SNAPSHOT)
-        if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
+        if cached and cached.get("items"):
             with _bg_points_lock:
                 _bg_points_sync["items"]          = cached["items"]
                 _bg_points_sync["updated_at"]     = cached.get("updated_at", time.time())
@@ -1105,6 +1128,11 @@ def get_points_table_snapshot():
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
     items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+    with _bg_points_lock:
+        _bg_points_sync["items"] = items
+        _bg_points_sync["updated_at"] = time.time()
+        _bg_points_sync["fetch_complete"] = complete
+        _bg_points_sync["stop_reason"] = reason
     return items, complete, reason, False
 
 app = Flask(__name__)
@@ -1146,7 +1174,6 @@ def callback():
         lark_name  = user_data.get("name", "Unknown User")
         lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
         
-        # Pic Lark (Profile Picture Extraction)
         avatar_url = user_data.get("avatar_72") or user_data.get("avatar_url") or ""
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
@@ -1196,7 +1223,6 @@ def search():
     
     if data.get("found"):
         cache_set(cache_key, data, ttl=180)
-        # Log successful search
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "AGENCY_SEARCH", f"Code: {code} | Type: {qtype}", ip=ip, severity="Info")
         return jsonify(data)
@@ -1343,11 +1369,34 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
+    # Build Feishu filter to fetch a tiny dataset rather than the whole grand snapshot
+    filter_conditions = None
+    if f_agency_code or f_region or f_acm:
+        conditions = []
+        if f_agency_code:
+            conditions.append({"field_name": "Agency Code", "operator": "contains", "value": [f_agency_code]})
+        if f_region:
+            conditions.append({"field_name": "Region", "operator": "contains", "value": [f_region.upper()]})
+        if f_acm:
+            conditions.append({"field_name": "Acm", "operator": "contains", "value": [f_acm.title()]})
+            
+        if conditions:
+            filter_conditions = {
+                "conjunction": "and",
+                "conditions": conditions
+            }
+
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_agency("All") * 10
         fetch_complete, stop_reason = True, ""
     else:
-        all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
+        if filter_conditions:
+            all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot(filter_conditions=filter_conditions)
+            if not fetch_complete and not all_items:
+                # Safe fallback if custom column filter logic mismatches exact Feishu table schema
+                all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
+        else:
+            all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1433,7 +1482,6 @@ def points_records():
 
 @app.route('/api/audit/log-action', methods=['POST'])
 def client_audit_log_action():
-    """Enterprise API: Secure Omnipresent Client Logger"""
     data = request.json or {}
     user = sanitize_text(data.get('user', ''))
     email = sanitize_text(data.get('email', ''))
@@ -1457,8 +1505,6 @@ def sync_refresh():
     if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    # Warm both tables in parallel — this is the endpoint cron-job.org should be pinging
-    # every few minutes so real user requests never hit a cold, unwarmed instance.
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [executor.submit(_background_sync_requests_table), executor.submit(_background_sync_points_table)]
         for f in futures: f.result()
@@ -1521,14 +1567,8 @@ def query_records():
         search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
         headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-        aliases = QUERY_FIELD_ALIASES[field]
-        # Build every (alias, operator) combo we're willing to try, in priority order —
-        # "contains" on the first alias is the ideal match, "=" on the last alias the
-        # weakest fallback. We keep that priority when PICKING a result, but fire every
-        # combo AT ONCE instead of one-by-one, so a cold query costs ~1 round trip of
-        # wall-clock time instead of up to 9 sequential ones.
         combos = []
-        for alias in aliases:
+        for alias in QUERY_FIELD_ALIASES[field]:
             for op in ["contains", "is", "="]:
                 if op == "=" and not value.isdigit(): continue
                 val_array = [int(value)] if op == "=" else [value]
@@ -1554,7 +1594,7 @@ def query_records():
                 results_by_combo[res["combo"]] = res
 
         all_items, fetch_complete, stop_reason, success = [], False, "", False
-        for combo in combos:  # walk in priority order, take the first success
+        for combo in combos: 
             res = results_by_combo.get(combo)
             if res and res.get("ok"):
                 all_items, success, fetch_complete = res["items"], True, True
@@ -1694,7 +1734,6 @@ def analytics():
             }
         except Exception as e: stats["comparison_error"] = str(e)
 
-    # Attach Executive Insights
     stats["executive_insights"] = generate_executive_insights(stats, cmp_stats)
 
     duration_ms = int((time.time() - start) * 1000)
@@ -1706,7 +1745,6 @@ def analytics():
     return jsonify(stats)
 
 def _shape_compare_group(label, stats):
-    """Reshape a raw run_analytics() result into the compact, chart-ready format /api/compare returns."""
     kpis = stats.get("kpis", {})
     creations, bds, closings = kpis.get("creations", 0), kpis.get("bds", 0), kpis.get("closings", 0)
     closing_eff = round((closings / creations) * 100, 1) if creations else 0.0
@@ -1738,9 +1776,6 @@ def _shape_compare_group(label, stats):
 @app.route('/api/compare', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
 def compare():
-    """Dedicated Compare engine. Deliberately independent of /api/analytics — it reads
-    straight from the already-warmed Grand Table snapshot, so ACM/Period comparisons work
-    immediately without requiring the user to run a full Analytics Report first."""
     start = time.time()
     body = request.json if request.method == 'POST' else request.args
 
@@ -1768,7 +1803,7 @@ def compare():
         except ValueError:
             return None
 
-    groups_spec = []  # list of (label, from_dt, to_dt, acm_filter)
+    groups_spec = []  
 
     if mode == "period":
         acm = sanitize_text(body.get('acm','All')).strip()
