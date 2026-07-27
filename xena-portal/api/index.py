@@ -1,4 +1,3 @@
-"""
 Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
