@@ -1,6 +1,6 @@
 """
 Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
-Refactored for live server‑side filtering (excluding date) + field projection.
+Refactored for live server‑side filtering + field projection (no sort API errors).
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
@@ -531,11 +531,12 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
     return stats
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HELPER: FETCH RECORDS WITH FILTER AND PAGINATION
+# HELPER: FETCH RECORDS WITH FILTER AND PAGINATION (no sort)
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_records_with_filter(table_id, filter_obj, field_names, sort=None, max_pages=50):
+def fetch_records_with_filter(table_id, filter_obj, field_names, max_pages=50):
     """
     Fetch records from a Bitable table using the search API with filter and field projection.
+    Sorting is done in‑memory after fetching.
     Returns (items, fetch_complete, stop_reason).
     """
     if MOCK_MODE:
@@ -556,8 +557,6 @@ def fetch_records_with_filter(table_id, filter_obj, field_names, sort=None, max_
         }
         if filter_obj:
             payload["filter"] = filter_obj
-        if sort:
-            payload["sort"] = sort
         if page_token:
             payload["page_token"] = page_token
 
@@ -1064,8 +1063,7 @@ def points_records():
         filter_obj = build_points_filter(f_agency_code, f_region, f_acm, search)
         field_names = ["Agency Code", "Agency Name", "Region", "Acm",
                        "Base Points", "Total Points", "Used Points", "Point Balance"]
-        sort = [f"{sort_by} {sort_dir.upper()}"] if sort_by else None
-        all_items, fetch_complete, stop_reason = fetch_records_with_filter(POINTS_TABLE_ID, filter_obj, field_names, sort)
+        all_items, fetch_complete, stop_reason = fetch_records_with_filter(POINTS_TABLE_ID, filter_obj, field_names)
 
     filtered = []
     for item in all_items:
@@ -1361,7 +1359,7 @@ def analytics():
     else:
         filter_obj = build_analytics_filter(region_filter, acm_filter, type_filter)
         all_items, fetch_complete, stop_reason = fetch_records_with_filter(
-            REQUESTS_TABLE_ID, filter_obj, field_names, sort=["Submitted on Copy ASC"]
+            REQUESTS_TABLE_ID, filter_obj, field_names
         )
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
@@ -1379,7 +1377,7 @@ def analytics():
             # For comparison we need to fetch again with the same filters (region/acm/type) but for the compare date range.
             # We could fetch once and filter in Python, but for simplicity we fetch again (the data is small due to filters).
             cmp_filter = build_analytics_filter(region_filter, acm_filter, type_filter)
-            cmp_items, _, _ = fetch_records_with_filter(REQUESTS_TABLE_ID, cmp_filter, field_names, sort=["Submitted on Copy ASC"])
+            cmp_items, _, _ = fetch_records_with_filter(REQUESTS_TABLE_ID, cmp_filter, field_names)
             cmp_stats = run_analytics(cmp_items, cmp_from_dt, cmp_to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
             stats["comparison"] = {
                 "from": cmp_from, "to": cmp_to,
@@ -1540,7 +1538,7 @@ def compare():
             fetch_complete = True
         else:
             filter_obj = build_analytics_filter(region_filter, acm_filter, type_filter)
-            all_items, fetch_complete, _ = fetch_records_with_filter(REQUESTS_TABLE_ID, filter_obj, field_names, sort=["Submitted on Copy ASC"])
+            all_items, fetch_complete, _ = fetch_records_with_filter(REQUESTS_TABLE_ID, filter_obj, field_names)
             if not fetch_complete:
                 all_items = []
         stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
