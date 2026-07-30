@@ -1,19 +1,8 @@
 {
-"functions": {
-"api//.py": {
-"maxDuration": 60
-}
-},
 "rewrites": [
 {
-"source": "/(.)",
+"source": "/(.*)",
 "destination": "/api/index.py"
-}
-],
-"crons": [
-{
-"path": "/api/sync/refresh",
-"schedule": "*/1 * * * *"
 }
 ]
 }
