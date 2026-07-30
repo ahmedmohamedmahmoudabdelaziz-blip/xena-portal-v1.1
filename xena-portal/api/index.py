@@ -13,7 +13,7 @@ Enterprise Updates:
 - Official Lark Avatar fetching
 """
 
-import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
+import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid, copy
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from functools import wraps
@@ -690,11 +690,26 @@ QUERY_RECORDS_FIELDS = [
 ]
 
 def _date_filter_value(dt):
-    """Value shape for a NUMBER field filter (epoch ms). If 'Submitted on Copy' is actually
-    a Bitable DateTime field rather than a plain Number field, change this to:
-    ["ExactDate", str(int(dt.timestamp() * 1000))] — test one request against your base to
-    confirm which shape it needs; the API 400s with a clear message if it's wrong."""
+    """Value shape for a NUMBER field filter (epoch ms). See _swap_date_shape() below —
+    if this shape is wrong for your base's actual field type, _fetch_bitable_shard()
+    self-heals by flipping to the DateTime shape automatically on a 1254018 InvalidFilter."""
     return [str(int(dt.timestamp() * 1000))]
+
+def _swap_date_shape(filter_obj):
+    """Flip any 'Submitted on Copy' condition's value between the plain-Number epoch-ms
+    shape (['<ms>']) and the DateTime shape (['ExactDate', '<ms>']). We don't know in
+    advance which one your Bitable base actually wants for this field — this makes that
+    a one-time auto-detected fact instead of a guess I have to make blind."""
+    alt = copy.deepcopy(filter_obj)
+    for cond in alt.get("conditions", []):
+        if cond.get("field_name") == "Submitted on Copy" and cond.get("operator") in \
+           ("isGreater", "isLess", "isGreaterEqual", "isLessEqual"):
+            val = cond.get("value", [])
+            if len(val) == 2 and val[0] == "ExactDate":
+                cond["value"] = [val[1]]
+            elif len(val) == 1:
+                cond["value"] = ["ExactDate", val[0]]
+    return alt
 
 def _peek_newest_date(tat, table_id):
     """One cheap page_size=1 call (same sort the old sequential fetch already used) purely
@@ -734,6 +749,7 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 
     items, seen, complete, reason = [], set(), True, ""
     page_token, projection = None, field_names
+    shape_retried = False
 
     for _ in range(200):
         payload = {"page_size": 500}
@@ -748,6 +764,16 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
                 # base (schema drift). Drop projection for this shard only and restart its
                 # cursor — correctness is preserved, we just lose the payload-size win here.
                 projection, page_token = None, None
+                items, seen = [], set()
+                continue
+            if data.get("code") == 1254018 and filter_obj and not shape_retried:
+                # InvalidFilter: almost certainly the 'Submitted on Copy' date-value shape
+                # (Number vs DateTime) doesn't match this field's real type on your base.
+                # Flip the shape once and retry before giving up — self-healing instead of
+                # a guess I have to get right blind.
+                logger.info("date_filter_shape_swap", table=table_id)
+                filter_obj = _swap_date_shape(filter_obj)
+                shape_retried, page_token = True, None
                 items, seen = [], set()
                 continue
             if data.get("code") != 0:
@@ -1708,6 +1734,7 @@ def points_search():
 @app.route('/api/query', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def query_records():
+    start = time.time()
     user  = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
     field = sanitize_text(request.args.get('field','')).strip().lower()
