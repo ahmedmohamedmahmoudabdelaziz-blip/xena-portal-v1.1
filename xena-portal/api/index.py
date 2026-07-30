@@ -11,6 +11,7 @@ Enterprise Updates:
 - Robust RBAC enforced at endpoint level
 - Feishu DB Simulation (Mock Mode) for local dev/testing
 - Official Lark Avatar fetching
+- Pagination Safety Ceilings (Anti-Skew & Rate Limit Protection)
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid, copy
@@ -54,7 +55,7 @@ PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham"
             "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
 IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
 
-CACHE_TTL_REALTIME   = 300    
+CACHE_TTL_REALTIME   = 300   
 CACHE_TTL_HISTORICAL = 3600   
 
 RATE_LIMIT_SEARCH    = (50, 60)
@@ -62,6 +63,14 @@ RATE_LIMIT_ANALYTICS = (30, 60)
 RATE_LIMIT_RECORDS   = (50, 60)
 
 COINS_MULTIPLIER = 100000
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PAGINATION SAFETY CEILINGS (Protection against data-skew and serverless timeouts)
+# ──────────────────────────────────────────────────────────────────────────────
+SHARD_MAX_PAGES = 30         # Cap a single shard to 15,000 records (30 pages * 500)
+SHARD_MAX_TIME  = 40         # Hard abort if a single shard spins for more than 40 seconds
+SEQ_MAX_PAGES   = 100        # Cap background syncs to 50,000 records
+SEQ_MAX_TIME    = 120        # Hard abort if sequential background sync exceeds 2 minutes
 
 # Universal Query — maps a frontend "search by" key to the real Feishu column name(s)
 QUERY_FIELD_ALIASES = {
@@ -600,7 +609,13 @@ def fetch_feishu_records(table_id, from_dt=None):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
 
     page_token = None
-    for _ in range(200):
+    start_time = time.time()
+    
+    for _ in range(SEQ_MAX_PAGES):
+        if time.time() - start_time > SEQ_MAX_TIME:
+            fetch_complete, stop_reason = False, f"Safety timeout: sequential fetch exceeded {SEQ_MAX_TIME}s ceiling."
+            break
+            
         params = {"page_size": 500, "automatic_fields": "true"} 
         if table_id == REQUESTS_TABLE_ID: params["sort"] = '["Numbering DESC"]'
         if page_token: params["page_token"] = page_token
@@ -654,20 +669,6 @@ def fetch_feishu_records(table_id, from_dt=None):
 # ──────────────────────────────────────────────────────────────────────────────
 # LIVE PARALLEL / SHARDED FETCH ENGINE
 # ──────────────────────────────────────────────────────────────────────────────
-# Feishu's Bitable pagination is cursor-based (page_token), NOT offset-based, so a single
-# query can never be "split and fetched in parallel" — page 3 literally cannot be requested
-# until page 2's token is known. The only way to get real parallelism is to fire off
-# SEVERAL INDEPENDENT, SERVER-SIDE-FILTERED queries at once (e.g. Region=PK vs Region=IN,
-# optionally further narrowed by date), each with its own page_token chain, and merge the
-# results. That's what this engine does. Every field list below is passed as `field_names`
-# so Feishu only serializes/returns the columns we actually use — this alone typically cuts
-# payload size (and JSON parse time) by 70-90% on wide tables.
-#
-# NOTE ON "Submitted on Copy": earlier debugging found the *text* "Submitted on" column
-# can't be filtered reliably server-side. "Submitted on Copy" was added specifically as a
-# numeric epoch-ms field so isGreater/isLess filters on it ARE reliable. Verify the exact
-# operator/value shape against your base once — Bitable uses a different `value` shape for
-# a true Date-type field vs a plain Number field; see _date_filter_value() below.
 
 REQUESTS_ANALYTICS_FIELDS = [
     "Numbering", "Submitted on Copy", "Request Type", "Status", "Region",
@@ -712,9 +713,7 @@ def _swap_date_shape(filter_obj):
     return alt
 
 def _peek_newest_date(tat, table_id):
-    """One cheap page_size=1 call (same sort the old sequential fetch already used) purely
-    to anchor 'now' for date-bucket sharding when the caller didn't supply an explicit
-    to_dt. Falls back to wall-clock time if the peek fails for any reason."""
+    """One cheap page_size=1 call purely to anchor 'now' for date-bucket sharding."""
     try:
         session = http_requests.Session()
         session.headers.update({"Authorization": f"Bearer {tat}"})
@@ -731,18 +730,15 @@ def _peek_newest_date(tat, table_id):
     return datetime.utcnow()
 
 def _date_buckets(from_dt, to_dt, n_buckets):
-    """Split [from_dt, to_dt) into n_buckets equal-width, CONTIGUOUS half-open intervals —
-    contiguous so there are no gaps (missed records) or overlaps (double counting, though
-    _merge_shards' record_id dedupe would absorb overlap anyway)."""
+    """Split [from_dt, to_dt) into n_buckets equal-width, CONTIGUOUS half-open intervals"""
     total_seconds = max((to_dt - from_dt).total_seconds(), 1)
     step = total_seconds / n_buckets
     return [(from_dt + timedelta(seconds=step * i), from_dt + timedelta(seconds=step * (i + 1)))
             for i in range(n_buckets)]
 
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
-    """Paginate ONE filtered Bitable query to completion inside a worker thread. Several of
-    these run concurrently (see fetch_requests_sharded / fetch_points_sharded below) — that
-    concurrency, not caching, is what buys back the wall-clock time."""
+    """Paginate ONE filtered Bitable query to completion inside a worker thread. Protected
+    by hard max_pages/max_time limits to prevent skewed buckets from causing 300s timeouts."""
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
@@ -750,8 +746,14 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
     items, seen, complete, reason = [], set(), True, ""
     page_token, projection = None, field_names
     shape_retried = False
+    start_time = time.time()
 
-    for _ in range(200):
+    for _ in range(SHARD_MAX_PAGES):
+        # HARD SAFETY CEILING: Break out immediately if this shard is running too long.
+        if time.time() - start_time > SHARD_MAX_TIME:
+            complete, reason = False, f"Shard safety timeout: exceeded {SHARD_MAX_TIME}s ceiling."
+            break
+            
         payload = {"page_size": 500}
         if filter_obj:  payload["filter"] = filter_obj
         if projection:  payload["field_names"] = projection
@@ -760,17 +762,10 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
             resp = session.post(url, json=payload, timeout=timeout)
             data = resp.json()
             if data.get("code") == 1254045 and projection:
-                # FieldNameNotFound: one of our projected column names doesn't exist on this
-                # base (schema drift). Drop projection for this shard only and restart its
-                # cursor — correctness is preserved, we just lose the payload-size win here.
                 projection, page_token = None, None
                 items, seen = [], set()
                 continue
             if data.get("code") == 1254018 and filter_obj and not shape_retried:
-                # InvalidFilter: almost certainly the 'Submitted on Copy' date-value shape
-                # (Number vs DateTime) doesn't match this field's real type on your base.
-                # Flip the shape once and retry before giving up — self-healing instead of
-                # a guess I have to get right blind.
                 logger.info("date_filter_shape_swap", table=table_id)
                 filter_obj = _swap_date_shape(filter_obj)
                 shape_retried, page_token = True, None
@@ -809,9 +804,7 @@ def _merge_shards(shard_results):
     return all_items, master_keys, fetch_complete, stop_reason
 
 def _run_shards_timed(table_id, tat, shards, field_names):
-    """Runs shards concurrently and logs each one's wall time + row count, so a slow request
-    shows up in your Vercel function logs as 'which shard was the long pole' instead of just
-    a single opaque total. Look for the 'shard_fetch' event."""
+    """Runs shards concurrently and logs each one's wall time + row count"""
     def _timed(shard_filter):
         t0 = time.time()
         items, complete, reason = _fetch_bitable_shard(table_id, tat, shard_filter, field_names)
@@ -823,24 +816,10 @@ def _run_shards_timed(table_id, tat, shards, field_names):
         futures = [executor.submit(_timed, f) for f in shards]
         return [f.result() for f in futures]
 
-REQUESTS_SHARD_COUNT = 10  # bumped from 6 — if Vercel/Feishu logs show 429s or a 'fatal' shard
-                            # error at this level, that's the Feishu QPS ceiling; dial back down.
-REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  # fixed fallback window when no from_dt is given at all
+REQUESTS_SHARD_COUNT = 10  
+REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
 
 def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
-    """LIVE replacement for fetch_feishu_records(REQUESTS_TABLE_ID, ...) on the Analytics /
-    Compare hot paths. Splits the query into N concurrent, CONTIGUOUS date-range shards on
-    'Submitted on Copy' (the numeric field added specifically because the text 'Submitted on'
-    column can't be filtered reliably server-side — see project history).
-
-    Earlier version of this function sharded by Region instead. That was wrong: Region is
-    frequently blank on raw records (see fetch_agency_data's ACM-based fallback), so nearly
-    everything landed in a single "Region isEmpty" catch-all shard and the other two shards
-    did almost nothing — 3 shards in name, ~1 in practice. Date buckets don't have that
-    failure mode since every submitted request has a timestamp.
-
-    Nothing is cached here; every call re-hits Feishu live.
-    """
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -860,27 +839,12 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
         shards.append({"conjunction": "and", "conditions": conditions})
 
     if not from_dt and not to_dt:
-        # True "all time" request (no range at all) — run_analytics does NOT drop dateless
-        # records in this mode (it only drops them once a range filter is active), so add a
-        # small catch-all shard for rows where 'Submitted on Copy' itself is blank, to match
-        # that existing behavior exactly. This is expected to be a tiny shard, not the
-        # dominant one — unlike the old Region-based catch-all.
         shards.append({"conjunction": "and", "conditions": [{"field_name": "Submitted on Copy", "operator": "isEmpty"}]})
 
     shard_results = _run_shards_timed(REQUESTS_TABLE_ID, tat, shards, field_names)
     return _merge_shards(shard_results)
 
 def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
-    """LIVE replacement for fetch_feishu_records(POINTS_TABLE_ID) on the Point Table page.
-    The Points table is an agency-snapshot table (one row per agency), not a time series, so
-    there's no reliable date field to shard on — and Region has the same blank-field problem
-    here as it did on the Requests table. Rather than guess at a shard key that risks silently
-    dropping agencies, this does a single field-projected LIVE fetch (no sharding, no cache).
-    Field projection alone is normally enough here since this table is far smaller than the
-    Requests table; if it's still slow, that's a sign the table itself is large and worth a
-    follow-up (e.g. sharding on Agency Code ranges) once we've confirmed the field types on
-    your base.
-    """
     if MOCK_MODE:
         items = MockFeishuDB.generate_agency("All") * 10
         return items, True, ""
@@ -1778,7 +1742,7 @@ def query_records():
         for alias in aliases:
             for op in ["contains", "is", "="]:
                 if op == "=" and not value.isdigit(): continue
-                # CHANGED HERE: Create a tuple instead of a list for val_array
+                # Create a tuple instead of a list for val_array
                 # so it remains hashable when used as a dictionary key later.
                 val_array = (int(value),) if op == "=" else (value,)
                 combos.append((alias, op, val_array))
