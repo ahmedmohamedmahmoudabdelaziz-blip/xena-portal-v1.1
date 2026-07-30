@@ -1,4 +1,9 @@
 {
+"functions": {
+"api//.py": {
+"maxDuration": 60
+}
+},
 "rewrites": [
 {
 "source": "/(.)",
@@ -8,7 +13,7 @@
 "crons": [
 {
 "path": "/api/sync/refresh",
-"schedule": "/5 * * * *"
+"schedule": "*/5 * * * *"
 }
 ]
 }
