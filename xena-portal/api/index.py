@@ -592,103 +592,81 @@ def generate_executive_insights(stats, cmp_stats=None):
     return insights
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SEQUENTIAL ENGINE & DELTA MERGE
+# ROBUST SEQUENTIAL ENGINE (REPLACES SHARDING/PROJECTION FRAGILITY)
 # ──────────────────────────────────────────────────────────────────────────────
-REQUESTS_ANALYTICS_FIELDS = [
-    "Numbering", "Submitted on Copy", "Request Type", "Status", "Region",
-    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Agency Type",
-    "Closing Reason", "Otherapp Name", "Reject Reason", "Create Way",
-]
-
-POINTS_TABLE_FIELDS = [
-    "Agency Code", "Agency Name", "Region", "Acm", "Acm Name (PK)", "Acm Name (IN)",
-    "Assigned Member", "Base Points", "Bonus Points", "Total Points", "# Total Points",
-    "Used Points", "Point Balance",
-]
-
-QUERY_RECORDS_FIELDS = [
-    "Numbering", "Request Type", "Submitted on Copy", "Submitted on", "Respondents",
-    "User ID", "Otherapp ID", "Otherapp Name", "Other App Name",
-    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member", "Region",
-    "Bd Code", "BD Code", "NID Number", "NID", "Status", "Request Status",
-    "Reject Reason", "Rejection Reason", "Audition note", "Audition Note", "Duplicated Check",
-]
-
-def _date_filter_value(dt):
-    """Value shape for a NUMBER field filter (epoch ms)."""
-    return [str(int(dt.timestamp() * 1000))]
-
-def _swap_date_shape(filter_obj):
-    """Flip 'Submitted on Copy' condition's value between Number epoch-ms and DateTime shape."""
-    alt = copy.deepcopy(filter_obj)
-    for cond in alt.get("conditions", []):
-        if cond.get("field_name") == "Submitted on Copy" and cond.get("operator") in \
-           ("isGreater", "isLess", "isGreaterEqual", "isLessEqual"):
-            val = cond.get("value", [])
-            if len(val) == 2 and val[0] == "ExactDate":
-                cond["value"] = [val[1]]
-            elif len(val) == 1:
-                cond["value"] = ["ExactDate", val[0]]
-    return alt
-
-def fetch_bitable_sequential(table_id, tat, filter_obj=None, field_names=None, max_time=120, max_pages=100):
+def fetch_all_sequential(table_id, max_time=25):
     """
-    Safely iterates through a Bitable search query sequentially. 
-    Uses field projection to cut payload sizes by 80%, bypassing the Feishu rate limits
-    that triggered timeouts during parallel sharding.
+    Robust, schema-agnostic sequential fetch for imported Excel tables.
+    - Uses GET /records which is vastly faster and more stable than POST /search.
+    - Sorts by Numbering DESC automatically so partial timeouts STILL return the newest data.
+    - Ignores fragile field_names projection so it never crashes on schema changes.
     """
     if MOCK_MODE:
         if table_id == REQUESTS_TABLE_ID: items = MockFeishuDB.generate_requests(300)
         else: items = MockFeishuDB.generate_agency("All") * 10
         return items, True, ""
 
+    tat = get_tenant_access_token()
     session = http_requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
+    session.headers.update({"Authorization": f"Bearer {tat}"})
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
 
-    items, seen, complete, reason = [], set(), True, ""
-    page_token, projection = None, field_names
-    shape_retried = False
+    items = []
+    page_token = None
     start_time = time.time()
+    complete = True
+    reason = ""
+    
+    # Always fetch newest first! This guarantees that if we hit the 25s timeout,
+    # we have the current month's data to power the dashboard.
+    sort_payload = '["Numbering DESC"]' if table_id == REQUESTS_TABLE_ID else None
 
-    for _ in range(max_pages):
+    for _ in range(200): # Hard cap at 100k rows
         if time.time() - start_time > max_time:
-            complete, reason = False, f"Safety timeout: exceeded {max_time}s ceiling."
+            complete = False
+            reason = f"Safety timeout: reached {max_time}s ceiling."
             break
             
-        payload = {"page_size": 500}
-        if filter_obj:  payload["filter"] = filter_obj
-        if projection:  payload["field_names"] = projection
-        if page_token:  payload["page_token"] = page_token
+        params = {"page_size": 500, "automatic_fields": "true"}
+        if sort_payload: params["sort"] = sort_payload
+        if page_token: params["page_token"] = page_token
+        
         try:
-            resp = session.post(url, json=payload, timeout=25)
+            resp = session.get(url, params=params, timeout=12)
             data = resp.json()
-            if data.get("code") == 1254045 and projection:
-                projection, page_token = None, None
-                items, seen = [], set()
+            
+            # If the table lacks a 'Numbering' column, Feishu throws 1254045.
+            # Instantly self-heal by dropping the sort requirement and trying again.
+            if data.get("code") in (1254045, 1254402) and sort_payload:
+                sort_payload = None
                 continue
-            if data.get("code") == 1254018 and filter_obj and not shape_retried:
-                filter_obj = _swap_date_shape(filter_obj)
-                shape_retried, page_token = True, None
-                items, seen = [], set()
-                continue
+                
             if data.get("code") != 0:
-                complete, reason = False, f"Feishu Error {data.get('code')}: {data.get('msg')}"
+                complete = False
+                reason = f"Feishu Error {data.get('code')}: {data.get('msg')}"
                 break
+                
             block = data.get("data", {})
-            for item in block.get("items", []):
-                rid = item.get("record_id")
-                if rid and rid not in seen:
-                    seen.add(rid)
-                    items.append(item)
+            page_items = block.get("items", [])
+            items.extend(page_items)
+            
             page_token = block.get("page_token")
             if not page_token or not block.get("has_more", False):
                 break
         except Exception as e:
-            complete, reason = False, str(e)
+            complete = False
+            reason = str(e)
             break
 
-    return items, complete, reason
+    # Safely deduplicate
+    seen, unique_items = set(), []
+    for it in items:
+        rid = it.get("record_id")
+        if rid not in seen:
+            seen.add(rid)
+            unique_items.append(it)
+
+    return unique_items, complete, reason
 
 # ──────────────────────────────────────────────────────────────────────────────
 # AGENCY SEARCH DUAL ENGINE
@@ -1019,8 +997,8 @@ def _background_sync_requests_table():
         if _bg_sync["syncing"]: return
         _bg_sync["syncing"] = True
     try:
-        tat = get_tenant_access_token()
-        items, complete, reason = fetch_bitable_sequential(REQUESTS_TABLE_ID, tat, field_names=REQUESTS_ANALYTICS_FIELDS, max_time=120)
+        # 120s timeout in background ensures we get the full historical table
+        items, complete, reason = fetch_all_sequential(REQUESTS_TABLE_ID, max_time=120)
         keys = set(items[0].get("fields", {}).keys()) if items else set()
         now = time.time()
         
@@ -1054,16 +1032,16 @@ def ensure_background_sync_started():
             threading.Thread(target=_background_sync_loop, daemon=True).start()
             _bg_thread_started = True
 
-def get_requests_table_snapshot(from_dt=None):
+def get_requests_table_snapshot(force_refresh=False):
     ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+    if not force_refresh and items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
 
-    if REDIS_ENABLED:
+    if not force_refresh and REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
         if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
             r_items, r_keys = cached["items"], set(cached.get("keys", []))
@@ -1076,10 +1054,18 @@ def get_requests_table_snapshot(from_dt=None):
             threading.Thread(target=_background_sync_requests_table, daemon=True).start()
             return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    # If completely cold, do a sequential pull (slower, but won't trigger Feishu 429 timeouts like sharding did)
-    tat = get_tenant_access_token()
-    items, complete, reason = fetch_bitable_sequential(REQUESTS_TABLE_ID, tat, field_names=REQUESTS_ANALYTICS_FIELDS, max_time=60)
+    # Synchronous Live Fetch (capped at 25s so Vercel doesn't 504 on us)
+    # Because fetch_all_sequential sorts DESC, even a timeout gets us the newest month of data perfectly!
+    items, complete, reason = fetch_all_sequential(REQUESTS_TABLE_ID, max_time=25)
     keys = set(items[0].get("fields", {}).keys()) if items else set()
+    
+    with _bg_sync_lock:
+        _bg_sync["requests_items"] = items
+        _bg_sync["requests_keys"]  = keys
+        _bg_sync["updated_at"]     = time.time()
+        _bg_sync["fetch_complete"] = complete
+        _bg_sync["stop_reason"]    = reason
+        
     return items, keys, complete, reason, False
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1096,8 +1082,7 @@ def _background_sync_points_table():
         if _bg_points_sync["syncing"]: return
         _bg_points_sync["syncing"] = True
     try:
-        tat = get_tenant_access_token()
-        items, complete, reason = fetch_bitable_sequential(POINTS_TABLE_ID, tat, field_names=POINTS_TABLE_FIELDS, max_time=120)
+        items, complete, reason = fetch_all_sequential(POINTS_TABLE_ID, max_time=120)
         now = time.time()
         with _bg_points_lock:
             _bg_points_sync["items"]          = items
@@ -1126,16 +1111,16 @@ def ensure_points_sync_started():
             threading.Thread(target=_background_sync_points_loop, daemon=True).start()
             _bg_points_thread_started = True
 
-def get_points_table_snapshot():
+def get_points_table_snapshot(force_refresh=False):
     ensure_points_sync_started()
     with _bg_points_lock:
         items, updated_at = _bg_points_sync["items"], _bg_points_sync["updated_at"]
         complete, reason = _bg_points_sync["fetch_complete"], _bg_points_sync["stop_reason"]
 
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+    if not force_refresh and items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, complete, reason, True
 
-    if REDIS_ENABLED:
+    if not force_refresh and REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_POINTS_SNAPSHOT)
         if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
             with _bg_points_lock:
@@ -1146,8 +1131,13 @@ def get_points_table_snapshot():
             threading.Thread(target=_background_sync_points_table, daemon=True).start()
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    tat = get_tenant_access_token()
-    items, complete, reason = fetch_bitable_sequential(POINTS_TABLE_ID, tat, field_names=POINTS_TABLE_FIELDS, max_time=60)
+    items, complete, reason = fetch_all_sequential(POINTS_TABLE_ID, max_time=25)
+    with _bg_points_lock:
+        _bg_points_sync["items"]          = items
+        _bg_points_sync["updated_at"]     = time.time()
+        _bg_points_sync["fetch_complete"] = complete
+        _bg_points_sync["stop_reason"]    = reason
+        
     return items, complete, reason, False
 
 app = Flask(__name__)
@@ -1331,11 +1321,13 @@ def audit_logs():
     if MOCK_MODE: return jsonify(audit.get_recent(50))
     
     tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    payload = {"page_size": min(int(request.args.get('limit','100')), 500)}
+    
     try:
-        res = http_requests.post(url, headers=headers, json=payload, timeout=10).json()
+        # Changed to GET /records to bypass POST /search projection errors here too
+        params = {"page_size": min(int(request.args.get('limit','100')), 500)}
+        res = http_requests.get(url, headers=headers, params=params, timeout=10).json()
         if res.get("code") != 0: raise Exception(res.get("msg", "Feishu API Error"))
         
         logs = []
@@ -1386,9 +1378,10 @@ def points_records():
     f_acm        = sanitize_text(request.args.get('acm','')).lower()
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
+    nocache      = request.args.get('nocache', '0') in ['1', 'true', True]
 
-    # Removed live-fetching penalty here. By default, rely entirely on the high-speed background snapshot.
-    all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
+    # Use the robust background snapshot, overriding if nocache is set
+    all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot(force_refresh=nocache)
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1552,11 +1545,6 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
-    # NOTE: the old 60s response cache for this endpoint has been removed — Search Records
-    # must return live data on every call. The combo fan-out below already runs every
-    # candidate filter concurrently, so dropping the cache doesn't reintroduce the old
-    # sequential-request slowness.
-
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(10)
         fetch_complete, stop_reason, success = True, "", True
@@ -1566,31 +1554,19 @@ def query_records():
         headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
         aliases = QUERY_FIELD_ALIASES[field]
-        # Build every (alias, operator) combo we're willing to try, in priority order —
-        # "contains" on the first alias is the ideal match, "=" on the last alias the
-        # weakest fallback. We keep that priority when PICKING a result, but fire every
-        # combo AT ONCE instead of one-by-one, so a cold query costs ~1 round trip of
-        # wall-clock time instead of up to 9 sequential ones.
         combos = []
         for alias in aliases:
             for op in ["contains", "is", "="]:
                 if op == "=" and not value.isdigit(): continue
-                # Create a tuple instead of a list for val_array
-                # so it remains hashable when used as a dictionary key later.
                 val_array = (int(value),) if op == "=" else (value,)
                 combos.append((alias, op, val_array))
 
-        def try_combo(combo, projection=QUERY_RECORDS_FIELDS):
+        def try_combo(combo):
             alias, op, val_array = combo
             payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
-            if projection: payload["field_names"] = projection
             try:
                 resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
                 data = resp.json()
-                if data.get("code") == 1254045 and projection:
-                    # FieldNameNotFound in our projection list — retry this combo once
-                    # without field_names rather than losing the match entirely.
-                    return try_combo(combo, projection=None)
                 if data.get("code") == 0:
                     return {"combo": combo, "ok": True, "items": data.get("data", {}).get("items", [])}
                 elif data.get("code") not in (1254011, 1254402, 1254010):
@@ -1710,36 +1686,8 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Always grab the comprehensive cached snapshot first (lightning fast).
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-
-    if nocache:
-        # User requested a forced live refresh.
-        # Relying on "South Asia Audition Team.xlsx" reality: real-world sheets have 
-        # arbitrary, blank, or out-of-order dates. Date-based delta fetches will miss data.
-        # Instead, we do a lightning-fast FULL sequential pull using Field Projection.
-        tat = get_tenant_access_token()
-        live_items, live_complete, live_reason = fetch_bitable_sequential(
-            REQUESTS_TABLE_ID, tat, filter_obj=None, 
-            field_names=REQUESTS_ANALYTICS_FIELDS, max_time=45
-        )
-        
-        if live_items and live_complete:
-            all_items = live_items
-            fetch_complete = True
-            stop_reason = ""
-            from_bg_cache = False
-            # Update background cache immediately so subsequent requests are instant
-            with _bg_sync_lock:
-                _bg_sync["requests_items"] = live_items
-                _bg_sync["updated_at"] = time.time()
-                _bg_sync["fetch_complete"] = True
-        else:
-            # Fall back to background cache if live fetch fails (e.g. Feishu outage)
-            if not live_complete:
-                fetch_complete = False
-                stop_reason = live_reason
-            from_bg_cache = True
+    # Always grab the cache snapshot. If nocache=True, it safely executes a 25s bounded fetch.
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(force_refresh=nocache)
 
     if not fetch_complete and not all_items:
         return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
@@ -1870,30 +1818,7 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
     
-    # Grab base snapshot
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-
-    if nocache:
-        tat = get_tenant_access_token()
-        live_items, live_complete, live_reason = fetch_bitable_sequential(
-            REQUESTS_TABLE_ID, tat, filter_obj=None, 
-            field_names=REQUESTS_ANALYTICS_FIELDS, max_time=45
-        )
-        
-        if live_items and live_complete:
-            all_items = live_items
-            fetch_complete = True
-            stop_reason = ""
-            from_bg_cache = False
-            with _bg_sync_lock:
-                _bg_sync["requests_items"] = live_items
-                _bg_sync["updated_at"] = time.time()
-                _bg_sync["fetch_complete"] = True
-        else:
-            if not live_complete:
-                fetch_complete = False
-                stop_reason = live_reason
-            from_bg_cache = True
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(force_refresh=nocache)
 
     if not fetch_complete and not all_items:
         return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
