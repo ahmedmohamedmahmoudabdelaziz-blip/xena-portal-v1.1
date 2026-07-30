@@ -1088,16 +1088,27 @@ def ensure_background_sync_started():
 
 def get_requests_table_snapshot(force_refresh=False):
     ensure_background_sync_started()
+    
+    # 1. Stale-While-Revalidate: Trigger background sync but DO NOT block the user
+    if force_refresh:
+        with _bg_sync_lock:
+            is_syncing = _bg_sync["syncing"]
+        if not is_syncing:
+            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+
+    # 2. Try to serve instantly from Memory Cache
     with _bg_sync_lock:
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
-    if not force_refresh and items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+    # If cache exists, serve it instantly (even if force_refresh is True)
+    if items and (force_refresh or (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE):
         return items, keys, complete, reason, True
 
-    if not force_refresh and REDIS_ENABLED:
+    # 3. Try to serve instantly from Redis Cache
+    if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
-        if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
+        if cached and cached.get("items"):
             r_items, r_keys = cached["items"], set(cached.get("keys", []))
             with _bg_sync_lock:
                 _bg_sync["requests_items"] = r_items
@@ -1105,11 +1116,17 @@ def get_requests_table_snapshot(force_refresh=False):
                 _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+            
+            # Auto-heal: If Redis data is stale, silently update it in the background
+            if (time.time() - cached.get("updated_at", 0)) > BACKGROUND_SYNC_MAX_AGE:
+                with _bg_sync_lock:
+                    is_syncing = _bg_sync["syncing"]
+                if not is_syncing:
+                    threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+                    
             return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    # Synchronous Live Fetch (capped at 45s to allow Dynamic Projection to finish all pages)
-    # Because fetch_all_sequential sorts DESC, even a timeout gets us the newest month of data perfectly!
+    # 4. Cache is completely empty (first boot). Block to get initial data.
     items, complete, reason = fetch_all_sequential(REQUESTS_TABLE_ID, max_time=45)
     keys = set(items[0].get("fields", {}).keys()) if items else set()
     
@@ -1167,24 +1184,43 @@ def ensure_points_sync_started():
 
 def get_points_table_snapshot(force_refresh=False):
     ensure_points_sync_started()
+    
+    # 1. Stale-While-Revalidate: Trigger background sync but DO NOT block the user
+    if force_refresh:
+        with _bg_points_lock:
+            is_syncing = _bg_points_sync["syncing"]
+        if not is_syncing:
+            threading.Thread(target=_background_sync_points_table, daemon=True).start()
+
+    # 2. Try to serve instantly from Memory Cache
     with _bg_points_lock:
         items, updated_at = _bg_points_sync["items"], _bg_points_sync["updated_at"]
         complete, reason = _bg_points_sync["fetch_complete"], _bg_points_sync["stop_reason"]
 
-    if not force_refresh and items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+    # If cache exists, serve it instantly (even if force_refresh is True)
+    if items and (force_refresh or (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE):
         return items, complete, reason, True
 
-    if not force_refresh and REDIS_ENABLED:
+    # 3. Try to serve instantly from Redis Cache
+    if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_POINTS_SNAPSHOT)
-        if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
+        if cached and cached.get("items"):
             with _bg_points_lock:
                 _bg_points_sync["items"]          = cached["items"]
                 _bg_points_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_points_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_points_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_points_table, daemon=True).start()
+            
+            # Auto-heal: If Redis data is stale, silently update it in the background
+            if (time.time() - cached.get("updated_at", 0)) > BACKGROUND_SYNC_MAX_AGE:
+                with _bg_points_lock:
+                    is_syncing = _bg_points_sync["syncing"]
+                if not is_syncing:
+                    threading.Thread(target=_background_sync_points_table, daemon=True).start()
+                    
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
+    # 4. Cache is completely empty (first boot). Block to get initial data.
     items, complete, reason = fetch_all_sequential(POINTS_TABLE_ID, max_time=45)
     with _bg_points_lock:
         _bg_points_sync["items"]          = items
