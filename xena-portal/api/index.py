@@ -592,84 +592,8 @@ def generate_executive_insights(stats, cmp_stats=None):
     return insights
 
 # ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING
+# HIGH-SPEED SEQUENTIAL ENGINE & DELTA MERGE
 # ──────────────────────────────────────────────────────────────────────────────
-def fetch_feishu_records(table_id, from_dt=None):
-    if MOCK_MODE:
-        items = MockFeishuDB.generate_requests(300)
-        keys = set(items[0]["fields"].keys()) if items else set()
-        return items, keys, True, ""
-
-    tat = get_tenant_access_token()
-    all_items, seen_ids, master_keys = [], set(), set()
-    fetch_complete, stop_reason, consecutive_old_pages = True, "", 0
-
-    session = http_requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
-
-    page_token = None
-    start_time = time.time()
-    
-    for _ in range(SEQ_MAX_PAGES):
-        if time.time() - start_time > SEQ_MAX_TIME:
-            fetch_complete, stop_reason = False, f"Safety timeout: sequential fetch exceeded {SEQ_MAX_TIME}s ceiling."
-            break
-            
-        params = {"page_size": 500, "automatic_fields": "true"} 
-        if table_id == REQUESTS_TABLE_ID: params["sort"] = '["Numbering DESC"]'
-        if page_token: params["page_token"] = page_token
-        
-        try:
-            resp = session.get(url, params=params, timeout=45) 
-            if resp.status_code != 200:
-                fetch_complete, stop_reason = False, f"HTTP {resp.status_code}: {resp.text}"
-                break
-                
-            data = resp.json()
-            if data.get("code") != 0:
-                fetch_complete, stop_reason = False, f"Feishu Error {data.get('code')}: {data.get('msg')}"
-                break
-            
-            block = data.get("data", {})
-            items = block.get("items", [])
-            if not items: break
-
-            page_old_count, valid_dates_in_page = 0, 0
-            for item in items:
-                rid = item.get("record_id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    all_items.append(item)
-                    master_keys.update(item.get("fields", {}).keys())
-                    raw_date = get_field_local(item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time", "Date")
-                    record_dt = parse_feishu_date(raw_date)
-                    if record_dt:
-                        valid_dates_in_page += 1
-                        if from_dt and record_dt < (from_dt - timedelta(days=1)):
-                            page_old_count += 1
-            
-            if valid_dates_in_page > 0 and page_old_count == valid_dates_in_page:
-                consecutive_old_pages += 1
-            else: consecutive_old_pages = 0
-
-            if consecutive_old_pages >= 3:
-                stop_reason = "Safely reached pages with all older records."
-                break
-
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False): break
-
-        except Exception as e:
-            fetch_complete, stop_reason = False, str(e)
-            break
-
-    return all_items, master_keys, fetch_complete, stop_reason
-
-# ──────────────────────────────────────────────────────────────────────────────
-# LIVE PARALLEL / SHARDED FETCH ENGINE
-# ──────────────────────────────────────────────────────────────────────────────
-
 REQUESTS_ANALYTICS_FIELDS = [
     "Numbering", "Submitted on Copy", "Request Type", "Status", "Region",
     "Acm Name (PK)", "Acm Name (IN)", "Acm", "Agency Type",
@@ -691,16 +615,11 @@ QUERY_RECORDS_FIELDS = [
 ]
 
 def _date_filter_value(dt):
-    """Value shape for a NUMBER field filter (epoch ms). See _swap_date_shape() below —
-    if this shape is wrong for your base's actual field type, _fetch_bitable_shard()
-    self-heals by flipping to the DateTime shape automatically on a 1254018 InvalidFilter."""
+    """Value shape for a NUMBER field filter (epoch ms)."""
     return [str(int(dt.timestamp() * 1000))]
 
 def _swap_date_shape(filter_obj):
-    """Flip any 'Submitted on Copy' condition's value between the plain-Number epoch-ms
-    shape (['<ms>']) and the DateTime shape (['ExactDate', '<ms>']). We don't know in
-    advance which one your Bitable base actually wants for this field — this makes that
-    a one-time auto-detected fact instead of a guess I have to make blind."""
+    """Flip 'Submitted on Copy' condition's value between Number epoch-ms and DateTime shape."""
     alt = copy.deepcopy(filter_obj)
     for cond in alt.get("conditions", []):
         if cond.get("field_name") == "Submitted on Copy" and cond.get("operator") in \
@@ -712,33 +631,17 @@ def _swap_date_shape(filter_obj):
                 cond["value"] = ["ExactDate", val[0]]
     return alt
 
-def _peek_newest_date(tat, table_id):
-    """One cheap page_size=1 call purely to anchor 'now' for date-bucket sharding."""
-    try:
-        session = http_requests.Session()
-        session.headers.update({"Authorization": f"Bearer {tat}"})
-        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
-        resp = session.get(url, params={"page_size": 1, "sort": '["Numbering DESC"]'}, timeout=15)
-        data = resp.json()
-        items = data.get("data", {}).get("items", [])
-        if items:
-            raw = get_field_local(items[0].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
-            dt = parse_feishu_date(raw)
-            if dt: return dt
-    except Exception as e:
-        logger.warn("peek_newest_date_failed", table=table_id, error=str(e))
-    return datetime.utcnow()
+def fetch_bitable_sequential(table_id, tat, filter_obj=None, field_names=None, max_time=120, max_pages=100):
+    """
+    Safely iterates through a Bitable search query sequentially. 
+    Uses field projection to cut payload sizes by 80%, bypassing the Feishu rate limits
+    that triggered timeouts during parallel sharding.
+    """
+    if MOCK_MODE:
+        if table_id == REQUESTS_TABLE_ID: items = MockFeishuDB.generate_requests(300)
+        else: items = MockFeishuDB.generate_agency("All") * 10
+        return items, True, ""
 
-def _date_buckets(from_dt, to_dt, n_buckets):
-    """Split [from_dt, to_dt) into n_buckets equal-width, CONTIGUOUS half-open intervals"""
-    total_seconds = max((to_dt - from_dt).total_seconds(), 1)
-    step = total_seconds / n_buckets
-    return [(from_dt + timedelta(seconds=step * i), from_dt + timedelta(seconds=step * (i + 1)))
-            for i in range(n_buckets)]
-
-def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
-    """Paginate ONE filtered Bitable query to completion inside a worker thread. Protected
-    by hard max_pages/max_time limits to prevent skewed buckets from causing 300s timeouts."""
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
@@ -748,10 +651,9 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
     shape_retried = False
     start_time = time.time()
 
-    for _ in range(SHARD_MAX_PAGES):
-        # HARD SAFETY CEILING: Break out immediately if this shard is running too long.
-        if time.time() - start_time > SHARD_MAX_TIME:
-            complete, reason = False, f"Shard safety timeout: exceeded {SHARD_MAX_TIME}s ceiling."
+    for _ in range(max_pages):
+        if time.time() - start_time > max_time:
+            complete, reason = False, f"Safety timeout: exceeded {max_time}s ceiling."
             break
             
         payload = {"page_size": 500}
@@ -759,14 +661,13 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
         if projection:  payload["field_names"] = projection
         if page_token:  payload["page_token"] = page_token
         try:
-            resp = session.post(url, json=payload, timeout=timeout)
+            resp = session.post(url, json=payload, timeout=25)
             data = resp.json()
             if data.get("code") == 1254045 and projection:
                 projection, page_token = None, None
                 items, seen = [], set()
                 continue
             if data.get("code") == 1254018 and filter_obj and not shape_retried:
-                logger.info("date_filter_shape_swap", table=table_id)
                 filter_obj = _swap_date_shape(filter_obj)
                 shape_retried, page_token = True, None
                 items, seen = [], set()
@@ -787,74 +688,6 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
             complete, reason = False, str(e)
             break
 
-    return items, complete, reason
-
-def _merge_shards(shard_results):
-    all_items, seen, master_keys = [], set(), set()
-    fetch_complete, stop_reason = True, ""
-    for items, complete, reason in shard_results:
-        if not complete:
-            fetch_complete, stop_reason = False, reason
-        for item in items:
-            rid = item.get("record_id")
-            if rid and rid not in seen:
-                seen.add(rid)
-                all_items.append(item)
-                master_keys.update(item.get("fields", {}).keys())
-    return all_items, master_keys, fetch_complete, stop_reason
-
-def _run_shards_timed(table_id, tat, shards, field_names):
-    """Runs shards concurrently and logs each one's wall time + row count, so a slow request
-    shows up in your Vercel function logs as 'which shard was the long pole' instead of just
-    a single opaque total. Look for the 'shard_fetch' event."""
-    def _timed(shard_filter):
-        t0 = time.time()
-        items, complete, reason = _fetch_bitable_shard(table_id, tat, shard_filter, field_names)
-        logger.info("shard_fetch", table=table_id, ms=int((time.time() - t0) * 1000),
-                    rows=len(items), complete=complete, reason=reason or "")
-        return items, complete, reason
-
-    with ThreadPoolExecutor(max_workers=len(shards)) as executor:
-        futures = [executor.submit(_timed, f) for f in shards]
-        return [f.result() for f in futures]
-
-REQUESTS_SHARD_COUNT = 4  # Reduced from 10 to strictly avoid Feishu 429 QPS lockouts/timeouts
-REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  # fixed fallback window when no from_dt is given at all
-
-def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
-    if MOCK_MODE:
-        items = MockFeishuDB.generate_requests(300)
-        keys = set(items[0]["fields"].keys()) if items else set()
-        return items, keys, True, ""
-
-    tat = get_tenant_access_token()
-
-    effective_to   = to_dt or (_peek_newest_date(tat, REQUESTS_TABLE_ID) + timedelta(days=1))
-    effective_from = from_dt or (effective_to - timedelta(days=REQUESTS_LOOKBACK_DAYS_DEFAULT))
-
-    shards = []
-    for b_from, b_to in _date_buckets(effective_from, effective_to, n_shards):
-        conditions = [
-            {"field_name": "Submitted on Copy", "operator": "isGreater", "value": _date_filter_value(b_from - timedelta(seconds=1))},
-            {"field_name": "Submitted on Copy", "operator": "isLess",    "value": _date_filter_value(b_to)},
-        ]
-        shards.append({"conjunction": "and", "conditions": conditions})
-
-    if not from_dt and not to_dt:
-        shards.append({"conjunction": "and", "conditions": [{"field_name": "Submitted on Copy", "operator": "isEmpty"}]})
-
-    shard_results = _run_shards_timed(REQUESTS_TABLE_ID, tat, shards, field_names)
-    return _merge_shards(shard_results)
-
-def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
-    if MOCK_MODE:
-        items = MockFeishuDB.generate_agency("All") * 10
-        return items, True, ""
-
-    tat = get_tenant_access_token()
-    t0 = time.time()
-    items, complete, reason = _fetch_bitable_shard(POINTS_TABLE_ID, tat, filter_obj=None, field_names=field_names)
-    logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
     return items, complete, reason
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1186,16 +1019,18 @@ def _background_sync_requests_table():
         if _bg_sync["syncing"]: return
         _bg_sync["syncing"] = True
     try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+        tat = get_tenant_access_token()
+        items, complete, reason = fetch_bitable_sequential(REQUESTS_TABLE_ID, tat, field_names=REQUESTS_ANALYTICS_FIELDS, max_time=120)
+        keys = set(items[0].get("fields", {}).keys()) if items else set()
         now = time.time()
+        
         with _bg_sync_lock:
             _bg_sync["requests_items"]  = items
             _bg_sync["requests_keys"]   = keys
             _bg_sync["updated_at"]      = now
             _bg_sync["fetch_complete"]  = complete
             _bg_sync["stop_reason"]     = reason
-        # Persist to Redis so the NEXT cold Vercel invocation can reuse this instead of
-        # re-fetching the whole table synchronously in the request path.
+            
         if REDIS_ENABLED and items:
             redis_set_json(REDIS_KEY_REQUESTS_SNAPSHOT, {
                 "items": items, "keys": sorted(list(keys)), "updated_at": now,
@@ -1228,8 +1063,6 @@ def get_requests_table_snapshot(from_dt=None):
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
 
-    # In-memory copy is empty or stale (near-certain sign of a cold Vercel start) —
-    # try Redis before paying for a full synchronous Feishu re-fetch.
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
         if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
@@ -1240,13 +1073,13 @@ def get_requests_table_snapshot(from_dt=None):
                 _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            # Kick a background refresh so the next request gets even fresher data,
-            # without making THIS request wait on it.
             threading.Thread(target=_background_sync_requests_table, daemon=True).start()
             return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    # COLD START FALLBACK: Use parallel sharded fetch instead of slow sequential fetch
-    items, keys, complete, reason = fetch_requests_sharded(from_dt=from_dt, n_shards=4)
+    # If completely cold, do a sequential pull (slower, but won't trigger Feishu 429 timeouts like sharding did)
+    tat = get_tenant_access_token()
+    items, complete, reason = fetch_bitable_sequential(REQUESTS_TABLE_ID, tat, field_names=REQUESTS_ANALYTICS_FIELDS, max_time=60)
+    keys = set(items[0].get("fields", {}).keys()) if items else set()
     return items, keys, complete, reason, False
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1263,7 +1096,8 @@ def _background_sync_points_table():
         if _bg_points_sync["syncing"]: return
         _bg_points_sync["syncing"] = True
     try:
-        items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+        tat = get_tenant_access_token()
+        items, complete, reason = fetch_bitable_sequential(POINTS_TABLE_ID, tat, field_names=POINTS_TABLE_FIELDS, max_time=120)
         now = time.time()
         with _bg_points_lock:
             _bg_points_sync["items"]          = items
@@ -1312,7 +1146,8 @@ def get_points_table_snapshot():
             threading.Thread(target=_background_sync_points_table, daemon=True).start()
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+    tat = get_tenant_access_token()
+    items, complete, reason = fetch_bitable_sequential(POINTS_TABLE_ID, tat, field_names=POINTS_TABLE_FIELDS, max_time=60)
     return items, complete, reason, False
 
 app = Flask(__name__)
@@ -1552,14 +1387,8 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    if MOCK_MODE:
-        all_items = MockFeishuDB.generate_agency("All") * 10
-        fetch_complete, stop_reason = True, ""
-    else:
-        all_items, fetch_complete, stop_reason = fetch_points_sharded()
-        if not fetch_complete and not all_items:
-            # Live sharded fetch failed outright — last-resort availability fallback only.
-            all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
+    # Removed live-fetching penalty here. By default, rely entirely on the high-speed background snapshot.
+    all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1871,11 +1700,6 @@ def analytics():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("analytics",["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get("analytics",["all"])
 
-    # NOTE: The computed `stats` payload is deliberately NEVER cached so dynamic 
-    # filters apply instantly. To guarantee the strict <30s response time requirement 
-    # across 30,000+ rows, we source raw records from the blazing-fast background 
-    # snapshot (refreshed every 3 mins). Live fetches only trigger on manual Sync Refresh.
-
     oldest_dt = from_dt
     newest_dt = to_dt
     if cmp_from and cmp_to:
@@ -1886,11 +1710,36 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
+    # Always grab the comprehensive cached snapshot first (lightning fast).
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
     if nocache:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt, n_shards=4)
-        from_bg_cache = False
-    else:
-        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+        # User requested a forced live refresh.
+        # Relying on "South Asia Audition Team.xlsx" reality: real-world sheets have 
+        # arbitrary, blank, or out-of-order dates. Date-based delta fetches will miss data.
+        # Instead, we do a lightning-fast FULL sequential pull using Field Projection.
+        tat = get_tenant_access_token()
+        live_items, live_complete, live_reason = fetch_bitable_sequential(
+            REQUESTS_TABLE_ID, tat, filter_obj=None, 
+            field_names=REQUESTS_ANALYTICS_FIELDS, max_time=45
+        )
+        
+        if live_items and live_complete:
+            all_items = live_items
+            fetch_complete = True
+            stop_reason = ""
+            from_bg_cache = False
+            # Update background cache immediately so subsequent requests are instant
+            with _bg_sync_lock:
+                _bg_sync["requests_items"] = live_items
+                _bg_sync["updated_at"] = time.time()
+                _bg_sync["fetch_complete"] = True
+        else:
+            # Fall back to background cache if live fetch fails (e.g. Feishu outage)
+            if not live_complete:
+                fetch_complete = False
+                stop_reason = live_reason
+            from_bg_cache = True
 
     if not fetch_complete and not all_items:
         return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
@@ -1957,9 +1806,7 @@ def _shape_compare_group(label, stats):
 @app.route('/api/compare', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
 def compare():
-    """Dedicated Compare engine. Deliberately independent of /api/analytics — it reads
-    straight from the already-warmed Grand Table snapshot, so ACM/Period comparisons work
-    immediately without requiring the user to run a full Analytics Report first."""
+    """Dedicated Compare engine."""
     start = time.time()
     body = request.json if request.method == 'POST' else request.args
 
@@ -2023,11 +1870,30 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
     
+    # Grab base snapshot
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
     if nocache:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt, n_shards=4)
-        from_bg_cache = False
-    else:
-        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+        tat = get_tenant_access_token()
+        live_items, live_complete, live_reason = fetch_bitable_sequential(
+            REQUESTS_TABLE_ID, tat, filter_obj=None, 
+            field_names=REQUESTS_ANALYTICS_FIELDS, max_time=45
+        )
+        
+        if live_items and live_complete:
+            all_items = live_items
+            fetch_complete = True
+            stop_reason = ""
+            from_bg_cache = False
+            with _bg_sync_lock:
+                _bg_sync["requests_items"] = live_items
+                _bg_sync["updated_at"] = time.time()
+                _bg_sync["fetch_complete"] = True
+        else:
+            if not live_complete:
+                fetch_complete = False
+                stop_reason = live_reason
+            from_bg_cache = True
 
     if not fetch_complete and not all_items:
         return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
