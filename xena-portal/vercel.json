@@ -13,7 +13,7 @@
 "crons": [
 {
 "path": "/api/sync/refresh",
-"schedule": "*/5 * * * *"
+"schedule": "*/1 * * * *"
 }
 ]
 }
