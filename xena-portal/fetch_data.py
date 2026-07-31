@@ -65,12 +65,41 @@ def get_valid_field_names(table_id, tat, desired_aliases):
         print(f"⚠️ Could not fetch schema for {table_id}: {e}", flush=True)
     return None
 
-def fetch_all_records(table_id, tat, desired_aliases):
-    # 1. Dynamically get safe field names to project (Prevents 1254045 errors)
+def fetch_all_records(table_id, tat, desired_aliases, filename):
     valid_fields = get_valid_field_names(table_id, tat, desired_aliases)
     
+    base_payload = {"page_size": 500}
+    
     if valid_fields:
+        base_payload["field_names"] = valid_fields
         print(f"  ... Projection active: extracting {len(valid_fields)} essential columns.", flush=True)
+        
+        # SMART FILTER: Tell Feishu to ignore the 100,000 completely blank rows
+        filter_field = None
+        if "requests" in filename.lower():
+            for f in ["Numbering", "Submitted on Copy", "Request Type"]:
+                if f in valid_fields: 
+                    filter_field = f
+                    break
+        elif "points" in filename.lower():
+            for f in ["Agency Code", "Agency Name"]:
+                if f in valid_fields: 
+                    filter_field = f
+                    break
+                    
+        if filter_field:
+            base_payload["filter"] = {
+                "conjunction": "and",
+                "conditions": [
+                    {
+                        "field_name": filter_field,
+                        "operator": "isNotEmpty",
+                        "value": []
+                    }
+                ]
+            }
+            print(f"  ... Anti-Blank Filter ON: Feishu will drop rows where '{filter_field}' is empty.", flush=True)
+            
     else:
         print(f"  ... Schema fetch failed. Will download full fat records.", flush=True)
         
@@ -83,9 +112,8 @@ def fetch_all_records(table_id, tat, desired_aliases):
     page_num = 1
     
     while has_more:
-        payload = {"page_size": 500}
-        if valid_fields:
-            payload["field_names"] = valid_fields
+        # Create a fresh copy of the payload for this specific page
+        payload = dict(base_payload)
         if page_token:
             payload["page_token"] = page_token
             
@@ -149,7 +177,8 @@ def main():
     
     for filename, table_id, aliases in tables:
         print(f"⏳ Fetching {filename}...", flush=True)
-        records = fetch_all_records(table_id, tat, desired_aliases=aliases)
+        # Notice we are passing the filename here now so the script knows which filter to apply!
+        records = fetch_all_records(table_id, tat, desired_aliases=aliases, filename=filename)
         if records:
             file_path = os.path.join(output_dir, filename)
             with open(file_path, "w", encoding="utf-8") as f:
