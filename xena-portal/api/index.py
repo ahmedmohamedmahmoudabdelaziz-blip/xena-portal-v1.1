@@ -488,10 +488,6 @@ def get_user_permissions(email, name):
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
     if cached: return cached
-    
-    # REMOVED load_static_json("access.json") HERE!
-    # Now it goes straight to Live Feishu every time (cached for just 5 minutes for speed,
-    # but instantly cleared when you add/edit a user).
 
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
@@ -804,7 +800,10 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
 
     history_points, history_target = [], []
     privileges_claimed, usage_this_month = defaultdict(int), defaultdict(int)
-    cm, cy = datetime.now().month, datetime.now().year
+    
+    # FIX: Resolve Timezone issue matching the Cairo +3 time from `parse_feishu_date`
+    now_cairo = datetime.utcnow() + timedelta(hours=3)
+    cm, cy = now_cairo.month, now_cairo.year
     
     if MOCK_MODE:
         hist_items = MockFeishuDB.generate_requests(50)
@@ -812,8 +811,13 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         try:
             hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
             hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
+            # FIX: Added strict error logging so it doesn't silently swallow Feishu problems
+            if hist_resp.get("code") != 0:
+                logger.warn("agency_history_feishu_error", code=code, error=hist_resp.get("msg"))
             hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
-        except: hist_items = []
+        except Exception as e:
+            logger.error("agency_history_fetch_failed", code=code, error=str(e))
+            hist_items = []
 
     for r in hist_items:
         hf = r.get("fields", {})
@@ -1429,19 +1433,14 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # Fast static JSON load
-    static_data = load_static_json('points.json')
-    if static_data is not None:
-        all_items = static_data
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
+    # Fixed Issue: Enforce live fetch for Points Records endpoint
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_agency("All") * 10
+        fetch_complete, stop_reason = True, ""
     else:
-        if MOCK_MODE:
-            all_items = MockFeishuDB.generate_agency("All") * 10
-            fetch_complete, stop_reason = True, ""
-        else:
-            all_items, fetch_complete, stop_reason = fetch_points_sharded()
-            if not fetch_complete and not all_items:
-                all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
+        all_items, fetch_complete, stop_reason = fetch_points_sharded()
+        if not fetch_complete and not all_items:
+            all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1601,7 +1600,6 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
-    # 100% Live Feishu API
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(10)
         fetch_complete, stop_reason, success = True, "", True
@@ -1746,23 +1744,14 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Fast static JSON load
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
-        master_keys = set()
-        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-            master_keys = set(all_items[0]["fields"].keys())
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-        from_bg_cache = False
-    else:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
-        from_bg_cache = False
+    # Fixed Issue: Enforce live fetch for Analytics endpoint
+    all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
+    from_bg_cache = False
 
+    if not fetch_complete and not all_items:
+        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
         if not fetch_complete and not all_items:
-            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
@@ -1857,23 +1846,14 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # Fast static JSON load
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
-        master_keys = set()
-        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-            master_keys = set(all_items[0]["fields"].keys())
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-        from_bg_cache = False
-    else:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
-        from_bg_cache = False
+    # Fixed Issue: Enforce live fetch for Compare endpoint
+    all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
+    from_bg_cache = False
 
+    if not fetch_complete and not all_items:
+        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
         if not fetch_complete and not all_items:
-            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
