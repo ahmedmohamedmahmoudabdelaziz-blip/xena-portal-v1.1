@@ -1,5 +1,14 @@
 """
 Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
+with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
+
+Enterprise Updates:
+- Background Snapshots as FALLBACK ONLY for Analytics, Compare, and Records.
+- Live Data for Universal Query and Agency Points (with micro-caching for UI speed).
+- Omnipresent Audit Logging.
+- Executive Insights Engine.
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
@@ -33,7 +42,7 @@ PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham"
             "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
 IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
 
-CACHE_TTL_REALTIME   = 300    
+CACHE_TTL_REALTIME   = 180    # 3 mins for rapid UI feeling on single agency lookups
 CACHE_TTL_HISTORICAL = 3600   
 
 RATE_LIMIT_SEARCH    = (50, 60)
@@ -59,44 +68,6 @@ MONTHLY_ALLOCATOR_LIMITS = {
 ORDER_TYPE_LIMITS = {
     "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
-
-_static_cache = {}
-
-def load_static_json(filename):
-    """Load pre-built static JSON. Tries memory, local disk, then Vercel CDN."""
-    if filename in _static_cache:
-        return _static_cache[filename]
-        
-    import json, os
-    candidates = [
-        os.path.join(os.path.dirname(__file__), '..', 'public', 'data', filename),
-        os.path.join(os.path.dirname(__file__), 'public', 'data', filename),
-        os.path.join(os.getcwd(), 'public', 'data', filename),
-        os.path.join('public', 'data', filename),
-    ]
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    _static_cache[filename] = data
-                    return data
-            except Exception:
-                pass
-                
-    try:
-        from flask import request
-        if request and request.host_url:
-            url = f"{request.host_url.rstrip('/')}/data/{filename}"
-            resp = http_requests.get(url, timeout=15)
-            if resp.status_code == 200:
-                data = resp.json()
-                _static_cache[filename] = data
-                return data
-    except Exception as e:
-        logger.warn("static_json_http_fail", filename=filename, error=str(e))
-        
-    return None
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
@@ -800,10 +771,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
 
     history_points, history_target = [], []
     privileges_claimed, usage_this_month = defaultdict(int), defaultdict(int)
-    
-    # FIX: Resolve Timezone issue matching the Cairo +3 time from `parse_feishu_date`
-    now_cairo = datetime.utcnow() + timedelta(hours=3)
-    cm, cy = now_cairo.month, now_cairo.year
+    cm, cy = datetime.now().month, datetime.now().year
     
     if MOCK_MODE:
         hist_items = MockFeishuDB.generate_requests(50)
@@ -811,13 +779,8 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         try:
             hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
             hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
-            # FIX: Added strict error logging so it doesn't silently swallow Feishu problems
-            if hist_resp.get("code") != 0:
-                logger.warn("agency_history_feishu_error", code=code, error=hist_resp.get("msg"))
             hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
-        except Exception as e:
-            logger.error("agency_history_fetch_failed", code=code, error=str(e))
-            hist_items = []
+        except: hist_items = []
 
     for r in hist_items:
         hf = r.get("fields", {})
@@ -1271,6 +1234,10 @@ def search():
     email   = sanitize_text(req_data.get('email',''))
     qtype   = req_data.get('type','points')
     
+    # Catching nocache param just like the old version
+    nocache_val = req_data.get('nocache', '0')
+    nocache = nocache_val in ['1', 'true', True]
+    
     if qtype not in ('points','target'): qtype = 'points'
     if not code: return jsonify({"found":False,"error":"Invalid or missing agency code."}), 400
 
@@ -1282,10 +1249,16 @@ def search():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
-    # 100% Live Feishu API - no local caching for search/target
+    # RESTORED: Micro-cache for old version fast feel
+    cache_key = cache_make_key("search", code, qtype)
+    if not nocache:
+        cached = cache_get(cache_key)
+        if cached: return jsonify(cached)
+
     data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
     
     if data.get("found"):
+        cache_set(cache_key, data, ttl=CACHE_TTL_REALTIME) # Cache set to 3 mins
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "AGENCY_SEARCH", f"Code: {code} | Type: {qtype}", ip=ip, severity="Info")
         return jsonify(data)
@@ -1433,13 +1406,14 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # Fixed Issue: Enforce live fetch for Points Records endpoint
+    # REMOVED Static JSON. Proper Live -> Fallback structure restored
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_agency("All") * 10
         fetch_complete, stop_reason = True, ""
     else:
         all_items, fetch_complete, stop_reason = fetch_points_sharded()
         if not fetch_complete and not all_items:
+            # Fallback ONLY triggers here
             all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
@@ -1600,6 +1574,7 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
+    # 100% Live Feishu API
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(10)
         fetch_complete, stop_reason, success = True, "", True
@@ -1744,11 +1719,12 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Fixed Issue: Enforce live fetch for Analytics endpoint
+    # REMOVED Static JSON. Proper Live -> Fallback structure restored
     all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
     from_bg_cache = False
 
     if not fetch_complete and not all_items:
+        # Fallback ONLY triggers here
         all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
         if not fetch_complete and not all_items:
             return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
@@ -1846,11 +1822,12 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # Fixed Issue: Enforce live fetch for Compare endpoint
+    # REMOVED Static JSON. Proper Live -> Fallback structure restored
     all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
     from_bg_cache = False
 
     if not fetch_complete and not all_items:
+        # Fallback ONLY triggers here
         all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
         if not fetch_complete and not all_items:
             return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
@@ -1899,8 +1876,7 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
-        "mock_mode_active": MOCK_MODE,
-        "static_files_cached_in_ram": list(_static_cache.keys())
+        "mock_mode_active": MOCK_MODE
     })
 
 ensure_background_sync_started()
