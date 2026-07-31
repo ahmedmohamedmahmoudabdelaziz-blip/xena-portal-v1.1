@@ -1,8 +1,15 @@
 {
   "buildCommand": "python fetch_data.py",
   "outputDirectory": "public",
+  "crons": [
+    {
+      "path": "/api/cron/build-snapshot",
+      "schedule": "0,30 * * * *"
+    }
+  ],
   "functions": {
     "api/**/*.py": {
+      "maxDuration": 60,
       "includeFiles": "public/data/**"
     }
   },
