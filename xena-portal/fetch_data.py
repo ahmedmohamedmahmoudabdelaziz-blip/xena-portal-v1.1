@@ -1,4 +1,10 @@
-import json, os, sys, time, traceback, requests
+import json
+import os
+import sys
+import time
+import traceback
+import requests
+import concurrent.futures
 from datetime import datetime, timezone
 
 # ── PATH SETUP ──
@@ -106,9 +112,9 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     valid_fields = set([f for f in config["aliases"] if f in actual_fields])
     
     if valid_fields:
-        log(f"   ... Python-side Projection active: limiting to {len(valid_fields)} columns to save RAM.")
+        log(f"   ... [{label}] Python-side Projection active: limiting to {len(valid_fields)} columns to save RAM.")
     else:
-        log(f"   ⚠️ Schema fetch failed or no matching columns. Falling back to downloading all columns.")
+        log(f"   ⚠️ [{label}] Schema fetch failed or no matching columns. Falling back to downloading all columns.")
     
     # WE RETURN TO THE GET ENDPOINT (Flawless Pagination!)
     api_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/records"
@@ -121,7 +127,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     
     for _ in range(500):
         if time.time() - start > 240:
-            log(f"   ⏱️ {label}: timeout reached (240s)")
+            log(f"   ⏱️ [{label}]: timeout reached (240s)")
             break
             
         params = {"page_size": 500}
@@ -132,7 +138,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
         data = resp.json()
         
         if data.get("code") != 0:
-            log(f"   ❌ {label}: Feishu error {data.get('code')}: {data.get('msg')}")
+            log(f"   ❌ [{label}]: Feishu error {data.get('code')}: {data.get('msg')}")
             break
             
         block = data.get("data", {})
@@ -155,7 +161,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
                 items.append({"record_id": it.get("record_id"), "fields": projected})
                 
         ghosts_on_page = len(page_items) - real_records_on_page
-        log(f"   ... Fetched page {page_num} ({real_records_on_page} real records, {ghosts_on_page} ghost rows)")
+        log(f"   ... [{label}] Fetched page {page_num} ({real_records_on_page} real records, {ghosts_on_page} ghost rows)")
         
         if real_records_on_page == 0 and len(page_items) > 0:
             consecutive_empty_pages += 1
@@ -163,7 +169,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
             consecutive_empty_pages = 0
             
         if consecutive_empty_pages >= 2:
-            log(f"   🛑 Detected {consecutive_empty_pages} pages of pure ghost rows. Spreadsheet bottom reached! Stopping.")
+            log(f"   🛑 [{label}] Detected {consecutive_empty_pages} pages of pure ghost rows. Spreadsheet bottom reached! Stopping.")
             break
             
         page_token = block.get("page_token")
@@ -233,9 +239,20 @@ TABLES = [
     }
 ]
 
+def fetch_and_save_table(table, app_id, app_secret, base_id):
+    """Wrapper function to handle a single table fetch within a thread."""
+    log(f"\n⏳ Starting fetch for {table['label']}...")
+    try:
+        data = fetch_all_records(table["id"], table, app_id, app_secret, base_id)
+        save_json(table["filename"], data)
+    except Exception as e:
+        log(f"❌ Failed {table['label']}: {e}")
+        traceback.print_exc()
+        save_json(table["filename"], [])
+
 def main():
     log("=" * 50)
-    log("🚀 Xena Portal Build Script (The Final Ghost-Buster)")
+    log("🚀 Xena Portal Build Script (Multi-Threaded Ghost-Buster)")
     log(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}")
     log("=" * 50)
     
@@ -250,15 +267,11 @@ def main():
         log("⚠️ LARK_APP_ID or LARK_APP_SECRET not set. Writing empty data.")
         for table in TABLES: save_json(table["filename"], [])
     else:
-        for table in TABLES:
-            log(f"\n⏳ Fetching {table['filename']}...")
-            try:
-                data = fetch_all_records(table["id"], table, APP_ID, APP_SECRET, BASE_ID)
-                save_json(table["filename"], data)
-            except Exception as e:
-                log(f"❌ Failed {table['label']}: {e}")
-                traceback.print_exc()
-                save_json(table["filename"], [])
+        # Launch all 4 table downloads AT THE EXACT SAME TIME!
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(fetch_and_save_table, table, APP_ID, APP_SECRET, BASE_ID) for table in TABLES]
+            # Wait for all parallel jobs to finish
+            concurrent.futures.wait(futures)
     
     log("=" * 50)
     log("🎉 Build complete!")
