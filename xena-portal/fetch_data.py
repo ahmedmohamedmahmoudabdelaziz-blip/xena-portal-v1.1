@@ -1,11 +1,6 @@
-import json
-import os
-import sys
-import time
-import traceback
-import requests
-import concurrent.futures
+import json, os, sys, time, traceback, requests
 from datetime import datetime, timezone
+import concurrent.futures
 
 # ── PATH SETUP ──
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +42,7 @@ def save_json(filename, data):
 def get_table_schema(table_id, token, base_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
     try:
-        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
+        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=20).json()
         if resp.get("code") == 0:
             return [f.get("field_name") for f in resp.get("data", {}).get("items", [])]
     except Exception as e:
@@ -55,7 +50,6 @@ def get_table_schema(table_id, token, base_id):
     return []
 
 def extract_field_text(field_data):
-    """Safely pull string values out of complex Feishu JSON cells."""
     if not field_data: return ""
     if isinstance(field_data, (str, int, float)): return str(field_data)
     if isinstance(field_data, dict):
@@ -79,29 +73,20 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def is_ghost_row(fields, human_keys):
-    """
-    The Impenetrable Ghost Row detector.
-    We define a strict whitelist of fields that a human MUST have typed 
-    for a row to be considered real (e.g., Agency Code, User ID, ACM).
-    If NONE of these specific fields exist in the row, it's a ghost.
-    """
     human_keys_lower = set(k.lower() for k in human_keys)
     
     for f_key, f_val in fields.items():
         if f_key.lower().strip() in human_keys_lower:
             val = extract_field_text(f_val).strip()
-            # If we found even ONE human identifier (like an Agency Code), it's a real row!
             if val and val.lower() not in ('none', 'null', '[]', '{}', '0', '0.0', ''):
                 return False 
-                
-    # If we checked every column and found NO human identifiers, it's a ghost.
     return True
 
 def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     label = config["label"]
     
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    resp = requests.post(url, json={"app_id": app_id, "app_secret": app_secret}, timeout=15).json()
+    resp = requests.post(url, json={"app_id": app_id, "app_secret": app_secret}, timeout=20).json()
     token = resp.get("tenant_access_token")
     if not token: raise Exception(f"Token error: {resp}")
         
@@ -116,7 +101,6 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     else:
         log(f"   ⚠️ [{label}] Schema fetch failed or no matching columns. Falling back to downloading all columns.")
     
-    # WE RETURN TO THE GET ENDPOINT (Flawless Pagination!)
     api_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/records"
     
     items = []
@@ -126,19 +110,36 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     consecutive_empty_pages = 0
     
     for _ in range(500):
-        if time.time() - start > 240:
-            log(f"   ⏱️ [{label}]: timeout reached (240s)")
+        # We increase total allowed time to 360s
+        if time.time() - start > 360:
+            log(f"   ⏱️ [{label}]: total timeout reached (360s)")
             break
             
         params = {"page_size": 500}
         if page_token:
             params["page_token"] = page_token
             
-        resp = session.get(api_url, params=params, timeout=20)
-        data = resp.json()
-        
-        if data.get("code") != 0:
-            log(f"   ❌ [{label}]: Feishu error {data.get('code')}: {data.get('msg')}")
+        # Retry mechanism for individual pages
+        success = False
+        data = {}
+        for attempt in range(4):
+            try:
+                # Increased timeout to 45 seconds to let Feishu compile the large page
+                resp = session.get(api_url, params=params, timeout=45)
+                data = resp.json()
+                
+                if data.get("code") == 0:
+                    success = True
+                    break
+                else:
+                    log(f"   ⚠️ [{label}] Feishu error {data.get('code')}: {data.get('msg')} (Attempt {attempt+1})")
+                    time.sleep(2)
+            except requests.exceptions.RequestException as e:
+                log(f"   ⚠️ [{label}] Network timeout/error: {e} (Attempt {attempt+1})")
+                time.sleep(3)
+                
+        if not success:
+            log(f"   ❌ [{label}] Failed to fetch page {page_num} after 4 attempts. Stopping here.")
             break
             
         block = data.get("data", {})
@@ -148,11 +149,9 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
         for it in page_items:
             fields = it.get("fields", {})
             
-            # 1. Check if it is a Ghost Row
             if not is_ghost_row(fields, config["human_keys"]):
                 real_records_on_page += 1
                 
-                # 2. Project the row in Python (Drops junk columns immediately)
                 if valid_fields:
                     projected = {k: v for k, v in fields.items() if k in valid_fields}
                 else:
@@ -178,7 +177,6 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
             
         page_num += 1
 
-    # Deduplicate (just in case)
     seen = set()
     unique = []
     for it in items:
@@ -240,7 +238,6 @@ TABLES = [
 ]
 
 def fetch_and_save_table(table, app_id, app_secret, base_id):
-    """Wrapper function to handle a single table fetch within a thread."""
     log(f"\n⏳ Starting fetch for {table['label']}...")
     try:
         data = fetch_all_records(table["id"], table, app_id, app_secret, base_id)
@@ -252,7 +249,7 @@ def fetch_and_save_table(table, app_id, app_secret, base_id):
 
 def main():
     log("=" * 50)
-    log("🚀 Xena Portal Build Script (Multi-Threaded Ghost-Buster)")
+    log("🚀 Xena Portal Build Script (Multi-Threaded Ghost-Buster with Robust Retry)")
     log(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}")
     log("=" * 50)
     
@@ -267,10 +264,8 @@ def main():
         log("⚠️ LARK_APP_ID or LARK_APP_SECRET not set. Writing empty data.")
         for table in TABLES: save_json(table["filename"], [])
     else:
-        # Launch all 4 table downloads AT THE EXACT SAME TIME!
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(fetch_and_save_table, table, APP_ID, APP_SECRET, BASE_ID) for table in TABLES]
-            # Wait for all parallel jobs to finish
             concurrent.futures.wait(futures)
     
     log("=" * 50)
