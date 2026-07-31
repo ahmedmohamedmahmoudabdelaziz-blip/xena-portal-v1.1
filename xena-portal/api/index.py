@@ -489,21 +489,9 @@ def get_user_permissions(email, name):
     cached = cache_get(cache_key)
     if cached: return cached
     
-    # Try fetching from static JSON first
-    static_access = load_static_json("access.json")
-    if static_access is not None:
-        for item in static_access:
-            fields = item.get("fields", {})
-            db_email = extract_field_text(fields.get("Email", "")).lower().strip()
-            db_person = extract_field_text(fields.get("Person", "")).lower().strip()
-            
-            if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
-                modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
-                parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
-                parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
-                result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
-                cache_set(cache_key, result, ttl=300)
-                return result
+    # REMOVED load_static_json("access.json") HERE!
+    # Now it goes straight to Live Feishu every time (cached for just 5 minutes for speed,
+    # but instantly cleared when you add/edit a user).
 
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
