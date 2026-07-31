@@ -1278,7 +1278,6 @@ def search():
     user    = sanitize_text(req_data.get('user',''))
     email   = sanitize_text(req_data.get('email',''))
     qtype   = req_data.get('type','points')
-    nocache = req_data.get('nocache', '0') in ['1', 'true', True]
     
     if qtype not in ('points','target'): qtype = 'points'
     if not code: return jsonify({"found":False,"error":"Invalid or missing agency code."}), 400
@@ -1291,16 +1290,10 @@ def search():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
-    cache_key = cache_make_key("search", code, qtype)
-    
-    if not nocache:
-        cached = cache_get(cache_key)
-        if cached: return jsonify(cached)
-        
+    # 100% Live Feishu API - no local caching for search/target
     data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
     
     if data.get("found"):
-        cache_set(cache_key, data, ttl=180)
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "AGENCY_SEARCH", f"Code: {code} | Type: {qtype}", ip=ip, severity="Info")
         return jsonify(data)
@@ -1448,7 +1441,7 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # Try static JSON first!
+    # Fast static JSON load
     static_data = load_static_json('points.json')
     if static_data is not None:
         all_items = static_data
@@ -1620,85 +1613,57 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
-    # Try static JSON first!
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
+    # 100% Live Feishu API
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_requests(10)
         fetch_complete, stop_reason, success = True, "", True
     else:
-        if MOCK_MODE:
-            all_items = MockFeishuDB.generate_requests(10)
-            fetch_complete, stop_reason, success = True, "", True
-        else:
-            tat = get_tenant_access_token()
-            search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-            headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        tat = get_tenant_access_token()
+        search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-            aliases = QUERY_FIELD_ALIASES[field]
-            combos = []
-            for alias in aliases:
-                for op in ["contains", "is", "="]:
-                    if op == "=" and not value.isdigit(): continue
-                    val_array = (int(value),) if op == "=" else (value,)
-                    combos.append((alias, op, val_array))
+        aliases = QUERY_FIELD_ALIASES[field]
+        combos = []
+        for alias in aliases:
+            for op in ["contains", "is", "="]:
+                if op == "=" and not value.isdigit(): continue
+                val_array = (int(value),) if op == "=" else (value,)
+                combos.append((alias, op, val_array))
 
-            def try_combo(combo, projection=QUERY_RECORDS_FIELDS):
-                alias, op, val_array = combo
-                payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
-                if projection: payload["field_names"] = projection
-                try:
-                    resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
-                    data = resp.json()
-                    if data.get("code") == 1254045 and projection:
-                        return try_combo(combo, projection=None)
-                    if data.get("code") == 0:
-                        return {"combo": combo, "ok": True, "items": data.get("data", {}).get("items", [])}
-                    elif data.get("code") not in (1254011, 1254402, 1254010):
-                        return {"combo": combo, "ok": False, "error": data.get("msg"), "fatal": data.get("code") == 99991663}
-                    return {"combo": combo, "ok": False, "error": None}
-                except Exception as e:
-                    return {"combo": combo, "ok": False, "error": str(e)}
+        def try_combo(combo, projection=QUERY_RECORDS_FIELDS):
+            alias, op, val_array = combo
+            payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
+            if projection: payload["field_names"] = projection
+            try:
+                resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
+                data = resp.json()
+                if data.get("code") == 1254045 and projection:
+                    return try_combo(combo, projection=None)
+                if data.get("code") == 0:
+                    return {"combo": combo, "ok": True, "items": data.get("data", {}).get("items", [])}
+                elif data.get("code") not in (1254011, 1254402, 1254010):
+                    return {"combo": combo, "ok": False, "error": data.get("msg"), "fatal": data.get("code") == 99991663}
+                return {"combo": combo, "ok": False, "error": None}
+            except Exception as e:
+                return {"combo": combo, "ok": False, "error": str(e)}
 
-            results_by_combo = {}
-            with ThreadPoolExecutor(max_workers=min(9, len(combos) or 1)) as executor:
-                for res in executor.map(try_combo, combos):
-                    results_by_combo[res["combo"]] = res
+        results_by_combo = {}
+        with ThreadPoolExecutor(max_workers=min(9, len(combos) or 1)) as executor:
+            for res in executor.map(try_combo, combos):
+                results_by_combo[res["combo"]] = res
 
-            all_items, fetch_complete, stop_reason, success = [], False, "", False
-            for combo in combos:
-                res = results_by_combo.get(combo)
-                if res and res.get("ok"):
-                    all_items, success, fetch_complete = res["items"], True, True
-                    break
-                if res and res.get("error"):
-                    stop_reason = res["error"]
+        all_items, fetch_complete, stop_reason, success = [], False, "", False
+        for combo in combos:
+            res = results_by_combo.get(combo)
+            if res and res.get("ok"):
+                all_items, success, fetch_complete = res["items"], True, True
+                break
+            if res and res.get("error"):
+                stop_reason = res["error"]
 
-            if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
+        if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
 
     results = []
-    
-    # Process memory results to find matches when loading from static file
-    if static_data is not None:
-        filtered_items = []
-        val_lower = str(value).lower()
-        aliases = [a.lower() for a in QUERY_FIELD_ALIASES[field]]
-        
-        for item in all_items:
-            fields_obj = item.get("fields", {})
-            for alias in aliases:
-                # Find matching field keys case-insensitively
-                actual_keys = [k for k in fields_obj.keys() if k.lower() == alias or k.lower().replace(" ", "") == alias.replace(" ", "")]
-                found = False
-                for k in actual_keys:
-                    field_val = extract_field_text(fields_obj[k]).lower()
-                    # Apply contains logic which mimics Feishu's fuzzy search
-                    if val_lower in field_val:
-                        filtered_items.append(item)
-                        found = True
-                        break
-                if found:
-                    break
-        all_items = filtered_items
 
     for item in all_items:
         fields = item.get("fields", {})
@@ -1741,7 +1706,7 @@ def query_records():
     return jsonify({
         "results": results, "count": len(results), "field": field, "value": value,
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": static_data is not None
+        "served_from_background_cache": False
     })
 
 @app.route('/api/analytics', methods=['GET', 'POST'])
@@ -1793,7 +1758,7 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Try static JSON first!
+    # Fast static JSON load
     static_data = load_static_json('requests.json')
     if static_data is not None:
         all_items = static_data
@@ -1904,7 +1869,7 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # Try static JSON first!
+    # Fast static JSON load
     static_data = load_static_json('requests.json')
     if static_data is not None:
         all_items = static_data
