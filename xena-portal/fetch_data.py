@@ -36,14 +36,14 @@ AUDIT_FIELDS = ["Timestamp", "Agent", "Action", "Target", "IP Address", "Severit
 
 def get_tenant_access_token():
     if not APP_ID or not APP_SECRET:
-        print("⚠️ Missing LARK_APP_ID or LARK_APP_SECRET. Aborting fetch.")
+        print("⚠️ Missing LARK_APP_ID or LARK_APP_SECRET. Aborting fetch.", flush=True)
         return None
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     try:
         resp = requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=15).json()
         return resp.get("tenant_access_token")
     except Exception as e:
-        print(f"❌ Failed to get access token: {e}")
+        print(f"❌ Failed to get access token: {e}", flush=True)
         return None
 
 def fetch_all_records(table_id, tat, essential_fields=None):
@@ -53,11 +53,15 @@ def fetch_all_records(table_id, tat, essential_fields=None):
     all_records = []
     page_token = None
     has_more = True
+    page_num = 1
+    
+    # Store the current projection list so we can turn it off permanently if it fails
+    current_projection = essential_fields
     
     while has_more:
         payload = {"page_size": 500}
-        if essential_fields:
-            payload["field_names"] = essential_fields
+        if current_projection:
+            payload["field_names"] = current_projection
         if page_token:
             payload["page_token"] = page_token
             
@@ -65,14 +69,16 @@ def fetch_all_records(table_id, tat, essential_fields=None):
             resp = requests.post(url, headers=headers, json=payload, timeout=30)
             data = resp.json()
             
-            # If projection fails due to missing columns, retry without projection
-            if data.get("code") == 1254045:
+            # If projection fails due to missing columns, turn off projection entirely for this table
+            if data.get("code") == 1254045 and current_projection:
+                print(f"⚠️  Notice: One or more field names not found in {table_id}. Falling back to full download...", flush=True)
+                current_projection = None
                 payload.pop("field_names", None)
                 resp = requests.post(url, headers=headers, json=payload, timeout=30)
                 data = resp.json()
                 
             if data.get("code") != 0:
-                print(f"❌ Error fetching {table_id}: {data.get('msg')}")
+                print(f"❌ Error fetching {table_id} (Page {page_num}): {data.get('msg')}", flush=True)
                 break
                 
             block = data.get("data", {})
@@ -82,26 +88,33 @@ def fetch_all_records(table_id, tat, essential_fields=None):
             for item in items:
                 record = {"record_id": item.get("record_id"), "fields": {}}
                 fields = item.get("fields", {})
+                
+                # We always filter out junk fields in Python, even if Feishu didn't do it for us
                 if essential_fields:
                     for f in essential_fields:
                         if f in fields and fields[f] is not None:
                             record["fields"][f] = fields[f]
                 else:
                     record["fields"] = fields
+                    
                 all_records.append(record)
                 
             has_more = block.get("has_more", False)
             page_token = block.get("page_token")
+            
+            print(f"  ... Fetched page {page_num} ({len(all_records)} records total)", flush=True)
+            page_num += 1
+            
         except Exception as e:
-            print(f"❌ Exception fetching {table_id}: {e}")
+            print(f"❌ Exception fetching {table_id} on page {page_num}: {e}", flush=True)
             break
             
     return all_records
 
 def main():
-    print("==================================================")
-    print("🚀 Xena Portal Build Script")
-    print(f"🕒 Time: {datetime.utcnow().isoformat()}")
+    print("==================================================", flush=True)
+    print("🚀 Xena Portal Build Script", flush=True)
+    print(f"🕒 Time: {datetime.utcnow().isoformat()}", flush=True)
     
     tat = get_tenant_access_token()
     if not tat:
@@ -109,7 +122,7 @@ def main():
         
     output_dir = os.path.join(os.getcwd(), "public", "data")
     os.makedirs(output_dir, exist_ok=True)
-    print(f"📁 Target Output Dir: {output_dir}")
+    print(f"📁 Target Output Dir: {output_dir}", flush=True)
     
     tables = [
         ("requests.json", REQUESTS_TABLE_ID, REQUESTS_FIELDS),
@@ -119,19 +132,19 @@ def main():
     ]
     
     for filename, table_id, fields in tables:
-        print(f"⏳ Fetching {filename}...")
+        print(f"⏳ Fetching {filename}...", flush=True)
         records = fetch_all_records(table_id, tat, essential_fields=fields)
         if records:
             file_path = os.path.join(output_dir, filename)
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(records, f)
             size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            print(f"✅ Saved {filename} ({len(records)} records) - {size_mb:.2f} MB")
+            print(f"✅ Saved {filename} ({len(records)} records) - {size_mb:.2f} MB\n", flush=True)
         else:
-            print(f"⚠️ No records found for {filename}.")
+            print(f"⚠️ No records found for {filename}.\n", flush=True)
             
-    print("==================================================")
-    print("🎉 Build Script Complete!")
+    print("==================================================", flush=True)
+    print("🎉 Build Script Complete!", flush=True)
 
 if __name__ == "__main__":
     main()
