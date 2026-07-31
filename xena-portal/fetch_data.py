@@ -1,249 +1,220 @@
-import json, os, sys, time, traceback, requests
+import os
+import json
+import requests
+from datetime import datetime, timezone
 
-# ── PATH SETUP ──
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PUBLIC_DIR = os.path.join(SCRIPT_DIR, "public")
-DATA_DIR = os.path.join(PUBLIC_DIR, "data")
+APP_ID = os.environ.get("LARK_APP_ID")
+APP_SECRET = os.environ.get("LARK_APP_SECRET")
+BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
 
-def log(msg):
-    print(msg, flush=True)
+REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
+POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
+ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
+AUDIT_TABLE_ID = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 
-def ensure_dirs():
-    os.makedirs(DATA_DIR, exist_ok=True)
-    log(f"📁 Created: {DATA_DIR}")
+# Sets of aliases to guarantee we catch the columns regardless of slight naming variations
+REQUESTS_ALIASES = {
+    "Numbering", "Submitted on Copy", "Submitted on", "Created Time", "Date",
+    "Request Type", "Request type", "Type", "Category", 
+    "Status", "Request Status", "Agency Status", "State",
+    "Region", "Agency Region", 
+    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
+    "Agency Type", "Type of Agency", 
+    "Closing Reason", "Closing Agencies Reason",
+    "Otherapp Name", "Other App Name", "Other Apps", 
+    "Reject Reason", "Rejection Reason",
+    "Create Way", "Creation Type", "Target Type", "Agency Code", "Point Balance",
+    "Latest Usage Tracker", "Agency Point Privilege", "Privilege", "Agency Privilege",
+    "Counter", "Qty", "Quantities Input", "Respondents", "User ID", "Otherapp ID",
+    "Bd Code", "BD Code", "NID Number", "NID", "Audition note", "Audition Note", "Duplicated Check"
+}
 
-def copy_index_html():
-    src = os.path.join(SCRIPT_DIR, "index.html")
-    dst = os.path.join(PUBLIC_DIR, "index.html")
-    
-    if os.path.exists(src):
-        with open(src, "r", encoding="utf-8") as f:
-            content = f.read()
-        with open(dst, "w", encoding="utf-8") as f:
-            f.write(content)
-        log(f"✅ Copied index.html ({len(content)} bytes)")
-        return True
-    else:
-        fallback = "<!DOCTYPE html><html><head><title>Xena Portal</title></head><body><h1>Xena Portal</h1><p>Loading...</p></body></html>"
-        with open(dst, "w", encoding="utf-8") as f:
-            f.write(fallback)
-        log(f"⚠️ Created fallback index.html (original not found at {src})")
-        return False
+POINTS_ALIASES = {
+    "Agency Code", "Agency Name", "Name", "Region", "Agency Region", 
+    "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member", 
+    "Base Points", "base_points", "Bonus Points", "Total Points", "# Total Points", "Total",
+    "Used Points", "Used", "Point Balance", "Balance"
+}
 
-def save_json(filename, data):
-    path = os.path.join(DATA_DIR, filename)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
-    
-    size_mb = os.path.getsize(path) / (1024 * 1024)
-    log(f"✅ Saved {filename} ({len(data)} records) - {size_mb:.2f} MB")
+ACCESS_ALIASES = {"Email", "Person", "Modules", "ACMs", "Regions"}
+AUDIT_ALIASES = {"Timestamp", "Agent", "Action", "Target", "IP Address", "Severity"}
 
-def get_table_schema(table_id, token, base_id):
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
-    try:
-        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
-        if resp.get("code") == 0:
-            return [f.get("field_name") for f in resp.get("data", {}).get("items", [])]
-    except Exception as e:
-        log(f"⚠️ Failed to fetch schema for {table_id}: {e}")
-    return []
-
-def fetch_all_records(table_id, config, app_id, app_secret, base_id):
-    label = config["label"]
-    
-    # 1. Get Token
+def get_tenant_access_token():
+    if not APP_ID or not APP_SECRET:
+        print("⚠️ Missing LARK_APP_ID or LARK_APP_SECRET. Aborting fetch.", flush=True)
+        return None
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    resp = requests.post(url, json={"app_id": app_id, "app_secret": app_secret}, timeout=15).json()
-    token = resp.get("tenant_access_token")
-    if not token:
-        raise Exception(f"Token error: {resp}")
-        
-    session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-    
-    # 2. Get Schema and find Valid Fields
-    actual_fields = get_table_schema(table_id, token, base_id)
-    valid_fields = [f for f in config["aliases"] if f in actual_fields][:100]
-    
-    # 3. Find the primary key for the Anti-Blank Filter
-    primary_key = None
-    for pk in config["primary_keys"]:
-        if pk in actual_fields:
-            primary_key = pk
-            break
+    try:
+        resp = requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=15).json()
+        return resp.get("tenant_access_token")
+    except Exception as e:
+        print(f"❌ Failed to get access token: {e}", flush=True)
+        return None
 
-    # 4. Build the payload
-    api_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/records/search?automatic_fields=true"
-    base_payload = {"page_size": 500}
+def get_valid_field_names(table_id, tat, desired_aliases):
+    """Fetches the actual table schema from Feishu and intersections it with our desired aliases."""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/fields"
+    headers = {"Authorization": f"Bearer {tat}"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=15).json()
+        if resp.get("code") == 0:
+            actual_fields = [f.get("field_name") for f in resp.get("data", {}).get("items", [])]
+            valid_projection = [f for f in desired_aliases if f in actual_fields]
+            return valid_projection[:100]  # Feishu limits to 100 fields max
+    except Exception as e:
+        print(f"⚠️ Could not fetch schema for {table_id}: {e}", flush=True)
+    return None
+
+def is_real_record(fields):
+    """
+    Bulletproof Ghost Row Detector.
+    Table-agnostic: Ignores columns that are known to be auto-generated formulas/timestamps.
+    If ANY other column has actual human text, it counts the row as real.
+    """
+    auto_keywords = [
+        "numbering", "submitted on", "created time", "point balance", 
+        "total points", "used points", "tracker"
+    ]
     
+    for key, val in fields.items():
+        key_lower = key.lower().strip()
+        
+        # Ignore columns that are known to auto-populate on blank rows
+        if any(kw in key_lower for kw in auto_keywords):
+            continue
+            
+        # Safely extract text from complex Feishu JSON cell objects
+        text_val = ""
+        if isinstance(val, list) and len(val) > 0:
+            item = val[0]
+            if isinstance(item, dict):
+                text_val = str(item.get('text', item.get('name', item.get('value', item.get('id', '')))))
+            else:
+                text_val = str(item)
+        elif isinstance(val, dict):
+            text_val = str(val.get('text', val.get('name', val.get('value', val.get('id', '')))))
+        else:
+            text_val = str(val)
+            
+        text_val = text_val.strip().lower()
+        
+        # If we find actual human text in ANY non-auto column, this row is real!
+        if text_val and text_val not in ("[]", "{}", "none", "", "0", "0.0", "null", "error"):
+            return True
+            
+    return False
+
+def fetch_all_records(table_id, tat, desired_aliases, filename):
+    valid_fields = get_valid_field_names(table_id, tat, desired_aliases)
+    
+    base_payload = {"page_size": 500, "automatic_fields": True}
     if valid_fields:
         base_payload["field_names"] = valid_fields
-        log(f"   ... Projection active: limiting to {len(valid_fields)} columns to save memory.")
+        print(f"  ... Projection active: extracting {len(valid_fields)} essential columns.", flush=True)
         
-    if primary_key:
-        base_payload["filter"] = {
-            "conjunction": "and",
-            "conditions": [{"field_name": primary_key, "operator": "isNotEmpty", "value": []}]
-        }
-        log(f"   ... Server-Side Filter active: Dropping rows where '{primary_key}' is blank.")
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # 5. Fetch Loop
-    items = []
+    all_records = []
     page_token = None
-    start = time.time()
+    has_more = True
     page_num = 1
     
-    consecutive_empty_pages = 0
+    consecutive_ghost_pages = 0
     
-    for _ in range(200):
-        if time.time() - start > 120:
-            log(f"   ⏱️ {label}: timeout reached (120s)")
-            break
-            
+    while has_more:
         payload = dict(base_payload)
         if page_token:
             payload["page_token"] = page_token
             
-        resp = session.post(api_url, json=payload, timeout=20)
-        data = resp.json()
-        
-        if data.get("code") != 0:
-            log(f"   ❌ {label}: Feishu error {data.get('code')}: {data.get('msg')}")
-            break
-            
-        block = data.get("data", {})
-        page_items = block.get("items", [])
-        
-        # Double-check: Even with server filters, ignore rows missing the primary key entirely
-        real_items = []
-        for it in page_items:
-            fields = it.get("fields", {})
-            # If we don't have a primary key, or the primary key actually exists and has a value
-            if not primary_key or fields.get(primary_key):
-                # Keep only the 'fields' and 'record_id' to save RAM
-                real_items.append({"record_id": it.get("record_id"), "fields": fields})
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+            data = resp.json()
                 
-        items.extend(real_items)
-        log(f"   ... Fetched page {page_num} ({len(real_items)} valid records)")
-        
-        if len(real_items) == 0 and len(page_items) > 0:
-            consecutive_empty_pages += 1
-        else:
-            consecutive_empty_pages = 0
+            if data.get("code") != 0:
+                print(f"❌ Error fetching {table_id}: {data.get('msg')}", flush=True)
+                break
+                
+            block = data.get("data", {})
+            items = block.get("items", [])
             
-        if consecutive_empty_pages >= 2:
-            log(f"   🛑 Reached bottom of real data. Stopping early to ignore ghost rows.")
+            real_records_on_page = 0
+            
+            for item in items:
+                fields = item.get("fields", {})
+                
+                if is_real_record(fields):
+                    real_records_on_page += 1
+                    record = {"record_id": item.get("record_id"), "fields": {}}
+                    
+                    if desired_aliases:
+                        for f in desired_aliases:
+                            if f in fields and fields[f] is not None:
+                                record["fields"][f] = fields[f]
+                    else:
+                        record["fields"] = fields
+                        
+                    all_records.append(record)
+            
+            ghosts_on_page = len(items) - real_records_on_page
+            print(f"  ... Fetched page {page_num} ({real_records_on_page} real records, {ghosts_on_page} ghost rows)", flush=True)
+            
+            if real_records_on_page == 0 and len(items) > 0:
+                consecutive_ghost_pages += 1
+            else:
+                consecutive_ghost_pages = 0
+                
+            # If we hit 2 full pages of ghost rows, stop downloading
+            if consecutive_ghost_pages >= 2:
+                print(f"  🛑 Detected {consecutive_ghost_pages} pages of pure ghost rows. Bottom of spreadsheet reached! Stopping early.", flush=True)
+                break
+                
+            has_more = block.get("has_more", False)
+            page_token = block.get("page_token")
+            page_num += 1
+            
+        except Exception as e:
+            print(f"❌ Exception fetching {table_id} on page {page_num}: {e}", flush=True)
             break
             
-        page_token = block.get("page_token")
-        if not page_token or not block.get("has_more"):
-            break
-            
-        page_num += 1
-
-    # 6. Deduplicate
-    seen = set()
-    unique = []
-    for it in items:
-        rid = it.get("record_id")
-        if rid and rid not in seen:
-            seen.add(rid)
-            unique.append(it)
-            
-    return unique
-
-TABLES = [
-    {
-        "id": "tblFMYa3dP3Ciu0V",
-        "filename": "requests.json",
-        "label": "Requests",
-        "aliases": [
-            "Numbering", "Submitted on Copy", "Submitted on", "Created Time", "Date",
-            "Request Type", "Request type", "Type", "Category", 
-            "Status", "Request Status", "Agency Status", "State",
-            "Region", "Agency Region", 
-            "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
-            "Agency Type", "Type of Agency", 
-            "Closing Reason", "Closing Agencies Reason",
-            "Otherapp Name", "Other App Name", "Other Apps", 
-            "Reject Reason", "Rejection Reason",
-            "Create Way", "Creation Type", "Target Type", "Agency Code", "Point Balance",
-            "Latest Usage Tracker", "Agency Point Privilege", "Privilege", "Agency Privilege",
-            "Counter", "Qty", "Quantities Input", "Respondents", "User ID", "Otherapp ID",
-            "Bd Code", "BD Code", "NID Number", "NID", "Audition note", "Audition Note", "Duplicated Check"
-        ],
-        "primary_keys": ["Request Type", "Request type", "Type"]
-    },
-    {
-        "id": "tbl6LYUxGi8tlkJH",
-        "filename": "points.json",
-        "label": "Points",
-        "aliases": [
-            "Agency Code", "Agency Name", "Name", "Region", "Agency Region", 
-            "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member", 
-            "Base Points", "base_points", "Bonus Points", "Total Points", "# Total Points", "Total",
-            "Used Points", "Used", "Point Balance", "Balance"
-        ],
-        "primary_keys": ["Agency Code", "Agency Name"]
-    },
-    {
-        "id": "tbl3wweYCpmDmDSx",
-        "filename": "access.json",
-        "label": "Access",
-        "aliases": ["Email", "Person", "Modules", "ACMs", "Regions"],
-        "primary_keys": ["Email", "Person"]
-    },
-    {
-        "id": os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB"),
-        "filename": "audit.json",
-        "label": "Audit",
-        "aliases": ["Timestamp", "Agent", "Action", "Target", "IP Address", "Severity"],
-        "primary_keys": ["Timestamp", "Action"]
-    }
-]
+    return all_records
 
 def main():
-    log("=" * 50)
-    log("🚀 Xena Portal Build Script (Fast Server-Side Filter)")
-    log(f"📂 Script dir: {SCRIPT_DIR}")
-    log(f"📂 Public dir: {PUBLIC_DIR}")
-    log("=" * 50)
+    print("==================================================", flush=True)
+    print("🚀 Xena Portal Build Script (Universal Ghost-Buster)", flush=True)
+    print(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}", flush=True)
     
-    ensure_dirs()
-    copy_index_html()
+    tat = get_tenant_access_token()
+    if not tat:
+        return
+        
+    output_dir = os.path.join(os.getcwd(), "public", "data")
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"📁 Target Output Dir: {output_dir}", flush=True)
     
-    APP_ID = os.environ.get("LARK_APP_ID", "")
-    APP_SECRET = os.environ.get("LARK_APP_SECRET", "")
-    BASE_ID = "C9zFb52m4abhtHsX5LjcBywbnze"
+    tables = [
+        ("requests.json", REQUESTS_TABLE_ID, REQUESTS_ALIASES),
+        ("points.json", POINTS_TABLE_ID, POINTS_ALIASES),
+        ("access.json", ACCESS_TABLE_ID, ACCESS_ALIASES),
+        ("audit.json", AUDIT_TABLE_ID, AUDIT_ALIASES)
+    ]
     
-    if not APP_ID or not APP_SECRET:
-        log("⚠️ LARK_APP_ID or LARK_APP_SECRET not set. Writing empty data files.")
-        for table in TABLES:
-            save_json(table["filename"], [])
-    else:
-        for table in TABLES:
-            log(f"\n⏳ Fetching {table['filename']}...")
-            try:
-                data = fetch_all_records(table["id"], table, APP_ID, APP_SECRET, BASE_ID)
-                save_json(table["filename"], data)
-            except Exception as e:
-                log(f"❌ Failed {table['label']}: {e}")
-                traceback.print_exc()
-                save_json(table["filename"], [])
-    
-    log("=" * 50)
-    log("🎉 Build complete!")
+    for filename, table_id, aliases in tables:
+        print(f"⏳ Fetching {filename}...", flush=True)
+        records = fetch_all_records(table_id, tat, desired_aliases=aliases, filename=filename)
+        
+        if records:
+            file_path = os.path.join(output_dir, filename)
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(records, f)
+            size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            print(f"✅ Saved {filename} ({len(records)} real records) - {size_mb:.2f} MB\n", flush=True)
+        else:
+            print(f"⚠️ No records found for {filename}.\n", flush=True)
+            
+    print("==================================================", flush=True)
+    print("🎉 Build Script Complete!", flush=True)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        log(f"💥 CRITICAL ERROR: {e}")
-        traceback.print_exc()
-        try:
-            os.makedirs(PUBLIC_DIR, exist_ok=True)
-            with open(os.path.join(PUBLIC_DIR, "index.html"), "w") as f:
-                f.write("<!DOCTYPE html><html><body><h1>Build Error - Check Logs</h1></body></html>")
-        except:
-            pass
-        sys.exit(0)
+    main()
+```eof
