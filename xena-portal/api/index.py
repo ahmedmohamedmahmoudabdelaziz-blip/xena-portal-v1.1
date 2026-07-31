@@ -1429,19 +1429,24 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # Fast static JSON load
-    static_data = load_static_json('points.json')
-    if static_data is not None:
-        all_items = static_data
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_agency("All") * 10
+        fetch_complete, stop_reason = True, ""
     else:
-        if MOCK_MODE:
-            all_items = MockFeishuDB.generate_agency("All") * 10
-            fetch_complete, stop_reason = True, ""
-        else:
+        # Prefer the cron-refreshed Redis snapshot (updates every ~30 min) so this
+        # stays live-ish and fast. Fall back to the build-time static JSON (frozen
+        # since the last deploy) only if the snapshot is unavailable, and to a full
+        # live fetch as a last resort.
+        all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
+
+        if not all_items:
+            static_data = load_static_json('points.json')
+            if static_data is not None:
+                all_items = static_data
+                fetch_complete, stop_reason = True, "loaded_from_static_json"
+
+        if not all_items:
             all_items, fetch_complete, stop_reason = fetch_points_sharded()
-            if not fetch_complete and not all_items:
-                all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1746,23 +1751,26 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Fast static JSON load
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
-        master_keys = set()
-        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-            master_keys = set(all_items[0]["fields"].keys())
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-        from_bg_cache = False
-    else:
+    # Prefer the cron-refreshed Redis snapshot (updates every ~30 min) so this stays
+    # live-ish and fast. Fall back to the build-time static JSON (frozen since the
+    # last deploy) only if the snapshot is unavailable, and to a full live fetch as
+    # a last resort.
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
+    if not all_items:
+        static_data = load_static_json('requests.json')
+        if static_data is not None:
+            all_items = static_data
+            master_keys = set()
+            if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
+                master_keys = set(all_items[0]["fields"].keys())
+            fetch_complete, stop_reason, from_bg_cache = True, "loaded_from_static_json", False
+
+    if not all_items:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
-
         if not fetch_complete and not all_items:
-            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
@@ -1857,23 +1865,26 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # Fast static JSON load
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
-        master_keys = set()
-        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-            master_keys = set(all_items[0]["fields"].keys())
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-        from_bg_cache = False
-    else:
+    # Prefer the cron-refreshed Redis snapshot (updates every ~30 min) so this stays
+    # live-ish and fast. Fall back to the build-time static JSON (frozen since the
+    # last deploy) only if the snapshot is unavailable, and to a full live fetch as
+    # a last resort.
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
+    if not all_items:
+        static_data = load_static_json('requests.json')
+        if static_data is not None:
+            all_items = static_data
+            master_keys = set()
+            if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
+                master_keys = set(all_items[0]["fields"].keys())
+            fetch_complete, stop_reason, from_bg_cache = True, "loaded_from_static_json", False
+
+    if not all_items:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
-
         if not fetch_complete and not all_items:
-            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
