@@ -809,38 +809,47 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     if MOCK_MODE:
         hist_items = MockFeishuDB.generate_requests(50)
     else:
-        # NOTE: this used to reuse `points_payload` as-is, with no "page_size" and no
-        # page_token loop. Feishu then silently falls back to its small default page
-        # (unpaginated, unsorted) — so once an agency accumulates more request-history
-        # rows than that single page holds, the newest submissions (e.g. today's) can
-        # fall outside the one page fetched and simply never appear in the Activity
-        # Timeline / Target claim counts, even though the record genuinely exists.
-        # Fix: explicit page_size + full page_token pagination, same pattern used
-        # everywhere else in this file (fetch_feishu_records, _fetch_bitable_shard, ...).
-        hist_items, hist_seen, hist_page_token = [], set(), None
+        # Query Requests (/api/query) never filters the Requests table by "Agency Code" —
+        # it only searches User ID / Numbering / Otherapp ID / NID / Bd Code, and it's
+        # reliably fast. Agency Code is the one field this function filters the Requests
+        # table by, and it behaves badly there (type/lookup-field mismatch, most likely):
+        # a plain single-page fetch silently returns the wrong slice (misses new records),
+        # and turning that into a full page_token loop just means scanning huge swaths of
+        # the *entire* table since the filter isn't actually restricting anything server-
+        # side — very slow, can hang.
+        #
+        # Fix: mirror /api/query's own proven pattern — fire a few candidate filter shapes
+        # for Agency Code CONCURRENTLY (string vs numeric value; "is" vs "contains"), sorted
+        # newest-first, and take whichever comes back with real rows. One round-trip of
+        # wall-clock time, not a sequential scan, and immune to the string/number mismatch.
         hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-        try:
-            for _ in range(50):
-                hist_payload = {
-                    "page_size": 500,
-                    "filter": points_payload["filter"],
-                }
-                if hist_page_token:
-                    hist_payload["page_token"] = hist_page_token
-                hist_resp = http_requests.post(hist_url, headers=headers, json=hist_payload, timeout=30).json()
-                if hist_resp.get("code") != 0:
+
+        hist_combos = [("is", [code])]
+        if code.isdigit():
+            hist_combos.append(("is", [int(code)]))
+        hist_combos.append(("contains", [code]))
+
+        def _try_hist_combo(combo):
+            op, val = combo
+            payload = {
+                "page_size": 500,
+                "sort": '["Submitted on Copy DESC"]',
+                "filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": op, "value": val}]},
+            }
+            try:
+                resp = http_requests.post(hist_url, headers=headers, json=payload, timeout=15).json()
+                if resp.get("code") == 0:
+                    return resp.get("data", {}).get("items", [])
+            except Exception:
+                pass
+            return []
+
+        hist_items = []
+        with ThreadPoolExecutor(max_workers=len(hist_combos)) as executor:
+            for items in executor.map(_try_hist_combo, hist_combos):
+                if items:
+                    hist_items = items
                     break
-                block = hist_resp.get("data", {})
-                for it in block.get("items", []):
-                    rid = it.get("record_id")
-                    if rid and rid not in hist_seen:
-                        hist_seen.add(rid)
-                        hist_items.append(it)
-                hist_page_token = block.get("page_token")
-                if not hist_page_token or not block.get("has_more"):
-                    break
-        except Exception:
-            pass
 
     for r in hist_items:
         hf = r.get("fields", {})
