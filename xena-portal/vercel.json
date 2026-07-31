@@ -1,14 +1,6 @@
 {
-  "buildCommand": "python fetch_data.py",
-  "outputDirectory": "public",
-  "functions": {
-    "api/**/*.py": {
-      "includeFiles": "public/data/**"
-    }
-  },
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
-    { "src": "/data/(.*)", "dest": "/data/$1" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ]
+"routes": [
+{ "src": "/api/(.)", "dest": "/api/index.py" },
+{ "src": "/(.)", "dest": "/index.html" }
+]
 }
