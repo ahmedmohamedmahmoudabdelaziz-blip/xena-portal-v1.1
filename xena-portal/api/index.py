@@ -809,47 +809,11 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     if MOCK_MODE:
         hist_items = MockFeishuDB.generate_requests(50)
     else:
-        # Query Requests (/api/query) never filters the Requests table by "Agency Code" —
-        # it only searches User ID / Numbering / Otherapp ID / NID / Bd Code, and it's
-        # reliably fast. Agency Code is the one field this function filters the Requests
-        # table by, and it behaves badly there (type/lookup-field mismatch, most likely):
-        # a plain single-page fetch silently returns the wrong slice (misses new records),
-        # and turning that into a full page_token loop just means scanning huge swaths of
-        # the *entire* table since the filter isn't actually restricting anything server-
-        # side — very slow, can hang.
-        #
-        # Fix: mirror /api/query's own proven pattern — fire a few candidate filter shapes
-        # for Agency Code CONCURRENTLY (string vs numeric value; "is" vs "contains"), sorted
-        # newest-first, and take whichever comes back with real rows. One round-trip of
-        # wall-clock time, not a sequential scan, and immune to the string/number mismatch.
-        hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-
-        hist_combos = [("is", [code])]
-        if code.isdigit():
-            hist_combos.append(("is", [int(code)]))
-        hist_combos.append(("contains", [code]))
-
-        def _try_hist_combo(combo):
-            op, val = combo
-            payload = {
-                "page_size": 500,
-                "sort": '["Submitted on Copy DESC"]',
-                "filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": op, "value": val}]},
-            }
-            try:
-                resp = http_requests.post(hist_url, headers=headers, json=payload, timeout=15).json()
-                if resp.get("code") == 0:
-                    return resp.get("data", {}).get("items", [])
-            except Exception:
-                pass
-            return []
-
-        hist_items = []
-        with ThreadPoolExecutor(max_workers=len(hist_combos)) as executor:
-            for items in executor.map(_try_hist_combo, hist_combos):
-                if items:
-                    hist_items = items
-                    break
+        try:
+            hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+            hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
+            hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
+        except: hist_items = []
 
     for r in hist_items:
         hf = r.get("fields", {})
@@ -1465,24 +1429,19 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    if MOCK_MODE:
-        all_items = MockFeishuDB.generate_agency("All") * 10
-        fetch_complete, stop_reason = True, ""
+    # Fast static JSON load
+    static_data = load_static_json('points.json')
+    if static_data is not None:
+        all_items = static_data
+        fetch_complete, stop_reason = True, "loaded_from_static_json"
     else:
-        # Prefer the cron-refreshed Redis snapshot (updates every ~30 min) so this
-        # stays live-ish and fast. Fall back to the build-time static JSON (frozen
-        # since the last deploy) only if the snapshot is unavailable, and to a full
-        # live fetch as a last resort.
-        all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
-
-        if not all_items:
-            static_data = load_static_json('points.json')
-            if static_data is not None:
-                all_items = static_data
-                fetch_complete, stop_reason = True, "loaded_from_static_json"
-
-        if not all_items:
+        if MOCK_MODE:
+            all_items = MockFeishuDB.generate_agency("All") * 10
+            fetch_complete, stop_reason = True, ""
+        else:
             all_items, fetch_complete, stop_reason = fetch_points_sharded()
+            if not fetch_complete and not all_items:
+                all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1787,26 +1746,23 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Prefer the cron-refreshed Redis snapshot (updates every ~30 min) so this stays
-    # live-ish and fast. Fall back to the build-time static JSON (frozen since the
-    # last deploy) only if the snapshot is unavailable, and to a full live fetch as
-    # a last resort.
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-
-    if not all_items:
-        static_data = load_static_json('requests.json')
-        if static_data is not None:
-            all_items = static_data
-            master_keys = set()
-            if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-                master_keys = set(all_items[0]["fields"].keys())
-            fetch_complete, stop_reason, from_bg_cache = True, "loaded_from_static_json", False
-
-    if not all_items:
+    # Fast static JSON load
+    static_data = load_static_json('requests.json')
+    if static_data is not None:
+        all_items = static_data
+        master_keys = set()
+        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
+            master_keys = set(all_items[0]["fields"].keys())
+        fetch_complete, stop_reason = True, "loaded_from_static_json"
+        from_bg_cache = False
+    else:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
+
         if not fetch_complete and not all_items:
-            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+            if not fetch_complete and not all_items:
+                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
@@ -1901,26 +1857,23 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # Prefer the cron-refreshed Redis snapshot (updates every ~30 min) so this stays
-    # live-ish and fast. Fall back to the build-time static JSON (frozen since the
-    # last deploy) only if the snapshot is unavailable, and to a full live fetch as
-    # a last resort.
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-
-    if not all_items:
-        static_data = load_static_json('requests.json')
-        if static_data is not None:
-            all_items = static_data
-            master_keys = set()
-            if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-                master_keys = set(all_items[0]["fields"].keys())
-            fetch_complete, stop_reason, from_bg_cache = True, "loaded_from_static_json", False
-
-    if not all_items:
+    # Fast static JSON load
+    static_data = load_static_json('requests.json')
+    if static_data is not None:
+        all_items = static_data
+        master_keys = set()
+        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
+            master_keys = set(all_items[0]["fields"].keys())
+        fetch_complete, stop_reason = True, "loaded_from_static_json"
+        from_bg_cache = False
+    else:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
+
         if not fetch_complete and not all_items:
-            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+            if not fetch_complete and not all_items:
+                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
