@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 
 APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
@@ -12,27 +12,32 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 AUDIT_TABLE_ID = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 
-REQUESTS_FIELDS = [
+# Sets of aliases to guarantee we catch the columns regardless of slight naming variations
+REQUESTS_ALIASES = {
     "Numbering", "Submitted on Copy", "Submitted on", "Created Time", "Date",
-    "Request Type", "Type", "Category", "Status", "Request Status", "Agency Status", "State",
-    "Region", "Agency Region", "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
-    "Agency Type", "Type of Agency", "Closing Reason", "Closing Agencies Reason",
-    "Otherapp Name", "Other App Name", "Other Apps", "Reject Reason", "Rejection Reason",
+    "Request Type", "Request type", "Type", "Category", 
+    "Status", "Request Status", "Agency Status", "State",
+    "Region", "Agency Region", 
+    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
+    "Agency Type", "Type of Agency", 
+    "Closing Reason", "Closing Agencies Reason",
+    "Otherapp Name", "Other App Name", "Other Apps", 
+    "Reject Reason", "Rejection Reason",
     "Create Way", "Creation Type", "Target Type", "Agency Code", "Point Balance",
     "Latest Usage Tracker", "Agency Point Privilege", "Privilege", "Agency Privilege",
     "Counter", "Qty", "Quantities Input", "Respondents", "User ID", "Otherapp ID",
     "Bd Code", "BD Code", "NID Number", "NID", "Audition note", "Audition Note", "Duplicated Check"
-]
+}
 
-POINTS_FIELDS = [
+POINTS_ALIASES = {
     "Agency Code", "Agency Name", "Name", "Region", "Agency Region", 
     "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member", 
     "Base Points", "base_points", "Bonus Points", "Total Points", "# Total Points", "Total",
     "Used Points", "Used", "Point Balance", "Balance"
-]
+}
 
-ACCESS_FIELDS = ["Email", "Person", "Modules", "ACMs", "Regions"]
-AUDIT_FIELDS = ["Timestamp", "Agent", "Action", "Target", "IP Address", "Severity"]
+ACCESS_ALIASES = {"Email", "Person", "Modules", "ACMs", "Regions"}
+AUDIT_ALIASES = {"Timestamp", "Agent", "Action", "Target", "IP Address", "Severity"}
 
 def get_tenant_access_token():
     if not APP_ID or not APP_SECRET:
@@ -46,7 +51,29 @@ def get_tenant_access_token():
         print(f"❌ Failed to get access token: {e}", flush=True)
         return None
 
-def fetch_all_records(table_id, tat, essential_fields=None):
+def get_valid_field_names(table_id, tat, desired_aliases):
+    """Fetches the actual table schema from Feishu and intersections it with our desired aliases."""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/fields"
+    headers = {"Authorization": f"Bearer {tat}"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=15).json()
+        if resp.get("code") == 0:
+            actual_fields = [f.get("field_name") for f in resp.get("data", {}).get("items", [])]
+            valid_projection = [f for f in desired_aliases if f in actual_fields]
+            return valid_projection[:100]  # Feishu limits to 100 fields max
+    except Exception as e:
+        print(f"⚠️ Could not fetch schema for {table_id}: {e}", flush=True)
+    return None
+
+def fetch_all_records(table_id, tat, desired_aliases):
+    # 1. Dynamically get safe field names to project (Prevents 1254045 errors)
+    valid_fields = get_valid_field_names(table_id, tat, desired_aliases)
+    
+    if valid_fields:
+        print(f"  ... Projection active: extracting {len(valid_fields)} essential columns.", flush=True)
+    else:
+        print(f"  ... Schema fetch failed. Will download full fat records.", flush=True)
+        
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
@@ -55,27 +82,16 @@ def fetch_all_records(table_id, tat, essential_fields=None):
     has_more = True
     page_num = 1
     
-    # Store the current projection list so we can turn it off permanently if it fails
-    current_projection = essential_fields
-    
     while has_more:
         payload = {"page_size": 500}
-        if current_projection:
-            payload["field_names"] = current_projection
+        if valid_fields:
+            payload["field_names"] = valid_fields
         if page_token:
             payload["page_token"] = page_token
             
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=30)
             data = resp.json()
-            
-            # If projection fails due to missing columns, turn off projection entirely for this table
-            if data.get("code") == 1254045 and current_projection:
-                print(f"⚠️  Notice: One or more field names not found in {table_id}. Falling back to full download...", flush=True)
-                current_projection = None
-                payload.pop("field_names", None)
-                resp = requests.post(url, headers=headers, json=payload, timeout=30)
-                data = resp.json()
                 
             if data.get("code") != 0:
                 print(f"❌ Error fetching {table_id} (Page {page_num}): {data.get('msg')}", flush=True)
@@ -84,14 +100,14 @@ def fetch_all_records(table_id, tat, essential_fields=None):
             block = data.get("data", {})
             items = block.get("items", [])
             
-            # Minimize record footprint
+            # Minimize record footprint (strip out all internal Feishu metadata)
             for item in items:
                 record = {"record_id": item.get("record_id"), "fields": {}}
                 fields = item.get("fields", {})
                 
-                # We always filter out junk fields in Python, even if Feishu didn't do it for us
-                if essential_fields:
-                    for f in essential_fields:
+                # Keep only fields we explicitly asked for, ignoring nulls
+                if desired_aliases:
+                    for f in desired_aliases:
                         if f in fields and fields[f] is not None:
                             record["fields"][f] = fields[f]
                 else:
@@ -113,8 +129,8 @@ def fetch_all_records(table_id, tat, essential_fields=None):
 
 def main():
     print("==================================================", flush=True)
-    print("🚀 Xena Portal Build Script", flush=True)
-    print(f"🕒 Time: {datetime.utcnow().isoformat()}", flush=True)
+    print("🚀 Xena Portal Build Script (Optimized)", flush=True)
+    print(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}", flush=True)
     
     tat = get_tenant_access_token()
     if not tat:
@@ -125,15 +141,15 @@ def main():
     print(f"📁 Target Output Dir: {output_dir}", flush=True)
     
     tables = [
-        ("requests.json", REQUESTS_TABLE_ID, REQUESTS_FIELDS),
-        ("points.json", POINTS_TABLE_ID, POINTS_FIELDS),
-        ("access.json", ACCESS_TABLE_ID, ACCESS_FIELDS),
-        ("audit.json", AUDIT_TABLE_ID, AUDIT_FIELDS)
+        ("requests.json", REQUESTS_TABLE_ID, REQUESTS_ALIASES),
+        ("points.json", POINTS_TABLE_ID, POINTS_ALIASES),
+        ("access.json", ACCESS_TABLE_ID, ACCESS_ALIASES),
+        ("audit.json", AUDIT_TABLE_ID, AUDIT_ALIASES)
     ]
     
-    for filename, table_id, fields in tables:
+    for filename, table_id, aliases in tables:
         print(f"⏳ Fetching {filename}...", flush=True)
-        records = fetch_all_records(table_id, tat, essential_fields=fields)
+        records = fetch_all_records(table_id, tat, desired_aliases=aliases)
         if records:
             file_path = os.path.join(output_dir, filename)
             with open(file_path, "w", encoding="utf-8") as f:
