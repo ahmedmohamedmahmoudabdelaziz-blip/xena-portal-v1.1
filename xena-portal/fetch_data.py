@@ -69,42 +69,9 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
     valid_fields = get_valid_field_names(table_id, tat, desired_aliases)
     
     base_payload = {"page_size": 500}
-    
     if valid_fields:
         base_payload["field_names"] = valid_fields
         print(f"  ... Projection active: extracting {len(valid_fields)} essential columns.", flush=True)
-        
-        # SMART FILTER: Tell Feishu to ignore the 100,000 completely blank rows
-        filter_field = None
-        if "requests" in filename.lower():
-            # REMOVED "Numbering" because Feishu auto-fills it on blank rows!
-            # Instead, we look for Request Type or Submitted Date.
-            for f in ["Request Type", "Submitted on Copy", "Region"]:
-                if f in valid_fields: 
-                    filter_field = f
-                    break
-        elif "points" in filename.lower():
-            # Use Agency Name or Region instead of Agency Code (just in case Code is also auto-generated)
-            for f in ["Agency Name", "Region", "Acm"]:
-                if f in valid_fields: 
-                    filter_field = f
-                    break
-                    
-        if filter_field:
-            base_payload["filter"] = {
-                "conjunction": "and",
-                "conditions": [
-                    {
-                        "field_name": filter_field,
-                        "operator": "isNotEmpty",
-                        "value": []
-                    }
-                ]
-            }
-            print(f"  ... Anti-Blank Filter ON: Feishu will drop rows where '{filter_field}' is empty.", flush=True)
-            
-    else:
-        print(f"  ... Schema fetch failed. Will download full fat records.", flush=True)
         
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -114,8 +81,10 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
     has_more = True
     page_num = 1
     
+    # GHOST ROW DETECTOR STATE
+    consecutive_ghost_pages = 0
+    
     while has_more:
-        # Create a fresh copy of the payload for this specific page
         payload = dict(base_payload)
         if page_token:
             payload["page_token"] = page_token
@@ -125,31 +94,60 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
             data = resp.json()
                 
             if data.get("code") != 0:
-                print(f"❌ Error fetching {table_id} (Page {page_num}): {data.get('msg')}", flush=True)
+                print(f"❌ Error fetching {table_id}: {data.get('msg')}", flush=True)
                 break
                 
             block = data.get("data", {})
             items = block.get("items", [])
             
-            # Minimize record footprint (strip out all internal Feishu metadata)
+            real_records_on_page = 0
+            
             for item in items:
-                record = {"record_id": item.get("record_id"), "fields": {}}
                 fields = item.get("fields", {})
                 
-                # Keep only fields we explicitly asked for, ignoring nulls
-                if desired_aliases:
-                    for f in desired_aliases:
-                        if f in fields and fields[f] is not None:
-                            record["fields"][f] = fields[f]
-                else:
-                    record["fields"] = fields
+                # A ghost row usually only has an auto-filled Numbering/Agency Code.
+                # We check if there is ANY actual human data in the other columns.
+                is_real = False
+                for key, val in fields.items():
+                    # Ignore fields that Feishu auto-populates on blank spreadsheet rows
+                    if "numbering" in key.lower() or "agency code" in key.lower(): 
+                        continue
                     
-                all_records.append(record)
+                    str_val = str(val).strip()
+                    # If we find actual data, it's a real row!
+                    if str_val and str_val not in ("[]", "{}", "None", "", "0", "0.0"):
+                        is_real = True
+                        break
+                        
+                if is_real:
+                    real_records_on_page += 1
+                    record = {"record_id": item.get("record_id"), "fields": {}}
+                    
+                    # Only save the columns we asked for to keep file size tiny
+                    if desired_aliases:
+                        for f in desired_aliases:
+                            if f in fields and fields[f] is not None:
+                                record["fields"][f] = fields[f]
+                    else:
+                        record["fields"] = fields
+                        
+                    all_records.append(record)
+            
+            ghosts_on_page = len(items) - real_records_on_page
+            print(f"  ... Fetched page {page_num} ({real_records_on_page} real records, {ghosts_on_page} ghost rows)", flush=True)
+            
+            if real_records_on_page == 0 and len(items) > 0:
+                consecutive_ghost_pages += 1
+            else:
+                consecutive_ghost_pages = 0
+                
+            # If we hit 2 pages in a row (1,000 records) of pure blanks, we've hit the bottom of the sheet!
+            if consecutive_ghost_pages >= 2:
+                print(f"  🛑 Detected {consecutive_ghost_pages} pages of pure ghost rows. Bottom of spreadsheet reached! Stopping early.", flush=True)
+                break
                 
             has_more = block.get("has_more", False)
             page_token = block.get("page_token")
-            
-            print(f"  ... Fetched page {page_num} ({len(all_records)} records total)", flush=True)
             page_num += 1
             
         except Exception as e:
@@ -160,7 +158,7 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
 
 def main():
     print("==================================================", flush=True)
-    print("🚀 Xena Portal Build Script (Optimized)", flush=True)
+    print("🚀 Xena Portal Build Script (Ghost-Buster Edition)", flush=True)
     print(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}", flush=True)
     
     tat = get_tenant_access_token()
@@ -180,14 +178,14 @@ def main():
     
     for filename, table_id, aliases in tables:
         print(f"⏳ Fetching {filename}...", flush=True)
-        # Notice we are passing the filename here now so the script knows which filter to apply!
         records = fetch_all_records(table_id, tat, desired_aliases=aliases, filename=filename)
+        
         if records:
             file_path = os.path.join(output_dir, filename)
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(records, f)
             size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            print(f"✅ Saved {filename} ({len(records)} records) - {size_mb:.2f} MB\n", flush=True)
+            print(f"✅ Saved {filename} ({len(records)} real records) - {size_mb:.2f} MB\n", flush=True)
         else:
             print(f"⚠️ No records found for {filename}.\n", flush=True)
             
