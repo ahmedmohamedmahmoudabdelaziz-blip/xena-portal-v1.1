@@ -509,16 +509,13 @@
             </div>
             
             <div class="top-bar-right">
-                <!-- Theme Toggle -->
                 <button class="utility-icon-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">🌙</button>
                 
-                <!-- Language Selector -->
                 <select class="lang-select" id="langSelect" onchange="changeLanguage(this.value)">
                     <option value="en">English</option>
                     <option value="zh">中文</option>
                 </select>
                 
-                <!-- User Profile -->
                 <button class="user-profile-btn" onclick="alert('Profile Settings coming soon!')">
                     <img id="userAvatar" class="user-avatar" alt="User Avatar">
                     <span class="user-name" id="sidebarUsername">Loading…</span>
@@ -526,15 +523,12 @@
             </div>
         </div>
         
-        <!-- Tabs Row -->
         <div class="multi-tab-bar" id="multiTabBar">
-            <!-- Tabs injected by JS -->
         </div>
 
         <input type="hidden" id="queryType" value="points">
 
         <div class="page-content-wrapper">
-            <!-- Content Divs go here -->
             <div id="pg-welcome" style="display:block">
                 <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
                     You do not have access to any modules. Please contact an administrator.
@@ -955,7 +949,6 @@
                         <ul id="insightsList"></ul>
                     </div>
 
-                    <!-- KPI cards -->
                     <div class="kpi-grid">
                         <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
                             <div class="kpi-label">Creations</div>
@@ -1473,7 +1466,6 @@ function renderTabs() {
         tabEl.onclick = () => setActiveTab(page);
         tabEl.dataset.page = page;
 
-        // --- Drag-to-reorder ---
         tabEl.draggable = true;
         tabEl.addEventListener('dragstart', (e) => {
             e.stopPropagation();
@@ -1493,7 +1485,6 @@ function renderTabs() {
         });
         tabEl.addEventListener('drop', (e) => {
             e.preventDefault();
-            // Commit the DOM order (set by dragover) back into openTabs, then re-render.
             openTabs = Array.from(container.children).map(el => el.dataset.page);
             renderTabs();
         });
@@ -1549,7 +1540,6 @@ function executePageLogic(page) {
             if(msgEl){ msgEl.innerHTML=`✅ Using balance auto-filled from last search${code?' ('+escHtml(code)+')':''}. Edit the code above and click "Load Data" to switch agencies.`; msgEl.style.color='var(--accent-green)'; }
             const controlsEl=document.getElementById('allocatorControls');
             if(controlsEl){ controlsEl.style.opacity='1'; controlsEl.style.pointerEvents='auto'; }
-            // Force re-render of caps based on loaded agency
             allocClearAll();
         }
     } else if(page==='admin-agents'){
@@ -1877,7 +1867,6 @@ function addComparePeriodRow(defaultLabel) {
         <button onclick="document.getElementById('${rowId}').remove()" style="background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);color:var(--accent-rose);padding:8px 12px;border-radius:8px;cursor:pointer;height:38px">✕</button>`;
     wrap.appendChild(row);
 
-    // Sensible default ranges for the two built-in presets so "Run" works with zero typing.
     const now = new Date();
     if (defaultLabel === 'This Month') {
         row.querySelector('.cmp-period-from').value = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -1940,7 +1929,6 @@ function renderCompareSummary(groups) {
 }
 
 function renderCompareCharts(groups) {
-    // 1. Grouped bar — KPIs per group
     const barCtx = document.getElementById('cmpAdvBarChart');
     if (charts['cmpAdvBarChart']) charts['cmpAdvBarChart'].destroy();
     charts['cmpAdvBarChart'] = new Chart(barCtx, {
@@ -1954,7 +1942,6 @@ function renderCompareCharts(groups) {
             scales:{ x:{grid:{display:false}}, y:{grid:{color:'#2a2c3f'}} } }
     });
 
-    // 2. Radar — quick shape comparison across 3 normalized metrics
     const radarCtx = document.getElementById('cmpAdvRadarChart');
     if (charts['cmpAdvRadarChart']) charts['cmpAdvRadarChart'].destroy();
     charts['cmpAdvRadarChart'] = new Chart(radarCtx, {
@@ -1969,9 +1956,6 @@ function renderCompareCharts(groups) {
             plugins:{ legend:{position:'bottom',labels:{color:'#8b8fa3'}}, datalabels:{display:false} } }
     });
 
-    // 3. Line — daily creations trend, one line per group, aligned on relative day index
-    // (periods being compared rarely share the same calendar dates, so we plot "day 1, day 2…"
-    // of each group's own range — this is the actual "each one with a different line" trend view).
     const lineCtx = document.getElementById('cmpAdvLineChart');
     if (charts['cmpAdvLineChart']) charts['cmpAdvLineChart'].destroy();
     const maxLen = Math.max(1, ...groups.map(g=>g.daily_trend.length));
@@ -1992,7 +1976,6 @@ function renderCompareCharts(groups) {
             scales:{ x:{grid:{display:false},ticks:{color:'#8b8fa3',maxTicksLimit:12}}, y:{grid:{color:'#2a2c3f'},ticks:{color:'#8b8fa3'}} } }
     });
 
-    // 4. Stacked status mix — Done / Rejected / Under Investigation per group
     const statusCtx = document.getElementById('cmpAdvStatusChart');
     if (charts['cmpAdvStatusChart']) charts['cmpAdvStatusChart'].destroy();
     const statusKeys = ['Done','Rejected','Under Investigation'];
@@ -2529,7 +2512,6 @@ function generateInsights(data) {
     const panel = document.getElementById('insightsPanel');
     const list = document.getElementById('insightsList');
     
-    // Add icon to insights securely via backend output parsing in frontend
     if (insights.length) {
         list.innerHTML = insights.map(i => {
             let icon = '💡';
@@ -2988,17 +2970,17 @@ function buildTargetTimeline() {
     
     tl.innerHTML = history.slice(0, 15).map(req => {
         const statusColor = req.status.toLowerCase().includes('done')?'var(--accent-green)':req.status.toLowerCase().includes('reject')?'var(--accent-rose)':'var(--accent-amber)';
+        const idDisplay = req.accepted_user_ids ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">🔹 IDs: ${escHtml(req.accepted_user_ids)}</div>` : '';
         return `<div class="timeline-item">
             <div class="timeline-dot tl-privilege"></div>
             <div class="timeline-date">${req.date}</div>
             <div class="timeline-title">${escHtml(req.privilege || 'Target Privilege')}</div>
+            ${idDisplay}
             <div class="timeline-sub" style="color:${statusColor}">${escHtml(req.status)}</div>
         </div>`;
     }).join('');
 }
 
-// Authoritative privilege ruleset (kept in sync with the Feishu automation's Smart Allocator).
-// "limit" = monthly cap for normal items, or per-request cap for type:"order" items (banners/splash).
 const pointPriceDB=[
     {key:"trend card",same:40,other:50,limit:10},
     {key:"traffic card",same:30,other:40,limit:50},
@@ -3040,10 +3022,7 @@ function buildAllocatorStatus(status) {
         return true;
     });
 
-    if (!items.length) { 
-    wrap.innerHTML='<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month\'s Usage vs Limits</h4><div style="color:var(--text-muted);font-size:.9rem">No usage recorded yet this month.</div>'; 
-    return; 
-}
+    if (!items.length) { wrap.innerHTML=''; return; }
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month's Usage vs Limits</h4>
         <div style="display:flex;flex-wrap:wrap;gap:10px">`+
         items.map(name=>{
@@ -3082,6 +3061,7 @@ function buildPointsTimeline(history) {
         if (req.privilege) subDetails.push(req.privilege); 
         if (req.target_type) subDetails.push(req.target_type);
         if (req.quantities_input && !req.privilege) subDetails.push(`Qty: ${req.quantities_input}`);
+        if (req.accepted_user_ids) subDetails.push(`IDs: ${req.accepted_user_ids}`);
 
         let titleHtml = `<div class="timeline-title">${escHtml(title)}</div>`;
         if (subDetails.length > 0) {
@@ -3101,17 +3081,14 @@ function buildPointsHistory(history) {
     const wrap=document.getElementById('pointsHistoryWrap');
     if (!wrap) return;
 
-    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
-    if (!pointReqs.length) { 
-    wrap.innerHTML='<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4><div style="color:var(--text-muted);font-size:.9rem">No usage history recorded yet this month.</div>'; 
-    return; 
-}
+    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type||r.accepted_user_ids);
+    if (!pointReqs.length) { wrap.innerHTML=''; return; }
     
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
         pointReqs.map(req=>{
             const status=req.status||'Pending';
             const statusColor=status.toLowerCase().includes('done')?'var(--accent-green)':status.toLowerCase().includes('reject')?'var(--accent-rose)':'var(--accent-amber)';
-            const items=[req.privilege, req.target_type, req.quantities_input?`Qty: ${req.quantities_input}`:''].filter(Boolean);
+            const items=[req.privilege, req.target_type, req.quantities_input?`Qty: ${req.quantities_input}`:'', req.accepted_user_ids?`IDs: ${req.accepted_user_ids}`:''].filter(Boolean);
             return `<div class="stat-box" style="text-align:left;margin-bottom:12px;padding:16px 20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <span style="font-size:.8rem;color:var(--text-muted)">${req.date||'Unknown'}</span>
@@ -3181,11 +3158,6 @@ function findAllocatorLimit(key) {
     return match ? status[match] : null;
 }
 
-// Combines the authoritative client-side ruleset (pointPriceDB) with the server-reported
-// monthly usage (allocator_status, parsed from Feishu's Latest Usage Tracker) to get a
-// real "how many more can this agency get right now" number for ANY privilege — not just
-// trend/traffic card. "order" type items (banners/splash) are capped per-request only,
-// since they don't accumulate a monthly usage count.
 function getEffectiveLimit(privKey) {
     const rule = findPriceRule(privKey);
     if (!rule) return { maxAllowed: 99, used: 0, limit: null, source: 'none' };
@@ -3199,8 +3171,6 @@ function getEffectiveLimit(privKey) {
         return { maxAllowed: Math.max(0, serverInfo.limit - serverInfo.used), used: serverInfo.used, limit: serverInfo.limit, source: 'server' };
     }
 
-    // No server usage data available (agency not loaded, or item untracked) — fall back
-    // to the ruleset's flat monthly ceiling so nothing can silently go uncapped.
     return { maxAllowed: rule.limit, used: 0, limit: rule.limit, source: 'fallback' };
 }
 
@@ -3522,6 +3492,7 @@ async function prFetch(page) {
             const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
             return `<tr style="${rowStyle};border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
                 cols.map(c => {
+                    <!-- ... existing code ... -->
                     let v = r[c];
                     if (c === 'health_score') {
                         const col = v >= 80 ? 'var(--accent-green)' : v >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
@@ -3841,7 +3812,7 @@ function configureSidebarAndCards() {
         allocator: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></svg>`,
         target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
         query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
-        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
+        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
     };
 
     const wc = document.getElementById('welcomeCards');
