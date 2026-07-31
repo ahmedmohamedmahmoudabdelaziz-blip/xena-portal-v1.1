@@ -3040,7 +3040,10 @@ function buildAllocatorStatus(status) {
         return true;
     });
 
-    if (!items.length) { wrap.innerHTML=''; return; }
+    if (!items.length) { 
+    wrap.innerHTML='<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month\'s Usage vs Limits</h4><div style="color:var(--text-muted);font-size:.9rem">No usage recorded yet this month.</div>'; 
+    return; 
+}
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month's Usage vs Limits</h4>
         <div style="display:flex;flex-wrap:wrap;gap:10px">`+
         items.map(name=>{
@@ -3099,7 +3102,10 @@ function buildPointsHistory(history) {
     if (!wrap) return;
 
     const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
-    if (!pointReqs.length) { wrap.innerHTML=''; return; }
+    if (!pointReqs.length) { 
+    wrap.innerHTML='<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4><div style="color:var(--text-muted);font-size:.9rem">No usage history recorded yet this month.</div>'; 
+    return; 
+}
     
     wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
         pointReqs.map(req=>{
