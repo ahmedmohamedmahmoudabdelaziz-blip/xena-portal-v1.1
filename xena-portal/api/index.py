@@ -103,7 +103,19 @@ ORDER_TYPE_LIMITS = {
     "live banner": 5,
     "splash": 10,
 }
-
+def load_static_json(filename):
+    """Load pre-built static JSON from the build step. Tries multiple paths for Vercel."""
+    candidates = [
+        os.path.join(os.path.dirname(__file__), '..', 'public', 'data', filename),
+        os.path.join(os.path.dirname(__file__), 'public', 'data', filename),
+        os.path.join(os.getcwd(), 'public', 'data', filename),
+        os.path.join('public', 'data', filename),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    return None
 # ──────────────────────────────────────────────────────────────────────────────
 # TENANT ACCESS TOKEN CACHE
 # ──────────────────────────────────────────────────────────────────────────────
