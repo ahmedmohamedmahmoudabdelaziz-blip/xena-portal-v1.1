@@ -1,4 +1,4 @@
-import json, os, time, requests
+import json, os, time, requests, shutil
 
 # ── ENVIRONMENT ──
 APP_ID = os.environ.get("LARK_APP_ID")
@@ -10,7 +10,12 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 AUDIT_TABLE_ID = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 
-DATA_DIR = "public/data"
+# ── PATHS ──
+# Get the directory where this script lives (repo root)
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+PUBLIC_DIR = os.path.join(REPO_ROOT, "public")
+DATA_DIR = os.path.join(PUBLIC_DIR, "data")
+
 os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_tenant_access_token():
@@ -30,12 +35,11 @@ def fetch_all_records(table_id, label):
     items = []
     page_token = None
     start_time = time.time()
-    max_time = 120  # 2 minutes safety cap
+    max_time = 120
 
-    # Sort by Numbering DESC for requests table
     sort_payload = '["Numbering DESC"]' if table_id == REQUESTS_TABLE_ID else None
 
-    for _ in range(200):  # Hard cap at 100k rows
+    for _ in range(200):
         if time.time() - start_time > max_time:
             print(f"⚠️ {label}: safety timeout reached")
             break
@@ -50,7 +54,6 @@ def fetch_all_records(table_id, label):
             resp = session.get(url, params=params, timeout=15)
             data = resp.json()
 
-            # Self-heal sort errors
             if data.get("code") in (1254045, 1254402) and sort_payload:
                 sort_payload = None
                 params.pop("sort", None)
@@ -72,7 +75,6 @@ def fetch_all_records(table_id, label):
             print(f"❌ {label}: Exception: {e}")
             break
 
-    # Deduplicate
     seen, unique = set(), []
     for it in items:
         rid = it.get("record_id")
@@ -86,28 +88,49 @@ def save_json(filename, data):
     path = os.path.join(DATA_DIR, filename)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"✅ Saved {filename} ({len(data)} records) → {path}")
+    print(f"✅ Saved {filename} ({len(data)} records)")
+
+def copy_static_files():
+    """Copy index.html and any assets into public/ so Vercel can serve them."""
+    # Copy index.html
+    src_index = os.path.join(REPO_ROOT, "index.html")
+    dst_index = os.path.join(PUBLIC_DIR, "index.html")
+    
+    if os.path.exists(src_index):
+        shutil.copy2(src_index, dst_index)
+        print(f"✅ Copied index.html → public/")
+    else:
+        print(f"⚠️ index.html not found at {src_index}")
+        # Create a basic placeholder so the site doesn't 404
+        with open(dst_index, "w", encoding="utf-8") as f:
+            f.write("<!DOCTYPE html><html><body><h1>Xena Portal</h1><p>Loading...</p></body></html>")
+        print(f"⚠️ Created placeholder index.html")
+
+    # Copy common asset folders if they exist
+    for folder in ["assets", "css", "js", "images", "img", "fonts"]:
+        src = os.path.join(REPO_ROOT, folder)
+        dst = os.path.join(PUBLIC_DIR, folder)
+        if os.path.exists(src):
+            if os.path.exists(dst):
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
+            print(f"✅ Copied {folder}/ → public/{folder}/")
 
 if __name__ == "__main__":
+    # 1. Copy static files FIRST
+    copy_static_files()
+
+    # 2. Fetch Feishu data
     if not APP_ID or not APP_SECRET:
-        print("⚠️ LARK_APP_ID or LARK_APP_SECRET not set. Writing empty files.")
-        save_json("requests.json", [])
-        save_json("points.json", [])
-        save_json("access.json", [])
-        save_json("audit.json", [])
+        print("⚠️ LARK_APP_ID or LARK_APP_SECRET not set. Writing empty data files.")
+        for name in ["requests.json", "points.json", "access.json", "audit.json"]:
+            save_json(name, [])
     else:
         print("🔌 Fetching from Feishu/Lark Base...")
+        save_json("requests.json", fetch_all_records(REQUESTS_TABLE_ID, "Requests"))
+        save_json("points.json",  fetch_all_records(POINTS_TABLE_ID,  "Points"))
+        save_json("access.json",  fetch_all_records(ACCESS_TABLE_ID,  "Access"))
+        save_json("audit.json",   fetch_all_records(AUDIT_TABLE_ID,   "Audit"))
 
-        requests_data = fetch_all_records(REQUESTS_TABLE_ID, "Requests")
-        save_json("requests.json", requests_data)
-
-        points_data = fetch_all_records(POINTS_TABLE_ID, "Points")
-        save_json("points.json", points_data)
-
-        access_data = fetch_all_records(ACCESS_TABLE_ID, "Access")
-        save_json("access.json", access_data)
-
-        audit_data = fetch_all_records(AUDIT_TABLE_ID, "Audit")
-        save_json("audit.json", audit_data)
-
-    print("🎉 Build-time data fetch complete!")
+    print("🎉 Build complete!")
+    print(f"📁 public/ contents: {os.listdir(PUBLIC_DIR)}")
