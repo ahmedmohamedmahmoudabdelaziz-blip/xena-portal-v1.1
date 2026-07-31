@@ -103,16 +103,15 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     session.headers.update({"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
     
     actual_fields = get_table_schema(table_id, token, base_id)
-    valid_fields = [f for f in config["aliases"] if f in actual_fields][:100]
-    
-    api_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/records/search"
-    
-    # automatic_fields: False drops all the bloat (creator avatars, emails, metadata)
-    base_payload = {"page_size": 500, "automatic_fields": False}
+    valid_fields = set([f for f in config["aliases"] if f in actual_fields])
     
     if valid_fields:
-        base_payload["field_names"] = valid_fields
-        log(f"   ... Projection active: limiting to {len(valid_fields)} columns.")
+        log(f"   ... Python-side Projection active: limiting to {len(valid_fields)} columns to save RAM.")
+    else:
+        log(f"   ⚠️ Schema fetch failed or no matching columns. Falling back to downloading all columns.")
+    
+    # WE RETURN TO THE GET ENDPOINT (Flawless Pagination!)
+    api_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/records"
     
     items = []
     page_token = None
@@ -120,16 +119,16 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     page_num = 1
     consecutive_empty_pages = 0
     
-    for _ in range(250):
-        if time.time() - start > 120:
-            log(f"   ⏱️ {label}: timeout reached (120s)")
+    for _ in range(500):
+        if time.time() - start > 240:
+            log(f"   ⏱️ {label}: timeout reached (240s)")
             break
             
-        payload = dict(base_payload)
+        params = {"page_size": 500}
         if page_token:
-            payload["page_token"] = page_token
+            params["page_token"] = page_token
             
-        resp = session.post(api_url, json=payload, timeout=20)
+        resp = session.get(api_url, params=params, timeout=20)
         data = resp.json()
         
         if data.get("code") != 0:
@@ -142,9 +141,18 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
         real_records_on_page = 0
         for it in page_items:
             fields = it.get("fields", {})
+            
+            # 1. Check if it is a Ghost Row
             if not is_ghost_row(fields, config["human_keys"]):
                 real_records_on_page += 1
-                items.append({"record_id": it.get("record_id"), "fields": fields})
+                
+                # 2. Project the row in Python (Drops junk columns immediately)
+                if valid_fields:
+                    projected = {k: v for k, v in fields.items() if k in valid_fields}
+                else:
+                    projected = fields
+                    
+                items.append({"record_id": it.get("record_id"), "fields": projected})
                 
         ghosts_on_page = len(page_items) - real_records_on_page
         log(f"   ... Fetched page {page_num} ({real_records_on_page} real records, {ghosts_on_page} ghost rows)")
@@ -164,6 +172,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
             
         page_num += 1
 
+    # Deduplicate (just in case)
     seen = set()
     unique = []
     for it in items:
@@ -179,7 +188,6 @@ TABLES = [
         "id": "tblFMYa3dP3Ciu0V",
         "filename": "requests.json",
         "label": "Requests",
-        # If none of these exist, it's IMPOSSIBLE for it to be a real request.
         "human_keys": ["Agency Code", "User ID", "Bd Code", "BD Code", "NID Number", "NID", "Respondents", "Otherapp ID", "Otherapp Name", "Other App Name", "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member"],
         "aliases": [
             "Numbering", "Submitted on Copy", "Submitted on", "Created Time", "Date",
@@ -227,7 +235,7 @@ TABLES = [
 
 def main():
     log("=" * 50)
-    log("🚀 Xena Portal Build Script (Infallible Strict Whitelist)")
+    log("🚀 Xena Portal Build Script (The Final Ghost-Buster)")
     log(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}")
     log("=" * 50)
     
