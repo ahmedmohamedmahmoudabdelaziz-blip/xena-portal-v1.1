@@ -77,12 +77,15 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
         # SMART FILTER: Tell Feishu to ignore the 100,000 completely blank rows
         filter_field = None
         if "requests" in filename.lower():
-            for f in ["Numbering", "Submitted on Copy", "Request Type"]:
+            # REMOVED "Numbering" because Feishu auto-fills it on blank rows!
+            # Instead, we look for Request Type or Submitted Date.
+            for f in ["Request Type", "Submitted on Copy", "Region"]:
                 if f in valid_fields: 
                     filter_field = f
                     break
         elif "points" in filename.lower():
-            for f in ["Agency Code", "Agency Name"]:
+            # Use Agency Name or Region instead of Agency Code (just in case Code is also auto-generated)
+            for f in ["Agency Name", "Region", "Acm"]:
                 if f in valid_fields: 
                     filter_field = f
                     break
