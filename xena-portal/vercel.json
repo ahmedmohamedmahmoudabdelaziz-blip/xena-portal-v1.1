@@ -1,9 +1,6 @@
 {
   "buildCommand": "pip install -r requirements.txt && python fetch_data.py",
   "outputDirectory": "public",
-  "builds": [
-    { "src": "api/index.py", "use": "@vercel/python" }
-  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/data/(.*)", "dest": "/data/$1" },
