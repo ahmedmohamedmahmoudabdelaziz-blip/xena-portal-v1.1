@@ -809,11 +809,38 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     if MOCK_MODE:
         hist_items = MockFeishuDB.generate_requests(50)
     else:
+        # NOTE: this used to reuse `points_payload` as-is, with no "page_size" and no
+        # page_token loop. Feishu then silently falls back to its small default page
+        # (unpaginated, unsorted) — so once an agency accumulates more request-history
+        # rows than that single page holds, the newest submissions (e.g. today's) can
+        # fall outside the one page fetched and simply never appear in the Activity
+        # Timeline / Target claim counts, even though the record genuinely exists.
+        # Fix: explicit page_size + full page_token pagination, same pattern used
+        # everywhere else in this file (fetch_feishu_records, _fetch_bitable_shard, ...).
+        hist_items, hist_seen, hist_page_token = [], set(), None
+        hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
         try:
-            hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-            hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
-            hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
-        except: hist_items = []
+            for _ in range(50):
+                hist_payload = {
+                    "page_size": 500,
+                    "filter": points_payload["filter"],
+                }
+                if hist_page_token:
+                    hist_payload["page_token"] = hist_page_token
+                hist_resp = http_requests.post(hist_url, headers=headers, json=hist_payload, timeout=30).json()
+                if hist_resp.get("code") != 0:
+                    break
+                block = hist_resp.get("data", {})
+                for it in block.get("items", []):
+                    rid = it.get("record_id")
+                    if rid and rid not in hist_seen:
+                        hist_seen.add(rid)
+                        hist_items.append(it)
+                hist_page_token = block.get("page_token")
+                if not hist_page_token or not block.get("has_more"):
+                    break
+        except Exception:
+            pass
 
     for r in hist_items:
         hf = r.get("fields", {})
