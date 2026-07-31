@@ -1,6 +1,5 @@
 import json, os, time, requests, shutil
 
-# ── ENVIRONMENT ──
 APP_ID = os.environ.get("LARK_APP_ID")
 APP_SECRET = os.environ.get("LARK_APP_SECRET")
 
@@ -10,8 +9,6 @@ POINTS_TABLE_ID = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID = "tbl3wweYCpmDmDSx"
 AUDIT_TABLE_ID = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 
-# ── PATHS ──
-# Get the directory where this script lives (repo root)
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(REPO_ROOT, "public")
 DATA_DIR = os.path.join(PUBLIC_DIR, "data")
@@ -45,10 +42,8 @@ def fetch_all_records(table_id, label):
             break
 
         params = {"page_size": 500, "automatic_fields": "true"}
-        if sort_payload:
-            params["sort"] = sort_payload
-        if page_token:
-            params["page_token"] = page_token
+        if sort_payload: params["sort"] = sort_payload
+        if page_token: params["page_token"] = page_token
 
         try:
             resp = session.get(url, params=params, timeout=15)
@@ -91,8 +86,6 @@ def save_json(filename, data):
     print(f"✅ Saved {filename} ({len(data)} records)")
 
 def copy_static_files():
-    """Copy index.html and any assets into public/ so Vercel can serve them."""
-    # Copy index.html
     src_index = os.path.join(REPO_ROOT, "index.html")
     dst_index = os.path.join(PUBLIC_DIR, "index.html")
     
@@ -101,26 +94,21 @@ def copy_static_files():
         print(f"✅ Copied index.html → public/")
     else:
         print(f"⚠️ index.html not found at {src_index}")
-        # Create a basic placeholder so the site doesn't 404
         with open(dst_index, "w", encoding="utf-8") as f:
             f.write("<!DOCTYPE html><html><body><h1>Xena Portal</h1><p>Loading...</p></body></html>")
         print(f"⚠️ Created placeholder index.html")
 
-    # Copy common asset folders if they exist
     for folder in ["assets", "css", "js", "images", "img", "fonts"]:
         src = os.path.join(REPO_ROOT, folder)
         dst = os.path.join(PUBLIC_DIR, folder)
         if os.path.exists(src):
-            if os.path.exists(dst):
-                shutil.rmtree(dst)
+            if os.path.exists(dst): shutil.rmtree(dst)
             shutil.copytree(src, dst)
             print(f"✅ Copied {folder}/ → public/{folder}/")
 
 if __name__ == "__main__":
-    # 1. Copy static files FIRST
     copy_static_files()
 
-    # 2. Fetch Feishu data
     if not APP_ID or not APP_SECRET:
         print("⚠️ LARK_APP_ID or LARK_APP_SECRET not set. Writing empty data files.")
         for name in ["requests.json", "points.json", "access.json", "audit.json"]:
