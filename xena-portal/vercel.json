@@ -1,14 +1,15 @@
 {
-"buildCommand": "python fetch_data.py",
-"outputDirectory": "public",
-"functions": {
-"api//*.py": {
-"includeFiles": "public/data/"
-}
-},
-"routes": [
-{ "src": "/api/(.)", "dest": "/api/index.py" },
-{ "src": "/data/(.)", "dest": "/data/$1" },
-{ "src": "/(.*)", "dest": "/$1" }
-]
+  "version": 2,
+  "buildCommand": "pip install -r requirements.txt",
+  "outputDirectory": "public",
+  "functions": {
+    "app.py": {
+      "includeFiles": "public/data/**"
+    }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/app.py" },
+    { "src": "/data/(.*)", "dest": "/data/$1" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
 }
