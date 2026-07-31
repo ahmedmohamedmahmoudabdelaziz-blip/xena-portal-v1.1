@@ -92,24 +92,45 @@ ORDER_TYPE_LIMITS = {
 # ──────────────────────────────────────────────────────────────────────────────
 # STATIC JSON FALLBACK LOADER
 # ──────────────────────────────────────────────────────────────────────────────
+_static_cache = {}
+
 def load_static_json(filename):
-    """Load pre-built static JSON from the build step. Tries multiple paths for Vercel."""
+    """Load pre-built static JSON. Tries memory, local disk, then Vercel CDN."""
+    # 1. RAM Cache: Crucial because requests.json is 137MB. Prevents parsing on every click.
+    if filename in _static_cache:
+        return _static_cache[filename]
+        
     import json, os
+    # 2. Local disk (Now possible because of "includeFiles" in vercel.json)
     candidates = [
         os.path.join(os.path.dirname(__file__), '..', 'public', 'data', filename),
         os.path.join(os.path.dirname(__file__), 'public', 'data', filename),
         os.path.join(os.getcwd(), 'public', 'data', filename),
-        os.path.join('public', 'data', filename),
     ]
     for path in candidates:
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    _static_cache[filename] = data
+                    return data
             except Exception:
                 pass
+                
+    # 3. Vercel Serverless CDN Fallback (If file isn't bundled on disk correctly)
+    try:
+        from flask import request
+        if request and request.host_url:
+            url = f"{request.host_url.rstrip('/')}/data/{filename}"
+            resp = http_requests.get(url, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                _static_cache[filename] = data
+                return data
+    except Exception as e:
+        logger.warn("static_json_http_fail", filename=filename, error=str(e))
+        
     return None
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TENANT ACCESS TOKEN CACHE
