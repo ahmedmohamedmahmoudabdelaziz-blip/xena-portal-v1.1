@@ -1,17 +1,5 @@
 """
 Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Combines the speed of v2.0 (Token Caching, Normalized Analytics, Session Re-use)
-with the bulletproof parsing of v1.1 (Fuzzy Aliases, Deep JSON Extraction, Health Score).
-Includes concurrent ThreadPoolExecutor for 2x faster Analytics processing.
-
-Enterprise Updates:
-- Static JSON Fallback for zero-latency lookups on Vercel
-- Omnipresent Audit Logging (/api/audit/log-action)
-- Executive Insights Engine for C-Suite summaries
-- Robust RBAC enforced at endpoint level
-- Feishu DB Simulation (Mock Mode) for local dev/testing
-- Official Lark Avatar fetching
 """
 
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
@@ -22,20 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_file, redirect
 import requests as http_requests
 
-# ──────────────────────────────────────────────────────────────────────────────
-# CENTRALISED CONFIGURATION & ENV
-# ──────────────────────────────────────────────────────────────────────────────
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
 
-# Persistent snapshot store (Upstash Redis REST API).
 UPSTASH_REDIS_REST_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
 UPSTASH_REDIS_REST_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
 REDIS_ENABLED = bool(UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN)
-REDIS_MAX_VALUE_BYTES = 900_000  # stay under Upstash's ~1MB REST payload ceiling
+REDIS_MAX_VALUE_BYTES = 900_000
 
-# If no APP_ID is found, the system will automatically fall back to the realistic DB Simulation.
 MOCK_MODE = not bool(APP_ID and APP_SECRET)
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -59,7 +42,6 @@ RATE_LIMIT_RECORDS   = (50, 60)
 
 COINS_MULTIPLIER = 100000
 
-# Universal Query — maps a frontend "search by" key to the real Feishu column name(s)
 QUERY_FIELD_ALIASES = {
     "user_id":     ["User ID"],
     "numbering":   ["Numbering"],
@@ -69,43 +51,28 @@ QUERY_FIELD_ALIASES = {
 }
 
 MONTHLY_ALLOCATOR_LIMITS = {
-    "trend card": 10,
-    "traffic card": 50,
-    "30 mic 15 days": 999,
-    "30 mic 30 days": 999,
-    "normal short id ( 2 levels above ) 15 days": 999,
-    "normal short id ( 2 levels above ) 30 days": 999,
-    "customized short id 15 days": 999,
-    "customized short id 30 days": 999,
-    "room pin-up": 999,
-    "welcome package 3": 15,
-    "welcome package 2": 50,
+    "trend card": 10, "traffic card": 50, "30 mic 15 days": 999, "30 mic 30 days": 999,
+    "normal short id ( 2 levels above ) 15 days": 999, "normal short id ( 2 levels above ) 30 days": 999,
+    "customized short id 15 days": 999, "customized short id 30 days": 999,
+    "room pin-up": 999, "welcome package 3": 15, "welcome package 2": 50,
 }
-# "Order" type privileges (banners, splash) are capped PER REQUEST, not monthly
 ORDER_TYPE_LIMITS = {
-    "main page banner": 3,
-    "news banner": 5,
-    "live banner": 5,
-    "splash": 10,
+    "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# STATIC JSON FALLBACK LOADER
-# ──────────────────────────────────────────────────────────────────────────────
 _static_cache = {}
 
 def load_static_json(filename):
     """Load pre-built static JSON. Tries memory, local disk, then Vercel CDN."""
-    # 1. RAM Cache: Crucial because requests.json is 137MB. Prevents parsing on every click.
     if filename in _static_cache:
         return _static_cache[filename]
         
     import json, os
-    # 2. Local disk (Now possible because of "includeFiles" in vercel.json)
     candidates = [
         os.path.join(os.path.dirname(__file__), '..', 'public', 'data', filename),
         os.path.join(os.path.dirname(__file__), 'public', 'data', filename),
         os.path.join(os.getcwd(), 'public', 'data', filename),
+        os.path.join('public', 'data', filename),
     ]
     for path in candidates:
         if os.path.exists(path):
@@ -117,7 +84,6 @@ def load_static_json(filename):
             except Exception:
                 pass
                 
-    # 3. Vercel Serverless CDN Fallback (If file isn't bundled on disk correctly)
     try:
         from flask import request
         if request and request.host_url:
@@ -132,14 +98,10 @@ def load_static_json(filename):
         
     return None
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TENANT ACCESS TOKEN CACHE
-# ──────────────────────────────────────────────────────────────────────────────
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
 def get_tenant_access_token():
     if MOCK_MODE: return "mock_tenant_token_12345"
-    
     with _token_cache["lock"]:
         if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
             return _token_cache["token"]
@@ -152,12 +114,8 @@ def get_tenant_access_token():
     with _token_cache["lock"]:
         _token_cache["token"] = token
         _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
-
     return token
 
-# ──────────────────────────────────────────────────────────────────────────────
-# STRUCTURED LOGGING
-# ──────────────────────────────────────────────────────────────────────────────
 class StructuredLogger:
     def __init__(self, name):
         self._log = logging.getLogger(name)
@@ -188,11 +146,7 @@ def mask_name(name):
     parts = name.strip().split()
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# PERSISTENT SNAPSHOT STORE (UPSTASH REDIS REST) — survives cold starts
-# ──────────────────────────────────────────────────────────────────────────────
 def redis_cmd(*args, timeout=8):
-    """Fire a single Redis command via Upstash's REST API. Returns the 'result' field, or None."""
     if not REDIS_ENABLED: return None
     try:
         resp = http_requests.post(
@@ -224,9 +178,6 @@ def redis_set_json(key, value, ttl=None):
     else:   redis_cmd("SET", key, payload)
     return True
 
-# ──────────────────────────────────────────────────────────────────────────────
-# IN-MEMORY CACHE WITH TTL
-# ──────────────────────────────────────────────────────────────────────────────
 _cache: dict = {}
 _cache_lock = threading.Lock()
 
@@ -253,9 +204,6 @@ def cache_invalidate(prefix=""):
         for k in keys:
             del _cache[k]
 
-# ──────────────────────────────────────────────────────────────────────────────
-# RATE LIMITER & INPUT SANITISATION
-# ──────────────────────────────────────────────────────────────────────────────
 _rate_store: dict = defaultdict(list)
 _rate_lock = threading.Lock()
 
@@ -295,9 +243,6 @@ def parse_float_safe(val):
     try: return float(str(val).replace(',', '').strip())
     except (ValueError, TypeError): return 0.0
 
-# ──────────────────────────────────────────────────────────────────────────────
-# AUDIT LOGGER (Omnipresent)
-# ──────────────────────────────────────────────────────────────────────────────
 class AuditLogger:
     def __init__(self):
         self._queue = []
@@ -339,11 +284,7 @@ class AuditLogger:
 
 audit = AuditLogger()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# REALISTIC FEISHU DB SIMULATION (MOCK ENGINE)
-# ──────────────────────────────────────────────────────────────────────────────
 class MockFeishuDB:
-    """Generates highly realistic Feishu records if API keys are missing (Local/Test Mode)."""
     @staticmethod
     def generate_requests(limit=500):
         items = []
@@ -396,9 +337,6 @@ class MockFeishuDB:
             }
         }]
 
-# ──────────────────────────────────────────────────────────────────────────────
-# BATTLE-TESTED PARSERS 
-# ──────────────────────────────────────────────────────────────────────────────
 def normalize_key(k):
     return " ".join(str(k).lower().strip().split())
 
@@ -550,6 +488,22 @@ def get_user_permissions(email, name):
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
     if cached: return cached
+    
+    # Try fetching from static JSON first
+    static_access = load_static_json("access.json")
+    if static_access is not None:
+        for item in static_access:
+            fields = item.get("fields", {})
+            db_email = extract_field_text(fields.get("Email", "")).lower().strip()
+            db_person = extract_field_text(fields.get("Person", "")).lower().strip()
+            
+            if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
+                modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
+                parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
+                parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
+                result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
+                cache_set(cache_key, result, ttl=300)
+                return result
 
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
@@ -574,11 +528,7 @@ def get_user_permissions(email, name):
     fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
     return fallback
 
-# ──────────────────────────────────────────────────────────────────────────────
-# EXECUTIVE INSIGHTS ENGINE
-# ──────────────────────────────────────────────────────────────────────────────
 def generate_executive_insights(stats, cmp_stats=None):
-    """Calculates C-Suite level text summaries from analytics payload."""
     insights = []
     
     kpis = stats.get("kpis", {})
@@ -586,7 +536,6 @@ def generate_executive_insights(stats, cmp_stats=None):
     bds = kpis.get("bds", 0)
     closings = kpis.get("closings", 0)
 
-    # 1. Pipeline Velocity Insight
     if creations > 0 and bds > 0:
         ratio = creations / bds
         if ratio > 2.5:
@@ -594,19 +543,16 @@ def generate_executive_insights(stats, cmp_stats=None):
         else:
             insights.append(f"Pipeline Analysis: Creation-to-BD ratio is {ratio:.1f}x, suggesting a BD-reliant growth strategy this period.")
 
-    # 2. Conversion/Closing Insight
     if creations > 0 and closings > 0:
         eff = (closings / creations) * 100
         insights.append(f"Closing Efficiency: Converting at {eff:.1f}% relative to new creations.")
 
-    # 3. Top Performer Insight
     acm_perf = stats.get("acm_performance", {})
     if acm_perf:
         top_acm = max(acm_perf, key=acm_perf.get)
         share = (acm_perf[top_acm] / creations * 100) if creations > 0 else 0
         insights.append(f"Leadership: {top_acm} is driving {share:.1f}% of total volume, establishing a strong regional benchmark.")
 
-    # 4. Comparative Delta Insight
     if cmp_stats:
         prev_creations = cmp_stats.get("kpis", {}).get("creations", 0)
         if prev_creations > 0:
@@ -616,9 +562,6 @@ def generate_executive_insights(stats, cmp_stats=None):
 
     return insights
 
-# ──────────────────────────────────────────────────────────────────────────────
-# HIGH-SPEED SESSION FETCHING
-# ──────────────────────────────────────────────────────────────────────────────
 def fetch_feishu_records(table_id, from_dt=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
@@ -685,9 +628,6 @@ def fetch_feishu_records(table_id, from_dt=None):
 
     return all_items, master_keys, fetch_complete, stop_reason
 
-# ──────────────────────────────────────────────────────────────────────────────
-# LIVE PARALLEL / SHARDED FETCH ENGINE
-# ──────────────────────────────────────────────────────────────────────────────
 REQUESTS_ANALYTICS_FIELDS = [
     "Numbering", "Submitted on Copy", "Request Type", "Status", "Region",
     "Acm Name (PK)", "Acm Name (IN)", "Acm", "Agency Type",
@@ -835,9 +775,6 @@ def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
     logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
     return items, complete, reason
 
-# ──────────────────────────────────────────────────────────────────────────────
-# AGENCY SEARCH DUAL ENGINE
-# ──────────────────────────────────────────────────────────────────────────────
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
         all_records = MockFeishuDB.generate_agency(code)
@@ -991,9 +928,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "requests": [r.get("fields", {}) for r in all_records]
         }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# NORMALISED FIELD MAP (ANALYTICS LOOP OPTIMIZATION)
-# ──────────────────────────────────────────────────────────────────────────────
 def _build_field_map_safe(item: dict) -> dict:
     fields = item.get("fields", {})
     raw_date   = get_field_local(fields,"Submitted on Copy","Submitted on","Created Time")
@@ -1142,9 +1076,6 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
     return stats
 
-# ──────────────────────────────────────────────────────────────────────────────
-# FLASK APP & BACKGROUND CACHE LOOP
-# ──────────────────────────────────────────────────────────────────────────────
 BACKGROUND_SYNC_INTERVAL = 180   
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
@@ -1219,9 +1150,6 @@ def get_requests_table_snapshot(from_dt=None):
 
     return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt) + (False,)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# POINTS TABLE SNAPSHOT
-# ──────────────────────────────────────────────────────────────────────────────
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
 _bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
 _bg_points_lock = threading.Lock()
@@ -1324,7 +1252,6 @@ def callback():
         
         lark_name  = user_data.get("name", "Unknown User")
         lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
-        
         avatar_url = user_data.get("avatar_72") or user_data.get("avatar_url") or ""
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
@@ -1521,6 +1448,7 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
+    # Try static JSON first!
     static_data = load_static_json('points.json')
     if static_data is not None:
         all_items = static_data
@@ -1532,7 +1460,6 @@ def points_records():
         else:
             all_items, fetch_complete, stop_reason = fetch_points_sharded()
             if not fetch_complete and not all_items:
-                # Live sharded fetch failed outright — last-resort availability fallback only.
                 all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
@@ -1621,7 +1548,6 @@ def points_records():
 
 @app.route('/api/audit/log-action', methods=['POST'])
 def client_audit_log_action():
-    """Enterprise API: Secure Omnipresent Client Logger"""
     data = request.json or {}
     user = sanitize_text(data.get('user', ''))
     email = sanitize_text(data.get('email', ''))
@@ -1694,6 +1620,7 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
+    # Try static JSON first!
     static_data = load_static_json('requests.json')
     if static_data is not None:
         all_items = static_data
@@ -1738,7 +1665,7 @@ def query_records():
                     results_by_combo[res["combo"]] = res
 
             all_items, fetch_complete, stop_reason, success = [], False, "", False
-            for combo in combos:  # walk in priority order, take the first success
+            for combo in combos:
                 res = results_by_combo.get(combo)
                 if res and res.get("ok"):
                     all_items, success, fetch_complete = res["items"], True, True
@@ -1749,6 +1676,30 @@ def query_records():
             if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
 
     results = []
+    
+    # Process memory results to find matches when loading from static file
+    if static_data is not None:
+        filtered_items = []
+        val_lower = str(value).lower()
+        aliases = [a.lower() for a in QUERY_FIELD_ALIASES[field]]
+        
+        for item in all_items:
+            fields_obj = item.get("fields", {})
+            for alias in aliases:
+                # Find matching field keys case-insensitively
+                actual_keys = [k for k in fields_obj.keys() if k.lower() == alias or k.lower().replace(" ", "") == alias.replace(" ", "")]
+                found = False
+                for k in actual_keys:
+                    field_val = extract_field_text(fields_obj[k]).lower()
+                    # Apply contains logic which mimics Feishu's fuzzy search
+                    if val_lower in field_val:
+                        filtered_items.append(item)
+                        found = True
+                        break
+                if found:
+                    break
+        all_items = filtered_items
+
     for item in all_items:
         fields = item.get("fields", {})
         
@@ -1790,7 +1741,7 @@ def query_records():
     return jsonify({
         "results": results, "count": len(results), "field": field, "value": value,
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": False
+        "served_from_background_cache": static_data is not None
     })
 
 @app.route('/api/analytics', methods=['GET', 'POST'])
@@ -1809,7 +1760,6 @@ def analytics():
     to_s   = sanitize_text(body.get('to',''))
     cmp_from = sanitize_text(body.get('compare_from',''))
     cmp_to   = sanitize_text(body.get('compare_to',''))
-    nocache  = body.get('nocache',False)
     ip       = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     audit.log(user, "GENERATE_ANALYTICS", f"R:{region}|ACM:{acm}", ip=ip, severity="Info")
@@ -1843,6 +1793,7 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
+    # Try static JSON first!
     static_data = load_static_json('requests.json')
     if static_data is not None:
         all_items = static_data
@@ -1887,35 +1838,6 @@ def analytics():
     stats["cache_hit"]   = False  
 
     return jsonify(stats)
-
-def _shape_compare_group(label, stats):
-    kpis = stats.get("kpis", {})
-    creations, bds, closings = kpis.get("creations", 0), kpis.get("bds", 0), kpis.get("closings", 0)
-    closing_eff = round((closings / creations) * 100, 1) if creations else 0.0
-
-    status_mix = defaultdict(int)
-    for bucket in ("creation_status", "bd_status", "closing_status"):
-        for k, v in stats.get(bucket, {}).items():
-            status_mix[k] += v
-
-    dates = sorted(set(stats.get("daily_trend_creation", {})) | set(stats.get("daily_trend_bd", {})) | set(stats.get("daily_trend_closing", {})))
-    daily_trend = [{
-        "date": d,
-        "creations": stats.get("daily_trend_creation", {}).get(d, 0),
-        "bds":       stats.get("daily_trend_bd", {}).get(d, 0),
-        "closings":  stats.get("daily_trend_closing", {}).get(d, 0),
-    } for d in dates]
-
-    return {
-        "label": label,
-        "kpis": {"creations": creations, "bds": bds, "closings": closings},
-        "closing_efficiency_pct": closing_eff,
-        "status_mix": dict(status_mix),
-        "daily_trend": daily_trend,
-        "top_reject_reasons": dict(list(stats.get("reject_reasons", {}).items())[:5]),
-        "acm_performance": dict(list(stats.get("acm_performance", {}).items())[:8]),
-        "scanned_rows": stats.get("scanned_rows", 0),
-    }
 
 @app.route('/api/compare', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
@@ -1982,6 +1904,7 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
+    # Try static JSON first!
     static_data = load_static_json('requests.json')
     if static_data is not None:
         all_items = static_data
@@ -2043,7 +1966,8 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
-        "mock_mode_active": MOCK_MODE
+        "mock_mode_active": MOCK_MODE,
+        "static_files_cached_in_ram": list(_static_cache.keys())
     })
 
 ensure_background_sync_started()
