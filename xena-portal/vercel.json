@@ -1,15 +1,15 @@
 {
   "version": 2,
-  "buildCommand": "uv pip install -r requirements.txt",
-  "outputDirectory": "public",
-  "functions": {
-    "api/index.py": {
-      "includeFiles": "public/data/**"
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
-  },
+  ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
-    { "src": "/data/(.*)", "dest": "/data/$1" },
-    { "src": "/(.*)", "dest": "/$1" }
+    {
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    }
   ]
 }
