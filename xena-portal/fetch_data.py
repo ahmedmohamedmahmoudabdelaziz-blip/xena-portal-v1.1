@@ -65,10 +65,49 @@ def get_valid_field_names(table_id, tat, desired_aliases):
         print(f"⚠️ Could not fetch schema for {table_id}: {e}", flush=True)
     return None
 
+def is_real_record(fields):
+    """
+    Bulletproof Ghost Row Detector.
+    Table-agnostic: Ignores columns that are known to be auto-generated formulas/timestamps.
+    If ANY other column has actual human text, it counts the row as real.
+    """
+    auto_keywords = [
+        "numbering", "submitted on", "created time", "point balance", 
+        "total points", "used points", "tracker"
+    ]
+    
+    for key, val in fields.items():
+        key_lower = key.lower().strip()
+        
+        # Ignore columns that are known to auto-populate on blank rows
+        if any(kw in key_lower for kw in auto_keywords):
+            continue
+            
+        # Safely extract text from complex Feishu JSON cell objects
+        text_val = ""
+        if isinstance(val, list) and len(val) > 0:
+            item = val[0]
+            if isinstance(item, dict):
+                text_val = str(item.get('text', item.get('name', item.get('value', item.get('id', '')))))
+            else:
+                text_val = str(item)
+        elif isinstance(val, dict):
+            text_val = str(val.get('text', val.get('name', val.get('value', val.get('id', '')))))
+        else:
+            text_val = str(val)
+            
+        text_val = text_val.strip().lower()
+        
+        # If we find actual human text in ANY non-auto column, this row is real!
+        if text_val and text_val not in ("[]", "{}", "none", "", "0", "0.0", "null", "error"):
+            return True
+            
+    return False
+
 def fetch_all_records(table_id, tat, desired_aliases, filename):
     valid_fields = get_valid_field_names(table_id, tat, desired_aliases)
     
-    base_payload = {"page_size": 500}
+    base_payload = {"page_size": 500, "automatic_fields": True}
     if valid_fields:
         base_payload["field_names"] = valid_fields
         print(f"  ... Projection active: extracting {len(valid_fields)} essential columns.", flush=True)
@@ -81,7 +120,6 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
     has_more = True
     page_num = 1
     
-    # GHOST ROW DETECTOR STATE
     consecutive_ghost_pages = 0
     
     while has_more:
@@ -105,25 +143,10 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
             for item in items:
                 fields = item.get("fields", {})
                 
-                # A ghost row usually only has an auto-filled Numbering/Agency Code.
-                # We check if there is ANY actual human data in the other columns.
-                is_real = False
-                for key, val in fields.items():
-                    # Ignore fields that Feishu auto-populates on blank spreadsheet rows
-                    if "numbering" in key.lower() or "agency code" in key.lower(): 
-                        continue
-                    
-                    str_val = str(val).strip()
-                    # If we find actual data, it's a real row!
-                    if str_val and str_val not in ("[]", "{}", "None", "", "0", "0.0"):
-                        is_real = True
-                        break
-                        
-                if is_real:
+                if is_real_record(fields):
                     real_records_on_page += 1
                     record = {"record_id": item.get("record_id"), "fields": {}}
                     
-                    # Only save the columns we asked for to keep file size tiny
                     if desired_aliases:
                         for f in desired_aliases:
                             if f in fields and fields[f] is not None:
@@ -141,7 +164,7 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
             else:
                 consecutive_ghost_pages = 0
                 
-            # If we hit 2 pages in a row (1,000 records) of pure blanks, we've hit the bottom of the sheet!
+            # If we hit 2 full pages of ghost rows, stop downloading
             if consecutive_ghost_pages >= 2:
                 print(f"  🛑 Detected {consecutive_ghost_pages} pages of pure ghost rows. Bottom of spreadsheet reached! Stopping early.", flush=True)
                 break
@@ -158,7 +181,7 @@ def fetch_all_records(table_id, tat, desired_aliases, filename):
 
 def main():
     print("==================================================", flush=True)
-    print("🚀 Xena Portal Build Script (Ghost-Buster Edition)", flush=True)
+    print("🚀 Xena Portal Build Script (Universal Ghost-Buster)", flush=True)
     print(f"🕒 Time: {datetime.now(timezone.utc).isoformat()}", flush=True)
     
     tat = get_tenant_access_token()
