@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pip install -r requirements.txt && python fetch_data.py",
+  "buildCommand": "python fetch_data.py",
   "outputDirectory": "public",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.py" },
