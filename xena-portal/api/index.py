@@ -100,6 +100,32 @@ def get_tenant_access_token():
         _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
     return token
 
+_schema_cache = {"data": {}, "lock": threading.Lock()}
+
+def get_table_schema(table_id, token, base_id, ttl=300):
+    """Returns the set of live field names for a table, cached briefly. Used to make
+    record-creation resilient: we drop any field we're about to write that Feishu
+    doesn't actually recognize, instead of letting the whole write fail."""
+    with _schema_cache["lock"]:
+        cached = _schema_cache["data"].get(table_id)
+        if cached and time.time() - cached["ts"] < ttl:
+            return cached["fields"]
+
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
+    try:
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
+        if resp.get("code") == 0:
+            fields = set(f.get("field_name") for f in resp.get("data", {}).get("items", []))
+            with _schema_cache["lock"]:
+                _schema_cache["data"][table_id] = {"fields": fields, "ts": time.time()}
+            return fields
+    except Exception as e:
+        logger.error("get_table_schema_failed", table_id=table_id, error=str(e))
+    # On failure, fall back to whatever we last successfully cached (better than nothing)
+    with _schema_cache["lock"]:
+        cached = _schema_cache["data"].get(table_id)
+        return cached["fields"] if cached else set()
+
 class StructuredLogger:
     def __init__(self, name):
         self._log = logging.getLogger(name)
@@ -1505,7 +1531,10 @@ def audit_logs():
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    payload = {"page_size": min(int(request.args.get('limit','100')), 500)}
+    payload = {
+        "page_size": min(int(request.args.get('limit','100')), 500),
+        "sort": [{"field_name": "Timestamp", "desc": True}],
+    }
     try:
         res = http_requests.post(url, headers=headers, json=payload, timeout=10).json()
         if res.get("code") != 0: raise Exception(res.get("msg", "Feishu API Error"))
@@ -1599,10 +1628,29 @@ def submit_request():
         if tokens:
             final_fields[field_name] = tokens
 
-    # 3. Enforce Server-Side Default for Tracking 
+    # 3. Enforce Server-Side Default for Tracking
     final_fields["Request Status"] = "Pending"
 
-    # 4. Save Final Record in Feishu with proper retry backoff
+    # 3b. Record who actually submitted this from the portal. Feishu's own "Respondents"
+    # field always attributes creation to the app/bot identity (since we write via a
+    # tenant access token, not a per-user token), so it can never show the real agent.
+    # This writes the portal login name into a dedicated field instead, IF that field
+    # exists in the table. Ahmed: create a plain Text field named "Submitted By" in the
+    # Requests table in Feishu and this will start populating automatically - no code
+    # change needed. Until then this is silently skipped (see schema filter below).
+    final_fields["Submitted By"] = user
+
+    # 4. Resilience: only send fields that actually exist in the live Feishu schema.
+    # Prevents a single unrecognized/renamed field (e.g. "Submitted By" before Ahmed
+    # creates it) from failing the whole submission with FieldNameNotFound.
+    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+    if actual_fields:
+        dropped = [k for k in final_fields if k not in actual_fields]
+        if dropped:
+            logger.warn("submit_dropped_unknown_fields", fields=dropped)
+        final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
+
+    # 5. Save Final Record in Feishu with proper retry backoff
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
