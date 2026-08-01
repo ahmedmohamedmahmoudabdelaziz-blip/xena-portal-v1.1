@@ -3481,12 +3481,15 @@ async function runQuery(){
                 ${qyRow('Submitted on', r.submitted_on)}
                 ${qyRow('Respondents', r.respondents)}
                 ${qyRow('User ID', r.user_id)}
+                ${qyRow('Agency Code', r.agency_code)}
+                ${qyRow('Agency Type', r.agency_type)}
                 ${qyRow('Otherapp ID', r.otherapp_id)}
                 ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
                 ${qyRow('Bd Code', r.bd_code)}
                 ${qyRow('Duplicated Check', r.duplicated_check)}
                 ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
                 ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+                ${r.closing_reason && (r.request_type || '').toLowerCase().includes('closing agency') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
             </div>
         `).join('');
 
