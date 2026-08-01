@@ -33,7 +33,7 @@ PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham"
             "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
 IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
 
-CACHE_TTL_REALTIME   = 300    
+CACHE_TTL_REALTIME   = 180    # 3 mins for Live lookups to prevent spam
 CACHE_TTL_HISTORICAL = 3600   
 
 RATE_LIMIT_SEARCH    = (50, 60)
@@ -43,7 +43,7 @@ RATE_LIMIT_RECORDS   = (50, 60)
 COINS_MULTIPLIER = 100000
 
 QUERY_FIELD_ALIASES = {
-    "user_id":     ["User ID"],
+    "user_id":     ["User ID", "User Id"],
     "numbering":   ["Numbering"],
     "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID"],
     "nid_number":  ["NID Number", "NID"],
@@ -56,6 +56,20 @@ MONTHLY_ALLOCATOR_LIMITS = {
     "customized short id 15 days": 999, "customized short id 30 days": 999,
     "room pin-up": 999, "welcome package 3": 15, "welcome package 2": 50,
 }
+ORDER_TYPE_LIMITS = {
+    "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
+}
+
+# ════════════════════════════════════════════════════════════════════
+# CORE UTILITIES & TIMEZONE MANAGEMENT
+# ════════════════════════════════════════════════════════════════════
+CAIRO_OFFSET = timedelta(hours=3)
+
+def cairo_now():
+    """Authoritative 'current time' for the whole app. Vercel's server clock is UTC,
+    but the business/users are in Cairo (UTC+3). Every 'Current Month' calculation
+    MUST go through this function."""
+    return datetime.now(timezone.utc) + CAIRO_OFFSET
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
@@ -243,6 +257,9 @@ class AuditLogger:
 
 audit = AuditLogger()
 
+# ════════════════════════════════════════════════════════════════════
+# MOCK DB & DATA PARSERS
+# ════════════════════════════════════════════════════════════════════
 class MockFeishuDB:
     @staticmethod
     def generate_requests(limit=500):
@@ -269,8 +286,9 @@ class MockFeishuDB:
                     "Agency Code": str(40000 + random.randint(1, 999)),
                     "Agency Point Privilege": req_type if "Card" in req_type else "",
                     "Target Type": "Agency" if "Target" in req_type else "",
-                    "Quantities Input": str(random.randint(1, 4)),
-                    "Point Balance": str(random.randint(100, 5000))
+                    "Quantities Input": str(random.randint(1, 3)),
+                    "Point Balance": str(random.randint(100, 5000)),
+                    "User ID": [str(random.randint(100000, 999999))],
                 }
             }
             items.append(item)
@@ -371,6 +389,14 @@ def extract_field_list(field_data):
         return res
     return [str(field_data).strip()]
 
+def get_accepted_ids(fields):
+    """Rule: Accepted IDs = User ID(s) minus Rejected ID(s), for a single request record."""
+    user_ids     = extract_field_list(get_field_local(fields, "User ID", "User Id"))
+    rejected_ids = extract_field_list(get_field_local(fields, "Rejected Ids", "Rejected ID", "Rejected IDs", "Rejected Id"))
+    rejected_set = {str(r).strip().lower() for r in rejected_ids if r}
+    accepted = [uid for uid in user_ids if str(uid).strip().lower() not in rejected_set]
+    return accepted
+
 def parse_feishu_date(date_val):
     if not date_val: return None
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
@@ -378,15 +404,15 @@ def parse_feishu_date(date_val):
     try:
         if isinstance(date_val, (int, float)):
             dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
-            dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return (dt_utc + CAIRO_OFFSET).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
             
         date_str = str(date_val).strip()
         if date_str.isdigit():
             dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
-            dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return (dt_utc + CAIRO_OFFSET).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         
+        # String dates (e.g., '2026-08-01') lack time, so they parse as Midnight. 
+        # We assume they already represent local Cairo dates input by agents.
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except Exception:
@@ -447,7 +473,8 @@ def get_user_permissions(email, name):
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
     if cached: return cached
-
+    
+    # 100% Live Request for Authentication - No static JSON used.
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -505,6 +532,9 @@ def generate_executive_insights(stats, cmp_stats=None):
 
     return insights
 
+# ════════════════════════════════════════════════════════════════════
+# CORE DATA FETCHING ENGINE (SHARDED)
+# ════════════════════════════════════════════════════════════════════
 def fetch_feishu_records(table_id, from_dt=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
@@ -718,6 +748,9 @@ def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
     logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
     return items, complete, reason
 
+# ════════════════════════════════════════════════════════════════════
+# CORE LOGIC: FETCH SINGLE AGENCY
+# ════════════════════════════════════════════════════════════════════
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
         all_records = MockFeishuDB.generate_agency(code)
@@ -759,10 +792,11 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
 
     history_points, history_target = [], []
     privileges_claimed, usage_this_month = defaultdict(int), defaultdict(int)
+    accepted_ids_all = []
     
-    # 🕒 TIMEZONE FIX: Strictly use UTC+3 (Cairo) to calculate current month
-    now_cairo = datetime.utcnow() + timedelta(hours=3)
-    cm, cy = now_cairo.month, now_cairo.year
+    # Strictly Enforce Cairo Time for Month Lookups
+    _cairo_now = cairo_now()
+    cm, cy = _cairo_now.month, _cairo_now.year
     
     if MOCK_MODE:
         hist_items = MockFeishuDB.generate_requests(50)
@@ -777,7 +811,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         hf = r.get("fields", {})
         h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
         
-        # Only process records for the *current* Cairo month
         if not h_date or h_date.month != cm or h_date.year != cy: continue
 
         req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
@@ -787,19 +820,15 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
 
         target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
         point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
-        
-        # 🆔 ACCEPTED ID RULE: Extract submitted minus rejected
-        raw_user_ids = extract_field_text(get_field_local(hf, "User ID", "User Id", "User Ids")).strip()
-        raw_rej_ids  = extract_field_text(get_field_local(hf, "Rejected Ids", "Rejected IDs", "Rejected ids", "Rejected id")).strip()
-        u_list = [x for x in re.split(r'[,\s\n]+', raw_user_ids) if x]
-        r_list = [x for x in re.split(r'[,\s\n]+', raw_rej_ids) if x]
-        accepted_u_list = [u for u in u_list if u not in r_list]
-        accepted_ids_str = ", ".join(accepted_u_list)
+
+        # Generate Accepted IDs
+        accepted_ids = get_accepted_ids(hf)
+        if accepted_ids: accepted_ids_all.extend(accepted_ids)
 
         if "target" in req_type_lower:
-            # ✅ TARGET LOGIC
             privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
-            raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty", "Quantity", "Quantities Input")).strip()
+            # Strict mapping to catch 'Counter', 'Qty', and 'Quantities Input' aliases.
+            raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty", "Quantities Input", "Quantity")).strip()
             qty = 1
             if raw_counter:
                 m = re.search(r'\d+', str(raw_counter))
@@ -809,30 +838,29 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 "date": h_date.strftime("%Y-%m-%d"), "_dt": h_date,
                 "request_type": req_type, "status": status_val,
                 "privilege": privilege_val, "quantities_input": str(qty),
-                "accepted_user_ids": accepted_ids_str
+                "accepted_ids": accepted_ids,
             })
 
             if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
                 privileges_claimed[privilege_val] += qty
 
         else:
-            # ✅ POINTS LOGIC
             latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
             parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
             
-            if parsed_items: 
-                privilege_val = " + ".join([f"{k.strip()} ({v})" for k, v in parsed_items])
-            else: 
-                privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+            if parsed_items: privilege_val = " + ".join([f"{k.strip()} ({v})" for k, v in parsed_items])
+            else: privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege")).strip()
+
+            qty_input_val = extract_field_text(get_field_local(hf, "Counter", "Qty", "Quantities Input", "Quantity")).strip()
+            if not qty_input_val: qty_input_val = "1" # Fallback to 1
 
             history_points.append({
                 "date": h_date.strftime("%Y-%m-%d"), "_dt": h_date,
                 "request_type": req_type, "status": status_val,
                 "target_type": target_type, "point_balance": point_balance,
                 "privilege": privilege_val,
-                # 🔥 FIX: Added 'Counter' and 'Qty' so '4 trend card' quantity isn't missed!
-                "quantities_input": extract_field_text(get_field_local(hf, "Quantities Input", "Counter", "Qty", "Quantity")).strip(),
-                "accepted_user_ids": accepted_ids_str
+                "quantities_input": qty_input_val,
+                "accepted_ids": accepted_ids,
             })
 
             if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
@@ -877,6 +905,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "health_status": health_status,
             "history": history_points, 
             "allocator_status": allocator_status,
+            "accepted_user_ids": sorted(set(accepted_ids_all)),
             "requests": [r.get("fields", {}) for r in all_records]
         }
     else:  
@@ -887,6 +916,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "base_points": raw_base_pts * COINS_MULTIPLIER, "health_score": 100, "health_status": "Healthy",
             "privileges_claimed": dict(privileges_claimed),  
             "history": history_target, 
+            "accepted_user_ids": sorted(set(accepted_ids_all)),
             "requests": [r.get("fields", {}) for r in all_records]
         }
 
@@ -1038,8 +1068,11 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
     return stats
 
-BACKGROUND_SYNC_INTERVAL = 1800  # 30 mins
-BACKGROUND_SYNC_MAX_AGE  = 3600  
+# ════════════════════════════════════════════════════════════════════
+# BACKGROUND SNAPSHOT MANAGER (CACHE FIRST)
+# ════════════════════════════════════════════════════════════════════
+BACKGROUND_SYNC_INTERVAL = 180   
+BACKGROUND_SYNC_MAX_AGE  = 600   
 
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
@@ -1089,18 +1122,14 @@ def ensure_background_sync_started():
             _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
-    """🔥 PRIORITY 1: Always check background snapshots (RAM -> Redis) first! 
-       Only returns None if completely empty, forcing a live fetch fallback."""
     ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
-    # 1. Try RAM
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
 
-    # 2. Try Redis (Survives Vercel Cold Starts)
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
         if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
@@ -1111,11 +1140,10 @@ def get_requests_table_snapshot(from_dt=None):
                 _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
+            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
             return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    # 3. Cache Miss (Tell the router to do a Live Sharded Fetch)
-    return None, set(), False, "Cache Empty", False
-
+    return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt) + (False,)
 
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
 _bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
@@ -1174,11 +1202,16 @@ def get_points_table_snapshot():
                 _bg_points_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_points_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_points_sync["stop_reason"]    = cached.get("stop_reason", "")
+            threading.Thread(target=_background_sync_points_table, daemon=True).start()
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    return None, False, "Cache Empty", False
+    items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+    return items, complete, reason, False
 
 
+# ════════════════════════════════════════════════════════════════════
+# FLASK ROUTER
+# ════════════════════════════════════════════════════════════════════
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
@@ -1243,7 +1276,7 @@ def search():
     user    = sanitize_text(req_data.get('user',''))
     email   = sanitize_text(req_data.get('email',''))
     qtype   = req_data.get('type','points')
-    nocache = req_data.get('nocache', '0') in ['1', 'true', True]
+    nocache = req_data.get('nocache', 'false').lower() == 'true'
     
     if qtype not in ('points','target'): qtype = 'points'
     if not code: return jsonify({"found":False,"error":"Invalid or missing agency code."}), 400
@@ -1256,16 +1289,16 @@ def search():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
-    cache_key = cache_make_key("search", code, qtype)
-    
+    # 100% Live Feishu API Search - With micro-caching (3 mins)
+    cache_key = cache_make_key("search", code, qtype, str(allowed_acms), str(allowed_regs))
     if not nocache:
         cached = cache_get(cache_key)
         if cached: return jsonify(cached)
-        
+
     data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
     
     if data.get("found"):
-        cache_set(cache_key, data, ttl=180)
+        cache_set(cache_key, data, ttl=CACHE_TTL_REALTIME) # Cache for 3 minutes to prevent heavy lookup spam
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "AGENCY_SEARCH", f"Code: {code} | Type: {qtype}", ip=ip, severity="Info")
         return jsonify(data)
@@ -1285,6 +1318,7 @@ def manage_users():
 
     if MOCK_MODE: return jsonify([{"id":"mock","email":"test@example.com","modules":"admin, target, points","acms_raw":"all","regions_raw":"all"}])
 
+    # 100% LIVE Data call - Access Table
     tat = get_tenant_access_token()
     headers  = {"Authorization":f"Bearer {tat}","Content-Type":"application/json"}
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
@@ -1336,7 +1370,7 @@ def manage_users():
         if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Unknown error")}), 500
             
         audit.log(admin_name, "UPDATE_USER" if existing_record_id else "ADD_USER", email_to_check, ip=ip, severity="Info")
-        cache_invalidate(cache_make_key("perms", email_to_check.lower(), ""))
+        cache_invalidate(cache_make_key("perms", email_to_check.lower(), "")) # Invalidate the permission cache dynamically
         return jsonify({"success":True,"record_id":res.get("data",{}).get("record",{}).get("record_id")})
 
     elif request.method == 'DELETE':
@@ -1413,10 +1447,17 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # 🔥 PRIORITY: Snapshot first, Live ONLY if Snapshot is totally missing
-    all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
-    if not all_items:
-        all_items, fetch_complete, stop_reason = fetch_points_sharded()
+    # Background Snapshot Priority: hit the RAM/Redis snapshot FIRST for instant loads.
+    # Only fall back to a live Feishu fetch if the cache is completely empty.
+    served_from_cache = False
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_agency("All") * 10
+        fetch_complete, stop_reason = True, ""
+    else:
+        all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
+        if not all_items:
+            all_items, fetch_complete, stop_reason = fetch_points_sharded()
+            served_from_cache = False
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1488,6 +1529,7 @@ def points_records():
             "total_pages": 1,
             "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
             "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
+            "served_from_background_cache": served_from_cache,
             "duration_ms": int((time.time() - start) * 1000), "raw_rows_fetched": len(all_items)
         })
 
@@ -1499,24 +1541,9 @@ def points_records():
         "total_pages": max(1, -(-total_count // page_size)),
         "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
+        "served_from_background_cache": served_from_cache,
         "duration_ms": int((time.time() - start) * 1000), "raw_rows_fetched": len(all_items)
     })
-
-@app.route('/api/audit/log-action', methods=['POST'])
-def client_audit_log_action():
-    data = request.json or {}
-    user = sanitize_text(data.get('user', ''))
-    email = sanitize_text(data.get('email', ''))
-    action = sanitize_text(data.get('action', ''))
-    target = sanitize_text(data.get('target', ''))
-    severity = sanitize_text(data.get('severity', 'Info'))
-    
-    perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Unauthorized"}), 403
-        
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-    audit.log(user, action, target, ip=ip, severity=severity)
-    return jsonify({"success": True})
 
 @app.route('/api/sync/refresh', methods=['POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
@@ -1544,15 +1571,6 @@ def sync_refresh():
         "redis_enabled": REDIS_ENABLED,
     })
 
-@app.route('/api/points/search', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
-def points_search():
-    if request.args.get('q') and not request.args.get('search'):
-        args = dict(request.args)
-        args['search'] = args.pop('q')
-        request.environ['QUERY_STRING'] = urllib.parse.urlencode(args, doseq=True)
-    return points_records()
-
 @app.route('/api/query', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def query_records():
@@ -1576,7 +1594,11 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
-    # 100% Live Feishu API
+    # 100% Live Feishu API with 3 min micro-cache to prevent lookup spam
+    cache_key = cache_make_key("query", field, value, str(allowed_acms), str(allowed_regs))
+    cached = cache_get(cache_key)
+    if cached: return jsonify(cached)
+
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(10)
         fetch_complete, stop_reason, success = True, "", True
@@ -1666,11 +1688,13 @@ def query_records():
     results.sort(key=lambda r: r["_sort_ts"], reverse=True)
     for r in results: r.pop("_sort_ts", None)
 
-    return jsonify({
+    response_data = {
         "results": results, "count": len(results), "field": field, "value": value,
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
         "served_from_background_cache": False
-    })
+    }
+    cache_set(cache_key, response_data, ttl=CACHE_TTL_REALTIME)
+    return jsonify(response_data)
 
 @app.route('/api/analytics', methods=['GET', 'POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
@@ -1721,9 +1745,9 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # 🔥 PRIORITY: Snapshot first, Live ONLY if Snapshot is totally missing
+    # Background Snapshot Priority: pull from the RAM/Redis snapshot FIRST for instant loads.
+    # Only do a live Feishu fetch if the cache is completely empty.
     all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-
     if not all_items:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
@@ -1823,9 +1847,9 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # 🔥 PRIORITY: Snapshot first, Live ONLY if Snapshot is totally missing
+    # Background Snapshot Priority: pull from the RAM/Redis snapshot FIRST for instant loads.
+    # Only do a live Feishu fetch if the cache is completely empty.
     all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-
     if not all_items:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
@@ -1844,6 +1868,19 @@ def compare():
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
         "served_from_background_cache": from_bg_cache, "duration_ms": duration_ms,
     })
+
+def _shape_compare_group(label, raw):
+    return {
+        "label": label,
+        "kpis": raw["kpis"],
+        "closing_efficiency_pct": round((raw["kpis"]["closings"] / raw["kpis"]["creations"] * 100) if raw["kpis"]["creations"] > 0 else 0, 1),
+        "status_mix": {
+            "Done": raw["creation_status"]["Done"],
+            "Rejected": raw["creation_status"]["Rejected"],
+            "Under Investigation": raw["creation_status"]["Under Investigation"]
+        },
+        "daily_trend": [{"date": d, "creations": raw["daily_trend_creation"].get(d, 0)} for d in sorted(raw["daily_trend_creation"].keys())]
+    }
 
 @app.route('/api/cache/clear', methods=['POST'])
 def clear_cache():
@@ -1869,14 +1906,14 @@ def health():
             "syncing": _bg_points_sync["syncing"],
         }
     return jsonify({
-        "status": "ok", "ts": datetime.utcnow().isoformat(),
+        "status": "ok", "ts": datetime.utcnow().isoformat(), "cairo_ts": cairo_now().isoformat(),
         "cache_entries": len(_cache), "audit_entries": len(audit._queue),
         "token_cached": _token_cache["token"] is not None,
         "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
-        "mock_mode_active": MOCK_MODE
+        "mock_mode_active": MOCK_MODE,
     })
 
 ensure_background_sync_started()
