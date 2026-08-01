@@ -1,7 +1,3 @@
-"""
-Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
-"""
-
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
@@ -200,6 +196,25 @@ def rate_limit(max_req, window):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+# ════════════════════════════════════════════════════════════════════
+# LOCAL JSON FALLBACK LOADER
+# ════════════════════════════════════════════════════════════════════
+def load_local_json(filename):
+    """Safely attempts to load a JSON file from the public/data/ folder"""
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = os.path.join(root_dir, 'public', 'data', filename)
+    
+    if not os.path.exists(file_path):
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'public', 'data', filename)
+
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error("local_json_read_failed", file=filename, error=str(e))
+    return None
 
 def sanitize_agency_code(code):
     if not code: return None
@@ -613,12 +628,14 @@ POINTS_TABLE_FIELDS = [
     "Used Points", "Point Balance",
 ]
 
+# Includes Universal Query fixes.
 QUERY_RECORDS_FIELDS = [
     "Numbering", "Request Type", "Submitted on Copy", "Submitted on", "Respondents",
     "User ID", "Otherapp ID", "Otherapp Name", "Other App Name",
     "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member", "Region",
     "Bd Code", "BD Code", "NID Number", "NID", "Status", "Request Status",
     "Reject Reason", "Rejection Reason", "Audition note", "Audition Note", "Duplicated Check",
+    "Agency Type", "Type of Agency", "Agency Code", "Closing Reason", "Closing Agencies Reason"
 ]
 
 def _date_filter_value(dt):
@@ -760,7 +777,8 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         points_payload = {
             "filter": {
                 "conjunction": "and",
-                "conditions": [{"field_name": "Agency Code", "operator": "is", "value": [code]}]
+                # FIX 1: Operator changed from "is" to "contains" to handle mixed types gracefully in Feishu
+                "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}] 
             }
         }
         search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
@@ -768,7 +786,16 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         try:
             resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
             if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
-            all_records = resp.get("data", {}).get("items", [])
+            
+            raw_records = resp.get("data", {}).get("items", [])
+            
+            # FIX 1: Strict Python filtering to guarantee exact exact match for "7451" etc.
+            all_records = []
+            for r in raw_records:
+                r_code = extract_field_text(get_field_local(r.get("fields", {}), "Agency Code"))
+                if str(r_code).strip() == str(code).strip():
+                    all_records.append(r)
+            
             if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
         except Exception as e:
             return {"found": False, "error": f"Search timeout or connection error: {str(e)}"}
@@ -804,7 +831,14 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         try:
             hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
             hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
-            hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
+            raw_hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
+            
+            # FIX 1: Also strictly filter the timeline records
+            hist_items = []
+            for r in raw_hist_items:
+                r_code = extract_field_text(get_field_local(r.get("fields", {}), "Agency Code"))
+                if str(r_code).strip() == str(code).strip():
+                    hist_items.append(r)
         except: hist_items = []
 
     for r in hist_items:
@@ -814,9 +848,15 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         if not h_date or h_date.month != cm or h_date.year != cy: continue
 
         req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
+        
+        # FIX 2: Strict lookup for "Status" column for Target Privileges
+        target_status_val = extract_field_text(hf.get("Status", "")).strip() 
+        # Fallback logic for point history usage
         status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
+        
         req_type_lower = req_type.lower()
         s_lower = status_val.lower()
+        target_s_lower = target_status_val.lower()
 
         target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
         point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
@@ -836,12 +876,13 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
 
             history_target.append({
                 "date": h_date.strftime("%Y-%m-%d"), "_dt": h_date,
-                "request_type": req_type, "status": status_val,
+                "request_type": req_type, 
+                "status": target_status_val, # FIX 2 Applied here
                 "privilege": privilege_val, "quantities_input": str(qty),
                 "accepted_ids": accepted_ids,
             })
 
-            if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
+            if target_s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
                 privileges_claimed[privilege_val] += qty
 
         else:
@@ -1298,7 +1339,7 @@ def search():
     data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
     
     if data.get("found"):
-        cache_set(cache_key, data, ttl=CACHE_TTL_REALTIME) # Cache for 3 minutes to prevent heavy lookup spam
+        cache_set(cache_key, data, ttl=CACHE_TTL_REALTIME) 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "AGENCY_SEARCH", f"Code: {code} | Type: {qtype}", ip=ip, severity="Info")
         return jsonify(data)
@@ -1447,19 +1488,24 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # Background Snapshot Priority: hit the RAM/Redis snapshot FIRST for instant loads.
-    # Only fall back to a live Feishu fetch if the cache is completely empty.
+    # HYBRID FALLBACK MANDATE: Local JSON check intercepts the request for Search Records & Point Table.
     served_from_cache = False
-    if MOCK_MODE:
+    local_points = load_local_json('points.json')
+    
+    if local_points is not None:
+        all_items = local_points
+        fetch_complete, stop_reason, served_from_cache = True, "", True
+    elif MOCK_MODE:
         all_items = MockFeishuDB.generate_agency("All") * 10
         fetch_complete, stop_reason = True, ""
     else:
+        # Fallback to standard snapshot & live pulling
         all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
         if not all_items:
             all_items, fetch_complete, stop_reason = fetch_points_sharded()
             served_from_cache = False
 
-    if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
+    if not fetch_complete and not all_items: return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     filtered = []
     for item in all_items:
@@ -1594,7 +1640,6 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
-    # 100% Live Feishu API with 3 min micro-cache to prevent lookup spam
     cache_key = cache_make_key("query", field, value, str(allowed_acms), str(allowed_regs))
     cached = cache_get(cache_key)
     if cached: return jsonify(cached)
@@ -1650,6 +1695,7 @@ def query_records():
 
     results = []
 
+    # FIX 3: Backend modifications to expose Agency Type, Code, and Closing Reason
     for item in all_items:
         fields = item.get("fields", {})
         
@@ -1667,6 +1713,10 @@ def query_records():
 
         submitted_raw = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         submitted_dt  = parse_feishu_date(submitted_raw)
+        
+        agency_type    = clean(get_field_local(fields, "Agency Type", "Type of Agency"))
+        agency_code    = extract_field_text(get_field_local(fields, "Agency Code"))
+        closing_reason = extract_field_text(get_field_local(fields, "Closing Reason", "Closing Agencies Reason"))
 
         results.append({
             "numbering":        extract_field_text(get_field_local(fields, "Numbering")),
@@ -1682,6 +1732,12 @@ def query_records():
             "reject_reason":    extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason")),
             "audition_note":    extract_field_text(get_field_local(fields, "Audition note", "Audition Note")),
             "duplicated_check": extract_field_text(get_field_local(fields, "Duplicated Check")),
+            
+            # FIX 3: Appended New Columns
+            "agency_type":      agency_type.title() if agency_type else "",
+            "agency_code":      agency_code,
+            "closing_reason":   closing_reason,
+            
             "_sort_ts": submitted_dt.timestamp() if submitted_dt else 0,
         })
 
@@ -1745,14 +1801,21 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # Background Snapshot Priority: pull from the RAM/Redis snapshot FIRST for instant loads.
-    # Only do a live Feishu fetch if the cache is completely empty.
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-    if not all_items:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
-        from_bg_cache = False
-        if not fetch_complete and not all_items:
-            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+    # HYBRID FALLBACK MANDATE: Local JSON check intercepts the request for Analytics Report.
+    local_requests = load_local_json('requests.json')
+    if local_requests is not None:
+        all_items = local_requests
+        master_keys = set()
+        if all_items: master_keys = set(all_items[0].get("fields", {}).keys())
+        fetch_complete, stop_reason, from_bg_cache = True, "", True
+    else:
+        # Step 3: API Fallback
+        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+        if not all_items:
+            all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
+            from_bg_cache = False
+            if not fetch_complete and not all_items:
+                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
@@ -1847,14 +1910,21 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # Background Snapshot Priority: pull from the RAM/Redis snapshot FIRST for instant loads.
-    # Only do a live Feishu fetch if the cache is completely empty.
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-    if not all_items:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
-        from_bg_cache = False
-        if not fetch_complete and not all_items:
-            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+    # HYBRID FALLBACK MANDATE: Local JSON check intercepts the request for Compare Module.
+    local_requests = load_local_json('requests.json')
+    if local_requests is not None:
+        all_items = local_requests
+        master_keys = set()
+        if all_items: master_keys = set(all_items[0].get("fields", {}).keys())
+        fetch_complete, stop_reason, from_bg_cache = True, "", True
+    else:
+        # Step 3: API Fallback
+        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+        if not all_items:
+            all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
+            from_bg_cache = False
+            if not fetch_complete and not all_items:
+                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
