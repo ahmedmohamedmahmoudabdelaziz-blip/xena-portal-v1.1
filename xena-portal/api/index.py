@@ -578,7 +578,7 @@ def get_user_permissions(email, name):
     
     if any(admin == name_clean for admin in ADMIN_USERS):
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "export_data"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data"], 
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
@@ -588,7 +588,7 @@ def get_user_permissions(email, name):
 
     if MOCK_MODE:
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "export_data"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data"], 
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
@@ -1565,6 +1565,7 @@ def submit_request():
     """Handles new record submissions, uploads attachments directly to Feishu, and writes to DB."""
     user = sanitize_text(request.form.get('user', ''))
     email = sanitize_text(request.form.get('email', ''))
+    uat = request.form.get('uat', '')
     
     if not user:
         return jsonify({"error": "Unauthorized"}), 403
@@ -1580,6 +1581,10 @@ def submit_request():
         return jsonify({"error": "Request Type is required."}), 400
 
     tat = get_tenant_access_token()
+    
+    # Use UAT if available so the action is attributed to the user in Feishu (Fixes Respondents)
+    api_token = uat if uat else tat
+    
     final_fields = {}
 
     # 1. Filter JSON fields to enforce schema security
@@ -1610,13 +1615,21 @@ def submit_request():
                     'size': str(len(file_bytes))
                 }
                 files = {'file': (f.filename, file_bytes, f.mimetype)}
-                h = {"Authorization": f"Bearer {tat}"}
+                h = {"Authorization": f"Bearer {api_token}"}
                 
                 up_res = http_requests.post(
                     "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
                     headers=h, data=form_data, files=files, timeout=30
                 ).json()
                 
+                # Fallback to TAT if UAT fails (e.g. expired)
+                if up_res.get("code") != 0 and api_token != tat:
+                    h = {"Authorization": f"Bearer {tat}"}
+                    up_res = http_requests.post(
+                        "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
+                        headers=h, data=form_data, files=files, timeout=30
+                    ).json()
+
                 if up_res.get("code") == 0:
                     tokens.append({"file_token": up_res["data"]["file_token"]})
                 else:
@@ -1630,19 +1643,9 @@ def submit_request():
 
     # 3. Enforce Server-Side Default for Tracking
     final_fields["Request Status"] = "Pending"
-
-    # 3b. Record who actually submitted this from the portal. Feishu's own "Respondents"
-    # field always attributes creation to the app/bot identity (since we write via a
-    # tenant access token, not a per-user token), so it can never show the real agent.
-    # This writes the portal login name into a dedicated field instead, IF that field
-    # exists in the table. Ahmed: create a plain Text field named "Submitted By" in the
-    # Requests table in Feishu and this will start populating automatically - no code
-    # change needed. Until then this is silently skipped (see schema filter below).
     final_fields["Submitted By"] = user
 
     # 4. Resilience: only send fields that actually exist in the live Feishu schema.
-    # Prevents a single unrecognized/renamed field (e.g. "Submitted By" before Ahmed
-    # creates it) from failing the whole submission with FieldNameNotFound.
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
         dropped = [k for k in final_fields if k not in actual_fields]
@@ -1652,7 +1655,7 @@ def submit_request():
 
     # 5. Save Final Record in Feishu with proper retry backoff
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
     
     success = False
     feishu_err = ""
@@ -1662,6 +1665,13 @@ def submit_request():
             resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
             data = resp.json()
             
+            # If UAT failed due to auth/permission, fallback to TAT immediately
+            if data.get("code") in [99991663, 99991668, 99991664] and api_token != tat:
+                api_token = tat
+                headers["Authorization"] = f"Bearer {tat}"
+                resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
+                data = resp.json()
+
             if data.get("code") == 0:
                 success = True
                 break
@@ -1977,6 +1987,182 @@ def query_records():
         "results": results, "count": len(results), "field": field, "value": value,
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
         "served_from_background_cache": False
+    })
+
+@app.route('/api/my-requests', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def my_requests():
+    user = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    
+    if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
+        return jsonify({"error":"Access denied"}), 403
+    
+    _cairo_now = cairo_now()
+    from_dt = _cairo_now - timedelta(days=10)
+    
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_requests(200)
+        fetch_complete, stop_reason = True, ""
+    else:
+        all_items, master_keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+    
+    results = []
+    user_clean = user.strip().lower()
+    
+    for item in all_items:
+        fields = item.get("fields", {})
+        
+        raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
+        dt = parse_feishu_date(raw_date)
+        if not dt or dt < from_dt:
+            continue
+        
+        # Match by Respondents or Submitted By
+        respondents = extract_field_text(get_field_local(fields, "Respondents", "Submitted By", "Created By"))
+        if user_clean not in respondents.lower():
+            continue
+        
+        region = clean(get_field_local(fields, "Region", "Agency Region"))
+        acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
+        acm_in = clean(get_field_local(fields, "Acm Name (IN)"))
+        acm_fb = clean(get_field_local(fields, "Acm", "Assigned Member"))
+        if region in ("", "none"):
+            if acm_pk in PK_ACMS or acm_fb in PK_ACMS: region = "pk"
+            elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
+        acm = (acm_in if region == "in" else acm_pk) or acm_fb
+        
+        results.append({
+            "numbering": extract_field_text(get_field_local(fields, "Numbering")),
+            "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
+            "submitted_on": dt.strftime("%Y-%m-%d") if dt else extract_field_text(raw_date),
+            "respondents": respondents,
+            "user_id": extract_field_text(get_field_local(fields, "User ID")),
+            "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
+            "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
+            "otherapp_id": extract_field_text(get_field_local(fields, "Otherapp ID", "Otherapp Name", "Other App Name")),
+            "acm": acm.title() if acm else "",
+            "region": region.upper() if region else "",
+            "bd_code": extract_field_text(get_field_local(fields, "Bd Code", "BD Code")),
+            "status": extract_field_text(get_field_local(fields, "Status", "Request Status")),
+            "reject_reason": extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason")),
+            "audition_note": extract_field_text(get_field_local(fields, "Audition note", "Audition Note")),
+            "closing_reason": extract_field_text(get_field_local(fields, "Closing Reason", "Closing Agencies Reason")),
+            "_sort_ts": dt.timestamp() if dt else 0,
+        })
+    
+    results.sort(key=lambda r: r["_sort_ts"], reverse=True)
+    for r in results: r.pop("_sort_ts", None)
+    
+    audit.log(user, "MY_REQUESTS_VIEW", f"Fetched {len(results)} records", ip=ip, severity="Info")
+    
+    return jsonify({
+        "results": results,
+        "count": len(results),
+        "fetch_complete": fetch_complete,
+        "stop_reason": ("" if fetch_complete else stop_reason),
+    })
+
+@app.route('/api/agency-list', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_list():
+    user = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    
+    if not perms.get("is_super_admin") and not any("query_agency_list" in m or "query" in m for m in perms.get("modules",[])):
+        return jsonify({"error":"Access denied"}), 403
+    
+    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("query",["all"])
+    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
+    allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
+    allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
+    
+    _cairo_now = cairo_now()
+    from_dt = _cairo_now - timedelta(days=40)
+    
+    f_region = sanitize_text(request.args.get('region','')).lower()
+    f_agency_code = sanitize_text(request.args.get('agency_code','')).lower()
+    f_agency_name = sanitize_text(request.args.get('agency_name','')).lower()
+    f_acm = sanitize_text(request.args.get('acm','')).lower()
+    
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_requests(300)
+        fetch_complete, stop_reason = True, ""
+    else:
+        all_items, master_keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+    
+    results = []
+    target_types = ["agency creation", "agency applied already by acm or bd link ( follow-up )", "applied already", "follow-up"]
+    
+    for item in all_items:
+        fields = item.get("fields", {})
+        req_type = clean(get_field_local(fields, "Request Type", "Type"))
+        
+        if not any(t in req_type for t in target_types):
+            continue
+        
+        raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
+        dt = parse_feishu_date(raw_date)
+        if not dt or dt < from_dt:
+            continue
+        
+        region = clean(get_field_local(fields, "Region", "Agency Region"))
+        acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
+        acm_in = clean(get_field_local(fields, "Acm Name (IN)"))
+        acm_fb = clean(get_field_local(fields, "Acm", "Assigned Member"))
+        if region in ("", "none"):
+            if acm_pk in PK_ACMS or acm_fb in PK_ACMS: region = "pk"
+            elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
+        acm = (acm_in if region == "in" else acm_pk) or acm_fb
+        
+        if "all" not in allowed_acms_set and acm.lower().strip() not in allowed_acms_set: 
+            continue
+        if "all" not in allowed_regs_set and region not in allowed_regs_set: 
+            continue
+        
+        agency_code = extract_field_text(get_field_local(fields, "Agency Code"))
+        agency_name = extract_field_text(get_field_local(fields, "Agency Name", "Name"))
+        
+        if f_region and f_region not in region: continue
+        if f_agency_code and f_agency_code not in agency_code.lower(): continue
+        if f_agency_name and f_agency_name not in agency_name.lower(): continue
+        if f_acm and f_acm not in acm.lower(): continue
+        
+        manager_raw = extract_field_text(get_field_local(fields, "User ID", "Agency Manager ID", "Manager ID"))
+        manager_name = extract_field_text(get_field_local(fields, "Applier real name", "Manager Name", "Agency Manager Name"))
+        manager_display = manager_raw + (f" ({manager_name})" if manager_name else "")
+        
+        results.append({
+            "record_id": item.get("record_id", ""),
+            "region": region.upper() if region else "",
+            "agency_code": agency_code,
+            "agency_name": agency_name,
+            "agency_manager": manager_display,
+            "country": extract_field_text(get_field_local(fields, "Country")) or (region.upper() if region else ""),
+            "create_time": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
+            "agency_members": extract_field_text(get_field_local(fields, "Agency Members", "Members", "Member Count")) or "0",
+            "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
+            "parent_agency": extract_field_text(get_field_local(fields, "Parent Agency", "Parent-Agency ID")),
+            "sub_agency": extract_field_text(get_field_local(fields, "Sub Agency", "Sub-Agency")),
+            "acm_name": acm.title() if acm else "",
+            "status": extract_field_text(get_field_local(fields, "Status", "Request Status")),
+            "_sort_ts": dt.timestamp() if dt else 0,
+        })
+    
+    results.sort(key=lambda r: r["_sort_ts"], reverse=True)
+    for r in results: r.pop("_sort_ts", None)
+    
+    audit.log(user, "AGENCY_LIST_VIEW", f"Fetched {len(results)} records", ip=ip, severity="Info")
+    
+    return jsonify({
+        "results": results,
+        "count": len(results),
+        "fetch_complete": fetch_complete,
+        "stop_reason": ("" if fetch_complete else stop_reason),
     })
 
 @app.route('/api/analytics', methods=['GET', 'POST'])
