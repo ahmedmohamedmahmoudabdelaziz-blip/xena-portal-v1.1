@@ -533,6 +533,14 @@
             </div>
             
             <div class="top-bar-right">
+                <!-- Feishu Quick Links -->
+                <a class="utility-icon-btn" href="https://micoworld.feishu.cn/base/C9zFb52m4abhtHsX5LjcBywbnze?from=from_copylink" target="_blank" rel="noopener" title="Open Feishu Sheet" style="text-decoration:none">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                </a>
+                <a class="utility-icon-btn" href="https://micoworld.feishu.cn/share/base/form/shrcnKiM5Nd35n4nP0IP2o1Y8Lb" target="_blank" rel="noopener" title="Open Request Form" style="text-decoration:none">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                </a>
+
                 <!-- Theme Toggle -->
                 <button class="utility-icon-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">🌙</button>
                 
@@ -1125,13 +1133,19 @@
                             <span id="prResultCount" style="font-size:.9rem;color:var(--text-muted)">Enter criteria and search</span>
                             <span id="prLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
                         </div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                            <select id="prPageSize" onchange="prFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
+                                <option value="25">25 / page</option>
+                                <option value="50" selected>50 / page</option>
+                                <option value="100">100 / page</option>
+                                <option value="200">200 / page</option>
+                            </select>
                             <button id="prExportCsvBtn" onclick="prExportCsv()" style="background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 Export CSV</button>
                             <button id="prExportXlsBtn" onclick="prExportExcel()" style="background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Export Excel</button>
                         </div>
                     </div>
 
-                    <div style="overflow-x:auto">
+                    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px">
                         <table id="prTable" style="width:100%;border-collapse:collapse;font-size:.87rem;display:none">
                             <thead id="prThead"></thead>
                             <tbody id="prTbody"></tbody>
@@ -3514,9 +3528,10 @@ async function prFetch(page) {
     page = Math.max(1, page || 1);
     prCurrentPage = page;
 
+    const pageSize = parseInt(document.getElementById('prPageSize')?.value || '50');
     const params = new URLSearchParams({
         page,
-        page_size: 50,
+        page_size: pageSize,
         user: loggedUser || '',
         email: loggedEmail || '',
         search: document.getElementById('prSearch')?.value || '',
@@ -3567,23 +3582,27 @@ async function prFetch(page) {
         const tbody = document.getElementById('prTbody');
         const tfoot = document.getElementById('prTfoot');
 
-        if (thead) thead.innerHTML = '<tr>' + cols.map(c=>`<th style="padding:10px 12px;text-align:left;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">${labels[c]||c}</th>`).join('') + '</tr>';
+        if (thead) thead.innerHTML = '<tr style="background:var(--surface-hover)">' + cols.map(c=>`<th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--surface-hover)">${labels[c]||c}</th>`).join('') + '</tr>';
 
         if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
             const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
-            return `<tr style="${rowStyle};border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
+            return `<tr style="${rowStyle};border-bottom:1px solid var(--border);transition:background .15s ease" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
                 cols.map(c => {
                     let v = r[c];
                     if (c === 'health_score') {
                         const col = v >= 80 ? 'var(--accent-green)' : v >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
-                        return `<td style="padding:9px 12px;color:${col};font-weight:600">${v ?? '—'}</td>`;
+                        const bg  = v >= 80 ? 'rgba(0,230,118,.12)' : v >= 50 ? 'rgba(255,171,0,.12)' : 'rgba(255,82,82,.12)';
+                        return `<td style="padding:9px 12px"><span style="display:inline-block;padding:2px 10px;border-radius:20px;background:${bg};color:${col};font-weight:700;font-size:.82rem">${v ?? '—'}</span></td>`;
                     }
                     if (c === 'point_balance') {
                         const col2 = v > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
-                        return `<td style="padding:9px 12px;color:${col2};font-weight:600">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                        return `<td style="padding:9px 12px;color:${col2};font-weight:700">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                    }
+                    if (c === 'agency_id') {
+                        return `<td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(String(v ?? '—'))}</td>`;
                     }
                     if (['total_points','used_points','base_points','bonus_points'].includes(c)) {
-                        return `<td style="padding:9px 12px;text-align:right">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                        return `<td style="padding:9px 12px;text-align:right;font-variant-numeric:tabular-nums">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
                     }
                     return `<td style="padding:9px 12px">${escHtml(String(v ?? '—'))}</td>`;
                 }).join('') +
@@ -3619,22 +3638,31 @@ async function prFetch(page) {
     }
 }
 
+const PR_EXPORT_COLS = ['agency_id','agency_name','region','acm','base_points','bonus_points','total_points','used_points','point_balance'];
+
 function prExportCsv() {
     const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', false);
+    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', false, PR_EXPORT_COLS);
 }
 
 function prExportExcel() {
     const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', true);
+    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', true, PR_EXPORT_COLS);
 }
 
 // ════════════════════════════════════════════════════════════════════
 // BULK EXPORT ENGINE
 // ════════════════════════════════════════════════════════════════════
-async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel) {
+const EXPORT_COL_LABELS = {
+    agency_id:'Agency Code', agency_name:'Agency Name', region:'Region', acm:'ACM',
+    base_points:'Base Points', bonus_points:'Bonus Points',
+    total_points:'Total Points', used_points:'Used Points', point_balance:'Point Balance',
+    health_score:'Health'
+};
+
+async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, customCols) {
     params.set('export', 'true');
     logFrontendAction(isExcel ? "EXPORT_EXCEL_BULK" : "EXPORT_CSV_BULK", endpoint);
     ToastManager.show('Preparing bulk export. This might take a few moments...', 'info', 8000);
@@ -3649,20 +3677,22 @@ async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel) {
         const records = data.records || [];
         if(!records.length) { ToastManager.show('No data found to export.', 'warning'); document.getElementById('loadingOverlay').style.display='none'; return; }
         
-        const cols = ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
+        const cols = customCols || ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
+        const labels = cols.map(c => EXPORT_COL_LABELS[c] || c);
         
         if (isExcel && window.XLSX) {
             const ws = XLSX.utils.json_to_sheet(records, {header: cols});
+            XLSX.utils.sheet_add_aoa(ws, [labels], {origin: 'A1'});
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Export");
             XLSX.writeFile(wb, `${fileNamePrefix}.xlsx`);
         } else {
-            const rows = [cols.join(','), ...records.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
+            const rows = [labels.join(','), ...records.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
             const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
             a.download = `${fileNamePrefix}.csv`; a.click();
         }
-        ToastManager.show('Bulk export successful!', 'success');
+        ToastManager.show(`Bulk export successful! (${records.length.toLocaleString()} records)`, 'success');
     } catch(e) {
         ToastManager.show('Export failed: ' + e.message, 'error', 8000);
     }
@@ -3793,7 +3823,7 @@ function ptExportCsv() {
 }
 
 function ptExportExcel() {
-    const params = newSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
     executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', true);
 }
