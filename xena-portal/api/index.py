@@ -206,30 +206,97 @@ def rate_limit(max_req, window):
 # ════════════════════════════════════════════════════════════════════
 _local_json_cache = {}
 _local_json_lock = threading.Lock()
+_data_status = {}   # diagnostic info per filename, surfaced via /api/debug/data-status
+SELF_BASE_URL = os.environ.get("SELF_BASE_URL", "").rstrip("/")
+
+def _candidate_data_paths(filename):
+    """Every plausible location the pre-fetched JSON could live at runtime on Vercel.
+    Different bundling behaviors (includeFiles vs static output vs cwd) land the file
+    in different places, so we just try them all instead of guessing once."""
+    here = os.path.abspath(__file__)                 # e.g. /var/task/api/index.py
+    api_dir = os.path.dirname(here)                  # .../api
+    project_root = os.path.dirname(api_dir)          # one level above /api
+    candidates = [
+        os.path.join(project_root, 'public', 'data', filename),
+        os.path.join(api_dir, 'public', 'data', filename),
+        os.path.join('/var/task', 'public', 'data', filename),
+        os.path.join(os.getcwd(), 'public', 'data', filename),
+        os.path.join(os.getcwd(), 'xena-portal', 'public', 'data', filename),
+    ]
+    seen, out = set(), []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+def _fetch_data_over_http(filename):
+    """Last-resort fallback: pull the pre-built JSON from this SAME deployment's own
+    CDN-served static asset (public/data/<file>.json is published at /data/<file>.json
+    per vercel.json's routes). This works even when includeFiles bundling fails to put
+    the file on the function's local disk, because it goes over the network to the
+    already-deployed static file instead of relying on the filesystem."""
+    base = SELF_BASE_URL
+    if not base:
+        try:
+            from flask import request as _req, has_request_context
+            if has_request_context():
+                base = _req.host_url.rstrip("/")
+        except Exception:
+            base = ""
+    if not base:
+        return None
+    url = f"{base}/data/{filename}"
+    try:
+        resp = http_requests.get(url, timeout=20)
+        if resp.status_code == 200:
+            return resp.json()
+        logger.warn("local_json_http_fallback_bad_status", file=filename, status=resp.status_code)
+    except Exception as e:
+        logger.warn("local_json_http_fallback_failed", file=filename, error=str(e))
+    return None
 
 def load_local_json(filename):
-    """Safely attempts to load a JSON file from the public/data/ folder, cached in RAM"""
+    """Loads a pre-fetched JSON file from public/data/, cached in RAM for 2 minutes.
+    Tries disk first (several candidate paths), then falls back to fetching it over
+    HTTP from this deployment's own /data/ static route. Returns None only if both
+    fail, in which case callers fall back to a live Feishu fetch."""
     with _local_json_lock:
         if filename in _local_json_cache:
             data, timestamp = _local_json_cache[filename]
-            if time.time() - timestamp < 120:  # Cache the big file in RAM for 2 minutes
+            if time.time() - timestamp < 120:
                 return data
 
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    file_path = os.path.join(root_dir, 'public', 'data', filename)
-    
-    if not os.path.exists(file_path):
-        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'public', 'data', filename)
-
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+    tried_paths = _candidate_data_paths(filename)
+    for file_path in tried_paths:
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
                 with _local_json_lock:
                     _local_json_cache[filename] = (data, time.time())
+                _data_status[filename] = {
+                    "source": "disk", "path": file_path,
+                    "records": len(data) if isinstance(data, list) else None,
+                    "loaded_at": time.time(),
+                }
                 return data
-        except Exception as e:
-            logger.error("local_json_read_failed", file=filename, error=str(e))
+            except Exception as e:
+                logger.error("local_json_read_failed", file=filename, path=file_path, error=str(e))
+
+    data = _fetch_data_over_http(filename)
+    if data is not None:
+        with _local_json_lock:
+            _local_json_cache[filename] = (data, time.time())
+        _data_status[filename] = {
+            "source": "http_self_fetch",
+            "records": len(data) if isinstance(data, list) else None,
+            "loaded_at": time.time(),
+        }
+        return data
+
+    _data_status[filename] = {"source": "not_found", "tried_paths": tried_paths, "loaded_at": time.time()}
+    logger.warn("local_json_not_found_anywhere", file=filename, tried_paths=tried_paths)
     return None
 
 def sanitize_agency_code(code):
@@ -1946,6 +2013,28 @@ def clear_cache():
     cache_invalidate()
     audit.log(admin_name, "CACHE_CLEARED", "all", ip=request.headers.get("X-Forwarded-For",""), severity="Warning")
     return jsonify({"success":True,"message":"Cache cleared."})
+
+@app.route('/api/debug/data-status', methods=['GET'])
+def debug_data_status():
+    admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
+    if not is_authorized:
+        perms = get_user_permissions("", admin_name)
+        if not perms.get("is_super_admin"):
+            return jsonify({"error": "Unauthorized"}), 403
+
+    # Force a lookup right now for the two big tables so the report is fresh,
+    # not just whatever happened to be cached from earlier requests.
+    load_local_json("requests.json")
+    load_local_json("points.json")
+
+    return jsonify({
+        "data_status": _data_status,
+        "cached_in_ram": list(_local_json_cache.keys()),
+        "candidate_paths_requests": _candidate_data_paths("requests.json"),
+        "candidate_paths_points": _candidate_data_paths("points.json"),
+        "self_base_url_env": SELF_BASE_URL or None,
+    })
 
 @app.route('/api/health', methods=['GET'])
 def health():
