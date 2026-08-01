@@ -56,47 +56,6 @@ MONTHLY_ALLOCATOR_LIMITS = {
     "customized short id 15 days": 999, "customized short id 30 days": 999,
     "room pin-up": 999, "welcome package 3": 15, "welcome package 2": 50,
 }
-ORDER_TYPE_LIMITS = {
-    "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
-}
-
-_static_cache = {}
-
-def load_static_json(filename):
-    """Load pre-built static JSON from cron job. Tries memory, local disk, then URL."""
-    if filename in _static_cache:
-        return _static_cache[filename]
-        
-    import json, os
-    candidates = [
-        os.path.join(os.path.dirname(__file__), '..', 'public', 'data', filename),
-        os.path.join(os.path.dirname(__file__), 'public', 'data', filename),
-        os.path.join(os.getcwd(), 'public', 'data', filename),
-        os.path.join('public', 'data', filename),
-    ]
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    _static_cache[filename] = data
-                    return data
-            except Exception:
-                pass
-                
-    try:
-        from flask import request
-        if request and request.host_url:
-            url = f"{request.host_url.rstrip('/')}/data/{filename}"
-            resp = http_requests.get(url, timeout=15)
-            if resp.status_code == 200:
-                data = resp.json()
-                _static_cache[filename] = data
-                return data
-    except Exception as e:
-        pass
-        
-    return None
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
@@ -169,8 +128,10 @@ def redis_set_json(key, value, ttl=None):
     try:
         payload = json.dumps(value, default=str)
     except Exception as e:
+        logger.warn("redis_serialize_failed", key=key, error=str(e))
         return False
     if len(payload) > REDIS_MAX_VALUE_BYTES:
+        logger.warn("redis_value_too_large", key=key, size_bytes=len(payload))
         return False
     if ttl: redis_cmd("SET", key, payload, "EX", int(ttl))
     else:   redis_cmd("SET", key, payload)
@@ -308,7 +269,7 @@ class MockFeishuDB:
                     "Agency Code": str(40000 + random.randint(1, 999)),
                     "Agency Point Privilege": req_type if "Card" in req_type else "",
                     "Target Type": "Agency" if "Target" in req_type else "",
-                    "Quantities Input": str(random.randint(1, 3)),
+                    "Quantities Input": str(random.randint(1, 4)),
                     "Point Balance": str(random.randint(100, 5000))
                 }
             }
@@ -486,7 +447,7 @@ def get_user_permissions(email, name):
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
     if cached: return cached
-    
+
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -799,9 +760,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     history_points, history_target = [], []
     privileges_claimed, usage_this_month = defaultdict(int), defaultdict(int)
     
-    # EXACT FIX: Forces Cairo Time (UTC+3) to perfectly sync with your timezone!
-    # Server running on Vercel is in UTC, so datetime.now() was previously returning July
-    # when it was actually August 1st in Egypt!
+    # 🕒 TIMEZONE FIX: Strictly use UTC+3 (Cairo) to calculate current month
     now_cairo = datetime.utcnow() + timedelta(hours=3)
     cm, cy = now_cairo.month, now_cairo.year
     
@@ -818,7 +777,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         hf = r.get("fields", {})
         h_date = parse_feishu_date(get_field_local(hf, "Submitted on Copy", "Submitted on", "Created Time"))
         
-        # With the Cairo Timezone fix above, this will now correctly include August 1st requests
+        # Only process records for the *current* Cairo month
         if not h_date or h_date.month != cm or h_date.year != cy: continue
 
         req_type      = extract_field_text(get_field_local(hf, "Request Type", "Type")).strip()
@@ -829,52 +788,52 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         target_type   = extract_field_text(get_field_local(hf, "Target Type")).strip()
         point_balance = extract_field_text(get_field_local(hf, "Point Balance")).strip()
         
-        # EXACT FIX: Extract IDs and Subtract Rejected from Submitted automatically
+        # 🆔 ACCEPTED ID RULE: Extract submitted minus rejected
         raw_user_ids = extract_field_text(get_field_local(hf, "User ID", "User Id", "User Ids")).strip()
-        raw_rej_ids  = extract_field_text(get_field_local(hf, "Rejected Ids", "Rejected IDs", "Rejected ids", "Rejected id", "Rejected ID")).strip()
-
+        raw_rej_ids  = extract_field_text(get_field_local(hf, "Rejected Ids", "Rejected IDs", "Rejected ids", "Rejected id")).strip()
         u_list = [x for x in re.split(r'[,\s\n]+', raw_user_ids) if x]
         r_list = [x for x in re.split(r'[,\s\n]+', raw_rej_ids) if x]
         accepted_u_list = [u for u in u_list if u not in r_list]
         accepted_ids_str = ", ".join(accepted_u_list)
 
         if "target" in req_type_lower:
+            # ✅ TARGET LOGIC
             privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
-            raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty")).strip()
+            raw_counter = extract_field_text(get_field_local(hf, "Counter", "Qty", "Quantity", "Quantities Input")).strip()
             qty = 1
             if raw_counter:
                 m = re.search(r'\d+', str(raw_counter))
                 if m: qty = int(m.group())
 
-            target_obj = {
+            history_target.append({
                 "date": h_date.strftime("%Y-%m-%d"), "_dt": h_date,
                 "request_type": req_type, "status": status_val,
-                "privilege": privilege_val, "quantities_input": str(qty) 
-            }
-            if accepted_ids_str:
-                target_obj["accepted_user_ids"] = accepted_ids_str
-            history_target.append(target_obj)
+                "privilege": privilege_val, "quantities_input": str(qty),
+                "accepted_user_ids": accepted_ids_str
+            })
 
             if s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
                 privileges_claimed[privilege_val] += qty
 
         else:
+            # ✅ POINTS LOGIC
             latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
             parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
             
-            if parsed_items: privilege_val = " + ".join([f"{k.strip()} ({v})" for k, v in parsed_items])
-            else: privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege")).strip()
+            if parsed_items: 
+                privilege_val = " + ".join([f"{k.strip()} ({v})" for k, v in parsed_items])
+            else: 
+                privilege_val = extract_field_text(get_field_local(hf, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
 
-            point_obj = {
+            history_points.append({
                 "date": h_date.strftime("%Y-%m-%d"), "_dt": h_date,
                 "request_type": req_type, "status": status_val,
                 "target_type": target_type, "point_balance": point_balance,
                 "privilege": privilege_val,
-                "quantities_input": extract_field_text(get_field_local(hf, "Quantities Input")).strip()
-            }
-            if accepted_ids_str:
-                point_obj["accepted_user_ids"] = accepted_ids_str
-            history_points.append(point_obj)
+                # 🔥 FIX: Added 'Counter' and 'Qty' so '4 trend card' quantity isn't missed!
+                "quantities_input": extract_field_text(get_field_local(hf, "Quantities Input", "Counter", "Qty", "Quantity")).strip(),
+                "accepted_user_ids": accepted_ids_str
+            })
 
             if not ("reject" in s_lower or "fail" in s_lower or "decline" in s_lower):
                 for item_name, item_qty in parsed_items:
@@ -1079,8 +1038,8 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
     return stats
 
-BACKGROUND_SYNC_INTERVAL = 180   
-BACKGROUND_SYNC_MAX_AGE  = 600   
+BACKGROUND_SYNC_INTERVAL = 1800  # 30 mins
+BACKGROUND_SYNC_MAX_AGE  = 3600  
 
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
@@ -1130,14 +1089,18 @@ def ensure_background_sync_started():
             _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
+    """🔥 PRIORITY 1: Always check background snapshots (RAM -> Redis) first! 
+       Only returns None if completely empty, forcing a live fetch fallback."""
     ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
+    # 1. Try RAM
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
         return items, keys, complete, reason, True
 
+    # 2. Try Redis (Survives Vercel Cold Starts)
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
         if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
@@ -1148,10 +1111,11 @@ def get_requests_table_snapshot(from_dt=None):
                 _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
             return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt) + (False,)
+    # 3. Cache Miss (Tell the router to do a Live Sharded Fetch)
+    return None, set(), False, "Cache Empty", False
+
 
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
 _bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
@@ -1210,11 +1174,9 @@ def get_points_table_snapshot():
                 _bg_points_sync["updated_at"]     = cached.get("updated_at", time.time())
                 _bg_points_sync["fetch_complete"] = cached.get("fetch_complete", True)
                 _bg_points_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_points_table, daemon=True).start()
             return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
-    return items, complete, reason, False
+    return None, False, "Cache Empty", False
 
 
 app = Flask(__name__)
@@ -1451,19 +1413,10 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # CHECK STATIC CRON FILE FIRST
-    static_data = load_static_json('points.json')
-    if static_data is not None:
-        all_items = static_data
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-    else:
-        if MOCK_MODE:
-            all_items = MockFeishuDB.generate_agency("All") * 10
-            fetch_complete, stop_reason = True, ""
-        else:
-            all_items, fetch_complete, stop_reason = fetch_points_sharded()
-            if not fetch_complete and not all_items:
-                all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
+    # 🔥 PRIORITY: Snapshot first, Live ONLY if Snapshot is totally missing
+    all_items, fetch_complete, stop_reason, _served_from_cache = get_points_table_snapshot()
+    if not all_items:
+        all_items, fetch_complete, stop_reason = fetch_points_sharded()
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
@@ -1768,23 +1721,14 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # CHECK STATIC CRON FILE FIRST
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
-        master_keys = set()
-        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-            master_keys = set(all_items[0]["fields"].keys())
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-        from_bg_cache = False
-    else:
+    # 🔥 PRIORITY: Snapshot first, Live ONLY if Snapshot is totally missing
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
+    if not all_items:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
-
         if not fetch_complete and not all_items:
-            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
@@ -1879,23 +1823,14 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # CHECK STATIC CRON FILE FIRST
-    static_data = load_static_json('requests.json')
-    if static_data is not None:
-        all_items = static_data
-        master_keys = set()
-        if all_items and isinstance(all_items[0], dict) and "fields" in all_items[0]:
-            master_keys = set(all_items[0]["fields"].keys())
-        fetch_complete, stop_reason = True, "loaded_from_static_json"
-        from_bg_cache = False
-    else:
+    # 🔥 PRIORITY: Snapshot first, Live ONLY if Snapshot is totally missing
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+
+    if not all_items:
         all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
         from_bg_cache = False
-
         if not fetch_complete and not all_items:
-            all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+            return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
@@ -1941,8 +1876,7 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
-        "mock_mode_active": MOCK_MODE,
-        "static_files_cached_in_ram": list(_static_cache.keys())
+        "mock_mode_active": MOCK_MODE
     })
 
 ensure_background_sync_started()
