@@ -401,6 +401,7 @@
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
         }
     </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -413,6 +414,7 @@
         <g id="icon-allocator"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></g>
         <g id="icon-target"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></g>
         <g id="icon-query"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+        <g id="icon-form"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></g>
         <g id="icon-admin"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g>
     </defs>
 </svg>
@@ -501,6 +503,33 @@
                 </div>
                 <div class="nav-group-body" id="navBodyQuery">
                     <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
+                </div>
+            </div>
+
+            <div class="nav-group" id="navGrpQuery">
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpQuery','navBodyQuery')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-query"></use></svg>
+                        <span data-i18n="universalQuery">Universal Query</span>
+                    </span>
+                    <span class="nav-arr" id="navArrQuery">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyQuery">
+                    <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
+                </div>
+            </div>
+
+            <div class="nav-group" id="navGrpSubmit">
+                <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpSubmit','navBodySubmit')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-form"></use></svg>
+                        <span data-i18n="submitRequest">Submit Request</span>
+                    </span>
+                    <span class="nav-arr" id="navArrSubmit">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodySubmit">
+                    <div class="nav-item" id="nav-new-request" onclick="openInTab('new-request')"><span data-i18n="newRequest">New Request</span></div>
                 </div>
             </div>
 
@@ -1323,6 +1352,33 @@
                         <p>No requests found for that value.</p>
                     </div>
                 </div>
+            <div id="pg-new-request" style="display:none">
+                <div class="card" style="max-width:800px; margin:0 auto;">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-form"></use></svg>
+                        <span data-i18n="createNewRequest">Create New Request</span>
+                    </h3>
+
+                    <form id="newRequestForm" onsubmit="submitReqForm(event)">
+                        <div class="control-grid" style="grid-template-columns:1fr; margin-bottom:24px;">
+                            <div class="control-group">
+                                <label>Request Type <span style="color:var(--accent-rose)">*</span></label>
+                                <select id="formRequestType" onchange="renderReqFormFields()" required style="border-color:var(--accent-cyan); background:rgba(0,212,255,0.05); font-weight:600;">
+                                    <option value="">-- Select Request Type --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="formDynamicFields" class="control-grid" style="display:none; padding-top:20px; border-top:1px dashed var(--border);">
+                            <!-- Fields injected dynamically -->
+                        </div>
+
+                        <div id="formSubmitArea" style="display:none; margin-top:32px;">
+                            <button type="submit" class="btn btn-primary" id="btnSubmitReq">Submit Request</button>
+                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:12px;">Files and inputs will be validated before submission.</p>
+                        </div>
+                    </form>
+                </div>
             </div>
 
         </div> 
@@ -1386,6 +1442,9 @@ const translations = {
         targetTimeline: "Target Timeline",
         universalQuery: "Universal Query",
         queryRequests: "Query Requests",
+        submitRequest: "Submit Request",
+        newRequest: "New Request",
+        createNewRequest: "Create New Request",
         accessManagement: "Access Management",
         manageAgents: "Manage Agents",
         auditLog: "Audit Log",
@@ -1409,6 +1468,9 @@ const translations = {
         targetTimeline: "目标时间表",
         universalQuery: "通用查询",
         queryRequests: "查询请求",
+        submitRequest: "提交请求",
+        newRequest: "新请求",
+        createNewRequest: "创建新请求",
         accessManagement: "权限管理",
         manageAgents: "管理代理",
         auditLog: "审计日志",
@@ -1454,7 +1516,8 @@ const pageTitlesMap = {
     'admin-audit': 'Audit Log',
     'points-records': 'Search Point Records',
     'points-table': 'Agency Point Table',
-    'query': 'Universal Query'
+    'query': 'Universal Query',
+    'new-request': 'New Request'
 };
 
 const zhPageTitlesMap = {
@@ -1469,12 +1532,13 @@ const zhPageTitlesMap = {
     'admin-audit': '审计日志',
     'points-records': '搜索记录',
     'points-table': '积分表',
-    'query': '通用查询'
+    'query': '通用查询',
+    'new-request': '新请求'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-new-request'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -1618,6 +1682,10 @@ function executePageLogic(page) {
     } else if(page==='query'){
         document.getElementById('pg-query').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
+    } else if(page==='new-request'){
+        document.getElementById('pg-new-request').style.display='block';
+        _expandNavGroup('navBodySubmit','navArrSubmit');
+        if(document.getElementById('formRequestType').options.length === 1) initReqFormOptions();
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
@@ -3382,10 +3450,10 @@ async function loadAgencyForAllocator() {
         if (msgEl) { msgEl.innerHTML = `❌ Failed to load agency: ${escHtml(err.message)}`; msgEl.style.color = 'var(--accent-rose)'; }
 
         const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '0.4';
-        controls.style.pointerEvents = 'none';
-    }
-    document.getElementById('loadingOverlay').style.display='none';
+        controls.style.opacity = '0.4';
+        controls.style.pointerEvents = 'none';
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3915,6 +3983,8 @@ function configureSidebarAndCards() {
         if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
     }
 
+    // Everyone logged in can submit requests, so no permission block needed for navGrpSubmit
+
     if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
 
     const icons = {
@@ -3924,6 +3994,7 @@ function configureSidebarAndCards() {
         allocator: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></svg>`,
         target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
         query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+        form: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
         admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
     };
 
@@ -3935,10 +4006,221 @@ function configureSidebarAndCards() {
     if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
     if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
     if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
     if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
 
     if (currentLang !== 'en') changeLanguage(currentLang);
 }
+
+// ════════════════════════════════════════════════════════════════════
+// NEW REQUEST FORM ENGINE
+// ════════════════════════════════════════════════════════════════════
+
+const REQ_BRANCHES = {
+    "Agency Creation": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", "Acm Name (PK)", "Acm Name (IN)", "Applier Note", "NID & Otherapp Screen"],
+    "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Acm Name (PK)", "Acm Name (IN)", "Applier Note"],
+    "Closing Agency": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Acm Name (PK)", "Acm Name (IN)", "Closing Reason", "Old ID", "Reporter ID", "Applier Note", "Evidence Screen"],
+    "BD Creation": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", "Acm Name (PK)", "Acm Name (IN)", "Applier Note", "NID & Otherapp Screen"],
+    "Remove BD ": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Acm Name (PK)", "Acm Name (IN)", "Applier Note"],
+    "Agency Target Privilege": ["Agency Code", "Agency Name", "Applier real name", "Target", "Privilege", "Applier Note", "Evidence Screen"],
+    "Agency Point Request": ["Agency Code", "Agency Name", "Applier real name", "Agency Point Privilege", "Applier Note", "Evidence Screen"],
+    "Change agency name ": ["Agency Code", "Agency Name", "Applier real name", "New agency name", "Applier Note", "Evidence Screen"],
+    "Change Agency Manger ID (with same owner)": ["Agency Code", "Agency Name", "Applier real name", "New ID", "Old ID", "Reporter ID", "Current agency manger name (same in NID )", "New agency owner ID", "Applier Note", "Evidence Screen"],
+    "Change Agency Ownership ": ["Agency Code", "Agency Name", "Applier real name", "New ID", "Old ID", "Reporter ID", "New agency owner ID", "New agency owner Name", "New and old onwer National IDS (Both NID)", "Applier Note", "Evidence Screen"],
+    "Merge agencies": ["Agency Code", "Agency Name", "Applier real name", "Agency to be merged and closed", "New agency name", "New ID", "Old ID", "Reporter ID", "Applier Note", "Evidence Screen"],
+    "Add & Remove Host Sign": ["Agency Code", "Agency Name", "Applier real name", "Type of Action Host sign", "Applier Note", "Evidence Screen"],
+    "Add & Remove games": ["Agency Code", "Agency Name", "Applier real name", "Type of Action 2", "Applier Note", "Evidence Screen"],
+    "Add & Change Short ID": ["User ID", "Applier real name", "New Short ID", "Applier Note", "Evidence Screen"],
+    "Remove short ID (only by user approve )": ["User ID", "Applier real name", "Applier Note", "Evidence Screen"],
+    "Welcome Package": ["User ID", "Applier real name", "New Short ID", "Wealth Level", "Vip Level", "Applier Note", "Evidence Screen"],
+    "App Rating Reward": ["User ID", "Applier real name", "Applier Note", "Evidence Screen"],
+    "Room Pinup (Only for the famous KOLS)": ["User ID", "Applier real name", "Applier Note", "Evidence Screen"]
+};
+
+const REQ_FIELD_DEFS = {
+    "Region": { type: "select", options: ["PK", "IN"], req: true },
+    "User ID": { type: "text", req: true },
+    "Agency Code": { type: "text", req: true },
+    "Agency Name": { type: "text", req: true },
+    "Applier real name": { type: "text", req: true },
+    "Otherapp Name": { type: "select", options: ["Yalla Ludo","Songora","Hello yo","Likee","Arza live","Ayoba","4Party","Bigo ","Ayome","Hiya","Poppo","YoYo","Yooy","Facebook ","viya","Yari","YoSo","sky live","Ahlan","Yalla ","Tami","HiFami","OYE TALK","GameGala","Chamet ","TikTok","Harunabad","Party star","Yaho ","Faya Star","Salam","Waki Star","Habi","Oner","RoStar","Wafa","Yoparti ","Yobi ","Starmaker","Facebook","Saya","Pawa","Migo","WePlay","Rina ","Tikko","Yudo ","Farah","Achat","Tada","Hayuki ","Imo","Hilo","1Star","Instgram","Yoparti","Islam","Hapi","Oichat","Halo Star","Funni","PotaLive ","Snapchat","Ume","Hago","hala","YoHoo Star","7stars","Ezzo","HamiParty","Spark live","Halla ","Taka ","YallaChat","StreamKar","Snack Video","Nawa ","Fomi Party","Meto","Popo","Kwai","Fancy Live","Coco ","JACO ","Hiiclub Pro","Famy","Vone"," Dimo chat ","SK Lite","Infriends","yolo","Ola Party ","Awaz ","TopVoice","Miparty ","HIBO ","Waky Pro","Joyo","Crush live","olamet","hoho","cocco ","Dawa ","Uouo","Baat Live","Heylla","Falla","Gamet ","StarChat ","WalaChat ","Doli Live","WeGo Party","Yo2 ","Lami","Nita","Faby Star","Ligo Live","ShareChat","Heyo Chat","MATE LIVE","SeaU Chat","Sawa ","Ochat ","Cat Live","Sango ","Ludo STAR","Seeya Live","PocoLive","LotFun","Gimme ","Hooka","Hichat ","YaYa ","bolo","SayHi","Yoki","Yaahlan ","Drago Live","2chat","Mr7ba","Gomo","Horo","HOOB Live","Zeep Live","Upfun","VoStar","Asha Live","Wyke","Haza","Hopi Star","Niki Live","Tayyb","Kome ","Naddy star","4Fun","Chatna","LaYam ","Mego","HOLLA","Vila","Wyak ","Yami ","Lama","HI FI","Weso","Okyi","Halawa ","Habbey Live","Tomohi ","MizMiz ","Lihoo","Youtube","ELive ","Vova","Pami ","LiveMe","Boomlive ","Gemgala","HeroVoice ","HiParty","Sodfa Chat","Fungo ","YU","Bingo Live","Haya","OurTalk","BoBo","Hati","Waky ","zs777","Pencil","LuvMug","Wikoo","LionsChat","Yayya","Alaab","Junko","NiuChat ","BuzzChat ","Azizi","masti","PartyYou","Nahki","Waho","ayou","Trendo","DramaTalk ","Tango","sama","yovi","Catchii","VoliStar","Walla","BestLive","KoKo","Sowa","Glow Live","Yoppo ","HelloTalk","Roka Live","Hady","Zilo Live","Timo Club","Chingari","Lukee","Fofoo","Dana ","SAHI","Chatta ","Yostar ","Azal Live","Elo TV","EloElo","Hayi","RAVA Live","Orii","Maza","Moj","Bulala","Oohla","Hoby","Toki","Sohha","Layaliya","Chatrika ","ZayChat","Waka","Zame","Eparty ","AloParty"], req: true },
+    "Otherapp ID": { type: "text", req: true },
+    "Country": { type: "text", req: true },
+    "Whatsapp Number": { type: "text", req: true },
+    "NID Number": { type: "text", req: true },
+    "Agency Type": { type: "select", options: ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"], req: true },
+    "Bd Code": { type: "text", req: true },
+    "Acm Name (PK)": { type: "select", options: ["Nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"], req: false },
+    "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella","nabeel"], req: false },
+    "Applier Note": { type: "text", req: false },
+    "NID & Otherapp Screen": { type: "file", req: true },
+    "Closing Reason": { type: "select", options: ["User Request","Duplicated Hosting","Acm Request","Opened by mistake"], req: true },
+    "Old ID": { type: "text", req: true },
+    "Reporter ID": { type: "text", req: true },
+    "Evidence Screen": { type: "file", req: true },
+    "BD Nickname": { type: "text", req: true },
+    "Email Adress": { type: "text", req: true },
+    "BD Hunted Agency Code": { type: "text", req: true },
+    "Target": { type: "text", req: true },
+    "Privilege": { type: "select", options: ["30 Mics","Dynamic Avatar","Game room","New User Welcome Room","20 Mics "], req: true },
+    "Agency Point Privilege": { type: "multiselect", options: ["Trend card ( 40 - 50 for others )","Traffic card ( 30 - 40 for others )","30 MIC 15 days ( 150 - 175 for others ) ","30 MIC 30 days ( 300 - 350 for others) ","Welcome Package 3 ( 80 )","Welcome Package 2 ( 30 )","Room Pin-Up ( 100 - 150 for others )","Customized Short ID 30 days ( 1200 - 1800 for others )","News banner ( 100 Points ) (No more than 5 days at one time)","Live banner ( 150 Points ) (No more than 5 days at one time)","Splash ( 1500 - 2000 for others )"], req: true },
+    "New agency name": { type: "text", req: true },
+    "New ID": { type: "text", req: true },
+    "Current agency manger name (same in NID )": { type: "text", req: true },
+    "New agency owner ID": { type: "text", req: true },
+    "New agency owner Name": { type: "text", req: true },
+    "New and old onwer National IDS (Both NID)": { type: "file", req: true },
+    "Agency to be merged and closed": { type: "text", req: true },
+    "Type of Action Host sign": { type: "select", options: ["Add Host Sign","Remove Host Sign"], req: true },
+    "Type of Action 2": { type: "select", options: ["Remove Games","ADD Games"], req: true },
+    "New Short ID": { type: "text", req: true },
+    "Wealth Level": { type: "text", req: true },
+    "Vip Level": { type: "text", req: true }
+};
+
+function initReqFormOptions() {
+    const sel = document.getElementById('formRequestType');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select Request Type --</option>';
+    Object.keys(REQ_BRANCHES).forEach(branch => {
+        sel.add(new Option(branch, branch));
+    });
+}
+
+function renderReqFormFields() {
+    const branch = document.getElementById('formRequestType').value;
+    const container = document.getElementById('formDynamicFields');
+    const submitArea = document.getElementById('formSubmitArea');
+
+    container.innerHTML = '';
+    if (!branch) {
+        container.style.display = 'none';
+        submitArea.style.display = 'none';
+        return;
+    }
+
+    const fields = REQ_BRANCHES[branch] || [];
+    fields.forEach(fName => {
+        const def = REQ_FIELD_DEFS[fName];
+        if (!def) return;
+
+        const reqMark = def.req ? '<span style="color:var(--accent-rose)">*</span>' : '';
+        const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
+
+        const wrap = document.createElement('div');
+        wrap.className = 'control-group';
+        wrap.innerHTML = `<label>${escHtml(fName)} ${reqMark}</label>`;
+
+        if (def.type === 'text') {
+            wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}">`;
+        } else if (def.type === 'select') {
+            let opts = `<option value="">-- Select --</option>`;
+            def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
+            wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''}>${opts}</select>`;
+        } else if (def.type === 'multiselect') {
+            let chks = def.options.map(o => `
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:500; cursor:pointer; color:var(--text); padding:4px 0; text-transform:none;">
+                    <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:16px;height:16px;accent-color:var(--accent-cyan);cursor:pointer;">
+                    ${escHtml(o)}
+                </label>`).join('');
+            wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; border-color:var(--border);">${chks}</div>`;
+        } else if (def.type === 'file') {
+            wrap.innerHTML += `
+                <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''} multiple 
+                    style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); padding:16px 14px;">`;
+        }
+
+        container.appendChild(wrap);
+    });
+
+    container.style.display = 'grid';
+    submitArea.style.display = 'block';
+}
+
+async function submitReqForm(e) {
+    e.preventDefault();
+    const form = e.target;
+    const branch = document.getElementById('formRequestType').value;
+    if (!branch) return;
+
+    // Validate Multi-Selects
+    let multiValid = true;
+    const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f].type === 'multiselect');
+    multiFields.forEach(mf => {
+        if (REQ_FIELD_DEFS[mf].req) {
+            const checked = form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`);
+            if (checked.length === 0) {
+                multiValid = false;
+                ToastManager.show(`Please select at least one option for ${mf}.`, 'warning');
+            }
+        }
+    });
+    if (!multiValid) return;
+
+    const btn = document.getElementById('btnSubmitReq');
+    const origTxt = btn.innerText;
+    btn.innerText = '⏳ Submitting to Feishu...';
+    btn.disabled = true;
+    document.getElementById('loadingOverlay').style.display = 'flex';
+
+    try {
+        const formData = new FormData(form);
+        const payloadFields = { "Request Type": branch };
+
+        // Process standard fields and collect multiples
+        form.querySelectorAll('input[type="text"], select').forEach(el => {
+            if (el.id === 'formRequestType') return;
+            if (el.value) payloadFields[el.name] = el.value;
+        });
+
+        multiFields.forEach(mf => {
+            const checked = Array.from(form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`)).map(c => c.value);
+            if (checked.length > 0) payloadFields[mf] = checked;
+        });
+
+        const finalData = new FormData();
+        finalData.append('user', loggedUser);
+        finalData.append('email', loggedEmail);
+        finalData.append('payload', JSON.stringify(payloadFields));
+
+        // Attach files specifically so Flask sees them under request.files
+        form.querySelectorAll('input[type="file"]').forEach(fInput => {
+            if (fInput.files.length > 0) {
+                Array.from(fInput.files).forEach(file => {
+                    finalData.append(fInput.name, file);
+                });
+            }
+        });
+
+        const res = await fetch('/api/requests/submit', {
+            method: 'POST',
+            body: finalData
+        });
+
+        let data;
+        try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response.'); }
+
+        if (!res.ok) throw new Error(data.error || 'Submission failed');
+
+        ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
+
+        // Reset form
+        form.reset();
+        document.getElementById('formDynamicFields').style.display = 'none';
+        document.getElementById('formSubmitArea').style.display = 'none';
+
+    } catch (e) {
+        ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
+    }
+
+    btn.innerText = origTxt;
+    btn.disabled = false;
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════════════
+// END NEW REQUEST FORM ENGINE
+// ════════════════════════════════════════════════════════════════════
 
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
