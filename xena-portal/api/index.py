@@ -50,6 +50,17 @@ QUERY_FIELD_ALIASES = {
     "bd_code":     ["Bd Code", "BD Code"],
 }
 
+# Strictly block users from manually overriding system/staff-managed fields during form submission
+EXCLUDED_SUBMIT_FIELDS = {
+    "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
+    "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
+    "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
+    "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
+    "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
+    "Assigned Member", "Done by", "Mentioned Person", "Assigned Time", "Completion Time",
+    "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Status", "Request Status"
+}
+
 MONTHLY_ALLOCATOR_LIMITS = {
     "trend card": 10, "traffic card": 50, "30 mic 15 days": 999, "30 mic 30 days": 999,
     "normal short id ( 2 levels above ) 15 days": 999, "normal short id ( 2 levels above ) 30 days": 999,
@@ -210,12 +221,10 @@ _data_status = {}   # diagnostic info per filename, surfaced via /api/debug/data
 SELF_BASE_URL = os.environ.get("SELF_BASE_URL", "").rstrip("/")
 
 def _candidate_data_paths(filename):
-    """Every plausible location the pre-fetched JSON could live at runtime on Vercel.
-    Different bundling behaviors (includeFiles vs static output vs cwd) land the file
-    in different places, so we just try them all instead of guessing once."""
-    here = os.path.abspath(__file__)                 # e.g. /var/task/api/index.py
-    api_dir = os.path.dirname(here)                  # .../api
-    project_root = os.path.dirname(api_dir)          # one level above /api
+    """Every plausible location the pre-fetched JSON could live at runtime on Vercel."""
+    here = os.path.abspath(__file__)                 
+    api_dir = os.path.dirname(here)                  
+    project_root = os.path.dirname(api_dir)          
     candidates = [
         os.path.join(project_root, 'public', 'data', filename),
         os.path.join(api_dir, 'public', 'data', filename),
@@ -231,11 +240,7 @@ def _candidate_data_paths(filename):
     return out
 
 def _fetch_data_over_http(filename):
-    """Last-resort fallback: pull the pre-built JSON from this SAME deployment's own
-    CDN-served static asset (public/data/<file>.json is published at /data/<file>.json
-    per vercel.json's routes). This works even when includeFiles bundling fails to put
-    the file on the function's local disk, because it goes over the network to the
-    already-deployed static file instead of relying on the filesystem."""
+    """Last-resort fallback: pull the pre-built JSON from this SAME deployment's own CDN-served static asset."""
     base = SELF_BASE_URL
     if not base:
         try:
@@ -257,10 +262,6 @@ def _fetch_data_over_http(filename):
     return None
 
 def load_local_json(filename):
-    """Loads a pre-fetched JSON file from public/data/, cached in RAM for 2 minutes.
-    Tries disk first (several candidate paths), then falls back to fetching it over
-    HTTP from this deployment's own /data/ static route. Returns None only if both
-    fail, in which case callers fall back to a live Feishu fetch."""
     with _local_json_lock:
         if filename in _local_json_cache:
             data, timestamp = _local_json_cache[filename]
@@ -487,7 +488,6 @@ def extract_field_list(field_data):
     return [str(field_data).strip()]
 
 def get_accepted_ids(fields):
-    """Rule: Accepted IDs = User ID(s) minus Rejected ID(s), for a single request record."""
     user_ids     = extract_field_list(get_field_local(fields, "User ID", "User Id"))
     rejected_ids = extract_field_list(get_field_local(fields, "Rejected Ids", "Rejected ID", "Rejected IDs", "Rejected Id"))
     rejected_set = {str(r).strip().lower() for r in rejected_ids if r}
@@ -809,11 +809,7 @@ REQUESTS_SHARD_COUNT = 10
 REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
 
 def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
-    """
-    FIX 4: Eliminated InvalidFilter (Feishu 1254018) Error.
-    Bypassing the Bitable sharded filter that breaks on mixed column types, and explicitly filtering
-    the results purely in Python side using `fetch_feishu_records`.
-    """
+    """Bypassing the Bitable sharded filter that breaks on mixed column types, and explicitly filtering the results purely in Python side using `fetch_feishu_records`."""
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -854,7 +850,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         points_payload = {
             "filter": {
                 "conjunction": "and",
-                # FIX 2: Fixed 7451 Bug using "contains"
                 "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]
             }
         }
@@ -865,7 +860,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
             raw_records = resp.get("data", {}).get("items", [])
             
-            # FIX 2: Exact matching to prevent partial matches like 74519 when searching 7451
             all_records = []
             for r in raw_records:
                 r_code = extract_field_text(get_field_local(r.get("fields", {}), "Agency Code"))
@@ -908,7 +902,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
             raw_hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
             
-            # Strict filtering for timeline records too
             hist_items = []
             for r in raw_hist_items:
                 r_code = extract_field_text(get_field_local(r.get("fields", {}), "Agency Code"))
@@ -933,7 +926,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         s_lower = status_val.lower()
         target_s_lower = target_status_val.lower()
 
-        # FIX 3: Emojis and Status Check applied universally!
         is_target_done   = any(ok in target_s_lower for ok in ("done", "complet", "approv", "confirm"))
         is_points_done   = any(ok in s_lower for ok in ("done", "complet", "approv", "confirm"))
         is_points_reject = any(rej in s_lower for rej in ("reject", "fail", "decline"))
@@ -955,7 +947,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             history_target.append({
                 "date": h_date.strftime("%Y-%m-%d"), "_dt": h_date,
                 "request_type": req_type, 
-                "status": target_status_val, # Dedicated Status
+                "status": target_status_val,
                 "privilege": privilege_val, "quantities_input": str(qty),
                 "accepted_ids": accepted_ids,
             })
@@ -967,7 +959,6 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             latest_usage  = extract_field_text(get_field_local(hf, "Latest Usage Tracker")).strip()
             parsed_items = re.findall(r'🔹\s*(.*?):\s*(\d+)', latest_usage)
             
-            # FIX 5: Use Latest Usage Tracker values as the true QTY
             if parsed_items: 
                 privilege_val = " + ".join([f"{k.strip()} ({v})" for k, v in parsed_items])
                 qty_input_val = str(sum(int(v) for k, v in parsed_items))
@@ -1244,7 +1235,6 @@ def ensure_background_sync_started():
             _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
-    # FIX 1: True Hybrid Fallback. Check the local file first.
     local_data = load_local_json("requests.json")
     if local_data:
         master_keys = set()
@@ -1252,7 +1242,6 @@ def get_requests_table_snapshot(from_dt=None):
             master_keys.update(local_data[0].get("fields", {}).keys())
         return local_data, master_keys, True, "", True
 
-    # Fallback to Threading/Redis
     ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
@@ -1317,7 +1306,6 @@ def ensure_points_sync_started():
             _bg_points_thread_started = True
 
 def get_points_table_snapshot():
-    # FIX 1: True Hybrid Fallback. Check the local file first.
     local_data = load_local_json("points.json")
     if local_data:
         return local_data, True, "", True
@@ -1421,7 +1409,6 @@ def search():
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
     allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
 
-    # 100% Live Feishu API - no local caching for search/target
     data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
     
     if data.get("found"):
@@ -1543,6 +1530,113 @@ def audit_logs():
     except Exception as e:
         logger.error("audit_log_fetch_failed", error=str(e))
         return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
+
+@app.route('/api/requests/submit', methods=['POST'])
+def submit_request():
+    """Handles new record submissions, uploads attachments directly to Feishu, and writes to DB."""
+    user = sanitize_text(request.form.get('user', ''))
+    email = sanitize_text(request.form.get('email', ''))
+    
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    try:
+        payload_str = request.form.get('payload', '{}')
+        user_fields = json.loads(payload_str)
+    except Exception as e:
+        return jsonify({"error": f"Invalid payload JSON: {str(e)}"}), 400
+
+    req_type = user_fields.get("Request Type")
+    if not req_type:
+        return jsonify({"error": "Request Type is required."}), 400
+
+    tat = get_tenant_access_token()
+    final_fields = {}
+
+    # 1. Filter JSON fields to enforce schema security
+    for key, val in user_fields.items():
+        if key not in EXCLUDED_SUBMIT_FIELDS:
+            if val not in (None, "", []):
+                final_fields[key] = val
+
+    # 2. Upload any sent attachments safely to Bitable 
+    for field_name in request.files:
+        if field_name in EXCLUDED_SUBMIT_FIELDS:
+            continue
+            
+        file_list = request.files.getlist(field_name)
+        tokens = []
+        
+        for f in file_list:
+            if not f.filename: continue
+                
+            file_bytes = f.read()
+            if not file_bytes: continue
+                
+            try:
+                form_data = {
+                    'file_name': f.filename,
+                    'parent_type': 'bitable_file',
+                    'parent_node': BASE_ID,
+                    'size': str(len(file_bytes))
+                }
+                files = {'file': (f.filename, file_bytes, f.mimetype)}
+                h = {"Authorization": f"Bearer {tat}"}
+                
+                up_res = http_requests.post(
+                    "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
+                    headers=h, data=form_data, files=files, timeout=30
+                ).json()
+                
+                if up_res.get("code") == 0:
+                    tokens.append({"file_token": up_res["data"]["file_token"]})
+                else:
+                    raise Exception(f"Upload API failed: {up_res.get('msg')}")
+            except Exception as e:
+                logger.error("file_upload_failed", error=str(e), filename=f.filename)
+                return jsonify({"error": f"Failed to upload {f.filename}. Error: {str(e)}"}), 502
+
+        if tokens:
+            final_fields[field_name] = tokens
+
+    # 3. Enforce Server-Side Default for Tracking 
+    final_fields["Request Status"] = "Pending"
+
+    # 4. Save Final Record in Feishu with proper retry backoff
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    success = False
+    feishu_err = ""
+    
+    for attempt in range(3):
+        try:
+            resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
+            data = resp.json()
+            
+            if data.get("code") == 0:
+                success = True
+                break
+            else:
+                feishu_err = data.get('msg', 'Unknown Error')
+                if data.get("code") == 1254045:
+                    feishu_err = "One of the provided fields does not match the exact Feishu column schema."
+                elif data.get("code") == 1254402:
+                    feishu_err = "An invalid option was selected for a dropdown field."
+                    
+                if attempt == 2:
+                    raise Exception(feishu_err)
+        except Exception as e:
+            if attempt == 2:
+                logger.error("feishu_submit_failed", error=str(e), req_type=req_type)
+                return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
+            time.sleep(1 * (attempt + 1))
+
+    # 5. Audit Trace Action
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')}", ip=ip, severity="Info")
+
+    return jsonify({"success": True, "message": f"Successfully submitted {req_type}!"})
 
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -1739,7 +1833,6 @@ def query_records():
 
     audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
 
-    # 100% Live Feishu API
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(10)
         fetch_complete, stop_reason, success = True, "", True
@@ -2028,8 +2121,6 @@ def debug_data_status():
         if not perms.get("is_super_admin"):
             return jsonify({"error": "Unauthorized"}), 403
 
-    # Force a lookup right now for the two big tables so the report is fresh,
-    # not just whatever happened to be cached from earlier requests.
     load_local_json("requests.json")
     load_local_json("points.json")
 
