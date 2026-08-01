@@ -312,7 +312,6 @@
         .health-At\.Risk,.health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
         .health-Critical{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
 
-        /* BEAUTIFUL TIMELINES & CARDS */
         .timeline{position:relative;padding-left:28px}
         .timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border)}
         .timeline-item{position:relative;margin-bottom:16px;}
@@ -404,7 +403,6 @@
 </head>
 <body>
 
-<!-- SVG ICONS -->
 <svg style="display:none;">
     <defs>
         <g id="icon-analytics"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
@@ -505,19 +503,6 @@
                 </div>
             </div>
 
-            <div class="nav-group" id="navGrpQuery">
-                <div class="nav-group-header" onclick="toggleNavGroup('navGrpQuery','navBodyQuery')">
-                    <span>
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-query"></use></svg>
-                        <span data-i18n="universalQuery">Universal Query</span>
-                    </span>
-                    <span class="nav-arr" id="navArrQuery">›</span>
-                </div>
-                <div class="nav-group-body" id="navBodyQuery">
-                    <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
-                </div>
-            </div>
-
             <div class="nav-group" id="navGrpSubmit">
                 <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpSubmit','navBodySubmit')">
@@ -533,6 +518,14 @@
             </div>
 
             <div class="nav-group" id="navGrpAdmin" style="display:none">
+                <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-admin"></use></svg>
+                        <span data-i18n="accessManagement">Access Management</span>
+                    </span>
+                    <span class="nav-arr" id="navArrAdmin">›</span>
+                </div>
                 <div class="nav-group-body" id="navBodyAdmin">
                     <div class="nav-item" id="nav-admin-agents" onclick="openInTab('admin-agents')"><span data-i18n="manageAgents">Manage Agents</span></div>
                     <div class="nav-item" id="nav-admin-audit"  onclick="openInTab('admin-audit')"><span data-i18n="auditLog">Audit Log</span></div>
@@ -553,7 +546,6 @@
             </div>
             
             <div class="top-bar-right">
-                <!-- Feishu Quick Links -->
                 <a class="utility-icon-btn" href="https://micoworld.feishu.cn/base/C9zFb52m4abhtHsX5LjcBywbnze?from=from_copylink" target="_blank" rel="noopener" title="Open Feishu Sheet" style="text-decoration:none">
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                 </a>
@@ -561,16 +553,13 @@
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
                 </a>
 
-                <!-- Theme Toggle -->
                 <button class="utility-icon-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">🌙</button>
                 
-                <!-- Language Selector -->
                 <select class="lang-select" id="langSelect" onchange="changeLanguage(this.value)">
                     <option value="en">English</option>
                     <option value="zh">中文</option>
                 </select>
                 
-                <!-- User Profile -->
                 <button class="user-profile-btn" onclick="alert('Profile Settings coming soon!')">
                     <img id="userAvatar" class="user-avatar" alt="User Avatar">
                     <span class="user-name" id="sidebarUsername">Loading…</span>
@@ -578,7 +567,6 @@
             </div>
         </div>
         
-        <!-- Tabs Row -->
         <div class="multi-tab-bar" id="multiTabBar">
             <!-- Tabs injected by JS -->
         </div>
@@ -586,7 +574,6 @@
         <input type="hidden" id="queryType" value="points">
 
         <div class="page-content-wrapper">
-            <!-- Content Divs go here -->
             <div id="pg-welcome" style="display:block">
                 <div id="noAccessMsg" style="display:none;color:var(--accent-rose);text-align:center;font-weight:bold;padding:20px;background:rgba(255,77,109,.1);border-radius:12px;margin-bottom:24px">
                     You do not have access to any modules. Please contact an administrator.
@@ -1007,7 +994,6 @@
                         <ul id="insightsList"></ul>
                     </div>
 
-                    <!-- KPI cards -->
                     <div class="kpi-grid">
                         <div class="kpi-card" data-metric="creations" onclick="crossFilter('creation_kpi',null)">
                             <div class="kpi-label">Creations</div>
@@ -1029,25 +1015,21 @@
                         </div>
                     </div>
 
-                    <!-- Row 1: 3 Status Donuts -->
                     <div class="chart-grid-3">
                         <div class="chart-box"><h3>Agency Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cCreation"></canvas></div></div>
                         <div class="chart-box"><h3>BD-Creation Status</h3><div class="chart-wrapper-pie"><canvas id="cBd"></canvas></div></div>
                         <div class="chart-box"><h3>Closing Agency Status</h3><div class="chart-wrapper-pie"><canvas id="cClosing"></canvas></div></div>
                     </div>
 
-                    <!-- Row 2: Rejection Reasons -->
                     <div class="chart-grid-1" style="margin-bottom:24px">
                         <div class="chart-box"><h3>Rejection Reasons</h3><div class="chart-wrapper-pie-large"><canvas id="cReject"></canvas></div></div>
                     </div>
 
-                    <!-- Row 3: Closing Reasons + ACM Closing Breakdown -->
                     <div class="chart-grid-2">
                         <div class="chart-box"><h3>Closing Reasons</h3><div class="chart-wrapper-pie"><canvas id="cClosePie"></canvas></div></div>
                         <div class="chart-box"><h3>ACM Closing Breakdown</h3><div class="chart-wrapper-bar"><canvas id="cCloseBar"></canvas></div></div>
                     </div>
 
-                    <!-- Row 4: ACM Performance -->
                     <div class="chart-box full-width" style="margin-bottom:24px">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                             <h3 style="margin-bottom:0">ACM Onboarding Performance</h3>
@@ -1067,24 +1049,20 @@
                         </div>
                     </div>
 
-                    <!-- Row 5: Guardian Types + Agency Types -->
                     <div class="chart-grid-2">
                         <div class="chart-box"><h3>Guardian Types</h3><div class="chart-wrapper-pie"><canvas id="cCreationType"></canvas></div></div>
                         <div class="chart-box"><h3>Agency Types</h3><div class="chart-wrapper-pie"><canvas id="cType"></canvas></div></div>
                     </div>
 
-                    <!-- Row 6: Other Apps Hosted -->
                     <div class="chart-grid-1" style="margin-bottom:24px">
                         <div class="chart-box"><h3>Other Apps Hosted</h3><div class="chart-wrapper-bar-tall"><canvas id="cOtherApp"></canvas></div></div>
                     </div>
 
-                    <!-- Row 7: Daily Trend lines -->
                     <div class="chart-grid-2">
                         <div class="chart-box"><h3>Daily Agency Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendCreation"></canvas></div></div>
                         <div class="chart-box"><h3>Daily BD Creations Trend</h3><div class="chart-wrapper-bar"><canvas id="cTrendBd"></canvas></div></div>
                     </div>
 
-                    <!-- Row 8: Activity Heatmap -->
                     <div class="chart-box full-width" id="heatmapBox" style="margin-bottom:24px">
                         <h3>Activity Heatmap</h3>
                         <div class="heatmap-outer">
@@ -1379,9 +1357,6 @@
 </div>
 
 <script>
-// ════════════════════════════════════════════════════════════════════
-// GLOBALS & STATE
-// ════════════════════════════════════════════════════════════════════
 let currentAgencyData=null, latestAnalyticsData=null, charts={};
 let userPermissions=null; 
 let isAdmin=false, userModules=[];
@@ -1395,9 +1370,6 @@ let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQue
 
 const urlParams=new URLSearchParams(window.location.search);
 
-// ════════════════════════════════════════════════════════════════════
-// UI HELPERS (User Badges, Safe Parsing)
-// ════════════════════════════════════════════════════════════════════
 function renderUserIds(ids) {
     if (!ids || !ids.length) return '';
     return `<div class="tl-users">
@@ -1406,9 +1378,6 @@ function renderUserIds(ids) {
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════════════════
-// CLIENT-SIDE AUDIT LOGGING
-// ════════════════════════════════════════════════════════════════════
 function logFrontendAction(action, target, severity="Info") {
     fetch('/api/audit/log-action', {
         method: 'POST',
@@ -1417,9 +1386,6 @@ function logFrontendAction(action, target, severity="Info") {
     }).catch(e => console.error('Audit fail', e));
 }
 
-// ════════════════════════════════════════════════════════════════════
-// TRANSLATION ENGINE
-// ════════════════════════════════════════════════════════════════════
 const translations = {
     en: {
         agencyAnalysis: "Agency Analysis",
@@ -1494,9 +1460,6 @@ function changeLanguage(lang) {
     renderTabs(); 
 }
 
-// ════════════════════════════════════════════════════════════════════
-// MULTI-TAB SYSTEM
-// ════════════════════════════════════════════════════════════════════
 const pageTitlesMap = {
     'welcome': 'Welcome',
     'analytics': 'Analytics Report',
@@ -1532,6 +1495,7 @@ const zhPageTitlesMap = {
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-new-request'];
+
 function openInTab(page) {
     if (!openTabs.includes(page)) {
         openTabs.push(page);
@@ -1681,7 +1645,7 @@ function executePageLogic(page) {
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
-
+}
 
 function filterSidebar() {
     const term = document.getElementById('sidebarSearch').value.toLowerCase();
@@ -1714,9 +1678,6 @@ function filterSidebar() {
     });
 }
 
-// ════════════════════════════════════════════════════════════════════
-// TOAST NOTIFICATION SYSTEM
-// ════════════════════════════════════════════════════════════════════
 const ToastManager = {
     show(msg, type='info', duration=5000) {
         const icons = {success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
@@ -1749,9 +1710,6 @@ const ToastManager = {
     }
 };
 
-// ════════════════════════════════════════════════════════════════════
-// KEYBOARD SHORTCUTS & THEMES
-// ════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
@@ -1866,10 +1824,6 @@ function _expandNavGroup(bodyId,arrId){
     if(body&&!body.classList.contains('open')){body.classList.add('open');if(arr)arr.classList.add('open');}
 }
 
-// ════════════════════════════════════════════════════════════════════
-// URL AND INITIALIZATION HANDLING
-// ════════════════════════════════════════════════════════════════════
-
 if (urlParams.get('auth_error')) {
     const authErr = urlParams.get('auth_error');
     setTimeout(()=>{
@@ -1930,9 +1884,6 @@ function closeSidebar(){
     document.getElementById('sidebarBackdrop').classList.remove('visible');
 }
 
-// ════════════════════════════════════════════════════════════════════
-// COMPARE ENGINE (Dedicated Module)
-// ════════════════════════════════════════════════════════════════════
 const COMPARE_GROUP_COLORS = ['#00d4ff','#00e676','#b967ff','#ffb800'];
 
 function setCompareMode(mode,btn){
@@ -2139,9 +2090,6 @@ async function runAcmCompare(){
 }
 
 
-// ════════════════════════════════════════════════════════════════════
-// ANALYTICS FILTERS
-// ════════════════════════════════════════════════════════════════════
 function updateCustomDateVisibility() {
     const isSpec=document.getElementById('anaDatePreset').value==='specific';
     document.getElementById('customFromDiv').style.display=isSpec?'block':'none';
@@ -2255,9 +2203,6 @@ function parseGranular(str,module) {
     return ['all'];
 }
 
-// ════════════════════════════════════════════════════════════════════
-// ADMIN ACTIONS
-// ════════════════════════════════════════════════════════════════════
 function editAgent(email,modulesStr,acmsRaw,regRaw) {
     document.getElementById('newAgentEmail').value=email;
     const m = modulesStr.toLowerCase();
@@ -2509,9 +2454,6 @@ function applyFiltersAndRedraw() {
     drawCharts(latestAnalyticsData);
 }
 
-// ════════════════════════════════════════════════════════════════════
-// ANALYTICS CORE
-// ════════════════════════════════════════════════════════════════════
 async function generateAnalytics() {
     if (document.getElementById('anaDatePreset').value!=='specific') setDatePresets();
     const region=document.getElementById('anaRegion').value;
@@ -2770,6 +2712,7 @@ function buildLeaderboard(acmEntries) {
         </tr>`;
     }).join('');
 }
+
 function switchAcmView(view,btn) {
     document.querySelectorAll('#analyticsContainer .tab-bar .tab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
@@ -3056,8 +2999,6 @@ function updatePrivilegeGrid() {
 
     const history = currentAgencyData.history || [];
     
-    // CAIRO TIMEZONE FIX: The backend already filters `history` to strictly the current month
-    // in Cairo time. We no longer do local `new Date().getMonth()` matching here, which caused the "Remaining is 33" bug.
     history.forEach(r => {
         const reqPriv = String(r.privilege || '').toLowerCase();
         if (!reqPriv.includes(priv.toLowerCase())) return;
@@ -3115,7 +3056,6 @@ function buildTargetTimeline() {
     }).join('');
 }
 
-// Authoritative privilege ruleset
 const pointPriceDB=[
     {key:"trend card",same:40,other:50,limit:10},
     {key:"traffic card",same:30,other:40,limit:50},
@@ -3250,9 +3190,6 @@ function buildPointsHistory(history) {
         }).join('');
 }
 
-// ════════════════════════════════════════════════════════════════════
-// SMART ALLOCATOR
-// ════════════════════════════════════════════════════════════════════
 function allocSelectAll() {
     document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
         el.classList.add('active');
@@ -3442,10 +3379,10 @@ async function loadAgencyForAllocator() {
         if (msgEl) { msgEl.innerHTML = `❌ Failed to load agency: ${escHtml(err.message)}`; msgEl.style.color = 'var(--accent-rose)'; }
 
         const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '0.4';
-        controls.style.pointerEvents = 'none';
-    }
-    document.getElementById('loadingOverlay').style.display='none';
+        controls.style.opacity = '0.4';
+        controls.style.pointerEvents = 'none';
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3975,8 +3912,6 @@ function configureSidebarAndCards() {
         if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
     }
 
-    // Everyone logged in can submit requests, so no permission block needed for navGrpSubmit
-
     if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
 
     const icons = {
@@ -3998,7 +3933,9 @@ function configureSidebarAndCards() {
     if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
     if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
     if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    
     wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
+    
     if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
 
     if (currentLang !== 'en') changeLanguage(currentLang);
@@ -4135,7 +4072,6 @@ async function submitReqForm(e) {
     const branch = document.getElementById('formRequestType').value;
     if (!branch) return;
 
-    // Validate Multi-Selects
     let multiValid = true;
     const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f].type === 'multiselect');
     multiFields.forEach(mf => {
@@ -4159,7 +4095,6 @@ async function submitReqForm(e) {
         const formData = new FormData(form);
         const payloadFields = { "Request Type": branch };
 
-        // Process standard fields and collect multiples
         form.querySelectorAll('input[type="text"], select').forEach(el => {
             if (el.id === 'formRequestType') return;
             if (el.value) payloadFields[el.name] = el.value;
@@ -4175,7 +4110,6 @@ async function submitReqForm(e) {
         finalData.append('email', loggedEmail);
         finalData.append('payload', JSON.stringify(payloadFields));
 
-        // Attach files specifically so Flask sees them under request.files
         form.querySelectorAll('input[type="file"]').forEach(fInput => {
             if (fInput.files.length > 0) {
                 Array.from(fInput.files).forEach(file => {
@@ -4196,7 +4130,6 @@ async function submitReqForm(e) {
 
         ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
         
-        // Reset form
         form.reset();
         document.getElementById('formDynamicFields').style.display = 'none';
         document.getElementById('formSubmitArea').style.display = 'none';
@@ -4210,12 +4143,7 @@ async function submitReqForm(e) {
     document.getElementById('loadingOverlay').style.display = 'none';
 }
 
-// ════════════════════════════════════════════════════════════════════
-// END NEW REQUEST FORM ENGINE
-// ════════════════════════════════════════════════════════════════════
-
 if (loggedUser&&loggedUat) {
-
     document.getElementById('loginOverlay').style.display='none';
     document.querySelector('.app-shell').style.display='flex';
     
