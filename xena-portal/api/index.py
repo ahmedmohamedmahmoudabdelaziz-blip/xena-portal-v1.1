@@ -712,6 +712,8 @@ QUERY_RECORDS_FIELDS = [
     "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member", "Region",
     "Bd Code", "BD Code", "NID Number", "NID", "Status", "Request Status",
     "Reject Reason", "Rejection Reason", "Audition note", "Audition Note", "Duplicated Check",
+    "Agency Code", "Agency Type", "Type of Agency",
+    "Closing Reason", "Closing Agencies Reason",
 ]
 
 def _date_filter_value(dt):
@@ -1813,6 +1815,8 @@ def query_records():
             "submitted_on":     submitted_dt.strftime("%Y-%m-%d") if submitted_dt else extract_field_text(submitted_raw),
             "respondents":      extract_field_text(get_field_local(fields, "Respondents")),
             "user_id":          extract_field_text(get_field_local(fields, "User ID")),
+            "agency_code":      extract_field_text(get_field_local(fields, "Agency Code")),
+            "agency_type":      extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
             "otherapp_id":      extract_field_text(get_field_local(fields, "Otherapp ID", "Otherapp Name", "Other App Name")),
             "acm":              acm.title() if acm else "",
             "region":           region.upper() if region else "",
@@ -1821,6 +1825,7 @@ def query_records():
             "reject_reason":    extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason")),
             "audition_note":    extract_field_text(get_field_local(fields, "Audition note", "Audition Note")),
             "duplicated_check": extract_field_text(get_field_local(fields, "Duplicated Check")),
+            "closing_reason":   extract_field_text(get_field_local(fields, "Closing Reason", "Closing Agencies Reason")),
             "_sort_ts": submitted_dt.timestamp() if submitted_dt else 0,
         })
 
