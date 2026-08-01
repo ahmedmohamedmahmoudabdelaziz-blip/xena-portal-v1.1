@@ -146,6 +146,7 @@
         .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
         .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email],.control-group input[type=number]{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
+        select option, .control-group select option { background:var(--surface); color:var(--text); }
         .control-group select:focus,.control-group input:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
         
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
@@ -500,6 +501,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodyQuery">
                     <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
+                    <div class="nav-item" id="nav-agency-list" onclick="openInTab('agency-list')"><span data-i18n="agencyList">Agency List</span></div>
                 </div>
             </div>
 
@@ -514,6 +516,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodySubmit">
                     <div class="nav-item" id="nav-new-request" onclick="openInTab('new-request')"><span data-i18n="newRequest">New Request</span></div>
+                    <div class="nav-item" id="nav-my-requests" onclick="openInTab('my-requests')"><span data-i18n="myRecentRequests">My Recent Requests</span></div>
                 </div>
             </div>
 
@@ -891,10 +894,20 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_agency_list" checked> Agency List</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
                                 <div class="control-group"><label>Regions</label><div class="pill-select-container" id="queryRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <div class="module-card">
+                            <div class="module-header">
+                                <h4>📝 Submit Request Module</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_new_request" checked> New Request</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_my_requests" checked> My Recent Requests</label>
                             </div>
                         </div>
                         <div class="module-card" style="border-color:var(--accent-purple)">
@@ -1473,7 +1486,9 @@ const pageTitlesMap = {
     'points-records': 'Search Point Records',
     'points-table': 'Agency Point Table',
     'query': 'Universal Query',
-    'new-request': 'New Request'
+    'agency-list': 'Agency List',
+    'new-request': 'New Request',
+    'my-requests': 'My Recent Requests'
 };
 
 const zhPageTitlesMap = {
@@ -1489,12 +1504,14 @@ const zhPageTitlesMap = {
     'points-records': '搜索记录',
     'points-table': '积分表',
     'query': '通用查询',
-    'new-request': '新请求'
+    'agency-list': '机构列表',
+    'new-request': '新请求',
+    'my-requests': '我的最近请求'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-new-request'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -2210,7 +2227,8 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'query_requests'].forEach(key => {
+     'query_requests','query_agency_list',
+     'submit_new_request','submit_my_requests'].forEach(key => {
         const master = key.split('_')[0];
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
@@ -2286,7 +2304,8 @@ async function addAgent() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'query_requests'].forEach(m => {
+     'query_requests','query_agency_list',
+     'submit_new_request','submit_my_requests'].forEach(m => {
         if(document.getElementById(`mod_${m}`).checked) modules.push(m);
     });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
@@ -3910,6 +3929,13 @@ function configureSidebarAndCards() {
     if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
     else {
         if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
+        if (!hasExactMod('query_agency_list') && !hasExactMod('query')) { const el=document.getElementById('nav-agency-list'); if (el) el.style.display = 'none'; }
+    }
+
+    if (!hasMod('submit')) document.getElementById('navGrpSubmit').style.display = 'none';
+    else {
+        if (!hasExactMod('submit_new_request') && !hasExactMod('submit')) document.getElementById('nav-new-request').style.display = 'none';
+        if (!hasExactMod('submit_my_requests') && !hasExactMod('submit')) { const el=document.getElementById('nav-my-requests'); if (el) el.style.display = 'none'; }
     }
 
     if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
@@ -3945,25 +3971,38 @@ function configureSidebarAndCards() {
 // NEW REQUEST FORM ENGINE
 // ════════════════════════════════════════════════════════════════════
 
+// Fields tagged ACM_AUTO are resolved at render-time to the single correct ACM field for the
+// chosen Region (Acm Name (PK) if Region=PK, Acm Name (IN) if Region=IN) instead of showing both.
+const ACM_AUTO = "__ACM_AUTO__";
+
 const REQ_BRANCHES = {
-    "Agency Creation": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", "Acm Name (PK)", "Acm Name (IN)", "Applier Note", "NID & Otherapp Screen"],
-    "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Acm Name (PK)", "Acm Name (IN)", "Applier Note"],
-    "Closing Agency": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Acm Name (PK)", "Acm Name (IN)", "Closing Reason", "Old ID", "Reporter ID", "Applier Note", "Evidence Screen"],
-    "BD Creation": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", "Acm Name (PK)", "Acm Name (IN)", "Applier Note", "NID & Otherapp Screen"],
-    "Remove BD ": ["Region", "User ID", "Agency Code", "Agency Name", "Applier real name", "Acm Name (PK)", "Acm Name (IN)", "Applier Note"],
-    "Agency Target Privilege": ["Agency Code", "Agency Name", "Applier real name", "Target", "Privilege", "Applier Note", "Evidence Screen"],
-    "Agency Point Request": ["Agency Code", "Agency Name", "Applier real name", "Agency Point Privilege", "Applier Note", "Evidence Screen"],
-    "Change agency name ": ["Agency Code", "Agency Name", "Applier real name", "New agency name", "Applier Note", "Evidence Screen"],
-    "Change Agency Manger ID (with same owner)": ["Agency Code", "Agency Name", "Applier real name", "New ID", "Old ID", "Reporter ID", "Current agency manger name (same in NID )", "New agency owner ID", "Applier Note", "Evidence Screen"],
-    "Change Agency Ownership ": ["Agency Code", "Agency Name", "Applier real name", "New ID", "Old ID", "Reporter ID", "New agency owner ID", "New agency owner Name", "New and old onwer National IDS (Both NID)", "Applier Note", "Evidence Screen"],
-    "Merge agencies": ["Agency Code", "Agency Name", "Applier real name", "Agency to be merged and closed", "New agency name", "New ID", "Old ID", "Reporter ID", "Applier Note", "Evidence Screen"],
-    "Add & Remove Host Sign": ["Agency Code", "Agency Name", "Applier real name", "Type of Action Host sign", "Applier Note", "Evidence Screen"],
-    "Add & Remove games": ["Agency Code", "Agency Name", "Applier real name", "Type of Action 2", "Applier Note", "Evidence Screen"],
-    "Add & Change Short ID": ["User ID", "Applier real name", "New Short ID", "Applier Note", "Evidence Screen"],
-    "Remove short ID (only by user approve )": ["User ID", "Applier real name", "Applier Note", "Evidence Screen"],
-    "Welcome Package": ["User ID", "Applier real name", "New Short ID", "Wealth Level", "Vip Level", "Applier Note", "Evidence Screen"],
-    "App Rating Reward": ["User ID", "Applier real name", "Applier Note", "Evidence Screen"],
-    "Room Pinup (Only for the famous KOLS)": ["User ID", "Applier real name", "Applier Note", "Evidence Screen"]
+    "Agency Creation": ["Region", "User ID", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", ACM_AUTO, "Applier Note", "Evidence Screen 2"],
+    "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
+    "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "Remove BD ": ["Region", "User ID", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen 2"],
+    "Agency Target Privilege": ["Region", "User ID", "Agency Code", "Target", "Privilege", "Applier Note", "Evidence Screen 2"],
+    "Agency Point Request": ["Region", "User ID", "Agency Code", "Agency Point Privilege", "Applier Note", "Evidence Screen 2"],
+    "Change agency name ": ["Region", "User ID", "Agency Code", "New agency name", "Applier Note", "Evidence Screen"],
+    "Change Agency Manger ID (with same owner)": ["Region", "User ID", "Agency Code", "Current agency manger name (same in NID )", "New agency owner ID", "Applier Note", "Evidence Screen 2"],
+    "Change Agency Ownership ": ["Region", "User ID", "Agency Code", "New agency owner ID", "New agency owner Name", "New and old onwer National IDS (Both NID)", "Applier Note", "Evidence Screen"],
+    "Merge agencies": ["Region", "User ID", "Agency Code", "Agency to be merged and closed", "Applier Note", "Evidence Screen"],
+    "Add & Remove Host Sign": ["Region", "User ID", "Agency Code", "Type of Action Host sign", "Applier Note", "Evidence Screen"],
+    "Add & Remove games": ["Region", "User ID", "Type of Action 2", "Applier Note", "Evidence Screen 2"],
+    "Add & Change Short ID": ["Region", "User ID", "New Short ID", "Vip Level", "Applier Note", "Evidence Screen 2"],
+    "Remove short ID (only by user approve )": ["Region", "User ID", "Applier Note", "Evidence Screen"],
+    "Welcome Package": ["Region", "User ID", "Wealth Level", "Applier Note", "Evidence Screen 2"],
+    "App Rating Reward": ["Region", "User ID", "Applier Note", "Evidence Screen"],
+    "Room Pinup (Only for the famous KOLS)": ["Region", "User ID", "Applier Note", "Evidence Screen 2"]
+};
+
+// Extra fields that only appear conditionally WITHIN a branch, based on another field's value
+// in that same branch (not based on Request Type). Currently only "Closing Agency" needs this:
+// the New ID / Old ID / Reporter ID trio only shows when Closing Reason = "Duplicated Hosting".
+const REQ_SUBCONDITIONS = {
+    "Closing Agency": [
+        { when: "Closing Reason", equals: "Duplicated Hosting", fields: ["New ID", "Old ID", "Reporter ID"] }
+    ]
 };
 
 const REQ_FIELD_DEFS = {
@@ -3973,24 +4012,25 @@ const REQ_FIELD_DEFS = {
     "Agency Name": { type: "text", req: true },
     "Applier real name": { type: "text", req: true },
     "Otherapp Name": { type: "select", options: ["Yalla Ludo","Songora","Hello yo","Likee","Arza live","Ayoba","4Party","Bigo ","Ayome","Hiya","Poppo","YoYo","Yooy","Facebook ","viya","Yari","YoSo","sky live","Ahlan","Yalla ","Tami","HiFami","OYE TALK","GameGala","Chamet ","TikTok","Harunabad","Party star","Yaho ","Faya Star","Salam","Waki Star","Habi","Oner","RoStar","Wafa","Yoparti ","Yobi ","Starmaker","Facebook","Saya","Pawa","Migo","WePlay","Rina ","Tikko","Yudo ","Farah","Achat","Tada","Hayuki ","Imo","Hilo","1Star","Instgram","Yoparti","Islam","Hapi","Oichat","Halo Star","Funni","PotaLive ","Snapchat","Ume","Hago","hala","YoHoo Star","7stars","Ezzo","HamiParty","Spark live","Halla ","Taka ","YallaChat","StreamKar","Snack Video","Nawa ","Fomi Party","Meto","Popo","Kwai","Fancy Live","Coco ","JACO ","Hiiclub Pro","Famy","Vone"," Dimo chat ","SK Lite","Infriends","yolo","Ola Party ","Awaz ","TopVoice","Miparty ","HIBO ","Waky Pro","Joyo","Crush live","olamet","hoho","cocco ","Dawa ","Uouo","Baat Live","Heylla","Falla","Gamet ","StarChat ","WalaChat ","Doli Live","WeGo Party","Yo2 ","Lami","Nita","Faby Star","Ligo Live","ShareChat","Heyo Chat","MATE LIVE","SeaU Chat","Sawa ","Ochat ","Cat Live","Sango ","Ludo STAR","Seeya Live","PocoLive","LotFun","Gimme ","Hooka","Hichat ","YaYa ","bolo","SayHi","Yoki","Yaahlan ","Drago Live","2chat","Mr7ba","Gomo","Horo","HOOB Live","Zeep Live","Upfun","VoStar","Asha Live","Wyke","Haza","Hopi Star","Niki Live","Tayyb","Kome ","Naddy star","4Fun","Chatna","LaYam ","Mego","HOLLA","Vila","Wyak ","Yami ","Lama","HI FI","Weso","Okyi","Halawa ","Habbey Live","Tomohi ","MizMiz ","Lihoo","Youtube","ELive ","Vova","Pami ","LiveMe","Boomlive ","Gemgala","HeroVoice ","HiParty","Sodfa Chat","Fungo ","YU","Bingo Live","Haya","OurTalk","BoBo","Hati","Waky ","zs777","Pencil","LuvMug","Wikoo","LionsChat","Yayya","Alaab","Junko","NiuChat ","BuzzChat ","Azizi","masti","PartyYou","Nahki","Waho","ayou","Trendo","DramaTalk ","Tango","sama","yovi","Catchii","VoliStar","Walla","BestLive","KoKo","Sowa","Glow Live","Yoppo ","HelloTalk","Roka Live","Hady","Zilo Live","Timo Club","Chingari","Lukee","Fofoo","Dana ","SAHI","Chatta ","Yostar ","Azal Live","Elo TV","EloElo","Hayi","RAVA Live","Orii","Maza","Moj","Bulala","Oohla","Hoby","Toki","Sohha","Layaliya","Chatrika ","ZayChat","Waka","Zame","Eparty ","AloParty"], req: true },
-    "Otherapp ID": { type: "text", req: true },
-    "Country": { type: "text", req: true },
+    "Otherapp ID": { type: "text", req: false },
+    "Country": { type: "text", req: false },
     "Whatsapp Number": { type: "text", req: true },
     "NID Number": { type: "text", req: true },
     "Agency Type": { type: "select", options: ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"], req: true },
     "Bd Code": { type: "text", req: true },
-    "Acm Name (PK)": { type: "select", options: ["Nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"], req: false },
-    "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella","nabeel"], req: false },
+    "Acm Name (PK)": { type: "select", options: ["Nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"], req: true },
+    "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella","nabeel"], req: true },
     "Applier Note": { type: "text", req: false },
     "NID & Otherapp Screen": { type: "file", req: true },
     "Closing Reason": { type: "select", options: ["User Request","Duplicated Hosting","Acm Request","Opened by mistake"], req: true },
     "Old ID": { type: "text", req: true },
     "Reporter ID": { type: "text", req: true },
     "Evidence Screen": { type: "file", req: true },
+    "Evidence Screen 2": { type: "file", req: false },
     "BD Nickname": { type: "text", req: true },
     "Email Adress": { type: "text", req: true },
     "BD Hunted Agency Code": { type: "text", req: true },
-    "Target": { type: "text", req: true },
+    "Target": { type: "text", req: false },
     "Privilege": { type: "select", options: ["30 Mics","Dynamic Avatar","Game room","New User Welcome Room","20 Mics "], req: true },
     "Agency Point Privilege": { type: "multiselect", options: ["Trend card ( 40 - 50 for others )","Traffic card ( 30 - 40 for others )","30 MIC 15 days ( 150 - 175 for others ) ","30 MIC 30 days ( 300 - 350 for others) ","Welcome Package 3 ( 80 )","Welcome Package 2 ( 30 )","Room Pin-Up ( 100 - 150 for others )","Customized Short ID 30 days ( 1200 - 1800 for others )","News banner ( 100 Points ) (No more than 5 days at one time)","Live banner ( 150 Points ) (No more than 5 days at one time)","Splash ( 1500 - 2000 for others )"], req: true },
     "New agency name": { type: "text", req: true },
@@ -4016,11 +4056,73 @@ function initReqFormOptions() {
     });
 }
 
+function acmFieldForRegion(region) {
+    // Maps a selected Region to the single correct ACM field name/def.
+    if (region === 'PK') return { name: 'Acm Name (PK)', def: REQ_FIELD_DEFS['Acm Name (PK)'] };
+    if (region === 'IN') return { name: 'Acm Name (IN)', def: REQ_FIELD_DEFS['Acm Name (IN)'] };
+    return null;
+}
+
+function buildFieldControl(fName, def, req) {
+    const reqMark = req ? '<span style="color:var(--accent-rose)">*</span>' : '';
+    const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
+    const wrap = document.createElement('div');
+    wrap.className = 'control-group';
+    wrap.dataset.field = fName;
+    wrap.innerHTML = `<label>${escHtml(fName)} ${reqMark}</label>`;
+
+    if (def.type === 'text') {
+        wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}">`;
+    } else if (def.type === 'select') {
+        let opts = `<option value="">-- Select --</option>`;
+        def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
+        wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''}>${opts}</select>`;
+    } else if (def.type === 'multiselect') {
+        let chks = def.options.map(o => `
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:500; cursor:pointer; color:var(--text); padding:4px 0; text-transform:none;">
+                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:16px;height:16px;accent-color:var(--accent-cyan);cursor:pointer;">
+                ${escHtml(o)}
+            </label>`).join('');
+        wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; border-color:var(--border);">${chks}</div>`;
+    } else if (def.type === 'file') {
+        wrap.innerHTML += `
+            <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} multiple
+                style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); padding:16px 14px;">`;
+    }
+    return wrap;
+}
+
+function refreshAcmAutoSlot() {
+    const slot = document.getElementById('acmAutoSlot');
+    if (!slot) return;
+    const regionSel = document.getElementById('reqfld_Region');
+    const region = regionSel ? regionSel.value : '';
+    slot.innerHTML = '';
+    const resolved = acmFieldForRegion(region);
+    if (resolved) {
+        slot.appendChild(buildFieldControl(resolved.name, resolved.def, true));
+    } else {
+        const hint = document.createElement('div');
+        hint.className = 'control-group';
+        hint.innerHTML = `<label>ACM</label><div style="padding:10px;color:var(--text-muted);font-size:.85rem;border:1px dashed var(--border);border-radius:8px">Select a Region above to choose the ACM</div>`;
+        slot.appendChild(hint);
+    }
+}
+
+function refreshClosingReasonSubfields() {
+    const wrap = document.getElementById('closingSubWrap');
+    if (!wrap) return;
+    const reasonSel = document.getElementById('reqfld_Closing_Reason');
+    const show = reasonSel && reasonSel.value === 'Duplicated Hosting';
+    wrap.style.display = show ? 'contents' : 'none';
+    wrap.querySelectorAll('input').forEach(inp => { inp.required = show; });
+}
+
 function renderReqFormFields() {
     const branch = document.getElementById('formRequestType').value;
     const container = document.getElementById('formDynamicFields');
     const submitArea = document.getElementById('formSubmitArea');
-    
+
     container.innerHTML = '';
     if (!branch) {
         container.style.display = 'none';
@@ -4030,37 +4132,48 @@ function renderReqFormFields() {
 
     const fields = REQ_BRANCHES[branch] || [];
     fields.forEach(fName => {
+        if (fName === ACM_AUTO) {
+            const slot = document.createElement('div');
+            slot.id = 'acmAutoSlot';
+            slot.className = 'control-group';
+            container.appendChild(slot);
+            return;
+        }
         const def = REQ_FIELD_DEFS[fName];
         if (!def) return;
-        
-        const reqMark = def.req ? '<span style="color:var(--accent-rose)">*</span>' : '';
-        const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
-        
-        const wrap = document.createElement('div');
-        wrap.className = 'control-group';
-        wrap.innerHTML = `<label>${escHtml(fName)} ${reqMark}</label>`;
-        
-        if (def.type === 'text') {
-            wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}">`;
-        } else if (def.type === 'select') {
-            let opts = `<option value="">-- Select --</option>`;
-            def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
-            wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''}>${opts}</select>`;
-        } else if (def.type === 'multiselect') {
-            let chks = def.options.map(o => `
-                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:500; cursor:pointer; color:var(--text); padding:4px 0; text-transform:none;">
-                    <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:16px;height:16px;accent-color:var(--accent-cyan);cursor:pointer;">
-                    ${escHtml(o)}
-                </label>`).join('');
-            wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; border-color:var(--border);">${chks}</div>`;
-        } else if (def.type === 'file') {
-            wrap.innerHTML += `
-                <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''} multiple 
-                    style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); padding:16px 14px;">`;
+        const el = buildFieldControl(fName, def, def.req);
+        container.appendChild(el);
+
+        if (fName === 'Region') {
+            el.querySelector('select').addEventListener('change', refreshAcmAutoSlot);
         }
-        
-        container.appendChild(wrap);
+        if (fName === 'Closing Reason') {
+            el.querySelector('select').addEventListener('change', refreshClosingReasonSubfields);
+        }
     });
+
+    // Sub-conditional fields (currently: Closing Reason == Duplicated Hosting -> New/Old/Reporter ID)
+    const subs = REQ_SUBCONDITIONS[branch];
+    if (subs) {
+        subs.forEach(rule => {
+            const wrap = document.createElement('div');
+            wrap.id = 'closingSubWrap';
+            wrap.style.display = 'none';
+            wrap.style.gridColumn = '1 / -1';
+            const inner = document.createElement('div');
+            inner.style.display = 'grid';
+            inner.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+            inner.style.gap = '16px';
+            rule.fields.forEach(subF => {
+                const subDef = REQ_FIELD_DEFS[subF];
+                if (subDef) inner.appendChild(buildFieldControl(subF, subDef, false));
+            });
+            wrap.appendChild(inner);
+            container.appendChild(wrap);
+        });
+    }
+
+    if (document.getElementById('acmAutoSlot')) refreshAcmAutoSlot();
 
     container.style.display = 'grid';
     submitArea.style.display = 'block';
@@ -4073,7 +4186,7 @@ async function submitReqForm(e) {
     if (!branch) return;
 
     let multiValid = true;
-    const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f].type === 'multiselect');
+    const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f] && REQ_FIELD_DEFS[f].type === 'multiselect');
     multiFields.forEach(mf => {
         if (REQ_FIELD_DEFS[mf].req) {
             const checked = form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`);
