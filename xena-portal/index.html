@@ -401,7 +401,6 @@
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
         }
     </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -534,14 +533,6 @@
             </div>
 
             <div class="nav-group" id="navGrpAdmin" style="display:none">
-                <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
-                <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
-                    <span>
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-admin"></use></svg>
-                        <span data-i18n="accessManagement">Access Management</span>
-                    </span>
-                    <span class="nav-arr" id="navArrAdmin">›</span>
-                </div>
                 <div class="nav-group-body" id="navBodyAdmin">
                     <div class="nav-item" id="nav-admin-agents" onclick="openInTab('admin-agents')"><span data-i18n="manageAgents">Manage Agents</span></div>
                     <div class="nav-item" id="nav-admin-audit"  onclick="openInTab('admin-audit')"><span data-i18n="auditLog">Audit Log</span></div>
@@ -1352,13 +1343,15 @@
                         <p>No requests found for that value.</p>
                     </div>
                 </div>
+            </div>
+
             <div id="pg-new-request" style="display:none">
                 <div class="card" style="max-width:800px; margin:0 auto;">
                     <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-form"></use></svg>
                         <span data-i18n="createNewRequest">Create New Request</span>
                     </h3>
-
+                    
                     <form id="newRequestForm" onsubmit="submitReqForm(event)">
                         <div class="control-grid" style="grid-template-columns:1fr; margin-bottom:24px;">
                             <div class="control-group">
@@ -1539,7 +1532,6 @@ const zhPageTitlesMap = {
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
 const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-new-request'];
-
 function openInTab(page) {
     if (!openTabs.includes(page)) {
         openTabs.push(page);
@@ -1689,7 +1681,7 @@ function executePageLogic(page) {
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
-}
+
 
 function filterSidebar() {
     const term = document.getElementById('sidebarSearch').value.toLowerCase();
@@ -3450,10 +3442,10 @@ async function loadAgencyForAllocator() {
         if (msgEl) { msgEl.innerHTML = `❌ Failed to load agency: ${escHtml(err.message)}`; msgEl.style.color = 'var(--accent-rose)'; }
 
         const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '0.4';
-        controls.style.pointerEvents = 'none';
-    }
-    document.getElementById('loadingOverlay').style.display='none';
+        controls.style.opacity = '0.4';
+        controls.style.pointerEvents = 'none';
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -4091,7 +4083,7 @@ function renderReqFormFields() {
     const branch = document.getElementById('formRequestType').value;
     const container = document.getElementById('formDynamicFields');
     const submitArea = document.getElementById('formSubmitArea');
-
+    
     container.innerHTML = '';
     if (!branch) {
         container.style.display = 'none';
@@ -4103,14 +4095,14 @@ function renderReqFormFields() {
     fields.forEach(fName => {
         const def = REQ_FIELD_DEFS[fName];
         if (!def) return;
-
+        
         const reqMark = def.req ? '<span style="color:var(--accent-rose)">*</span>' : '';
         const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
-
+        
         const wrap = document.createElement('div');
         wrap.className = 'control-group';
         wrap.innerHTML = `<label>${escHtml(fName)} ${reqMark}</label>`;
-
+        
         if (def.type === 'text') {
             wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}">`;
         } else if (def.type === 'select') {
@@ -4129,7 +4121,7 @@ function renderReqFormFields() {
                 <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${def.req ? 'required' : ''} multiple 
                     style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); padding:16px 14px;">`;
         }
-
+        
         container.appendChild(wrap);
     });
 
@@ -4199,16 +4191,16 @@ async function submitReqForm(e) {
 
         let data;
         try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response.'); }
-
+        
         if (!res.ok) throw new Error(data.error || 'Submission failed');
 
         ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
-
+        
         // Reset form
         form.reset();
         document.getElementById('formDynamicFields').style.display = 'none';
         document.getElementById('formSubmitArea').style.display = 'none';
-
+        
     } catch (e) {
         ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
     }
@@ -4223,6 +4215,7 @@ async function submitReqForm(e) {
 // ════════════════════════════════════════════════════════════════════
 
 if (loggedUser&&loggedUat) {
+
     document.getElementById('loginOverlay').style.display='none';
     document.querySelector('.app-shell').style.display='flex';
     
