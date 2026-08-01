@@ -201,6 +201,36 @@ def rate_limit(max_req, window):
         return wrapper
     return decorator
 
+# ════════════════════════════════════════════════════════════════════
+# LOCAL JSON FALLBACK LOADER + RAM CACHE (Fixes "Data too large")
+# ════════════════════════════════════════════════════════════════════
+_local_json_cache = {}
+_local_json_lock = threading.Lock()
+
+def load_local_json(filename):
+    """Safely attempts to load a JSON file from the public/data/ folder, cached in RAM"""
+    with _local_json_lock:
+        if filename in _local_json_cache:
+            data, timestamp = _local_json_cache[filename]
+            if time.time() - timestamp < 120:  # Cache the big file in RAM for 2 minutes
+                return data
+
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = os.path.join(root_dir, 'public', 'data', filename)
+    
+    if not os.path.exists(file_path):
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'public', 'data', filename)
+
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                with _local_json_lock:
+                    _local_json_cache[filename] = (data, time.time())
+                return data
+        except Exception as e:
+            logger.error("local_json_read_failed", file=filename, error=str(e))
+    return None
 
 def sanitize_agency_code(code):
     if not code: return None
@@ -1093,8 +1123,6 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
 # ════════════════════════════════════════════════════════════════════
 # BACKGROUND SNAPSHOT MANAGER
-# Architecture: RAM → Upstash Redis → Live Feishu (fallback)
-# NO local static JSON files. Snapshot is rebuilt from Feishu every 3 min.
 # ════════════════════════════════════════════════════════════════════
 BACKGROUND_SYNC_INTERVAL = 180   
 BACKGROUND_SYNC_MAX_AGE  = 600   
@@ -1147,8 +1175,15 @@ def ensure_background_sync_started():
             _bg_thread_started = True
 
 def get_requests_table_snapshot(from_dt=None):
+    # FIX 1: True Hybrid Fallback. Check the local file first.
+    local_data = load_local_json("requests.json")
+    if local_data:
+        master_keys = set()
+        if isinstance(local_data, list) and len(local_data) > 0:
+            master_keys.update(local_data[0].get("fields", {}).keys())
+        return local_data, master_keys, True, "", True
 
-    # Priority 1: RAM hot cache → Priority 2: Redis → Priority 3: Live Feishu
+    # Fallback to Threading/Redis
     ensure_background_sync_started()
     with _bg_sync_lock:
         items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
@@ -1213,6 +1248,10 @@ def ensure_points_sync_started():
             _bg_points_thread_started = True
 
 def get_points_table_snapshot():
+    # FIX 1: True Hybrid Fallback. Check the local file first.
+    local_data = load_local_json("points.json")
+    if local_data:
+        return local_data, True, "", True
 
     ensure_points_sync_started()
     with _bg_points_lock:
