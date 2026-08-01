@@ -1,3 +1,7 @@
+"""
+Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
+"""
+
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
@@ -426,8 +430,6 @@ def parse_feishu_date(date_val):
             dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
             return (dt_utc + CAIRO_OFFSET).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         
-        # String dates (e.g., '2026-08-01') lack time, so they parse as Midnight. 
-        # We assume they already represent local Cairo dates input by agents.
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
     except Exception:
@@ -766,6 +768,39 @@ def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
     return items, complete, reason
 
 # ════════════════════════════════════════════════════════════════════
+# TRUE HYBRID FALLBACK IMPLEMENTATION (NO BACKGROUND THREADS)
+# ════════════════════════════════════════════════════════════════════
+
+def get_requests_table_snapshot(from_dt=None):
+    """
+    CRITICAL MANDATE: Step 1 & 2 logic for local fallback (Requests Table).
+    Reads directly from public/data/requests.json
+    """
+    local_data = load_local_json("requests.json")
+    if local_data:
+        master_keys = set()
+        if isinstance(local_data, list) and len(local_data) > 0:
+            master_keys.update(local_data[0].get("fields", {}).keys())
+        return local_data, master_keys, True, "", True # True = served_from_background_cache
+
+    # Step 3: Fallback to live API if local JSON doesn't exist
+    items, master_keys, complete, reason = fetch_requests_sharded(from_dt=from_dt)
+    return items, master_keys, complete, reason, False
+
+def get_points_table_snapshot():
+    """
+    CRITICAL MANDATE: Step 1 & 2 logic for local fallback (Points Table).
+    Reads directly from public/data/points.json
+    """
+    local_data = load_local_json("points.json")
+    if local_data:
+        return local_data, True, "", True # True = served_from_background_cache
+
+    # Step 3: Fallback to live API if local JSON doesn't exist
+    items, complete, reason = fetch_points_sharded()
+    return items, complete, reason, False
+
+# ════════════════════════════════════════════════════════════════════
 # CORE LOGIC: FETCH SINGLE AGENCY
 # ════════════════════════════════════════════════════════════════════
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
@@ -853,6 +888,8 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         target_status_val = extract_field_text(hf.get("Status", "")).strip() 
         # Fallback logic for point history usage
         status_val    = extract_field_text(get_field_local(hf, "Status", "Request Status")).strip()
+        if not target_status_val:
+            target_status_val = status_val
         
         req_type_lower = req_type.lower()
         s_lower = status_val.lower()
@@ -882,7 +919,8 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 "accepted_ids": accepted_ids,
             })
 
-            if target_s_lower in ("done", "done ", "completed", "approved", "confirm") and privilege_val:
+            # FIX 2.1: Use `any(ok in ...)` to aggressively catch "done ✅" inside the target string.
+            if any(ok in target_s_lower for ok in ("done", "complet", "approv", "confirm")) and privilege_val:
                 privileges_claimed[privilege_val] += qty
 
         else:
@@ -1108,147 +1146,6 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
         stats[k] = dict(sorted(stats[k].items()))
 
     return stats
-
-# ════════════════════════════════════════════════════════════════════
-# BACKGROUND SNAPSHOT MANAGER (CACHE FIRST)
-# ════════════════════════════════════════════════════════════════════
-BACKGROUND_SYNC_INTERVAL = 180   
-BACKGROUND_SYNC_MAX_AGE  = 600   
-
-_bg_sync = {
-    "requests_items": [], "requests_keys": set(),
-    "updated_at": 0, "fetch_complete": True, "stop_reason": "",
-    "syncing": False,
-}
-_bg_sync_lock = threading.Lock()
-_bg_thread_started = False
-_bg_thread_lock = threading.Lock()
-
-REDIS_KEY_REQUESTS_SNAPSHOT = "xena:snapshot:requests_table"
-
-def _background_sync_requests_table():
-    with _bg_sync_lock:
-        if _bg_sync["syncing"]: return
-        _bg_sync["syncing"] = True
-    try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
-        now = time.time()
-        with _bg_sync_lock:
-            _bg_sync["requests_items"]  = items
-            _bg_sync["requests_keys"]   = keys
-            _bg_sync["updated_at"]      = now
-            _bg_sync["fetch_complete"]  = complete
-            _bg_sync["stop_reason"]     = reason
-        if REDIS_ENABLED and items:
-            redis_set_json(REDIS_KEY_REQUESTS_SNAPSHOT, {
-                "items": items, "keys": sorted(list(keys)), "updated_at": now,
-                "fetch_complete": complete, "stop_reason": reason,
-            }, ttl=BACKGROUND_SYNC_MAX_AGE + 300)
-    except Exception as e:
-        logger.error("background_sync_failed", table="grand_table", error=str(e))
-    finally:
-        with _bg_sync_lock:
-            _bg_sync["syncing"] = False
-
-def _background_sync_loop():
-    while True:
-        _background_sync_requests_table()
-        time.sleep(BACKGROUND_SYNC_INTERVAL)
-
-def ensure_background_sync_started():
-    global _bg_thread_started
-    with _bg_thread_lock:
-        if not _bg_thread_started:
-            threading.Thread(target=_background_sync_loop, daemon=True).start()
-            _bg_thread_started = True
-
-def get_requests_table_snapshot(from_dt=None):
-    ensure_background_sync_started()
-    with _bg_sync_lock:
-        items, keys, updated_at = _bg_sync["requests_items"], _bg_sync["requests_keys"], _bg_sync["updated_at"]
-        complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
-
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-        return items, keys, complete, reason, True
-
-    if REDIS_ENABLED:
-        cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
-        if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
-            r_items, r_keys = cached["items"], set(cached.get("keys", []))
-            with _bg_sync_lock:
-                _bg_sync["requests_items"] = r_items
-                _bg_sync["requests_keys"]  = r_keys
-                _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
-                _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
-                _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
-            return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
-
-    return fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt) + (False,)
-
-REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
-_bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
-_bg_points_lock = threading.Lock()
-_bg_points_thread_started = False
-_bg_points_thread_lock = threading.Lock()
-
-def _background_sync_points_table():
-    with _bg_points_lock:
-        if _bg_points_sync["syncing"]: return
-        _bg_points_sync["syncing"] = True
-    try:
-        items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
-        now = time.time()
-        with _bg_points_lock:
-            _bg_points_sync["items"]          = items
-            _bg_points_sync["updated_at"]     = now
-            _bg_points_sync["fetch_complete"] = complete
-            _bg_points_sync["stop_reason"]    = reason
-        if REDIS_ENABLED and items:
-            redis_set_json(REDIS_KEY_POINTS_SNAPSHOT, {
-                "items": items, "updated_at": now, "fetch_complete": complete, "stop_reason": reason,
-            }, ttl=BACKGROUND_SYNC_MAX_AGE + 300)
-    except Exception as e:
-        logger.error("background_sync_failed", table="points_table", error=str(e))
-    finally:
-        with _bg_points_lock:
-            _bg_points_sync["syncing"] = False
-
-def _background_sync_points_loop():
-    while True:
-        _background_sync_points_table()
-        time.sleep(BACKGROUND_SYNC_INTERVAL)
-
-def ensure_points_sync_started():
-    global _bg_points_thread_started
-    with _bg_points_thread_lock:
-        if not _bg_points_thread_started:
-            threading.Thread(target=_background_sync_points_loop, daemon=True).start()
-            _bg_points_thread_started = True
-
-def get_points_table_snapshot():
-    ensure_points_sync_started()
-    with _bg_points_lock:
-        items, updated_at = _bg_points_sync["items"], _bg_points_sync["updated_at"]
-        complete, reason = _bg_points_sync["fetch_complete"], _bg_points_sync["stop_reason"]
-
-    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-        return items, complete, reason, True
-
-    if REDIS_ENABLED:
-        cached = redis_get_json(REDIS_KEY_POINTS_SNAPSHOT)
-        if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
-            with _bg_points_lock:
-                _bg_points_sync["items"]          = cached["items"]
-                _bg_points_sync["updated_at"]     = cached.get("updated_at", time.time())
-                _bg_points_sync["fetch_complete"] = cached.get("fetch_complete", True)
-                _bg_points_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_points_table, daemon=True).start()
-            return cached["items"], cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
-
-    items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
-    return items, complete, reason, False
-
 
 # ════════════════════════════════════════════════════════════════════
 # FLASK ROUTER
@@ -1488,22 +1385,12 @@ def points_records():
     sort_by      = sanitize_text(request.args.get('sort_by','point_balance'))
     sort_dir     = 'desc' if request.args.get('sort_dir','desc').lower() != 'asc' else 'asc'
 
-    # HYBRID FALLBACK MANDATE: Local JSON check intercepts the request for Search Records & Point Table.
-    served_from_cache = False
-    local_points = load_local_json('points.json')
-    
-    if local_points is not None:
-        all_items = local_points
-        fetch_complete, stop_reason, served_from_cache = True, "", True
-    elif MOCK_MODE:
+    # HYBRID FALLBACK MANDATE: Local JSON logic applied strictly here
+    if MOCK_MODE:
         all_items = MockFeishuDB.generate_agency("All") * 10
-        fetch_complete, stop_reason = True, ""
+        fetch_complete, stop_reason, served_from_cache = True, "", False
     else:
-        # Fallback to standard snapshot & live pulling
         all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
-        if not all_items:
-            all_items, fetch_complete, stop_reason = fetch_points_sharded()
-            served_from_cache = False
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
@@ -1600,20 +1487,10 @@ def sync_refresh():
     if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
 
     cache_invalidate()
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(_background_sync_requests_table), executor.submit(_background_sync_points_table)]
-        for f in futures: f.result()
-
-    with _bg_sync_lock:
-        req_count, req_updated, req_complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
-    with _bg_points_lock:
-        pts_count, pts_updated, pts_complete = len(_bg_points_sync["items"]), _bg_points_sync["updated_at"], _bg_points_sync["fetch_complete"]
-
-    audit.log(user, "MANUAL_SYNC_REFRESH", "grand_table+points_table", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
+    audit.log(user, "MANUAL_SYNC_REFRESH", "Cache Cleared", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
     return jsonify({
         "success": True,
-        "requests_table": {"record_count": req_count, "updated_at": req_updated, "fetch_complete": req_complete},
-        "points_table":   {"record_count": pts_count, "updated_at": pts_updated, "fetch_complete": pts_complete},
+        "message": "Caches cleared. The system will rely on local JSON or fetch live if missing.",
         "redis_enabled": REDIS_ENABLED,
     })
 
@@ -1801,21 +1678,11 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    # HYBRID FALLBACK MANDATE: Local JSON check intercepts the request for Analytics Report.
-    local_requests = load_local_json('requests.json')
-    if local_requests is not None:
-        all_items = local_requests
-        master_keys = set()
-        if all_items: master_keys = set(all_items[0].get("fields", {}).keys())
-        fetch_complete, stop_reason, from_bg_cache = True, "", True
-    else:
-        # Step 3: API Fallback
-        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-        if not all_items:
-            all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
-            from_bg_cache = False
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+    # HYBRID FALLBACK MANDATE: Local JSON logic applied strictly here
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+    
+    if not fetch_complete and not all_items:
+        return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
@@ -1910,21 +1777,11 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    # HYBRID FALLBACK MANDATE: Local JSON check intercepts the request for Compare Module.
-    local_requests = load_local_json('requests.json')
-    if local_requests is not None:
-        all_items = local_requests
-        master_keys = set()
-        if all_items: master_keys = set(all_items[0].get("fields", {}).keys())
-        fetch_complete, stop_reason, from_bg_cache = True, "", True
-    else:
-        # Step 3: API Fallback
-        all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
-        if not all_items:
-            all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=oldest_dt, to_dt=newest_dt)
-            from_bg_cache = False
-            if not fetch_complete and not all_items:
-                return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
+    # HYBRID FALLBACK MANDATE: Local JSON logic applied strictly here
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+    
+    if not fetch_complete and not all_items:
+        return jsonify({"error": f"Data fetch failed: {stop_reason}"}), 502
 
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
@@ -1963,31 +1820,15 @@ def clear_cache():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    with _bg_sync_lock:
-        bg_info = {
-            "record_count": len(_bg_sync["requests_items"]),
-            "age_seconds": (time.time() - _bg_sync["updated_at"]) if _bg_sync["updated_at"] else None,
-            "syncing": _bg_sync["syncing"],
-        }
-    with _bg_points_lock:
-        pts_bg_info = {
-            "record_count": len(_bg_points_sync["items"]),
-            "age_seconds": (time.time() - _bg_points_sync["updated_at"]) if _bg_points_sync["updated_at"] else None,
-            "syncing": _bg_points_sync["syncing"],
-        }
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(), "cairo_ts": cairo_now().isoformat(),
         "cache_entries": len(_cache), "audit_entries": len(audit._queue),
         "token_cached": _token_cache["token"] is not None,
         "token_expires_in_s": max(0, int(_token_cache["expires_at"] - time.time())),
-        "background_sync": bg_info,
-        "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
         "mock_mode_active": MOCK_MODE,
+        "hybrid_fallback_active": True
     })
-
-ensure_background_sync_started()
-ensure_points_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
