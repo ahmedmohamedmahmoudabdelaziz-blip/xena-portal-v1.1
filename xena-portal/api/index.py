@@ -2008,8 +2008,22 @@ def my_requests():
         all_items = MockFeishuDB.generate_requests(200)
         fetch_complete, stop_reason = True, ""
     else:
-        # LIVE FETCH: Bypassing background snapshot to get immediate data like Query Requests
-        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=from_dt)
+        # Push the heavy lifting to Feishu (Exactly like Query Requests)
+        tat = get_tenant_access_token()
+        user_filter = {
+            "conjunction": "or",
+            "conditions": [
+                {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                {"field_name": "Submitted By", "operator": "contains", "value": [user]},
+                {"field_name": "Created By", "operator": "contains", "value": [user]}
+            ]
+        }
+        all_items, fetch_complete, stop_reason = _fetch_bitable_shard(
+            REQUESTS_TABLE_ID, 
+            tat, 
+            filter_obj=user_filter,
+            field_names=QUERY_RECORDS_FIELDS
+        )
     
     results = []
     user_clean = user.strip().lower()
