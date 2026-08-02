@@ -2007,7 +2007,8 @@ def my_requests():
         all_items = MockFeishuDB.generate_requests(200)
         fetch_complete, stop_reason = True, ""
     else:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+        # UPDATED: Use the high-speed cache snapshot instead of synchronous fetching
+        all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=from_dt)
     
     results = []
     user_clean = user.strip().lower()
@@ -2093,7 +2094,8 @@ def agency_list():
         all_items = MockFeishuDB.generate_requests(300)
         fetch_complete, stop_reason = True, ""
     else:
-        all_items, master_keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+        # UPDATED: Use the high-speed cache snapshot instead of synchronous fetching
+        all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=from_dt)
     
     results = []
     target_types = ["agency creation", "agency applied already by acm or bd link ( follow-up )", "applied already", "follow-up"]
