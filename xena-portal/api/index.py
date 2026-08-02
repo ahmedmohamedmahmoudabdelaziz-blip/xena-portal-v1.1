@@ -2439,36 +2439,53 @@ def debug_data_status():
         "self_base_url_env": SELF_BASE_URL or None,
     })
 
-# === NEW: PUSHER WEBHOOK ENDPOINT ===
+# ════════════════════════════════════════════════════════════════════
+# PUSHER WEBHOOK ENDPOINT  (Fire-and-Forget — fixes Feishu timeout)
+# ════════════════════════════════════════════════════════════════════
+
 @app.route('/api/webhook/ticket-assigned', methods=['POST'])
 def ticket_webhook():
-    """Receives data from Feishu Bitable Automation when a ticket is assigned, and pushes it to the Website."""
+    """Receives data from Feishu Bitable Automation when a ticket updates.
+    
+    CRITICAL: We MUST return HTTP 200 in < ~3 seconds or Feishu will mark
+    the automation as 'Connection Timed Out'. Therefore we acknowledge
+    immediately and process the Pusher trigger in a background thread.
+    """
     data = request.json or {}
     
-    # Feishu initially sends a "challenge" string when setting up webhooks to verify ownership.
+    # 1. Feishu challenge handshake (only during initial webhook setup)
     if "challenge" in data:
         return jsonify({"challenge": data["challenge"]})
-        
-    if not pusher_client:
-        logger.error("pusher_webhook_failed", error="Pusher keys missing or pusher module not installed.")
-        # Fast exit, but return 200 so Feishu doesn't retry and timeout
-        return jsonify({"success": False, "error": "Pusher not configured"}), 200
-        
-    try:
-        # Feishu automation will send us the specific record data. 
-        # We pass it immediately to Pusher on the "tickets" channel.
-        ticket_data = data.get("ticket_data", data) 
-        
-        pusher_client.trigger('tickets-channel', 'new-ticket', ticket_data)
-        
-        logger.info("pusher_event_triggered", channel="tickets-channel")
-        # Fast exit
-        return jsonify({"success": True})
-        
-    except Exception as e:
-        logger.error("pusher_webhook_failed", error=str(e))
-        # Return 200 even on error so Feishu marks it 'delivered' and stops timing out/retrying
-        return jsonify({"success": False, "error": str(e)}), 200
+    
+    # 2. Queue the real work to a daemon thread so the HTTP response
+    #    goes back to Feishu instantly, before Pusher network latency.
+    def _push_async(payload: dict):
+        if not pusher_client:
+            logger.error("pusher_webhook_failed", error="Pusher client not initialized (missing env vars or import failed)")
+            return
+        try:
+            # Feishu automation sends the record fields directly in the body.
+            # If you ever wrap them in a 'ticket_data' key, use .get("ticket_data", payload)
+            ticket_data = payload.get("ticket_data", payload)
+            pusher_client.trigger('tickets-channel', 'new-ticket', ticket_data)
+            logger.info("pusher_event_triggered", channel="tickets-channel", event="new-ticket")
+        except Exception as e:
+            # Log only — Feishu already got its 200 and won't retry.
+            logger.error("pusher_webhook_failed", error=str(e))
+    
+    threading.Thread(target=_push_async, args=(data,), daemon=True).start()
+    
+    # 3. Immediate ACK — Feishu sees this in ~20–50 ms even on cold starts.
+    return jsonify({"success": True, "queued": True}), 200
+
+
+@app.route('/api/webhook/ticket-assigned', methods=['GET', 'HEAD'])
+def ticket_webhook_ping():
+    """Lightweight health probe so you can test reachability in a browser."""
+    return jsonify({
+        "status": "listening",
+        "pusher_ready": pusher_client is not None
+    }), 200
 
 
 @app.route('/api/health', methods=['GET'])
