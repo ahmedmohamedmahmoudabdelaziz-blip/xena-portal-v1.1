@@ -10,38 +10,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
 :root {
-    --bg: #0b0c10;
-    --surface: #151621;
-    --surface-hover: #1c1d2b;
-    --border: #2a2c3f;
-    --border-hover: #3d4059;
-    --text: #e0e0e0;
-    --text-muted: #8b8fa3;
-    --accent-cyan: #00d4ff;
-    --accent-green: #00e676;
-    --accent-rose: #ff4d6d;
-    --accent-amber: #ffb800;
-    --accent-purple: #b967ff;
-    --shadow: 0 8px 32px rgba(0, 0, 0, .4);
-    --radius: 16px;
-    --sidebar-bg: #101623;
+    --bg: #0b0c10;
+    --surface: #151621;
+    --surface-hover: #1c1d2b;
+    --border: #2a2c3f;
+    --border-hover: #3d4059;
+    --text: #e0e0e0;
+    --text-muted: #8b8fa3;
+    --accent-cyan: #00d4ff;
+    --accent-green: #00e676;
+    --accent-rose: #ff4d6d;
+    --accent-amber: #ffb800;
+    --accent-purple: #b967ff;
+    --shadow: 0 8px 32px rgba(0, 0, 0, .4);
+    --radius: 16px;
+    --sidebar-bg: #101623;
 }
 
 [data-theme="light"] {
-    --bg: #f0f2f8;
-    --surface: #fff;
-    --surface-hover: #f5f7ff;
-    --border: #dde1f0;
-    --border-hover: #b8bfe8;
-    --text: #1a1c2e;
-    --text-muted: #5a6080;
-    --accent-cyan: #0099cc;
-    --accent-green: #00b84a;
-    --accent-rose: #d63050;
-    --accent-amber: #c88a00;
-    --accent-purple: #8a44cc;
-    --shadow: 0 4px 20px rgba(0, 0, 0, .08);
-    --sidebar-bg: #1d232e;
+    --bg: #f0f2f8;
+    --surface: #fff;
+    --surface-hover: #f5f7ff;
+    --border: #dde1f0;
+    --border-hover: #b8bfe8;
+    --text: #1a1c2e;
+    --text-muted: #5a6080;
+    --accent-cyan: #0099cc;
+    --accent-green: #00b84a;
+    --accent-rose: #d63050;
+    --accent-amber: #c88a00;
+    --accent-purple: #8a44cc;
+    --shadow: 0 4px 20px rgba(0, 0, 0, .08);
+    --sidebar-bg: #1d232e;
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
@@ -346,86 +346,86 @@ select option,.control-group select option{background:var(--surface);color:var(-
         .priv-toggle.active .priv-check{opacity:1}
 
         .health-badge{position:absolute;top:16px;left:16px;padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid}
-        .health-Healthy{background:rgba(0,230,118,.15);color:var(--accent-green);border-color:rgba(0,230,118,.3)}
-        .health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
-        .health-Critical{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
+        .health-Healthy{background:rgba(0,230,118,.15);color:var(--accent-green);border-color:rgba(0,230,118,.3)}
+        .health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
+        .health-Critical{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
 
-        .timeline{position:relative;padding-left:28px}
-        .timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border)}
-        .timeline-item{position:relative;margin-bottom:16px}
-        .timeline-dot{position:absolute;left:-22px;top:20px;width:12px;height:12px;border-radius:50%;border:2px solid var(--surface)}
-        .tl-creation{background:var(--accent-green)}
-        .tl-privilege{background:var(--accent-cyan)}
-        .tl-points{background:var(--accent-amber)}
-        .tl-rejection{background:var(--accent-rose)}
+        .timeline{position:relative;padding-left:28px}
+        .timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border)}
+        .timeline-item{position:relative;margin-bottom:16px}
+        .timeline-dot{position:absolute;left:-22px;top:20px;width:12px;height:12px;border-radius:50%;border:2px solid var(--surface)}
+        .tl-creation{background:var(--accent-green)}
+        .tl-privilege{background:var(--accent-cyan)}
+        .tl-points{background:var(--accent-amber)}
+        .tl-rejection{background:var(--accent-rose)}
 
-        .tl-card{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:16px 20px;transition:all 0.2s ease}
-        .tl-card:hover{background:rgba(255,255,255,0.04);border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.15)}
-        .tl-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-        .tl-title{font-weight:600;font-size:1rem;color:var(--text)}
-        .tl-status{font-size:0.75rem;font-weight:700;padding:4px 10px;border-radius:6px;white-space:nowrap}
-        .tl-meta{display:flex;flex-wrap:wrap;gap:14px;font-size:0.85rem;color:var(--text-muted);margin-bottom:12px}
-        .tl-meta span{display:flex;align-items:center;gap:6px}
-        .tl-users{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
-        .user-badge{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--accent-cyan);padding:3px 10px;border-radius:14px;font-size:0.8rem;font-family:monospace;font-weight:600}
-        .status-done{background:rgba(0,230,118,0.15);color:var(--accent-green)}
-        .status-reject{background:rgba(255,77,109,0.15);color:var(--accent-rose)}
-        .status-pending{background:rgba(255,184,0,0.15);color:var(--accent-amber)}
+        .tl-card{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:16px 20px;transition:all 0.2s ease}
+        .tl-card:hover{background:rgba(255,255,255,0.04);border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+        .tl-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+        .tl-title{font-weight:600;font-size:1rem;color:var(--text)}
+        .tl-status{font-size:0.75rem;font-weight:700;padding:4px 10px;border-radius:6px;white-space:nowrap}
+        .tl-meta{display:flex;flex-wrap:wrap;gap:14px;font-size:0.85rem;color:var(--text-muted);margin-bottom:12px}
+        .tl-meta span{display:flex;align-items:center;gap:6px}
+        .tl-users{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
+        .user-badge{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--accent-cyan);padding:3px 10px;border-radius:14px;font-size:0.8rem;font-family:monospace;font-weight:600}
+        .status-done{background:rgba(0,230,118,0.15);color:var(--accent-green)}
+        .status-reject{background:rgba(255,77,109,0.15);color:var(--accent-rose)}
+        .status-pending{background:rgba(255,184,0,0.15);color:var(--accent-amber)}
 
-        .history-card{text-align:left;margin-bottom:14px;padding:18px 24px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;transition:all 0.2s}
-        .history-card:hover{border-color:var(--border-hover);background:rgba(255,255,255,0.04)}
-        .compare-table{width:100%;border-collapse:collapse;min-width:500px}
-        .compare-table th,.compare-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);font-size:.9rem}
-        .compare-table th{color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;background:var(--surface-hover)}
-        .compare-table tr:hover td{background:var(--surface-hover)}
-        .best-val{color:var(--accent-green);font-weight:700}
-        .worst-val{color:var(--accent-rose)}
+        .history-card{text-align:left;margin-bottom:14px;padding:18px 24px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;transition:all 0.2s}
+        .history-card:hover{border-color:var(--border-hover);background:rgba(255,255,255,0.04)}
+        .compare-table{width:100%;border-collapse:collapse;min-width:500px}
+        .compare-table th,.compare-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);font-size:.9rem}
+        .compare-table th{color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;background:var(--surface-hover)}
+        .compare-table tr:hover td{background:var(--surface-hover)}
+        .best-val{color:var(--accent-green);font-weight:700}
+        .worst-val{color:var(--accent-rose)}
 
-        .empty-state{text-align:center;padding:60px 24px;color:var(--text-muted)}
-        .empty-state svg{width:56px;height:56px;fill:none;stroke:var(--border-hover);stroke-width:1.5;margin-bottom:16px}
-        .empty-state h3{font-size:1.1rem;color:var(--text);margin-bottom:8px}
-        .empty-state p{font-size:.9rem;margin-bottom:20px}
-        .empty-state-action{background:transparent;border:1px solid var(--accent-cyan);color:var(--accent-cyan);padding:10px 24px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:.9rem;transition:all .2s}
-        .empty-state-action:hover{background:var(--accent-cyan);color:#000}
+        .empty-state{text-align:center;padding:60px 24px;color:var(--text-muted)}
+        .empty-state svg{width:56px;height:56px;fill:none;stroke:var(--border-hover);stroke-width:1.5;margin-bottom:16px}
+        .empty-state h3{font-size:1.1rem;color:var(--text);margin-bottom:8px}
+        .empty-state p{font-size:.9rem;margin-bottom:20px}
+        .empty-state-action{background:transparent;border:1px solid var(--accent-cyan);color:var(--accent-cyan);padding:10px 24px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:.9rem;transition:all .2s}
+        .empty-state-action:hover{background:var(--accent-cyan);color:#000}
 
-        .audit-row{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.82rem}
-        .audit-ts{color:var(--text-muted);font-family:monospace}
-        .audit-actor{color:var(--accent-cyan);font-weight:600}
-        .audit-action{background:rgba(0,212,255,.1);color:var(--accent-cyan);padding:2px 8px;border-radius:4px;font-family:monospace;font-size:.78rem}
-        .audit-target{color:var(--text)}
+        .audit-row{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+        .audit-ts{color:var(--text-muted);font-family:monospace}
+        .audit-actor{color:var(--accent-cyan);font-weight:600}
+        .audit-action{background:rgba(0,212,255,.1);color:var(--accent-cyan);padding:2px 8px;border-radius:4px;font-family:monospace;font-size:.78rem}
+        .audit-target{color:var(--text)}
 
-        .tab-bar{display:flex;gap:4px;margin-bottom:20px;background:var(--surface-hover);padding:4px;border-radius:10px}
-        .tab-btn{flex:1;padding:8px 16px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.85rem;background:transparent;color:var(--text-muted);transition:all .2s}
-        .tab-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.2)}
+        .tab-bar{display:flex;gap:4px;margin-bottom:20px;background:var(--surface-hover);padding:4px;border-radius:10px}
+        .tab-btn{flex:1;padding:8px 16px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.85rem;background:transparent;color:var(--text-muted);transition:all .2s}
+        .tab-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.2)}
 
-        @media (max-width: 900px) {
-            .chart-grid-3{grid-template-columns:repeat(2,1fr)}
-            .kpi-grid{grid-template-columns:repeat(2,1fr)}
-            .sidebar{transform:translateX(-240px)}
-            .sidebar.open{transform:translateX(0)}
-            .sidebar-backdrop.visible{display:block}
-            .main-content{margin-left:0;max-width:100vw}
-            .hamburger{display:block}
-            .top-bar-right { gap: 8px; }
-            .user-name { display: none; }
-        }
-        @media (max-width: 600px) {
-            .page-content-wrapper{padding:12px}
-            .kpi-grid{grid-template-columns:1fr}
-            .chart-grid-3,.chart-grid-2{grid-template-columns:1fr}
-            .chart-wrapper-pie-large{height:380px}
-            .control-grid{grid-template-columns:1fr}
-            .compare-kpi-row{flex-direction:column}
-            .user-row{flex-direction:column;align-items:flex-start}
-        }
-        @media print {
-            .sidebar,.page-top-bar,.multi-tab-bar,#pg-analytics .card,.loading-overlay,#toastContainer,.btn,.tab-bar,
-            #activeFiltersBar,.preset-bar,.filter-chip{display:none!important}
-            body{background:#fff;color:#000}
-            .main-content{margin-left: 0;}
-            .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
-        }
-    </style>
+        @media (max-width: 900px) {
+            .chart-grid-3{grid-template-columns:repeat(2,1fr)}
+            .kpi-grid{grid-template-columns:repeat(2,1fr)}
+            .sidebar{transform:translateX(-240px)}
+            .sidebar.open{transform:translateX(0)}
+            .sidebar-backdrop.visible{display:block}
+            .main-content{margin-left:0;max-width:100vw}
+            .hamburger{display:block}
+            .top-bar-right { gap: 8px; }
+            .user-name { display: none; }
+        }
+        @media (max-width: 600px) {
+            .page-content-wrapper{padding:12px}
+            .kpi-grid{grid-template-columns:1fr}
+            .chart-grid-3,.chart-grid-2{grid-template-columns:1fr}
+            .chart-wrapper-pie-large{height:380px}
+            .control-grid{grid-template-columns:1fr}
+            .compare-kpi-row{flex-direction:column}
+            .user-row{flex-direction:column;align-items:flex-start}
+        }
+        @media print {
+            .sidebar,.page-top-bar,.multi-tab-bar,#pg-analytics .card,.loading-overlay,#toastContainer,.btn,.tab-bar,
+            #activeFiltersBar,.preset-bar,.filter-chip{display:none!important}
+            body{background:#fff;color:#000}
+            .main-content{margin-left: 0;}
+            .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
+        }
+    </style>
 </head>
 <body>
 
@@ -1165,7 +1165,7 @@ select option,.control-group select option{background:var(--surface);color:var(-
                         </div>
                         <div class="control-group" style="display:flex;align-items:flex-end">
                             <button class="btn btn-primary" onclick="prFetch(1)" style="width:100%">🔎 Search</button>
-                        </div>
+                            </div>
                     </div>
                 </div>
 
@@ -3221,458 +3221,458 @@ function buildTargetTimeline() {
 }
 
 const pointPriceDB=[
-    {key:"trend card",same:40,other:50,limit:10},
-    {key:"traffic card",same:30,other:40,limit:50},
-    {key:"30 mic 15 days",same:150,other:175,limit:999},
-    {key:"30 mic 30 days",same:300,other:350,limit:999},
-    {key:"normal short id ( 2 levels above ) 15 days",same:120,other:180,limit:999},
-    {key:"normal short id ( 2 levels above ) 30 days",same:240,other:360,limit:999},
-    {key:"customized short id 15 days",same:300,other:450,limit:999},
-    {key:"customized short id 30 days",same:1200,other:1800,limit:999},
-    {key:"room pin-up",same:100,other:150,limit:999},
-    {key:"welcome package 3",same:80,other:80,limit:15},
-    {key:"welcome package 2",same:30,other:30,limit:50},
-    {key:"main page banner",same:150,other:150,limit:3,type:"order"},
-    {key:"news banner",same:100,other:100,limit:5,type:"order"},
-    {key:"live banner",same:150,other:150,limit:5,type:"order"},
-    {key:"splash",same:1500,other:2000,limit:10,type:"order"}
+    {key:"trend card",same:40,other:50,limit:10},
+    {key:"traffic card",same:30,other:40,limit:50},
+    {key:"30 mic 15 days",same:150,other:175,limit:999},
+    {key:"30 mic 30 days",same:300,other:350,limit:999},
+    {key:"normal short id ( 2 levels above ) 15 days",same:120,other:180,limit:999},
+    {key:"normal short id ( 2 levels above ) 30 days",same:240,other:360,limit:999},
+    {key:"customized short id 15 days",same:300,other:450,limit:999},
+    {key:"customized short id 30 days",same:1200,other:1800,limit:999},
+    {key:"room pin-up",same:100,other:150,limit:999},
+    {key:"welcome package 3",same:80,other:80,limit:15},
+    {key:"welcome package 2",same:30,other:30,limit:50},
+    {key:"main page banner",same:150,other:150,limit:3,type:"order"},
+    {key:"news banner",same:100,other:100,limit:5,type:"order"},
+    {key:"live banner",same:150,other:150,limit:5,type:"order"},
+    {key:"splash",same:1500,other:2000,limit:10,type:"order"}
 ];
 function findPriceRule(key){ return pointPriceDB.find(e=>e.key===key); }
 
 function updatePointsGrid() {
-    if (!currentAgencyData) return;
-    document.getElementById('ptTotal').innerText=(currentAgencyData.total_points||0).toLocaleString();
-    document.getElementById('ptUsed').innerText=(currentAgencyData.used_points||0).toLocaleString();
-    document.getElementById('ptBalance').innerText=(currentAgencyData.point_balance||0).toLocaleString();
-    buildPointsTimeline(currentAgencyData.history||[]);
-    buildPointsHistory(currentAgencyData.history||[]);
-    buildAllocatorStatus(currentAgencyData.allocator_status||{});
+    if (!currentAgencyData) return;
+    document.getElementById('ptTotal').innerText=(currentAgencyData.total_points||0).toLocaleString();
+    document.getElementById('ptUsed').innerText=(currentAgencyData.used_points||0).toLocaleString();
+    document.getElementById('ptBalance').innerText=(currentAgencyData.point_balance||0).toLocaleString();
+    buildPointsTimeline(currentAgencyData.history||[]);
+    buildPointsHistory(currentAgencyData.history||[]);
+    buildAllocatorStatus(currentAgencyData.allocator_status||{});
 }
 
 function buildAllocatorStatus(status) {
-    const wrap=document.getElementById('allocatorStatusWrap');
-    if (!wrap) return;
-    
-    const items = Object.keys(status).filter(name => {
-        const n = name.toLowerCase();
-        if (n.includes('dynamic') || n.includes('avatar') || n.includes('20 mic') || n === '30 mics' || n.includes('welcome room') || n.includes('game room')) {
-            return false;
-        }
-        return true;
-    });
+    const wrap=document.getElementById('allocatorStatusWrap');
+    if (!wrap) return;
+    
+    const items = Object.keys(status).filter(name => {
+        const n = name.toLowerCase();
+        if (n.includes('dynamic') || n.includes('avatar') || n.includes('20 mic') || n === '30 mics' || n.includes('welcome room') || n.includes('game room')) {
+            return false;
+        }
+        return true;
+    });
 
-    if (!items.length) { wrap.innerHTML=''; return; }
-    wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month's Usage vs Limits</h4>
-        <div style="display:flex;flex-wrap:wrap;gap:10px">`+
-        items.map(name=>{
-            const s=status[name];
-            const hasLimit=s.limit!==null && s.limit!==undefined;
-            const overLimit=hasLimit && s.used>s.limit;
-            const color=hasLimit?(overLimit?'var(--accent-rose)':'var(--accent-green)'):'var(--text-muted)';
-            return `<div class="stat-box" style="padding:10px 14px;text-align:left">
-                <div style="font-size:.8rem;color:var(--text-muted)">${escHtml(name.toUpperCase())}</div>
-                <div style="font-weight:700;color:${color}">${s.used}${hasLimit?' / '+s.limit:''}</div>
-                ${!hasLimit?'<div style="font-size:.7rem;color:var(--text-muted)">limit not set</div>':''}
-            </div>`;
-        }).join('')+'</div>';
+    if (!items.length) { wrap.innerHTML=''; return; }
+    wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:12px;margin-top:8px">📊 This Month's Usage vs Limits</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">`+
+        items.map(name=>{
+            const s=status[name];
+            const hasLimit=s.limit!==null && s.limit!==undefined;
+            const overLimit=hasLimit && s.used>s.limit;
+            const color=hasLimit?(overLimit?'var(--accent-rose)':'var(--accent-green)'):'var(--text-muted)';
+            return `<div class="stat-box" style="padding:10px 14px;text-align:left">
+                <div style="font-size:.8rem;color:var(--text-muted)">${escHtml(name.toUpperCase())}</div>
+                <div style="font-weight:700;color:${color}">${s.used}${hasLimit?' / '+s.limit:''}</div>
+                ${!hasLimit?'<div style="font-size:.7rem;color:var(--text-muted)">limit not set</div>':''}
+            </div>`;
+        }).join('')+'</div>';
 }
 
 function buildPointsTimeline(history) {
-    const tl=document.getElementById('agencyTimeline');
-    if (!tl) return;
-    
-    if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No points activity this month.</div>'; return; }
-    
-    tl.innerHTML=history.slice(0,15).map(req=>{
-        const dateStr=req.date||'Unknown';
-        const type=(req.request_type||'Request').toLowerCase();
-        const status=req.status||'';
-        const isDone = status.toLowerCase().includes('done');
-        const isReject = status.toLowerCase().includes('reject');
-        const statusClass = isDone ? 'status-done' : isReject ? 'status-reject' : 'status-pending';
-        
-        let dotClass='tl-privilege';
-        if (type.includes('creation') || type.includes('bd')) dotClass='tl-creation';
-        else if (type.includes('point')) dotClass='tl-points';
-        else if (type.includes('reject')) dotClass='tl-rejection';
+    const tl=document.getElementById('agencyTimeline');
+    if (!tl) return;
+    
+    if (!history.length) { tl.innerHTML='<div style="color:var(--text-muted);font-size:.9rem">No points activity this month.</div>'; return; }
+    
+    tl.innerHTML=history.slice(0,15).map(req=>{
+        const dateStr=req.date||'Unknown';
+        const type=(req.request_type||'Request').toLowerCase();
+        const status=req.status||'';
+        const isDone = status.toLowerCase().includes('done');
+        const isReject = status.toLowerCase().includes('reject');
+        const statusClass = isDone ? 'status-done' : isReject ? 'status-reject' : 'status-pending';
+        
+        let dotClass='tl-privilege';
+        if (type.includes('creation') || type.includes('bd')) dotClass='tl-creation';
+        else if (type.includes('point')) dotClass='tl-points';
+        else if (type.includes('reject')) dotClass='tl-rejection';
 
-        let title = (req.request_type || 'Request').replace(/\b\w/g, c => c.toUpperCase());
-        let metaTags = [];
-        
-        if (req.privilege) metaTags.push(`<span>🔹 ${escHtml(req.privilege)}</span>`);
-        if (req.target_type) metaTags.push(`<span>🎯 ${escHtml(req.target_type)}</span>`);
-        if (req.quantities_input) metaTags.push(`<span>📦 Qty: ${escHtml(req.quantities_input)}</span>`);
+        let title = (req.request_type || 'Request').replace(/\b\w/g, c => c.toUpperCase());
+        let metaTags = [];
+        
+        if (req.privilege) metaTags.push(`<span>🔹 ${escHtml(req.privilege)}</span>`);
+        if (req.target_type) metaTags.push(`<span>🎯 ${escHtml(req.target_type)}</span>`);
+        if (req.quantities_input) metaTags.push(`<span>📦 Qty: ${escHtml(req.quantities_input)}</span>`);
 
-        return `
-        <div class="timeline-item">
-            <div class="timeline-dot ${dotClass}"></div>
-            <div class="tl-card">
-                <div class="tl-header">
-                    <div class="tl-title">${escHtml(title)}</div>
-                    <div class="tl-status ${statusClass}">${escHtml(status||'Pending')}</div>
-                </div>
-                <div class="tl-meta">
-                    <span>📅 ${dateStr}</span>
-                    ${metaTags.join('')}
-                </div>
-                ${renderUserIds(req.accepted_ids)}
-            </div>
-        </div>`;
-    }).join('');
+        return `
+        <div class="timeline-item">
+            <div class="timeline-dot ${dotClass}"></div>
+            <div class="tl-card">
+                <div class="tl-header">
+                    <div class="tl-title">${escHtml(title)}</div>
+                    <div class="tl-status ${statusClass}">${escHtml(status||'Pending')}</div>
+                </div>
+                <div class="tl-meta">
+                    <span>📅 ${dateStr}</span>
+                    ${metaTags.join('')}
+                </div>
+                ${renderUserIds(req.accepted_ids)}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function buildPointsHistory(history) {
-    const wrap=document.getElementById('pointsHistoryWrap');
-    if (!wrap) return;
+    const wrap=document.getElementById('pointsHistoryWrap');
+    if (!wrap) return;
 
-    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
-    if (!pointReqs.length) { wrap.innerHTML=''; return; }
-    
-    wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
-        pointReqs.map(req=>{
-            const status=req.status||'Pending';
-            const isDone = status.toLowerCase().includes('done');
-            const isReject = status.toLowerCase().includes('reject');
-            const statusClass = isDone ? 'status-done' : isReject ? 'status-reject' : 'status-pending';
-            
-            let metaTags = [];
-            if (req.privilege) metaTags.push(`<span>🔹 ${escHtml(req.privilege)}</span>`);
-            if (req.target_type) metaTags.push(`<span>🎯 ${escHtml(req.target_type)}</span>`);
-            if (req.quantities_input) metaTags.push(`<span>📦 Qty: ${escHtml(req.quantities_input)}</span>`);
+    const pointReqs=history.filter(r=>r.privilege||r.quantities_input||r.target_type);
+    if (!pointReqs.length) { wrap.innerHTML=''; return; }
+    
+    wrap.innerHTML=`<h4 style="color:var(--text);margin-bottom:16px;margin-top:8px">📋 Monthly Usage History</h4>`+
+        pointReqs.map(req=>{
+            const status=req.status||'Pending';
+            const isDone = status.toLowerCase().includes('done');
+            const isReject = status.toLowerCase().includes('reject');
+            const statusClass = isDone ? 'status-done' : isReject ? 'status-reject' : 'status-pending';
+            
+            let metaTags = [];
+            if (req.privilege) metaTags.push(`<span>🔹 ${escHtml(req.privilege)}</span>`);
+            if (req.target_type) metaTags.push(`<span>🎯 ${escHtml(req.target_type)}</span>`);
+            if (req.quantities_input) metaTags.push(`<span>📦 Qty: ${escHtml(req.quantities_input)}</span>`);
 
-            return `
-            <div class="history-card">
-                <div class="tl-header">
-                    <div class="tl-title">${req.date||'Unknown'}</div>
-                    <div class="tl-status ${statusClass}">${escHtml(status)}</div>
-                </div>
-                <div class="tl-meta" style="margin-bottom:0">
-                    ${metaTags.length ? metaTags.join('') : '<span>No items</span>'}
-                </div>
-                ${renderUserIds(req.accepted_ids)}
-            </div>`;
-        }).join('');
+            return `
+            <div class="history-card">
+                <div class="tl-header">
+                    <div class="tl-title">${req.date||'Unknown'}</div>
+                    <div class="tl-status ${statusClass}">${escHtml(status)}</div>
+                </div>
+                <div class="tl-meta" style="margin-bottom:0">
+                    ${metaTags.length ? metaTags.join('') : '<span>No items</span>'}
+                </div>
+                ${renderUserIds(req.accepted_ids)}
+            </div>`;
+        }).join('');
 }
 
 function allocSelectAll() {
-    document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
-        el.classList.add('active');
-        const input = el.querySelector('.priv-qty');
-        if(input && !input.disabled) handleQtyChange(input, el.getAttribute('data-val'));
-    });
+    document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
+        el.classList.add('active');
+        const input = el.querySelector('.priv-qty');
+        if(input && !input.disabled) handleQtyChange(input, el.getAttribute('data-val'));
+    });
 }
 function allocClearAll() {
-    document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
-        el.classList.remove('active');
-        const input = el.querySelector('.priv-qty');
-        if(input) {
-            input.value = 1;
-            input.disabled = false;
-        }
-    });
+    document.querySelectorAll('#calcPrivGrid .priv-toggle').forEach(el => {
+        el.classList.remove('active');
+        const input = el.querySelector('.priv-qty');
+        if(input) {
+            input.value = 1;
+            input.disabled = false;
+        }
+    });
 }
 function copyAllocatorReceipt() {
-    const pre = document.getElementById('allocatorOutput');
-    if (!pre || !pre.textContent.trim()) {
-        ToastManager.show('Run the allocator first to generate a receipt.','warning'); return;
-    }
-    
-    logFrontendAction("COPY_RECEIPT", "Smart Allocator");
+    const pre = document.getElementById('allocatorOutput');
+    if (!pre || !pre.textContent.trim()) {
+        ToastManager.show('Run the allocator first to generate a receipt.','warning'); return;
+    }
+    
+    logFrontendAction("COPY_RECEIPT", "Smart Allocator");
 
-    document.execCommand('copy');
-    navigator.clipboard?.writeText(pre.textContent).then(()=>{
-        ToastManager.show('Receipt copied to clipboard!','success');
-    }).catch(()=>{
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(pre);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        document.execCommand('copy');
-        selection.removeAllRanges();
-        ToastManager.show('Receipt copied!','success');
-    });
+    document.execCommand('copy');
+    navigator.clipboard?.writeText(pre.textContent).then(()=>{
+        ToastManager.show('Receipt copied to clipboard!','success');
+    }).catch(()=>{
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('copy');
+        selection.removeAllRanges();
+        ToastManager.show('Receipt copied!','success');
+    });
 }
 
 function privToggle(el, e) {
-    if (e && e.target && e.target.tagName==='INPUT') return;
-    if (el.querySelector('.priv-qty').disabled) return; 
-    el.classList.toggle('active');
+    if (e && e.target && e.target.tagName==='INPUT') return;
+    if (el.querySelector('.priv-qty').disabled) return; 
+    el.classList.toggle('active');
 }
 
 function findAllocatorLimit(key) {
-    const status = (currentAgencyData && currentAgencyData.allocator_status) || {};
-    const lower = key.toLowerCase();
-    const match = Object.keys(status).find(name => {
-        const n = name.toLowerCase();
-        return n === lower || n.includes(lower) || lower.includes(n);
-    });
-    return match ? status[match] : null;
+    const status = (currentAgencyData && currentAgencyData.allocator_status) || {};
+    const lower = key.toLowerCase();
+    const match = Object.keys(status).find(name => {
+        const n = name.toLowerCase();
+        return n === lower || n.includes(lower) || lower.includes(n);
+    });
+    return match ? status[match] : null;
 }
 
 function getEffectiveLimit(privKey) {
-    const rule = findPriceRule(privKey);
-    if (!rule) return { maxAllowed: 99, used: 0, limit: null, source: 'none' };
+    const rule = findPriceRule(privKey);
+    if (!rule) return { maxAllowed: 99, used: 0, limit: null, source: 'none' };
 
-    if (rule.type === 'order') {
-        return { maxAllowed: rule.limit, used: 0, limit: rule.limit, source: 'order' };
-    }
+    if (rule.type === 'order') {
+        return { maxAllowed: rule.limit, used: 0, limit: rule.limit, source: 'order' };
+    }
 
-    const serverInfo = findAllocatorLimit(privKey);
-    if (serverInfo && serverInfo.limit !== null && serverInfo.limit !== undefined) {
-        return { maxAllowed: Math.max(0, serverInfo.limit - serverInfo.used), used: serverInfo.used, limit: serverInfo.limit, source: 'server' };
-    }
+    const serverInfo = findAllocatorLimit(privKey);
+    if (serverInfo && serverInfo.limit !== null && serverInfo.limit !== undefined) {
+        return { maxAllowed: Math.max(0, serverInfo.limit - serverInfo.used), used: serverInfo.used, limit: serverInfo.limit, source: 'server' };
+    }
 
-    return { maxAllowed: rule.limit, used: 0, limit: rule.limit, source: 'fallback' };
+    return { maxAllowed: rule.limit, used: 0, limit: rule.limit, source: 'fallback' };
 }
 
 function handleQtyChange(inputEl, privKey) {
-    const { maxAllowed } = getEffectiveLimit(privKey);
-    let val = parseInt(inputEl.value) || 1;
+    const { maxAllowed } = getEffectiveLimit(privKey);
+    let val = parseInt(inputEl.value) || 1;
 
-    if (maxAllowed <= 0) {
-        inputEl.value = 0;
-        inputEl.disabled = true;
-        inputEl.closest('.priv-toggle').classList.remove('active');
-        ToastManager.show(`Monthly limit reached for ${privKey}.`, 'warning');
-    } else if (val > maxAllowed) {
-        inputEl.value = maxAllowed;
-        ToastManager.show(`Limit reached. Auto-capped at ${maxAllowed} for ${privKey}.`, 'warning');
-    } else if (val <= 0) {
-        inputEl.value = 1;
-    }
+    if (maxAllowed <= 0) {
+        inputEl.value = 0;
+        inputEl.disabled = true;
+        inputEl.closest('.priv-toggle').classList.remove('active');
+        ToastManager.show(`Monthly limit reached for ${privKey}.`, 'warning');
+    } else if (val > maxAllowed) {
+        inputEl.value = maxAllowed;
+        ToastManager.show(`Limit reached. Auto-capped at ${maxAllowed} for ${privKey}.`, 'warning');
+    } else if (val <= 0) {
+        inputEl.value = 1;
+    }
 }
 
 function runAllocator() {
-    const balance=parseInt(document.getElementById('allocatorBalance')?.value||'0',10)||0;
-    if (balance<=0) {
-        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Load an agency above to run the allocator.</span>';
-        return;
-    }
-    const activeToggles=Array.from(document.querySelectorAll('#calcPrivGrid .priv-toggle.active'));
-    if (!activeToggles.length) {
-        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select one or more privileges above to preview allocation.</span>';
-        return;
-    }
-    
-    logFrontendAction("RUN_ALLOCATOR", `Balance: ${balance}`);
+    const balance=parseInt(document.getElementById('allocatorBalance')?.value||'0',10)||0;
+    if (balance<=0) {
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--accent-amber)">⚠️ Load an agency above to run the allocator.</span>';
+        return;
+    }
+    const activeToggles=Array.from(document.querySelectorAll('#calcPrivGrid .priv-toggle.active'));
+    if (!activeToggles.length) {
+        document.getElementById('allocatorOutput').innerHTML='<span style="color:var(--text-muted)">Select one or more privileges above to preview allocation.</span>';
+        return;
+    }
+    
+    logFrontendAction("RUN_ALLOCATOR", `Balance: ${balance}`);
 
-    const regionMode = document.getElementById('allocatorRegion')?.value || 'same';
-    let remaining=balance, receiptLines=[], totalCost=0, approvedCount=0, rejectedCount=0;
+    const regionMode = document.getElementById('allocatorRegion')?.value || 'same';
+    let remaining=balance, receiptLines=[], totalCost=0, approvedCount=0, rejectedCount=0;
 
-    activeToggles.forEach(el=>{
-        const key=el.getAttribute('data-val');
-        const qtyInput=el.querySelector('.priv-qty');
-        const qty=Math.max(1,parseInt(qtyInput?.value||'1',10)||1);
-        const entry=findPriceRule(key);
-        if (!entry) return;
-        const unitPrice = regionMode === 'other' ? entry.other : entry.same;
-        const display=key.split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1):w).join(' ');
+    activeToggles.forEach(el=>{
+        const key=el.getAttribute('data-val');
+        const qtyInput=el.querySelector('.priv-qty');
+        const qty=Math.max(1,parseInt(qtyInput?.value||'1',10)||1);
+        const entry=findPriceRule(key);
+        if (!entry) return;
+        const unitPrice = regionMode === 'other' ? entry.other : entry.same;
+        const display=key.split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1):w).join(' ');
 
-        const { maxAllowed, used, limit, source } = getEffectiveLimit(key);
-        const limitLabel = entry.type === 'order' ? `max ${limit} per request` : (source==='server' ? `${used}/${limit} used this month` : `limit ${limit}`);
+        const { maxAllowed, used, limit, source } = getEffectiveLimit(key);
+        const limitLabel = entry.type === 'order' ? `max ${limit} per request` : (source==='server' ? `${used}/${limit} used this month` : `limit ${limit}`);
 
-        if (maxAllowed <= 0) {
-            receiptLines.push(`❌ REJECTED: ${qty}× ${display} — limit reached (${limitLabel})`);
-            rejectedCount+=qty;
-            return;
-        }
-        const grantQty = Math.min(qty, maxAllowed);
-        const lineCost = unitPrice*grantQty;
-        const cappedNote = grantQty<qty ? ` (capped to ${grantQty}: ${limitLabel})` : '';
+        if (maxAllowed <= 0) {
+            receiptLines.push(`❌ REJECTED: ${qty}× ${display} — limit reached (${limitLabel})`);
+            rejectedCount+=qty;
+            return;
+        }
+        const grantQty = Math.min(qty, maxAllowed);
+        const lineCost = unitPrice*grantQty;
+        const cappedNote = grantQty<qty ? ` (capped to ${grantQty}: ${limitLabel})` : '';
 
-        if (remaining>=lineCost) {
-            receiptLines.push(`✅ APPROVED: ${grantQty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts${cappedNote}`);
-            totalCost+=lineCost;
-            remaining-=lineCost;
-            approvedCount+=grantQty;
-            if (grantQty<qty) rejectedCount += (qty-grantQty);
-        } else {
-            receiptLines.push(`❌ REJECTED: ${grantQty}× ${display} — need ${lineCost} pts, only ${remaining} left${cappedNote}`);
-            rejectedCount+=qty;
-        }
-    });
-    
-    const regionLabel = regionMode==='other' ? '(Other Agency ID Rate)' : '(Same Agency ID Rate)';
-    const out=receiptLines.join('\n')+
-        `\n\n─────────────────────────────\n`+
-        `📍 PRICING    : ${regionLabel}\n`+
-        `✅ APPROVED   : ${approvedCount} item(s)\n`+
-        `❌ REJECTED   : ${rejectedCount} item(s)\n`+
-        `💰 TOTAL COST : ${totalCost.toLocaleString()} pts\n`+
-        `💳 BALANCE    : ${balance.toLocaleString()} pts\n`+
-        `✨ REMAINING  : ${remaining.toLocaleString()} pts`;
+        if (remaining>=lineCost) {
+            receiptLines.push(`✅ APPROVED: ${grantQty}× ${display} @ ${unitPrice} pts each = ${lineCost} pts${cappedNote}`);
+            totalCost+=lineCost;
+            remaining-=lineCost;
+            approvedCount+=grantQty;
+            if (grantQty<qty) rejectedCount += (qty-grantQty);
+        } else {
+            receiptLines.push(`❌ REJECTED: ${grantQty}× ${display} — need ${lineCost} pts, only ${remaining} left${cappedNote}`);
+            rejectedCount+=qty;
+        }
+    });
+    
+    const regionLabel = regionMode==='other' ? '(Other Agency ID Rate)' : '(Same Agency ID Rate)';
+    const out=receiptLines.join('\n')+
+        `\n\n─────────────────────────────\n`+
+        `📍 PRICING    : ${regionLabel}\n`+
+        `✅ APPROVED   : ${approvedCount} item(s)\n`+
+        `❌ REJECTED   : ${rejectedCount} item(s)\n`+
+        `💰 TOTAL COST : ${totalCost.toLocaleString()} pts\n`+
+        `💳 BALANCE    : ${balance.toLocaleString()} pts\n`+
+        `✨ REMAINING  : ${remaining.toLocaleString()} pts`;
 
-    document.getElementById('allocatorOutput').innerHTML=out.split('\n').map(l=>{
-        if(l.startsWith('✅'))return`<span style="color:var(--accent-green)">${l}</span>`;
-        if(l.startsWith('❌'))return`<span style="color:var(--accent-rose)">${l}</span>`;
-        if(l.startsWith('📍'))return`<span style="color:var(--accent-purple)">${l}</span>`;
-        if(l.startsWith('💰'))return`<span style="color:var(--accent-rose);font-weight:bold">${l}</span>`;
-        if(l.startsWith('💳'))return`<span style="color:var(--text-muted)">${l}</span>`;
-        if(l.startsWith('✨'))return`<span style="color:var(--accent-cyan);font-weight:bold">${l}</span>`;
-        if(l.startsWith('─'))return`<span style="color:var(--border-hover)">${l}</span>`;
-        return l;
-    }).join('\n');
+    document.getElementById('allocatorOutput').innerHTML=out.split('\n').map(l=>{
+        if(l.startsWith('✅'))return`<span style="color:var(--accent-green)">${l}</span>`;
+        if(l.startsWith('❌'))return`<span style="color:var(--accent-rose)">${l}</span>`;
+        if(l.startsWith('📍'))return`<span style="color:var(--accent-purple)">${l}</span>`;
+        if(l.startsWith('💰'))return`<span style="color:var(--accent-rose);font-weight:bold">${l}</span>`;
+        if(l.startsWith('💳'))return`<span style="color:var(--text-muted)">${l}</span>`;
+        if(l.startsWith('✨'))return`<span style="color:var(--accent-cyan);font-weight:bold">${l}</span>`;
+        if(l.startsWith('─'))return`<span style="color:var(--border-hover)">${l}</span>`;
+        return l;
+    }).join('\n');
 }
 
 async function loadAgencyForAllocator() {
-    const code = document.getElementById('allocAgencyCodeSearch').value.trim();
-    if (!code) { ToastManager.show('Please enter an agency code first.', 'warning'); return; }
+    const code = document.getElementById('allocAgencyCodeSearch').value.trim();
+    if (!code) { ToastManager.show('Please enter an agency code first.', 'warning'); return; }
 
-    const msgEl=document.getElementById('allocatorLockMsg');
-    document.getElementById('loadingOverlay').style.display='flex';
-    try {
-        const res = await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=points`);
-        let data;
-        try { data = await res.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        if (!res.ok) throw new Error(data.error);
+    const msgEl=document.getElementById('allocatorLockMsg');
+    document.getElementById('loadingOverlay').style.display='flex';
+    try {
+        const res = await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=points`);
+        let data;
+        try { data = await res.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if (!res.ok) throw new Error(data.error);
 
-        currentAgencyData = data;
-        document.getElementById('allocatorBalance').value = data.point_balance || 0;
+        currentAgencyData = data;
+        document.getElementById('allocatorBalance').value = data.point_balance || 0;
 
-        if (msgEl) { msgEl.innerHTML = `✅ Loaded Agency <strong>${escHtml(code)}</strong> — balance ${(data.point_balance||0).toLocaleString()} pts. Monthly limits from this agency's usage will now be enforced.`; msgEl.style.color = 'var(--accent-green)'; }
+        if (msgEl) { msgEl.innerHTML = `✅ Loaded Agency <strong>${escHtml(code)}</strong> — balance ${(data.point_balance||0).toLocaleString()} pts. Monthly limits from this agency's usage will now be enforced.`; msgEl.style.color = 'var(--accent-green)'; }
 
-        const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '1';
-        controls.style.pointerEvents = 'auto';
-        
-        allocClearAll(); 
+        const controls = document.getElementById('allocatorControls');
+        controls.style.opacity = '1';
+        controls.style.pointerEvents = 'auto';
+        
+        allocClearAll(); 
 
-    } catch(err) {
-        ToastManager.show(err.message, 'error');
-        if (msgEl) { msgEl.innerHTML = `❌ Failed to load agency: ${escHtml(err.message)}`; msgEl.style.color = 'var(--accent-rose)'; }
+    } catch(err) {
+        ToastManager.show(err.message, 'error');
+        if (msgEl) { msgEl.innerHTML = `❌ Failed to load agency: ${escHtml(err.message)}`; msgEl.style.color = 'var(--accent-rose)'; }
 
-        const controls = document.getElementById('allocatorControls');
-        controls.style.opacity = '0.4';
-        controls.style.pointerEvents = 'none';
-    }
-    document.getElementById('loadingOverlay').style.display='none';
+        const controls = document.getElementById('allocatorControls');
+        controls.style.opacity = '0.4';
+        controls.style.pointerEvents = 'none';
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════════════
 // UNIVERSAL QUERY
 // ════════════════════════════════════════════════════════════════════
 const QY_FIELD_LABELS = {
-    user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
-    nid_number: 'NID Number', bd_code: 'Bd Code'
+    user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
+    nid_number: 'NID Number', bd_code: 'Bd Code'
 };
 
 (function initQyFieldLabel(){
-    const sel = document.getElementById('qySearchField');
-    if (!sel) return;
-    sel.addEventListener('change', () => {
-        const lbl = document.getElementById('qyValueLabel');
-        if (lbl) lbl.textContent = (QY_FIELD_LABELS[sel.value] || 'Value') + ' Value';
-    });
+    const sel = document.getElementById('qySearchField');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+        const lbl = document.getElementById('qyValueLabel');
+        if (lbl) lbl.textContent = (QY_FIELD_LABELS[sel.value] || 'Value') + ' Value';
+    });
 })();
 
 function qyStatusClass(status){
-    const s = (status||'').toLowerCase();
-    if (s.includes('done') || s.includes('complet') || s.includes('approv')) return 'qy-status-done';
-    if (s.includes('reject') || s.includes('fail') || s.includes('decline')) return 'qy-status-rejected';
-    return 'qy-status-pending';
+    const s = (status||'').toLowerCase();
+    if (s.includes('done') || s.includes('complet') || s.includes('approv')) return 'qy-status-done';
+    if (s.includes('reject') || s.includes('fail') || s.includes('decline')) return 'qy-status-rejected';
+    return 'qy-status-pending';
 }
 
 function parseDuplicatedCheck(val) {
-    if (!val || val === '[]') return '—';
-    try {
-        let matches = [...val.matchAll(/'text':\s*'([^']+)'/g)];
-        if (matches.length > 0) {
-            return matches.map(m => {
-                let text = m[1];
-                let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
-                return `<span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;font-weight:600;">${escHtml(text)}</span>`;
-            }).join('');
-        }
-        
-        let str = val.replace(/'/g, '"');
-        let arr = JSON.parse(str);
-        if (Array.isArray(arr)) {
-            return arr.map(item => {
-                let text = item.text || item;
-                let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
-                return `<span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;font-weight:600;">${escHtml(text)}</span>`;
-            }).join('');
-        }
-    } catch(e) {}
-    return `<span style="font-size:0.8rem;color:var(--text);">${escHtml(val)}</span>`;
+    if (!val || val === '[]') return '—';
+    try {
+        let matches = [...val.matchAll(/'text':\s*'([^']+)'/g)];
+        if (matches.length > 0) {
+            return matches.map(m => {
+                let text = m[1];
+                let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
+                return `<span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;font-weight:600;">${escHtml(text)}</span>`;
+            }).join('');
+        }
+        
+        let str = val.replace(/'/g, '"');
+        let arr = JSON.parse(str);
+        if (Array.isArray(arr)) {
+            return arr.map(item => {
+                let text = item.text || item;
+                let color = text.includes('🔴') || text.toLowerCase().includes('fail') ? 'var(--accent-rose)' : 'var(--accent-green)';
+                return `<span style="display:inline-block;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${color};color:${color};font-size:0.75rem;margin:2px;font-weight:600;">${escHtml(text)}</span>`;
+            }).join('');
+        }
+    } catch(e) {}
+    return `<span style="font-size:0.8rem;color:var(--text);">${escHtml(val)}</span>`;
 }
 
 function qyRow(label, value){
-    if (value === undefined || value === null || value === '') return '';
-    if (label === 'Duplicated Check') return `<div class="qy-row" style="flex-direction:column;align-items:flex-start"><span class="qy-row-label" style="margin-bottom:4px">${escHtml(label)}</span><span class="qy-row-val" style="text-align:left">${parseDuplicatedCheck(value)}</span></div>`;
-    return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
+    if (value === undefined || value === null || value === '') return '';
+    if (label === 'Duplicated Check') return `<div class="qy-row" style="flex-direction:column;align-items:flex-start"><span class="qy-row-label" style="margin-bottom:4px">${escHtml(label)}</span><span class="qy-row-val" style="text-align:left">${parseDuplicatedCheck(value)}</span></div>`;
+    return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
 }
 
 async function runQuery(){
-    const field = document.getElementById('qySearchField')?.value || 'user_id';
-    const value = (document.getElementById('qySearchValue')?.value || '').trim();
+    const field = document.getElementById('qySearchField')?.value || 'user_id';
+    const value = (document.getElementById('qySearchValue')?.value || '').trim();
 
-    if (!value) { ToastManager.show('Enter a value to search first.', 'warning'); return; }
+    if (!value) { ToastManager.show('Enter a value to search first.', 'warning'); return; }
 
-    const spinner  = document.getElementById('qyLoadingSpinner');
-    const countEl  = document.getElementById('qyResultCount');
-    const resultsEl= document.getElementById('qyResults');
-    const emptyEl  = document.getElementById('qyEmpty');
+    const spinner  = document.getElementById('qyLoadingSpinner');
+    const countEl  = document.getElementById('qyResultCount');
+    const resultsEl= document.getElementById('qyResults');
+    const emptyEl  = document.getElementById('qyEmpty');
 
-    if (spinner)   spinner.style.display = 'inline';
-    if (emptyEl)   emptyEl.style.display = 'none';
-    if (resultsEl) resultsEl.innerHTML = '';
+    if (spinner)   spinner.style.display = 'inline';
+    if (emptyEl)   emptyEl.style.display = 'none';
+    if (resultsEl) resultsEl.innerHTML = '';
 
-    try {
-        const params = new URLSearchParams({
-            field, value, user: loggedUser || '', email: loggedEmail || ''
-        });
-        const resp = await fetch('/api/query?' + params.toString());
-        let data;
-        try { data = await resp.json(); }
-        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
+    try {
+        const params = new URLSearchParams({
+            field, value, user: loggedUser || '', email: loggedEmail || ''
+        });
+        const resp = await fetch('/api/query?' + params.toString());
+        let data;
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
 
-        if (spinner) spinner.style.display = 'none';
+        if (spinner) spinner.style.display = 'none';
 
-        if (data.fetch_complete === false) {
-            ToastManager.show(`Note: full history scan hit a snag (${data.stop_reason||'unknown'}). Results shown may be partial — try again.`, 'warning', 8000);
-        }
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Note: full history scan hit a snag (${data.stop_reason||'unknown'}). Results shown may be partial — try again.`, 'warning', 8000);
+        }
 
-        const results = data.results || [];
-        if (!results.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
-            if (countEl) countEl.textContent = `0 requests found for ${QY_FIELD_LABELS[field]} "${value}"`;
-            return;
-        }
+        const results = data.results || [];
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (countEl) countEl.textContent = `0 requests found for ${QY_FIELD_LABELS[field]} "${value}"`;
+            return;
+        }
 
-        if (countEl) countEl.textContent = `${results.length} request${results.length===1?'':'s'} found for ${QY_FIELD_LABELS[field]} "${value}"`;
+        if (countEl) countEl.textContent = `${results.length} request${results.length===1?'':'s'} found for ${QY_FIELD_LABELS[field]} "${value}"`;
 
-        if (resultsEl) resultsEl.innerHTML = results.map(r => `
-            <div class="qy-card">
-                <div class="qy-card-head">
-                    <div>
-                        <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
-                        <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
-                    </div>
-                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
-                </div>
-                ${qyRow('Submitted on', r.submitted_on)}
-                ${qyRow('Respondents', r.respondents)}
-                ${qyRow('User ID', r.user_id)}
-                ${qyRow('Agency Code', r.agency_code)}
-                ${qyRow('Agency Type', r.agency_type)}
-                ${qyRow('Otherapp ID', r.otherapp_id)}
-                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
-                ${qyRow('Bd Code', r.bd_code)}
-                ${qyRow('Duplicated Check', r.duplicated_check)}
-                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
-                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
-                ${r.closing_reason && (r.request_type || '').toLowerCase().includes('closing agency') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
-            </div>
-        `).join('');
+        if (resultsEl) resultsEl.innerHTML = results.map(r => `
+            <div class="qy-card">
+                <div class="qy-card-head">
+                    <div>
+                        <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
+                        <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
+                    </div>
+                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
+                </div>
+                ${qyRow('Submitted on', r.submitted_on)}
+                ${qyRow('Respondents', r.respondents)}
+                ${qyRow('User ID', r.user_id)}
+                ${qyRow('Agency Code', r.agency_code)}
+                ${qyRow('Agency Type', r.agency_type)}
+                ${qyRow('Otherapp ID', r.otherapp_id)}
+                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                ${qyRow('Bd Code', r.bd_code)}
+                ${qyRow('Duplicated Check', r.duplicated_check)}
+                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+                ${r.closing_reason && (r.request_type || '').toLowerCase().includes('closing agency') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
+            </div>
+        `).join('');
 
-    } catch (e) {
-        if (spinner) spinner.style.display = 'none';
-        if (countEl) countEl.textContent = 'Error: ' + e.message;
-        ToastManager.show('Query failed: ' + e.message, 'error', 8000);
-    }
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Query failed: ' + e.message, 'error', 8000);
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3681,183 +3681,183 @@ async function runQuery(){
 let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
 
 function prDebounce() {
-    clearTimeout(prDebounceTimer);
-    prDebounceTimer = setTimeout(() => prFetch(1), 400);
+    clearTimeout(prDebounceTimer);
+    prDebounceTimer = setTimeout(() => prFetch(1), 400);
 }
 
 async function prFetch(page) {
-    page = Math.max(1, page || 1);
-    prCurrentPage = page;
+    page = Math.max(1, page || 1);
+    prCurrentPage = page;
 
-    const pageSize = parseInt(document.getElementById('prPageSize')?.value || '50');
-    const params = new URLSearchParams({
-        page,
-        page_size: pageSize,
-        user: loggedUser || '',
-        email: loggedEmail || '',
-        search: document.getElementById('prSearch')?.value || '',
-        region: document.getElementById('prRegion')?.value || '',
-        acm:    document.getElementById('prAcm')?.value    || '',
-    });
+    const pageSize = parseInt(document.getElementById('prPageSize')?.value || '50');
+    const params = new URLSearchParams({
+        page,
+        page_size: pageSize,
+        user: loggedUser || '',
+        email: loggedEmail || '',
+        search: document.getElementById('prSearch')?.value || '',
+        region: document.getElementById('prRegion')?.value || '',
+        acm:    document.getElementById('prAcm')?.value    || '',
+    });
 
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
 
-    const spinner  = document.getElementById('prLoadingSpinner');
-    const countEl  = document.getElementById('prResultCount');
-    const tableEl  = document.getElementById('prTable');
-    const emptyEl  = document.getElementById('prEmpty');
-    const pagination = document.getElementById('prPagination');
+    const spinner  = document.getElementById('prLoadingSpinner');
+    const countEl  = document.getElementById('prResultCount');
+    const tableEl  = document.getElementById('prTable');
+    const emptyEl  = document.getElementById('prEmpty');
+    const pagination = document.getElementById('prPagination');
 
-    if (spinner)  spinner.style.display = 'inline';
-    if (tableEl)  tableEl.style.display = 'none';
-    if (emptyEl)  emptyEl.style.display = 'none';
-    if (pagination) pagination.style.display = 'none';
+    if (spinner)  spinner.style.display = 'inline';
+    if (tableEl)  tableEl.style.display = 'none';
+    if (emptyEl)  emptyEl.style.display = 'none';
+    if (pagination) pagination.style.display = 'none';
 
-    try {
-        const resp = await fetch('/api/points/records?' + params.toString());
-        let data;
-        try { data = await resp.json(); }
-        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        
-        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
-        prAllData = data.records || [];
+    try {
+        const resp = await fetch('/api/points/records?' + params.toString());
+        let data;
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
+        prAllData = data.records || [];
 
-        if (spinner)  spinner.style.display = 'none';
+        if (spinner)  spinner.style.display = 'none';
 
-        if (data.fetch_complete === false) {
-            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}. Click Search again to retry.`,'warning',8000);
-        }
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}. Click Search again to retry.`,'warning',8000);
+        }
 
-        if (!prAllData.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
-            if (countEl) countEl.textContent = '0 records found';
-            return;
-        } const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
-        const labels = {
-            agency_id:'Agency Code', acm:'ACM', region:'Region',
-            base_points:'Base Pts', bonus_points:'Bonus Pts', total_points:'Total Pts',
-            used_points:'Used Pts', point_balance:'Balance', health_score:'Health'
-        };
+        if (!prAllData.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (countEl) countEl.textContent = '0 records found';
+            return;
+        } const cols = ['agency_id','acm','region','base_points','bonus_points','total_points','used_points','point_balance','health_score'];
+        const labels = {
+            agency_id:'Agency Code', acm:'ACM', region:'Region',
+            base_points:'Base Pts', bonus_points:'Bonus Pts', total_points:'Total Pts',
+            used_points:'Used Pts', point_balance:'Balance', health_score:'Health'
+        };
 
-        const thead = document.getElementById('prThead');
-        const tbody = document.getElementById('prTbody');
-        const tfoot = document.getElementById('prTfoot');
+        const thead = document.getElementById('prThead');
+        const tbody = document.getElementById('prTbody');
+        const tfoot = document.getElementById('prTfoot');
 
-        if (thead) thead.innerHTML = '<tr style="background:var(--surface-hover)">' + cols.map(c=>`<th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--surface-hover)">${labels[c]||c}</th>`).join('') + '</tr>';
+        if (thead) thead.innerHTML = '<tr style="background:var(--surface-hover)">' + cols.map(c=>`<th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--surface-hover)">${labels[c]||c}</th>`).join('') + '</tr>';
 
-        if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
-            const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
-            return `<tr style="${rowStyle};border-bottom:1px solid var(--border);transition:background .15s ease" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
-                cols.map(c => {
-                    let v = r[c];
-                    if (c === 'health_score') {
-                        const col = v >= 80 ? 'var(--accent-green)' : v >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
-                        const bg  = v >= 80 ? 'rgba(0,230,118,.12)' : v >= 50 ? 'rgba(255,171,0,.12)' : 'rgba(255,82,82,.12)';
-                        return `<td style="padding:9px 12px"><span style="display:inline-block;padding:2px 10px;border-radius:20px;background:${bg};color:${col};font-weight:700;font-size:.82rem">${v ?? '—'}</span></td>`;
-                    }
-                    if (c === 'point_balance') {
-                        const col2 = v > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
-                        return `<td style="padding:9px 12px;color:${col2};font-weight:700">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
-                    }
-                    if (c === 'agency_id') {
-                        return `<td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(String(v ?? '—'))}</td>`;
-                    }
-                    if (['total_points','used_points','base_points','bonus_points'].includes(c)) {
-                        return `<td style="padding:9px 12px;text-align:right;font-variant-numeric:tabular-nums">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
-                    }
-                    return `<td style="padding:9px 12px">${escHtml(String(v ?? '—'))}</td>`;
-                }).join('') +
-            '</tr>';
-        }).join('');
+        if (tbody) tbody.innerHTML = prAllData.map((r,i)=>{
+            const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
+            return `<tr style="${rowStyle};border-bottom:1px solid var(--border);transition:background .15s ease" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">` +
+                cols.map(c => {
+                    let v = r[c];
+                    if (c === 'health_score') {
+                        const col = v >= 80 ? 'var(--accent-green)' : v >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+                        const bg  = v >= 80 ? 'rgba(0,230,118,.12)' : v >= 50 ? 'rgba(255,171,0,.12)' : 'rgba(255,82,82,.12)';
+                        return `<td style="padding:9px 12px"><span style="display:inline-block;padding:2px 10px;border-radius:20px;background:${bg};color:${col};font-weight:700;font-size:.82rem">${v ?? '—'}</span></td>`;
+                    }
+                    if (c === 'point_balance') {
+                        const col2 = v > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
+                        return `<td style="padding:9px 12px;color:${col2};font-weight:700">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                    }
+                    if (c === 'agency_id') {
+                        return `<td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(String(v ?? '—'))}</td>`;
+                    }
+                    if (['total_points','used_points','base_points','bonus_points'].includes(c)) {
+                        return `<td style="padding:9px 12px;text-align:right;font-variant-numeric:tabular-nums">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
+                    }
+                    return `<td style="padding:9px 12px">${escHtml(String(v ?? '—'))}</td>`;
+                }).join('') +
+            '</tr>';
+        }).join('');
 
-        if (tfoot && data.totals) {
-            tfoot.innerHTML = '<tr style="border-top:2px solid var(--border)">' +
-                cols.map((c,i) => {
-                    if (c === 'total_points') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>`;
-                    if (c === 'used_points')  return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>`;
-                    if (c === 'point_balance') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>`;
-                    if (i === 0) return `<td style="padding:9px 12px;font-weight:700;color:var(--text-muted)">TOTALS</td>`;
-                    return '<td></td>';
-                }).join('') + '</tr>';
-        }
+        if (tfoot && data.totals) {
+            tfoot.innerHTML = '<tr style="border-top:2px solid var(--border)">' +
+                cols.map((c,i) => {
+                    if (c === 'total_points') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>`;
+                    if (c === 'used_points')  return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>`;
+                    if (c === 'point_balance') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>`;
+                    if (i === 0) return `<td style="padding:9px 12px;font-weight:700;color:var(--text-muted)">TOTALS</td>`;
+                    return '<td></td>';
+                }).join('') + '</tr>';
+        }
 
-        if (tableEl) tableEl.style.display = '';
+        if (tableEl) tableEl.style.display = '';
 
-        document.getElementById('prPageNum').textContent    = data.page;
-        document.getElementById('prTotalPages').textContent = data.total_pages;
-        document.getElementById('prTotalCount').textContent = data.total.toLocaleString();
-        const prevBtn = document.getElementById('prPrevBtn');
-        const nextBtn = document.getElementById('prNextBtn');
-        if (prevBtn) prevBtn.disabled = data.page <= 1;
-        if (nextBtn) nextBtn.disabled = data.page >= data.total_pages;
-        if (pagination) { pagination.style.display = 'flex'; }
+        document.getElementById('prPageNum').textContent    = data.page;
+        document.getElementById('prTotalPages').textContent = data.total_pages;
+        document.getElementById('prTotalCount').textContent = data.total.toLocaleString();
+        const prevBtn = document.getElementById('prPrevBtn');
+        const nextBtn = document.getElementById('prNextBtn');
+        if (prevBtn) prevBtn.disabled = data.page <= 1;
+        if (nextBtn) nextBtn.disabled = data.page >= data.total_pages;
+        if (pagination) { pagination.style.display = 'flex'; }
 
-    } catch (e) {
-        if (spinner) spinner.style.display = 'none';
-        if (countEl) countEl.textContent = 'Error: ' + e.message;
-        ToastManager.show('Failed to load records: ' + e.message, 'error');
-    }
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Failed to load records: ' + e.message, 'error');
+    }
 }
 
 const PR_EXPORT_COLS = ['agency_id','agency_name','region','acm','base_points','bonus_points','total_points','used_points','point_balance'];
 
 function prExportCsv() {
-    const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', false, PR_EXPORT_COLS);
+    const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', false, PR_EXPORT_COLS);
 }
 
 function prExportExcel() {
-    const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', true, PR_EXPORT_COLS);
+    const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_records_bulk', true, PR_EXPORT_COLS);
 }
 
 // ════════════════════════════════════════════════════════════════════
 // BULK EXPORT ENGINE
 // ════════════════════════════════════════════════════════════════════
 const EXPORT_COL_LABELS = {
-    agency_id:'Agency Code', agency_name:'Agency Name', region:'Region', acm:'ACM',
-    base_points:'Base Points', bonus_points:'Bonus Points',
-    total_points:'Total Points', used_points:'Used Points', point_balance:'Point Balance',
-    health_score:'Health'
+    agency_id:'Agency Code', agency_name:'Agency Name', region:'Region', acm:'ACM',
+    base_points:'Base Points', bonus_points:'Bonus Points',
+    total_points:'Total Points', used_points:'Used Points', point_balance:'Point Balance',
+    health_score:'Health'
 };
 
 async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, customCols) {
-    params.set('export', 'true');
-    logFrontendAction(isExcel ? "EXPORT_EXCEL_BULK" : "EXPORT_CSV_BULK", endpoint);
-    ToastManager.show('Preparing bulk export. This might take a few moments...', 'info', 8000);
-    document.getElementById('loadingOverlay').style.display='flex';
-    
-    try {
-        const res = await fetch(`${endpoint}?${params.toString()}`);
-        let data;
-        try { data = await res.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        if(!res.ok) throw new Error(data.error);
-        
-        const records = data.records || [];
-        if(!records.length) { ToastManager.show('No data found to export.', 'warning'); document.getElementById('loadingOverlay').style.display='none'; return; }
-        
-        const cols = customCols || ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
-        const labels = cols.map(c => EXPORT_COL_LABELS[c] || c);
-        
-        if (isExcel && window.XLSX) {
-            const ws = XLSX.utils.json_to_sheet(records, {header: cols});
-            XLSX.utils.sheet_add_aoa(ws, [labels], {origin: 'A1'});
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Export");
-            XLSX.writeFile(wb, `${fileNamePrefix}.xlsx`);
-        } else {
-            const rows = [labels.join(','), ...records.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
-            const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `${fileNamePrefix}.csv`; a.click();
-        }
-        ToastManager.show(`Bulk export successful! (${records.length.toLocaleString()} records)`, 'success');
-    } catch(e) {
-        ToastManager.show('Export failed: ' + e.message, 'error', 8000);
-    }
-    document.getElementById('loadingOverlay').style.display='none';
+    params.set('export', 'true');
+    logFrontendAction(isExcel ? "EXPORT_EXCEL_BULK" : "EXPORT_CSV_BULK", endpoint);
+    ToastManager.show('Preparing bulk export. This might take a few moments...', 'info', 8000);
+    document.getElementById('loadingOverlay').style.display='flex';
+    
+    try {
+        const res = await fetch(`${endpoint}?${params.toString()}`);
+        let data;
+        try { data = await res.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if(!res.ok) throw new Error(data.error);
+        
+        const records = data.records || [];
+        if(!records.length) { ToastManager.show('No data found to export.', 'warning'); document.getElementById('loadingOverlay').style.display='none'; return; }
+        
+        const cols = customCols || ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
+        const labels = cols.map(c => EXPORT_COL_LABELS[c] || c);
+        
+        if (isExcel && window.XLSX) {
+            const ws = XLSX.utils.json_to_sheet(records, {header: cols});
+            XLSX.utils.sheet_add_aoa(ws, [labels], {origin: 'A1'});
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Export");
+            XLSX.writeFile(wb, `${fileNamePrefix}.xlsx`);
+        } else {
+            const rows = [labels.join(','), ...records.map(r => cols.map(c => JSON.stringify(r[c]??'')).join(','))];
+            const blob = new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `${fileNamePrefix}.csv`; a.click();
+        }
+        ToastManager.show(`Bulk export successful! (${records.length.toLocaleString()} records)`, 'success');
+    } catch(e) {
+        ToastManager.show('Export failed: ' + e.message, 'error', 8000);
+    }
+    document.getElementById('loadingOverlay').style.display='none';
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3866,260 +3866,260 @@ async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, cust
 let ptCurrentPage = 1, ptAllData = [], ptDebounceTimer = null;
 
 function ptDebounce() {
-    clearTimeout(ptDebounceTimer);
-    ptDebounceTimer = setTimeout(() => ptFetch(1), 400);
+    clearTimeout(ptDebounceTimer);
+    ptDebounceTimer = setTimeout(() => ptFetch(1), 400);
 }
 
 async function ptFetch(page) {
-    page = Math.max(1, page || 1);
-    ptCurrentPage = page;
+    page = Math.max(1, page || 1);
+    ptCurrentPage = page;
 
-    const pageSize = parseInt(document.getElementById('ptPageSize')?.value || '50');
-    const params = new URLSearchParams({
-        page,
-        page_size: pageSize,
-        user:     loggedUser || '',
-        email:    loggedEmail || '',
-        search:   document.getElementById('ptSearch')?.value  || '',
-        region:   document.getElementById('ptRegion')?.value  || '',
-        status:   document.getElementById('ptStatus')?.value  || '',
-        sort_by:  document.getElementById('ptSortBy')?.value  || 'date',
-        sort_dir: document.getElementById('ptSortDir')?.value || 'desc',
-    });
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    const pageSize = parseInt(document.getElementById('ptPageSize')?.value || '50');
+    const params = new URLSearchParams({
+        page,
+        page_size: pageSize,
+        user:     loggedUser || '',
+        email:    loggedEmail || '',
+        search:   document.getElementById('ptSearch')?.value  || '',
+        region:   document.getElementById('ptRegion')?.value  || '',
+        status:   document.getElementById('ptStatus')?.value  || '',
+        sort_by:  document.getElementById('ptSortBy')?.value  || 'date',
+        sort_dir: document.getElementById('ptSortDir')?.value || 'desc',
+    });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
 
-    const loadingBar = document.getElementById('ptLoadingBar');
-    const tableEl   = document.getElementById('ptTable');
-    const emptyEl   = document.getElementById('ptEmpty');
-    const pagination = document.getElementById('ptPagination');
-    const kpiRow    = document.getElementById('ptKpiRow');
+    const loadingBar = document.getElementById('ptLoadingBar');
+    const tableEl   = document.getElementById('ptTable');
+    const emptyEl   = document.getElementById('ptEmpty');
+    const pagination = document.getElementById('ptPagination');
+    const kpiRow    = document.getElementById('ptKpiRow');
 
-    if (loadingBar) loadingBar.style.display = 'block';
-    if (tableEl)   tableEl.style.display   = 'none';
-    if (emptyEl)   emptyEl.style.display   = 'none';
-    if (pagination) pagination.style.display = 'none';
-    if (kpiRow)    kpiRow.style.display    = 'none';
+    if (loadingBar) loadingBar.style.display = 'block';
+    if (tableEl)   tableEl.style.display   = 'none';
+    if (emptyEl)   emptyEl.style.display   = 'none';
+    if (pagination) pagination.style.display = 'none';
+    if (kpiRow)    kpiRow.style.display    = 'none';
 
-    try {
-        const resp = await fetch('/api/points/records?' + params.toString());
-        let data;
-        try { data = await resp.json(); }
-        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        
-        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
-        ptAllData = data.records || [];
+    try {
+        const resp = await fetch('/api/points/records?' + params.toString());
+        let data;
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
+        ptAllData = data.records || [];
 
-        if (data.fetch_complete === false) {
-            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}. Click Refresh to retry.`,'warning',8000);
-        }
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}. Click Refresh to retry.`,'warning',8000);
+        }
 
-        if (loadingBar) loadingBar.style.display = 'none';
+        if (loadingBar) loadingBar.style.display = 'none';
 
-        if (!ptAllData.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
-            return;
-        }
+        if (!ptAllData.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
 
-        if (kpiRow && data.totals) {
-            document.getElementById('ptKpiTotal').textContent   = (data.totals.total_points||0).toLocaleString();
-            document.getElementById('ptKpiUsed').textContent    = (data.totals.used_points||0).toLocaleString();
-            document.getElementById('ptKpiBalance').textContent = (data.totals.point_balance||0).toLocaleString();
-            kpiRow.style.display = 'grid';
-        }
+        if (kpiRow && data.totals) {
+            document.getElementById('ptKpiTotal').textContent   = (data.totals.total_points||0).toLocaleString();
+            document.getElementById('ptKpiUsed').textContent    = (data.totals.used_points||0).toLocaleString();
+            document.getElementById('ptKpiBalance').textContent = (data.totals.point_balance||0).toLocaleString();
+            kpiRow.style.display = 'grid';
+        }
 
-        const tbody = document.getElementById('ptTbody');
-        const tfoot = document.getElementById('ptTfoot');
-        if (tbody) tbody.innerHTML = ptAllData.map((r,i) => {
-            const rowBg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
-            const healthCol = (r.health_score||0) >= 80 ? 'var(--accent-green)' : (r.health_score||0) >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
-            const balCol = (r.point_balance||0) > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
-            return `<tr style="${rowBg};border-bottom:1px solid var(--border)"
-                        onmouseover="this.style.background='var(--surface-hover)'"
-                        onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">
-                <td style="padding:9px 12px">${escHtml(r.agency_id||'—')}</td>
-                <td style="padding:9px 12px;font-weight:500">${escHtml(r.agency_name||'—')}</td>
-                <td style="padding:9px 12px;text-transform:uppercase;font-size:.8rem;color:var(--text-muted)">${escHtml(r.region||'—')}</td>
-                <td style="padding:9px 12px">${escHtml(r.acm||'—')}</td>
-                <td style="padding:9px 12px;text-align:right">${(r.total_points||0).toLocaleString()}</td>
-                <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(r.used_points||0).toLocaleString()}</td>
-                <td style="padding:9px 12px;text-align:right;font-weight:700;color:${balCol}">${(r.point_balance||0).toLocaleString()}</td>
-                <td style="padding:9px 12px;text-align:center;font-weight:700;color:${healthCol}">${r.health_score||0}</td>
-                <td style="padding:9px 12px;font-size:.82rem">${escHtml(r.status||'—')}</td>
-                <td style="padding:9px 12px;font-size:.82rem;color:var(--text-muted)">${escHtml(r.date||'—')}</td>
-            </tr>`;
-        }).join('');
+        const tbody = document.getElementById('ptTbody');
+        const tfoot = document.getElementById('ptTfoot');
+        if (tbody) tbody.innerHTML = ptAllData.map((r,i) => {
+            const rowBg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
+            const healthCol = (r.health_score||0) >= 80 ? 'var(--accent-green)' : (r.health_score||0) >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)';
+            const balCol = (r.point_balance||0) > 0 ? 'var(--accent-cyan)' : 'var(--accent-rose)';
+            return `<tr style="${rowBg};border-bottom:1px solid var(--border)"
+                        onmouseover="this.style.background='var(--surface-hover)'"
+                        onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">
+                <td style="padding:9px 12px">${escHtml(r.agency_id||'—')}</td>
+                <td style="padding:9px 12px;font-weight:500">${escHtml(r.agency_name||'—')}</td>
+                <td style="padding:9px 12px;text-transform:uppercase;font-size:.8rem;color:var(--text-muted)">${escHtml(r.region||'—')}</td>
+                <td style="padding:9px 12px">${escHtml(r.acm||'—')}</td>
+                <td style="padding:9px 12px;text-align:right">${(r.total_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(r.used_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;font-weight:700;color:${balCol}">${(r.point_balance||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:center;font-weight:700;color:${healthCol}">${r.health_score||0}</td>
+                <td style="padding:9px 12px;font-size:.82rem">${escHtml(r.status||'—')}</td>
+                <td style="padding:9px 12px;font-size:.82rem;color:var(--text-muted)">${escHtml(r.date||'—')}</td>
+            </tr>`;
+        }).join('');
 
-        if (tfoot && data.totals) {
-            tfoot.innerHTML = `<tr style="border-top:2px solid var(--border);font-weight:700">
-                <td style="padding:9px 12px;color:var(--text-muted)">TOTALS</td>
-                <td></td><td></td><td></td>
-                <td style="padding:9px 12px;text-align:right;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>
-                <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>
-                <td style="padding:9px 12px;text-align:right;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>
-                <td></td><td></td><td></td>
-            </tr>`;
-        }
+        if (tfoot && data.totals) {
+            tfoot.innerHTML = `<tr style="border-top:2px solid var(--border);font-weight:700">
+                <td style="padding:9px 12px;color:var(--text-muted)">TOTALS</td>
+                <td></td><td></td><td></td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>
+                <td style="padding:9px 12px;text-align:right;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>
+                <td></td><td></td><td></td>
+            </tr>`;
+        }
 
-        if (tableEl) tableEl.style.display = '';
+        if (tableEl) tableEl.style.display = '';
 
-        document.getElementById('ptPageNum').textContent    = data.page;
-        document.getElementById('ptTotalPages').textContent = data.total_pages;
-        document.getElementById('ptTotalCount').textContent = data.total.toLocaleString();
-        const prevBtn = document.getElementById('ptPrevBtn');
-        const nextBtn = document.getElementById('ptNextBtn');
-        if (prevBtn) prevBtn.disabled = data.page <= 1;
-        if (nextBtn) nextBtn.disabled = data.page >= data.total_pages;
-        if (pagination) { pagination.style.display = 'flex'; }
+        document.getElementById('ptPageNum').textContent    = data.page;
+        document.getElementById('ptTotalPages').textContent = data.total_pages;
+        document.getElementById('ptTotalCount').textContent = data.total.toLocaleString();
+        const prevBtn = document.getElementById('ptPrevBtn');
+        const nextBtn = document.getElementById('ptNextBtn');
+        if (prevBtn) prevBtn.disabled = data.page <= 1;
+        if (nextBtn) nextBtn.disabled = data.page >= data.total_pages;
+        if (pagination) { pagination.style.display = 'flex'; }
 
-    } catch (e) {
-        if (loadingBar) loadingBar.style.display = 'none';
-        ToastManager.show('Failed to load table: ' + e.message, 'error');
-    }
+    } catch (e) {
+        if (loadingBar) loadingBar.style.display = 'none';
+        ToastManager.show('Failed to load table: ' + e.message, 'error');
+    }
 }
 
 function ptExportCsv() {
-    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', false);
+    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', false);
 }
 
 function ptExportExcel() {
-    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', true);
+    const params = new URLSearchParams({ search: document.getElementById('ptSearch')?.value || '', region: document.getElementById('ptRegion')?.value || '', acm: document.getElementById('ptAcm')?.value || '', user: loggedUser, email: loggedEmail });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    executeBulkExport('/api/points/records', params, 'xena_point_table_bulk', true);
 }
 
 function enforceExportLocks() {
-    if (isAdmin) return;
-    const exportAllowed = userModules.includes('export_data');
-    if (!exportAllowed) {
-        document.querySelectorAll('.bulk-export-btn, button[onclick*="Export"], button[id*="export"]').forEach(btn => btn.style.display = 'none');
-    }
+    if (isAdmin) return;
+    const exportAllowed = userModules.includes('export_data');
+    if (!exportAllowed) {
+        document.querySelectorAll('.bulk-export-btn, button[onclick*="Export"], button[id*="export"]').forEach(btn => btn.style.display = 'none');
+    }
 }
 
 function populateAcmFilterSelect() {
-    ['prAcm', 'ptAcm'].forEach(id => {
-        const sel = document.getElementById(id);
-        if (sel) {
-            sel.innerHTML = '<option value="">All ACMs</option>';
-            allAcms.forEach(a => sel.add(new Option(a, a.toLowerCase())));
-        }
-    });
+    ['prAcm', 'ptAcm'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) {
+            sel.innerHTML = '<option value="">All ACMs</option>';
+            allAcms.forEach(a => sel.add(new Option(a, a.toLowerCase())));
+        }
+    });
 }
 
 function enforceLocks() {
-    populateAcmFilterSelect();
-    enforceExportLocks();
-    if (isAdmin) return;
-    const p = userPermissions?.permissions || {};
+    populateAcmFilterSelect();
+    enforceExportLocks();
+    if (isAdmin) return;
+    const p = userPermissions?.permissions || {};
 
-    const anaReg = p.regions?.analytics || ['all'];
-    if (!anaReg.includes('all')) {
-        const sel = document.getElementById('anaRegion');
-        if (sel) {
-            sel.innerHTML = '';
-            ['PK','IN'].filter(r => anaReg.includes(r.toLowerCase())).forEach(r => sel.add(new Option(r, r)));
-            if (sel.options.length === 1) { sel.value = sel.options[0].value; sel.style.pointerEvents = 'none'; sel.style.opacity = '0.7'; }
-        }
-    }
+    const anaReg = p.regions?.analytics || ['all'];
+    if (!anaReg.includes('all')) {
+        const sel = document.getElementById('anaRegion');
+        if (sel) {
+            sel.innerHTML = '';
+            ['PK','IN'].filter(r => anaReg.includes(r.toLowerCase())).forEach(r => sel.add(new Option(r, r)));
+            if (sel.options.length === 1) { sel.value = sel.options[0].value; sel.style.pointerEvents = 'none'; sel.style.opacity = '0.7'; }
+        }
+    }
 
-    const ptReg = p.regions?.points || ['all'];
-    if (!ptReg.includes('all')) {
-        ['prRegion', 'ptRegion'].forEach(id => {
-            const sel = document.getElementById(id);
-            if (!sel) return;
-            sel.innerHTML = '';
-            ['pk','in'].filter(r => ptReg.includes(r)).forEach(r => sel.add(new Option(r.toUpperCase(), r)));
-            if (sel.options.length === 1) { sel.value = sel.options[0].value; sel.style.pointerEvents = 'none'; sel.style.opacity = '0.7'; }
-        });
-    }
+    const ptReg = p.regions?.points || ['all'];
+    if (!ptReg.includes('all')) {
+        ['prRegion', 'ptRegion'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            sel.innerHTML = '';
+            ['pk','in'].filter(r => ptReg.includes(r)).forEach(r => sel.add(new Option(r.toUpperCase(), r)));
+            if (sel.options.length === 1) { sel.value = sel.options[0].value; sel.style.pointerEvents = 'none'; sel.style.opacity = '0.7'; }
+        });
+    }
 
-    const ptAcm = p.acms?.points || ['all'];
-    if (!ptAcm.includes('all')) {
-        ['prAcm', 'ptAcm'].forEach(id => {
-            const prAcm = document.getElementById(id);
-            if (prAcm) {
-                prAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
-                ptAcm.forEach(a => prAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
-            }
-        });
-    }
-    
-    const qryAcm = p.acms?.query || ['all'];
-    if (!qryAcm.includes('all')) {
-        const alAcm = document.getElementById('alAcm');
-        if (alAcm) {
-            alAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
-            qryAcm.forEach(a => alAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
-        }
-    }
-    
-    updateAcmDropdown();
+    const ptAcm = p.acms?.points || ['all'];
+    if (!ptAcm.includes('all')) {
+        ['prAcm', 'ptAcm'].forEach(id => {
+            const prAcm = document.getElementById(id);
+            if (prAcm) {
+                prAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
+                ptAcm.forEach(a => prAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+            }
+        });
+    }
+    
+    const qryAcm = p.acms?.query || ['all'];
+    if (!qryAcm.includes('all')) {
+        const alAcm = document.getElementById('alAcm');
+        if (alAcm) {
+            alAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
+            qryAcm.forEach(a => alAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+        }
+    }
+    
+    updateAcmDropdown();
 }
 
 function hasMod(m) { return isAdmin || userModules.some(um => um.includes(m)); }
 function hasExactMod(m) { return isAdmin || userModules.includes(m); }
 
 function configureSidebarAndCards() {
-    if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
-    else {
-        if (!hasExactMod('target_check') && !hasExactMod('target')) document.getElementById('nav-target').style.display = 'none';
-        if (!hasExactMod('target_timeline') && !hasExactMod('target')) document.getElementById('nav-target-timeline').style.display = 'none';
-    }
+    if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
+    else {
+        if (!hasExactMod('target_check') && !hasExactMod('target')) document.getElementById('nav-target').style.display = 'none';
+        if (!hasExactMod('target_timeline') && !hasExactMod('target')) document.getElementById('nav-target-timeline').style.display = 'none';
+    }
 
-    if (!hasMod('points')) document.getElementById('navGrpPoints').style.display = 'none';
-    else {
-        if (!hasExactMod('points_check') && !hasExactMod('points')) document.getElementById('nav-points').style.display = 'none';
-        if (!hasExactMod('points_allocator') && !hasExactMod('points')) document.getElementById('nav-allocator').style.display = 'none';
-        if (!hasExactMod('points_records') && !hasExactMod('points')) document.getElementById('nav-points-records').style.display = 'none';
-        if (!hasExactMod('points_table') && !hasExactMod('points')) document.getElementById('nav-points-table').style.display = 'none';
-    }
+    if (!hasMod('points')) document.getElementById('navGrpPoints').style.display = 'none';
+    else {
+        if (!hasExactMod('points_check') && !hasExactMod('points')) document.getElementById('nav-points').style.display = 'none';
+        if (!hasExactMod('points_allocator') && !hasExactMod('points')) document.getElementById('nav-allocator').style.display = 'none';
+        if (!hasExactMod('points_records') && !hasExactMod('points')) document.getElementById('nav-points-records').style.display = 'none';
+        if (!hasExactMod('points_table') && !hasExactMod('points')) document.getElementById('nav-points-table').style.display = 'none';
+    }
 
-    if (!hasMod('analytics')) document.getElementById('navGrpAnalytics').style.display = 'none';
-    else {
-        if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
-        if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
-    }
+    if (!hasMod('analytics')) document.getElementById('navGrpAnalytics').style.display = 'none';
+    else {
+        if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
+        if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
+    }
 
-    if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
-    else {
-        if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
-        if (!hasExactMod('query_agency_list') && !hasExactMod('query')) { const el=document.getElementById('nav-agency-list'); if (el) el.style.display = 'none'; }
-    }
+    if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
+    else {
+        if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
+        if (!hasExactMod('query_agency_list') && !hasExactMod('query')) { const el=document.getElementById('nav-agency-list'); if (el) el.style.display = 'none'; }
+    }
 
-    if (!hasMod('submit')) document.getElementById('navGrpSubmit').style.display = 'none';
-    else {
-        if (!hasExactMod('submit_new_request') && !hasExactMod('submit')) document.getElementById('nav-new-request').style.display = 'none';
-        if (!hasExactMod('submit_my_requests') && !hasExactMod('submit')) { const el=document.getElementById('nav-my-requests'); if (el) el.style.display = 'none'; }
-    }
+    if (!hasMod('submit')) document.getElementById('navGrpSubmit').style.display = 'none';
+    else {
+        if (!hasExactMod('submit_new_request') && !hasExactMod('submit')) document.getElementById('nav-new-request').style.display = 'none';
+        if (!hasExactMod('submit_my_requests') && !hasExactMod('submit')) { const el=document.getElementById('nav-my-requests'); if (el) el.style.display = 'none'; }
+    }
 
-    if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
+    if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
 
-    const icons = {
-        analytics: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
-        compare: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
-        points: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
-        allocator: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></svg>`,
-        target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
-        query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
-        form: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
-        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
-    };
+    const icons = {
+        analytics: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+        compare: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
+        points: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
+        allocator: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 9h.01"/><path d="M9 9h.01"/><path d="M9 15v-2"/><path d="M15 15v-2"/></svg>`,
+        target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+        query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+        form: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
+    };
 
-    const wc = document.getElementById('welcomeCards');
-    wc.innerHTML = '';
-    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('analytics')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.analytics}</div><div class="welcome-card-title" data-i18n="analyticsReport">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
-    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.compare}</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM, period or radar comparison</div></div>`;
-    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon" style="color:var(--accent-amber)">${icons.points}</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
-    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
-    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
-    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
-    
-    wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
-    
-    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
+    const wc = document.getElementById('welcomeCards');
+    wc.innerHTML = '';
+    if (hasExactMod('analytics_report') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('analytics')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.analytics}</div><div class="welcome-card-title" data-i18n="analyticsReport">Analytics Report</div><div class="welcome-card-desc">Agency creation, BD &amp; closing trends</div></div>`;
+    if (hasExactMod('analytics_compare') || hasExactMod('analytics')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('compare')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.compare}</div><div class="welcome-card-title" data-i18n="compareAcm">Compare Agencies</div><div class="welcome-card-desc">Side-by-side ACM, period or radar comparison</div></div>`;
+    if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon" style="color:var(--accent-amber)">${icons.points}</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
+    if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
+    if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
+    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    
+    wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
+    
+    if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
 
-    if (currentLang !== 'en') changeLanguage(currentLang);
+    if (currentLang !== 'en') changeLanguage(currentLang);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -4127,144 +4127,144 @@ function configureSidebarAndCards() {
 // ════════════════════════════════════════════════════════════════════
 
 async function loadMyRequests() {
-    const resultsEl = document.getElementById('myReqResults');
-    const emptyEl = document.getElementById('myReqEmpty');
-    
-    if (resultsEl) resultsEl.innerHTML = '';
-    if (emptyEl) emptyEl.style.display = 'none';
-    document.getElementById('loadingOverlay').style.display = 'flex';
-    
-    try {
-        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
-        let data;
-        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
-        
-        if (data.fetch_complete === false) {
-            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}.`, 'warning', 6000);
-        }
-        
-        const results = data.results || [];
-        if (!results.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
-            document.getElementById('loadingOverlay').style.display = 'none';
-            return;
-        }
-        
-        if (resultsEl) {
-            resultsEl.innerHTML = results.map(r => `
-                <div class="qy-card">
-                    <div class="qy-card-head">
-                        <div>
-                            <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
-                            <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
-                        </div>
-                        <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
-                    </div>
-                    ${qyRow('Submitted on', r.submitted_on)}
-                    ${qyRow('Respondents', r.respondents)}
-                    ${qyRow('User ID', r.user_id)}
-                    ${qyRow('Agency Code', r.agency_code)}
-                    ${qyRow('Agency Type', r.agency_type)}
-                    ${qyRow('Otherapp ID', r.otherapp_id)}
-                    ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
-                    ${qyRow('Bd Code', r.bd_code)}
-                    ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
-                    ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
-                    ${r.closing_reason && (r.request_type||'').toLowerCase().includes('closing') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
-                </div>
-            `).join('');
-        }
-    } catch (e) {
-        ToastManager.show('Failed to load my requests: ' + e.message, 'error');
-        if (emptyEl) emptyEl.style.display = 'block';
-    }
-    document.getElementById('loadingOverlay').style.display = 'none';
+    const resultsEl = document.getElementById('myReqResults');
+    const emptyEl = document.getElementById('myReqEmpty');
+    
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    
+    try {
+        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        let data;
+        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
+        
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}.`, 'warning', 6000);
+        }
+        
+        const results = data.results || [];
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+        }
+        
+        if (resultsEl) {
+            resultsEl.innerHTML = results.map(r => `
+                <div class="qy-card">
+                    <div class="qy-card-head">
+                        <div>
+                            <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
+                            <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
+                        </div>
+                        <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
+                    </div>
+                    ${qyRow('Submitted on', r.submitted_on)}
+                    ${qyRow('Respondents', r.respondents)}
+                    ${qyRow('User ID', r.user_id)}
+                    ${qyRow('Agency Code', r.agency_code)}
+                    ${qyRow('Agency Type', r.agency_type)}
+                    ${qyRow('Otherapp ID', r.otherapp_id)}
+                    ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                    ${qyRow('Bd Code', r.bd_code)}
+                    ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                    ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+                    ${r.closing_reason && (r.request_type||'').toLowerCase().includes('closing') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        ToastManager.show('Failed to load my requests: ' + e.message, 'error');
+        if (emptyEl) emptyEl.style.display = 'block';
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
 }
 
 let alDebounceTimer = null;
 function alDebounce() {
-    clearTimeout(alDebounceTimer);
-    alDebounceTimer = setTimeout(() => alFetch(), 400);
+    clearTimeout(alDebounceTimer);
+    alDebounceTimer = setTimeout(() => alFetch(), 400);
 }
 
 async function alFetch() {
-    const spinner = document.getElementById('alLoadingSpinner');
-    const countEl = document.getElementById('alResultCount');
-    const tableEl = document.getElementById('alTable');
-    const tbody = document.getElementById('alTbody');
-    const emptyEl = document.getElementById('alEmpty');
-    
-    if (spinner) spinner.style.display = 'inline';
-    if (tableEl) tableEl.style.display = 'none';
-    if (emptyEl) emptyEl.style.display = 'none';
-    
-    const params = new URLSearchParams({
-        user: loggedUser || '',
-        email: loggedEmail || '',
-        region: document.getElementById('alRegion')?.value || '',
-        agency_code: document.getElementById('alAgencyCode')?.value || '',
-        agency_name: document.getElementById('alAgencyName')?.value || '',
-        acm: document.getElementById('alAcm')?.value || '',
-    });
-    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
-    
-    try {
-        const resp = await fetch('/api/agency-list?' + params.toString());
-        let data;
-        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
-        if (!resp.ok) throw new Error(data.error || 'Failed to load agency list');
-        
-        if (spinner) spinner.style.display = 'none';
-        
-        const results = data.results || [];
-        if (countEl) countEl.textContent = `${results.length} agenc${results.length===1?'y':'ies'} found (last 40 days)`;
-        
-        if (!results.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
-            return;
-        }
-        
-        if (tbody) {
-            tbody.innerHTML = results.map((r, i) => {
-                const typeClass = (r.agency_type||'').toLowerCase().includes('walk') ? 'al-type-walkin' : 
-                                  (r.agency_type||'').toLowerCase().includes('acm') ? 'al-type-acm' :
-                                  (r.agency_type||'').toLowerCase().includes('bd') ? 'al-type-bd' : 'al-type-default';
-                return `<tr>
-                    <td><span style="font-weight:600; font-size:0.8rem; letter-spacing:1px; opacity:0.8;">${escHtml(r.region||'—')}</span></td>
-                    <td><strong style="color:var(--accent-cyan)">${escHtml(r.agency_code||'—')}</strong></td>
-                    <td style="font-weight:600; color:var(--text);">${escHtml(r.agency_name||'—')}</td>
-                    <td style="font-family:monospace; font-size:0.85rem;">${escHtml(r.agency_manager||'—')}</td>
-                    <td style="font-size:0.8rem; letter-spacing:0.5px; opacity:0.7;">${escHtml(r.country||'—')}</td>
-                    <td style="color:var(--text-muted);">${escHtml(r.create_time||'—')}</td>
-                    <td style="text-align:center; font-weight:800; color:var(--text);">${escHtml(r.agency_members||'0')}</td>
-                    <td><span class="al-type-pill ${typeClass}">${escHtml(r.agency_type||'—')}</span></td>
-                    <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.parent_agency||'—')}</td>
-                    <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.sub_agency||'—')}</td>
-                    <td style="font-weight:600; color:var(--accent-purple);">${escHtml(r.acm_name||'—')}</td>
-                </tr>`;
-            }).join('');
-        }
-        if (tableEl) tableEl.style.display = '';
-    } catch (e) {
-        if (spinner) spinner.style.display = 'none';
-        if (countEl) countEl.textContent = 'Error: ' + e.message;
-        ToastManager.show('Failed to load agency list: ' + e.message, 'error');
-    }
+    const spinner = document.getElementById('alLoadingSpinner');
+    const countEl = document.getElementById('alResultCount');
+    const tableEl = document.getElementById('alTable');
+    const tbody = document.getElementById('alTbody');
+    const emptyEl = document.getElementById('alEmpty');
+    
+    if (spinner) spinner.style.display = 'inline';
+    if (tableEl) tableEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'none';
+    
+    const params = new URLSearchParams({
+        user: loggedUser || '',
+        email: loggedEmail || '',
+        region: document.getElementById('alRegion')?.value || '',
+        agency_code: document.getElementById('alAgencyCode')?.value || '',
+        agency_name: document.getElementById('alAgencyName')?.value || '',
+        acm: document.getElementById('alAcm')?.value || '',
+    });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    
+    try {
+        const resp = await fetch('/api/agency-list?' + params.toString());
+        let data;
+        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if (!resp.ok) throw new Error(data.error || 'Failed to load agency list');
+        
+        if (spinner) spinner.style.display = 'none';
+        
+        const results = data.results || [];
+        if (countEl) countEl.textContent = `${results.length} agenc${results.length===1?'y':'ies'} found (last 40 days)`;
+        
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        
+        if (tbody) {
+            tbody.innerHTML = results.map((r, i) => {
+                const typeClass = (r.agency_type||'').toLowerCase().includes('walk') ? 'al-type-walkin' : 
+                                  (r.agency_type||'').toLowerCase().includes('acm') ? 'al-type-acm' :
+                                  (r.agency_type||'').toLowerCase().includes('bd') ? 'al-type-bd' : 'al-type-default';
+                return `<tr>
+                    <td><span style="font-weight:600; font-size:0.8rem; letter-spacing:1px; opacity:0.8;">${escHtml(r.region||'—')}</span></td>
+                    <td><strong style="color:var(--accent-cyan)">${escHtml(r.agency_code||'—')}</strong></td>
+                    <td style="font-weight:600; color:var(--text);">${escHtml(r.agency_name||'—')}</td>
+                    <td style="font-family:monospace; font-size:0.85rem;">${escHtml(r.agency_manager||'—')}</td>
+                    <td style="font-size:0.8rem; letter-spacing:0.5px; opacity:0.7;">${escHtml(r.country||'—')}</td>
+                    <td style="color:var(--text-muted);">${escHtml(r.create_time||'—')}</td>
+                    <td style="text-align:center; font-weight:800; color:var(--text);">${escHtml(r.agency_members||'0')}</td>
+                    <td><span class="al-type-pill ${typeClass}">${escHtml(r.agency_type||'—')}</span></td>
+                    <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.parent_agency||'—')}</td>
+                    <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.sub_agency||'—')}</td>
+                    <td style="font-weight:600; color:var(--accent-purple);">${escHtml(r.acm_name||'—')}</td>
+                </tr>`;
+            }).join('');
+        }
+        if (tableEl) tableEl.style.display = '';
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Failed to load agency list: ' + e.message, 'error');
+    }
 }
 
 function populateAlAcmSelect() {
-    const sel = document.getElementById('alAcm');
-    if (sel && sel.options.length <= 1) {
-        sel.innerHTML = '<option value="">All ACMs</option>';
-        allAcms.forEach(a => sel.add(new Option(a, a.toLowerCase())));
-        
-        if (!isAdmin && userPermissions?.permissions?.acms?.query && !userPermissions.permissions.acms.query.includes('all')) {
-            const allowed = userPermissions.permissions.acms.query;
-            sel.innerHTML = '<option value="">All Permitted ACMs</option>';
-            allowed.forEach(a => sel.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
-        }
-    }
+    const sel = document.getElementById('alAcm');
+    if (sel && sel.options.length <= 1) {
+        sel.innerHTML = '<option value="">All ACMs</option>';
+        allAcms.forEach(a => sel.add(new Option(a, a.toLowerCase())));
+        
+        if (!isAdmin && userPermissions?.permissions?.acms?.query && !userPermissions.permissions.acms.query.includes('all')) {
+            const allowed = userPermissions.permissions.acms.query;
+            sel.innerHTML = '<option value="">All Permitted ACMs</option>';
+            allowed.forEach(a => sel.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+        }
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -4273,355 +4273,355 @@ function populateAlAcmSelect() {
 const ACM_AUTO = "__ACM_AUTO__";
 
 const REQ_BRANCHES = {
-    "Agency Creation": ["Region", "User ID", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
-    "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", ACM_AUTO, "Applier Note", "Evidence Screen 2"],
-    "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
-    "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
-    "Remove BD ": ["Region", "User ID", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen 2"],
-    "Agency Target Privilege": ["Region", "User ID", "Agency Code", "Target", "Privilege", "Applier Note", "Evidence Screen 2"],
-    "Agency Point Request": ["Region", "User ID", "Agency Code", "Agency Point Privilege", "Applier Note", "Evidence Screen 2"],
-    "Change agency name ": ["Region", "User ID", "Agency Code", "New agency name", "Applier Note", "Evidence Screen"],
-    "Change Agency Manger ID (with same owner)": ["Region", "User ID", "Agency Code", "Current agency manger name (same in NID )", "New agency owner ID", "Applier Note", "Evidence Screen 2"],
-    "Change Agency Ownership ": ["Region", "User ID", "Agency Code", "New agency owner ID", "New agency owner Name", "New and old onwer National IDS (Both NID)", "Applier Note", "Evidence Screen"],
-    "Merge agencies": ["Region", "User ID", "Agency Code", "Agency to be merged and closed", "Applier Note", "Evidence Screen"],
-    "Add & Remove Host Sign": ["Region", "User ID", "Agency Code", "Type of Action Host sign", "Applier Note", "Evidence Screen"],
-    "Add & Remove games": ["Region", "User ID", "Type of Action 2", "Applier Note", "Evidence Screen 2"],
-    "Add & Change Short ID": ["Region", "User ID", "New Short ID", "Vip Level", "Applier Note", "Evidence Screen 2"],
-    "Remove short ID (only by user approve )": ["Region", "User ID", "Applier Note", "Evidence Screen"],
-    "Welcome Package": ["Region", "User ID", "Wealth Level", "Applier Note", "Evidence Screen 2"],
-    "App Rating Reward": ["Region", "User ID", "Applier Note", "Evidence Screen"],
-    "Room Pinup (Only for the famous KOLS)": ["Region", "User ID", "Applier Note", "Evidence Screen 2"]
+    "Agency Creation": ["Region", "User ID", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", ACM_AUTO, "Applier Note", "Evidence Screen 2"],
+    "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
+    "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "Remove BD ": ["Region", "User ID", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen 2"],
+    "Agency Target Privilege": ["Region", "User ID", "Agency Code", "Target", "Privilege", "Applier Note", "Evidence Screen 2"],
+    "Agency Point Request": ["Region", "User ID", "Agency Code", "Agency Point Privilege", "Applier Note", "Evidence Screen 2"],
+    "Change agency name ": ["Region", "User ID", "Agency Code", "New agency name", "Applier Note", "Evidence Screen"],
+    "Change Agency Manger ID (with same owner)": ["Region", "User ID", "Agency Code", "Current agency manger name (same in NID )", "New agency owner ID", "Applier Note", "Evidence Screen 2"],
+    "Change Agency Ownership ": ["Region", "User ID", "Agency Code", "New agency owner ID", "New agency owner Name", "New and old onwer National IDS (Both NID)", "Applier Note", "Evidence Screen"],
+    "Merge agencies": ["Region", "User ID", "Agency Code", "Agency to be merged and closed", "Applier Note", "Evidence Screen"],
+    "Add & Remove Host Sign": ["Region", "User ID", "Agency Code", "Type of Action Host sign", "Applier Note", "Evidence Screen"],
+    "Add & Remove games": ["Region", "User ID", "Type of Action 2", "Applier Note", "Evidence Screen 2"],
+    "Add & Change Short ID": ["Region", "User ID", "New Short ID", "Vip Level", "Applier Note", "Evidence Screen 2"],
+    "Remove short ID (only by user approve )": ["Region", "User ID", "Applier Note", "Evidence Screen"],
+    "Welcome Package": ["Region", "User ID", "Wealth Level", "Applier Note", "Evidence Screen 2"],
+    "App Rating Reward": ["Region", "User ID", "Applier Note", "Evidence Screen"],
+    "Room Pinup (Only for the famous KOLS)": ["Region", "User ID", "Applier Note", "Evidence Screen 2"]
 };
 
 const REQ_SUBCONDITIONS = {
-    "Closing Agency": [
-        { when: "Closing Reason", equals: "Duplicated Hosting", fields: ["New ID", "Old ID", "Reporter ID"] }
-    ]
+    "Closing Agency": [
+        { when: "Closing Reason", equals: "Duplicated Hosting", fields: ["New ID", "Old ID", "Reporter ID"] }
+    ]
 };
 
 const REQ_FIELD_DEFS = {
-    "Region": { type: "select", options: ["PK", "IN"], req: true },
-    "User ID": { type: "text", req: true },
-    "Agency Code": { type: "text", req: true },
-    "Agency Name": { type: "text", req: true },
-    "Applier real name": { type: "text", req: true },
-    "Otherapp Name": { type: "select", options: ["Yalla Ludo","Songora","Hello yo","Likee","Arza live","Ayoba","4Party","Bigo ","Ayome","Hiya","Poppo","YoYo","Yooy","Facebook ","viya","Yari","YoSo","sky live","Ahlan","Yalla ","Tami","HiFami","OYE TALK","GameGala","Chamet ","TikTok","Harunabad","Party star","Yaho ","Faya Star","Salam","Waki Star","Habi","Oner","RoStar","Wafa","Yoparti ","Yobi ","Starmaker","Facebook","Saya","Pawa","Migo","WePlay","Rina ","Tikko","Yudo ","Farah","Achat","Tada","Hayuki ","Imo","Hilo","1Star","Instgram","Yoparti","Islam","Hapi","Oichat","Halo Star","Funni","PotaLive ","Snapchat","Ume","Hago","hala","YoHoo Star","7stars","Ezzo","HamiParty","Spark live","Halla ","Taka ","YallaChat","StreamKar","Snack Video","Nawa ","Fomi Party","Meto","Popo","Kwai","Fancy Live","Coco ","JACO ","Hiiclub Pro","Famy","Vone"," Dimo chat ","SK Lite","Infriends","yolo","Ola Party ","Awaz ","TopVoice","Miparty ","HIBO ","Waky Pro","Joyo","Crush live","olamet","hoho","cocco ","Dawa ","Uouo","Baat Live","Heylla","Falla","Gamet ","StarChat ","WalaChat ","Doli Live","WeGo Party","Yo2 ","Lami","Nita","Faby Star","Ligo Live","ShareChat","Heyo Chat","MATE LIVE","SeaU Chat","Sawa ","Ochat ","Cat Live","Sango ","Ludo STAR","Seeya Live","PocoLive","LotFun","Gimme ","Hooka","Hichat ","YaYa ","bolo","SayHi","Yoki","Yaahlan ","Drago Live","2chat","Mr7ba","Gomo","Horo","HOOB Live","Zeep Live","Upfun","VoStar","Asha Live","Wyke","Haza","Hopi Star","Niki Live","Tayyb","Kome ","Naddy star","4Fun","Chatna","LaYam ","Mego","HOLLA","Vila","Wyak ","Yami ","Lama","HI FI","Weso","Okyi","Halawa ","Habbey Live","Tomohi ","MizMiz ","Lihoo","Youtube","ELive ","Vova","Pami ","LiveMe","Boomlive ","Gemgala","HeroVoice ","HiParty","Sodfa Chat","Fungo ","YU","Bingo Live","Haya","OurTalk","BoBo","Hati","Waky ","zs777","Pencil","LuvMug","Wikoo","LionsChat","Yayya","Alaab","Junko","NiuChat ","BuzzChat ","Azizi","masti","PartyYou","Nahki","Waho","ayou","Trendo","DramaTalk ","Tango","sama","yovi","Catchii","VoliStar","Walla","BestLive","KoKo","Sowa","Glow Live","Yoppo ","HelloTalk","Roka Live","Hady","Zilo Live","Timo Club","Chingari","Lukee","Fofoo","Dana ","SAHI","Chatta ","Yostar ","Azal Live","Elo TV","EloElo","Hayi","RAVA Live","Orii","Maza","Moj","Bulala","Oohla","Hoby","Toki","Sohha","Layaliya","Chatrika ","ZayChat","Waka","Zame","Eparty ","AloParty"], req: true },
-    "Otherapp ID": { type: "text", req: false },
-    "Country": { type: "text", req: false },
-    "Whatsapp Number": { type: "text", req: true },
-    "NID Number": { type: "text", req: true },
-    "Agency Type": { type: "select", options: ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"], req: true },
-    "Bd Code": { type: "text", req: true },
-    "Acm Name (PK)": { type: "select", options: ["Nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"], req: true },
-    "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella","nabeel"], req: true },
-    "Applier Note": { type: "text", req: false },
-    "NID & Otherapp Screen": { type: "file", req: true },
-    "Closing Reason": { type: "select", options: ["User Request","Duplicated Hosting","Acm Request","Opened by mistake"], req: true },
-    "Old ID": { type: "text", req: true },
-    "Reporter ID": { type: "text", req: true },
-    "Evidence Screen": { type: "file", req: true },
-    "Evidence Screen 2": { type: "file", req: false },
-    "BD Nickname": { type: "text", req: true },
-    "Email Adress": { type: "text", req: true },
-    "BD Hunted Agency Code": { type: "text", req: true },
-    "Target": { type: "text", req: false },
-    "Privilege": { type: "select", options: ["30 Mics","Dynamic Avatar","Game room","New User Welcome Room","20 Mics "], req: true },
-    "Agency Point Privilege": { type: "multiselect", options: ["Trend card ( 40 - 50 for others )","Traffic card ( 30 - 40 for others )","30 MIC 15 days ( 150 - 175 for others ) ","30 MIC 30 days ( 300 - 350 for others) ","Welcome Package 3 ( 80 )","Welcome Package 2 ( 30 )","Room Pin-Up ( 100 - 150 for others )","Customized Short ID 30 days ( 1200 - 1800 for others )","News banner ( 100 Points ) (No more than 5 days at one time)","Live banner ( 150 Points ) (No more than 5 days at one time)","Splash ( 1500 - 2000 for others )"], req: true },
-    "New agency name": { type: "text", req: true },
-    "New ID": { type: "text", req: true },
-    "Current agency manger name (same in NID )": { type: "text", req: true },
-    "New agency owner ID": { type: "text", req: true },
-    "New agency owner Name": { type: "text", req: true },
-    "New and old onwer National IDS (Both NID)": { type: "file", req: true },
-    "Agency to be merged and closed": { type: "text", req: true },
-    "Type of Action Host sign": { type: "select", options: ["Add Host Sign","Remove Host Sign"], req: true },
-    "Type of Action 2": { type: "select", options: ["Remove Games","ADD Games"], req: true },
-    "New Short ID": { type: "text", req: true },
-    "Wealth Level": { type: "text", req: true },
-    "Vip Level": { type: "text", req: true }
+    "Region": { type: "select", options: ["PK", "IN"], req: true },
+    "User ID": { type: "text", req: true },
+    "Agency Code": { type: "text", req: true },
+    "Agency Name": { type: "text", req: true },
+    "Applier real name": { type: "text", req: true },
+    "Otherapp Name": { type: "select", options: ["Yalla Ludo","Songora","Hello yo","Likee","Arza live","Ayoba","4Party","Bigo ","Ayome","Hiya","Poppo","YoYo","Yooy","Facebook ","viya","Yari","YoSo","sky live","Ahlan","Yalla ","Tami","HiFami","OYE TALK","GameGala","Chamet ","TikTok","Harunabad","Party star","Yaho ","Faya Star","Salam","Waki Star","Habi","Oner","RoStar","Wafa","Yoparti ","Yobi ","Starmaker","Facebook","Saya","Pawa","Migo","WePlay","Rina ","Tikko","Yudo ","Farah","Achat","Tada","Hayuki ","Imo","Hilo","1Star","Instgram","Yoparti","Islam","Hapi","Oichat","Halo Star","Funni","PotaLive ","Snapchat","Ume","Hago","hala","YoHoo Star","7stars","Ezzo","HamiParty","Spark live","Halla ","Taka ","YallaChat","StreamKar","Snack Video","Nawa ","Fomi Party","Meto","Popo","Kwai","Fancy Live","Coco ","JACO ","Hiiclub Pro","Famy","Vone"," Dimo chat ","SK Lite","Infriends","yolo","Ola Party ","Awaz ","TopVoice","Miparty ","HIBO ","Waky Pro","Joyo","Crush live","olamet","hoho","cocco ","Dawa ","Uouo","Baat Live","Heylla","Falla","Gamet ","StarChat ","WalaChat ","Doli Live","WeGo Party","Yo2 ","Lami","Nita","Faby Star","Ligo Live","ShareChat","Heyo Chat","MATE LIVE","SeaU Chat","Sawa ","Ochat ","Cat Live","Sango ","Ludo STAR","Seeya Live","PocoLive","LotFun","Gimme ","Hooka","Hichat ","YaYa ","bolo","SayHi","Yoki","Yaahlan ","Drago Live","2chat","Mr7ba","Gomo","Horo","HOOB Live","Zeep Live","Upfun","VoStar","Asha Live","Wyke","Haza","Hopi Star","Niki Live","Tayyb","Kome ","Naddy star","4Fun","Chatna","LaYam ","Mego","HOLLA","Vila","Wyak ","Yami ","Lama","HI FI","Weso","Okyi","Halawa ","Habbey Live","Tomohi ","MizMiz ","Lihoo","Youtube","ELive ","Vova","Pami ","LiveMe","Boomlive ","Gemgala","HeroVoice ","HiParty","Sodfa Chat","Fungo ","YU","Bingo Live","Haya","OurTalk","BoBo","Hati","Waky ","zs777","Pencil","LuvMug","Wikoo","LionsChat","Yayya","Alaab","Junko","NiuChat ","BuzzChat ","Azizi","masti","PartyYou","Nahki","Waho","ayou","Trendo","DramaTalk ","Tango","sama","yovi","Catchii","VoliStar","Walla","BestLive","KoKo","Sowa","Glow Live","Yoppo ","HelloTalk","Roka Live","Hady","Zilo Live","Timo Club","Chingari","Lukee","Fofoo","Dana ","SAHI","Chatta ","Yostar ","Azal Live","Elo TV","EloElo","Hayi","RAVA Live","Orii","Maza","Moj","Bulala","Oohla","Hoby","Toki","Sohha","Layaliya","Chatrika ","ZayChat","Waka","Zame","Eparty ","AloParty"], req: true },
+    "Otherapp ID": { type: "text", req: false },
+    "Country": { type: "text", req: false },
+    "Whatsapp Number": { type: "text", req: true },
+    "NID Number": { type: "text", req: true },
+    "Agency Type": { type: "select", options: ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"], req: true },
+    "Bd Code": { type: "text", req: true },
+    "Acm Name (PK)": { type: "select", options: ["Nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"], req: true },
+    "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Shivam","Ravikant","Ansh","Rocky","Bella","nabeel"], req: true },
+    "Applier Note": { type: "text", req: false },
+    "NID & Otherapp Screen": { type: "file", req: true },
+    "Closing Reason": { type: "select", options: ["User Request","Duplicated Hosting","Acm Request","Opened by mistake"], req: true },
+    "Old ID": { type: "text", req: true },
+    "Reporter ID": { type: "text", req: true },
+    "Evidence Screen": { type: "file", req: true },
+    "Evidence Screen 2": { type: "file", req: false },
+    "BD Nickname": { type: "text", req: true },
+    "Email Adress": { type: "text", req: true },
+    "BD Hunted Agency Code": { type: "text", req: true },
+    "Target": { type: "text", req: false },
+    "Privilege": { type: "select", options: ["30 Mics","Dynamic Avatar","Game room","New User Welcome Room","20 Mics "], req: true },
+    "Agency Point Privilege": { type: "multiselect", options: ["Trend card ( 40 - 50 for others )","Traffic card ( 30 - 40 for others )","30 MIC 15 days ( 150 - 175 for others ) ","30 MIC 30 days ( 300 - 350 for others) ","Welcome Package 3 ( 80 )","Welcome Package 2 ( 30 )","Room Pin-Up ( 100 - 150 for others )","Customized Short ID 30 days ( 1200 - 1800 for others )","News banner ( 100 Points ) (No more than 5 days at one time)","Live banner ( 150 Points ) (No more than 5 days at one time)","Splash ( 1500 - 2000 for others )"], req: true },
+    "New agency name": { type: "text", req: true },
+    "New ID": { type: "text", req: true },
+    "Current agency manger name (same in NID )": { type: "text", req: true },
+    "New agency owner ID": { type: "text", req: true },
+    "New agency owner Name": { type: "text", req: true },
+    "New and old onwer National IDS (Both NID)": { type: "file", req: true },
+    "Agency to be merged and closed": { type: "text", req: true },
+    "Type of Action Host sign": { type: "select", options: ["Add Host Sign","Remove Host Sign"], req: true },
+    "Type of Action 2": { type: "select", options: ["Remove Games","ADD Games"], req: true },
+    "New Short ID": { type: "text", req: true },
+    "Wealth Level": { type: "text", req: true },
+    "Vip Level": { type: "text", req: true }
 };
 
 function initReqFormOptions() {
-    const sel = document.getElementById('formRequestType');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">-- Select Request Type --</option>';
-    Object.keys(REQ_BRANCHES).forEach(branch => {
-        sel.add(new Option(branch, branch));
-    });
+    const sel = document.getElementById('formRequestType');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select Request Type --</option>';
+    Object.keys(REQ_BRANCHES).forEach(branch => {
+        sel.add(new Option(branch, branch));
+    });
 }
 
 function acmFieldForRegion(region) {
-    if (region === 'PK') return { name: 'Acm Name (PK)', def: REQ_FIELD_DEFS['Acm Name (PK)'] };
-    if (region === 'IN') return { name: 'Acm Name (IN)', def: REQ_FIELD_DEFS['Acm Name (IN)'] };
-    return null;
+    if (region === 'PK') return { name: 'Acm Name (PK)', def: REQ_FIELD_DEFS['Acm Name (PK)'] };
+    if (region === 'IN') return { name: 'Acm Name (IN)', def: REQ_FIELD_DEFS['Acm Name (IN)'] };
+    return null;
 }
 
 function buildFieldControl(fName, def, req) {
-    const reqMark = req ? '<span style="color:var(--accent-rose)">*</span>' : '';
-    const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
-    const wrap = document.createElement('div');
-    wrap.className = 'control-group';
-    wrap.dataset.field = fName;
-    wrap.innerHTML = `<label style="font-size:0.8rem;">${escHtml(fName)} ${reqMark}</label>`;
+    const reqMark = req ? '<span style="color:var(--accent-rose)">*</span>' : '';
+    const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
+    const wrap = document.createElement('div');
+    wrap.className = 'control-group';
+    wrap.dataset.field = fName;
+    wrap.innerHTML = `<label style="font-size:0.8rem;">${escHtml(fName)} ${reqMark}</label>`;
 
-    if (def.type === 'text') {
-        wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}" class="form-highlight-input">`;
-    } else if (def.type === 'select') {
-        let opts = `<option value="">-- Select --</option>`;
-        def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
-        wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} class="form-highlight-input">${opts}</select>`;
-    } else if (def.type === 'multiselect') {
-        let chks = def.options.map(o => `
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; font-weight:600; cursor:pointer; color:var(--text); padding:6px 0; text-transform:none;">
-                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:18px;height:18px;accent-color:var(--accent-cyan);cursor:pointer;">
-                ${escHtml(o)}
-            </label>`).join('');
-        wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:6px; max-height:280px; overflow-y:auto; border:1px solid var(--accent-cyan); background:rgba(0,212,255,0.03);">${chks}</div>`;
-    } else if (def.type === 'file') {
-        wrap.innerHTML += `
-            <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} multiple
-                style="background:rgba(255,255,255,0.02); border:1px dashed var(--accent-purple); padding:20px 14px; cursor:pointer;" class="form-highlight-input">`;
-    }
-    return wrap;
+    if (def.type === 'text') {
+        wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}" class="form-highlight-input">`;
+    } else if (def.type === 'select') {
+        let opts = `<option value="">-- Select --</option>`;
+        def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
+        wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} class="form-highlight-input">${opts}</select>`;
+    } else if (def.type === 'multiselect') {
+        let chks = def.options.map(o => `
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; font-weight:600; cursor:pointer; color:var(--text); padding:6px 0; text-transform:none;">
+                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:18px;height:18px;accent-color:var(--accent-cyan);cursor:pointer;">
+                ${escHtml(o)}
+            </label>`).join('');
+        wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:6px; max-height:280px; overflow-y:auto; border:1px solid var(--accent-cyan); background:rgba(0,212,255,0.03);">${chks}</div>`;
+    } else if (def.type === 'file') {
+        wrap.innerHTML += `
+            <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} multiple
+                style="background:rgba(255,255,255,0.02); border:1px dashed var(--accent-purple); padding:20px 14px; cursor:pointer;" class="form-highlight-input">`;
+    }
+    return wrap;
 }
 
 function refreshAcmAutoSlot() {
-    const slot = document.getElementById('acmAutoSlot');
-    if (!slot) return;
-    const regionSel = document.getElementById('reqfld_Region');
-    const region = regionSel ? regionSel.value : '';
-    slot.innerHTML = '';
-    const resolved = acmFieldForRegion(region);
-    if (resolved) {
-        slot.appendChild(buildFieldControl(resolved.name, resolved.def, true));
-    } else {
-        const hint = document.createElement('div');
-        hint.className = 'control-group';
-        hint.innerHTML = `<label style="font-size:0.8rem;">ACM</label><div style="padding:14px;color:var(--text-muted);font-size:.9rem;font-weight:600;border:1px dashed var(--border-hover);border-radius:10px;background:rgba(0,0,0,0.2);">Select a Region above to choose the ACM</div>`;
-        slot.appendChild(hint);
-    }
+    const slot = document.getElementById('acmAutoSlot');
+    if (!slot) return;
+    const regionSel = document.getElementById('reqfld_Region');
+    const region = regionSel ? regionSel.value : '';
+    slot.innerHTML = '';
+    const resolved = acmFieldForRegion(region);
+    if (resolved) {
+        slot.appendChild(buildFieldControl(resolved.name, resolved.def, true));
+    } else {
+        const hint = document.createElement('div');
+        hint.className = 'control-group';
+        hint.innerHTML = `<label style="font-size:0.8rem;">ACM</label><div style="padding:14px;color:var(--text-muted);font-size:.9rem;font-weight:600;border:1px dashed var(--border-hover);border-radius:10px;background:rgba(0,0,0,0.2);">Select a Region above to choose the ACM</div>`;
+        slot.appendChild(hint);
+    }
 }
 
 function refreshClosingReasonSubfields() {
-    const wrap = document.getElementById('closingSubWrap');
-    if (!wrap) return;
-    const reasonSel = document.getElementById('reqfld_Closing_Reason');
-    const show = reasonSel && reasonSel.value === 'Duplicated Hosting';
-    wrap.style.display = show ? 'contents' : 'none';
-    wrap.querySelectorAll('input').forEach(inp => { inp.required = show; });
+    const wrap = document.getElementById('closingSubWrap');
+    if (!wrap) return;
+    const reasonSel = document.getElementById('reqfld_Closing_Reason');
+    const show = reasonSel && reasonSel.value === 'Duplicated Hosting';
+    wrap.style.display = show ? 'contents' : 'none';
+    wrap.querySelectorAll('input').forEach(inp => { inp.required = show; });
 }
 
 function renderReqFormFields() {
-    const branch = document.getElementById('formRequestType').value;
-    const container = document.getElementById('formDynamicFields');
-    const submitArea = document.getElementById('formSubmitArea');
+    const branch = document.getElementById('formRequestType').value;
+    const container = document.getElementById('formDynamicFields');
+    const submitArea = document.getElementById('formSubmitArea');
 
-    container.innerHTML = '';
-    if (!branch) {
-        container.style.display = 'none';
-        submitArea.style.display = 'none';
-        return;
-    }
+    container.innerHTML = '';
+    if (!branch) {
+        container.style.display = 'none';
+        submitArea.style.display = 'none';
+        return;
+    }
 
-    const fields = REQ_BRANCHES[branch] || [];
-    fields.forEach(fName => {
-        if (fName === ACM_AUTO) {
-            const slot = document.createElement('div');
-            slot.id = 'acmAutoSlot';
-            slot.className = 'control-group';
-            container.appendChild(slot);
-            return;
-        }
-        const def = REQ_FIELD_DEFS[fName];
-        if (!def) return;
-        const el = buildFieldControl(fName, def, def.req);
-        container.appendChild(el);
+    const fields = REQ_BRANCHES[branch] || [];
+    fields.forEach(fName => {
+        if (fName === ACM_AUTO) {
+            const slot = document.createElement('div');
+            slot.id = 'acmAutoSlot';
+            slot.className = 'control-group';
+            container.appendChild(slot);
+            return;
+        }
+        const def = REQ_FIELD_DEFS[fName];
+        if (!def) return;
+        const el = buildFieldControl(fName, def, def.req);
+        container.appendChild(el);
 
-        if (fName === 'Region') {
-            el.querySelector('select').addEventListener('change', refreshAcmAutoSlot);
-        }
-        if (fName === 'Closing Reason') {
-            el.querySelector('select').addEventListener('change', refreshClosingReasonSubfields);
-        }
-    });
+        if (fName === 'Region') {
+            el.querySelector('select').addEventListener('change', refreshAcmAutoSlot);
+        }
+        if (fName === 'Closing Reason') {
+            el.querySelector('select').addEventListener('change', refreshClosingReasonSubfields);
+        }
+    });
 
-    const subs = REQ_SUBCONDITIONS[branch];
-    if (subs) {
-        subs.forEach(rule => {
-            const wrap = document.createElement('div');
-            wrap.id = 'closingSubWrap';
-            wrap.style.display = 'none';
-            wrap.style.gridColumn = '1 / -1';
-            const inner = document.createElement('div');
-            inner.style.display = 'grid';
-            inner.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
-            inner.style.gap = '20px';
-            inner.style.padding = '20px';
-            inner.style.background = 'rgba(255,255,255,0.02)';
-            inner.style.border = '1px dashed var(--border-hover)';
-            inner.style.borderRadius = '12px';
-            rule.fields.forEach(subF => {
-                const subDef = REQ_FIELD_DEFS[subF];
-                if (subDef) inner.appendChild(buildFieldControl(subF, subDef, false));
-            });
-            wrap.appendChild(inner);
-            container.appendChild(wrap);
-        });
-    }
+    const subs = REQ_SUBCONDITIONS[branch];
+    if (subs) {
+        subs.forEach(rule => {
+            const wrap = document.createElement('div');
+            wrap.id = 'closingSubWrap';
+            wrap.style.display = 'none';
+            wrap.style.gridColumn = '1 / -1';
+            const inner = document.createElement('div');
+            inner.style.display = 'grid';
+            inner.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+            inner.style.gap = '20px';
+            inner.style.padding = '20px';
+            inner.style.background = 'rgba(255,255,255,0.02)';
+            inner.style.border = '1px dashed var(--border-hover)';
+            inner.style.borderRadius = '12px';
+            rule.fields.forEach(subF => {
+                const subDef = REQ_FIELD_DEFS[subF];
+                if (subDef) inner.appendChild(buildFieldControl(subF, subDef, false));
+            });
+            wrap.appendChild(inner);
+            container.appendChild(wrap);
+        });
+    }
 
-    if (document.getElementById('acmAutoSlot')) refreshAcmAutoSlot();
+    if (document.getElementById('acmAutoSlot')) refreshAcmAutoSlot();
 
-    container.style.display = 'grid';
-    submitArea.style.display = 'block';
+    container.style.display = 'grid';
+    submitArea.style.display = 'block';
 }
 
 async function submitReqForm(e) {
-    e.preventDefault();
-    const form = e.target;
-    const branch = document.getElementById('formRequestType').value;
-    if (!branch) return;
+    e.preventDefault();
+    const form = e.target;
+    const branch = document.getElementById('formRequestType').value;
+    if (!branch) return;
 
-    let multiValid = true;
-    const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f] && REQ_FIELD_DEFS[f].type === 'multiselect');
-    multiFields.forEach(mf => {
-        if (REQ_FIELD_DEFS[mf].req) {
-            const checked = form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`);
-            if (checked.length === 0) {
-                multiValid = false;
-                ToastManager.show(`Please select at least one option for ${mf}.`, 'warning');
-            }
-        }
-    });
-    if (!multiValid) return;
+    let multiValid = true;
+    const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f] && REQ_FIELD_DEFS[f].type === 'multiselect');
+    multiFields.forEach(mf => {
+        if (REQ_FIELD_DEFS[mf].req) {
+            const checked = form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`);
+            if (checked.length === 0) {
+                multiValid = false;
+                ToastManager.show(`Please select at least one option for ${mf}.`, 'warning');
+            }
+        }
+    });
+    if (!multiValid) return;
 
-    const btn = document.getElementById('btnSubmitReq');
-    const origTxt = btn.innerHTML;
-    btn.innerHTML = '⏳ Submitting to Feishu...';
-    btn.disabled = true;
-    document.getElementById('loadingOverlay').style.display = 'flex';
+    const btn = document.getElementById('btnSubmitReq');
+    const origTxt = btn.innerHTML;
+    btn.innerHTML = '⏳ Submitting to Feishu...';
+    btn.disabled = true;
+    document.getElementById('loadingOverlay').style.display = 'flex';
 
-    try {
-        const payloadFields = { "Request Type": branch };
+    try {
+        const payloadFields = { "Request Type": branch };
 
-        form.querySelectorAll('input[type="text"], select').forEach(el => {
-            if (el.id === 'formRequestType') return;
-            if (el.value) payloadFields[el.name] = el.value;
-        });
+        form.querySelectorAll('input[type="text"], select').forEach(el => {
+            if (el.id === 'formRequestType') return;
+            if (el.value) payloadFields[el.name] = el.value;
+        });
 
-        multiFields.forEach(mf => {
-            const checked = Array.from(form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`)).map(c => c.value);
-            if (checked.length > 0) payloadFields[mf] = checked;
-        });
+        multiFields.forEach(mf => {
+            const checked = Array.from(form.querySelectorAll(`input[type="checkbox"][name="${mf}"]:checked`)).map(c => c.value);
+            if (checked.length > 0) payloadFields[mf] = checked;
+        });
 
-        const finalData = new FormData();
-        finalData.append('user', loggedUser);
-        finalData.append('email', loggedEmail);
-        
-        // This fixes the Respondents identity issue! Appends the user's specific access token.
-        if (loggedUat) finalData.append('uat', loggedUat); 
-        
-        finalData.append('payload', JSON.stringify(payloadFields));
+        const finalData = new FormData();
+        finalData.append('user', loggedUser);
+        finalData.append('email', loggedEmail);
+        
+        // This fixes the Respondents identity issue! Appends the user's specific access token.
+        if (loggedUat) finalData.append('uat', loggedUat); 
+        
+        finalData.append('payload', JSON.stringify(payloadFields));
 
-        form.querySelectorAll('input[type="file"]').forEach(fInput => {
-            if (fInput.files.length > 0) {
-                Array.from(fInput.files).forEach(file => {
-                    finalData.append(fInput.name, file);
-                });
-            }
-        });
+        form.querySelectorAll('input[type="file"]').forEach(fInput => {
+            if (fInput.files.length > 0) {
+                Array.from(fInput.files).forEach(file => {
+                    finalData.append(fInput.name, file);
+                });
+            }
+        });
 
-        const res = await fetch('/api/requests/submit', {
-            method: 'POST',
-            body: finalData
-        });
+        const res = await fetch('/api/requests/submit', {
+            method: 'POST',
+            body: finalData
+        });
 
-        let data;
-        try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response.'); }
-        
-        if (!res.ok) throw new Error(data.error || 'Submission failed');
+        let data;
+        try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response.'); }
+        
+        if (!res.ok) throw new Error(data.error || 'Submission failed');
 
-        ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
-        
-        form.reset();
-        document.getElementById('formDynamicFields').style.display = 'none';
-        document.getElementById('formSubmitArea').style.display = 'none';
-        
-    } catch (e) {
-        ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
-    }
+        ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
+        
+        form.reset();
+        document.getElementById('formDynamicFields').style.display = 'none';
+        document.getElementById('formSubmitArea').style.display = 'none';
+        
+    } catch (e) {
+        ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
+    }
 
-    btn.innerHTML = origTxt;
-    btn.disabled = false;
-    document.getElementById('loadingOverlay').style.display = 'none';
+    btn.innerHTML = origTxt;
+    btn.disabled = false;
+    document.getElementById('loadingOverlay').style.display = 'none';
 }
 
 if (loggedUser&&loggedUat) {
-    document.getElementById('loginOverlay').style.display='none';
-    document.querySelector('.app-shell').style.display='flex';
-    
-    document.getElementById('sidebarUsername').textContent = loggedUser;
-    
-    const avatarUrl = localStorage.getItem('xenaAvatar');
-    if (avatarUrl && avatarUrl.startsWith('http')) {
-        document.getElementById('userAvatar').src = avatarUrl;
-    } else {
-        const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
-        document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
-    }
+    document.getElementById('loginOverlay').style.display='none';
+    document.querySelector('.app-shell').style.display='flex';
+    
+    document.getElementById('sidebarUsername').textContent = loggedUser;
+    
+    const avatarUrl = localStorage.getItem('xenaAvatar');
+    if (avatarUrl && avatarUrl.startsWith('http')) {
+        document.getElementById('userAvatar').src = avatarUrl;
+    } else {
+        const cleanName = loggedUser.replace(/[^a-zA-Z\s]/g, '').trim();
+        document.getElementById('userAvatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=random&color=fff&size=128&font-size=0.33`;
+    }
 
-    fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
-        .then(r=>r.json())
-        .then(d=>{
-            userPermissions = d;
-            userModules = d.modules || [];
-            isAdmin = !!d.is_super_admin;
-            
-            if (!isAdmin && userModules.length === 0) {
-                document.getElementById('sidebar').style.display = 'none';
-                document.querySelector('.main-content').style.marginLeft = '0';
-                
-                ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-                document.getElementById('pg-welcome').style.display = 'block';
-                document.getElementById('welcomeHero').style.display = 'none'; 
-                document.getElementById('noAccessMsg').style.display = 'none'; 
-                
-                document.getElementById('pg-welcome').innerHTML = `
-                    <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;text-align:center">
-                        <div style="font-size:4rem;margin-bottom:16px">🔒</div>
-                        <h2 style="font-size:2.5rem;color:var(--accent-rose);margin-bottom:12px">Access Denied</h2>
-                        <p style="color:var(--text-muted);font-size:1.1rem;max-width:450px;margin-bottom:32px">You do not have permission to view any modules. Please contact your administrator to request access.</p>
-                        <button class="btn btn-outline" style="border-color:var(--border);color:var(--text);padding:12px 24px" onclick="logout()">Back to Login</button>
-                    </div>
-                `;
-                document.querySelector('.page-top-bar').style.display = 'none';
-                document.getElementById('multiTabBar').style.display = 'none';
-                return;
-            }
+    fetch(`/api/auth/me?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`)
+        .then(r=>r.json())
+        .then(d=>{
+            userPermissions = d;
+            userModules = d.modules || [];
+            isAdmin = !!d.is_super_admin;
+            
+            if (!isAdmin && userModules.length === 0) {
+                document.getElementById('sidebar').style.display = 'none';
+                document.querySelector('.main-content').style.marginLeft = '0';
+                
+                ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+                document.getElementById('pg-welcome').style.display = 'block';
+                document.getElementById('welcomeHero').style.display = 'none'; 
+                document.getElementById('noAccessMsg').style.display = 'none'; 
+                
+                document.getElementById('pg-welcome').innerHTML = `
+                    <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;text-align:center">
+                        <div style="font-size:4rem;margin-bottom:16px">🔒</div>
+                        <h2 style="font-size:2.5rem;color:var(--accent-rose);margin-bottom:12px">Access Denied</h2>
+                        <p style="color:var(--text-muted);font-size:1.1rem;max-width:450px;margin-bottom:32px">You do not have permission to view any modules. Please contact your administrator to request access.</p>
+                        <button class="btn btn-outline" style="border-color:var(--border);color:var(--text);padding:12px 24px" onclick="logout()">Back to Login</button>
+                    </div>
+                `;
+                document.querySelector('.page-top-bar').style.display = 'none';
+                document.getElementById('multiTabBar').style.display = 'none';
+                return;
+            }
 
-            enforceLocks();
-            configureSidebarAndCards();
-            renderTabs();
+            enforceLocks();
+            configureSidebarAndCards();
+            renderTabs();
 
-        }).catch(e=>console.error(e));
+        }).catch(e=>console.error(e));
 
-    updateAcmDropdown();
-    setDatePresets();
-    initPills();
-    renderPresetBar();
-    populateAcmFilterSelect();
+    updateAcmDropdown();
+    setDatePresets();
+    initPills();
+    renderPresetBar();
+    populateAcmFilterSelect();
 
-    if (hashRegion) {
-        const sel=document.getElementById('anaRegion');
-        if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
-        updateAcmDropdown();
-        if (hashAcm) {
-            const acmSel=document.getElementById('anaAcm');
-            if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
-        }
-        openInTab('analytics');
-    } else {
-        openInTab('welcome'); 
-    }
+    if (hashRegion) {
+        const sel=document.getElementById('anaRegion');
+        if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
+        updateAcmDropdown();
+        if (hashAcm) {
+            const acmSel=document.getElementById('anaAcm');
+            if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
+        }
+        openInTab('analytics');
+    } else {
+        openInTab('welcome'); 
+    }
 }
 </script>
 </body>
