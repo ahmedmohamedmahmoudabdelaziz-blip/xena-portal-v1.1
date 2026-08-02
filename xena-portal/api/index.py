@@ -10,12 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_file, redirect
 import requests as http_requests
 
-# === NEW: PUSHER IMPORT ===
-try:
-    import pusher
-except ImportError:
-    pusher = None
-
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
@@ -76,17 +70,6 @@ MONTHLY_ALLOCATOR_LIMITS = {
 ORDER_TYPE_LIMITS = {
     "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
-
-# === NEW: PUSHER INITIALIZATION ===
-pusher_client = None
-if pusher and os.environ.get("PUSHER_APP_ID"):
-    pusher_client = pusher.Pusher(
-        app_id=os.environ.get("PUSHER_APP_ID"),
-        key=os.environ.get("PUSHER_KEY"),
-        secret=os.environ.get("PUSHER_SECRET"),
-        cluster=os.environ.get("PUSHER_CLUSTER"),
-        ssl=True
-    )
 
 # ════════════════════════════════════════════════════════════════════
 # CORE UTILITIES & TIMEZONE MANAGEMENT
@@ -778,12 +761,6 @@ def _peek_newest_date(tat, table_id):
         logger.warn("peek_newest_date_failed", table=table_id, error=str(e))
     return datetime.utcnow()
 
-def _date_buckets(from_dt, to_dt, n_buckets):
-    total_seconds = max((to_dt - from_dt).total_seconds(), 1)
-    step = total_seconds / n_buckets
-    return [(from_dt + timedelta(seconds=step * i), from_dt + timedelta(seconds=step * (i + 1)))
-            for i in range(n_buckets)]
-
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
@@ -822,36 +799,7 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 
     return items, complete, reason
 
-def _merge_shards(shard_results):
-    all_items, seen, master_keys = [], set(), set()
-    fetch_complete, stop_reason = True, ""
-    for items, complete, reason in shard_results:
-        if not complete:
-            fetch_complete, stop_reason = False, reason
-        for item in items:
-            rid = item.get("record_id")
-            if rid and rid not in seen:
-                seen.add(rid)
-                all_items.append(item)
-                master_keys.update(item.get("fields", {}).keys())
-    return all_items, master_keys, fetch_complete, stop_reason
-
-def _run_shards_timed(table_id, tat, shards, field_names):
-    def _timed(shard_filter):
-        t0 = time.time()
-        items, complete, reason = _fetch_bitable_shard(table_id, tat, shard_filter, field_names)
-        logger.info("shard_fetch", table=table_id, ms=int((time.time() - t0) * 1000),
-                    rows=len(items), complete=complete, reason=reason or "")
-        return items, complete, reason
-
-    with ThreadPoolExecutor(max_workers=len(shards)) as executor:
-        futures = [executor.submit(_timed, f) for f in shards]
-        return [f.result() for f in futures]
-
-REQUESTS_SHARD_COUNT = 10 
-REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
-
-def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
+def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=10):
     """Bypassing the Bitable sharded filter that breaks on mixed column types, and explicitly filtering the results purely in Python side using `fetch_feishu_records`."""
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
@@ -860,7 +808,6 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
 
     items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
 
-    # Clean pure-Python filtering
     filtered_items = []
     for item in items:
         if from_dt or to_dt:
@@ -872,17 +819,6 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
         filtered_items.append(item)
         
     return filtered_items, keys, fetch_complete, stop_reason
-
-def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
-    if MOCK_MODE:
-        items = MockFeishuDB.generate_agency("All") * 10
-        return items, True, ""
-
-    tat = get_tenant_access_token()
-    t0 = time.time()
-    items, complete, reason = _fetch_bitable_shard(POINTS_TABLE_ID, tat, filter_obj=None, field_names=field_names)
-    logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
-    return items, complete, reason
 
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
@@ -2018,88 +1954,65 @@ def my_requests():
         return jsonify({"error":"Access denied"}), 403
     
     _cairo_now = cairo_now()
-    # Limited to 15 days for fast live fetching
     from_dt = _cairo_now - timedelta(days=15)
     
     if MOCK_MODE:
-        all_items = MockFeishuDB.generate_requests(200)
+        all_items = MockFeishuDB.generate_requests(50)
         fetch_complete, stop_reason = True, ""
     else:
         tat = get_tenant_access_token()
-        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-        session = http_requests.Session()
-        session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+        search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
         
-        all_items = []
-        page_token = None
-        fetch_complete = True
-        stop_reason = ""
-        _fetch_start = time.time()
-        _time_budget = 40  # stay well under Vercel's 60s maxDuration, leaving room for the Python-side filter pass below
-
-        # TARGETED LIVE FETCH: Ask Feishu for pages sorted by newest first (Numbering is an
-        # auto-increment serial, so DESC order is a reliable proxy for recency without needing
-        # a date filter). This completely avoids Bitable "filter" format errors on Person arrays.
-        # Bounded by wall-clock time, not just a fixed page count, so a busy day (lots of
-        # records inside the 15-day window) can't push this past Vercel's function timeout -
-        # we always return valid JSON, worst case with fetch_complete=False for a partial result.
-        while time.time() - _fetch_start < _time_budget:
-            params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
-            if page_token: params["page_token"] = page_token
-
-            try:
-                resp = session.get(url, params=params, timeout=12)
+        # OFF-LOAD FILTERING TO FEISHU: Instantly fetch only records associated with this agent
+        payload = {
+            "page_size": 500,
+            "filter": {
+                "conjunction": "or",
+                "conditions": [
+                    {"field_name": "Submitted By", "operator": "contains", "value": [user]},
+                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                    {"field_name": "Created By", "operator": "contains", "value": [user]},
+                    {"field_name": "Assigned Member", "operator": "contains", "value": [user]}
+                ]
+            },
+            "sort": [{"field_name": "Numbering", "desc": True}]
+        }
+        
+        try:
+            resp = http_requests.post(search_url, headers=headers, json=payload, timeout=15)
+            data = resp.json()
+            if data.get("code") == 0:
+                all_items = data.get("data", {}).get("items", [])
+                fetch_complete, stop_reason = True, ""
+            elif data.get("code") == 1254045:
+                # Safe fallback if a new column like "Submitted By" was recently deleted/renamed in your sheet
+                payload["filter"]["conditions"] = [
+                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                    {"field_name": "Assigned Member", "operator": "contains", "value": [user]}
+                ]
+                resp = http_requests.post(search_url, headers=headers, json=payload, timeout=15)
                 data = resp.json()
                 if data.get("code") == 0:
-                    block = data.get("data", {})
-                    items = block.get("items", [])
-                    all_items.extend(items)
-
-                    # Stop fetching immediately if we cross into older dates
-                    if items:
-                        last_item = items[-1]
-                        last_date_raw = get_field_local(last_item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
-                        last_dt = parse_feishu_date(last_date_raw)
-                        if last_dt and last_dt < from_dt:
-                            break
-
-                    page_token = block.get("page_token")
-                    if not page_token or not block.get("has_more", False):
-                        break
+                    all_items = data.get("data", {}).get("items", [])
+                    fetch_complete, stop_reason = True, ""
                 else:
-                    fetch_complete = False
-                    stop_reason = data.get("msg")
-                    break
-            except Exception as e:
-                fetch_complete = False
-                stop_reason = str(e)
-                break
-        else:
-            # Loop exited because we hit the time budget, not because we naturally finished
-            fetch_complete = False
-            stop_reason = "time_budget_exceeded"
+                    all_items, fetch_complete, stop_reason = [], False, data.get("msg")
+            else:
+                all_items, fetch_complete, stop_reason = [], False, data.get("msg")
+        except Exception as e:
+            all_items, fetch_complete, stop_reason = [], False, str(e)
     
     results = []
-    user_clean = user.strip().lower()
     
     for item in all_items:
         fields = item.get("fields", {})
         
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
-        if not dt or dt < from_dt:
-            continue
         
-        # Python-side filtering (Super fast and immune to schema errors).
-        # IMPORTANT: check "Submitted By" first - that's the field the portal itself sets to
-        # the real submitting agent. "Respondents"/"Created By" are Feishu-managed fields that
-        # always reflect the app's own bot identity (since writes go through a shared tenant
-        # token), not the individual agent, so they're only useful as a fallback for older
-        # records created before "Submitted By" existed.
-        submitted_by = extract_field_text(get_field_local(fields, "Submitted By"))
-        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
-        match_source = submitted_by or respondents
-        if user_clean not in match_source.lower():
+        # Apply the exact 15-day limit on the ultra-small result set
+        if not dt or dt < from_dt:
             continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
@@ -2111,10 +2024,14 @@ def my_requests():
             elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
         acm = (acm_in if region == "in" else acm_pk) or acm_fb
         
+        submitted_by = extract_field_text(get_field_local(fields, "Submitted By"))
+        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
+        
         results.append({
+            "record_id": item.get("record_id"),
             "numbering": extract_field_text(get_field_local(fields, "Numbering")),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
-            "submitted_on": dt.strftime("%Y-%m-%d") if dt else extract_field_text(raw_date),
+            "submitted_on": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
             "respondents": submitted_by or respondents,
             "user_id": extract_field_text(get_field_local(fields, "User ID")),
             "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
@@ -2142,6 +2059,98 @@ def my_requests():
         "stop_reason": ("" if fetch_complete else stop_reason),
     })
 
+@app.route('/api/live-queue', methods=['GET'])
+def live_queue():
+    """Lightweight endpoint to be polled every 5 seconds by the frontend"""
+    user = sanitize_text(request.args.get('user',''))
+    
+    if not user or MOCK_MODE:
+        return jsonify({"success": True, "tickets": []})
+        
+    tat = get_tenant_access_token()
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    # Fast query: Find where Assigned Member == User AND Status contains "In Progress"
+    payload = {
+        "page_size": 50,
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {
+                    "field_name": "Assigned Member",
+                    "operator": "contains",
+                    "value": [user]
+                },
+                {
+                    "field_name": "Request Status", 
+                    "operator": "contains",
+                    "value": ["In Progress"] 
+                }
+            ]
+        },
+        "sort": [{"field_name": "Numbering", "desc": True}]
+    }
+    
+    try:
+        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
+        data = resp.json()
+        
+        # Smart fallback: If the exact column in Feishu is named "Status" instead of "Request Status", 
+        # this will catch the 1254045 (field not found) error and try again automatically.
+        if data.get("code") == 1254045:
+            payload["filter"]["conditions"][1]["field_name"] = "Status"
+            resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
+            data = resp.json()
+            
+        if data.get("code") == 0:
+            items = data.get("data", {}).get("items", [])
+            # Extract just the necessary fields to keep the 5-sec poll ultra-light
+            tickets = []
+            for item in items:
+                fields = item.get("fields", {})
+                tickets.append({
+                    "record_id": item.get("record_id"),
+                    "numbering": extract_field_text(get_field_local(fields, "Numbering")),
+                    "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
+                    "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
+                    "user_id": extract_field_text(get_field_local(fields, "User ID")),
+                })
+            return jsonify({"success": True, "tickets": tickets})
+            
+        return jsonify({"success": False, "error": data.get("msg")})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/requests/update', methods=['POST'])
+def update_request():
+    """Allows the agent to write status updates back to Feishu"""
+    data = request.json or {}
+    user = sanitize_text(data.get('user', ''))
+    record_id = sanitize_text(data.get('record_id', ''))
+    fields = data.get('fields', {})
+    
+    if not user or not record_id or not fields:
+        return jsonify({"success": False, "error": "Missing data"}), 400
+        
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    try:
+        # Using PUT allows us to modify the provided fields directly in the specific row
+        resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=10)
+        resp_data = resp.json()
+        
+        if resp_data.get("code") == 0:
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+            audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
+            return jsonify({"success": True})
+            
+        return jsonify({"success": False, "error": resp_data.get("msg")})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/api/agency-list', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_list():
@@ -2167,7 +2176,7 @@ def agency_list():
         all_items = MockFeishuDB.generate_requests(300)
         fetch_complete, stop_reason = True, ""
     else:
-        # Prevent timeout: Use the high-speed background cache and pull everything (removed 40-day limitation)
+        # Prevent timeout: Use the high-speed background cache and pull everything
         all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=None)
     
     results = []
@@ -2439,39 +2448,6 @@ def debug_data_status():
         "self_base_url_env": SELF_BASE_URL or None,
     })
 
-# ════════════════════════════════════════════════════════════════════
-# PUSHER WEBHOOK ENDPOINT  (Fire-and-Forget — fixes Feishu timeout)
-# ════════════════════════════════════════════════════════════════════
-
-@app.route('/api/webhook/ticket-assigned', methods=['POST'])
-def ticket_webhook():
-    data = request.json or {}
-    
-    # Feishu challenge handshake
-    if "challenge" in data:
-        return jsonify({"challenge": data["challenge"]})
-    
-    # Fire-and-forget background thread
-    def _push_async(payload: dict):
-        if not pusher_client:
-            logger.error("pusher_webhook_failed", error="Pusher client not initialized")
-            return
-        try:
-            ticket_data = payload.get("ticket_data", payload)
-            pusher_client.trigger('tickets-channel', 'new-ticket', ticket_data)
-            logger.info("pusher_event_triggered", channel="tickets-channel", event="new-ticket")
-        except Exception as e:
-            logger.error("pusher_webhook_failed", error=str(e))
-    
-    threading.Thread(target=_push_async, args=(data,), daemon=True).start()
-    return jsonify({"success": True, "queued": True}), 200
-
-
-@app.route('/api/webhook/ticket-assigned', methods=['GET', 'HEAD'])
-def ticket_webhook_ping():
-    return jsonify({"status": "listening", "pusher_ready": pusher_client is not None}), 200
-
-
 @app.route('/api/health', methods=['GET'])
 def health():
     with _bg_sync_lock:
@@ -2494,7 +2470,7 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
-        "pusher_enabled": pusher_client is not None,
+        "pusher_enabled": False, # Pusher fully removed!
         "mock_mode_active": MOCK_MODE,
     })
 
