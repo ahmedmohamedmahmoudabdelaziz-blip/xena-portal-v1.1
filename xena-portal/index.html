@@ -99,61 +99,84 @@
         .page-content-wrapper { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
 
         .welcome-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:920px;margin:0 auto}
-        .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .25s;box-shadow:var(--shadow);text-align:center; display:flex; flex-direction:column; align-items:center;}
-        .welcome-card:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:0 12px 40px rgba(0,212,255,.12)}
+        .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .3s cubic-bezier(0.2, 0.8, 0.2, 1);box-shadow:var(--shadow);text-align:center; display:flex; flex-direction:column; align-items:center;}
+        .welcome-card:hover{transform:translateY(-6px);border-color:var(--accent-cyan);box-shadow:0 12px 40px rgba(0,212,255,.15); background:linear-gradient(180deg, var(--surface) 0%, rgba(0,212,255,0.03) 100%);}
         .welcome-card-icon{margin-bottom:12px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.03);}
         .welcome-card-icon svg { width:24px; height:24px; }
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
 
-        .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-        .qy-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:18px;transition:all .2s}
-        .qy-card:hover{border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,212,255,.08)}
-        .qy-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
-        .qy-card-num{font-size:1rem;font-weight:700;color:var(--accent-cyan)}
-        .qy-card-type{font-size:.75rem;color:var(--text-muted);margin-top:2px}
-        .qy-status-pill{font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;text-transform:capitalize}
-        .qy-status-done{background:rgba(0,230,118,.12);color:var(--accent-green)}
-        .qy-status-rejected{background:rgba(255,77,109,.12);color:var(--accent-rose)}
-        .qy-status-pending{background:rgba(255,171,0,.12);color:var(--accent-amber)}
-        .qy-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:.83rem}
-        .qy-row-label{color:var(--text-muted);white-space:nowrap}
-        .qy-row-val{color:var(--text);text-align:right;font-weight:500;word-break:break-word}
-        .qy-note-block{margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;font-size:.8rem;color:var(--text-muted)}
-        .qy-note-block b{color:var(--text)}
+        /* QY Cards (Universal Query & My Requests) - Upgraded Design */
+        .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+        .qy-card{background:linear-gradient(145deg, var(--surface) 0%, rgba(255,255,255,0.01) 100%);border:1px solid var(--border);border-radius:16px;padding:20px;transition:all .3s ease; position:relative; overflow:hidden;}
+        .qy-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: transparent; transition: background 0.3s ease; }
+        .qy-card:hover{border-color:var(--border-hover);transform:translateY(-4px);box-shadow:0 12px 30px rgba(0,0,0,0.4), 0 0 20px rgba(0,212,255,.05);}
+        .qy-card:hover::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)); }
+        .qy-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px dashed var(--border)}
+        .qy-card-num{font-size:1.1rem;font-weight:800;color:var(--accent-cyan); letter-spacing: 0.5px;}
+        .qy-card-type{font-size:.78rem;color:var(--text-muted);margin-top:4px; font-weight:500;}
+        .qy-status-pill{font-size:.72rem;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;text-transform:capitalize; border:1px solid transparent;}
+        .qy-status-done{background:rgba(0,230,118,.12);color:var(--accent-green); border-color:rgba(0,230,118,.3);}
+        .qy-status-rejected{background:rgba(255,77,109,.12);color:var(--accent-rose); border-color:rgba(255,77,109,.3);}
+        .qy-status-pending{background:rgba(255,171,0,.12);color:var(--accent-amber); border-color:rgba(255,171,0,.3);}
+        .qy-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:.85rem; border-bottom:1px solid rgba(255,255,255,0.02);}
+        .qy-row:last-of-type { border-bottom: none; }
+        .qy-row-label{color:var(--text-muted);white-space:nowrap; font-weight:500;}
+        .qy-row-val{color:var(--text);text-align:right;font-weight:600;word-break:break-word;}
+        .qy-note-block{margin-top:12px;padding:12px 14px;background:rgba(0,0,0,.2);border-radius:10px;font-size:.8rem;color:var(--text-muted); border-left: 3px solid var(--border-hover);}
+        .qy-note-block b{color:var(--text); display:block; margin-bottom: 4px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;}
 
         .compare-mode-toggle{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
         .compare-mode-btn{flex:1;min-width:160px;padding:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.9rem;transition:all .2s;text-align:center}
         .compare-mode-btn.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:700}
 
-        .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+        .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s cubic-bezier(0.2, 0.8, 0.2, 1);font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px;}
         .btn-primary{background:linear-gradient(135deg,var(--accent-cyan),#3a7bd5);color:#000}
-        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,212,255,.25)}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,212,255,.3)}
         .btn-success{background:linear-gradient(135deg,var(--accent-green),#00b0ff);color:#000}
-        .btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,230,118,.25)}
+        .btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,230,118,.3)}
         .btn-outline{background:transparent;border:1px solid var(--border-hover);color:var(--text);padding:8px 16px;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:500;font-size:.9rem;white-space:nowrap}
-        .btn-outline:hover{border-color:var(--accent-cyan);color:var(--accent-cyan)}
+        .btn-outline:hover{border-color:var(--accent-cyan);color:var(--accent-cyan); background:rgba(0,212,255,0.05);}
         .logout-btn{background:transparent;border:1px solid var(--accent-rose);color:var(--accent-rose);padding:8px 16px;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:500;font-size:.9rem;white-space:nowrap; width: 100%; margin-top: 10px;}
         .logout-btn:hover{background:rgba(255,77,109,.1)}
         .btn-allocator{background:transparent;border:1px solid var(--accent-purple);color:var(--accent-purple);box-shadow:0 0 10px rgba(185,103,255,.1);width:100%;padding:14px;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s;font-family:inherit;margin-top:10px}
         .btn-allocator:hover{background:var(--accent-purple);color:#000;box-shadow:0 8px 25px rgba(185,103,255,.4);transform:translateY(-2px)}
         .btn-sm{padding:6px 12px;border-radius:6px;font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
         
-        .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);transition:border-color .2s;margin-bottom:24px}
+        .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);transition:border-color .2s;margin-bottom:24px}
         .card:hover{border-color:var(--border-hover)}
         
         .centered-search-box{max-width:450px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
         .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
-        .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
-        .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email],.control-group input[type=number]{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
+        .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px}
+        .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email],.control-group input[type=number]{width:100%;padding:12px 14px;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
         select option, .control-group select option { background:var(--surface); color:var(--text); }
-        .control-group select:focus,.control-group input:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+        .control-group select:focus,.control-group input:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1); background:rgba(0,0,0,0.4);}
+        
+        /* Modern Form Customizations */
+        .form-card { max-width: 800px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .form-highlight-input { border-color: var(--accent-cyan) !important; background: rgba(0,212,255,0.03) !important; font-weight: 600; box-shadow: 0 4px 15px rgba(0,212,255,0.05); }
+        .form-highlight-input:focus { background: rgba(0,212,255,0.06) !important; }
         
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-        .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(4px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
-        .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
+        .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
+        .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
+
+        /* Custom Agency List Table */
+        .al-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
+        .al-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+        .al-table th { padding: 14px 16px; text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; background: rgba(28, 29, 43, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--border); }
+        .al-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; transition: background 0.2s; }
+        .al-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
+        .al-table tbody tr:last-child td { border-bottom: none; }
+        
+        .al-type-pill { display:inline-flex; align-items:center; justify-content:center; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:700; text-transform:capitalize; border:1px solid transparent; letter-spacing: 0.3px; }
+        .al-type-walkin { background:rgba(0,230,118,.12); color:var(--accent-green); border-color: rgba(0,230,118,.3); }
+        .al-type-acm { background:rgba(0,212,255,.12); color:var(--accent-cyan); border-color: rgba(0,212,255,.3); }
+        .al-type-bd { background:rgba(255,184,0,.12); color:var(--accent-amber); border-color: rgba(255,184,0,.3); }
+        .al-type-default { background:rgba(255,255,255,.05); color:var(--text-muted); border-color: var(--border); }
 
         #toastContainer{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:380px}
         .toast-item{display:flex;align-items:flex-start;gap:12px;padding:14px 18px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid transparent;animation:toast-in .3s ease;cursor:pointer;position:relative;overflow:hidden;background:var(--surface);color:var(--text)}
@@ -591,6 +614,7 @@
                 <div class="welcome-cards" id="welcomeCards"></div>
             </div>
 
+            <!-- ... Compare Page ... -->
             <div id="pg-compare" style="display:none">
                 <div class="card">
                     <h3 style="margin-bottom:16px;color:var(--accent-cyan); display:flex; align-items:center; gap:8px;">
@@ -674,6 +698,7 @@
                 </div>
             </div>
 
+            <!-- ... Agency Target / Points ... -->
             <div id="pg-agency" style="display:none">
                 <div class="card" style="margin-bottom:24px">
                     <h3 id="agencyLookupTitle" style="margin-bottom:16px;color:var(--accent-cyan)">🔍 Agency Lookup</h3>
@@ -763,6 +788,7 @@
                 </div>
             </div>
 
+            <!-- ... Smart Allocator ... -->
             <div id="pg-allocator" style="display:none">
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
                     <div class="card">
@@ -829,6 +855,7 @@
                 </div>
             </div>
 
+            <!-- ... Admin ... -->
             <div id="pg-admin-agents" style="display:none">
                 <div class="card">
                     <h3 style="color:var(--accent-cyan);margin-bottom:20px; display:flex; align-items:center; gap:8px;">
@@ -935,6 +962,7 @@
                 </div>
             </div>
 
+            <!-- ... Analytics ... -->
             <div id="pg-analytics" style="display:none">
                 <div class="card">
                     <div class="preset-bar" id="presetBar">
@@ -1107,6 +1135,7 @@
                 </div>
             </div>
 
+            <!-- ... Point Records ... -->
             <div id="pg-points-records" style="display:none">
                 <div class="card" style="margin-bottom:20px">
                     <h3 style="color:var(--accent-cyan);margin-bottom:20px; display:flex; align-items:center; gap:8px;">
@@ -1290,15 +1319,15 @@
             </div>
 
             <div id="pg-query" style="display:none">
-                <div class="card" style="margin-bottom:20px">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:20px; display:flex; align-items:center; gap:8px;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <div class="card" style="margin-bottom:24px; padding-bottom:32px;">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                         Universal Request Query
                     </h3>
-                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+                    <div class="control-grid" style="grid-template-columns: 2fr 4fr 2fr; align-items:end; gap:20px;">
                         <div class="control-group">
                             <label>Search By</label>
-                            <select id="qySearchField">
+                            <select id="qySearchField" style="background:var(--surface-hover); border-color:var(--border-hover);">
                                 <option value="user_id">User ID</option>
                                 <option value="numbering">Numbering</option>
                                 <option value="otherapp_id">Otherapp ID</option>
@@ -1306,60 +1335,165 @@
                                 <option value="bd_code">Bd Code</option>
                             </select>
                         </div>
-                        <div class="control-group" style="grid-column:span 2">
+                        <div class="control-group">
                             <label id="qyValueLabel">User ID Value</label>
-                            <input type="text" id="qySearchValue" placeholder="Type the value to search…" onkeydown="if(event.key==='Enter')runQuery()">
+                            <input type="text" id="qySearchValue" placeholder="Type the value to search…" style="background:var(--surface-hover); border-color:var(--border-hover);" onkeydown="if(event.key==='Enter')runQuery()">
                         </div>
-                        <div class="control-group" style="display:flex;align-items:flex-end">
-                            <button class="btn btn-primary" onclick="runQuery()" style="width:100%">🔍 Search</button>
+                        <div class="control-group">
+                            <button class="btn btn-primary" onclick="runQuery()" style="height:48px; font-size:1.05rem;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                Search
+                            </button>
                         </div>
                     </div>
-                    <div style="font-size:.78rem;color:var(--text-muted);margin-top:-6px">
-                        Searches every request ever submitted for this value — no date limit. Every matching request is shown as its own card below.
+                    <div style="font-size:.85rem;color:var(--text-muted);margin-top:16px; display:flex; align-items:center; gap:8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        Searches every request ever submitted for this value — no date limit.
                     </div>
                 </div>
 
-                <div class="card">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-                        <span id="qyResultCount" style="font-size:.9rem;color:var(--text-muted)">Choose a field and enter a value to search</span>
-                        <span id="qyLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Searching full history…</span>
+                <div class="card" style="background:transparent; border:none; padding:0; box-shadow:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                        <span id="qyResultCount" style="font-size:1rem;color:var(--text-muted); font-weight:500;">Awaiting search criteria...</span>
+                        <span id="qyLoadingSpinner" style="display:none;color:var(--accent-cyan); font-weight:600;">⏳ Searching full history…</span>
                     </div>
 
                     <div id="qyResults" class="qy-grid"></div>
 
-                    <div id="qyEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
-                        <div style="font-size:2rem;margin-bottom:12px">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-hover)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <div id="qyEmpty" style="display:none;text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
+                        <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
+                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                         </div>
-                        <p>No requests found for that value.</p>
+                        <p style="font-size:1.1rem; font-weight:500;">No requests found for that value.</p>
+                        <p style="font-size:0.9rem; margin-top:8px;">Try searching by a different field or verify your spelling.</p>
                     </div>
                 </div>
             </div>
 
-            <div id="pg-new-request" style="display:none">
-                <div class="card" style="max-width:800px; margin:0 auto;">
+            <div id="pg-agency-list" style="display:none">
+                <div class="card" style="margin-bottom:24px">
                     <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-form"></use></svg>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        Agency List <span style="font-size:0.8rem;color:var(--text-muted);font-weight:400;margin-left:8px;">(Last 40 Days)</span>
+                    </h3>
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px; align-items:end;">
+                        <div class="control-group">
+                            <label>Region</label>
+                            <select id="alRegion" onchange="alFetch()" style="background:var(--surface-hover);">
+                                <option value="">All Regions</option>
+                                <option value="pk">PK</option>
+                                <option value="in">IN</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Agency Code</label>
+                            <input type="text" id="alAgencyCode" placeholder="e.g. 50923" oninput="alDebounce()" style="background:var(--surface-hover);">
+                        </div>
+                        <div class="control-group">
+                            <label>Agency Name</label>
+                            <input type="text" id="alAgencyName" placeholder="Search name..." oninput="alDebounce()" style="background:var(--surface-hover);">
+                        </div>
+                        <div class="control-group">
+                            <label>ACM</label>
+                            <select id="alAcm" onchange="alFetch()" style="background:var(--surface-hover);">
+                                <option value="">All ACMs</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <button class="btn btn-primary" onclick="alFetch()" style="height:44px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0; overflow:hidden;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border); background:rgba(0,0,0,0.1);">
+                        <span id="alResultCount" style="font-size:1rem;color:var(--text); font-weight:600;">Loading agency list...</span>
+                        <span id="alLoadingSpinner" style="display:none;color:var(--accent-cyan); font-weight:600;">⏳ Loading…</span>
+                    </div>
+
+                    <div class="al-table-wrap">
+                        <table id="alTable" class="al-table" style="display:none;">
+                            <thead>
+                                <tr>
+                                    <th>Region</th>
+                                    <th>Agency ID</th>
+                                    <th>Agency Name</th>
+                                    <th>Manager ID (Name)</th>
+                                    <th>Country</th>
+                                    <th>Create Time</th>
+                                    <th style="text-align:center;">Members</th>
+                                    <th>Agency Type</th>
+                                    <th>Parent Agency</th>
+                                    <th>Sub Agency</th>
+                                    <th>ACM Name</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alTbody"></tbody>
+                        </table>
+                        <div id="alEmpty" style="display:none;text-align:center;padding:60px 24px;color:var(--text-muted)">
+                            <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
+                                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                            </div>
+                            <p style="font-size:1.1rem; font-weight:500;">No agencies found in the last 40 days.</p>
+                            <p style="font-size:0.9rem; margin-top:8px;">Try adjusting your filters above.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pg-my-requests" style="display:none">
+                <div class="card" style="margin-bottom:24px; padding-bottom:32px; background:linear-gradient(135deg, rgba(0,212,255,0.03), transparent); border-color:rgba(0,212,255,0.1);">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:12px; display:flex; align-items:center; gap:10px; font-size:1.4rem;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        My Recent Requests
+                    </h3>
+                    <div style="font-size:.95rem;color:var(--text-muted);">
+                        Showing all requests you personally submitted in the last 10 days across all categories.
+                    </div>
+                </div>
+                
+                <div id="myReqResults" class="qy-grid"></div>
+                
+                <div id="myReqEmpty" style="display:none;text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
+                    <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </div>
+                    <p style="font-size:1.1rem; font-weight:500;">No requests found in the last 10 days.</p>
+                </div>
+            </div>
+
+            <div id="pg-new-request" style="display:none">
+                <div class="form-card">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; justify-content:center; gap:10px; font-size:1.5rem; border-bottom:1px solid rgba(0,212,255,0.1); padding-bottom:20px;">
+                        <div style="background:rgba(0,212,255,0.1); padding:8px; border-radius:10px;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        </div>
                         <span data-i18n="createNewRequest">Create New Request</span>
                     </h3>
                     
                     <form id="newRequestForm" onsubmit="submitReqForm(event)">
                         <div class="control-grid" style="grid-template-columns:1fr; margin-bottom:24px;">
                             <div class="control-group">
-                                <label>Request Type <span style="color:var(--accent-rose)">*</span></label>
-                                <select id="formRequestType" onchange="renderReqFormFields()" required style="border-color:var(--accent-cyan); background:rgba(0,212,255,0.05); font-weight:600;">
+                                <label style="font-size:0.85rem;">Select Request Category <span style="color:var(--accent-rose)">*</span></label>
+                                <select id="formRequestType" class="form-highlight-input" onchange="renderReqFormFields()" required style="padding:14px; font-size:1rem;">
                                     <option value="">-- Select Request Type --</option>
                                 </select>
                             </div>
                         </div>
 
-                        <div id="formDynamicFields" class="control-grid" style="display:none; padding-top:20px; border-top:1px dashed var(--border);">
+                        <div id="formDynamicFields" class="control-grid" style="display:none; padding-top:24px; border-top:1px dashed var(--border); gap:24px;">
                             <!-- Fields injected dynamically -->
                         </div>
 
-                        <div id="formSubmitArea" style="display:none; margin-top:32px;">
-                            <button type="submit" class="btn btn-primary" id="btnSubmitReq">Submit Request</button>
-                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:12px;">Files and inputs will be validated before submission.</p>
+                        <div id="formSubmitArea" style="display:none; margin-top:40px; padding-top:24px; border-top:1px solid var(--border);">
+                            <button type="submit" class="btn btn-primary" id="btnSubmitReq" style="padding:16px; font-size:1.1rem; width:100%; max-width:400px; margin:0 auto;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                Secure Submit to Feishu
+                            </button>
+                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Files and inputs will be validated before submission. Ensure all data is correct.</p>
                         </div>
                     </form>
                 </div>
@@ -1655,10 +1789,19 @@ function executePageLogic(page) {
     } else if(page==='query'){
         document.getElementById('pg-query').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
+    } else if(page==='agency-list'){
+        document.getElementById('pg-agency-list').style.display='block';
+        _expandNavGroup('navBodyQuery','navArrQuery');
+        populateAlAcmSelect();
+        alFetch(); // auto fetch on load
     } else if(page==='new-request'){
         document.getElementById('pg-new-request').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
         if(document.getElementById('formRequestType').options.length === 1) initReqFormOptions();
+    } else if(page==='my-requests'){
+        document.getElementById('pg-my-requests').style.display='block';
+        _expandNavGroup('navBodySubmit','navArrSubmit');
+        loadMyRequests(); // fetch user requests on load
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
@@ -3899,6 +4042,16 @@ function enforceLocks() {
             }
         });
     }
+    
+    const qryAcm = p.acms?.query || ['all'];
+    if (!qryAcm.includes('all')) {
+        const alAcm = document.getElementById('alAcm');
+        if (alAcm) {
+            alAcm.innerHTML = '<option value="">All Permitted ACMs</option>';
+            qryAcm.forEach(a => alAcm.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+        }
+    }
+    
     updateAcmDropdown();
 }
 
@@ -3968,11 +4121,153 @@ function configureSidebarAndCards() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// NEW REQUEST FORM ENGINE
+// AGENCY LIST & MY RECENT REQUESTS
 // ════════════════════════════════════════════════════════════════════
 
-// Fields tagged ACM_AUTO are resolved at render-time to the single correct ACM field for the
-// chosen Region (Acm Name (PK) if Region=PK, Acm Name (IN) if Region=IN) instead of showing both.
+async function loadMyRequests() {
+    const resultsEl = document.getElementById('myReqResults');
+    const emptyEl = document.getElementById('myReqEmpty');
+    
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    
+    try {
+        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        let data;
+        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
+        
+        if (data.fetch_complete === false) {
+            ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}.`, 'warning', 6000);
+        }
+        
+        const results = data.results || [];
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+        }
+        
+        if (resultsEl) {
+            resultsEl.innerHTML = results.map(r => `
+                <div class="qy-card">
+                    <div class="qy-card-head">
+                        <div>
+                            <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
+                            <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
+                        </div>
+                        <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
+                    </div>
+                    ${qyRow('Submitted on', r.submitted_on)}
+                    ${qyRow('Respondents', r.respondents)}
+                    ${qyRow('User ID', r.user_id)}
+                    ${qyRow('Agency Code', r.agency_code)}
+                    ${qyRow('Agency Type', r.agency_type)}
+                    ${qyRow('Otherapp ID', r.otherapp_id)}
+                    ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                    ${qyRow('Bd Code', r.bd_code)}
+                    ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                    ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+                    ${r.closing_reason && (r.request_type||'').toLowerCase().includes('closing') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        ToastManager.show('Failed to load my requests: ' + e.message, 'error');
+        if (emptyEl) emptyEl.style.display = 'block';
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+let alDebounceTimer = null;
+function alDebounce() {
+    clearTimeout(alDebounceTimer);
+    alDebounceTimer = setTimeout(() => alFetch(), 400);
+}
+
+async function alFetch() {
+    const spinner = document.getElementById('alLoadingSpinner');
+    const countEl = document.getElementById('alResultCount');
+    const tableEl = document.getElementById('alTable');
+    const tbody = document.getElementById('alTbody');
+    const emptyEl = document.getElementById('alEmpty');
+    
+    if (spinner) spinner.style.display = 'inline';
+    if (tableEl) tableEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'none';
+    
+    const params = new URLSearchParams({
+        user: loggedUser || '',
+        email: loggedEmail || '',
+        region: document.getElementById('alRegion')?.value || '',
+        agency_code: document.getElementById('alAgencyCode')?.value || '',
+        agency_name: document.getElementById('alAgencyName')?.value || '',
+        acm: document.getElementById('alAcm')?.value || '',
+    });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    
+    try {
+        const resp = await fetch('/api/agency-list?' + params.toString());
+        let data;
+        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+        if (!resp.ok) throw new Error(data.error || 'Failed to load agency list');
+        
+        if (spinner) spinner.style.display = 'none';
+        
+        const results = data.results || [];
+        if (countEl) countEl.textContent = `${results.length} agenc${results.length===1?'y':'ies'} found (last 40 days)`;
+        
+        if (!results.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        
+        if (tbody) {
+            tbody.innerHTML = results.map((r, i) => {
+                const typeClass = (r.agency_type||'').toLowerCase().includes('walk') ? 'al-type-walkin' : 
+                                  (r.agency_type||'').toLowerCase().includes('acm') ? 'al-type-acm' :
+                                  (r.agency_type||'').toLowerCase().includes('bd') ? 'al-type-bd' : 'al-type-default';
+                return `<tr>
+                    <td><span style="font-weight:600; font-size:0.8rem; letter-spacing:1px; opacity:0.8;">${escHtml(r.region||'—')}</span></td>
+                    <td><strong style="color:var(--accent-cyan)">${escHtml(r.agency_code||'—')}</strong></td>
+                    <td style="font-weight:600; color:var(--text);">${escHtml(r.agency_name||'—')}</td>
+                    <td style="font-family:monospace; font-size:0.85rem;">${escHtml(r.agency_manager||'—')}</td>
+                    <td style="font-size:0.8rem; letter-spacing:0.5px; opacity:0.7;">${escHtml(r.country||'—')}</td>
+                    <td style="color:var(--text-muted);">${escHtml(r.create_time||'—')}</td>
+                    <td style="text-align:center; font-weight:800; color:var(--text);">${escHtml(r.agency_members||'0')}</td>
+                    <td><span class="al-type-pill ${typeClass}">${escHtml(r.agency_type||'—')}</span></td>
+                    <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.parent_agency||'—')}</td>
+                    <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.sub_agency||'—')}</td>
+                    <td style="font-weight:600; color:var(--accent-purple);">${escHtml(r.acm_name||'—')}</td>
+                </tr>`;
+            }).join('');
+        }
+        if (tableEl) tableEl.style.display = '';
+    } catch (e) {
+        if (spinner) spinner.style.display = 'none';
+        if (countEl) countEl.textContent = 'Error: ' + e.message;
+        ToastManager.show('Failed to load agency list: ' + e.message, 'error');
+    }
+}
+
+function populateAlAcmSelect() {
+    const sel = document.getElementById('alAcm');
+    if (sel && sel.options.length <= 1) {
+        sel.innerHTML = '<option value="">All ACMs</option>';
+        allAcms.forEach(a => sel.add(new Option(a, a.toLowerCase())));
+        
+        if (!isAdmin && userPermissions?.permissions?.acms?.query && !userPermissions.permissions.acms.query.includes('all')) {
+            const allowed = userPermissions.permissions.acms.query;
+            sel.innerHTML = '<option value="">All Permitted ACMs</option>';
+            allowed.forEach(a => sel.add(new Option(a.charAt(0).toUpperCase() + a.slice(1), a)));
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// NEW REQUEST FORM ENGINE
+// ════════════════════════════════════════════════════════════════════
 const ACM_AUTO = "__ACM_AUTO__";
 
 const REQ_BRANCHES = {
@@ -3996,9 +4291,6 @@ const REQ_BRANCHES = {
     "Room Pinup (Only for the famous KOLS)": ["Region", "User ID", "Applier Note", "Evidence Screen 2"]
 };
 
-// Extra fields that only appear conditionally WITHIN a branch, based on another field's value
-// in that same branch (not based on Request Type). Currently only "Closing Agency" needs this:
-// the New ID / Old ID / Reporter ID trio only shows when Closing Reason = "Duplicated Hosting".
 const REQ_SUBCONDITIONS = {
     "Closing Agency": [
         { when: "Closing Reason", equals: "Duplicated Hosting", fields: ["New ID", "Old ID", "Reporter ID"] }
@@ -4057,7 +4349,6 @@ function initReqFormOptions() {
 }
 
 function acmFieldForRegion(region) {
-    // Maps a selected Region to the single correct ACM field name/def.
     if (region === 'PK') return { name: 'Acm Name (PK)', def: REQ_FIELD_DEFS['Acm Name (PK)'] };
     if (region === 'IN') return { name: 'Acm Name (IN)', def: REQ_FIELD_DEFS['Acm Name (IN)'] };
     return null;
@@ -4069,25 +4360,25 @@ function buildFieldControl(fName, def, req) {
     const wrap = document.createElement('div');
     wrap.className = 'control-group';
     wrap.dataset.field = fName;
-    wrap.innerHTML = `<label>${escHtml(fName)} ${reqMark}</label>`;
+    wrap.innerHTML = `<label style="font-size:0.8rem;">${escHtml(fName)} ${reqMark}</label>`;
 
     if (def.type === 'text') {
-        wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}">`;
+        wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}" class="form-highlight-input">`;
     } else if (def.type === 'select') {
         let opts = `<option value="">-- Select --</option>`;
         def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
-        wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''}>${opts}</select>`;
+        wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} class="form-highlight-input">${opts}</select>`;
     } else if (def.type === 'multiselect') {
         let chks = def.options.map(o => `
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; font-weight:500; cursor:pointer; color:var(--text); padding:4px 0; text-transform:none;">
-                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:16px;height:16px;accent-color:var(--accent-cyan);cursor:pointer;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; font-weight:600; cursor:pointer; color:var(--text); padding:6px 0; text-transform:none;">
+                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:18px;height:18px;accent-color:var(--accent-cyan);cursor:pointer;">
                 ${escHtml(o)}
             </label>`).join('');
-        wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; border-color:var(--border);">${chks}</div>`;
+        wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:6px; max-height:280px; overflow-y:auto; border:1px solid var(--accent-cyan); background:rgba(0,212,255,0.03);">${chks}</div>`;
     } else if (def.type === 'file') {
         wrap.innerHTML += `
             <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} multiple
-                style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); padding:16px 14px;">`;
+                style="background:rgba(255,255,255,0.02); border:1px dashed var(--accent-purple); padding:20px 14px; cursor:pointer;" class="form-highlight-input">`;
     }
     return wrap;
 }
@@ -4104,7 +4395,7 @@ function refreshAcmAutoSlot() {
     } else {
         const hint = document.createElement('div');
         hint.className = 'control-group';
-        hint.innerHTML = `<label>ACM</label><div style="padding:10px;color:var(--text-muted);font-size:.85rem;border:1px dashed var(--border);border-radius:8px">Select a Region above to choose the ACM</div>`;
+        hint.innerHTML = `<label style="font-size:0.8rem;">ACM</label><div style="padding:14px;color:var(--text-muted);font-size:.9rem;font-weight:600;border:1px dashed var(--border-hover);border-radius:10px;background:rgba(0,0,0,0.2);">Select a Region above to choose the ACM</div>`;
         slot.appendChild(hint);
     }
 }
@@ -4152,7 +4443,6 @@ function renderReqFormFields() {
         }
     });
 
-    // Sub-conditional fields (currently: Closing Reason == Duplicated Hosting -> New/Old/Reporter ID)
     const subs = REQ_SUBCONDITIONS[branch];
     if (subs) {
         subs.forEach(rule => {
@@ -4163,7 +4453,11 @@ function renderReqFormFields() {
             const inner = document.createElement('div');
             inner.style.display = 'grid';
             inner.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
-            inner.style.gap = '16px';
+            inner.style.gap = '20px';
+            inner.style.padding = '20px';
+            inner.style.background = 'rgba(255,255,255,0.02)';
+            inner.style.border = '1px dashed var(--border-hover)';
+            inner.style.borderRadius = '12px';
             rule.fields.forEach(subF => {
                 const subDef = REQ_FIELD_DEFS[subF];
                 if (subDef) inner.appendChild(buildFieldControl(subF, subDef, false));
@@ -4199,13 +4493,12 @@ async function submitReqForm(e) {
     if (!multiValid) return;
 
     const btn = document.getElementById('btnSubmitReq');
-    const origTxt = btn.innerText;
-    btn.innerText = '⏳ Submitting to Feishu...';
+    const origTxt = btn.innerHTML;
+    btn.innerHTML = '⏳ Submitting to Feishu...';
     btn.disabled = true;
     document.getElementById('loadingOverlay').style.display = 'flex';
 
     try {
-        const formData = new FormData(form);
         const payloadFields = { "Request Type": branch };
 
         form.querySelectorAll('input[type="text"], select').forEach(el => {
@@ -4221,6 +4514,10 @@ async function submitReqForm(e) {
         const finalData = new FormData();
         finalData.append('user', loggedUser);
         finalData.append('email', loggedEmail);
+        
+        // This fixes the Respondents identity issue! Appends the user's specific access token.
+        if (loggedUat) finalData.append('uat', loggedUat); 
+        
         finalData.append('payload', JSON.stringify(payloadFields));
 
         form.querySelectorAll('input[type="file"]').forEach(fInput => {
@@ -4251,7 +4548,7 @@ async function submitReqForm(e) {
         ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
     }
 
-    btn.innerText = origTxt;
+    btn.innerHTML = origTxt;
     btn.disabled = false;
     document.getElementById('loadingOverlay').style.display = 'none';
 }
