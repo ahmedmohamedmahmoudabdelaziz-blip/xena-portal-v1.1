@@ -2445,47 +2445,31 @@ def debug_data_status():
 
 @app.route('/api/webhook/ticket-assigned', methods=['POST'])
 def ticket_webhook():
-    """Receives data from Feishu Bitable Automation when a ticket updates.
-    
-    CRITICAL: We MUST return HTTP 200 in < ~3 seconds or Feishu will mark
-    the automation as 'Connection Timed Out'. Therefore we acknowledge
-    immediately and process the Pusher trigger in a background thread.
-    """
     data = request.json or {}
     
-    # 1. Feishu challenge handshake (only during initial webhook setup)
+    # Feishu challenge handshake
     if "challenge" in data:
         return jsonify({"challenge": data["challenge"]})
     
-    # 2. Queue the real work to a daemon thread so the HTTP response
-    #    goes back to Feishu instantly, before Pusher network latency.
+    # Fire-and-forget background thread
     def _push_async(payload: dict):
         if not pusher_client:
-            logger.error("pusher_webhook_failed", error="Pusher client not initialized (missing env vars or import failed)")
+            logger.error("pusher_webhook_failed", error="Pusher client not initialized")
             return
         try:
-            # Feishu automation sends the record fields directly in the body.
-            # If you ever wrap them in a 'ticket_data' key, use .get("ticket_data", payload)
             ticket_data = payload.get("ticket_data", payload)
             pusher_client.trigger('tickets-channel', 'new-ticket', ticket_data)
             logger.info("pusher_event_triggered", channel="tickets-channel", event="new-ticket")
         except Exception as e:
-            # Log only — Feishu already got its 200 and won't retry.
             logger.error("pusher_webhook_failed", error=str(e))
     
     threading.Thread(target=_push_async, args=(data,), daemon=True).start()
-    
-    # 3. Immediate ACK — Feishu sees this in ~20–50 ms even on cold starts.
     return jsonify({"success": True, "queued": True}), 200
 
 
 @app.route('/api/webhook/ticket-assigned', methods=['GET', 'HEAD'])
 def ticket_webhook_ping():
-    """Lightweight health probe so you can test reachability in a browser."""
-    return jsonify({
-        "status": "listening",
-        "pusher_ready": pusher_client is not None
-    }), 200
+    return jsonify({"status": "listening", "pusher_ready": pusher_client is not None}), 200
 
 
 @app.route('/api/health', methods=['GET'])
