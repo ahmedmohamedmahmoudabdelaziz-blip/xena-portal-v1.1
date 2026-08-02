@@ -2008,22 +2008,50 @@ def my_requests():
         all_items = MockFeishuDB.generate_requests(200)
         fetch_complete, stop_reason = True, ""
     else:
-        # Push the heavy lifting to Feishu (Exactly like Query Requests)
         tat = get_tenant_access_token()
-        user_filter = {
-            "conjunction": "or",
-            "conditions": [
-                {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                {"field_name": "Submitted By", "operator": "contains", "value": [user]},
-                {"field_name": "Created By", "operator": "contains", "value": [user]}
-            ]
-        }
-        all_items, fetch_complete, stop_reason = _fetch_bitable_shard(
-            REQUESTS_TABLE_ID, 
-            tat, 
-            filter_obj=user_filter,
-            field_names=QUERY_RECORDS_FIELDS
-        )
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+        session = http_requests.Session()
+        session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+        
+        all_items = []
+        page_token = None
+        fetch_complete = True
+        stop_reason = ""
+        
+        # TARGETED LIVE FETCH: Ask Feishu for pages sorted by newest first.
+        # This completely avoids Bitable "filter" format errors on Person arrays
+        # Fast exit max 5 pages (~2500 requests) or immediately when spotting a 15-day old request
+        for _ in range(5):
+            params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+            if page_token: params["page_token"] = page_token
+                
+            try:
+                resp = session.get(url, params=params, timeout=10)
+                data = resp.json()
+                if data.get("code") == 0:
+                    block = data.get("data", {})
+                    items = block.get("items", [])
+                    all_items.extend(items)
+                    
+                    # Stop fetching immediately if we cross into older dates
+                    if items:
+                        last_item = items[-1]
+                        last_date_raw = get_field_local(last_item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
+                        last_dt = parse_feishu_date(last_date_raw)
+                        if last_dt and last_dt < from_dt:
+                            break 
+                    
+                    page_token = block.get("page_token")
+                    if not page_token or not block.get("has_more", False):
+                        break
+                else:
+                    fetch_complete = False
+                    stop_reason = data.get("msg")
+                    break
+            except Exception as e:
+                fetch_complete = False
+                stop_reason = str(e)
+                break
     
     results = []
     user_clean = user.strip().lower()
@@ -2036,7 +2064,7 @@ def my_requests():
         if not dt or dt < from_dt:
             continue
         
-        # Match by Respondents or Submitted By
+        # Python-side filtering (Super fast and immune to schema errors)
         respondents = extract_field_text(get_field_local(fields, "Respondents", "Submitted By", "Created By"))
         if user_clean not in respondents.lower():
             continue
