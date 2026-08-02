@@ -761,6 +761,12 @@ def _peek_newest_date(tat, table_id):
         logger.warn("peek_newest_date_failed", table=table_id, error=str(e))
     return datetime.utcnow()
 
+def _date_buckets(from_dt, to_dt, n_buckets):
+    total_seconds = max((to_dt - from_dt).total_seconds(), 1)
+    step = total_seconds / n_buckets
+    return [(from_dt + timedelta(seconds=step * i), from_dt + timedelta(seconds=step * (i + 1)))
+            for i in range(n_buckets)]
+
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
@@ -799,7 +805,36 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 
     return items, complete, reason
 
-def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=10):
+def _merge_shards(shard_results):
+    all_items, seen, master_keys = [], set(), set()
+    fetch_complete, stop_reason = True, ""
+    for items, complete, reason in shard_results:
+        if not complete:
+            fetch_complete, stop_reason = False, reason
+        for item in items:
+            rid = item.get("record_id")
+            if rid and rid not in seen:
+                seen.add(rid)
+                all_items.append(item)
+                master_keys.update(item.get("fields", {}).keys())
+    return all_items, master_keys, fetch_complete, stop_reason
+
+def _run_shards_timed(table_id, tat, shards, field_names):
+    def _timed(shard_filter):
+        t0 = time.time()
+        items, complete, reason = _fetch_bitable_shard(table_id, tat, shard_filter, field_names)
+        logger.info("shard_fetch", table=table_id, ms=int((time.time() - t0) * 1000),
+                    rows=len(items), complete=complete, reason=reason or "")
+        return items, complete, reason
+
+    with ThreadPoolExecutor(max_workers=len(shards)) as executor:
+        futures = [executor.submit(_timed, f) for f in shards]
+        return [f.result() for f in futures]
+
+REQUESTS_SHARD_COUNT = 10 
+REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
+
+def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
     """Bypassing the Bitable sharded filter that breaks on mixed column types, and explicitly filtering the results purely in Python side using `fetch_feishu_records`."""
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
@@ -808,6 +843,7 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
 
     items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
 
+    # Clean pure-Python filtering
     filtered_items = []
     for item in items:
         if from_dt or to_dt:
@@ -819,6 +855,17 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
         filtered_items.append(item)
         
     return filtered_items, keys, fetch_complete, stop_reason
+
+def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
+    if MOCK_MODE:
+        items = MockFeishuDB.generate_agency("All") * 10
+        return items, True, ""
+
+    tat = get_tenant_access_token()
+    t0 = time.time()
+    items, complete, reason = _fetch_bitable_shard(POINTS_TABLE_ID, tat, filter_obj=None, field_names=field_names)
+    logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
+    return items, complete, reason
 
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
@@ -1313,6 +1360,31 @@ def get_points_table_snapshot():
 
 
 app = Flask(__name__)
+
+# === NEW: FEISHU WEBHOOK ENDPOINT (HYBRID APPROACH) ===
+@app.route('/api/webhook/feishu', methods=['POST'])
+def feishu_webhook():
+    """Receives events from Feishu Event Subscriptions (like record updates)."""
+    data = request.json or {}
+    
+    # 1. Pass the Feishu Verification Challenge
+    if data.get("type") == "url_verification" or "challenge" in data:
+        return jsonify({"challenge": data.get("challenge")})
+        
+    # 2. Handle Record Changes (Optional but powerful)
+    # When a record changes in Feishu, we instantly trigger a background refresh
+    # so our memory cache stays perfectly up-to-date without waiting 3 minutes.
+    header = data.get("header", {})
+    event = data.get("event", {})
+    
+    if header.get("event_type") in ["bitable.application.record.created_v1", "bitable.application.record.updated_v1"]:
+        if event.get("table_id") == REQUESTS_TABLE_ID:
+            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+        elif event.get("table_id") == POINTS_TABLE_ID:
+            threading.Thread(target=_background_sync_points_table, daemon=True).start()
+            
+    # Always return 200 OK so Feishu knows we successfully received it
+    return jsonify({"code": 0, "msg": "success"}), 200
 
 @app.route('/', methods=['GET'])
 def home():
@@ -1985,19 +2057,6 @@ def my_requests():
             if data.get("code") == 0:
                 all_items = data.get("data", {}).get("items", [])
                 fetch_complete, stop_reason = True, ""
-            elif data.get("code") == 1254045:
-                # Safe fallback if a new column like "Submitted By" was recently deleted/renamed in your sheet
-                payload["filter"]["conditions"] = [
-                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                    {"field_name": "Assigned Member", "operator": "contains", "value": [user]}
-                ]
-                resp = http_requests.post(search_url, headers=headers, json=payload, timeout=15)
-                data = resp.json()
-                if data.get("code") == 0:
-                    all_items = data.get("data", {}).get("items", [])
-                    fetch_complete, stop_reason = True, ""
-                else:
-                    all_items, fetch_complete, stop_reason = [], False, data.get("msg")
             else:
                 all_items, fetch_complete, stop_reason = [], False, data.get("msg")
         except Exception as e:
@@ -2096,8 +2155,6 @@ def live_queue():
         resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
         data = resp.json()
         
-        # Smart fallback: If the exact column in Feishu is named "Status" instead of "Request Status", 
-        # this will catch the 1254045 (field not found) error and try again automatically.
         if data.get("code") == 1254045:
             payload["filter"]["conditions"][1]["field_name"] = "Status"
             resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
@@ -2105,7 +2162,6 @@ def live_queue():
             
         if data.get("code") == 0:
             items = data.get("data", {}).get("items", [])
-            # Extract just the necessary fields to keep the 5-sec poll ultra-light
             tickets = []
             for item in items:
                 fields = item.get("fields", {})
@@ -2122,13 +2178,13 @@ def live_queue():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+
 @app.route('/api/requests/update', methods=['POST'])
 def update_request():
     """Allows the agent to write status updates back to Feishu"""
-    data = request.json or {}
-    user = sanitize_text(data.get('user', ''))
-    record_id = sanitize_text(data.get('record_id', ''))
-    fields = data.get('fields', {})
+    user = sanitize_text(request.json.get('user', ''))
+    record_id = sanitize_text(request.json.get('record_id', ''))
+    fields = request.json.get('fields', {})
     
     if not user or not record_id or not fields:
         return jsonify({"success": False, "error": "Missing data"}), 400
@@ -2138,16 +2194,16 @@ def update_request():
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        # Using PUT allows us to modify the provided fields directly in the specific row
+        # Using PUT (or PATCH) updates only the specific record in Feishu
         resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=10)
-        resp_data = resp.json()
+        data = resp.json()
         
-        if resp_data.get("code") == 0:
+        if data.get("code") == 0:
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
             return jsonify({"success": True})
             
-        return jsonify({"success": False, "error": resp_data.get("msg")})
+        return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
@@ -2470,7 +2526,6 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
-        "pusher_enabled": False, # Pusher fully removed!
         "mock_mode_active": MOCK_MODE,
     })
 
