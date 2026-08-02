@@ -841,7 +841,7 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
         keys = set(items[0]["fields"].keys()) if items else set()
         return items, keys, True, ""
 
-    items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+    items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
 
     # Clean pure-Python filtering
     filtered_items = []
@@ -2001,14 +2001,15 @@ def my_requests():
         return jsonify({"error":"Access denied"}), 403
     
     _cairo_now = cairo_now()
-    from_dt = _cairo_now - timedelta(days=10)
+    # Limited to 15 days for fast live fetching
+    from_dt = _cairo_now - timedelta(days=15)
     
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(200)
         fetch_complete, stop_reason = True, ""
     else:
-        # UPDATED: Use the high-speed cache snapshot instead of synchronous fetching
-        all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=from_dt)
+        # LIVE FETCH: Bypassing background snapshot to get immediate data like Query Requests
+        all_items, master_keys, fetch_complete, stop_reason = fetch_requests_sharded(from_dt=from_dt)
     
     results = []
     user_clean = user.strip().lower()
@@ -2082,9 +2083,6 @@ def agency_list():
     allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
     allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
     
-    _cairo_now = cairo_now()
-    from_dt = _cairo_now - timedelta(days=40)
-    
     f_region = sanitize_text(request.args.get('region','')).lower()
     f_agency_code = sanitize_text(request.args.get('agency_code','')).lower()
     f_agency_name = sanitize_text(request.args.get('agency_name','')).lower()
@@ -2094,8 +2092,8 @@ def agency_list():
         all_items = MockFeishuDB.generate_requests(300)
         fetch_complete, stop_reason = True, ""
     else:
-        # UPDATED: Use the high-speed cache snapshot instead of synchronous fetching
-        all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=from_dt)
+        # Prevent timeout: Use the high-speed background cache and pull everything (removed 40-day limitation)
+        all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=None)
     
     results = []
     target_types = ["agency creation", "agency applied already by acm or bd link ( follow-up )", "applied already", "follow-up"]
@@ -2109,8 +2107,6 @@ def agency_list():
         
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
-        if not dt or dt < from_dt:
-            continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
