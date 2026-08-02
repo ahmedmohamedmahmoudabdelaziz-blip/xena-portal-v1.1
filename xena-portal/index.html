@@ -543,6 +543,20 @@
                 </div>
             </div>
 
+            <div class="nav-group" id="navGrpTickets" style="display:none">
+                <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpTickets','navBodyTickets')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
+                        <span data-i18n="ticketQueue">Ticket Queue</span>
+                    </span>
+                    <span class="nav-arr" id="navArrTickets">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyTickets">
+                    <div class="nav-item" id="nav-live-tickets" onclick="openInTab('live-tickets')"><span data-i18n="liveQueue">Live Queue</span></div>
+                </div>
+            </div>
+
             <div class="nav-group" id="navGrpAdmin" style="display:none">
                 <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
@@ -935,6 +949,14 @@
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_new_request" checked> New Request</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_my_requests" checked> My Recent Requests</label>
+                            </div>
+                        </div>
+                        <div class="module-card">
+                            <div class="module-header">
+                                <h4>🎫 Ticket Queue Module</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
                             </div>
                         </div>
                         <div class="module-card" style="border-color:var(--accent-purple)">
@@ -1451,7 +1473,7 @@
                         My Recent Requests
                     </h3>
                     <div style="font-size:.95rem;color:var(--text-muted);">
-                        Showing all requests you personally submitted in the last 10 days across all categories.
+                        Showing all requests you personally submitted in the last 15 days across all categories.
                     </div>
                 </div>
                 
@@ -1461,7 +1483,85 @@
                     <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
                         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     </div>
-                    <p style="font-size:1.1rem; font-weight:500;">No requests found in the last 10 days.</p>
+                    <p style="font-size:1.1rem; font-weight:500;">No requests found in the last 15 days.</p>
+                </div>
+            </div>
+
+            <div id="pg-live-tickets" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+                        <h3 style="color:var(--accent-cyan);margin:0; display:flex; align-items:center; gap:10px;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
+                            Live Ticket Queue
+                        </h3>
+                        <div style="display:flex;align-items:center;gap:14px">
+                            <span id="ltQueueCount" style="font-size:.85rem;color:var(--text-muted)">0 queued</span>
+                            <span id="ltConnStatus" style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-muted)">
+                                <span id="ltConnDot" style="width:8px;height:8px;border-radius:50%;background:var(--text-muted)"></span>
+                                <span id="ltConnLabel">Connecting…</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div id="ltDisabledNote" style="display:none;font-size:.78rem;color:var(--accent-amber);background:rgba(255,171,0,.08);border:1px solid rgba(255,171,0,.25);border-radius:8px;padding:8px 12px;margin-top:14px">
+                        No live Pusher connection configured yet — set <code>LT_PUSHER_KEY</code> / <code>LT_PUSHER_CLUSTER</code> in the script to go live.
+                    </div>
+                </div>
+
+                <div id="ltQueueGrid" class="qy-grid"></div>
+
+                <div id="ltEmpty" style="text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
+                    <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
+                    </div>
+                    <p style="font-size:1.1rem; font-weight:500;">No tickets in your queue yet.</p>
+                    <p style="font-size:.85rem;margin-top:6px">New tickets assigned to you will appear here in real time.</p>
+                </div>
+
+                <!-- Ticket modal, hidden until a card is clicked -->
+                <div id="ltModalOverlay" class="loading-overlay" style="display:none;z-index:600;align-items:flex-start;overflow-y:auto;padding:40px 16px">
+                    <div id="ltModalCard" class="card" style="max-width:680px;width:100%;margin:0 auto;text-align:left;max-height:none">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1px dashed var(--border)">
+                            <div>
+                                <div id="ltModalType" style="font-size:.8rem;font-weight:700;color:var(--accent-cyan)"></div>
+                                <div id="ltModalTitle" style="font-size:1.2rem;font-weight:700;margin-top:2px"></div>
+                            </div>
+                            <button onclick="ltCloseModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:4px">×</button>
+                        </div>
+
+                        <div id="ltModalFields" class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:8px"></div>
+
+                        <div style="margin-top:10px;padding-top:18px;border-top:1px solid var(--border)">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                                <h4 style="margin:0;font-size:.95rem;color:var(--text)">Processing</h4>
+                                <span id="ltDupBadge" class="qy-status-pill" style="background:rgba(255,255,255,0.05)">Not yet checked</span>
+                            </div>
+                            <div class="control-grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+                                <div class="control-group">
+                                    <label>Status</label>
+                                    <select id="ltStatus">
+                                        <option value="">-- Select --</option>
+                                        <option value="Done">Done</option>
+                                        <option value="Rejected">Rejected</option>
+                                        <option value="Under Investigation">Under Investigation</option>
+                                    </select>
+                                </div>
+                                <div class="control-group">
+                                    <label>Reject Reason</label>
+                                    <input type="text" id="ltRejectReason" placeholder="Only if rejecting…">
+                                </div>
+                            </div>
+                            <div class="control-group" style="margin-bottom:6px">
+                                <label>Audition Note</label>
+                                <textarea id="ltAuditionNote" rows="3" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.9rem;font-family:inherit;resize:vertical"></textarea>
+                            </div>
+                            <div id="ltModalError" style="display:none;font-size:.78rem;color:var(--accent-rose);background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.25);border-radius:8px;padding:8px 12px;margin-top:8px"></div>
+                        </div>
+
+                        <div style="display:flex;justify-content:space-between;gap:12px;margin-top:20px">
+                            <button class="btn" id="ltVerifyBtn" onclick="ltVerify()" style="width:auto;padding:10px 18px;background:var(--surface-hover);color:var(--text);border:1px solid var(--border)">🔄 Verify</button>
+                            <button class="btn btn-primary" id="ltResolveBtn" onclick="ltResolve()" style="width:auto;padding:10px 22px">✅ Submit &amp; Resolve</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1622,7 +1722,8 @@ const pageTitlesMap = {
     'query': 'Universal Query',
     'agency-list': 'Agency List',
     'new-request': 'New Request',
-    'my-requests': 'My Recent Requests'
+    'my-requests': 'My Recent Requests',
+    'live-tickets': 'Live Ticket Queue'
 };
 
 const zhPageTitlesMap = {
@@ -1640,12 +1741,13 @@ const zhPageTitlesMap = {
     'query': '通用查询',
     'agency-list': '机构列表',
     'new-request': '新请求',
-    'my-requests': '我的最近请求'
+    'my-requests': '我的最近请求',
+    'live-tickets': '实时工单队列'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests','pg-live-tickets'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -1802,6 +1904,10 @@ function executePageLogic(page) {
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
         loadMyRequests(); // fetch user requests on load
+    } else if(page==='live-tickets'){
+        document.getElementById('pg-live-tickets').style.display='block';
+        _expandNavGroup('navBodyTickets','navArrTickets');
+        initLiveTicketWorkspace();
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
@@ -2371,7 +2477,7 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests'].forEach(key => {
+     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(key => {
         const master = key.split('_')[0];
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
@@ -2448,7 +2554,7 @@ async function addAgent() {
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests'].forEach(m => {
+     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
         if(document.getElementById(`mod_${m}`).checked) modules.push(m);
     });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
@@ -4091,6 +4197,10 @@ function configureSidebarAndCards() {
         if (!hasExactMod('submit_my_requests') && !hasExactMod('submit')) { const el=document.getElementById('nav-my-requests'); if (el) el.style.display = 'none'; }
     }
 
+    if (hasExactMod('tickets_live_queue') || hasExactMod('tickets') || isAdmin) {
+        document.getElementById('navGrpTickets').style.display = 'block';
+    }
+
     if (isAdmin) document.getElementById('navGrpAdmin').style.display = 'block';
 
     const icons = {
@@ -4181,6 +4291,279 @@ async function loadMyRequests() {
 }
 
 let alDebounceTimer = null;
+
+// ════════════════════════════════════════════════════════════════════
+// LIVE TICKET WORKSPACE (vanilla JS port of the React component)
+// ════════════════════════════════════════════════════════════════════
+
+// Fill these in with your real Pusher app credentials to go live.
+// Leave LT_PUSHER_KEY as-is to keep the page in "preview" mode (no live connection).
+const LT_PUSHER_KEY = "YOUR_PUSHER_APP_KEY";
+const LT_PUSHER_CLUSTER = "ap1";
+const LT_CHANNEL_NAME = "tickets-channel";
+const LT_EVENT_NAME = "new-ticket";
+
+// Mirrors the same 18 request types used in the submission form, so tickets show
+// exactly the fields that were actually collected. Adjust key names on the left
+// if your actual ticket payload differs from these snake_case assumptions.
+const LT_FIELD_MAP = {
+    "Agency Creation": [["region","Region"],["user_id","User ID"],["agency_name","Agency Name"],["applier_real_name","Applier Real Name"],["otherapp_name","Otherapp Name"],["otherapp_id","Otherapp ID"],["country","Country"],["whatsapp_number","Whatsapp Number"],["nid_number","NID Number"],["agency_type","Agency Type"],["bd_code","Bd Code"],["acm","ACM"]],
+    "Agency applied already by ACM or BD link ( follow-up )": [["region","Region"],["user_id","User ID"],["acm","ACM"]],
+    "Closing Agency": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["acm","ACM"],["closing_reason","Closing Reason"],["new_id","New ID"],["old_id","Old ID"],["reporter_id","Reporter ID"]],
+    "BD Creation": [["region","Region"],["user_id","User ID"],["applier_real_name","Applier Real Name"],["bd_nickname","BD Nickname"],["email_address","Email Address"],["bd_hunted_agency_code","BD Hunted Agency Code"],["country","Country"],["whatsapp_number","Whatsapp Number"],["nid_number","NID Number"],["acm","ACM"]],
+    "Remove BD ": [["region","Region"],["user_id","User ID"],["acm","ACM"],["closing_reason","Reason"]],
+    "Agency Target Privilege": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["target","Target"],["privilege","Privilege"]],
+    "Agency Point Request": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["agency_point_privilege","Agency Point Privilege"]],
+    "Change agency name ": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["new_agency_name","New Agency Name"]],
+    "Change Agency Manger ID (with same owner)": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["current_agency_manager_name","Current Agency Manager Name"],["new_agency_owner_id","New Agency Owner ID"]],
+    "Change Agency Ownership ": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["new_agency_owner_id","New Agency Owner ID"],["new_agency_owner_name","New Agency Owner Name"]],
+    "Merge agencies": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["agency_to_be_merged_and_closed","Agency To Merge & Close"]],
+    "Add & Remove Host Sign": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["type_of_action_host_sign","Action"]],
+    "Add & Remove games": [["region","Region"],["user_id","User ID"],["type_of_action_2","Action"]],
+    "Add & Change Short ID": [["region","Region"],["user_id","User ID"],["new_short_id","New Short ID"],["vip_level","VIP Level"]],
+    "Remove short ID (only by user approve )": [["region","Region"],["user_id","User ID"]],
+    "Welcome Package": [["region","Region"],["user_id","User ID"],["wealth_level","Wealth Level"]],
+    "App Rating Reward": [["region","Region"],["user_id","User ID"]],
+    "Room Pinup (Only for the famous KOLS)": [["region","Region"],["user_id","User ID"]],
+};
+const LT_ALWAYS_SHOW = [["applier_note","Applier Note"]];
+
+let ltQueue = [];
+let ltActiveTicket = null;
+let ltPusherInstance = null;
+let ltInitialized = false;
+
+function ltFieldsForTicket(ticket) {
+    const mapped = LT_FIELD_MAP[ticket.request_type];
+    if (mapped) return mapped;
+    // Fallback: show any simple (non-object) field the backend sent that isn't
+    // one of the processing/meta fields already rendered elsewhere in the modal.
+    const skip = new Set(['status','reject_reason','audition_note','duplicated_check','record_id','request_type','assigned_member']);
+    return Object.keys(ticket)
+        .filter(k => !skip.has(k) && typeof ticket[k] !== 'object' && ticket[k] !== '' && ticket[k] != null)
+        .map(k => [k, k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase())]);
+}
+
+function ltDupClass(value) {
+    const v = (value || '').toString().trim();
+    if (/dup/i.test(v)) return 'style="background:rgba(255,82,82,.12);color:var(--accent-rose);border-color:rgba(255,82,82,.3)"';
+    if (/no|clear|unique/i.test(v)) return 'style="background:rgba(0,230,118,.12);color:var(--accent-green);border-color:rgba(0,230,118,.3)"';
+    return 'style="background:rgba(255,255,255,0.05);color:var(--text-muted)"';
+}
+
+function ltRenderQueue() {
+    const grid = document.getElementById('ltQueueGrid');
+    const empty = document.getElementById('ltEmpty');
+    const countEl = document.getElementById('ltQueueCount');
+    if (countEl) countEl.textContent = `${ltQueue.length} queued`;
+
+    if (!ltQueue.length) {
+        if (grid) grid.innerHTML = '';
+        if (empty) empty.style.display = 'block';
+        return;
+    }
+    if (empty) empty.style.display = 'none';
+    if (grid) grid.innerHTML = ltQueue.map(t => `
+        <div class="qy-card" style="cursor:pointer" onclick="ltOpenTicket('${escHtml(t.record_id || t.id || '')}')">
+            <div class="qy-card-head">
+                <div>
+                    <div class="qy-card-num" style="color:var(--accent-cyan);font-size:.75rem;font-weight:700">${escHtml(t.request_type || 'Request')}</div>
+                    <div class="qy-card-type" style="font-weight:600;margin-top:2px">${escHtml(t.agency_code || t.user_id || '#'+String(t.record_id||'').slice(-6))}</div>
+                </div>
+                <span class="qy-status-pill" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">new</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:6px">
+                👤 ${escHtml(t.assigned_member || 'Unassigned')}
+            </div>
+        </div>
+    `).join('');
+}
+
+function ltOpenTicket(recordId) {
+    const ticket = ltQueue.find(t => (t.record_id || t.id) === recordId);
+    if (!ticket) return;
+    ltActiveTicket = ticket;
+
+    document.getElementById('ltModalType').textContent = ticket.request_type || '';
+    document.getElementById('ltModalTitle').textContent = ticket.agency_code || ticket.user_id || 'Ticket';
+
+    const fieldsEl = document.getElementById('ltModalFields');
+    const rows = [...ltFieldsForTicket(ticket), ...LT_ALWAYS_SHOW]
+        .filter(([k]) => ticket[k] !== undefined && ticket[k] !== null && ticket[k] !== '')
+        .map(([k, label]) => {
+            let v = ticket[k];
+            if (Array.isArray(v)) v = v.map(x => (typeof x === 'object' ? (x.name || x.url || JSON.stringify(x)) : x)).join(', ');
+            return `<div class="control-group" style="margin-bottom:2px">
+                <label style="font-size:.68rem">${escHtml(label)}</label>
+                <div style="font-size:.9rem;color:var(--text);padding:2px 0;word-break:break-word">${escHtml(String(v))}</div>
+            </div>`;
+        }).join('');
+    fieldsEl.innerHTML = rows || '<div style="color:var(--text-muted);font-size:.85rem">No details available.</div>';
+
+    document.getElementById('ltStatus').value = ticket.status || '';
+    document.getElementById('ltRejectReason').value = ticket.reject_reason || '';
+    document.getElementById('ltAuditionNote').value = ticket.audition_note || '';
+    const badge = document.getElementById('ltDupBadge');
+    badge.textContent = ticket.duplicated_check || 'Not yet checked';
+    badge.setAttribute('style', ltDupClass(ticket.duplicated_check));
+    document.getElementById('ltModalError').style.display = 'none';
+
+    document.getElementById('ltModalOverlay').style.display = 'flex';
+}
+
+function ltCloseModal() {
+    document.getElementById('ltModalOverlay').style.display = 'none';
+    ltActiveTicket = null;
+}
+
+function ltShowModalError(msg) {
+    const el = document.getElementById('ltModalError');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+function ltCurrentPayload() {
+    return {
+        record_id: ltActiveTicket.record_id || ltActiveTicket.id,
+        status: document.getElementById('ltStatus').value,
+        reject_reason: document.getElementById('ltRejectReason').value,
+        audition_note: document.getElementById('ltAuditionNote').value,
+    };
+}
+
+async function ltSaveProgress(payload) {
+    const res = await fetch('/api/requests/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) { let d={}; try{d=await res.json();}catch(e){} throw new Error(d.error || `Save failed (${res.status})`); }
+    try { return await res.json(); } catch(e) { return {}; }
+}
+
+function ltWait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function ltVerify() {
+    if (!ltActiveTicket) return;
+    const btn = document.getElementById('ltVerifyBtn');
+    btn.disabled = true; btn.textContent = '⏳ Verifying…';
+    document.getElementById('ltModalError').style.display = 'none';
+
+    try {
+        // 1. Save whatever the agent has entered so far
+        await ltSaveProgress(ltCurrentPayload());
+
+        // 2. Give the backend's duplicate-check formulas time to recalculate
+        await ltWait(4000);
+
+        // 3. Pull the fresh record back
+        const res = await fetch(`/api/requests/single?record_id=${encodeURIComponent(ltActiveTicket.record_id || ltActiveTicket.id)}`);
+        if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+        const fresh = await res.json();
+
+        // 4. Reflect the updated duplicate-check result (and merge anything else that changed)
+        Object.assign(ltActiveTicket, fresh);
+        ltQueue = ltQueue.map(t => (t.record_id||t.id) === (ltActiveTicket.record_id||ltActiveTicket.id) ? {...t, ...fresh} : t);
+
+        const badge = document.getElementById('ltDupBadge');
+        badge.textContent = ltActiveTicket.duplicated_check || 'Not yet checked';
+        badge.setAttribute('style', ltDupClass(ltActiveTicket.duplicated_check));
+        ToastManager.show('Verified — record refreshed.', 'success');
+    } catch (e) {
+        ltShowModalError(e.message || 'Verify failed');
+    } finally {
+        btn.disabled = false; btn.textContent = '🔄 Verify';
+    }
+}
+
+async function ltResolve() {
+    if (!ltActiveTicket) return;
+    const status = document.getElementById('ltStatus').value;
+    if (!status) { ltShowModalError('Choose a Status before resolving.'); return; }
+
+    const btn = document.getElementById('ltResolveBtn');
+    btn.disabled = true; btn.textContent = '⏳ Submitting…';
+    document.getElementById('ltModalError').style.display = 'none';
+
+    try {
+        await ltSaveProgress(ltCurrentPayload());
+        const rid = ltActiveTicket.record_id || ltActiveTicket.id;
+        ltQueue = ltQueue.filter(t => (t.record_id||t.id) !== rid);
+        ltRenderQueue();
+        ltCloseModal();
+        ToastManager.show('Ticket resolved.', 'success');
+    } catch (e) {
+        ltShowModalError(e.message || 'Resolve failed');
+    } finally {
+        btn.disabled = false; btn.textContent = '✅ Submit & Resolve';
+    }
+}
+
+function ltSetConnStatus(status) {
+    const dot = document.getElementById('ltConnDot');
+    const label = document.getElementById('ltConnLabel');
+    const disabledNote = document.getElementById('ltDisabledNote');
+    const map = {
+        connecting: ['var(--accent-amber)', 'Connecting…'],
+        connected:  ['var(--accent-green)', 'Live'],
+        error:      ['var(--accent-rose)', 'Connection error'],
+        disabled:   ['var(--text-muted)', 'Offline (preview)'],
+    };
+    const [color, text] = map[status] || map.disabled;
+    if (dot) dot.style.background = color;
+    if (label) label.textContent = text;
+    if (disabledNote) disabledNote.style.display = (status === 'disabled') ? 'block' : 'none';
+}
+
+function ltHandleIncoming(payload) {
+    if (!payload) return;
+    if (payload.assigned_member && payload.assigned_member !== loggedUser) return;
+    const id = payload.record_id || payload.id;
+    if (ltQueue.some(t => (t.record_id||t.id) === id)) return;
+    ltQueue.unshift(payload);
+    ltRenderQueue();
+    ToastManager.show(`New ticket: ${payload.request_type || 'Request'}`, 'info');
+}
+
+function ltConnectPusher() {
+    if (LT_PUSHER_KEY === 'YOUR_PUSHER_APP_KEY') { ltSetConnStatus('disabled'); return; }
+
+    function doConnect() {
+        if (!window.Pusher) { ltSetConnStatus('error'); return; }
+        try {
+            ltPusherInstance = new window.Pusher(LT_PUSHER_KEY, { cluster: LT_PUSHER_CLUSTER });
+            const channel = ltPusherInstance.subscribe(LT_CHANNEL_NAME);
+            channel.bind(LT_EVENT_NAME, ltHandleIncoming);
+            ltPusherInstance.connection.bind('connected', () => ltSetConnStatus('connected'));
+            ltPusherInstance.connection.bind('error', () => ltSetConnStatus('error'));
+        } catch (e) {
+            ltSetConnStatus('error');
+        }
+    }
+
+    if (window.Pusher) { doConnect(); return; }
+    const existing = document.querySelector('script[data-pusher-loader="true"]');
+    const script = existing || document.createElement('script');
+    if (!existing) {
+        script.src = 'https://js.pusher.com/8.4/pusher.min.js';
+        script.async = true;
+        script.dataset.pusherLoader = 'true';
+        document.head.appendChild(script);
+    }
+    script.addEventListener('load', doConnect);
+    script.addEventListener('error', () => ltSetConnStatus('error'));
+}
+
+function initLiveTicketWorkspace() {
+    ltRenderQueue();
+    if (!ltInitialized) {
+        ltInitialized = true;
+        ltSetConnStatus('connecting');
+        ltConnectPusher();
+    }
+}
+
+
 function alDebounce() {
     clearTimeout(alDebounceTimer);
     alDebounceTimer = setTimeout(() => alFetch(), 400);
