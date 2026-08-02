@@ -2451,7 +2451,8 @@ def ticket_webhook():
         
     if not pusher_client:
         logger.error("pusher_webhook_failed", error="Pusher keys missing or pusher module not installed.")
-        return jsonify({"error": "Pusher not configured"}), 500
+        # Fast exit, but return 200 so Feishu doesn't retry and timeout
+        return jsonify({"success": False, "error": "Pusher not configured"}), 200
         
     try:
         # Feishu automation will send us the specific record data. 
@@ -2461,11 +2462,13 @@ def ticket_webhook():
         pusher_client.trigger('tickets-channel', 'new-ticket', ticket_data)
         
         logger.info("pusher_event_triggered", channel="tickets-channel")
+        # Fast exit
         return jsonify({"success": True})
         
     except Exception as e:
         logger.error("pusher_webhook_failed", error=str(e))
-        return jsonify({"error": str(e)}), 500
+        # Return 200 even on error so Feishu marks it 'delivered' and stops timing out/retrying
+        return jsonify({"success": False, "error": str(e)}), 200
 
 
 @app.route('/api/health', methods=['GET'])
@@ -2493,9 +2496,6 @@ def health():
         "pusher_enabled": pusher_client is not None,
         "mock_mode_active": MOCK_MODE,
     })
-
-ensure_background_sync_started()
-ensure_points_sync_started()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
