@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, request, jsonify, send_file, redirect
+from flask import Flask, request, jsonify, send_file, redirect, Response
 import requests as http_requests
 
 APP_ID       = os.environ.get("LARK_APP_ID")
@@ -481,6 +481,17 @@ def extract_field_text(field_data):
             else: texts.append(str(item))
         return " ".join(texts).strip()
     return str(field_data)
+
+def extract_attachments(field_data):
+    """For Attachment-type fields: returns [{name, url}] where url points at our own
+    proxy endpoint (so the browser never needs the Feishu tenant token directly)."""
+    if not field_data or not isinstance(field_data, list): return []
+    out = []
+    for item in field_data:
+        if isinstance(item, dict) and item.get("file_token"):
+            out.append({"name": item.get("name", "file"), "url": f"/api/attachments/{item['file_token']}"})
+    return out
+
 
 def extract_field_list(field_data):
     if not field_data: return []
@@ -2041,10 +2052,15 @@ def my_requests():
         fetch_complete, stop_reason = True, ""
     else:
         tat = get_tenant_access_token()
-        search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
         headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-        
-        # OFF-LOAD FILTERING TO FEISHU: Instantly fetch only records associated with this agent
+        all_items, fetch_complete, stop_reason = [], True, ""
+
+        # ATTEMPT 1: offload filtering to Feishu (fast path). Restricted to field types
+        # Feishu's filter API reliably supports "contains" on: Text, and CreatedUser
+        # rendered as text. User-type (Assigned Member) and Formula-type (Created By)
+        # fields are known to trip "InvalidFilter" with this operator, so they're
+        # deliberately excluded from the server-side filter and left to the fallback.
+        search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
         payload = {
             "page_size": 500,
             "filter": {
@@ -2052,23 +2068,64 @@ def my_requests():
                 "conditions": [
                     {"field_name": "Submitted By", "operator": "contains", "value": [user]},
                     {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                    {"field_name": "Created By", "operator": "contains", "value": [user]},
-                    {"field_name": "Assigned Member", "operator": "contains", "value": [user]}
                 ]
             },
             "sort": [{"field_name": "Numbering", "desc": True}]
         }
-        
+        used_fallback = False
         try:
             resp = http_requests.post(search_url, headers=headers, json=payload, timeout=15)
             data = resp.json()
             if data.get("code") == 0:
                 all_items = data.get("data", {}).get("items", [])
-                fetch_complete, stop_reason = True, ""
             else:
-                all_items, fetch_complete, stop_reason = [], False, data.get("msg")
+                used_fallback = True
+                logger.warn("my_requests_filter_rejected", code=data.get("code"), msg=data.get("msg"))
         except Exception as e:
-            all_items, fetch_complete, stop_reason = [], False, str(e)
+            used_fallback = True
+            logger.warn("my_requests_filter_exception", error=str(e))
+
+        # ATTEMPT 2 (fallback): sort-only + wall-clock-bounded pagination + Python-side
+        # filter. Slower per-call but immune to Feishu's filter-format quirks entirely.
+        if used_fallback:
+            list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+            session = http_requests.Session()
+            session.headers.update(headers)
+            page_token = None
+            _fetch_start = time.time()
+            _time_budget = 40
+            user_clean = user.strip().lower()
+
+            while time.time() - _fetch_start < _time_budget:
+                params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+                if page_token: params["page_token"] = page_token
+                try:
+                    resp = session.get(list_url, params=params, timeout=12)
+                    data = resp.json()
+                    if data.get("code") != 0:
+                        fetch_complete, stop_reason = False, data.get("msg")
+                        break
+                    block = data.get("data", {})
+                    items = block.get("items", [])
+                    for it in items:
+                        f = it.get("fields", {})
+                        sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
+                        rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+                        if user_clean in sb or user_clean in rp:
+                            all_items.append(it)
+                    if items:
+                        last_date_raw = get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
+                        last_dt = parse_feishu_date(last_date_raw)
+                        if last_dt and last_dt < from_dt:
+                            break
+                    page_token = block.get("page_token")
+                    if not page_token or not block.get("has_more", False):
+                        break
+                except Exception as e:
+                    fetch_complete, stop_reason = False, str(e)
+                    break
+            else:
+                fetch_complete, stop_reason = False, "time_budget_exceeded"
     
     results = []
     
@@ -2511,6 +2568,117 @@ def debug_data_status():
         "candidate_paths_points": _candidate_data_paths("points.json"),
         "self_base_url_env": SELF_BASE_URL or None,
     })
+
+# Maps Feishu field names -> the flat snake_case keys the Live Ticket Queue UI expects
+# (same convention used in the frontend's LT_FIELD_MAP). Keeping this as one dict makes
+# it easy to extend if new fields need to show up in the ticket workspace.
+TICKET_FIELD_KEY_MAP = {
+    "Region": "region", "User ID": "user_id", "Agency Code": "agency_code",
+    "Agency Name": "agency_name", "Applier real name": "applier_real_name",
+    "Otherapp Name": "otherapp_name", "Otherapp ID": "otherapp_id", "Country": "country",
+    "Whatsapp Number": "whatsapp_number", "NID Number": "nid_number", "Agency Type": "agency_type",
+    "Bd Code": "bd_code", "Acm Name (PK)": "acm", "Acm Name (IN)": "acm",
+    "Closing Reason": "closing_reason", "New ID": "new_id", "Old ID": "old_id",
+    "Reporter ID": "reporter_id", "BD Nickname": "bd_nickname", "Email Adress": "email_address",
+    "BD Hunted Agency Code": "bd_hunted_agency_code", "Target": "target", "Privilege": "privilege",
+    "Agency Point Privilege": "agency_point_privilege", "New agency name": "new_agency_name",
+    "Current agency manger name (same in NID )": "current_agency_manager_name",
+    "New agency owner ID": "new_agency_owner_id", "New agency owner Name": "new_agency_owner_name",
+    "Agency to be merged and closed": "agency_to_be_merged_and_closed",
+    "Type of Action Host sign": "type_of_action_host_sign", "Type of Action 2": "type_of_action_2",
+    "New Short ID": "new_short_id", "Wealth Level": "wealth_level", "Vip Level": "vip_level",
+    "Applier Note": "applier_note",
+}
+TICKET_ATTACHMENT_FIELDS = ["Evidence Screen", "Evidence Screen 2", "NID & Otherapp Screen", "New and old onwer National IDS (Both NID)"]
+
+def build_ticket_payload(item):
+    """Flattens a raw Feishu record into the shape the Live Ticket Queue frontend expects."""
+    fields = item.get("fields", {})
+    ticket = {"record_id": item.get("record_id")}
+    for feishu_name, key in TICKET_FIELD_KEY_MAP.items():
+        val = extract_field_text(fields.get(feishu_name))
+        if val:
+            ticket[key] = val
+    for att_field in TICKET_ATTACHMENT_FIELDS:
+        pics = extract_attachments(fields.get(att_field))
+        if pics:
+            ticket.setdefault("attachments", []).extend(pics)
+    ticket["request_type"] = extract_field_text(get_field_local(fields, "Request Type", "Type"))
+    ticket["assigned_member"] = extract_field_text(get_field_local(fields, "Assigned Member"))
+    ticket["status"] = extract_field_text(get_field_local(fields, "Status"))
+    ticket["reject_reason"] = extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason"))
+    ticket["audition_note"] = extract_field_text(get_field_local(fields, "Audition note", "Audition Note"))
+    ticket["duplicated_check"] = extract_field_text(get_field_local(fields, "Duplicated Check"))
+    return ticket
+
+@app.route('/api/attachments/<file_token>', methods=['GET'])
+def proxy_attachment(file_token):
+    """Streams a Feishu attachment back through our own server so the browser never
+    needs the tenant token directly (Feishu's raw attachment URLs require Bearer auth)."""
+    user = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("modules") and not perms.get("is_super_admin"):
+        return jsonify({"error": "Access denied"}), 403
+    try:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, stream=True)
+        if resp.status_code != 200:
+            return jsonify({"error": "Could not fetch attachment"}), 502
+        return Response(resp.content, content_type=resp.headers.get("Content-Type", "application/octet-stream"))
+    except Exception as e:
+        logger.error("attachment_proxy_failed", file_token=file_token, error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tickets/pull-assigned', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def pull_assigned_ticket():
+    """Manual 'pull' alternative to the live push feed: looks up whatever's currently
+    assigned to this agent with Request Status = In Progress, right now, on demand."""
+    user = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("tickets" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+    if not user:
+        return jsonify({"error": "Missing user"}), 400
+
+    if MOCK_MODE:
+        return jsonify({"tickets": []})
+
+    tat = get_tenant_access_token()
+    list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    session = http_requests.Session()
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+
+    user_clean = user.strip().lower()
+    matches = []
+    page_token = None
+    _start = time.time()
+    while time.time() - _start < 35:
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        if page_token: params["page_token"] = page_token
+        try:
+            resp = session.get(list_url, params=params, timeout=12)
+            data = resp.json()
+            if data.get("code") != 0:
+                break
+            block = data.get("data", {})
+            for it in block.get("items", []):
+                f = it.get("fields", {})
+                assigned = extract_field_text(get_field_local(f, "Assigned Member")).lower()
+                status = extract_field_text(get_field_local(f, "Request Status")).strip().lower()
+                if user_clean in assigned and status == "in progress":
+                    matches.append(build_ticket_payload(it))
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False) or len(matches) >= 20:
+                break
+        except Exception as e:
+            logger.error("pull_assigned_failed", error=str(e))
+            break
+
+    return jsonify({"tickets": matches})
 
 @app.route('/api/health', methods=['GET'])
 def health():
