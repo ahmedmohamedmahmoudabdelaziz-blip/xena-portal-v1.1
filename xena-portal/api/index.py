@@ -10,6 +10,12 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, send_file, redirect
 import requests as http_requests
 
+# === NEW: PUSHER IMPORT ===
+try:
+    import pusher
+except ImportError:
+    pusher = None
+
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
 REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
@@ -70,6 +76,17 @@ MONTHLY_ALLOCATOR_LIMITS = {
 ORDER_TYPE_LIMITS = {
     "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
+
+# === NEW: PUSHER INITIALIZATION ===
+pusher_client = None
+if pusher and os.environ.get("PUSHER_APP_ID"):
+    pusher_client = pusher.Pusher(
+        app_id=os.environ.get("PUSHER_APP_ID"),
+        key=os.environ.get("PUSHER_KEY"),
+        secret=os.environ.get("PUSHER_SECRET"),
+        cluster=os.environ.get("PUSHER_CLUSTER"),
+        ssl=True
+    )
 
 # ════════════════════════════════════════════════════════════════════
 # CORE UTILITIES & TIMEZONE MANAGEMENT
@@ -1433,7 +1450,7 @@ def search():
         return jsonify({"found": False, "error": f"Access Denied: You do not have permission to view {qtype.title()}."}), 403
 
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get(qtype,["all"])
-    allowed_regs = perms.get("permissions",{}).get("regions",{}).get(qtype,["all"])
+    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
 
     data = fetch_agency_data(code, qtype, allowed_acms, allowed_regs)
     
@@ -2017,30 +2034,35 @@ def my_requests():
         page_token = None
         fetch_complete = True
         stop_reason = ""
-        
-        # TARGETED LIVE FETCH: Ask Feishu for pages sorted by newest first.
-        # This completely avoids Bitable "filter" format errors on Person arrays
-        # Fast exit max 5 pages (~2500 requests) or immediately when spotting a 15-day old request
-        for _ in range(5):
+        _fetch_start = time.time()
+        _time_budget = 40  # stay well under Vercel's 60s maxDuration, leaving room for the Python-side filter pass below
+
+        # TARGETED LIVE FETCH: Ask Feishu for pages sorted by newest first (Numbering is an
+        # auto-increment serial, so DESC order is a reliable proxy for recency without needing
+        # a date filter). This completely avoids Bitable "filter" format errors on Person arrays.
+        # Bounded by wall-clock time, not just a fixed page count, so a busy day (lots of
+        # records inside the 15-day window) can't push this past Vercel's function timeout -
+        # we always return valid JSON, worst case with fetch_complete=False for a partial result.
+        while time.time() - _fetch_start < _time_budget:
             params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
             if page_token: params["page_token"] = page_token
-                
+
             try:
-                resp = session.get(url, params=params, timeout=10)
+                resp = session.get(url, params=params, timeout=12)
                 data = resp.json()
                 if data.get("code") == 0:
                     block = data.get("data", {})
                     items = block.get("items", [])
                     all_items.extend(items)
-                    
+
                     # Stop fetching immediately if we cross into older dates
                     if items:
                         last_item = items[-1]
                         last_date_raw = get_field_local(last_item.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
                         last_dt = parse_feishu_date(last_date_raw)
                         if last_dt and last_dt < from_dt:
-                            break 
-                    
+                            break
+
                     page_token = block.get("page_token")
                     if not page_token or not block.get("has_more", False):
                         break
@@ -2052,6 +2074,10 @@ def my_requests():
                 fetch_complete = False
                 stop_reason = str(e)
                 break
+        else:
+            # Loop exited because we hit the time budget, not because we naturally finished
+            fetch_complete = False
+            stop_reason = "time_budget_exceeded"
     
     results = []
     user_clean = user.strip().lower()
@@ -2064,9 +2090,16 @@ def my_requests():
         if not dt or dt < from_dt:
             continue
         
-        # Python-side filtering (Super fast and immune to schema errors)
-        respondents = extract_field_text(get_field_local(fields, "Respondents", "Submitted By", "Created By"))
-        if user_clean not in respondents.lower():
+        # Python-side filtering (Super fast and immune to schema errors).
+        # IMPORTANT: check "Submitted By" first - that's the field the portal itself sets to
+        # the real submitting agent. "Respondents"/"Created By" are Feishu-managed fields that
+        # always reflect the app's own bot identity (since writes go through a shared tenant
+        # token), not the individual agent, so they're only useful as a fallback for older
+        # records created before "Submitted By" existed.
+        submitted_by = extract_field_text(get_field_local(fields, "Submitted By"))
+        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
+        match_source = submitted_by or respondents
+        if user_clean not in match_source.lower():
             continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
@@ -2082,7 +2115,7 @@ def my_requests():
             "numbering": extract_field_text(get_field_local(fields, "Numbering")),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
             "submitted_on": dt.strftime("%Y-%m-%d") if dt else extract_field_text(raw_date),
-            "respondents": respondents,
+            "respondents": submitted_by or respondents,
             "user_id": extract_field_text(get_field_local(fields, "User ID")),
             "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
             "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
@@ -2406,6 +2439,35 @@ def debug_data_status():
         "self_base_url_env": SELF_BASE_URL or None,
     })
 
+# === NEW: PUSHER WEBHOOK ENDPOINT ===
+@app.route('/api/webhook/ticket-assigned', methods=['POST'])
+def ticket_webhook():
+    """Receives data from Feishu Bitable Automation when a ticket is assigned, and pushes it to the Website."""
+    data = request.json or {}
+    
+    # Feishu initially sends a "challenge" string when setting up webhooks to verify ownership.
+    if "challenge" in data:
+        return jsonify({"challenge": data["challenge"]})
+        
+    if not pusher_client:
+        logger.error("pusher_webhook_failed", error="Pusher keys missing or pusher module not installed.")
+        return jsonify({"error": "Pusher not configured"}), 500
+        
+    try:
+        # Feishu automation will send us the specific record data. 
+        # We pass it immediately to Pusher on the "tickets" channel.
+        ticket_data = data.get("ticket_data", data) 
+        
+        pusher_client.trigger('tickets-channel', 'new-ticket', ticket_data)
+        
+        logger.info("pusher_event_triggered", channel="tickets-channel")
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        logger.error("pusher_webhook_failed", error=str(e))
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/health', methods=['GET'])
 def health():
     with _bg_sync_lock:
@@ -2428,6 +2490,7 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
+        "pusher_enabled": pusher_client is not None,
         "mock_mode_active": MOCK_MODE,
     })
 
