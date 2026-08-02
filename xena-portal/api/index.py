@@ -1362,29 +1362,37 @@ def get_points_table_snapshot():
 app = Flask(__name__)
 
 # === NEW: FEISHU WEBHOOK ENDPOINT (HYBRID APPROACH) ===
-@app.route('/api/webhook/feishu', methods=['POST'])
+@app.route('/api/webhook/feishu', methods=['GET', 'POST'])
 def feishu_webhook():
     """Receives events from Feishu Event Subscriptions (like record updates)."""
-    data = request.json or {}
-    
-    # 1. Pass the Feishu Verification Challenge
-    if data.get("type") == "url_verification" or "challenge" in data:
-        return jsonify({"challenge": data.get("challenge")})
+    try:
+        # force=True guarantees Flask reads the payload even if Feishu sends unusual HTTP headers
+        # silent=True prevents Flask from crashing if the payload is empty
+        data = request.get_json(force=True, silent=True) or {}
         
-    # 2. Handle Record Changes (Optional but powerful)
-    # When a record changes in Feishu, we instantly trigger a background refresh
-    # so our memory cache stays perfectly up-to-date without waiting 3 minutes.
-    header = data.get("header", {})
-    event = data.get("event", {})
-    
-    if header.get("event_type") in ["bitable.application.record.created_v1", "bitable.application.record.updated_v1"]:
-        if event.get("table_id") == REQUESTS_TABLE_ID:
-            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
-        elif event.get("table_id") == POINTS_TABLE_ID:
-            threading.Thread(target=_background_sync_points_table, daemon=True).start()
+        # 1. Pass the Feishu Verification Challenge instantly
+        if "challenge" in data:
+            return jsonify({"challenge": data["challenge"]})
             
-    # Always return 200 OK so Feishu knows we successfully received it
-    return jsonify({"code": 0, "msg": "success"}), 200
+        # 2. Handle Record Changes (Optional but powerful)
+        # When a record changes in Feishu, we instantly trigger a background refresh
+        # so our memory cache stays perfectly up-to-date without waiting 3 minutes.
+        header = data.get("header", {})
+        event = data.get("event", {})
+        
+        if header.get("event_type") in ["bitable.application.record.created_v1", "bitable.application.record.updated_v1"]:
+            if event.get("table_id") == REQUESTS_TABLE_ID:
+                threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+            elif event.get("table_id") == POINTS_TABLE_ID:
+                threading.Thread(target=_background_sync_points_table, daemon=True).start()
+                
+        # Always return 200 OK so Feishu knows we successfully received it
+        return jsonify({"code": 0, "msg": "success"}), 200
+        
+    except Exception as e:
+        logger.error("webhook_parsing_error", error=str(e))
+        # Even if parsing fails completely, reply 200 so Feishu doesn't timeout/block us
+        return jsonify({"code": 0, "msg": "success"}), 200
 
 @app.route('/', methods=['GET'])
 def home():
