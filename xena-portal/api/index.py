@@ -1609,7 +1609,7 @@ def audit_logs():
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
-    """Handles new record submissions, uploads attachments directly to Feishu, and writes to DB."""
+    """Handles new record submissions, uploads attachments safely, and writes to DB using a Hybrid Approach."""
     user = sanitize_text(request.form.get('user', ''))
     email = sanitize_text(request.form.get('email', ''))
     uat = request.form.get('uat', '')
@@ -1640,7 +1640,9 @@ def submit_request():
             if val not in (None, "", []):
                 final_fields[key] = val
 
-    # 2. Upload any sent attachments safely to Bitable 
+    # 2. Upload any sent attachments safely to Bitable
+    # Attachments fallback to TAT automatically if UAT lacks permission to Drive API,
+    # as file ownership doesn't affect the record's "Created By" attribution.
     for field_name in request.files:
         if field_name in EXCLUDED_SUBMIT_FIELDS:
             continue
@@ -1669,7 +1671,6 @@ def submit_request():
                     headers=h, data=form_data, files=files, timeout=30
                 ).json()
                 
-                # Fallback to TAT if UAT fails (e.g. expired)
                 if up_res.get("code") != 0 and api_token != tat:
                     h = {"Authorization": f"Bearer {tat}"}
                     up_res = http_requests.post(
@@ -1688,45 +1689,49 @@ def submit_request():
         if tokens:
             final_fields[field_name] = tokens
 
-    # 3. Enforce Server-Side Default for Tracking
-    final_fields["Request Status"] = "Pending"
-    final_fields["Submitted By"] = user
+    # 3. System fields (Handled Separately to avoid 1254045 permission errors)
+    system_fields = {
+        "Request Status": "Pending",
+        "Submitted By": user
+    }
 
-    # 4. Resilience: only send fields that actually exist in the live Feishu schema.
+    # 4. Resilience: filter out any fields not present in the live schema
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
         dropped = [k for k in final_fields if k not in actual_fields]
         if dropped:
             logger.warn("submit_dropped_unknown_fields", fields=dropped)
         final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
+        system_fields = {k: v for k, v in system_fields.items() if k in actual_fields}
 
-    # 5. Save Final Record in Feishu with proper retry backoff
+    # IMPORTANT: If using UAT, we ONLY send the fields the agent filled out (final_fields)
+    # This prevents the 1254045 error caused by the agent lacking permission to edit system_fields.
+    # If using TAT (App token), we can safely bundle them all together initially.
+    create_fields = final_fields.copy()
+    if api_token == tat:
+        create_fields.update(system_fields)
+
+    # 5. Save Final Record in Feishu
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
     
     success = False
     feishu_err = ""
+    record_id = None
     
     for attempt in range(3):
         try:
-            resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
+            resp = http_requests.post(url, headers=headers, json={"fields": create_fields}, timeout=15)
             data = resp.json()
             
-            # If UAT failed for ANY reason (schema, auth, permission restriction), fallback to TAT
-            # This completely solves the 1254045 error for secondary agents without schema-level edit rights
-            if data.get("code") != 0 and api_token != tat:
-                api_token = tat
-                headers["Authorization"] = f"Bearer {tat}"
-                resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
-                data = resp.json()
-
             if data.get("code") == 0:
                 success = True
+                record_id = data.get("data", {}).get("record", {}).get("record_id")
                 break
             else:
                 feishu_err = data.get('msg', 'Unknown Error')
                 if data.get("code") == 1254045:
-                    feishu_err = "One of the provided fields does not match the exact Feishu column schema."
+                    feishu_err = "One of the provided fields does not match the exact Feishu column schema or you lack permission to write to it."
                 elif data.get("code") == 1254402:
                     feishu_err = "An invalid option was selected for a dropdown field."
                     
@@ -1738,7 +1743,17 @@ def submit_request():
                 return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
             time.sleep(1 * (attempt + 1))
 
-    # 5. Audit Trace Action
+    # 6. HYBRID STEP: If successfully created via UAT, inject the system fields via TAT
+    # This ensures the record is "Created By" the agent, but the backend still tracks the status.
+    if success and api_token != tat and record_id and system_fields:
+        try:
+            tat_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+            update_url = f"{url}/{record_id}"
+            http_requests.put(update_url, headers=tat_headers, json={"fields": system_fields}, timeout=5)
+        except Exception as e:
+            logger.warn("system_fields_update_failed", record_id=record_id, error=str(e))
+
+    # 7. Audit Trace Action
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')}", ip=ip, severity="Info")
 
