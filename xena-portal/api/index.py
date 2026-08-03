@@ -1609,8 +1609,8 @@ def audit_logs():
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
-    """Flawless Hybrid Engine: Creates an empty record using User's context first to capture identity. 
-    Then, the System token (TAT) populates all the user's submitted fields and system tracking fields."""
+    """Flawless Hybrid Engine: Creates an empty shell record using User's context first to capture identity natively. 
+    Then, the System token (TAT) immediately populates all the user's submitted fields and system tracking fields."""
     user = sanitize_text(request.form.get('user', ''))
     email = sanitize_text(request.form.get('email', ''))
     uat = request.form.get('uat', '')
@@ -1630,6 +1630,8 @@ def submit_request():
 
     tat = get_tenant_access_token()
     
+    # Pre-fetch the User's Feishu Open ID using their UAT
+    # (Used to explicitly stamp their profile into 'Respondents' if UAT creation fails)
     open_id = None
     if uat:
         try:
@@ -1686,22 +1688,38 @@ def submit_request():
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
-    # ATTEMPT 1: Create an EMPTY record using User's Token (UAT)
+    # ATTEMPT 1: Create an empty/minimal record using User's Token (UAT)
     # This purely registers their Feishu Name/Avatar into the "Created By" column natively.
     if uat:
-        try:
-            h_uat = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
-            resp = http_requests.post(url, headers=h_uat, json={"fields": {}}, timeout=10)
-            data = resp.json()
-            if data.get("code") == 0:
-                success = True
-                record_id = data.get("data", {}).get("record", {}).get("record_id")
-            else:
-                logger.warn("uat_blank_creation_rejected", code=data.get("code"), msg=data.get("msg"))
-        except Exception as e:
-            logger.warn("uat_blank_creation_exception", error=str(e))
+        h_uat = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
+        
+        # We try a completely empty record first. If Bitable complains about missing required fields,
+        # we try passing just the Request Type.
+        attempts = [
+            {},                             # 1. Blank record (Guaranteed no permission block)
+            {"Request Type": req_type}      # 2. Minimal fields (If Bitable validation requires a field)
+        ]
+        
+        for fields_to_try in attempts:
+            try:
+                resp = http_requests.post(url, headers=h_uat, json={"fields": fields_to_try}, timeout=10)
+                data = resp.json()
+                code = data.get("code")
+                
+                if code == 0:
+                    success = True
+                    record_id = data.get("data", {}).get("record", {}).get("record_id")
+                    break
+                elif code in [99991668, 99991664, 99991663]:
+                    # EXPIRED TOKEN: Halt immediately and inform the user.
+                    return jsonify({"error": "Your Feishu session has expired. Please refresh the page to log in again."}), 401
+                else:
+                    logger.warn("uat_creation_attempt_failed", code=code, msg=data.get("msg"))
+            except Exception as e:
+                logger.warn("uat_creation_exception", error=str(e))
+                break # Network error, break loop to fallback
 
-    # ATTEMPT 2: Fallback to System Token (TAT) if UAT lacks base creation rights entirely
+    # ATTEMPT 2: Fallback to System Token (TAT) ONLY if UAT fundamentally lacks table creation rights
     if not success:
         used_tat_for_creation = True
         create_fields = final_fields.copy()
@@ -1727,7 +1745,7 @@ def submit_request():
                 time.sleep(1 * (attempt + 1))
 
     # PHASE 2: Data Population via TAT (System)
-    # If the UAT successfully created the blank row, the System takes over to inject all form data + system tracking.
+    # The UAT created the empty row. Now the System immediately injects all form data + system tracking.
     if success and not used_tat_for_creation and record_id:
         update_fields = final_fields.copy()
         update_fields.update(system_fields)
@@ -1737,15 +1755,13 @@ def submit_request():
         
         for attempt in range(3):
             try:
-                # Use PUT to overwrite the empty row with full data
+                # Use PUT to completely update the empty row with the full payload
                 resp = http_requests.put(update_url, headers=tat_headers, json={"fields": update_fields}, timeout=15)
                 data = resp.json()
                 if data.get("code") == 0:
                     break
                 else:
                     if attempt == 2:
-                        # If TAT fails to update the record (extremely rare), we should warn but not crash the user 
-                        # since the row *was* created. But ideally it succeeds.
                         logger.error("tat_population_failed", msg=data.get("msg"))
             except Exception as e:
                 if attempt == 2: logger.error("tat_population_exception", error=str(e))
