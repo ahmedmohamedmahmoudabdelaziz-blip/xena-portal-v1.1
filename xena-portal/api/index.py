@@ -1,7 +1,3 @@
-"""
-Xena Data Portal — High-Speed Hybrid Backend (Enterprise Edition)
-"""
-
 import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
@@ -50,7 +46,6 @@ QUERY_FIELD_ALIASES = {
     "bd_code":     ["Bd Code", "BD Code"],
 }
 
-# Strictly block users from manually overriding system/staff-managed fields during form submission
 EXCLUDED_SUBMIT_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
@@ -61,34 +56,15 @@ EXCLUDED_SUBMIT_FIELDS = {
     "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Status", "Request Status"
 }
 
-# Ticket-processing endpoint (/api/requests/update) is allowed to write these — they're
-# staff-managed, but staff (ticket agents) are exactly who's supposed to set them while
-# working a ticket. Same base list as EXCLUDED_SUBMIT_FIELDS, minus the handful of fields
-# the Live Ticket Queue modal legitimately edits.
-TICKET_UPDATE_READONLY_FIELDS = EXCLUDED_SUBMIT_FIELDS - {"Status", "Request Status", "Approval"}
-
-# Some Feishu columns have historically drifted between two possible names in this sheet
-# (e.g. "Status" vs "Request Status"). Rather than hardcode a guess, we resolve against
-# the table's *live* schema at write time and use whichever candidate actually exists —
-# see resolve_field_name() / get_table_schema(). Adjust the candidate lists here if your
-# Feishu column names differ from these.
-WRITE_FIELD_ALIASES = {
-    "status":        ["Request Status", "Status"],
-    "reject_reason": ["Reject Reason", "Rejection Reason"],
-    "audition_note": ["Audition note", "Audition Note"],
-    "approval":      ["Approval", "Chinese Approval"],
+# Update fields allows auditors to edit Status, Approval, Reject Reason, etc.
+EXCLUDED_UPDATE_FIELDS = {
+    "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
+    "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
+    "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
+    "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
+    "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
+    "Assigned Time", "Completion Time", "Last Retry Time", "Ready to Archive", "Reward"
 }
-
-def resolve_field_name(candidates, schema_fields):
-    """Given an ordered list of possible real Feishu column names, return the first one
-    that actually exists in the live schema. Falls back to the first candidate if the
-    schema is unavailable or none matched, so writes still go out rather than silently
-    vanishing — get_table_schema() will then drop it if it truly doesn't exist."""
-    if schema_fields:
-        for c in candidates:
-            if c in schema_fields:
-                return c
-    return candidates[0]
 
 MONTHLY_ALLOCATOR_LIMITS = {
     "trend card": 10, "traffic card": 50, "30 mic 15 days": 999, "30 mic 30 days": 999,
@@ -106,9 +82,6 @@ ORDER_TYPE_LIMITS = {
 CAIRO_OFFSET = timedelta(hours=3)
 
 def cairo_now():
-    """Authoritative 'current time' for the whole app. Vercel's server clock is UTC,
-    but the business/users are in Cairo (UTC+3). Every 'Current Month' calculation
-    MUST go through this function."""
     return datetime.now(timezone.utc) + CAIRO_OFFSET
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
@@ -132,9 +105,6 @@ def get_tenant_access_token():
 _schema_cache = {"data": {}, "lock": threading.Lock()}
 
 def get_table_schema(table_id, token, base_id, ttl=300):
-    """Returns the set of live field names for a table, cached briefly. Used to make
-    record-creation resilient: we drop any field we're about to write that Feishu
-    doesn't actually recognize, instead of letting the whole write fail."""
     with _schema_cache["lock"]:
         cached = _schema_cache["data"].get(table_id)
         if cached and time.time() - cached["ts"] < ttl:
@@ -150,49 +120,9 @@ def get_table_schema(table_id, token, base_id, ttl=300):
             return fields
     except Exception as e:
         logger.error("get_table_schema_failed", table_id=table_id, error=str(e))
-    # On failure, fall back to whatever we last successfully cached (better than nothing)
     with _schema_cache["lock"]:
         cached = _schema_cache["data"].get(table_id)
         return cached["fields"] if cached else set()
-
-_field_meta_cache = {"data": {}, "lock": threading.Lock()}
-
-FEISHU_TYPE_NAMES = {
-    1: "text", 2: "number", 3: "select", 4: "multiselect", 5: "date",
-    7: "checkbox", 11: "user", 13: "phone", 15: "url", 17: "attachment",
-    18: "link", 19: "lookup", 20: "formula", 21: "duplex_link", 1001: "created_time",
-    1002: "modified_time", 1003: "created_by", 1004: "modified_by", 1005: "auto_number",
-}
-
-def get_table_field_meta(table_id, token, base_id, ttl=300):
-    """Like get_table_schema(), but returns full field metadata (type + dropdown options)
-    instead of just names — so the frontend can build controls (select vs text, and the
-    REAL option labels) that always match whatever the Feishu column actually is, instead
-    of a hardcoded guess that silently drifts out of sync with the sheet."""
-    with _field_meta_cache["lock"]:
-        cached = _field_meta_cache["data"].get(table_id)
-        if cached and time.time() - cached["ts"] < ttl:
-            return cached["fields"]
-
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
-    try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
-        if resp.get("code") == 0:
-            out = {}
-            for f in resp.get("data", {}).get("items", []):
-                name = f.get("field_name")
-                ftype = f.get("type")
-                prop = f.get("property") or {}
-                options = [o.get("name") for o in (prop.get("options") or []) if o.get("name")]
-                out[name] = {"type": FEISHU_TYPE_NAMES.get(ftype, "text"), "options": options}
-            with _field_meta_cache["lock"]:
-                _field_meta_cache["data"][table_id] = {"fields": out, "ts": time.time()}
-            return out
-    except Exception as e:
-        logger.error("get_table_field_meta_failed", table_id=table_id, error=str(e))
-    with _field_meta_cache["lock"]:
-        cached = _field_meta_cache["data"].get(table_id)
-        return cached["fields"] if cached else {}
 
 class StructuredLogger:
     def __init__(self, name):
@@ -311,11 +241,10 @@ def rate_limit(max_req, window):
 # ════════════════════════════════════════════════════════════════════
 _local_json_cache = {}
 _local_json_lock = threading.Lock()
-_data_status = {}   # diagnostic info per filename, surfaced via /api/debug/data-status
+_data_status = {}   
 SELF_BASE_URL = os.environ.get("SELF_BASE_URL", "").rstrip("/")
 
 def _candidate_data_paths(filename):
-    """Every plausible location the pre-fetched JSON could live at runtime on Vercel."""
     here = os.path.abspath(__file__)                 
     api_dir = os.path.dirname(here)                  
     project_root = os.path.dirname(api_dir)          
@@ -334,7 +263,6 @@ def _candidate_data_paths(filename):
     return out
 
 def _fetch_data_over_http(filename):
-    """Last-resort fallback: pull the pre-built JSON from this SAME deployment's own CDN-served static asset."""
     base = SELF_BASE_URL
     if not base:
         try:
@@ -551,15 +479,12 @@ def extract_field_text(field_data):
     return str(field_data)
 
 def extract_attachments(field_data):
-    """For Attachment-type fields: returns [{name, url}] where url points at our own
-    proxy endpoint (so the browser never needs the Feishu tenant token directly)."""
     if not field_data or not isinstance(field_data, list): return []
     out = []
     for item in field_data:
         if isinstance(item, dict) and item.get("file_token"):
             out.append({"name": item.get("name", "file"), "url": f"/api/attachments/{item['file_token']}"})
     return out
-
 
 def extract_field_list(field_data):
     if not field_data: return []
@@ -657,7 +582,7 @@ def get_user_permissions(email, name):
     
     if any(admin == name_clean for admin in ADMIN_USERS):
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"], 
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
@@ -667,7 +592,7 @@ def get_user_permissions(email, name):
 
     if MOCK_MODE:
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"], 
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
@@ -821,31 +746,6 @@ QUERY_RECORDS_FIELDS = [
     "Closing Reason", "Closing Agencies Reason",
 ]
 
-def _date_filter_value(dt):
-    return [str(int(dt.timestamp() * 1000))]
-
-def _peek_newest_date(tat, table_id):
-    try:
-        session = http_requests.Session()
-        session.headers.update({"Authorization": f"Bearer {tat}"})
-        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
-        resp = session.get(url, params={"page_size": 1, "sort": '["Numbering DESC"]'}, timeout=15)
-        data = resp.json()
-        items = data.get("data", {}).get("items", [])
-        if items:
-            raw = get_field_local(items[0].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
-            dt = parse_feishu_date(raw)
-            if dt: return dt
-    except Exception as e:
-        logger.warn("peek_newest_date_failed", table=table_id, error=str(e))
-    return datetime.utcnow()
-
-def _date_buckets(from_dt, to_dt, n_buckets):
-    total_seconds = max((to_dt - from_dt).total_seconds(), 1)
-    step = total_seconds / n_buckets
-    return [(from_dt + timedelta(seconds=step * i), from_dt + timedelta(seconds=step * (i + 1)))
-            for i in range(n_buckets)]
-
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
@@ -884,37 +784,10 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 
     return items, complete, reason
 
-def _merge_shards(shard_results):
-    all_items, seen, master_keys = [], set(), set()
-    fetch_complete, stop_reason = True, ""
-    for items, complete, reason in shard_results:
-        if not complete:
-            fetch_complete, stop_reason = False, reason
-        for item in items:
-            rid = item.get("record_id")
-            if rid and rid not in seen:
-                seen.add(rid)
-                all_items.append(item)
-                master_keys.update(item.get("fields", {}).keys())
-    return all_items, master_keys, fetch_complete, stop_reason
-
-def _run_shards_timed(table_id, tat, shards, field_names):
-    def _timed(shard_filter):
-        t0 = time.time()
-        items, complete, reason = _fetch_bitable_shard(table_id, tat, shard_filter, field_names)
-        logger.info("shard_fetch", table=table_id, ms=int((time.time() - t0) * 1000),
-                    rows=len(items), complete=complete, reason=reason or "")
-        return items, complete, reason
-
-    with ThreadPoolExecutor(max_workers=len(shards)) as executor:
-        futures = [executor.submit(_timed, f) for f in shards]
-        return [f.result() for f in futures]
-
 REQUESTS_SHARD_COUNT = 10 
 REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
 
 def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
-    """Bypassing the Bitable sharded filter that breaks on mixed column types, and explicitly filtering the results purely in Python side using `fetch_feishu_records`."""
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -922,7 +795,6 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
 
     items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
 
-    # Clean pure-Python filtering
     filtered_items = []
     for item in items:
         if from_dt or to_dt:
@@ -1440,22 +1312,13 @@ def get_points_table_snapshot():
 
 app = Flask(__name__)
 
-# === NEW: FEISHU WEBHOOK ENDPOINT (HYBRID APPROACH) ===
 @app.route('/api/webhook/feishu', methods=['GET', 'POST'])
 def feishu_webhook():
-    """Receives events from Feishu Event Subscriptions (like record updates)."""
     try:
-        # force=True guarantees Flask reads the payload even if Feishu sends unusual HTTP headers
-        # silent=True prevents Flask from crashing if the payload is empty
         data = request.get_json(force=True, silent=True) or {}
-        
-        # 1. Pass the Feishu Verification Challenge instantly
         if "challenge" in data:
             return jsonify({"challenge": data["challenge"]})
             
-        # 2. Handle Record Changes (Optional but powerful)
-        # When a record changes in Feishu, we instantly trigger a background refresh
-        # so our memory cache stays perfectly up-to-date without waiting 3 minutes.
         header = data.get("header", {})
         event = data.get("event", {})
         
@@ -1465,12 +1328,9 @@ def feishu_webhook():
             elif event.get("table_id") == POINTS_TABLE_ID:
                 threading.Thread(target=_background_sync_points_table, daemon=True).start()
                 
-        # Always return 200 OK so Feishu knows we successfully received it
         return jsonify({"code": 0, "msg": "success"}), 200
-        
     except Exception as e:
         logger.error("webhook_parsing_error", error=str(e))
-        # Even if parsing fails completely, reply 200 so Feishu doesn't timeout/block us
         return jsonify({"code": 0, "msg": "success"}), 200
 
 @app.route('/', methods=['GET'])
@@ -1672,9 +1532,77 @@ def audit_logs():
         logger.error("audit_log_fetch_failed", error=str(e))
         return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
 
+@app.route('/api/requests/single', methods=['GET'])
+def get_single_request():
+    record_id = sanitize_text(request.args.get('record_id',''))
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+        
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+    try:
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        data = resp.json()
+        if data.get("code") == 0:
+            return jsonify({"success": True, "record": data["data"]["record"]})
+        return jsonify({"success": False, "error": data.get("msg")}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/requests/update', methods=['POST'])
+def update_request():
+    user = sanitize_text(request.form.get('user', ''))
+    record_id = sanitize_text(request.form.get('record_id', ''))
+    
+    try:
+        fields = json.loads(request.form.get('fields', '{}'))
+    except:
+        return jsonify({"success": False, "error": "Invalid fields JSON format"}), 400
+
+    tat = get_tenant_access_token()
+    
+    # Safely upload newly selected files
+    for field_name in request.files:
+        if field_name in EXCLUDED_UPDATE_FIELDS: continue
+        file_list = request.files.getlist(field_name)
+        tokens = []
+        for f in file_list:
+            if not f.filename: continue
+            file_bytes = f.read()
+            if not file_bytes: continue
+            try:
+                form_data = {'file_name': f.filename, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
+                files = {'file': (f.filename, file_bytes, f.mimetype)}
+                up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
+                if up_res.get("code") == 0:
+                    tokens.append({"file_token": up_res["data"]["file_token"]})
+            except Exception as e:
+                logger.error("file_upload_failed", error=str(e))
+        if tokens:
+            fields[field_name] = tokens
+
+    # Drop read-only fields so Feishu doesn't reject the save attempt
+    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+    if actual_fields:
+        fields = {k: v for k, v in fields.items() if k in actual_fields and k not in EXCLUDED_UPDATE_FIELDS}
+
+    # Updating with TAT avoids all permission constraints for agents editing tickets
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    try:
+        resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=15)
+        data = resp.json()
+        if data.get("code") == 0:
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+            audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
+            return jsonify({"success": True})
+        return jsonify({"success": False, "error": data.get("msg")})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
-    """Handles new record submissions, uploads attachments directly to Feishu, and writes to DB."""
     user = sanitize_text(request.form.get('user', ''))
     email = sanitize_text(request.form.get('email', ''))
     uat = request.form.get('uat', '')
@@ -1693,19 +1621,15 @@ def submit_request():
         return jsonify({"error": "Request Type is required."}), 400
 
     tat = get_tenant_access_token()
-    
-    # Use UAT if available so the action is attributed to the user in Feishu (Fixes Respondents)
     api_token = uat if uat else tat
     
     final_fields = {}
 
-    # 1. Filter JSON fields to enforce schema security
     for key, val in user_fields.items():
         if key not in EXCLUDED_SUBMIT_FIELDS:
             if val not in (None, "", []):
                 final_fields[key] = val
 
-    # 2. Upload any sent attachments safely to Bitable 
     for field_name in request.files:
         if field_name in EXCLUDED_SUBMIT_FIELDS:
             continue
@@ -1734,7 +1658,6 @@ def submit_request():
                     headers=h, data=form_data, files=files, timeout=30
                 ).json()
                 
-                # Fallback to TAT if UAT fails (e.g. expired)
                 if up_res.get("code") != 0 and api_token != tat:
                     h = {"Authorization": f"Bearer {tat}"}
                     up_res = http_requests.post(
@@ -1753,11 +1676,9 @@ def submit_request():
         if tokens:
             final_fields[field_name] = tokens
 
-    # 3. Enforce Server-Side Default for Tracking
     final_fields["Request Status"] = "Pending"
     final_fields["Submitted By"] = user
 
-    # 4. Resilience: only send fields that actually exist in the live Feishu schema.
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
         dropped = [k for k in final_fields if k not in actual_fields]
@@ -1765,44 +1686,41 @@ def submit_request():
             logger.warn("submit_dropped_unknown_fields", fields=dropped)
         final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
 
-    # 5. Save Final Record in Feishu with proper retry backoff
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-    headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-    
     success = False
-    feishu_err = ""
-    
-    for attempt in range(3):
-        try:
-            resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
+
+    try:
+        # Primary Attempt (User Context): Create the blank row under the agent's identity
+        create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
+        resp = http_requests.post(url, headers=create_headers, json={"fields": {}}, timeout=15)
+        data = resp.json()
+        
+        # Fallback to TAT if UAT was entirely restricted
+        if data.get("code") != 0 and api_token != tat:
+            create_headers["Authorization"] = f"Bearer {tat}"
+            resp = http_requests.post(url, headers=create_headers, json={"fields": {}}, timeout=15)
             data = resp.json()
+
+        if data.get("code") == 0:
+            record_id = data["data"]["record"]["record_id"]
             
-            # If UAT failed due to auth/permission, fallback to TAT immediately
-            if data.get("code") in [99991663, 99991668, 99991664] and api_token != tat:
-                api_token = tat
-                headers["Authorization"] = f"Bearer {tat}"
-                resp = http_requests.post(url, headers=headers, json={"fields": final_fields}, timeout=15)
-                data = resp.json()
-
-            if data.get("code") == 0:
+            # System Patch (TAT Context): Override schema constraints & permissions 
+            update_url = f"{url}/{record_id}"
+            update_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+            update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": final_fields}, timeout=15)
+            update_data = update_resp.json()
+            
+            if update_data.get("code") == 0:
                 success = True
-                break
             else:
-                feishu_err = data.get('msg', 'Unknown Error')
-                if data.get("code") == 1254045:
-                    feishu_err = "One of the provided fields does not match the exact Feishu column schema."
-                elif data.get("code") == 1254402:
-                    feishu_err = "An invalid option was selected for a dropdown field."
-                    
-                if attempt == 2:
-                    raise Exception(feishu_err)
-        except Exception as e:
-            if attempt == 2:
-                logger.error("feishu_submit_failed", error=str(e), req_type=req_type)
-                return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
-            time.sleep(1 * (attempt + 1))
+                raise Exception(f"System Patch failed: {update_data.get('msg')}")
+        else:
+            raise Exception(f"Primary Creation failed: {data.get('msg')}")
 
-    # 5. Audit Trace Action
+    except Exception as e:
+        logger.error("feishu_submit_failed", error=str(e), req_type=req_type)
+        return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
+
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')}", ip=ip, severity="Info")
 
@@ -2112,38 +2030,55 @@ def my_requests():
     if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
     
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
     _cairo_now = cairo_now()
     from_dt = _cairo_now - timedelta(days=15)
-
-    if MOCK_MODE:
-        all_items = MockFeishuDB.generate_requests(50)
-        fetch_complete, stop_reason = True, ""
-    else:
-        # NOTE (fixed 2026-08): this used to fire a Feishu-side "contains" filter on
-        # "Submitted By" / "Respondents" — both Person-type fields. Feishu's filter API
-        # does not reliably support "contains" with a plain-text name on Person-type
-        # fields, so that request was rejected every single time with InvalidFilter
-        # (code 1254018), and this endpoint fell back to paginating the ENTIRE requests
-        # table live, inside the request, with a 40s internal budget — which routinely
-        # ran past Vercel's function timeout and left the frontend spinning forever.
-        #
-        # Fix: never hit Feishu's live filter API here at all. Read from the same
-        # background-synced / Redis-cached snapshot the rest of the app already
-        # maintains (get_requests_table_snapshot) and filter in Python. This responds
-        # in milliseconds on a warm cache and self-heals from a cold cache using the
-        # same bounded, early-exiting pagination fetch_feishu_records already uses
-        # elsewhere (it stops once it's paged 3 requests older than `from_dt`).
-        all_raw_items, _keys, fetch_complete, stop_reason, _from_cache = get_requests_table_snapshot(from_dt=from_dt)
-
-        user_clean = user.strip().lower()
-        all_items = []
-        for it in all_raw_items:
-            f = it.get("fields", {})
-            sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
-            rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
-            if user_clean in sb or user_clean in rp:
-                all_items.append(it)
-
+    
+    # We query directly and page purely using Python logic (immune to InvalidFilter)
+    session = http_requests.Session()
+    session.headers.update(headers)
+    list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    
+    all_items = []
+    page_token = None
+    fetch_complete, stop_reason = True, ""
+    
+    while True:
+        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        if page_token: params["page_token"] = page_token
+        
+        try:
+            resp = session.get(list_url, params=params, timeout=15)
+            data = resp.json()
+            if data.get("code") != 0:
+                fetch_complete, stop_reason = False, data.get("msg")
+                break
+                
+            block = data.get("data", {})
+            items = block.get("items", [])
+            user_clean = user.strip().lower()
+            
+            for it in items:
+                f = it.get("fields", {})
+                sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
+                rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+                if user_clean in sb or user_clean in rp:
+                    all_items.append(it)
+                    
+            if items:
+                last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
+                if last_dt and last_dt < from_dt:
+                    break
+                    
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False):
+                break
+        except Exception as e:
+            fetch_complete, stop_reason = False, str(e)
+            break
+            
     results = []
     
     for item in all_items:
@@ -2152,7 +2087,6 @@ def my_requests():
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
         
-        # Apply the exact 15-day limit on the ultra-small result set
         if not dt or dt < from_dt:
             continue
         
@@ -2202,7 +2136,6 @@ def my_requests():
 
 @app.route('/api/live-queue', methods=['GET'])
 def live_queue():
-    """Lightweight endpoint to be polled every 5 seconds by the frontend"""
     user = sanitize_text(request.args.get('user',''))
     
     if not user or MOCK_MODE:
@@ -2212,7 +2145,6 @@ def live_queue():
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
-    # Fast query: Find where Assigned Member == User AND Status contains "In Progress"
     payload = {
         "page_size": 50,
         "filter": {
@@ -2260,130 +2192,6 @@ def live_queue():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
-
-@app.route('/api/requests/update', methods=['POST'])
-def update_request():
-    """Allows a ticket agent to write processing/edit updates back to Feishu.
-
-    FIX (2026-08): this previously required a top-level `user` key that the frontend
-    never actually sent (it sent {record_id, status, reject_reason, audition_note} with
-    no `user` and no `fields` wrapper), so every single save/verify/resolve click from
-    the ticket modal was rejected here with a 400 before it ever reached Feishu. The
-    frontend now sends the documented shape: {user, record_id, fields: {<real Feishu
-    column name>: <value>, ...}}.
-    """
-    body = request.get_json(silent=True) or {}
-    user = sanitize_text(body.get('user', ''))
-    email = sanitize_text(body.get('email', ''))
-    record_id = sanitize_text(body.get('record_id', ''))
-    fields = body.get('fields', {}) or {}
-
-    if not user or not record_id or not fields:
-        return jsonify({"success": False, "error": "Missing data (user, record_id and fields are all required)"}), 400
-
-    perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("tickets" in m for m in perms.get("modules", [])):
-        return jsonify({"success": False, "error": "Access denied"}), 403
-
-    tat = get_tenant_access_token()
-
-    # Never allow the ticket modal to touch permanently system-computed columns.
-    fields = {k: v for k, v in fields.items() if k not in TICKET_UPDATE_READONLY_FIELDS}
-
-    # Collapse known write-aliases (e.g. "Status" vs "Request Status") down to whichever
-    # one the live schema actually has, so a naming drift in the sheet can't silently
-    # drop an agent's update.
-    schema_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
-    for logical_key, candidates in WRITE_FIELD_ALIASES.items():
-        present = [c for c in candidates if c in fields]
-        if present:
-            value = fields[present[0]]
-            for c in present:
-                fields.pop(c, None)
-            fields[resolve_field_name(candidates, schema_fields)] = value
-
-    # Resilience: drop anything that isn't actually a live column, same pattern as submit.
-    if schema_fields:
-        dropped = [k for k in fields if k not in schema_fields]
-        if dropped:
-            logger.warn("ticket_update_dropped_unknown_fields", fields=dropped, record_id=record_id)
-        fields = {k: v for k, v in fields.items() if k in schema_fields}
-
-    if not fields:
-        return jsonify({"success": False, "error": "Nothing to save (no recognized fields)."}), 400
-
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-
-    try:
-        resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=10)
-        data = resp.json()
-
-        if data.get("code") == 0:
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-            audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | Fields: {list(fields.keys())}", ip=ip, severity="Info")
-            return jsonify({"success": True})
-
-        return jsonify({"success": False, "error": data.get("msg")})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-
-@app.route('/api/requests/single', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
-def get_single_request():
-    """Fetches one record fresh from Feishu by record_id, in the same shape the ticket
-    queue list already uses. FIX (2026-08): the frontend's "Duplicated Check" flow
-    (ltVerify) has always called this exact URL to refresh a ticket after saving — but
-    this route didn't exist, so that call 404'd every time and the check silently failed."""
-    user = sanitize_text(request.args.get('user', ''))
-    email = sanitize_text(request.args.get('email', ''))
-    record_id = sanitize_text(request.args.get('record_id', ''))
-    if not record_id:
-        return jsonify({"error": "Missing record_id"}), 400
-
-    perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("tickets" in m for m in perms.get("modules", [])):
-        return jsonify({"error": "Access denied"}), 403
-
-    if MOCK_MODE:
-        item = MockFeishuDB.generate_requests(1)[0]
-        item["record_id"] = record_id
-        return jsonify(build_ticket_payload(item))
-
-    tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
-    try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
-        data = resp.json()
-        if data.get("code") != 0:
-            return jsonify({"error": data.get("msg", "Record not found")}), 404
-        item = data.get("data", {}).get("record", {})
-        item.setdefault("record_id", record_id)
-        return jsonify(build_ticket_payload(item))
-    except Exception as e:
-        logger.error("get_single_request_failed", record_id=record_id, error=str(e))
-        return jsonify({"error": str(e)}), 502
-
-@app.route('/api/tickets/field-schema', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
-def tickets_field_schema():
-    """Exposes the Requests table's LIVE Feishu column types + dropdown options, so the
-    Live Ticket Queue modal can render each field with the control type (select vs free
-    text) and the exact option labels the sheet actually has — instead of a hardcoded
-    guess that silently goes stale the next time someone edits a dropdown in Feishu."""
-    user = sanitize_text(request.args.get('user', ''))
-    email = sanitize_text(request.args.get('email', ''))
-    perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("tickets" in m or "submit" in m for m in perms.get("modules", [])):
-        return jsonify({"error": "Access denied"}), 403
-
-    if MOCK_MODE:
-        return jsonify({"fields": {}})
-
-    tat = get_tenant_access_token()
-    meta = get_table_field_meta(REQUESTS_TABLE_ID, tat, BASE_ID)
-    return jsonify({"fields": meta})
-
 @app.route('/api/agency-list', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_list():
@@ -2409,7 +2217,6 @@ def agency_list():
         all_items = MockFeishuDB.generate_requests(300)
         fetch_complete, stop_reason = True, ""
     else:
-        # Prevent timeout: Use the high-speed background cache and pull everything
         all_items, master_keys, fetch_complete, stop_reason, _ = get_requests_table_snapshot(from_dt=None)
     
     results = []
@@ -2681,9 +2488,6 @@ def debug_data_status():
         "self_base_url_env": SELF_BASE_URL or None,
     })
 
-# Maps Feishu field names -> the flat snake_case keys the Live Ticket Queue UI expects
-# (same convention used in the frontend's LT_FIELD_MAP). Keeping this as one dict makes
-# it easy to extend if new fields need to show up in the ticket workspace.
 TICKET_FIELD_KEY_MAP = {
     "Region": "region", "User ID": "user_id", "Agency Code": "agency_code",
     "Agency Name": "agency_name", "Applier real name": "applier_real_name",
@@ -2699,15 +2503,11 @@ TICKET_FIELD_KEY_MAP = {
     "Agency to be merged and closed": "agency_to_be_merged_and_closed",
     "Type of Action Host sign": "type_of_action_host_sign", "Type of Action 2": "type_of_action_2",
     "New Short ID": "new_short_id", "Wealth Level": "wealth_level", "Vip Level": "vip_level",
-    "Applier Note": "applier_note", "Numbering": "numbering",
+    "Applier Note": "applier_note",
 }
 TICKET_ATTACHMENT_FIELDS = ["Evidence Screen", "Evidence Screen 2", "NID & Otherapp Screen", "New and old onwer National IDS (Both NID)"]
 
 def build_ticket_payload(item):
-    """Flattens a raw Feishu record into the shape the Live Ticket Queue frontend expects.
-    Also carries every field's REAL Feishu column name in `_field_names` so the modal can
-    build editable inputs that write back to the exact right column (see field-schema
-    endpoint below) instead of a name the frontend guessed."""
     fields = item.get("fields", {})
     ticket = {"record_id": item.get("record_id")}
     for feishu_name, key in TICKET_FIELD_KEY_MAP.items():
@@ -2720,18 +2520,14 @@ def build_ticket_payload(item):
             ticket.setdefault("attachments", []).extend(pics)
     ticket["request_type"] = extract_field_text(get_field_local(fields, "Request Type", "Type"))
     ticket["assigned_member"] = extract_field_text(get_field_local(fields, "Assigned Member"))
-    ticket["submitted_on"] = extract_field_text(get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time"))
-    ticket["status"] = extract_field_text(get_field_local(fields, "Request Status", "Status"))
+    ticket["status"] = extract_field_text(get_field_local(fields, "Status"))
     ticket["reject_reason"] = extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason"))
     ticket["audition_note"] = extract_field_text(get_field_local(fields, "Audition note", "Audition Note"))
     ticket["duplicated_check"] = extract_field_text(get_field_local(fields, "Duplicated Check"))
-    ticket["chinese_approval"] = extract_field_text(get_field_local(fields, "Approval", "Chinese Approval"))
     return ticket
 
 @app.route('/api/attachments/<file_token>', methods=['GET'])
 def proxy_attachment(file_token):
-    """Streams a Feishu attachment back through our own server so the browser never
-    needs the tenant token directly (Feishu's raw attachment URLs require Bearer auth)."""
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
     perms = get_user_permissions(email, user)
@@ -2751,8 +2547,6 @@ def proxy_attachment(file_token):
 @app.route('/api/tickets/pull-assigned', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def pull_assigned_ticket():
-    """Manual 'pull' alternative to the live push feed: looks up whatever's currently
-    assigned to this agent with Request Status = In Progress, right now, on demand."""
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
     perms = get_user_permissions(email, user)
