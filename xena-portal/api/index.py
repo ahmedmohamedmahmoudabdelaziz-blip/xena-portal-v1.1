@@ -2340,8 +2340,8 @@ def live_queue():
         return jsonify({"success": False, "error": str(e)})
 
 
-@app.route('/api/requests/update', methods=['POST'])
-def update_request():
+@app.route('/api/requests/agent-update', methods=['POST'])
+def update_request_agent():
     """Allows the agent to write status updates back to Feishu"""
     user = sanitize_text(request.json.get('user', ''))
     record_id = sanitize_text(request.json.get('record_id', ''))
