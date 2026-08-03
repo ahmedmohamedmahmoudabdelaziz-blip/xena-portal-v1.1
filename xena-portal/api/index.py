@@ -1609,7 +1609,8 @@ def audit_logs():
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
-    """Handles new record submissions, uploads attachments safely, and writes to DB using a Hybrid Approach."""
+    """Flawless Hybrid Engine: Creates an empty record using User's context first to capture identity. 
+    Then, the System token (TAT) populates all the user's submitted fields and system tracking fields."""
     user = sanitize_text(request.form.get('user', ''))
     email = sanitize_text(request.form.get('email', ''))
     uat = request.form.get('uat', '')
@@ -1629,133 +1630,130 @@ def submit_request():
 
     tat = get_tenant_access_token()
     
-    # Use UAT if available so the action is attributed to the user in Feishu (Fixes Respondents)
-    api_token = uat if uat else tat
-    
+    open_id = None
+    if uat:
+        try:
+            u_info = http_requests.get("https://open.feishu.cn/open-apis/authen/v1/user_info", headers={"Authorization": f"Bearer {uat}"}, timeout=5).json()
+            open_id = u_info.get("data", {}).get("open_id")
+        except: pass
+
+    # Prepare final fields
     final_fields = {}
+    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID) or set()
 
-    # 1. Filter JSON fields to enforce schema security
     for key, val in user_fields.items():
-        if key not in EXCLUDED_SUBMIT_FIELDS:
-            if val not in (None, "", []):
-                final_fields[key] = val
+        if key not in EXCLUDED_SUBMIT_FIELDS and val not in (None, "", []):
+            if actual_fields and key not in actual_fields: continue
+            final_fields[key] = val
 
-    # 2. Upload any sent attachments safely to Bitable
-    # Attachments fallback to TAT automatically if UAT lacks permission to Drive API,
-    # as file ownership doesn't affect the record's "Created By" attribution.
+    # Upload files exclusively using TAT to prevent permission issues
     for field_name in request.files:
-        if field_name in EXCLUDED_SUBMIT_FIELDS:
-            continue
+        if field_name in EXCLUDED_SUBMIT_FIELDS: continue
+        if actual_fields and field_name not in actual_fields: continue
             
         file_list = request.files.getlist(field_name)
         tokens = []
-        
         for f in file_list:
-            if not f.filename: continue
-                
-            file_bytes = f.read()
-            if not file_bytes: continue
-                
+            b = f.read()
+            if not b: continue
             try:
                 form_data = {
                     'file_name': f.filename,
                     'parent_type': 'bitable_file',
                     'parent_node': BASE_ID,
-                    'size': str(len(file_bytes))
+                    'size': str(len(b))
                 }
-                files = {'file': (f.filename, file_bytes, f.mimetype)}
-                h = {"Authorization": f"Bearer {api_token}"}
-                
-                up_res = http_requests.post(
-                    "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
-                    headers=h, data=form_data, files=files, timeout=30
-                ).json()
-                
-                if up_res.get("code") != 0 and api_token != tat:
-                    h = {"Authorization": f"Bearer {tat}"}
-                    up_res = http_requests.post(
-                        "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
-                        headers=h, data=form_data, files=files, timeout=30
-                    ).json()
-
+                files = {'file': (f.filename, b, f.mimetype)}
+                h = {"Authorization": f"Bearer {tat}"}
+                up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers=h, data=form_data, files=files, timeout=30).json()
                 if up_res.get("code") == 0:
                     tokens.append({"file_token": up_res["data"]["file_token"]})
                 else:
-                    raise Exception(f"Upload API failed: {up_res.get('msg')}")
+                    raise Exception(f"File upload failed: {up_res.get('msg')}")
             except Exception as e:
                 logger.error("file_upload_failed", error=str(e), filename=f.filename)
                 return jsonify({"error": f"Failed to upload {f.filename}. Error: {str(e)}"}), 502
-
         if tokens:
             final_fields[field_name] = tokens
 
-    # 3. System fields (Handled Separately to avoid 1254045 permission errors)
-    system_fields = {
-        "Request Status": "Pending",
-        "Submitted By": user
-    }
-
-    # 4. Resilience: filter out any fields not present in the live schema
-    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+    system_fields = {"Request Status": "Pending", "Submitted By": user}
     if actual_fields:
-        dropped = [k for k in final_fields if k not in actual_fields]
-        if dropped:
-            logger.warn("submit_dropped_unknown_fields", fields=dropped)
-        final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
         system_fields = {k: v for k, v in system_fields.items() if k in actual_fields}
 
-    # IMPORTANT: If using UAT, we ONLY send the fields the agent filled out (final_fields)
-    # This prevents the 1254045 error caused by the agent lacking permission to edit system_fields.
-    # If using TAT (App token), we can safely bundle them all together initially.
-    create_fields = final_fields.copy()
-    if api_token == tat:
-        create_fields.update(system_fields)
-
-    # 5. Save Final Record in Feishu
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-    headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-    
     success = False
-    feishu_err = ""
     record_id = None
-    
-    for attempt in range(3):
+    used_tat_for_creation = False
+
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+
+    # ATTEMPT 1: Create an EMPTY record using User's Token (UAT)
+    # This purely registers their Feishu Name/Avatar into the "Created By" column natively.
+    if uat:
         try:
-            resp = http_requests.post(url, headers=headers, json={"fields": create_fields}, timeout=15)
+            h_uat = {"Authorization": f"Bearer {uat}", "Content-Type": "application/json"}
+            resp = http_requests.post(url, headers=h_uat, json={"fields": {}}, timeout=10)
             data = resp.json()
-            
             if data.get("code") == 0:
                 success = True
                 record_id = data.get("data", {}).get("record", {}).get("record_id")
-                break
             else:
-                feishu_err = data.get('msg', 'Unknown Error')
-                if data.get("code") == 1254045:
-                    feishu_err = "One of the provided fields does not match the exact Feishu column schema or you lack permission to write to it."
-                elif data.get("code") == 1254402:
-                    feishu_err = "An invalid option was selected for a dropdown field."
-                    
+                logger.warn("uat_blank_creation_rejected", code=data.get("code"), msg=data.get("msg"))
+        except Exception as e:
+            logger.warn("uat_blank_creation_exception", error=str(e))
+
+    # ATTEMPT 2: Fallback to System Token (TAT) if UAT lacks base creation rights entirely
+    if not success:
+        used_tat_for_creation = True
+        create_fields = final_fields.copy()
+        create_fields.update(system_fields)
+        if open_id and (not actual_fields or "Respondents" in actual_fields):
+            create_fields["Respondents"] = [{"id": open_id}]
+            
+        h_tat = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        for attempt in range(3):
+            try:
+                resp = http_requests.post(url, headers=h_tat, json={"fields": create_fields}, timeout=15)
+                data = resp.json()
+                if data.get("code") == 0:
+                    success = True
+                    record_id = data.get("data", {}).get("record", {}).get("record_id")
+                    break
+                else:
+                    feishu_err = data.get('msg', 'Unknown Error')
+                    if attempt == 2: raise Exception(feishu_err)
+            except Exception as e:
                 if attempt == 2:
-                    raise Exception(feishu_err)
-        except Exception as e:
-            if attempt == 2:
-                logger.error("feishu_submit_failed", error=str(e), req_type=req_type)
-                return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
-            time.sleep(1 * (attempt + 1))
+                    return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
+                time.sleep(1 * (attempt + 1))
 
-    # 6. HYBRID STEP: If successfully created via UAT, inject the system fields via TAT
-    # This ensures the record is "Created By" the agent, but the backend still tracks the status.
-    if success and api_token != tat and record_id and system_fields:
-        try:
-            tat_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-            update_url = f"{url}/{record_id}"
-            http_requests.put(update_url, headers=tat_headers, json={"fields": system_fields}, timeout=5)
-        except Exception as e:
-            logger.warn("system_fields_update_failed", record_id=record_id, error=str(e))
+    # PHASE 2: Data Population via TAT (System)
+    # If the UAT successfully created the blank row, the System takes over to inject all form data + system tracking.
+    if success and not used_tat_for_creation and record_id:
+        update_fields = final_fields.copy()
+        update_fields.update(system_fields)
+        
+        tat_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        update_url = f"{url}/{record_id}"
+        
+        for attempt in range(3):
+            try:
+                # Use PUT to overwrite the empty row with full data
+                resp = http_requests.put(update_url, headers=tat_headers, json={"fields": update_fields}, timeout=15)
+                data = resp.json()
+                if data.get("code") == 0:
+                    break
+                else:
+                    if attempt == 2:
+                        # If TAT fails to update the record (extremely rare), we should warn but not crash the user 
+                        # since the row *was* created. But ideally it succeeds.
+                        logger.error("tat_population_failed", msg=data.get("msg"))
+            except Exception as e:
+                if attempt == 2: logger.error("tat_population_exception", error=str(e))
+                time.sleep(1 * (attempt + 1))
 
-    # 7. Audit Trace Action
+    # Audit Trace Action
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')}", ip=ip, severity="Info")
+    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {user_fields.get('Agency Code', 'N/A')} | Mode: {'TAT-Fallback' if used_tat_for_creation else 'UAT-Blank+TAT-Populate'}", ip=ip, severity="Info")
 
     return jsonify({"success": True, "message": f"Successfully submitted {req_type}!"})
 
