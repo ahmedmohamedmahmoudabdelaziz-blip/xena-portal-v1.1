@@ -2030,7 +2030,7 @@ function toggleTheme() {
     html.setAttribute('data-theme', isDark ? 'light' : 'dark');
     document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
     localStorage.setItem('xenaTheme', isDark ? 'light' : 'dark');
-    Chart.defaults.color = isDark ? '#1a1c2e' : '#8b8fa3';
+    if (typeof Chart !== 'undefined') Chart.defaults.color = isDark ? '#1a1c2e' : '#8b8fa3';
 }
 (function(){
     const t = localStorage.getItem('xenaTheme');
@@ -2085,16 +2085,32 @@ const leaderLinePlugin = {
         } catch(e){}
     }
 };
-Chart.register(ChartDataLabels,leaderLinePlugin);
-Chart.defaults.color='#8b8fa3';
-Chart.defaults.font.family="'Inter',sans-serif";
-Chart.defaults.plugins.tooltip.backgroundColor='rgba(21,22,33,.95)';
-Chart.defaults.plugins.tooltip.titleColor='#fff';
-Chart.defaults.plugins.tooltip.bodyColor='#e0e0e0';
-Chart.defaults.plugins.tooltip.borderColor='#2a2c3f';
-Chart.defaults.plugins.tooltip.borderWidth=1;
-Chart.defaults.plugins.tooltip.padding=12;
-Chart.defaults.plugins.tooltip.cornerRadius=8;
+// FIX (2026-08): this block used to run unguarded at the top level. Chart.js and its
+// datalabels plugin load from cdn.jsdelivr.net (see the <script src> tags in <head>) —
+// on any network that blocks or throttles that CDN (common on some corporate/mainland
+// China connections), `Chart` is undefined here and the line below throws. Because this
+// was a top-level statement, that uncaught error aborted the rest of THIS SAME <script>
+// block's execution — which silently broke every feature defined further down in the
+// file (the ticket queue, "My Recent Requests", the submit form, etc.) with zero visible
+// error to the user. Wrapping it means a broken CDN only takes down charts, not the app.
+try {
+    if (typeof Chart !== 'undefined') {
+        if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels, leaderLinePlugin);
+        Chart.defaults.color='#8b8fa3';
+        Chart.defaults.font.family="'Inter',sans-serif";
+        Chart.defaults.plugins.tooltip.backgroundColor='rgba(21,22,33,.95)';
+        Chart.defaults.plugins.tooltip.titleColor='#fff';
+        Chart.defaults.plugins.tooltip.bodyColor='#e0e0e0';
+        Chart.defaults.plugins.tooltip.borderColor='#2a2c3f';
+        Chart.defaults.plugins.tooltip.borderWidth=1;
+        Chart.defaults.plugins.tooltip.padding=12;
+        Chart.defaults.plugins.tooltip.cornerRadius=8;
+    } else {
+        console.error('Chart.js failed to load (CDN blocked/unreachable) — charts will be unavailable, but the rest of the app will keep working.');
+    }
+} catch (e) {
+    console.error('Chart.js setup failed, continuing without it:', e);
+}
 
 const PALETTE=['#00d4ff','#ff4d6d','#ffb800','#00e676','#b967ff','#2196f3','#ff8a65','#4db6ac','#e040fb','#69f0ae','#ff5252','#00bcd4','#ffeb3b','#7c4dff'];
 const pkAcms=["nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"];
