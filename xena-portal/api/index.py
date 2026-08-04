@@ -57,12 +57,19 @@ EXCLUDED_SUBMIT_FIELDS = {
 }
 
 # Update fields allows auditors to edit Status, Approval, Reject Reason, etc.
+# BUG FIX: "Assigned Member", "Done by", and "Mentioned Person" are Feishu User-type
+# fields. They were missing from this set (only "Lock Owner" was excluded), so if the
+# frontend ever rendered one as an editable text input, saving it back as a plain string
+# made Feishu reject the whole write with "UserFieldConvFail". Excluding all four
+# User-type fields here means a save/duplicate-check can never break on this again, even
+# if a future frontend change re-introduces an editable control for one of them.
 EXCLUDED_UPDATE_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
     "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
     "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
     "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
+    "Assigned Member", "Done by", "Mentioned Person",
     "Assigned Time", "Completion Time", "Last Retry Time", "Ready to Archive", "Reward"
 }
 
@@ -1733,23 +1740,43 @@ def submit_request():
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
+    created_via = "user_token"
 
     try:
-        # Primary Attempt (User Context): Create the blank row under the agent's identity
+        # Primary Attempt (User Context): Create ONLY the blank row under the agent's
+        # own identity -- no fields at all, so Feishu's own "Created By"/"Respondents"
+        # system columns get stamped with the real submitter if their token is allowed
+        # to create records on this base.
         create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
         resp = http_requests.post(url, headers=create_headers, json={"fields": {}}, timeout=15)
         data = resp.json()
         
-        # Fallback to TAT if UAT was entirely restricted
+        # Fallback to TAT if UAT was entirely restricted. NOTE: this is expected to
+        # trigger for every agent who genuinely lacks native Bitable record-create
+        # permission on this base (the reason this two-step flow exists in the first
+        # place) -- in that case Feishu's own "Created By" column will always show the
+        # app identity, no matter what token order we try, because that column is a
+        # platform-level automatic field driven by whichever token performed the create
+        # call. The real submitter is still recorded reliably in the "Submitted By"
+        # field below, which is what /api/my-requests and the audit log key off of.
         if data.get("code") != 0 and api_token != tat:
+            logger.warn("submit_primary_create_fallback", user=user,
+                        feishu_code=data.get("code"), feishu_msg=data.get("msg"))
             create_headers["Authorization"] = f"Bearer {tat}"
             resp = http_requests.post(url, headers=create_headers, json={"fields": {}}, timeout=15)
             data = resp.json()
+            created_via = "tenant_token_fallback"
+        elif not uat:
+            created_via = "tenant_token_no_uat"
 
         if data.get("code") == 0:
             record_id = data["data"]["record"]["record_id"]
             
-            # System Patch (TAT Context): Override schema constraints & permissions 
+            # System Patch (TAT Context): fills in ONLY the fields the user actually
+            # populated on the form (final_fields), plus the two operational fields
+            # "Request Status"/"Submitted By" -- never anything else. Everything the
+            # user didn't fill in stays untouched for manual entry on the sheet, exactly
+            # as requested.
             update_url = f"{url}/{record_id}"
             update_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
             update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": final_fields}, timeout=15)
@@ -1767,9 +1794,9 @@ def submit_request():
         return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
 
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')}", ip=ip, severity="Info")
+    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')} | created_via: {created_via}", ip=ip, severity="Info")
 
-    return jsonify({"success": True, "message": f"Successfully submitted {req_type}!"})
+    return jsonify({"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via})
 
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -2075,125 +2102,38 @@ def my_requests():
     if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
     
-    tat = get_tenant_access_token()
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    
     _cairo_now = cairo_now()
     from_dt = _cairo_now - timedelta(days=15)
     user_clean = user.strip().lower()
 
-    # ISSUE 8 FIX (server-side filtering): instead of downloading the whole table and
-    # filtering every row in Python, we now push the "Respondents == this user" condition
-    # down to Feishu via the /records/search filter's "contains" operator on the
-    # CreatedUser-type "Respondents" field (Feishu's Bitable search API matches Person/
-    # User fields by display name for this operator). This cuts the payload from "the
-    # entire Requests table" to "just this person's rows". Note: "Submitted By" (used in
-    # the old local-filter fallback) isn't an actual field in this table's schema, so it
-    # never contributed real matches even before this change -- Respondents is the field
-    # that actually carries this data.
+    # BUG FIX (was: "Server timeout: Data too large or loading"):
+    # The previous version of this endpoint tried to push the user filter down to
+    # Feishu via /records/search with a "contains" condition on "Respondents" (a
+    # CreatedUser-type field). That filter call was failing server-side, which tripped
+    # the full-table fallback scan (page_size 500, sequential pages) on *every* request
+    # -- and on Vercel that sequential full-table pull runs past the function's execution
+    # time limit, so Vercel kills it and returns a non-JSON timeout page instead of a
+    # normal error, which is exactly the "Server timeout: Data too large or loading"
+    # message (that message only ever means "res.json() couldn't parse the response").
     #
-    # NOTE ON THE DATE BOUND: we deliberately do NOT also push "Submitted on >= 15 days
-    # ago" down to Feishu. "Submitted on" was previously confirmed to behave unreliably
-    # for server-side date comparisons (this is why the codebase moved to Python-side
-    # date filtering in the first place). Server-side >= / <= comparisons on it are not
-    # trustworthy, so the 15-day cutoff below stays a local, exact check on the parsed
-    # datetime. This still uses "sort by Numbering DESC + stop once results age out of
-    # the window" to avoid pulling old rows, same as before -- it's just now applied to
-    # a per-user filtered set instead of the entire table.
-    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    session = http_requests.Session()
-    session.headers.update(headers)
+    # Fix: stop hitting Feishu live for this at all. Reuse the same warm Requests-table
+    # snapshot that /api/sync/refresh keeps hot in Redis (get_requests_table_snapshot),
+    # which already backs the analytics/compare pages. Reading from that snapshot is a
+    # single Redis round-trip instead of N sequential Feishu page fetches, so it can't
+    # time out, and it sidesteps the "is this filter/operator actually supported"
+    # question entirely -- we're back to the same proven "download once, filter locally"
+    # approach this codebase already relies on elsewhere, just served from cache instead
+    # of re-fetched from Feishu on every click.
+    all_items, _keys, fetch_complete, stop_reason, served_from_cache = get_requests_table_snapshot(from_dt=from_dt)
 
-    all_items = []
-    page_token = None
-    fetch_complete, stop_reason = True, ""
-    server_filter_ok = True  # if the Respondents filter itself errors out, fall back below
-
-    while True:
-        payload = {
-            "page_size": 100,  # capped at 100/page per Feishu's search endpoint limit
-            "filter": {
-                "conjunction": "and",
-                "conditions": [
-                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                ]
-            },
-            "sort": [{"field_name": "Numbering", "desc": True}]
-        }
-        if page_token:
-            payload["page_token"] = page_token
-
-        try:
-            resp = session.post(search_url, json=payload, timeout=15)
-            data = resp.json()
-
-            if data.get("code") != 0:
-                # Server-side filter itself failed (bad field name, permissions, etc.) --
-                # fall back to the full-table Python-side scan rather than showing the
-                # user an empty/broken page.
-                server_filter_ok = False
-                fetch_complete, stop_reason = False, data.get("msg")
-                break
-
-            block = data.get("data", {})
-            items = block.get("items", [])
-
-            # Defense-in-depth: Feishu's "contains" operator is a substring match, so
-            # e.g. filtering for "Ahmed" could also match "Ahmed Samurai" -- re-check
-            # exact-ish membership locally the same way /api/live-queue already does.
-            for it in items:
-                f = it.get("fields", {})
-                sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
-                rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
-                if user_clean in sb or user_clean in rp:
-                    all_items.append(it)
-
-            if items:
-                last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
-                if last_dt and last_dt < from_dt:
-                    break
-
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False):
-                break
-        except Exception as e:
-            fetch_complete, stop_reason = False, str(e)
-            break
-
-    # Fallback: if the server-side Respondents filter itself errored (unsupported
-    # operator on this field type, permissions, etc.), don't leave the user with a
-    # broken/empty page -- scan the table locally like the original implementation did.
-    if not server_filter_ok:
-        all_items = []
-        page_token = None
-        fetch_complete, stop_reason = True, ""
-        list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-        while True:
-            params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
-            if page_token: params["page_token"] = page_token
-            try:
-                resp = session.get(list_url, params=params, timeout=15)
-                data = resp.json()
-                if data.get("code") != 0:
-                    fetch_complete, stop_reason = False, data.get("msg")
-                    break
-                block = data.get("data", {})
-                items = block.get("items", [])
-                for it in items:
-                    f = it.get("fields", {})
-                    rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
-                    if user_clean in rp:
-                        all_items.append(it)
-                if items:
-                    last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
-                    if last_dt and last_dt < from_dt:
-                        break
-                page_token = block.get("page_token")
-                if not page_token or not block.get("has_more", False):
-                    break
-            except Exception as e:
-                fetch_complete, stop_reason = False, str(e)
-                break
+    matched_items = []
+    for it in all_items:
+        f = it.get("fields", {})
+        rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+        sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
+        if user_clean in rp or user_clean in sb:
+            matched_items.append(it)
+    all_items = matched_items
 
     results = []
     
@@ -2248,6 +2188,7 @@ def my_requests():
         "count": len(results),
         "fetch_complete": fetch_complete,
         "stop_reason": ("" if fetch_complete else stop_reason),
+        "served_from_background_cache": served_from_cache,
     })
 
 @app.route('/api/live-queue', methods=['GET'])
