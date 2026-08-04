@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xena Data Portal</title>
-    <!-- Favicon: minimalist cyan "S" mark. Scoped ONLY to the browser tab icon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><rect width='100' height='100' rx='22' fill='%230b0d10'/><text x='50' y='68' font-family='Arial, Helvetica, sans-serif' font-size='58' font-weight='700' fill='%2300d4ff' text-anchor='middle'>S</text></svg>">
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><circle cx='50' cy='50' r='38' fill='%23841b2d' stroke='%23841b2d' stroke-width='16' stroke-dasharray='0 14.92' stroke-linecap='round'/><circle cx='50' cy='50' r='29' fill='%232a2c30'/><text x='47' y='66' font-family='Times New Roman, serif' font-size='52' font-weight='bold' fill='%23841b2d' text-anchor='middle' font-style='italic'>S</text><path d='M 32 60 L 46 72 L 85 25 L 80 20 L 46 60 L 36 52 Z' fill='%23841b2d' stroke='%232a2c30' stroke-width='2' stroke-linejoin='round'/></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -108,6 +108,7 @@
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
 
+        /* QY Cards (Universal Query & My Requests) */
         .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
         .qy-card{background:linear-gradient(145deg, var(--surface) 0%, rgba(255,255,255,0.01) 100%);border:1px solid var(--border);border-radius:16px;padding:20px;transition:all .3s ease; position:relative; overflow:hidden;}
         .qy-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: transparent; transition: background 0.3s ease; }
@@ -155,6 +156,7 @@
         .control-group select:focus,.control-group input:focus,.control-group textarea:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1); background:rgba(0,0,0,0.4);}
         .control-group input:disabled, .control-group select:disabled, .control-group textarea:disabled { opacity: 0.6; cursor: not-allowed; background:rgba(0,0,0,0.4); }
         
+        /* Modern Form Customizations */
         .form-card { max-width: 800px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
         .form-highlight-input { border-color: var(--accent-cyan) !important; background: rgba(0,212,255,0.03) !important; font-weight: 600; box-shadow: 0 4px 15px rgba(0,212,255,0.05); }
         .form-highlight-input:focus { background: rgba(0,212,255,0.06) !important; }
@@ -165,6 +167,7 @@
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
 
+        /* Custom Agency List Table */
         .al-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
         .al-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
         .al-table th { padding: 14px 16px; text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; background: rgba(28, 29, 43, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--border); }
@@ -423,13 +426,42 @@
             .main-content{margin-left: 0;}
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
         }
+        /* ISSUE 2 FIX: image lightbox/modal (replaces target="_blank" attachment links) */
+        .img-lightbox-overlay{
+            display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,11,14,0.92);
+            align-items:center;justify-content:center;flex-direction:column;
+        }
+        .img-lightbox-overlay.active{display:flex}
+        .img-lightbox-toolbar{
+            position:absolute;top:14px;right:18px;display:flex;gap:8px;z-index:2;
+        }
+        .img-lightbox-toolbar button{
+            background:rgba(255,255,255,0.08);border:1px solid var(--border,rgba(255,255,255,0.15));
+            color:#fff;width:38px;height:38px;border-radius:8px;cursor:pointer;font-size:16px;
+            display:flex;align-items:center;justify-content:center;transition:background .15s;
+        }
+        .img-lightbox-toolbar button:hover{background:rgba(255,255,255,0.18)}
+        .img-lightbox-stage{
+            width:90vw;height:82vh;display:flex;align-items:center;justify-content:center;overflow:hidden;
+        }
+        .img-lightbox-stage img{
+            max-width:100%;max-height:100%;object-fit:contain;user-select:none;pointer-events:none;
+            transition:transform .12s ease-out;
+        }
+        .img-lightbox-hint{color:var(--text-muted,#8a8fa3);font-size:.75rem;margin-top:10px}
+        .img-attach-thumb{
+            display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;
+            border:1px solid var(--border,rgba(255,255,255,0.15));cursor:zoom-in;background:none;padding:0;
+        }
+        .img-attach-thumb img{width:100%;height:100%;object-fit:cover}
     </style>
 </head>
+
 <body>
 
-<!-- Original Wax Seal Logo for Login & Sidebar Headers (Issue 3 Fix) -->
 <svg style="display:none;">
     <defs>
+        <!-- Custom Wax Seal Logo from image -->
         <g id="icon-logo">
             <!-- Scalloped Background -->
             <circle cx="50" cy="50" r="38" fill="#841b2d" stroke="#841b2d" stroke-width="16" stroke-dasharray="0 14.92" stroke-linecap="round"/>
@@ -455,6 +487,23 @@
 </svg>
 
 <div id="toastContainer"></div>
+
+<!-- ISSUE 2 FIX: image lightbox/modal, replaces target="_blank" attachment links -->
+<div id="imgLightboxOverlay" class="img-lightbox-overlay" onclick="if(event.target===this) closeImageLightbox()">
+    <div class="img-lightbox-toolbar" onclick="event.stopPropagation()">
+        <button type="button" onclick="lightboxZoom(0.25)" title="Zoom in">➕</button>
+        <button type="button" onclick="lightboxZoom(-0.25)" title="Zoom out">➖</button>
+        <button type="button" onclick="lightboxRotate(-90)" title="Rotate left">↺</button>
+        <button type="button" onclick="lightboxRotate(90)" title="Rotate right">↻</button>
+        <button type="button" onclick="lightboxReset()" title="Reset">⟲</button>
+        <button type="button" onclick="closeImageLightbox()" title="Close">✕</button>
+    </div>
+    <div class="img-lightbox-stage">
+        <img id="imgLightboxImg" src="" alt="Attachment preview">
+    </div>
+    <div class="img-lightbox-hint">Scroll to zoom · Click outside or press Esc to close</div>
+</div>
+
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
     <div style="color:var(--text-muted);font-weight:500;" id="loadingText" data-i18n="crunching">Crunching Feishu data...</div>
@@ -1583,6 +1632,12 @@
                                <div id="tw-dup-display" style="padding:16px; background:rgba(255,255,255,0.05); border-radius:10px; margin-bottom:12px; font-weight:600;">Not yet checked</div>
                                <button type="button" id="twVerifyBtn" class="btn btn-outline" onclick="twRunVerify()" style="width:auto; border-color:var(--accent-amber); color:var(--accent-amber);">🔄 Run Duplicate Check</button>
                            </div>
+                           <!-- ISSUE 4 FIX: Reject Reason (fldf3OhGJT) now lives in the 3rd
+                                section (Duplicate Check), not the Audition Action card. -->
+                           <div class="control-group" style="grid-column: 1 / -1;">
+                               <label>Reject Reason</label>
+                               <div id="tw-reject-reason-wrap" class="sub-opts" style="border-color:var(--accent-rose); background:rgba(255,77,109,0.03);"></div>
+                           </div>
                        </div>
                    </div>
 
@@ -1629,9 +1684,13 @@
                                    <option value="Under Investigation">Under Investigation</option>
                                </select>
                            </div>
-                           <div class="control-group" style="grid-column: 1 / -1;">
-                               <label>Reject Reason</label>
-                               <div id="tw-reject-reason-wrap" class="sub-opts" style="border-color:var(--accent-rose); background:rgba(255,77,109,0.03);"></div>
+                           <!-- ISSUE 4 FIX: Mentioned Group (fld9RClgRw) now rendered here,
+                                in the final Audition Action / Chinese Approval area. -->
+                           <div class="control-group">
+                               <label>Mentioned Group</label>
+                               <select id="tw-mentioned-group" name="Mentioned Group" data-feishu-field="Mentioned Group" class="form-highlight-input">
+                                   <option value="">-- Select --</option>
+                               </select>
                            </div>
                            <div class="control-group" style="grid-column: 1 / -1;">
                                <label>Audition Note</label>
@@ -1864,7 +1923,7 @@ function renderTabs() {
     const titlesMap = currentLang === 'zh' ? zhPageTitlesMap : pageTitlesMap;
 
     openTabs.forEach(page => {
-        if(page === 'ticket-workspace') return; 
+        if(page === 'ticket-workspace') return; // Don't render workspace as a tab
         
         const title = titlesMap[page] || page;
         const isActive = page === activeTabId || (page === 'live-tickets' && activeTabId === 'ticket-workspace');
@@ -1974,7 +2033,7 @@ function executePageLogic(page) {
         document.getElementById('pg-agency-list').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
         populateAlAcmSelect();
-        alFetch(); 
+        alFetch(); // auto fetch on load
     } else if(page==='new-request'){
         document.getElementById('pg-new-request').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -1982,7 +2041,7 @@ function executePageLogic(page) {
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
-        loadMyRequests(); 
+        loadMyRequests(); // fetch user requests on load
     } else if(page==='live-tickets'){
         document.getElementById('pg-live-tickets').style.display='block';
         _expandNavGroup('navBodyTickets','navArrTickets');
@@ -3867,7 +3926,8 @@ async function loadMyRequests() {
     
     try {
         const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
-        const data = await resp.json();
+        let data;
+        try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
         if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
         
         if (data.fetch_complete === false) {
@@ -4384,6 +4444,9 @@ const LT_ALWAYS_SHOW = [["applier_note","Applier Note"]];
 
 const FIELD_SCHEMA = {"Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)"]}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Shivam-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed", "Ahmed Samurai"]}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty"]}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"]}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA", "nabeel"]}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name"]}, "Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )"]}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "SingleLink"}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}};
 
+// Exact per-Request-Type field layout for the ticket workspace's Dynamic Request
+// Section, sourced directly from the live Feishu form (keys match Feishu's
+// Request Type option strings, trimmed).
 const TICKET_DYNAMIC_FIELDS = {
     "Agency Creation": [
         "Region",
@@ -4493,7 +4556,12 @@ const TICKET_DYNAMIC_FIELDS = {
         "Agency Code",
         "Evidence Screen"
     ],
-    "Change agency name": [
+    // ISSUE 3 FIX: these three keys must match the *exact* live "Request Type" option
+    // strings from FIELD_SCHEMA above (which include trailing spaces baked into the
+    // Feishu sheet's option list itself). A key of "Change agency name" (no trailing
+    // space) never matches the real value "Change agency name " (trailing space), so
+    // this branch was silently falling through to the generic fallback every time.
+    "Change agency name ": [
         "Region",
         "Agency Code",
         "User ID",
@@ -4508,7 +4576,8 @@ const TICKET_DYNAMIC_FIELDS = {
         "Current agency manger name (same in NID )",
         "Evidence Screen"
     ],
-    "Change Agency Ownership": [
+    // ISSUE 3 FIX: live option has a trailing space ("Change Agency Ownership ").
+    "Change Agency Ownership ": [
         "Region",
         "Agency Code",
         "User ID",
@@ -4524,7 +4593,8 @@ const TICKET_DYNAMIC_FIELDS = {
         "Agency to be merged and closed",
         "Evidence Screen"
     ],
-    "Remove BD": [
+    // ISSUE 3 FIX: live option has a trailing space ("Remove BD ").
+    "Remove BD ": [
         "Bd Code",
         "User ID",
         "Closing Reason",
@@ -4534,6 +4604,9 @@ const TICKET_DYNAMIC_FIELDS = {
     ]
 };
 
+// Automation/system fields (Formula, Lookup, internal bot wiring, etc.) that should
+// never be rendered as editable controls, used as a fallback filter for Request Types
+// that don't have an explicit entry in TICKET_DYNAMIC_FIELDS above.
 const TICKET_INTERNAL_FIELDS = new Set([
     "Numbering",
     "Submitted on",
@@ -4602,6 +4675,7 @@ function feishuValueToString(value) {
 }
 
 function feishuValueToList(value) {
+    // Like feishuValueToString but returns each segment separately (for MultiSelect matching).
     if (value === null || value === undefined || value === '') return [];
     if (Array.isArray(value)) {
         return value.map(item => {
@@ -4649,6 +4723,11 @@ async function ltPullAssigned() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to pull tickets');
 
+        // The backend now returns the LIVE, server-filtered set of tickets that are
+        // still "In Progress" and assigned to this user. We resync ltQueue to exactly
+        // match this set (instead of only ever adding) so tickets that were closed,
+        // reassigned, or resolved in Lark disappear from the queue immediately rather
+        // than lingering in stale client-side state.
         const tickets = data.tickets || [];
         const prevIds = new Set(ltQueue.map(q => q.record_id || q.id));
         const newIds = new Set(tickets.map(t => t.record_id || t.id));
@@ -4723,8 +4802,19 @@ async function twOpenWorkspace(recordId) {
         const sec2 = document.getElementById('tw-sec-2');
         sec1.innerHTML = ''; sec2.innerHTML = '';
 
-        const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering', 'Create Way']);
+        // Fields shown via their own dedicated controls elsewhere in the form
+        // (Duplicate Check card, Chinese Approval card, Audition Action card, header).
+        // ISSUE 4 FIX: "Mentioned Group" added here since it now has a dedicated
+        // dropdown (#tw-mentioned-group) instead of falling through to the generic
+        // dynamic-field renderer.
+        const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering', 'Create Way', 'Mentioned Group']);
 
+        // ISSUE 6 FIX: the Dynamic Request Section now mirrors the live Feishu form —
+        // when the Request Type has an exact field list (TICKET_DYNAMIC_FIELDS), only
+        // those fields are rendered (in that order, even if currently empty, so missing
+        // data can be filled in). Unmapped Request Types fall back to "every field that
+        // has a value and isn't a pure automation/system field" (TICKET_INTERNAL_FIELDS)
+        // instead of dumping every raw column including Formula/Lookup bot-wiring fields.
         const reqType = (ticket.fields['Request Type'] || '').toString().trim();
         const explicitList = TICKET_DYNAMIC_FIELDS[reqType];
 
@@ -4746,7 +4836,7 @@ async function twOpenWorkspace(recordId) {
             const val = ticket.fields[key];
             if (val === undefined || val === null || val === '') return;
             if (LT_PROCESSING_KEYS.has(key)) return;
-            if (!LT_BASIC_KEYS.has(key)) return;
+            if (!LT_BASIC_KEYS.has(key)) return; // dynamic-section fields handled below
             sec1.appendChild(createTwControl(key, val));
         });
 
@@ -4763,6 +4853,18 @@ async function twOpenWorkspace(recordId) {
         document.getElementById('tw-chinese-action').value = typeof ticket.fields['Type of Action'] === 'string' ? ticket.fields['Type of Action'].trim() : (ticket.fields['Type of Action']?.text?.trim() || '');
         document.getElementById('tw-chinese-note').value = ticket.fields['chinese Note'] || '';
 
+        // ISSUE 4 FIX: populate the "Mentioned Group" dropdown (options come straight
+        // from the live schema, same pattern used for Create Way below).
+        const mgSel = document.getElementById('tw-mentioned-group');
+        if (mgSel) {
+            const mgMeta = FIELD_SCHEMA['Mentioned Group'];
+            const mgVal = feishuValueToString(ticket.fields['Mentioned Group']);
+            const mgOpts = (mgMeta?.options || []).map(o => `<option value="${escHtml(o)}" ${o === mgVal ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+            mgSel.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
+        }
+
+        // ISSUE 5 FIX: "Reject Reason" (MultiSelect) now renders real checkboxes instead
+        // of being silently dropped.
         const rrWrap = document.getElementById('tw-reject-reason-wrap');
         if (rrWrap) {
             const rrMeta = FIELD_SCHEMA['Reject Reason'];
@@ -4774,6 +4876,7 @@ async function twOpenWorkspace(recordId) {
                 </label>`).join('');
         }
 
+        // ISSUE 5 FIX: "Create Way" restored as a dropdown in the Duplicate Check card.
         let cwWrap = document.getElementById('tw-create-way-wrap');
         const dupCard = document.getElementById('tw-sec-3');
         if (!cwWrap && dupCard) {
@@ -4800,30 +4903,97 @@ async function twOpenWorkspace(recordId) {
     document.getElementById('loadingOverlay').style.display = 'none';
 }
 
+// ISSUE 2 FIX: image lightbox/modal with zoom + rotate, mirroring Feishu/Lark's inline
+// attachment viewer. No target="_blank" is used anywhere for attachment thumbnails.
+let lightboxZoomLevel = 1;
+let lightboxRotation = 0;
+
+function openImageLightbox(src) {
+    const overlay = document.getElementById('imgLightboxOverlay');
+    const img = document.getElementById('imgLightboxImg');
+    if (!overlay || !img) return;
+    lightboxZoomLevel = 1;
+    lightboxRotation = 0;
+    img.style.transform = 'scale(1) rotate(0deg)';
+    img.src = src;
+    overlay.classList.add('active');
+    document.addEventListener('keydown', lightboxKeyHandler);
+    overlay.addEventListener('wheel', lightboxWheelHandler, { passive: false });
+}
+
+function closeImageLightbox() {
+    const overlay = document.getElementById('imgLightboxOverlay');
+    const img = document.getElementById('imgLightboxImg');
+    if (!overlay) return;
+    overlay.classList.remove('active');
+    if (img) img.src = '';
+    document.removeEventListener('keydown', lightboxKeyHandler);
+    overlay.removeEventListener('wheel', lightboxWheelHandler);
+}
+
+function lightboxZoom(delta) {
+    lightboxZoomLevel = Math.min(Math.max(lightboxZoomLevel + delta, 0.25), 6);
+    lightboxApplyTransform();
+}
+
+function lightboxRotate(deg) {
+    lightboxRotation = (lightboxRotation + deg) % 360;
+    lightboxApplyTransform();
+}
+
+function lightboxReset() {
+    lightboxZoomLevel = 1;
+    lightboxRotation = 0;
+    lightboxApplyTransform();
+}
+
+function lightboxApplyTransform() {
+    const img = document.getElementById('imgLightboxImg');
+    if (img) img.style.transform = `scale(${lightboxZoomLevel}) rotate(${lightboxRotation}deg)`;
+}
+
+function lightboxKeyHandler(e) {
+    if (e.key === 'Escape') closeImageLightbox();
+    else if (e.key === '+' || e.key === '=') lightboxZoom(0.25);
+    else if (e.key === '-') lightboxZoom(-0.25);
+    else if (e.key === 'r' || e.key === 'R') lightboxRotate(90);
+}
+
+function lightboxWheelHandler(e) {
+    e.preventDefault();
+    lightboxZoom(e.deltaY < 0 ? 0.25 : -0.25);
+}
+
 function createTwControl(key, value) {
     const wrap = document.createElement('div');
     wrap.className = 'control-group';
     const label = `<label>${escHtml(key)}</label>`;
-    const meta = FIELD_SCHEMA[key]; 
+    const meta = FIELD_SCHEMA[key]; // { field_id, ui_type, options? } from the live Lark schema
 
+    // ISSUE 8 FIX: Attachment fields now carry field_id so the backend can build the
+    // "extra" bitablePerm parameter Feishu requires under advanced permissions.
+    // ISSUE 2 FIX: thumbnails now open the in-page lightbox (openImageLightbox) instead
+    // of an <a target="_blank"> link, so images never leave the current page/tab.
     if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].file_token) {
         const fieldIdQS = meta?.field_id ? `&field_id=${encodeURIComponent(meta.field_id)}` : '';
         let html = label + `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
         value.forEach(f => {
             const src = `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`;
-            html += `<a href="${src}" target="_blank" style="display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;border:1px solid var(--border);"><img src="${src}" loading="lazy" onerror="this.closest('a').innerHTML='📎';" style="width:100%;height:100%;object-fit:cover;"></a>`;
+            html += `<button type="button" class="img-attach-thumb" onclick="openImageLightbox('${src.replace(/'/g, "\\'")}')" title="Click to preview"><img src="${src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
         });
         html += `</div><input type="file" name="${escHtml(key)}" multiple class="form-highlight-input" style="font-size:0.75rem;padding:8px;background:rgba(255,255,255,0.02) !important;">`;
         wrap.innerHTML = html;
         return wrap;
     }
 
+    // User/Person fields (e.g. "Lock Owner", "Mentioned Person") -> read as text of names
     if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].id && value[0].name) {
         const str = value.map(v => v.name).join(', ');
         wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(str)}" class="form-highlight-input">`;
         return wrap;
     }
 
+    // ISSUE 4/5/6 CONTROL MAPPING: render strictly by the schema's ui_type.
     if (meta?.ui_type === 'SingleSelect' && meta.options) {
         const cur = feishuValueToString(value);
         const opts = meta.options.map(o => `<option value="${escHtml(o)}" ${o === cur ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
@@ -4849,6 +5019,10 @@ function createTwControl(key, value) {
         return wrap;
     }
 
+    // Text, Formula, Lookup, DateTime, and anything else -> plain (read-friendly) text
+    // input, but ALWAYS unwrapped via feishuValueToString so Lark's array/object segment
+    // shapes (e.g. Lookup/Formula returning [{"type":"text","text":"..."}]) never leak
+    // through as raw "[{...}]" JSON in the UI.
     const readOnly = meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type);
     const valStr = feishuValueToString(value);
     wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" ${readOnly ? 'readonly style="opacity:.7;cursor:not-allowed;"' : ''}>`;
@@ -4861,22 +5035,26 @@ function twCloseWorkspace() {
     executePageLogic('live-tickets');
 }
 
+// Shared by twSaveWorkspace and twRunVerify. Collects text/number/select/textarea
+// values, groups MultiSelect checkboxes (data-multi="true") into arrays per field name,
+// and skips read-only Formula/Lookup/computed inputs (Feishu rejects writes to these).
 function twCollectFields(form) {
     const fields = {};
-    form.querySelectorAll('input, textarea, select').forEach(el => {
-        if (!el.name || el.readOnly || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
-        
-        if (el.type === 'checkbox') {
-            if (el.dataset.multi === 'true') {
-                if (!fields[el.name]) fields[el.name] = [];
-                if (el.checked) fields[el.name].push(el.value);
-            } else {
-                fields[el.name] = el.checked;
-            }
-        } else if (el.type === 'radio') {
-            if (el.checked) fields[el.name] = el.value;
+    form.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => {
+        if (!el.name || el.readOnly) return;
+        fields[el.name] = el.value;
+    });
+    const cbByName = {};
+    form.querySelectorAll('input[type="checkbox"]').forEach(el => {
+        if (!el.name) return;
+        (cbByName[el.name] = cbByName[el.name] || []).push(el);
+    });
+    Object.keys(cbByName).forEach(name => {
+        const els = cbByName[name];
+        if (els.length > 1 || els[0].dataset.multi === 'true') {
+            fields[name] = els.filter(e => e.checked).map(e => e.value);
         } else {
-            if (el.value !== "") fields[el.name] = el.value;
+            fields[name] = els[0].checked;
         }
     });
     return fields;
@@ -4886,44 +5064,34 @@ async function twSaveWorkspace() {
     const btn = document.getElementById('twSaveBtn');
     btn.disabled = true; btn.textContent = '⏳ Saving…';
     
-    try {
-        const form = document.getElementById('tw-form');
-        const fields = twCollectFields(form);
-        
-        const mappedFields = {};
-        for (const [key, val] of Object.entries(fields)) {
-            if (FIELD_SCHEMA[key] && FIELD_SCHEMA[key].field_id) {
-                mappedFields[FIELD_SCHEMA[key].field_id] = val;
-            } else {
-                mappedFields[key] = val;
-            }
-        }
+    const form = document.getElementById('tw-form');
+    const fields = twCollectFields(form);
+    const finalData = new FormData();
+    
+    finalData.append('user', loggedUser);
+    finalData.append('record_id', document.getElementById('tw-record-id').value);
 
-        const finalData = new FormData();
-        finalData.append('user', loggedUser);
-        finalData.append('record_id', document.getElementById('tw-record-id').value);
-        finalData.append('fields', JSON.stringify(mappedFields));
-        
-        form.querySelectorAll('input[type="file"]').forEach(fInput => {
-            if (fInput.files.length > 0) {
-                const fieldKey = FIELD_SCHEMA[fInput.name] ? FIELD_SCHEMA[fInput.name].field_id : fInput.name;
-                Array.from(fInput.files).forEach(file => {
-                    finalData.append(fieldKey, file);
-                });
-            }
-        });
-        
+    finalData.append('fields', JSON.stringify(fields));
+    
+    form.querySelectorAll('input[type="file"]').forEach(fInput => {
+        if (fInput.files.length > 0) {
+            Array.from(fInput.files).forEach(file => {
+                finalData.append(fInput.name, file);
+            });
+        }
+    });
+    
+    try {
         const res = await fetch('/api/requests/update', {
             method: 'POST',
             body: finalData
         });
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
-        ToastManager.show('Ticket saved & resolved successfully.', 'success');
+        ToastManager.show('Ticket saved successfully.', 'success');
         
         const rid = document.getElementById('tw-record-id').value;
         ltQueue = ltQueue.filter(t => (t.record_id||t.id) !== rid);
-        ltRenderQueue();
         
         twCloseWorkspace();
     } catch (e) {
@@ -4940,49 +5108,25 @@ async function twRunVerify() {
     try {
         const form = document.getElementById('tw-form');
         const fields = twCollectFields(form);
-        
-        const mappedFields = {};
-        for (const [key, val] of Object.entries(fields)) {
-            if (FIELD_SCHEMA[key] && FIELD_SCHEMA[key].field_id) {
-                mappedFields[FIELD_SCHEMA[key].field_id] = val;
-            } else {
-                mappedFields[key] = val;
-            }
-        }
-
-        const beforeVal = JSON.stringify(ltActiveTicket && ltActiveTicket.fields ? ltActiveTicket.fields['Duplicated Check'] : null);
-
         const finalData = new FormData();
         finalData.append('user', loggedUser);
         finalData.append('record_id', recordId);
-        finalData.append('fields', JSON.stringify(mappedFields));
+        finalData.append('fields', JSON.stringify(fields));
 
-        form.querySelectorAll('input[type="file"]').forEach(fInput => {
-            if (fInput.files.length > 0) {
-                const fieldKey = FIELD_SCHEMA[fInput.name] ? FIELD_SCHEMA[fInput.name].field_id : fInput.name;
-                Array.from(fInput.files).forEach(file => {
-                    finalData.append(fieldKey, file);
-                });
-            }
-        });
-
+        // ISSUE 5 FIX (push-wait-fetch): step 1, push the edited fields and make sure
+        // the push itself actually succeeded before waiting on Feishu to recalculate.
         const pushRes = await fetch('/api/requests/update', { method: 'POST', body: finalData });
-        const pushData = await pushRes.json();
-        if (!pushData.success) throw new Error(pushData.error || 'Failed to push updates');
-
-        btn.textContent = '⏳ Waiting for calc…';
-        let latest = null;
-        const maxAttempts = 10;
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            await new Promise(r => setTimeout(r, 1000));
-            const res = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}&_ts=${Date.now()}`, { cache: 'no-store' });
-            const data = await res.json();
-            if (!data.success) continue;
-            latest = data.record;
-            const nowVal = JSON.stringify(latest.fields ? latest.fields['Duplicated Check'] : null);
-            if (nowVal !== beforeVal && nowVal !== undefined) break;
+        const pushData = await pushRes.json().catch(() => ({}));
+        if (!pushRes.ok || pushData.success === false) {
+            throw new Error(pushData.error || 'Failed to save the fields needed for the duplicate check.');
         }
 
+        // Step 2: give Lark's formula engine time to recalculate "Duplicated Check"
+        // from the values we just pushed.
+        await new Promise(r => setTimeout(r, 2500));
+
+        // Step 3: fetch the freshly recalculated record and re-render the workspace
+        // (this also naturally refreshes the "Duplicated Check" card display).
         await twOpenWorkspace(recordId);
         ToastManager.show('Duplicate check refreshed.', 'success');
     } catch(e) {
@@ -4991,6 +5135,7 @@ async function twRunVerify() {
         btn.disabled = false; btn.textContent = '🔄 Run Duplicate Check';
     }
 }
+
 
 function ltSetConnStatus(status) {
     const dot = document.getElementById('ltConnDot');
@@ -5055,6 +5200,7 @@ function initLiveTicketWorkspace() {
         ltConnectPusher();
     }
 }
+
 
 function alDebounce() {
     clearTimeout(alDebounceTimer);
@@ -5174,6 +5320,9 @@ function populateAlAcmSelect() {
     }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// NEW REQUEST FORM ENGINE
+// ════════════════════════════════════════════════════════════════════
 const ACM_AUTO = "__ACM_AUTO__";
 
 const REQ_BRANCHES = {
@@ -5417,28 +5566,18 @@ async function submitReqForm(e) {
             if (checked.length > 0) payloadFields[mf] = checked;
         });
 
-        const mappedPayload = {};
-        for (const [key, val] of Object.entries(payloadFields)) {
-            if (FIELD_SCHEMA[key] && FIELD_SCHEMA[key].field_id) {
-                mappedPayload[FIELD_SCHEMA[key].field_id] = val;
-            } else {
-                mappedPayload[key] = val;
-            }
-        }
-
         const finalData = new FormData();
         finalData.append('user', loggedUser);
         finalData.append('email', loggedEmail);
         
         if (loggedUat) finalData.append('uat', loggedUat); 
         
-        finalData.append('payload', JSON.stringify(mappedPayload));
+        finalData.append('payload', JSON.stringify(payloadFields));
 
         form.querySelectorAll('input[type="file"]').forEach(fInput => {
             if (fInput.files.length > 0) {
-                const fieldKey = FIELD_SCHEMA[fInput.name] ? FIELD_SCHEMA[fInput.name].field_id : fInput.name;
                 Array.from(fInput.files).forEach(file => {
-                    finalData.append(fieldKey, file);
+                    finalData.append(fInput.name, file);
                 });
             }
         });
