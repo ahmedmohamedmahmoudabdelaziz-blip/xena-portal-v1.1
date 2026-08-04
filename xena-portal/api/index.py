@@ -2154,11 +2154,6 @@ def live_queue():
             "conjunction": "and",
             "conditions": [
                 {
-                    "field_name": "Assigned Member",
-                    "operator": "contains",
-                    "value": [user]
-                },
-                {
                     "field_name": "Request Status", 
                     "operator": "contains",
                     "value": ["In Progress"] 
@@ -2173,22 +2168,26 @@ def live_queue():
         data = resp.json()
         
         if data.get("code") == 1254045:
-            payload["filter"]["conditions"][1]["field_name"] = "Status"
+            payload["filter"]["conditions"][0]["field_name"] = "Status"
             resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
             data = resp.json()
             
         if data.get("code") == 0:
             items = data.get("data", {}).get("items", [])
             tickets = []
+            user_clean = user.strip().lower()
             for item in items:
                 fields = item.get("fields", {})
-                tickets.append({
-                    "record_id": item.get("record_id"),
-                    "numbering": extract_field_text(get_field_local(fields, "Numbering")),
-                    "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
-                    "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
-                    "user_id": extract_field_text(get_field_local(fields, "User ID")),
-                })
+                assigned_member = extract_field_text(get_field_local(fields, "Assigned Member")).lower()
+                if user_clean in assigned_member:
+                    tickets.append({
+                        "record_id": item.get("record_id"),
+                        "numbering": extract_field_text(get_field_local(fields, "Numbering")),
+                        "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
+                        "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
+                        "user_id": extract_field_text(get_field_local(fields, "User ID")),
+                        "assigned_member": extract_field_text(get_field_local(fields, "Assigned Member")),
+                    })
             return jsonify({"success": True, "tickets": tickets})
             
         return jsonify({"success": False, "error": data.get("msg")})
@@ -2597,11 +2596,6 @@ def pull_assigned_ticket():
     if MOCK_MODE:
         return jsonify({"tickets": []})
 
-    # ROOT CAUSE (was): this endpoint crawled the ENTIRE requests table page-by-page
-    # (page_size 500, sequential, up to 35s) and filtered client-side in Python.
-    # The Query page instead uses Feishu's server-side /records/search filter, which
-    # returns only matching rows in a single round trip. We now do the same thing here
-    # (identical approach to /api/live-queue) so this endpoint is as fast as Query.
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -2612,7 +2606,6 @@ def pull_assigned_ticket():
             "filter": {
                 "conjunction": "and",
                 "conditions": [
-                    {"field_name": "Assigned Member", "operator": "contains", "value": [user]},
                     {"field_name": status_field, "operator": "contains", "value": ["In Progress"]},
                 ],
             },
@@ -2632,7 +2625,15 @@ def pull_assigned_ticket():
             data = resp.json()
         if data.get("code") == 0:
             items = data.get("data", {}).get("items", [])
-            matches = [build_ticket_payload(it) for it in items[:20]]
+            user_clean = user.strip().lower()
+            
+            filtered_items = []
+            for it in items:
+                assigned_member = extract_field_text(it.get("fields", {}).get("Assigned Member", "")).lower()
+                if user_clean in assigned_member:
+                    filtered_items.append(it)
+                    
+            matches = [build_ticket_payload(it) for it in filtered_items[:20]]
         else:
             logger.error("pull_assigned_failed", error=data.get("msg"))
     except Exception as e:
