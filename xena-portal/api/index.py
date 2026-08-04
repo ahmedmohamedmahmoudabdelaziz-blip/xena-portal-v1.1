@@ -2033,55 +2033,100 @@ def my_requests():
     if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
     
+    if not user:
+        return jsonify({"error": "Missing user"}), 400
+
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    
+
     _cairo_now = cairo_now()
     from_dt = _cairo_now - timedelta(days=15)
-    
-    # We query directly and page purely using Python logic (immune to InvalidFilter)
+
     session = http_requests.Session()
     session.headers.update(headers)
     list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-    
+
+    # --- Issue 8 / 2b: server-side filtering via Feishu's List Records filter syntax ---
+    # Respondents (fldAE3MeYy) == currently logged-in user
+    # Submitted on (fldV5rIFQ0) >= Today - 15 Days
+    def _esc(s):
+        return str(s).replace('\\', '\\\\').replace('"', '\\"')
+
+    user_clean = user.strip()
+    from_str = from_dt.strftime("%Y-%m-%d %H:%M")
+    filter_str = (
+        f'AND(CurrentValue.[Respondents].contains("{_esc(user_clean)}"),'
+        f'CurrentValue.[Submitted on] >= "{from_str}")'
+    )
+
     all_items = []
     page_token = None
     fetch_complete, stop_reason = True, ""
-    
+    server_filter_ok = True
+
     while True:
-        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+        params = {"page_size": 100, "filter": filter_str, "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
-        
+
         try:
             resp = session.get(list_url, params=params, timeout=15)
             data = resp.json()
             if data.get("code") != 0:
-                fetch_complete, stop_reason = False, data.get("msg")
+                # Feishu rejected the filter (e.g. field type doesn't support this operator).
+                # Fall back once to the safe paginated + local-filter path below.
+                server_filter_ok = False
+                stop_reason = data.get("msg")
                 break
-                
+
             block = data.get("data", {})
-            items = block.get("items", [])
-            user_clean = user.strip().lower()
-            
-            for it in items:
-                f = it.get("fields", {})
-                sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
-                rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
-                if user_clean in sb or user_clean in rp:
-                    all_items.append(it)
-                    
-            if items:
-                last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
-                if last_dt and last_dt < from_dt:
-                    break
-                    
+            all_items.extend(block.get("items", []))
             page_token = block.get("page_token")
             if not page_token or not block.get("has_more", False):
                 break
         except Exception as e:
+            server_filter_ok = False
             fetch_complete, stop_reason = False, str(e)
             break
-            
+
+    if not server_filter_ok:
+        # Fallback: page the full table and filter locally (previous behavior),
+        # so the feature degrades gracefully instead of breaking outright.
+        all_items = []
+        page_token = None
+        fetch_complete, stop_reason = True, ""
+        while True:
+            params = {"page_size": 100, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+            if page_token: params["page_token"] = page_token
+            try:
+                resp = session.get(list_url, params=params, timeout=15)
+                data = resp.json()
+                if data.get("code") != 0:
+                    fetch_complete, stop_reason = False, data.get("msg")
+                    break
+
+                block = data.get("data", {})
+                items = block.get("items", [])
+                user_lc = user_clean.lower()
+
+                for it in items:
+                    f = it.get("fields", {})
+                    sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
+                    rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+                    if user_lc in sb or user_lc in rp:
+                        all_items.append(it)
+
+                if items:
+                    last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
+                    if last_dt and last_dt < from_dt:
+                        break
+
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            except Exception as e:
+                fetch_complete, stop_reason = False, str(e)
+                break
+
     results = []
     
     for item in all_items:
