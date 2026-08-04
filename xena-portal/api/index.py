@@ -20,8 +20,8 @@ MOCK_MODE = not bool(APP_ID and APP_SECRET)
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
-ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
 AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")   
+ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
@@ -46,9 +46,6 @@ QUERY_FIELD_ALIASES = {
     "bd_code":     ["Bd Code", "BD Code"],
 }
 
-# The explicit field mapping dictionary containing both UI Types and corresponding field_ids.
-FIELD_SCHEMA = {"Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)"]}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Shivam-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed", "Ahmed Samurai"]}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty"]}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"]}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA", "nabeel"]}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name"]}, "Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )"]}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "SingleLink"}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}};
-
 EXCLUDED_SUBMIT_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
@@ -59,12 +56,11 @@ EXCLUDED_SUBMIT_FIELDS = {
     "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Status", "Request Status"
 }
 
-# Update fields allows auditors to edit Status, Approval, Reject Reason, etc.
-# Note: "Duplicated Check" (Formula) is strictly excluded to prevent Lark API write failures.
+# Strictly block all formula and automated fields from ever being sent in a PATCH/PUT payload
 EXCLUDED_UPDATE_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
-    "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
+    "Duplicated Check", "fldfCHFGMl", "Handle Time (Seconds)", "Base Points", "Formula",
     "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
     "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
     "Assigned Time", "Completion Time", "Last Retry Time", "Ready to Archive", "Reward"
@@ -80,9 +76,103 @@ ORDER_TYPE_LIMITS = {
     "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
 
-# ════════════════════════════════════════════════════════════════════
-# CORE UTILITIES & TIMEZONE MANAGEMENT
-# ════════════════════════════════════════════════════════════════════
+FIELD_SCHEMA = {
+    "Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, 
+    "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, 
+    "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, 
+    "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, 
+    "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, 
+    "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, 
+    "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, 
+    "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect"}, 
+    "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, 
+    "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect"}, 
+    "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, 
+    "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, 
+    "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, 
+    "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, 
+    "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, 
+    "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect"}, 
+    "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, 
+    "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, 
+    "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, 
+    "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, 
+    "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, 
+    "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, 
+    "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, 
+    "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, 
+    "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, 
+    "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, 
+    "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, 
+    "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect"}, 
+    "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, 
+    "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, 
+    "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, 
+    "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, 
+    "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect"}, 
+    "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, 
+    "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect"}, 
+    "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect"}, 
+    "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect"}, 
+    "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, 
+    "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, 
+    "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, 
+    "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, 
+    "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, 
+    "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, 
+    "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, 
+    "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect"}, 
+    "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, 
+    "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, 
+    "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, 
+    "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, 
+    "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect"}, 
+    "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, 
+    "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect"}, 
+    "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, 
+    "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, 
+    "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, 
+    "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect"}, 
+    "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect"}, 
+    "Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect"}, 
+    "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, 
+    "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, 
+    "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, 
+    "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect"}, 
+    "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, 
+    "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, 
+    "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, 
+    "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, 
+    "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect"}, 
+    "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, 
+    "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, 
+    "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, 
+    "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, 
+    "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, 
+    "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, 
+    "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, 
+    "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, 
+    "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, 
+    "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, 
+    "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, 
+    "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect"}, 
+    "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect"}, 
+    "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, 
+    "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect"}, 
+    "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, 
+    "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, 
+    "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, 
+    "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect"}, 
+    "Parent items": {"field_id": "fldGLV94um", "ui_type": "SingleLink"}, 
+    "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, 
+    "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, 
+    "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, 
+    "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, 
+    "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, 
+    "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, 
+    "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}
+}
+
 CAIRO_OFFSET = timedelta(hours=3)
 
 def cairo_now():
@@ -123,7 +213,7 @@ def get_table_schema(table_id, token, base_id, ttl=300):
                 _schema_cache["data"][table_id] = {"fields": fields, "ts": time.time()}
             return fields
     except Exception as e:
-        logger.error("get_table_schema_failed", table_id=table_id, error=str(e))
+        pass
     with _schema_cache["lock"]:
         cached = _schema_cache["data"].get(table_id)
         return cached["fields"] if cached else set()
@@ -180,11 +270,9 @@ def redis_get_json(key):
 def redis_set_json(key, value, ttl=None):
     try:
         payload = json.dumps(value, default=str)
-    except Exception as e:
-        logger.warn("redis_serialize_failed", key=key, error=str(e))
+    except Exception:
         return False
     if len(payload) > REDIS_MAX_VALUE_BYTES:
-        logger.warn("redis_value_too_large", key=key, size_bytes=len(payload))
         return False
     if ttl: redis_cmd("SET", key, payload, "EX", int(ttl))
     else:   redis_cmd("SET", key, payload)
@@ -240,9 +328,6 @@ def rate_limit(max_req, window):
         return wrapper
     return decorator
 
-# ════════════════════════════════════════════════════════════════════
-# LOCAL JSON FALLBACK LOADER + RAM CACHE (Fixes "Data too large")
-# ════════════════════════════════════════════════════════════════════
 _local_json_cache = {}
 _local_json_lock = threading.Lock()
 _data_status = {}   
@@ -282,9 +367,7 @@ def _fetch_data_over_http(filename):
         resp = http_requests.get(url, timeout=20)
         if resp.status_code == 200:
             return resp.json()
-        logger.warn("local_json_http_fallback_bad_status", file=filename, status=resp.status_code)
-    except Exception as e:
-        logger.warn("local_json_http_fallback_failed", file=filename, error=str(e))
+    except Exception: pass
     return None
 
 def load_local_json(filename):
@@ -308,8 +391,7 @@ def load_local_json(filename):
                     "loaded_at": time.time(),
                 }
                 return data
-            except Exception as e:
-                logger.error("local_json_read_failed", file=filename, path=file_path, error=str(e))
+            except Exception as e: pass
 
     data = _fetch_data_over_http(filename)
     if data is not None:
@@ -323,7 +405,6 @@ def load_local_json(filename):
         return data
 
     _data_status[filename] = {"source": "not_found", "tried_paths": tried_paths, "loaded_at": time.time()}
-    logger.warn("local_json_not_found_anywhere", file=filename, tried_paths=tried_paths)
     return None
 
 def sanitize_agency_code(code):
@@ -374,17 +455,13 @@ class AuditLogger:
                 "Severity": entry["severity"]
             }}
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
-        except Exception as e:
-            logger.error("audit_write_failed", error=str(e))
+        except Exception: pass
 
     def get_recent(self, limit=100):
         with self._lock: return list(reversed(self._queue[-limit:]))
 
 audit = AuditLogger()
 
-# ════════════════════════════════════════════════════════════════════
-# MOCK DB & DATA PARSERS
-# ════════════════════════════════════════════════════════════════════
 class MockFeishuDB:
     @staticmethod
     def generate_requests(limit=500):
@@ -791,10 +868,7 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 
     return items, complete, reason
 
-REQUESTS_SHARD_COUNT = 10 
-REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
-
-def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
+def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=10):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -813,17 +887,6 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
         filtered_items.append(item)
         
     return filtered_items, keys, fetch_complete, stop_reason
-
-def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
-    if MOCK_MODE:
-        items = MockFeishuDB.generate_agency("All") * 10
-        return items, True, ""
-
-    tat = get_tenant_access_token()
-    t0 = time.time()
-    items, complete, reason = _fetch_bitable_shard(POINTS_TABLE_ID, tat, filter_obj=None, field_names=field_names)
-    logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
-    return items, complete, reason
 
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
@@ -1165,9 +1228,6 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
     return stats
 
-# ════════════════════════════════════════════════════════════════════
-# BACKGROUND SNAPSHOT MANAGER
-# ════════════════════════════════════════════════════════════════════
 BACKGROUND_SYNC_INTERVAL = 180   
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
@@ -1547,9 +1607,10 @@ def get_single_request():
         
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+    
+    # We deliberately omit cache headers or any custom caching to ensure Duplicated Check pulls live formula data
     try:
-        # Prevent caching locally to get the absolute latest status from Lark instantly
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}", "Cache-Control": "no-cache"}, timeout=10)
         data = resp.json()
         if data.get("code") == 0:
             return jsonify({"success": True, "record": data["data"]["record"]})
@@ -1559,39 +1620,19 @@ def get_single_request():
 
 @app.route('/api/requests/update', methods=['POST'])
 def update_request():
-    # Issue 5 / 4 Fix: Completely maps frontend values against actual field_ids.
-    # Discards empty values that break Feishu validation. Drops read-only fields.
     user = sanitize_text(request.form.get('user', ''))
     record_id = sanitize_text(request.form.get('record_id', ''))
     
     try:
         fields = json.loads(request.form.get('fields', '{}'))
-    except:
+    except Exception:
         return jsonify({"success": False, "error": "Invalid fields JSON format"}), 400
 
     tat = get_tenant_access_token()
-    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     
-    validated_fields = {}
-    for k, v in fields.items():
-        if k in EXCLUDED_UPDATE_FIELDS: continue
-        # Strip empties, Feishu API fails if SingleSelect is empty string ""
-        if v in (None, "", []): continue 
-        if actual_fields and k not in actual_fields: continue
-        validated_fields[k] = v
-
-    final_fields = {}
-    for k, v in validated_fields.items():
-        if k in FIELD_SCHEMA:
-            final_fields[FIELD_SCHEMA[k]["field_id"]] = v
-        else:
-            final_fields[k] = v
-
     # Safely upload newly selected files
     for field_name in request.files:
         if field_name in EXCLUDED_UPDATE_FIELDS: continue
-        if actual_fields and field_name not in actual_fields: continue
-        
         file_list = request.files.getlist(field_name)
         tokens = []
         for f in file_list:
@@ -1606,25 +1647,36 @@ def update_request():
                     tokens.append({"file_token": up_res["data"]["file_token"]})
             except Exception as e:
                 logger.error("file_upload_failed", error=str(e))
-        
         if tokens:
-            if field_name in FIELD_SCHEMA:
-                final_fields[FIELD_SCHEMA[field_name]["field_id"]] = tokens
-            else:
-                final_fields[field_name] = tokens
+            fields[field_name] = tokens
 
-    # Using Feishu PUT on the record endpoint behaves as a PATCH 
-    # (only provided fields are modified, unmentioned fields are retained).
+    # Map fields to exact field_ids where possible to ensure Feishu always accepts the PATCH
+    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+    payload_fields = {}
+    
+    for k, v in fields.items():
+        if k in EXCLUDED_UPDATE_FIELDS: continue
+        
+        meta = FIELD_SCHEMA.get(k)
+        if meta and "field_id" in meta:
+            payload_fields[meta["field_id"]] = v
+        elif actual_fields and k in actual_fields:
+            payload_fields[k] = v
+        elif not actual_fields:
+            payload_fields[k] = v # Fallback
+
+    # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        resp = http_requests.put(url, headers=headers, json={"fields": final_fields}, timeout=15)
+        resp = http_requests.put(url, headers=headers, json={"fields": payload_fields}, timeout=15)
         data = resp.json()
         if data.get("code") == 0:
+            updated_record = data.get("data", {}).get("record", {})
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
-            return jsonify({"success": True})
+            return jsonify({"success": True, "record": updated_record})
         return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -1651,31 +1703,23 @@ def submit_request():
     tat = get_tenant_access_token()
     api_token = uat if uat else tat
     
-    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
-    validated_fields = {}
+    final_fields = {}
 
     for key, val in user_fields.items():
         if key not in EXCLUDED_SUBMIT_FIELDS:
             if val not in (None, "", []):
-                if actual_fields and key not in actual_fields: continue
-                validated_fields[key] = val
-
-    final_fields = {}
-    for key, val in validated_fields.items():
-        if key in FIELD_SCHEMA:
-            final_fields[FIELD_SCHEMA[key]["field_id"]] = val
-        else:
-            final_fields[key] = val
+                final_fields[key] = val
 
     for field_name in request.files:
-        if field_name in EXCLUDED_SUBMIT_FIELDS: continue
-        if actual_fields and field_name not in actual_fields: continue
+        if field_name in EXCLUDED_SUBMIT_FIELDS:
+            continue
             
         file_list = request.files.getlist(field_name)
         tokens = []
         
         for f in file_list:
             if not f.filename: continue
+                
             file_bytes = f.read()
             if not file_bytes: continue
                 
@@ -1710,18 +1754,23 @@ def submit_request():
                 return jsonify({"error": f"Failed to upload {f.filename}. Error: {str(e)}"}), 502
 
         if tokens:
-            if field_name in FIELD_SCHEMA:
-                final_fields[FIELD_SCHEMA[field_name]["field_id"]] = tokens
-            else:
-                final_fields[field_name] = tokens
+            final_fields[field_name] = tokens
 
-    # System Status Initializers mapped to field_ids
-    if "Request Status" in FIELD_SCHEMA:
-        final_fields[FIELD_SCHEMA["Request Status"]["field_id"]] = "Pending"
-    else:
-        final_fields["Request Status"] = "Pending"
-        
+    final_fields["Request Status"] = "Pending"
     final_fields["Submitted By"] = user
+
+    actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+    mapped_payload = {}
+    
+    # Map all submitted fields to exact field_ids to ensure they save properly
+    for k, v in final_fields.items():
+        meta = FIELD_SCHEMA.get(k)
+        if meta and "field_id" in meta:
+            mapped_payload[meta["field_id"]] = v
+        elif actual_fields and k in actual_fields:
+            mapped_payload[k] = v
+        elif not actual_fields:
+            mapped_payload[k] = v # Fallback
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
@@ -1744,7 +1793,7 @@ def submit_request():
             # System Patch (TAT Context): Override schema constraints & permissions 
             update_url = f"{url}/{record_id}"
             update_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-            update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": final_fields}, timeout=15)
+            update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": mapped_payload}, timeout=15)
             update_data = update_resp.json()
             
             if update_data.get("code") == 0:
@@ -1759,7 +1808,7 @@ def submit_request():
         return jsonify({"error": f"Failed to create record: {str(e)}"}), 502
 
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type}", ip=ip, severity="Info")
+    audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')}", ip=ip, severity="Info")
 
     return jsonify({"success": True, "message": f"Successfully submitted {req_type}!"})
 
@@ -2059,8 +2108,6 @@ def query_records():
 @app.route('/api/my-requests', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def my_requests():
-    # Issue 1 Fix: Explicitly implements the requested filter sequence entirely on the
-    # server side using Feishu's supported string operators for the exact requested match.
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
     perms = get_user_permissions(email, user)
@@ -2082,20 +2129,15 @@ def my_requests():
     session.headers.update(headers)
     list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
 
-    def _esc(s):
-        return str(s).replace('\\', '\\\\').replace('"', '\\"')
-
-    user_clean = user.strip()
+    # Strict compliance: Format filter string exactly per Feishu's Bitable syntax requirements
+    user_clean = user.strip().replace('"', '\\"')
     from_str = from_dt.strftime("%Y-%m-%d %H:%M")
     
-    # Exact requested string format translated into native Bitable API query structure.
-    filter_str = f'CurrentValue.[Respondents].contains("{_esc(user_clean)}") && CurrentValue.[Submitted on] >= "{from_str}"'
+    filter_str = f'CurrentValue.[Respondents].contains("{user_clean}") && CurrentValue.[Submitted on] >= "{from_str}"'
 
     all_items = []
     page_token = None
-    fetch_complete, stop_reason = True, ""
 
-    # Paginate through ALL matching filtered records
     while True:
         params = {"page_size": 100, "filter": filter_str, "sort": '["Numbering DESC"]'}
         if page_token: params["page_token"] = page_token
@@ -2104,18 +2146,16 @@ def my_requests():
             resp = session.get(list_url, params=params, timeout=15)
             data = resp.json()
             if data.get("code") != 0:
-                fetch_complete, stop_reason = False, data.get("msg")
-                break
+                # Bubble up the explicit syntax rejection so we do NOT fall back to local parsing
+                return jsonify({"error": f"Feishu Database Error: {data.get('msg')}"}), 400
 
             block = data.get("data", {})
             all_items.extend(block.get("items", []))
-            
             page_token = block.get("page_token")
             if not page_token or not block.get("has_more", False):
                 break
         except Exception as e:
-            fetch_complete, stop_reason = False, str(e)
-            break
+            return jsonify({"error": str(e)}), 500
 
     results = []
     
@@ -2160,13 +2200,13 @@ def my_requests():
     results.sort(key=lambda r: r["_sort_ts"], reverse=True)
     for r in results: r.pop("_sort_ts", None)
     
-    audit.log(user, "MY_REQUESTS_VIEW", f"Fetched {len(results)} records", ip=ip, severity="Info")
+    audit.log(user, "MY_REQUESTS_VIEW", f"Fetched {len(results)} records via server-side filter", ip=ip, severity="Info")
     
     return jsonify({
         "results": results,
         "count": len(results),
-        "fetch_complete": fetch_complete,
-        "stop_reason": ("" if fetch_complete else stop_reason),
+        "fetch_complete": True,
+        "stop_reason": "",
     })
 
 @app.route('/api/live-queue', methods=['GET'])
@@ -2178,7 +2218,14 @@ def live_queue():
         
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    # Strictly bust caching mechanics
+    headers = {
+        "Authorization": f"Bearer {tat}", 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache"
+    }
     
     payload = {
         "page_size": 50,
@@ -2541,10 +2588,6 @@ TICKET_FIELD_KEY_MAP = {
 }
 TICKET_ATTACHMENT_FIELDS = ["Evidence Screen", "Evidence Screen 2", "NID & Otherapp Screen", "New and old onwer National IDS (Both NID)"]
 
-# Feishu field_ids for the Attachment columns on the Requests table (from the live
-# Bitable schema). Required to build the "extra" bitablePerm parameter when the base
-# has Advanced Permissions enabled — without it, /drive/v1/medias/{token}/download
-# returns a permission error even with a valid tenant_access_token.
 ATTACHMENT_FIELD_IDS = {
     "NID & Otherapp Screen": "fldWEHdmZn",
     "Evidence Screen": "fldhBymdRS",
@@ -2624,9 +2667,15 @@ def pull_assigned_ticket():
 
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    # Strictly bust caching
+    headers = {
+        "Authorization": f"Bearer {tat}", 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache"
+    }
 
-    # Issue 2 Fix: Safely fetching "In Progress" ensures tickets synced out when closed
     def _search(status_field):
         payload = {
             "page_size": 100,
