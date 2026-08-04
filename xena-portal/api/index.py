@@ -20,8 +20,8 @@ MOCK_MODE = not bool(APP_ID and APP_SECRET)
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
-AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")   
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
+AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")   
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
@@ -56,11 +56,11 @@ EXCLUDED_SUBMIT_FIELDS = {
     "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Status", "Request Status"
 }
 
-# Strictly block all formula and automated fields from ever being sent in a PATCH/PUT payload
+# Update fields allows auditors to edit Status, Approval, Reject Reason, etc.
 EXCLUDED_UPDATE_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
-    "Duplicated Check", "fldfCHFGMl", "Handle Time (Seconds)", "Base Points", "Formula",
+    "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
     "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
     "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
     "Assigned Time", "Completion Time", "Last Retry Time", "Ready to Archive", "Reward"
@@ -76,133 +76,79 @@ ORDER_TYPE_LIMITS = {
     "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
 
-FIELD_SCHEMA = {
-    "Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, 
-    "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, 
-    "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, 
-    "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, 
-    "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, 
-    "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, 
-    "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, 
-    "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect"}, 
-    "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, 
-    "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect"}, 
-    "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, 
-    "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, 
-    "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, 
-    "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, 
-    "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, 
-    "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect"}, 
-    "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, 
-    "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, 
-    "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, 
-    "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, 
-    "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, 
-    "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, 
-    "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, 
-    "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, 
-    "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, 
-    "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, 
-    "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, 
-    "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect"}, 
-    "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, 
-    "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, 
-    "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, 
-    "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, 
-    "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect"}, 
-    "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, 
-    "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect"}, 
-    "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect"}, 
-    "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect"}, 
-    "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, 
-    "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, 
-    "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, 
-    "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, 
-    "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, 
-    "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, 
-    "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, 
-    "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect"}, 
-    "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, 
-    "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, 
-    "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, 
-    "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, 
-    "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect"}, 
-    "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, 
-    "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect"}, 
-    "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, 
-    "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, 
-    "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, 
-    "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect"}, 
-    "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect"}, 
-    "Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect"}, 
-    "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, 
-    "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, 
-    "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, 
-    "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect"}, 
-    "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, 
-    "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, 
-    "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, 
-    "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, 
-    "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect"}, 
-    "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, 
-    "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, 
-    "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, 
-    "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, 
-    "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, 
-    "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, 
-    "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, 
-    "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, 
-    "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, 
-    "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, 
-    "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, 
-    "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect"}, 
-    "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect"}, 
-    "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, 
-    "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect"}, 
-    "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, 
-    "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, 
-    "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, 
-    "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect"}, 
-    "Parent items": {"field_id": "fldGLV94um", "ui_type": "SingleLink"}, 
-    "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, 
-    "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, 
-    "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, 
-    "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, 
-    "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, 
-    "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, 
-    "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}
-}
-
+# ════════════════════════════════════════════════════════════════════
+# CORE UTILITIES & TIMEZONE MANAGEMENT
+# ════════════════════════════════════════════════════════════════════
 CAIRO_OFFSET = timedelta(hours=3)
 
 def cairo_now():
     return datetime.now(timezone.utc) + CAIRO_OFFSET
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
+_TOKEN_REDIS_KEY = "xena:tenant_access_token"
 
 def get_tenant_access_token():
+    """
+    ISSUE 1 FIX (Ticket Open Speed): the tenant access token used to live only in an
+    in-process dict, which is wiped every time Vercel spins up a fresh serverless
+    instance (cold start). That forced a full extra round-trip to Feishu's auth
+    endpoint on almost every request -- one of the two sequential network calls behind
+    every single ticket open. We now check, in order: (1) this warm instance's memory
+    (fastest, ~0ms), (2) Upstash Redis (survives cold starts, ~10-30ms), and only fall
+    back to actually calling Feishu's auth API when both are empty/expired.
+    """
     if MOCK_MODE: return "mock_tenant_token_12345"
+
     with _token_cache["lock"]:
         if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
             return _token_cache["token"]
+
+    if REDIS_ENABLED:
+        cached = redis_get_json(_TOKEN_REDIS_KEY)
+        if cached and time.time() < cached.get("expires_at", 0):
+            with _token_cache["lock"]:
+                _token_cache["token"] = cached["token"]
+                _token_cache["expires_at"] = cached["expires_at"]
+            return cached["token"]
 
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
     token = resp.get("tenant_access_token")
     expire = resp.get("expire", 7200)
+    expires_at = time.time() + max(expire - 300, 60)
 
     with _token_cache["lock"]:
         _token_cache["token"] = token
-        _token_cache["expires_at"] = time.time() + max(expire - 300, 60)
+        _token_cache["expires_at"] = expires_at
+
+    if REDIS_ENABLED and token:
+        redis_set_json(_TOKEN_REDIS_KEY, {"token": token, "expires_at": expires_at}, ttl=max(expire - 300, 60))
+
     return token
 
 _schema_cache = {"data": {}, "lock": threading.Lock()}
+_SCHEMA_REDIS_TTL = 300
 
 def get_table_schema(table_id, token, base_id, ttl=300):
+    """
+    ISSUE 1 FIX (Ticket Open Speed): same cold-start problem as the token cache above --
+    this schema lookup (used to filter out read-only fields before a save/submit) used
+    to hit Feishu's /fields endpoint on every cold instance. Now backed by Redis so a
+    warm schema survives across serverless instances, not just within one process.
+    """
     with _schema_cache["lock"]:
         cached = _schema_cache["data"].get(table_id)
         if cached and time.time() - cached["ts"] < ttl:
             return cached["fields"]
+
+    redis_key = f"xena:schema:{table_id}"
+    if REDIS_ENABLED:
+        cached_fields = redis_get_json(redis_key)
+        if cached_fields is not None:
+            fields = set(cached_fields)
+            with _schema_cache["lock"]:
+                _schema_cache["data"][table_id] = {"fields": fields, "ts": time.time()}
+            return fields
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
     try:
@@ -211,9 +157,11 @@ def get_table_schema(table_id, token, base_id, ttl=300):
             fields = set(f.get("field_name") for f in resp.get("data", {}).get("items", []))
             with _schema_cache["lock"]:
                 _schema_cache["data"][table_id] = {"fields": fields, "ts": time.time()}
+            if REDIS_ENABLED:
+                redis_set_json(redis_key, list(fields), ttl=_SCHEMA_REDIS_TTL)
             return fields
     except Exception as e:
-        pass
+        logger.error("get_table_schema_failed", table_id=table_id, error=str(e))
     with _schema_cache["lock"]:
         cached = _schema_cache["data"].get(table_id)
         return cached["fields"] if cached else set()
@@ -270,9 +218,11 @@ def redis_get_json(key):
 def redis_set_json(key, value, ttl=None):
     try:
         payload = json.dumps(value, default=str)
-    except Exception:
+    except Exception as e:
+        logger.warn("redis_serialize_failed", key=key, error=str(e))
         return False
     if len(payload) > REDIS_MAX_VALUE_BYTES:
+        logger.warn("redis_value_too_large", key=key, size_bytes=len(payload))
         return False
     if ttl: redis_cmd("SET", key, payload, "EX", int(ttl))
     else:   redis_cmd("SET", key, payload)
@@ -328,6 +278,9 @@ def rate_limit(max_req, window):
         return wrapper
     return decorator
 
+# ════════════════════════════════════════════════════════════════════
+# LOCAL JSON FALLBACK LOADER + RAM CACHE (Fixes "Data too large")
+# ════════════════════════════════════════════════════════════════════
 _local_json_cache = {}
 _local_json_lock = threading.Lock()
 _data_status = {}   
@@ -367,7 +320,9 @@ def _fetch_data_over_http(filename):
         resp = http_requests.get(url, timeout=20)
         if resp.status_code == 200:
             return resp.json()
-    except Exception: pass
+        logger.warn("local_json_http_fallback_bad_status", file=filename, status=resp.status_code)
+    except Exception as e:
+        logger.warn("local_json_http_fallback_failed", file=filename, error=str(e))
     return None
 
 def load_local_json(filename):
@@ -391,7 +346,8 @@ def load_local_json(filename):
                     "loaded_at": time.time(),
                 }
                 return data
-            except Exception as e: pass
+            except Exception as e:
+                logger.error("local_json_read_failed", file=filename, path=file_path, error=str(e))
 
     data = _fetch_data_over_http(filename)
     if data is not None:
@@ -405,6 +361,7 @@ def load_local_json(filename):
         return data
 
     _data_status[filename] = {"source": "not_found", "tried_paths": tried_paths, "loaded_at": time.time()}
+    logger.warn("local_json_not_found_anywhere", file=filename, tried_paths=tried_paths)
     return None
 
 def sanitize_agency_code(code):
@@ -455,13 +412,17 @@ class AuditLogger:
                 "Severity": entry["severity"]
             }}
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
-        except Exception: pass
+        except Exception as e:
+            logger.error("audit_write_failed", error=str(e))
 
     def get_recent(self, limit=100):
         with self._lock: return list(reversed(self._queue[-limit:]))
 
 audit = AuditLogger()
 
+# ════════════════════════════════════════════════════════════════════
+# MOCK DB & DATA PARSERS
+# ════════════════════════════════════════════════════════════════════
 class MockFeishuDB:
     @staticmethod
     def generate_requests(limit=500):
@@ -868,7 +829,10 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 
     return items, complete, reason
 
-def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=10):
+REQUESTS_SHARD_COUNT = 10 
+REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
+
+def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -887,6 +851,17 @@ def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYT
         filtered_items.append(item)
         
     return filtered_items, keys, fetch_complete, stop_reason
+
+def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
+    if MOCK_MODE:
+        items = MockFeishuDB.generate_agency("All") * 10
+        return items, True, ""
+
+    tat = get_tenant_access_token()
+    t0 = time.time()
+    items, complete, reason = _fetch_bitable_shard(POINTS_TABLE_ID, tat, filter_obj=None, field_names=field_names)
+    logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
+    return items, complete, reason
 
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
@@ -1228,6 +1203,9 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
 
     return stats
 
+# ════════════════════════════════════════════════════════════════════
+# BACKGROUND SNAPSHOT MANAGER
+# ════════════════════════════════════════════════════════════════════
 BACKGROUND_SYNC_INTERVAL = 180   
 BACKGROUND_SYNC_MAX_AGE  = 600   
 
@@ -1607,10 +1585,8 @@ def get_single_request():
         
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
-    
-    # We deliberately omit cache headers or any custom caching to ensure Duplicated Check pulls live formula data
     try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}", "Cache-Control": "no-cache"}, timeout=10)
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
         data = resp.json()
         if data.get("code") == 0:
             return jsonify({"success": True, "record": data["data"]["record"]})
@@ -1625,7 +1601,7 @@ def update_request():
     
     try:
         fields = json.loads(request.form.get('fields', '{}'))
-    except Exception:
+    except:
         return jsonify({"success": False, "error": "Invalid fields JSON format"}), 400
 
     tat = get_tenant_access_token()
@@ -1650,33 +1626,22 @@ def update_request():
         if tokens:
             fields[field_name] = tokens
 
-    # Map fields to exact field_ids where possible to ensure Feishu always accepts the PATCH
+    # Drop read-only fields so Feishu doesn't reject the save attempt
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
-    payload_fields = {}
-    
-    for k, v in fields.items():
-        if k in EXCLUDED_UPDATE_FIELDS: continue
-        
-        meta = FIELD_SCHEMA.get(k)
-        if meta and "field_id" in meta:
-            payload_fields[meta["field_id"]] = v
-        elif actual_fields and k in actual_fields:
-            payload_fields[k] = v
-        elif not actual_fields:
-            payload_fields[k] = v # Fallback
+    if actual_fields:
+        fields = {k: v for k, v in fields.items() if k in actual_fields and k not in EXCLUDED_UPDATE_FIELDS}
 
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        resp = http_requests.put(url, headers=headers, json={"fields": payload_fields}, timeout=15)
+        resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=15)
         data = resp.json()
         if data.get("code") == 0:
-            updated_record = data.get("data", {}).get("record", {})
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
-            return jsonify({"success": True, "record": updated_record})
+            return jsonify({"success": True})
         return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -1760,17 +1725,11 @@ def submit_request():
     final_fields["Submitted By"] = user
 
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
-    mapped_payload = {}
-    
-    # Map all submitted fields to exact field_ids to ensure they save properly
-    for k, v in final_fields.items():
-        meta = FIELD_SCHEMA.get(k)
-        if meta and "field_id" in meta:
-            mapped_payload[meta["field_id"]] = v
-        elif actual_fields and k in actual_fields:
-            mapped_payload[k] = v
-        elif not actual_fields:
-            mapped_payload[k] = v # Fallback
+    if actual_fields:
+        dropped = [k for k in final_fields if k not in actual_fields]
+        if dropped:
+            logger.warn("submit_dropped_unknown_fields", fields=dropped)
+        final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
@@ -1793,7 +1752,7 @@ def submit_request():
             # System Patch (TAT Context): Override schema constraints & permissions 
             update_url = f"{url}/{record_id}"
             update_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-            update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": mapped_payload}, timeout=15)
+            update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": final_fields}, timeout=15)
             update_data = update_resp.json()
             
             if update_data.get("code") == 0:
@@ -2116,46 +2075,125 @@ def my_requests():
     if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
     
-    if not user:
-        return jsonify({"error": "Missing user"}), 400
-
     tat = get_tenant_access_token()
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-
+    
     _cairo_now = cairo_now()
     from_dt = _cairo_now - timedelta(days=15)
+    user_clean = user.strip().lower()
 
+    # ISSUE 8 FIX (server-side filtering): instead of downloading the whole table and
+    # filtering every row in Python, we now push the "Respondents == this user" condition
+    # down to Feishu via the /records/search filter's "contains" operator on the
+    # CreatedUser-type "Respondents" field (Feishu's Bitable search API matches Person/
+    # User fields by display name for this operator). This cuts the payload from "the
+    # entire Requests table" to "just this person's rows". Note: "Submitted By" (used in
+    # the old local-filter fallback) isn't an actual field in this table's schema, so it
+    # never contributed real matches even before this change -- Respondents is the field
+    # that actually carries this data.
+    #
+    # NOTE ON THE DATE BOUND: we deliberately do NOT also push "Submitted on >= 15 days
+    # ago" down to Feishu. "Submitted on" was previously confirmed to behave unreliably
+    # for server-side date comparisons (this is why the codebase moved to Python-side
+    # date filtering in the first place). Server-side >= / <= comparisons on it are not
+    # trustworthy, so the 15-day cutoff below stays a local, exact check on the parsed
+    # datetime. This still uses "sort by Numbering DESC + stop once results age out of
+    # the window" to avoid pulling old rows, same as before -- it's just now applied to
+    # a per-user filtered set instead of the entire table.
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     session = http_requests.Session()
     session.headers.update(headers)
-    list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-
-    # Strict compliance: Format filter string exactly per Feishu's Bitable syntax requirements
-    user_clean = user.strip().replace('"', '\\"')
-    from_str = from_dt.strftime("%Y-%m-%d %H:%M")
-    
-    filter_str = f'CurrentValue.[Respondents].contains("{user_clean}") && CurrentValue.[Submitted on] >= "{from_str}"'
 
     all_items = []
     page_token = None
+    fetch_complete, stop_reason = True, ""
+    server_filter_ok = True  # if the Respondents filter itself errors out, fall back below
 
     while True:
-        params = {"page_size": 100, "filter": filter_str, "sort": '["Numbering DESC"]'}
-        if page_token: params["page_token"] = page_token
+        payload = {
+            "page_size": 100,  # capped at 100/page per Feishu's search endpoint limit
+            "filter": {
+                "conjunction": "and",
+                "conditions": [
+                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                ]
+            },
+            "sort": [{"field_name": "Numbering", "desc": True}]
+        }
+        if page_token:
+            payload["page_token"] = page_token
 
         try:
-            resp = session.get(list_url, params=params, timeout=15)
+            resp = session.post(search_url, json=payload, timeout=15)
             data = resp.json()
+
             if data.get("code") != 0:
-                # Bubble up the explicit syntax rejection so we do NOT fall back to local parsing
-                return jsonify({"error": f"Feishu Database Error: {data.get('msg')}"}), 400
+                # Server-side filter itself failed (bad field name, permissions, etc.) --
+                # fall back to the full-table Python-side scan rather than showing the
+                # user an empty/broken page.
+                server_filter_ok = False
+                fetch_complete, stop_reason = False, data.get("msg")
+                break
 
             block = data.get("data", {})
-            all_items.extend(block.get("items", []))
+            items = block.get("items", [])
+
+            # Defense-in-depth: Feishu's "contains" operator is a substring match, so
+            # e.g. filtering for "Ahmed" could also match "Ahmed Samurai" -- re-check
+            # exact-ish membership locally the same way /api/live-queue already does.
+            for it in items:
+                f = it.get("fields", {})
+                sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
+                rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+                if user_clean in sb or user_clean in rp:
+                    all_items.append(it)
+
+            if items:
+                last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
+                if last_dt and last_dt < from_dt:
+                    break
+
             page_token = block.get("page_token")
             if not page_token or not block.get("has_more", False):
                 break
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            fetch_complete, stop_reason = False, str(e)
+            break
+
+    # Fallback: if the server-side Respondents filter itself errored (unsupported
+    # operator on this field type, permissions, etc.), don't leave the user with a
+    # broken/empty page -- scan the table locally like the original implementation did.
+    if not server_filter_ok:
+        all_items = []
+        page_token = None
+        fetch_complete, stop_reason = True, ""
+        list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+        while True:
+            params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
+            if page_token: params["page_token"] = page_token
+            try:
+                resp = session.get(list_url, params=params, timeout=15)
+                data = resp.json()
+                if data.get("code") != 0:
+                    fetch_complete, stop_reason = False, data.get("msg")
+                    break
+                block = data.get("data", {})
+                items = block.get("items", [])
+                for it in items:
+                    f = it.get("fields", {})
+                    rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+                    if user_clean in rp:
+                        all_items.append(it)
+                if items:
+                    last_dt = parse_feishu_date(get_field_local(items[-1].get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
+                    if last_dt and last_dt < from_dt:
+                        break
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            except Exception as e:
+                fetch_complete, stop_reason = False, str(e)
+                break
 
     results = []
     
@@ -2164,6 +2202,9 @@ def my_requests():
         
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
+        
+        if not dt or dt < from_dt:
+            continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
@@ -2200,13 +2241,13 @@ def my_requests():
     results.sort(key=lambda r: r["_sort_ts"], reverse=True)
     for r in results: r.pop("_sort_ts", None)
     
-    audit.log(user, "MY_REQUESTS_VIEW", f"Fetched {len(results)} records via server-side filter", ip=ip, severity="Info")
+    audit.log(user, "MY_REQUESTS_VIEW", f"Fetched {len(results)} records", ip=ip, severity="Info")
     
     return jsonify({
         "results": results,
         "count": len(results),
-        "fetch_complete": True,
-        "stop_reason": "",
+        "fetch_complete": fetch_complete,
+        "stop_reason": ("" if fetch_complete else stop_reason),
     })
 
 @app.route('/api/live-queue', methods=['GET'])
@@ -2218,14 +2259,7 @@ def live_queue():
         
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    
-    # Strictly bust caching mechanics
-    headers = {
-        "Authorization": f"Bearer {tat}", 
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache"
-    }
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     payload = {
         "page_size": 50,
@@ -2588,6 +2622,10 @@ TICKET_FIELD_KEY_MAP = {
 }
 TICKET_ATTACHMENT_FIELDS = ["Evidence Screen", "Evidence Screen 2", "NID & Otherapp Screen", "New and old onwer National IDS (Both NID)"]
 
+# Feishu field_ids for the Attachment columns on the Requests table (from the live
+# Bitable schema). Required to build the "extra" bitablePerm parameter when the base
+# has Advanced Permissions enabled — without it, /drive/v1/medias/{token}/download
+# returns a permission error even with a valid tenant_access_token.
 ATTACHMENT_FIELD_IDS = {
     "NID & Otherapp Screen": "fldWEHdmZn",
     "Evidence Screen": "fldhBymdRS",
@@ -2627,6 +2665,10 @@ def proxy_attachment(file_token):
         url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
         headers = {"Authorization": f"Bearer {tat}"}
 
+        # ROOT CAUSE (Issue 8): with Advanced Permissions enabled on the base, Feishu's
+        # media download endpoint requires an "extra" param identifying which Bitable
+        # attachment cell the token belongs to, or it rejects the request. We build it
+        # when a field_id was supplied by the caller.
         def _attempt(with_extra):
             params = {}
             if with_extra and field_id:
@@ -2641,6 +2683,8 @@ def proxy_attachment(file_token):
 
         resp = _attempt(with_extra=True)
         if resp.status_code != 200 and field_id:
+            # Fall back without the extra param, in case advanced permissions aren't
+            # actually enabled and the unnecessary param is what's causing the failure.
             resp = _attempt(with_extra=False)
 
         if resp.status_code != 200:
@@ -2667,14 +2711,7 @@ def pull_assigned_ticket():
 
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    
-    # Strictly bust caching
-    headers = {
-        "Authorization": f"Bearer {tat}", 
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache"
-    }
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     def _search(status_field):
         payload = {
