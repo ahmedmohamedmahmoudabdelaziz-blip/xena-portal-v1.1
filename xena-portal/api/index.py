@@ -478,12 +478,15 @@ def extract_field_text(field_data):
         return " ".join(texts).strip()
     return str(field_data)
 
-def extract_attachments(field_data):
+def extract_attachments(field_data, field_id=None):
     if not field_data or not isinstance(field_data, list): return []
     out = []
     for item in field_data:
         if isinstance(item, dict) and item.get("file_token"):
-            out.append({"name": item.get("name", "file"), "url": f"/api/attachments/{item['file_token']}"})
+            url = f"/api/attachments/{item['file_token']}"
+            if field_id:
+                url += f"?field_id={field_id}"
+            out.append({"name": item.get("name", "file"), "url": url})
     return out
 
 def extract_field_list(field_data):
@@ -2507,6 +2510,17 @@ TICKET_FIELD_KEY_MAP = {
 }
 TICKET_ATTACHMENT_FIELDS = ["Evidence Screen", "Evidence Screen 2", "NID & Otherapp Screen", "New and old onwer National IDS (Both NID)"]
 
+# Feishu field_ids for the Attachment columns on the Requests table (from the live
+# Bitable schema). Required to build the "extra" bitablePerm parameter when the base
+# has Advanced Permissions enabled — without it, /drive/v1/medias/{token}/download
+# returns a permission error even with a valid tenant_access_token.
+ATTACHMENT_FIELD_IDS = {
+    "NID & Otherapp Screen": "fldWEHdmZn",
+    "Evidence Screen": "fldhBymdRS",
+    "Evidence Screen 2": "fldBQzos6f",
+    "New and old onwer National IDS (Both NID)": "fldKf2AtEJ",
+}
+
 def build_ticket_payload(item):
     fields = item.get("fields", {})
     ticket = {"record_id": item.get("record_id")}
@@ -2515,7 +2529,7 @@ def build_ticket_payload(item):
         if val:
             ticket[key] = val
     for att_field in TICKET_ATTACHMENT_FIELDS:
-        pics = extract_attachments(fields.get(att_field))
+        pics = extract_attachments(fields.get(att_field), ATTACHMENT_FIELD_IDS.get(att_field))
         if pics:
             ticket.setdefault("attachments", []).extend(pics)
     ticket["request_type"] = extract_field_text(get_field_local(fields, "Request Type", "Type"))
@@ -2530,14 +2544,39 @@ def build_ticket_payload(item):
 def proxy_attachment(file_token):
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
+    field_id = sanitize_text(request.args.get('field_id', ''))
     perms = get_user_permissions(email, user)
     if not perms.get("modules") and not perms.get("is_super_admin"):
         return jsonify({"error": "Access denied"}), 403
     try:
         tat = get_tenant_access_token()
         url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, stream=True)
+        headers = {"Authorization": f"Bearer {tat}"}
+
+        # ROOT CAUSE (Issue 8): with Advanced Permissions enabled on the base, Feishu's
+        # media download endpoint requires an "extra" param identifying which Bitable
+        # attachment cell the token belongs to, or it rejects the request. We build it
+        # when a field_id was supplied by the caller.
+        def _attempt(with_extra):
+            params = {}
+            if with_extra and field_id:
+                params["extra"] = json.dumps({
+                    "bitablePerm": {
+                        "tableId": REQUESTS_TABLE_ID,
+                        "attachmentToken": file_token,
+                        "fieldId": field_id,
+                    }
+                })
+            return http_requests.get(url, headers=headers, params=params, timeout=20, stream=True)
+
+        resp = _attempt(with_extra=True)
+        if resp.status_code != 200 and field_id:
+            # Fall back without the extra param, in case advanced permissions aren't
+            # actually enabled and the unnecessary param is what's causing the failure.
+            resp = _attempt(with_extra=False)
+
         if resp.status_code != 200:
+            logger.error("attachment_proxy_failed", file_token=file_token, field_id=field_id, status=resp.status_code, body=resp.text[:300])
             return jsonify({"error": "Could not fetch attachment"}), 502
         return Response(resp.content, content_type=resp.headers.get("Content-Type", "application/octet-stream"))
     except Exception as e:
@@ -2558,36 +2597,46 @@ def pull_assigned_ticket():
     if MOCK_MODE:
         return jsonify({"tickets": []})
 
+    # ROOT CAUSE (was): this endpoint crawled the ENTIRE requests table page-by-page
+    # (page_size 500, sequential, up to 35s) and filtered client-side in Python.
+    # The Query page instead uses Feishu's server-side /records/search filter, which
+    # returns only matching rows in a single round trip. We now do the same thing here
+    # (identical approach to /api/live-queue) so this endpoint is as fast as Query.
     tat = get_tenant_access_token()
-    list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
-    session = http_requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-    user_clean = user.strip().lower()
+    def _search(status_field):
+        payload = {
+            "page_size": 100,
+            "filter": {
+                "conjunction": "and",
+                "conditions": [
+                    {"field_name": "Assigned Member", "operator": "contains", "value": [user]},
+                    {"field_name": status_field, "operator": "contains", "value": ["In Progress"]},
+                ],
+            },
+            "sort": [{"field_name": "Numbering", "desc": True}],
+        }
+        return session.post(search_url, json=payload, timeout=12)
+
+    session = http_requests.Session()
+    session.headers.update(headers)
+
     matches = []
-    page_token = None
-    _start = time.time()
-    while time.time() - _start < 35:
-        params = {"page_size": 500, "automatic_fields": "true", "sort": '["Numbering DESC"]'}
-        if page_token: params["page_token"] = page_token
-        try:
-            resp = session.get(list_url, params=params, timeout=12)
+    try:
+        resp = _search("Request Status")
+        data = resp.json()
+        if data.get("code") == 1254045:
+            resp = _search("Status")
             data = resp.json()
-            if data.get("code") != 0:
-                break
-            block = data.get("data", {})
-            for it in block.get("items", []):
-                f = it.get("fields", {})
-                assigned = extract_field_text(get_field_local(f, "Assigned Member")).lower()
-                status = extract_field_text(get_field_local(f, "Request Status")).strip().lower()
-                if user_clean in assigned and status == "in progress":
-                    matches.append(build_ticket_payload(it))
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False) or len(matches) >= 20:
-                break
-        except Exception as e:
-            logger.error("pull_assigned_failed", error=str(e))
-            break
+        if data.get("code") == 0:
+            items = data.get("data", {}).get("items", [])
+            matches = [build_ticket_payload(it) for it in items[:20]]
+        else:
+            logger.error("pull_assigned_failed", error=data.get("msg"))
+    except Exception as e:
+        logger.error("pull_assigned_failed", error=str(e))
 
     return jsonify({"tickets": matches})
 
