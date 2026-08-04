@@ -463,16 +463,13 @@
     <defs>
         <!-- Custom Wax Seal Logo from image -->
         <g id="icon-logo">
-            <!-- Scalloped Background -->
-            <circle cx="50" cy="50" r="38" fill="#841b2d" stroke="#841b2d" stroke-width="16" stroke-dasharray="0 14.92" stroke-linecap="round"/>
-            <!-- Inner Shadow/Stroke -->
-            <circle cx="50" cy="50" r="33" fill="#6d1524"/>
-            <!-- Dark Inner Circle -->
-            <circle cx="50" cy="50" r="29" fill="#2a2c30"/>
-            <!-- Letter S -->
-            <text x="47" y="66" font-family="'Times New Roman', Times, serif" font-size="52" font-weight="bold" fill="#841b2d" text-anchor="middle" font-style="italic">S</text>
-            <!-- Swooping Checkmark -->
-            <path d="M 32 60 L 46 72 L 85 25 L 80 20 L 46 60 L 36 52 Z" fill="#841b2d" stroke="#2a2c30" stroke-width="2" stroke-linejoin="round"/>
+            <!-- Minimalist four-pointed "sparkle" mark: outline only (no fill), sharp
+                 outer points with a gently rounded/curved concave waist between each
+                 point, in bright neon cyan. Replaces the old maroon "S" badge mark
+                 that was still leaking into the login card and sidebar header. -->
+            <path d="M 50 6 Q 59 41, 94 50 Q 59 59, 50 94 Q 41 59, 6 50 Q 41 41, 50 6 Z"
+                  fill="none" stroke="var(--accent-cyan)" stroke-width="5"
+                  stroke-linejoin="round" stroke-linecap="round"/>
         </g>
         
         <g id="icon-analytics"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
@@ -4986,10 +4983,17 @@ function createTwControl(key, value) {
         return wrap;
     }
 
-    // User/Person fields (e.g. "Lock Owner", "Mentioned Person") -> read as text of names
+    // User/Person fields (e.g. "Lock Owner", "Assigned Member", "Mentioned Person",
+    // "Done by") -> display-only. These are Feishu User-type fields; Feishu's API
+    // rejects writes to them unless sent as proper user objects, not plain text. This
+    // was the exact cause of "UserFieldConvFail" on Save/Duplicate Check -- this field
+    // was rendered as an ordinary editable text input, and whatever string ended up in
+    // it got sent back to Feishu as if it were a real value, which Feishu can't convert
+    // back into a user. Marked readonly here, and also stripped server-side as a second
+    // line of defense (see EXCLUDED_UPDATE_FIELDS in main.py).
     if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].id && value[0].name) {
         const str = value.map(v => v.name).join(', ');
-        wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(str)}" class="form-highlight-input">`;
+        wrap.innerHTML = label + `<input type="text" value="${escHtml(str)}" class="form-highlight-input" readonly style="opacity:.7;cursor:not-allowed;">`;
         return wrap;
     }
 
