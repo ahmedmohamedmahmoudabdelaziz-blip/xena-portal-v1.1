@@ -4386,6 +4386,249 @@ const LT_FIELD_MAP = {
 };
 const LT_ALWAYS_SHOW = [["applier_note","Applier Note"]];
 
+const FIELD_SCHEMA = {"Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)"]}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Shivam-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed", "Ahmed Samurai"]}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty"]}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"]}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Shivam", "Ravikant", "Ansh", "Rocky", "BELLA", "nabeel"]}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name"]}, "Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )"]}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "SingleLink"}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}};
+
+// Exact per-Request-Type field layout for the ticket workspace's Dynamic Request
+// Section, sourced directly from the live Feishu form (keys match Feishu's
+// Request Type option strings, trimmed).
+const TICKET_DYNAMIC_FIELDS = {
+    "Agency Creation": [
+        "Region",
+        "Agency Type",
+        "Bd Code",
+        "Agency Name",
+        "User ID",
+        "Applier real name",
+        "Whatsapp Number",
+        "NID Number",
+        "Otherapp Name",
+        "Otherapp ID",
+        "NID & Otherapp Screen",
+        "Agency Code"
+    ],
+    "Audit": [
+        "raw_text"
+    ],
+    "Agency creation by AC (Walkin)": [
+        "Region",
+        "User ID",
+        "Evidence Screen 2"
+    ],
+    "Closing Agency": [
+        "User ID",
+        "Agency Code",
+        "Old ID",
+        "Reporter ID",
+        "NID Number",
+        "Closing Reason",
+        "Evidence Screen",
+        "New ID",
+        "Host Number Before close the agency",
+        "Agency Name"
+    ],
+    "BD Creation": [
+        "Region",
+        "User ID",
+        "BD Nickname",
+        "Email Adress",
+        "Applier real name",
+        "Acm Name (PK)",
+        "Acm Name (IN)",
+        "Whatsapp Number",
+        "NID Number",
+        "NID & Otherapp Screen",
+        "BD Hunted Agency Code",
+        "Bd Code"
+    ],
+    "Agency Target Privilege": [
+        "Agency Code",
+        "User ID",
+        "Privilege",
+        "Base Points",
+        "Counter",
+        "Formula",
+        "Rejected Ids",
+        "Target  Duplicated check",
+        "Evidence Screen 2"
+    ],
+    "Agency Point Request": [
+        "Agency Code",
+        "User ID",
+        "Point Balance",
+        "Agency Point Privilege",
+        "Quantities Input",
+        "Target Type",
+        "Order Action",
+        "Transaction Receipt",
+        "Latest Usage Tracker",
+        "Evidence Screen 2"
+    ],
+    "Add & Change Short ID": [
+        "User ID",
+        "New Short ID",
+        "Vip Level",
+        "Evidence Screen 2"
+    ],
+    "Add & Remove Host Sign": [
+        "Region",
+        "User ID",
+        "Agency Code",
+        "Type of Action Host sign",
+        "Evidence Screen"
+    ],
+    "Welcome Package": [
+        "Region",
+        "User ID",
+        "Wealth Level",
+        "Evidence Screen"
+    ],
+    "Add & Remove games": [
+        "Region",
+        "User ID",
+        "Type of Action 2",
+        "Evidence Screen"
+    ],
+    "Remove short ID (only by user approve )": [
+        "Region",
+        "User ID",
+        "Agency Code",
+        "Evidence Screen"
+    ],
+    "Room Pinup (Only for the famous KOLS)": [
+        "Region",
+        "User ID",
+        "Agency Code",
+        "Evidence Screen"
+    ],
+    "Change agency name": [
+        "Region",
+        "Agency Code",
+        "User ID",
+        "New agency name",
+        "Evidence Screen"
+    ],
+    "Change Agency Manger ID (with same owner)": [
+        "Region",
+        "Agency Code",
+        "User ID",
+        "New agency owner ID",
+        "Current agency manger name (same in NID )",
+        "Evidence Screen"
+    ],
+    "Change Agency Ownership": [
+        "Region",
+        "Agency Code",
+        "User ID",
+        "New agency owner ID",
+        "New agency owner Name",
+        "New and old onwer National IDS (Both NID)",
+        "Evidence Screen"
+    ],
+    "Merge agencies": [
+        "Region",
+        "Agency Code",
+        "User ID",
+        "Agency to be merged and closed",
+        "Evidence Screen"
+    ],
+    "Remove BD": [
+        "Bd Code",
+        "User ID",
+        "Closing Reason",
+        "NID Number",
+        "Evidence Screen",
+        "Evidence Screen 2"
+    ]
+};
+
+// Automation/system fields (Formula, Lookup, internal bot wiring, etc.) that should
+// never be rendered as editable controls, used as a fallback filter for Request Types
+// that don't have an explicit entry in TICKET_DYNAMIC_FIELDS above.
+const TICKET_INTERNAL_FIELDS = new Set([
+    "Numbering",
+    "Submitted on",
+    "Submitted on Copy",
+    "Match ID",
+    "Record ID Text",
+    "Last Retry Time",
+    "Lock Owner",
+    "Ready to Archive",
+    "Robot Filter",
+    "Respondents",
+    "Reward",
+    "Created By",
+    "Webhook Lookup",
+    "Mention this Group",
+    "Mentioned Group",
+    "Cleaned User ID",
+    "Bot Color",
+    "Bot Title",
+    "Bot Message",
+    "Ticket Details",
+    "Duplicated Check",
+    "Assigned Member",
+    "Assigned Time",
+    "Completion Time",
+    "Handle Time (Seconds)",
+    "Request Status",
+    "Approval",
+    "Mentioned Person",
+    "chinese Note",
+    "Type of Action",
+    "Target",
+    "Parent items",
+    "approve note",
+    "time of the requests",
+    "Done by",
+    "Status",
+    "Request Type",
+    "Reject Reason",
+    "Audition note",
+    "Create Way"
+]);
+
+function feishuValueToString(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (Array.isArray(value)) {
+        if (value.length === 0) return '';
+        return value.map(item => {
+            if (item && typeof item === 'object') {
+                for (const k of ['text','name','en_name','email','value','id']) {
+                    if (item[k] !== undefined && item[k] !== null && item[k] !== '') return String(item[k]);
+                }
+                return '';
+            }
+            return String(item);
+        }).filter(s => s !== '').join(', ');
+    }
+    if (typeof value === 'object') {
+        for (const k of ['text','name','en_name','email','value','label','id']) {
+            if (value[k] !== undefined && value[k] !== null && value[k] !== '') return String(value[k]);
+        }
+        return '';
+    }
+    return String(value);
+}
+
+function feishuValueToList(value) {
+    // Like feishuValueToString but returns each segment separately (for MultiSelect matching).
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) {
+        return value.map(item => {
+            if (item && typeof item === 'object') {
+                for (const k of ['text','name','en_name','email','value','id']) {
+                    if (item[k] !== undefined && item[k] !== null && item[k] !== '') return String(item[k]);
+                }
+                return '';
+            }
+            return String(item);
+        }).filter(s => s !== '');
+    }
+    const s = feishuValueToString(value);
+    return s ? s.split(',').map(x => x.trim()).filter(Boolean) : [];
+}
+
 let ltQueue = [];
 let ltActiveTicket = null;
 let ltPusherInstance = null;
@@ -4417,23 +4660,29 @@ async function ltPullAssigned() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to pull tickets');
 
+        // The backend now returns the LIVE, server-filtered set of tickets that are
+        // still "In Progress" and assigned to this user. We resync ltQueue to exactly
+        // match this set (instead of only ever adding) so tickets that were closed,
+        // reassigned, or resolved in Lark disappear from the queue immediately rather
+        // than lingering in stale client-side state.
         const tickets = data.tickets || [];
-        let added = 0;
-        tickets.forEach(t => {
-            const id = t.record_id || t.id;
-            if (!ltQueue.some(q => (q.record_id||q.id) === id)) {
-                ltQueue.unshift(t);
-                added++;
-            }
-        });
+        const prevIds = new Set(ltQueue.map(q => q.record_id || q.id));
+        const newIds = new Set(tickets.map(t => t.record_id || t.id));
+        const added = tickets.filter(t => !prevIds.has(t.record_id || t.id)).length;
+        const removed = ltQueue.filter(q => !newIds.has(q.record_id || q.id)).length;
+
+        ltQueue = tickets;
         ltRenderQueue();
 
         if (!tickets.length) {
             ToastManager.show('No in-progress ticket assigned to you right now.', 'info');
-        } else if (!added) {
+        } else if (!added && !removed) {
             ToastManager.show('Already up to date — nothing new.', 'info');
         } else {
-            ToastManager.show(`Pulled ${added} ticket${added>1?'s':''} from the sheet.`, 'success');
+            const parts = [];
+            if (added) parts.push(`${added} new`);
+            if (removed) parts.push(`${removed} cleared (resolved/reassigned)`);
+            ToastManager.show(`Queue synced — ${parts.join(', ')}.`, 'success');
         }
     } catch (e) {
         ToastManager.show('Pull failed: ' + e.message, 'error', 6000);
@@ -4490,19 +4739,43 @@ async function twOpenWorkspace(recordId) {
         const sec2 = document.getElementById('tw-sec-2');
         sec1.innerHTML = ''; sec2.innerHTML = '';
 
-        const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering']);
-        
+        // Fields shown via their own dedicated controls elsewhere in the form
+        // (Duplicate Check card, Chinese Approval card, Audition Action card, header).
+        const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering', 'Create Way']);
+
+        // ISSUE 6 FIX: the Dynamic Request Section now mirrors the live Feishu form —
+        // when the Request Type has an exact field list (TICKET_DYNAMIC_FIELDS), only
+        // those fields are rendered (in that order, even if currently empty, so missing
+        // data can be filled in). Unmapped Request Types fall back to "every field that
+        // has a value and isn't a pure automation/system field" (TICKET_INTERNAL_FIELDS)
+        // instead of dumping every raw column including Formula/Lookup bot-wiring fields.
+        const reqType = (ticket.fields['Request Type'] || '').toString().trim();
+        const explicitList = TICKET_DYNAMIC_FIELDS[reqType];
+
+        let dynamicKeys;
+        if (explicitList) {
+            dynamicKeys = explicitList.filter(k => !LT_BASIC_KEYS.has(k));
+        } else {
+            dynamicKeys = Object.keys(ticket.fields).filter(key => {
+                const val = ticket.fields[key];
+                if (val === undefined || val === null || val === '') return false;
+                if (LT_PROCESSING_KEYS.has(key)) return false;
+                if (LT_BASIC_KEYS.has(key)) return false;
+                if (TICKET_INTERNAL_FIELDS.has(key)) return false;
+                return true;
+            });
+        }
+
         Object.keys(ticket.fields).forEach(key => {
             const val = ticket.fields[key];
             if (val === undefined || val === null || val === '') return;
-            if (LT_PROCESSING_KEYS.has(key)) return; 
-            
-            const el = createTwControl(key, val);
-            if (LT_BASIC_KEYS.has(key)) {
-                sec1.appendChild(el);
-            } else {
-                sec2.appendChild(el);
-            }
+            if (LT_PROCESSING_KEYS.has(key)) return;
+            if (!LT_BASIC_KEYS.has(key)) return; // dynamic-section fields handled below
+            sec1.appendChild(createTwControl(key, val));
+        });
+
+        dynamicKeys.forEach(key => {
+            sec2.appendChild(createTwControl(key, ticket.fields[key]));
         });
 
         if(sec1.children.length === 0) sec1.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No basic information found.</div>';
@@ -4513,7 +4786,36 @@ async function twOpenWorkspace(recordId) {
         document.getElementById('tw-audition-note').value = ticket.fields['Audition note'] || '';
         document.getElementById('tw-chinese-action').value = typeof ticket.fields['Type of Action'] === 'string' ? ticket.fields['Type of Action'].trim() : (ticket.fields['Type of Action']?.text?.trim() || '');
         document.getElementById('tw-chinese-note').value = ticket.fields['chinese Note'] || '';
-        
+
+        // ISSUE 5 FIX: "Reject Reason" (MultiSelect) now renders real checkboxes instead
+        // of being silently dropped.
+        const rrWrap = document.getElementById('tw-reject-reason-wrap');
+        if (rrWrap) {
+            const rrMeta = FIELD_SCHEMA['Reject Reason'];
+            const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
+            rrWrap.innerHTML = (rrMeta?.options || []).map(o => `
+                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                    <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent-rose);">
+                    ${escHtml(o)}
+                </label>`).join('');
+        }
+
+        // ISSUE 5 FIX: "Create Way" restored as a dropdown in the Duplicate Check card.
+        let cwWrap = document.getElementById('tw-create-way-wrap');
+        const dupCard = document.getElementById('tw-sec-3');
+        if (!cwWrap && dupCard) {
+            cwWrap = document.createElement('div');
+            cwWrap.id = 'tw-create-way-wrap';
+            cwWrap.className = 'control-group';
+            dupCard.insertBefore(cwWrap, dupCard.firstChild);
+        }
+        if (cwWrap) {
+            const cwMeta = FIELD_SCHEMA['Create Way'];
+            const cwVal = feishuValueToString(ticket.fields['Create Way']);
+            const cwOpts = (cwMeta?.options || []).map(o => `<option value="${escHtml(o)}" ${o === cwVal ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+            cwWrap.innerHTML = `<label>Create Way</label><select name="Create Way" class="form-highlight-input"><option value="">-- Select --</option>${cwOpts}</select>`;
+        }
+
         const dupCheck = document.getElementById('tw-dup-display');
         dupCheck.innerHTML = parseDuplicatedCheck(JSON.stringify(ticket.fields['Duplicated Check']||''));
         dupCheck.setAttribute('style', ltDupClass(ticket.fields['Duplicated Check']||''));
@@ -4528,33 +4830,63 @@ async function twOpenWorkspace(recordId) {
 function createTwControl(key, value) {
     const wrap = document.createElement('div');
     wrap.className = 'control-group';
-    
-    let label = `<label>${escHtml(key)}</label>`;
-    
-    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
-        if (value[0].file_token) {
-            let html = label + `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
-            value.forEach(f => {
-                html += `<a href="/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}" target="_blank" style="display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;border:1px solid var(--border);"><img src="/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}" style="width:100%;height:100%;object-fit:cover;"></a>`;
-            });
-            html += `</div><input type="file" name="${escHtml(key)}" multiple class="form-highlight-input" style="font-size:0.75rem;padding:8px;background:rgba(255,255,255,0.02) !important;">`;
-            wrap.innerHTML = html;
-            return wrap;
-        } else if (value[0].id && value[0].name) {
-            const str = value.map(v => v.name).join(', ');
-            wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(str)}" class="form-highlight-input">`;
-            return wrap;
-        }
+    const label = `<label>${escHtml(key)}</label>`;
+    const meta = FIELD_SCHEMA[key]; // { field_id, ui_type, options? } from the live Lark schema
+
+    // ISSUE 8 FIX: Attachment fields now carry field_id so the backend can build the
+    // "extra" bitablePerm parameter Feishu requires under advanced permissions.
+    if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].file_token) {
+        const fieldIdQS = meta?.field_id ? `&field_id=${encodeURIComponent(meta.field_id)}` : '';
+        let html = label + `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
+        value.forEach(f => {
+            const src = `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`;
+            html += `<a href="${src}" target="_blank" style="display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;border:1px solid var(--border);"><img src="${src}" loading="lazy" onerror="this.closest('a').innerHTML='📎';" style="width:100%;height:100%;object-fit:cover;"></a>`;
+        });
+        html += `</div><input type="file" name="${escHtml(key)}" multiple class="form-highlight-input" style="font-size:0.75rem;padding:8px;background:rgba(255,255,255,0.02) !important;">`;
+        wrap.innerHTML = html;
+        return wrap;
     }
-    
-    let valStr = '';
-    if (typeof value === 'object' && value !== null) {
-        valStr = value.text || value.name || value.id || JSON.stringify(value);
-    } else {
-        valStr = String(value);
+
+    // User/Person fields (e.g. "Lock Owner", "Mentioned Person") -> read as text of names
+    if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].id && value[0].name) {
+        const str = value.map(v => v.name).join(', ');
+        wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(str)}" class="form-highlight-input">`;
+        return wrap;
     }
-    
-    wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input">`;
+
+    // ISSUE 4/5/6 CONTROL MAPPING: render strictly by the schema's ui_type.
+    if (meta?.ui_type === 'SingleSelect' && meta.options) {
+        const cur = feishuValueToString(value);
+        const opts = meta.options.map(o => `<option value="${escHtml(o)}" ${o === cur ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+        wrap.innerHTML = label + `<select name="${escHtml(key)}" class="form-highlight-input"><option value="">-- Select --</option>${opts}</select>`;
+        return wrap;
+    }
+    if (meta?.ui_type === 'MultiSelect' && meta.options) {
+        const checkedSet = new Set(feishuValueToList(value));
+        const chks = meta.options.map(o => `
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" name="${escHtml(key)}" value="${escHtml(o)}" data-multi="true" ${checkedSet.has(o) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent-cyan);">
+                ${escHtml(o)}
+            </label>`).join('');
+        wrap.innerHTML = label + `<div class="sub-opts" style="flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;">${chks}</div>`;
+        return wrap;
+    }
+    if (meta?.ui_type === 'Checkbox') {
+        wrap.innerHTML = `<label style="display:flex; align-items:center; gap:10px; cursor:pointer;"><input type="checkbox" name="${escHtml(key)}" ${value ? 'checked' : ''} style="width:18px;height:18px;"> ${escHtml(key)}</label>`;
+        return wrap;
+    }
+    if (meta?.ui_type === 'Number') {
+        wrap.innerHTML = label + `<input type="number" name="${escHtml(key)}" value="${escHtml(feishuValueToString(value))}" class="form-highlight-input">`;
+        return wrap;
+    }
+
+    // Text, Formula, Lookup, DateTime, and anything else -> plain (read-friendly) text
+    // input, but ALWAYS unwrapped via feishuValueToString so Lark's array/object segment
+    // shapes (e.g. Lookup/Formula returning [{"type":"text","text":"..."}]) never leak
+    // through as raw "[{...}]" JSON in the UI.
+    const readOnly = meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type);
+    const valStr = feishuValueToString(value);
+    wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" ${readOnly ? 'readonly style="opacity:.7;cursor:not-allowed;"' : ''}>`;
     return wrap;
 }
 
@@ -4564,23 +4896,42 @@ function twCloseWorkspace() {
     executePageLogic('live-tickets');
 }
 
+// Shared by twSaveWorkspace and twRunVerify. Collects text/number/select/textarea
+// values, groups MultiSelect checkboxes (data-multi="true") into arrays per field name,
+// and skips read-only Formula/Lookup/computed inputs (Feishu rejects writes to these).
+function twCollectFields(form) {
+    const fields = {};
+    form.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => {
+        if (!el.name || el.readOnly) return;
+        fields[el.name] = el.value;
+    });
+    const cbByName = {};
+    form.querySelectorAll('input[type="checkbox"]').forEach(el => {
+        if (!el.name) return;
+        (cbByName[el.name] = cbByName[el.name] || []).push(el);
+    });
+    Object.keys(cbByName).forEach(name => {
+        const els = cbByName[name];
+        if (els.length > 1 || els[0].dataset.multi === 'true') {
+            fields[name] = els.filter(e => e.checked).map(e => e.value);
+        } else {
+            fields[name] = els[0].checked;
+        }
+    });
+    return fields;
+}
+
 async function twSaveWorkspace() {
     const btn = document.getElementById('twSaveBtn');
     btn.disabled = true; btn.textContent = '⏳ Saving…';
     
     const form = document.getElementById('tw-form');
-    const fields = {};
+    const fields = twCollectFields(form);
     const finalData = new FormData();
     
     finalData.append('user', loggedUser);
     finalData.append('record_id', document.getElementById('tw-record-id').value);
-    
-    form.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
-        if (!el.name) return;
-        fields[el.name] = el.value;
-    });
-    fields['Approval'] = document.getElementById('tw-audition-approval').checked;
-    
+
     finalData.append('fields', JSON.stringify(fields));
     
     form.querySelectorAll('input[type="file"]').forEach(fInput => {
@@ -4617,15 +4968,10 @@ async function twRunVerify() {
     btn.disabled = true; btn.textContent = '⏳ Checking…';
     try {
         const form = document.getElementById('tw-form');
-        const fields = {};
+        const fields = twCollectFields(form);
         const finalData = new FormData();
         finalData.append('user', loggedUser);
         finalData.append('record_id', recordId);
-        form.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
-            if (!el.name) return;
-            fields[el.name] = el.value;
-        });
-        fields['Approval'] = document.getElementById('tw-audition-approval').checked;
         finalData.append('fields', JSON.stringify(fields));
 
         await fetch('/api/requests/update', { method: 'POST', body: finalData }); 
