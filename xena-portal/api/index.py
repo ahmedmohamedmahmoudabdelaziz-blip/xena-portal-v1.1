@@ -52,24 +52,28 @@ EXCLUDED_SUBMIT_FIELDS = {
     "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
     "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
     "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
-    "Assigned Member", "Done by", "Mentioned Person", "Assigned Time", "Completion Time",
+    "Assigned Member", "Assigned Time", "Completion Time",
     "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Status", "Request Status"
 }
 
 # Update fields allows auditors to edit Status, Approval, Reject Reason, etc.
-# BUG FIX: "Assigned Member", "Done by", and "Mentioned Person" are Feishu User-type
-# fields. They were missing from this set (only "Lock Owner" was excluded), so if the
-# frontend ever rendered one as an editable text input, saving it back as a plain string
-# made Feishu reject the whole write with "UserFieldConvFail". Excluding all four
-# User-type fields here means a save/duplicate-check can never break on this again, even
-# if a future frontend change re-introduces an editable control for one of them.
+# BUG FIX (still applies): "Assigned Member" and "Lock Owner" are Feishu User-type
+# fields that stay system-managed (assignment happens via Pull My Ticket, not by
+# hand), so writing plain text to them still gets rejected by Feishu with
+# "UserFieldConvFail" -- keep those excluded.
+#
+# "Done by" and "Mentioned Person" are ALSO User-type fields, but they're now
+# picked from a real member-search control (see #tw-*-picker in the frontend and
+# /api/members/search) that sends proper `[{"id": open_id}]` objects instead of
+# plain text, so Feishu accepts the write -- they're deliberately no longer
+# excluded here.
 EXCLUDED_UPDATE_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
     "Duplicated Check", "Handle Time (Seconds)", "Base Points", "Formula",
     "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
     "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
-    "Assigned Member", "Done by", "Mentioned Person",
+    "Assigned Member",
     "Assigned Time", "Completion Time", "Last Retry Time", "Ready to Archive", "Reward"
 }
 
@@ -172,57 +176,6 @@ def get_table_schema(table_id, token, base_id, ttl=300):
     with _schema_cache["lock"]:
         cached = _schema_cache["data"].get(table_id)
         return cached["fields"] if cached else set()
-
-def ensure_submitted_by_field_exists(tat):
-    """
-    ROOT CAUSE (real submitter lost / "Samurai app" shown as creator): the app has
-    always tried to stamp every new request with the real submitting agent's name in
-    a "Submitted By" text field, but that field never actually existed as a real
-    column on the live Feishu table -- it's absent from the live /fields schema. Every
-    write to it was silently dropped by the actual_fields filter in submit_request()
-    before ever reaching Feishu (get_table_schema() only keeps keys Feishu actually
-    recognizes), so the only record of a ticket's creator was Feishu's own automatic
-    "Respondents"/"Created By" columns. Those are populated by Feishu itself from
-    whichever token performed the create call -- for an agent with no native
-    Bitable record-create permission, that's always the app's own tenant identity
-    (shows up as the app's bot name, e.g. "Samurai app"), and Feishu does not allow
-    that to be overridden after the fact for *any* caller, including a full admin
-    token. This is the one piece of the puzzle actually fixable in code: create the
-    missing "Submitted By" text column once (idempotent -- no-ops if it already
-    exists), so going forward every request reliably carries the true submitter,
-    visible as its own column right in the sheet, regardless of which token Feishu
-    used internally to create the row.
-    """
-    fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
-    if fields and "Submitted By" in fields:
-        return True
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/fields"
-    try:
-        resp = http_requests.post(
-            url,
-            headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
-            json={"field_name": "Submitted By", "type": 1},  # type 1 = single-line Text
-            timeout=10,
-        )
-        data = resp.json()
-        # code 0 = created; 1254063/1254302-ish "field already exists" style codes are
-        # also treated as success here (another instance may have created it first) --
-        # anything else is a real failure and just falls through to caching whatever
-        # the schema already was, same as before this fix.
-        if data.get("code") == 0 or "already exist" in str(data.get("msg", "")).lower():
-            with _schema_cache["lock"]:
-                _schema_cache["data"].pop(REQUESTS_TABLE_ID, None)
-            with _field_types_cache["lock"]:
-                _field_types_cache["data"].pop(REQUESTS_TABLE_ID, None)
-            if REDIS_ENABLED:
-                redis_cmd("DEL", f"xena:schema:{REQUESTS_TABLE_ID}")
-                redis_cmd("DEL", f"xena:fieldtypes:{REQUESTS_TABLE_ID}")
-            return True
-        logger.error("submitted_by_field_create_failed", response=data)
-        return False
-    except Exception as e:
-        logger.error("submitted_by_field_create_failed", error=str(e))
-        return False
 
 _field_types_cache = {"data": {}, "lock": threading.Lock()}
 _FIELD_TYPES_REDIS_TTL = 300
@@ -1818,6 +1771,63 @@ def get_single_request():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/members/search', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def search_members():
+    """
+    Backs the "Done by" / "Mentioned Person" user picker in the ticket workspace
+    (mirrors Feishu's own @-mention/person-field picker).
+
+    NOTE for Ahmed: this calls Feishu's Contact API to list the tenant's members
+    (GET .../contact/v3/users/find_by_department, department_id=0 = root dept),
+    then filters by name locally. That endpoint needs the app to actually have a
+    contact-read scope granted and approved in the Feishu app admin console
+    (contact:user.base:readonly is enough for name + open_id + avatar; nothing
+    sensitive like phone/email is requested). If that scope isn't granted yet,
+    this will come back with a non-zero Feishu error code, which we surface as
+    JSON below instead of crashing -- so the frontend can fall back gracefully.
+    The result list is cached for 5 minutes since the org's member list barely
+    changes and this avoids hitting Feishu on every keystroke.
+    """
+    query = sanitize_text(request.args.get('q', '')).strip().lower()
+
+    cache_key = cache_make_key("members_directory")
+    members = cache_get(cache_key)
+    if members is None:
+        tat = get_tenant_access_token()
+        url = "https://open.feishu.cn/open-apis/contact/v3/users/find_by_department"
+        members, page_token = [], None
+        try:
+            for _ in range(20):  # 20 * 50 = 1,000 member hard ceiling, plenty for a team directory
+                params = {"department_id": "0", "user_id_type": "open_id", "page_size": 50}
+                if page_token:
+                    params["page_token"] = page_token
+                resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, params=params, timeout=10)
+                data = resp.json()
+                if data.get("code") != 0:
+                    return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}",
+                                     "hint": "This usually means the Feishu app doesn't have the contact:user.base:readonly scope granted/approved yet."}), 400
+                block = data.get("data", {})
+                for u in block.get("items", []):
+                    open_id = u.get("open_id")
+                    name = u.get("name")
+                    if not open_id or not name:
+                        continue
+                    members.append({"open_id": open_id, "name": name, "avatar_url": (u.get("avatar") or {}).get("avatar_72", "")})
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            cache_set(cache_key, members, ttl=300)
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    if query:
+        results = [m for m in members if query in m["name"].lower()]
+    else:
+        results = members
+
+    return jsonify({"success": True, "results": results[:30], "count": len(results)})
+
 @app.route('/api/requests/update', methods=['POST'])
 def update_request():
     user = sanitize_text(request.form.get('user', ''))
@@ -1931,10 +1941,6 @@ def submit_request():
 
     tat = get_tenant_access_token()
     api_token = uat if uat else tat
-
-    # BUG FIX (real submitter lost): make sure the "Submitted By" column actually
-    # exists before we try to write to it below -- see ensure_submitted_by_field_exists().
-    ensure_submitted_by_field_exists(tat)
 
     final_fields = {}
 
@@ -2425,21 +2431,31 @@ def my_requests():
                 break
         return items, complete, reason
 
-    # PRIMARY filter now keys off "Submitted By" (a plain Text field we guarantee
-    # exists via ensure_submitted_by_field_exists(), populated with the real agent's
-    # name on every new submission) instead of "Respondents". "Respondents" is a
-    # Feishu-managed CreatedUser column stamped from whichever token performed the
-    # create call -- for an agent without native record-create permission that's
-    # always the app's own identity, never the agent, so filtering on it could never
-    # find that agent's own tickets. "Submitted By" is a normal field we control, so a
-    # plain "contains" text filter against it is reliable.
+    # NOTE on "Respondents": Feishu's own auto-populated creator column. For an
+    # agent whose account doesn't have native Bitable record-create permission on
+    # this table, this column is stamped with the app's own identity instead of the
+    # agent's -- see the note above submit_request()'s Primary Attempt for why, and
+    # the message to the team about the only real fix (granting those agents
+    # edit/create permission on the table in Feishu directly). That's a separate,
+    # platform-level issue from what this filter/fallback chain below is about:
+    # making sure a *complete* search actually runs, not silently capping at 100
+    # unfiltered records.
+    #
+    # We deliberately do NOT filter server-side on "Respondents" here.
+    # "Respondents" is a Feishu Person-type field, and Feishu's `contains` operator
+    # on Person fields matches against open_id, not the plain display name we have
+    # in `user`. That filter doesn't error (code stays 0), it just silently matches
+    # almost nothing -- which caused this endpoint to "succeed" with 1-2 stray
+    # records instead of falling through to a real fallback. So: filter only on
+    # date server-side (cheap, reliable), and let the local matched_items loop
+    # below (which already checks Respondents/Submitted By by display name) do the
+    # per-user filtering safely.
     base_payload = {
         "page_size": 100,
         "sort": [{"field_name": "Numbering", "desc": True}],
         "filter": {
             "conjunction": "and",
             "conditions": [
-                {"field_name": "Submitted By", "operator": "contains", "value": [user]},
                 {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
                 {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
             ],
@@ -2452,7 +2468,6 @@ def my_requests():
     # timestamps rather than a bare date string.
     if not fetch_complete:
         dt_conditions = [
-            {"field_name": "Submitted By", "operator": "contains", "value": [user]},
             {"field_name": "Submitted on", "operator": ">=", "value": [from_dt.strftime("%Y-%m-%dT%H:%M:%S")]},
             {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
         ]
@@ -2463,27 +2478,15 @@ def my_requests():
         }
         all_items, fetch_complete, stop_reason = _run_search(dt_payload)
 
-    # Fallback #2: date filtering unavailable on either field -- drop the date bound
-    # entirely and filter locally on the (now much smaller, per-user) result set.
-    if not fetch_complete:
-        submitted_by_only_payload = {
-            "page_size": 100,
-            "sort": [{"field_name": "Numbering", "desc": True}],
-            "filter": {
-                "conjunction": "and",
-                "conditions": [{"field_name": "Submitted By", "operator": "contains", "value": [user]}],
-            },
-        }
-        all_items, fetch_complete, stop_reason = _run_search(submitted_by_only_payload)
-
-    # Fallback #3: even the "Submitted By" filter failed (e.g. the field was only just
-    # created and hasn't propagated yet, or this record predates the fix and only has
-    # the old "Respondents" stamp) -- paginate the raw table (still sorted newest-first,
-    # NOT capped to a single page) and let the local matching loop below pick out this
-    # user's own tickets by "Submitted By" OR "Respondents"/"Created By". Stops as soon
-    # as a page's oldest record falls outside the requested date window, since further
-    # pages (newest-first) will only be older still -- keeps this bounded and fast
-    # instead of always walking the whole table.
+    # Fallback #2: date filtering unavailable on both fields -- paginate the raw table
+    # (still sorted newest-first, NOT capped to a single page) and let the local
+    # matching loop below pick out this user's own tickets by "Submitted By" OR
+    # "Respondents"/"Created By". Stops as soon as a page's oldest record falls
+    # outside the requested date window, since further pages (newest-first) will only
+    # be older still -- keeps this bounded and fast instead of always walking the
+    # whole table. THIS is the part that was previously silently capped at a single
+    # unfiltered page of 100 records, which is why some agents' own history looked
+    # incomplete -- it's now a real, bounded pagination loop.
     if not fetch_complete:
         try:
             raw_items, page_token = [], None
@@ -2513,7 +2516,7 @@ def my_requests():
                 if not page_token or not block.get("has_more", False):
                     break
             all_items = raw_items
-            fetch_complete, stop_reason = False, "Text filter unavailable -- results gathered by paginating and matching locally, may include a few extra days at the boundary."
+            fetch_complete, stop_reason = False, "Filter unavailable -- results gathered by paginating and matching locally, may include a few extra days at the boundary."
         except Exception as e:
             all_items, fetch_complete, stop_reason = [], False, str(e)
 
