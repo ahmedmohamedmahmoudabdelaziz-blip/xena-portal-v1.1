@@ -108,7 +108,6 @@
         .welcome-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px}
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
 
-        /* QY Cards (Universal Query & My Requests) */
         .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
         .qy-card{background:linear-gradient(145deg, var(--surface) 0%, rgba(255,255,255,0.01) 100%);border:1px solid var(--border);border-radius:16px;padding:20px;transition:all .3s ease; position:relative; overflow:hidden;}
         .qy-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: transparent; transition: background 0.3s ease; }
@@ -156,7 +155,6 @@
         .control-group select:focus,.control-group input:focus,.control-group textarea:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1); background:rgba(0,0,0,0.4);}
         .control-group input:disabled, .control-group select:disabled, .control-group textarea:disabled { opacity: 0.6; cursor: not-allowed; background:rgba(0,0,0,0.4); }
         
-        /* Modern Form Customizations */
         .form-card { max-width: 800px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
         .form-highlight-input { border-color: var(--accent-cyan) !important; background: rgba(0,212,255,0.03) !important; font-weight: 600; box-shadow: 0 4px 15px rgba(0,212,255,0.05); }
         .form-highlight-input:focus { background: rgba(0,212,255,0.06) !important; }
@@ -167,7 +165,6 @@
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
 
-        /* Custom Agency List Table */
         .al-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
         .al-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
         .al-table th { padding: 14px 16px; text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; background: rgba(28, 29, 43, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--border); }
@@ -4798,7 +4795,7 @@ function ltRenderQueue() {
     `).join('');
 }
 
-const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','Acm Name (PK)','Acm Name (IN)','Acm','Assigned Member']);
+const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','Acm Name (PK)','Acm Name (IN)','Acm','Assigned Member', 'Mentioned Person', 'Done by']);
 
 async function twOpenWorkspace(recordId) {
     document.getElementById('loadingOverlay').style.display = 'flex';
@@ -4986,17 +4983,19 @@ function createTwControl(key, value) {
     const label = `<label>${escHtml(key)}</label>`;
     const meta = FIELD_SCHEMA[key]; // { field_id, ui_type, options? } from the live Lark schema
 
-    // ISSUE 8 FIX: Attachment fields now carry field_id so the backend can build the
-    // "extra" bitablePerm parameter Feishu requires under advanced permissions.
-    // ISSUE 2 FIX: thumbnails now open the in-page lightbox (openImageLightbox) instead
-    // of an <a target="_blank"> link, so images never leave the current page/tab.
-    if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].file_token) {
+    // ISSUE 8 FIX & ATTACHMENT MERGE FIX
+    if (meta?.ui_type === 'Attachment' || (Array.isArray(value) && value.length > 0 && value[0] && value[0].file_token)) {
         const fieldIdQS = meta?.field_id ? `&field_id=${encodeURIComponent(meta.field_id)}` : '';
         let html = label + `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
-        value.forEach(f => {
-            const src = `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`;
-            html += `<button type="button" class="img-attach-thumb" onclick="openImageLightbox('${src.replace(/'/g, "\\'")}')" title="Click to preview"><img src="${src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
+        
+        const existing = Array.isArray(value) ? value : [];
+        existing.forEach(f => {
+            if (f.file_token) {
+                const src = `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`;
+                html += `<button type="button" class="img-attach-thumb" onclick="openImageLightbox('${src.replace(/'/g, "\\'")}')" title="Click to preview"><img src="${src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
+            }
         });
+        
         html += `</div><input type="file" name="${escHtml(key)}" multiple class="form-highlight-input" style="font-size:0.75rem;padding:8px;background:rgba(255,255,255,0.02) !important;">`;
         wrap.innerHTML = html;
         return wrap;
@@ -5048,7 +5047,13 @@ function createTwControl(key, value) {
     // through as raw "[{...}]" JSON in the UI.
     const readOnly = meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type);
     const valStr = feishuValueToString(value);
-    wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" ${readOnly ? 'readonly style="opacity:.7;cursor:not-allowed;"' : ''}>`;
+    
+    // TEXTAREA FIX for comma/newline separated IDs
+    if (!readOnly && (valStr.includes('\n') || valStr.includes(','))) {
+        wrap.innerHTML = label + `<textarea name="${escHtml(key)}" class="form-highlight-input" rows="4">${escHtml(valStr)}</textarea>`;
+    } else {
+        wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" ${readOnly ? 'readonly style="opacity:.7;cursor:not-allowed;"' : ''}>`;
+    }
     return wrap;
 }
 
