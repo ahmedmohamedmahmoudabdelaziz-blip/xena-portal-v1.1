@@ -1538,8 +1538,20 @@
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                         My Recent Requests
                     </h3>
-                    <div style="font-size:.95rem;color:var(--text-muted);">
-                        Showing all requests you personally submitted in the last 15 days across all categories.
+                    <div style="font-size:.95rem;color:var(--text-muted);margin-bottom:16px;">
+                        Pulls live from Feishu -- nothing loads until you click Search, and results are never served from a cache.
+                    </div>
+                    <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
+                        <div class="control-group" style="margin:0; min-width:160px;">
+                            <label style="font-size:.8rem;">Lookback window</label>
+                            <select id="myReqDaysSelect" class="form-highlight-input">
+                                <option value="15" selected>Last 15 days</option>
+                                <option value="30">Last 30 days</option>
+                                <option value="60">Last 60 days</option>
+                                <option value="90">Last 90 days</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn" style="width:auto;" onclick="loadMyRequests()">🔍 Search</button>
                     </div>
                 </div>
                 
@@ -1549,7 +1561,7 @@
                     <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
                         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     </div>
-                    <p style="font-size:1.1rem; font-weight:500;">No requests found in the last 15 days.</p>
+                    <p style="font-size:1.1rem; font-weight:500;">Click Search to load your recent requests.</p>
                 </div>
             </div>
 
@@ -2038,7 +2050,10 @@ function executePageLogic(page) {
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
-        loadMyRequests(); // fetch user requests on load
+        // FIX: don't auto-fetch on open anymore -- this page now only queries Feishu
+        // live when the user clicks Search (see #myReqResults / loadMyRequests()).
+        const emptyEl = document.getElementById('myReqEmpty');
+        if (emptyEl && !document.getElementById('myReqResults').innerHTML) emptyEl.style.display = 'block';
     } else if(page==='live-tickets'){
         document.getElementById('pg-live-tickets').style.display='block';
         _expandNavGroup('navBodyTickets','navArrTickets');
@@ -3916,13 +3931,17 @@ async function runQuery(){
 async function loadMyRequests() {
     const resultsEl = document.getElementById('myReqResults');
     const emptyEl = document.getElementById('myReqEmpty');
+    const daysSel = document.getElementById('myReqDaysSelect');
+    const days = daysSel ? daysSel.value : '15';
     
     if (resultsEl) resultsEl.innerHTML = '';
-    if (emptyEl) emptyEl.style.display = 'none';
+    if (emptyEl) { emptyEl.style.display = 'none'; emptyEl.querySelector('p').textContent = 'No requests found in that window.'; }
     document.getElementById('loadingOverlay').style.display = 'flex';
     
     try {
-        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        // FIX: always a live, on-demand fetch (no snapshot/cache) triggered only by the
+        // Search button -- see /api/my-requests in main.py.
+        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&days=${encodeURIComponent(days)}`);
         let data;
         try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
         if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
