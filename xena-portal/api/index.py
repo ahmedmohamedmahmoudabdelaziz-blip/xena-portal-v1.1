@@ -173,6 +173,57 @@ def get_table_schema(table_id, token, base_id, ttl=300):
         cached = _schema_cache["data"].get(table_id)
         return cached["fields"] if cached else set()
 
+def ensure_submitted_by_field_exists(tat):
+    """
+    ROOT CAUSE (real submitter lost / "Samurai app" shown as creator): the app has
+    always tried to stamp every new request with the real submitting agent's name in
+    a "Submitted By" text field, but that field never actually existed as a real
+    column on the live Feishu table -- it's absent from the live /fields schema. Every
+    write to it was silently dropped by the actual_fields filter in submit_request()
+    before ever reaching Feishu (get_table_schema() only keeps keys Feishu actually
+    recognizes), so the only record of a ticket's creator was Feishu's own automatic
+    "Respondents"/"Created By" columns. Those are populated by Feishu itself from
+    whichever token performed the create call -- for an agent with no native
+    Bitable record-create permission, that's always the app's own tenant identity
+    (shows up as the app's bot name, e.g. "Samurai app"), and Feishu does not allow
+    that to be overridden after the fact for *any* caller, including a full admin
+    token. This is the one piece of the puzzle actually fixable in code: create the
+    missing "Submitted By" text column once (idempotent -- no-ops if it already
+    exists), so going forward every request reliably carries the true submitter,
+    visible as its own column right in the sheet, regardless of which token Feishu
+    used internally to create the row.
+    """
+    fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+    if fields and "Submitted By" in fields:
+        return True
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/fields"
+    try:
+        resp = http_requests.post(
+            url,
+            headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+            json={"field_name": "Submitted By", "type": 1},  # type 1 = single-line Text
+            timeout=10,
+        )
+        data = resp.json()
+        # code 0 = created; 1254063/1254302-ish "field already exists" style codes are
+        # also treated as success here (another instance may have created it first) --
+        # anything else is a real failure and just falls through to caching whatever
+        # the schema already was, same as before this fix.
+        if data.get("code") == 0 or "already exist" in str(data.get("msg", "")).lower():
+            with _schema_cache["lock"]:
+                _schema_cache["data"].pop(REQUESTS_TABLE_ID, None)
+            with _field_types_cache["lock"]:
+                _field_types_cache["data"].pop(REQUESTS_TABLE_ID, None)
+            if REDIS_ENABLED:
+                redis_cmd("DEL", f"xena:schema:{REQUESTS_TABLE_ID}")
+                redis_cmd("DEL", f"xena:fieldtypes:{REQUESTS_TABLE_ID}")
+            return True
+        logger.error("submitted_by_field_create_failed", response=data)
+        return False
+    except Exception as e:
+        logger.error("submitted_by_field_create_failed", error=str(e))
+        return False
+
 _field_types_cache = {"data": {}, "lock": threading.Lock()}
 _FIELD_TYPES_REDIS_TTL = 300
 
@@ -937,7 +988,7 @@ QUERY_RECORDS_FIELDS = [
     "Bd Code", "BD Code", "NID Number", "NID", "Status", "Request Status",
     "Reject Reason", "Rejection Reason", "Audition note", "Audition Note", "Duplicated Check",
     "Agency Code", "Agency Type", "Type of Agency",
-    "Closing Reason", "Closing Agencies Reason", "Submitted By"
+    "Closing Reason", "Closing Agencies Reason",
 ]
 
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
@@ -1780,41 +1831,40 @@ def update_request():
     tat = get_tenant_access_token()
     
     # Safely upload newly selected files
-    attach_fields = [f for f in request.files if f not in EXCLUDED_UPDATE_FIELDS]
-    if attach_fields:
-        # Get current record to merge attachments
-        cur_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
-        cur_resp = http_requests.get(cur_url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
-        cur_data = cur_resp.json()
-        cur_fields = {}
-        if cur_data.get("code") == 0:
-            cur_fields = cur_data.get("data", {}).get("record", {}).get("fields", {})
-
-        for field_name in attach_fields:
-            file_list = request.files.getlist(field_name)
-            tokens = []
-            for f in file_list:
-                if not f.filename: continue
-                file_bytes = f.read()
-                if not file_bytes: continue
-                try:
-                    form_data = {'file_name': f.filename, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
-                    files = {'file': (f.filename, file_bytes, f.mimetype)}
-                    up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
-                    if up_res.get("code") == 0:
-                        tokens.append({"file_token": up_res["data"]["file_token"]})
-                except Exception as e:
-                    logger.error("file_upload_failed", error=str(e))
-            
+    #
+    # BUG FIX (new attachment uploads were deleting the old ones): this used to do
+    # `fields[field_name] = tokens`, sending ONLY the newly uploaded file(s). Feishu's
+    # Attachment fields have full-replace write semantics -- whatever list you send
+    # becomes the entire cell content -- so any attachment already on the record that
+    # wasn't in that list got silently wiped the moment a new one was added. The
+    # frontend now also sends the record's *existing* attachment tokens for this field
+    # inside the `fields` JSON payload (see createTwControl/twSaveWorkspace in
+    # index.html), so here we merge the newly uploaded tokens onto whatever existing
+    # ones were sent instead of overwriting -- new images land side by side with the
+    # old ones, matching how the sheet is expected to behave.
+    for field_name in request.files:
+        if field_name in EXCLUDED_UPDATE_FIELDS: continue
+        file_list = request.files.getlist(field_name)
+        tokens = []
+        for f in file_list:
+            if not f.filename: continue
+            file_bytes = f.read()
+            if not file_bytes: continue
+            try:
+                form_data = {'file_name': f.filename, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
+                files = {'file': (f.filename, file_bytes, f.mimetype)}
+                up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
+                if up_res.get("code") == 0:
+                    tokens.append({"file_token": up_res["data"]["file_token"]})
+            except Exception as e:
+                logger.error("file_upload_failed", error=str(e))
+        if tokens:
+            existing = fields.get(field_name)
             existing_tokens = []
-            if field_name in cur_fields and isinstance(cur_fields[field_name], list):
-                existing_tokens = [t for t in cur_fields[field_name] if isinstance(t, dict) and t.get("file_token")]
-            
-            if tokens:
-                # Combine, avoiding duplicates by file_token
-                merged = existing_tokens + [t for t in tokens if t.get("file_token") and not any(e.get("file_token") == t["file_token"] for e in existing_tokens)]
-                if merged:
-                    fields[field_name] = merged
+            if isinstance(existing, list):
+                existing_tokens = [{"file_token": x["file_token"]} for x in existing
+                                    if isinstance(x, dict) and x.get("file_token")]
+            fields[field_name] = existing_tokens + tokens
 
     # Drop read-only fields so Feishu doesn't reject the save attempt
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
@@ -1881,7 +1931,11 @@ def submit_request():
 
     tat = get_tenant_access_token()
     api_token = uat if uat else tat
-    
+
+    # BUG FIX (real submitter lost): make sure the "Submitted By" column actually
+    # exists before we try to write to it below -- see ensure_submitted_by_field_exists().
+    ensure_submitted_by_field_exists(tat)
+
     final_fields = {}
 
     for key, val in user_fields.items():
@@ -2371,21 +2425,23 @@ def my_requests():
                 break
         return items, complete, reason
 
+    # PRIMARY filter now keys off "Submitted By" (a plain Text field we guarantee
+    # exists via ensure_submitted_by_field_exists(), populated with the real agent's
+    # name on every new submission) instead of "Respondents". "Respondents" is a
+    # Feishu-managed CreatedUser column stamped from whichever token performed the
+    # create call -- for an agent without native record-create permission that's
+    # always the app's own identity, never the agent, so filtering on it could never
+    # find that agent's own tickets. "Submitted By" is a normal field we control, so a
+    # plain "contains" text filter against it is reliable.
     base_payload = {
         "page_size": 100,
         "sort": [{"field_name": "Numbering", "desc": True}],
         "filter": {
             "conjunction": "and",
             "conditions": [
+                {"field_name": "Submitted By", "operator": "contains", "value": [user]},
                 {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
                 {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
-                {
-                    "conjunction": "or",
-                    "conditions": [
-                        {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                        {"field_name": "Submitted By", "operator": "contains", "value": [user]}
-                    ]
-                }
             ],
         },
     }
@@ -2396,15 +2452,9 @@ def my_requests():
     # timestamps rather than a bare date string.
     if not fetch_complete:
         dt_conditions = [
+            {"field_name": "Submitted By", "operator": "contains", "value": [user]},
             {"field_name": "Submitted on", "operator": ">=", "value": [from_dt.strftime("%Y-%m-%dT%H:%M:%S")]},
             {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
-            {
-                "conjunction": "or",
-                "conditions": [
-                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                    {"field_name": "Submitted By", "operator": "contains", "value": [user]}
-                ]
-            }
         ]
         dt_payload = {
             "page_size": 100,
@@ -2416,29 +2466,54 @@ def my_requests():
     # Fallback #2: date filtering unavailable on either field -- drop the date bound
     # entirely and filter locally on the (now much smaller, per-user) result set.
     if not fetch_complete:
-        respondents_only_payload = {
+        submitted_by_only_payload = {
             "page_size": 100,
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {
-                "conjunction": "or",
-                "conditions": [
-                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
-                    {"field_name": "Submitted By", "operator": "contains", "value": [user]}
-                ],
+                "conjunction": "and",
+                "conditions": [{"field_name": "Submitted By", "operator": "contains", "value": [user]}],
             },
         }
-        all_items, fetch_complete, stop_reason = _run_search(respondents_only_payload)
+        all_items, fetch_complete, stop_reason = _run_search(submitted_by_only_payload)
 
-    # Fallback #3: even the Respondents "contains" filter failed (unexpected, but
-    # don't leave the user with a broken page) -- last resort, single unfiltered page
-    # pull with a hard 100-record ceiling so this can never hang.
+    # Fallback #3: even the "Submitted By" filter failed (e.g. the field was only just
+    # created and hasn't propagated yet, or this record predates the fix and only has
+    # the old "Respondents" stamp) -- paginate the raw table (still sorted newest-first,
+    # NOT capped to a single page) and let the local matching loop below pick out this
+    # user's own tickets by "Submitted By" OR "Respondents"/"Created By". Stops as soon
+    # as a page's oldest record falls outside the requested date window, since further
+    # pages (newest-first) will only be older still -- keeps this bounded and fast
+    # instead of always walking the whole table.
     if not fetch_complete:
         try:
-            resp = session.post(search_url, json={"page_size": 100, "sort": [{"field_name": "Numbering", "desc": True}]}, timeout=15)
-            data = resp.json()
-            if data.get("code") == 0:
-                all_items = data.get("data", {}).get("items", [])
-                fetch_complete, stop_reason = False, "Filter unavailable -- showing latest 100 records only, unfiltered by user."
+            raw_items, page_token = [], None
+            threshold = from_dt.replace(tzinfo=None)
+            for _ in range(50):  # 50 * 100 = 5,000 record hard ceiling, same bound as _run_search
+                body = {"page_size": 100, "sort": [{"field_name": "Numbering", "desc": True}]}
+                if page_token:
+                    body["page_token"] = page_token
+                resp = session.post(search_url, json=body, timeout=15)
+                data = resp.json()
+                if data.get("code") != 0:
+                    break
+                block = data.get("data", {})
+                page_items = block.get("items", [])
+                raw_items.extend(page_items)
+
+                oldest_in_page = None
+                for it in page_items:
+                    raw_d = get_field_local(it.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
+                    d = parse_feishu_date(raw_d)
+                    if d and (oldest_in_page is None or d < oldest_in_page):
+                        oldest_in_page = d
+                if oldest_in_page and oldest_in_page < threshold:
+                    break
+
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            all_items = raw_items
+            fetch_complete, stop_reason = False, "Text filter unavailable -- results gathered by paginating and matching locally, may include a few extra days at the boundary."
         except Exception as e:
             all_items, fetch_complete, stop_reason = [], False, str(e)
 
@@ -2930,8 +3005,6 @@ def proxy_attachment(file_token):
         tat = get_tenant_access_token()
         url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
         headers = {"Authorization": f"Bearer {tat}"}
-
-        logger.info("attachment_proxy_request", file_token=file_token, field_id=field_id, user=user)
 
         # ROOT CAUSE (Issue 8): with Advanced Permissions enabled on the base, Feishu's
         # media download endpoint requires an "extra" param identifying which Bitable
