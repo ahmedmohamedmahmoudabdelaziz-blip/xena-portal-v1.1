@@ -248,6 +248,29 @@ def strip_readonly_fields(fields, field_types):
         logger.warn("stripped_readonly_fields_before_write", fields=dropped)
     return {k: v for k, v in fields.items() if field_types.get(k) not in READONLY_UI_TYPES}
 
+def strip_invalid_attachment_fields(fields, field_types):
+    """
+    BUG FIX (AttachFieldConvFail): Feishu's Attachment-type fields only accept a list
+    of {"file_token": "..."} objects -- never null, an empty string, or a plain string.
+    A stale/legacy frontend payload (e.g. an attachment field echoed back as its old
+    display text instead of being omitted) was slipping through update_request()'s
+    other filters and crashing the whole write. This drops any Attachment-typed key
+    whose value isn't already a well-formed token list, leaving the existing
+    attachment on that record untouched (rather than trying to convert/clear it).
+    """
+    cleaned, dropped = {}, []
+    for k, v in fields.items():
+        if field_types.get(k) == "Attachment":
+            if isinstance(v, list) and v and all(isinstance(x, dict) and x.get("file_token") for x in v):
+                cleaned[k] = v
+            else:
+                dropped.append(k)
+            continue
+        cleaned[k] = v
+    if dropped:
+        logger.warn("stripped_invalid_attachment_fields", fields=dropped)
+    return cleaned
+
 def coerce_number_fields(fields, field_types):
     """
     For every field the live schema says is Number-like: drop it entirely if the
@@ -1784,20 +1807,34 @@ def update_request():
     # BUG FIX (NumberFieldConvFail): drop/convert blank or non-numeric values for
     # Number-type fields before they ever reach Feishu -- see coerce_number_fields().
     field_types = get_field_ui_types(REQUESTS_TABLE_ID, tat, BASE_ID)
+    if not field_types:
+        # Cache came back empty (cold start / stale Redis entry) -- force a fresh
+        # fetch rather than silently skipping every type-based safety check below.
+        with _field_types_cache["lock"]:
+            _field_types_cache["data"].pop(REQUESTS_TABLE_ID, None)
+        if REDIS_ENABLED:
+            redis_cmd("DEL", f"xena:fieldtypes:{REQUESTS_TABLE_ID}")
+        field_types = get_field_ui_types(REQUESTS_TABLE_ID, tat, BASE_ID)
     if field_types:
         fields = coerce_number_fields(fields, field_types)
         # BUG FIX: never write to Formula/Lookup/AutoNumber/CreatedTime/etc fields,
         # even if one somehow made it this far (e.g. a future frontend regression like
         # the "Assigned Member" one) -- see strip_readonly_fields().
         fields = strip_readonly_fields(fields, field_types)
+        # BUG FIX (AttachFieldConvFail): drop any Attachment-typed field that isn't a
+        # valid list of file tokens (e.g. a stale echoed-back value) -- see
+        # strip_invalid_attachment_fields().
+        fields = strip_invalid_attachment_fields(fields, field_types)
 
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    
+
+    logger.info("update_fields_payload", record_id=record_id, fields=fields)
     try:
         resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=15)
         data = resp.json()
+        logger.info("update_feishu_response", record_id=record_id, response=data)
         if data.get("code") == 0:
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
@@ -2278,31 +2315,31 @@ def my_requests():
     # "Search" (not automatically when the page opens), so a live round-trip to Feishu
     # here is expected and acceptable rather than something to hide behind a cache.
     #
-    # We use the classic List Records endpoint's formula-style `filter` query param
-    # (GET .../records?filter=...) rather than the /records/search POST endpoint, with
-    # a CurrentValue.[...] formula combining the Respondents membership check and the
-    # date range, matching Lark's documented filter syntax:
-    #   CurrentValue.[Respondents].contains("name") && CurrentValue.[Submitted on] >= "..."
-    # Max 100 records/page on this endpoint (per Feishu docs), paginated via page_token.
+    # We use the /records/search POST endpoint (not the classic GET .../records?filter=
+    # formula endpoint) because its structured filter conditions are far more reliable
+    # against this base than the CurrentValue.[...] formula string was. "Submitted on
+    # Copy" is a plain Date field (no time component), so ">=" / "<=" against a bare
+    # "YYYY-MM-DD" string is the fast, low-error path. "Submitted on" is the DateTime
+    # twin of that field and needs full ISO-8601 timestamps if we ever have to fall
+    # back to it. Max 100 records/page on this endpoint, paginated via page_token.
     tat = get_tenant_access_token()
     session = http_requests.Session()
-    session.headers.update({"Authorization": f"Bearer {tat}"})
-    list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
-    from_str = from_dt.strftime("%Y-%m-%d %H:%M")
-    to_str = _cairo_now.strftime("%Y-%m-%d %H:%M")
-    user_escaped = user.replace('"', '\\"')
+    from_str = from_dt.strftime("%Y-%m-%d")
+    to_str = _cairo_now.strftime("%Y-%m-%d")
 
-    def _run_filter(filter_str):
-        """Runs the live paginated fetch for a given formula filter string. Returns
+    def _run_search(payload):
+        """Runs the live paginated /records/search fetch for a given payload. Returns
         (items, complete, reason)."""
         items, page_token, complete, reason = [], None, True, ""
         for _ in range(50):  # 50 * 100 = 5,000 records hard ceiling as a sanity bound
-            params = {"page_size": 100, "automatic_fields": "true", "filter": filter_str}
+            body = dict(payload)
             if page_token:
-                params["page_token"] = page_token
+                body["page_token"] = page_token
             try:
-                resp = session.get(list_url, params=params, timeout=15)
+                resp = session.post(search_url, json=body, timeout=15)
                 data = resp.json()
                 if data.get("code") != 0:
                     complete, reason = False, f"{data.get('code')}: {data.get('msg')}"
@@ -2317,26 +2354,55 @@ def my_requests():
                 break
         return items, complete, reason
 
-    combined_filter = (
-        f'CurrentValue.[Respondents].contains("{user_escaped}") && '
-        f'CurrentValue.[Submitted on] >= "{from_str}" && '
-        f'CurrentValue.[Submitted on] <= "{to_str}"'
-    )
-    all_items, fetch_complete, stop_reason = _run_filter(combined_filter)
+    base_payload = {
+        "page_size": 100,
+        "sort": [{"field_name": "Numbering", "desc": True}],
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
+                {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
+            ],
+        },
+    }
+    all_items, fetch_complete, stop_reason = _run_search(base_payload)
 
-    # Fallback #1: date comparison on "Submitted on" not supported/erroring on this
-    # base -- drop the date bound and filter locally on the (now much smaller,
-    # per-user) result set instead of giving up.
+    # Fallback #1: "Submitted on Copy" not present/erroring on this base -- retry
+    # against the DateTime "Submitted on" field instead, which needs full ISO-8601
+    # timestamps rather than a bare date string.
     if not fetch_complete:
-        respondents_only_filter = f'CurrentValue.[Respondents].contains("{user_escaped}")'
-        all_items, fetch_complete, stop_reason = _run_filter(respondents_only_filter)
+        dt_conditions = [
+            {"field_name": "Respondents", "operator": "contains", "value": [user]},
+            {"field_name": "Submitted on", "operator": ">=", "value": [from_dt.strftime("%Y-%m-%dT%H:%M:%S")]},
+            {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
+        ]
+        dt_payload = {
+            "page_size": 100,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {"conjunction": "and", "conditions": dt_conditions},
+        }
+        all_items, fetch_complete, stop_reason = _run_search(dt_payload)
 
-    # Fallback #2: even the Respondents "contains" formula filter failed (unexpected,
-    # but don't leave the user with a broken page) -- last resort, single unfiltered
-    # page pull with a hard 100-record ceiling so this can never hang.
+    # Fallback #2: date filtering unavailable on either field -- drop the date bound
+    # entirely and filter locally on the (now much smaller, per-user) result set.
+    if not fetch_complete:
+        respondents_only_payload = {
+            "page_size": 100,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {
+                "conjunction": "and",
+                "conditions": [{"field_name": "Respondents", "operator": "contains", "value": [user]}],
+            },
+        }
+        all_items, fetch_complete, stop_reason = _run_search(respondents_only_payload)
+
+    # Fallback #3: even the Respondents "contains" filter failed (unexpected, but
+    # don't leave the user with a broken page) -- last resort, single unfiltered page
+    # pull with a hard 100-record ceiling so this can never hang.
     if not fetch_complete:
         try:
-            resp = session.get(list_url, params={"page_size": 100, "automatic_fields": "true", "sort": '["Numbering DESC"]'}, timeout=15)
+            resp = session.post(search_url, json={"page_size": 100, "sort": [{"field_name": "Numbering", "desc": True}]}, timeout=15)
             data = resp.json()
             if data.get("code") == 0:
                 all_items = data.get("data", {}).get("items", [])
