@@ -399,6 +399,16 @@
         .tab-btn{flex:1;padding:8px 16px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.85rem;background:transparent;color:var(--text-muted);transition:all .2s}
         .tab-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.2)}
 
+        /* Manual Request Type tab strip in the ticket workspace -- lets an admin pick
+           which Request Type's field layout to render in the Dynamic Request Section,
+           instead of always trusting the record's own "Request Type" value. */
+        .tw-reqtype-tab{flex-shrink:0;padding:8px 14px;border:none;background:transparent;color:var(--text-muted);font-family:inherit;font-weight:500;font-size:.82rem;cursor:pointer;border-radius:7px;white-space:nowrap;transition:all .15s;border-bottom:2px solid transparent}
+        .tw-reqtype-tab:hover{color:var(--text);background:rgba(255,255,255,.05)}
+        .tw-reqtype-tab.active{color:var(--accent-cyan);background:rgba(0,212,255,.08);border-bottom:2px solid var(--accent-cyan)}
+        .tw-reqtype-more-item{padding:10px 14px;font-size:.82rem;color:var(--text-muted);cursor:pointer;white-space:nowrap}
+        .tw-reqtype-more-item:hover{background:var(--surface-hover);color:var(--text)}
+        .tw-reqtype-more-item.active{color:var(--accent-cyan);font-weight:600}
+
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
             .kpi-grid{grid-template-columns:repeat(2,1fr)}
@@ -1613,6 +1623,19 @@
                    <button id="twSaveBtn" class="btn btn-primary" onclick="twSaveWorkspace()" style="width:auto; padding:10px 24px;">💾 Save &amp; Resolve</button>
                </div>
                
+               <!-- Manual Request Type picker: switches which field set the Dynamic
+                    Request Section (card 2) renders, by hand, instead of relying only
+                    on whatever "Request Type" the record already has. -->
+               <div class="card" style="padding:8px; margin-bottom:16px;">
+                   <div style="display:flex; align-items:center; gap:4px;">
+                       <div id="tw-reqtype-tabs" style="display:flex; gap:2px; overflow-x:auto; flex:1;"></div>
+                       <div id="tw-reqtype-more-wrap" style="position:relative; flex-shrink:0;">
+                           <button type="button" id="tw-reqtype-more-btn" class="tw-reqtype-tab" onclick="twToggleReqTypeMoreMenu(event)">More ▾</button>
+                           <div id="tw-reqtype-more-menu" style="display:none; position:absolute; top:110%; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.35); min-width:240px; max-height:320px; overflow-y:auto; z-index:50;"></div>
+                       </div>
+                   </div>
+               </div>
+
                <form id="tw-form">
                    <input type="hidden" id="tw-record-id">
                    
@@ -4807,6 +4830,115 @@ function ltRenderQueue() {
 // fields) in the Basic Information card for every ticket, regardless of Request Type.
 const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','Acm Name (PK)','Acm Name (IN)','Acm','Assigned Member','Mentioned Person','Done by']);
 
+// Fields shown via their own dedicated controls elsewhere in the form (Duplicate
+// Check card, Chinese Approval card, Audition Action card, header) -- moved to
+// module scope so both twOpenWorkspace and twRenderSection2 (used again on manual
+// tab switches) share the exact same exclusion list.
+const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering', 'Create Way', 'Mentioned Group']);
+
+// The Request Type the admin has manually picked via the tab strip (card 1.5),
+// overriding the record's own "Request Type" for purposes of which fields render
+// in the Dynamic Request Section. null = "just use the record's own type" (default).
+// Reset to null every time a fresh ticket is opened.
+let twManualReqType = null;
+
+// Renders the Dynamic Request Section (card 2) for a given ticket, using
+// reqTypeOverride if provided (manual tab pick) or the record's own "Request Type"
+// otherwise. Pulled out of twOpenWorkspace so twSelectRequestType can call it again
+// on every tab click without re-fetching the record.
+function twRenderSection2(ticket, reqTypeOverride) {
+    const sec2 = document.getElementById('tw-sec-2');
+    if (!sec2) return;
+    sec2.innerHTML = '';
+
+    const reqType = (reqTypeOverride || ticket.fields['Request Type'] || '').toString().trim();
+    const explicitList = TICKET_DYNAMIC_FIELDS[reqType];
+
+    let dynamicKeys;
+    if (explicitList) {
+        dynamicKeys = explicitList.filter(k => !LT_BASIC_KEYS.has(k));
+    } else {
+        dynamicKeys = Object.keys(ticket.fields).filter(key => {
+            const val = ticket.fields[key];
+            if (val === undefined || val === null || val === '') return false;
+            if (LT_PROCESSING_KEYS.has(key)) return false;
+            if (LT_BASIC_KEYS.has(key)) return false;
+            if (TICKET_INTERNAL_FIELDS.has(key)) return false;
+            return true;
+        });
+    }
+
+    dynamicKeys.forEach(key => {
+        sec2.appendChild(createTwControl(key, ticket.fields[key]));
+    });
+
+    if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
+}
+
+// Picks which Request Type tabs are shown inline vs. tucked into the "More ▾"
+// menu. Keeps a fixed number of tabs visible, but always makes sure the currently
+// selected type is one of the visible ones (swapping the last visible tab into the
+// overflow menu to make room for it if needed) -- same behaviour as the screenshot
+// where "Agency Target Privilege" stays visible/underlined once picked.
+const TW_REQTYPE_VISIBLE_COUNT = 8;
+function twReqTypeTabLayout(selected) {
+    const all = Object.keys(TICKET_DYNAMIC_FIELDS);
+    let visible = all.slice(0, TW_REQTYPE_VISIBLE_COUNT);
+    if (selected && all.includes(selected) && !visible.includes(selected)) {
+        visible = visible.slice(0, TW_REQTYPE_VISIBLE_COUNT - 1).concat([selected]);
+    }
+    const overflow = all.filter(t => !visible.includes(t));
+    return { visible, overflow };
+}
+
+function twRenderReqTypeTabs(selectedType) {
+    const tabsEl = document.getElementById('tw-reqtype-tabs');
+    const moreMenu = document.getElementById('tw-reqtype-more-menu');
+    const moreBtn = document.getElementById('tw-reqtype-more-btn');
+    if (!tabsEl) return;
+
+    const { visible, overflow } = twReqTypeTabLayout(selectedType);
+
+    tabsEl.innerHTML = visible.map(t => `
+        <button type="button" class="tw-reqtype-tab ${t === selectedType ? 'active' : ''}" onclick="twSelectRequestType('${t.replace(/'/g, "\\'")}')" title="${escHtml(t.trim())}">${escHtml(t.trim())}</button>
+    `).join('');
+
+    if (moreMenu) {
+        moreMenu.innerHTML = overflow.map(t => `
+            <div class="tw-reqtype-more-item ${t === selectedType ? 'active' : ''}" onclick="twSelectRequestType('${t.replace(/'/g, "\\'")}')">${escHtml(t.trim())}</div>
+        `).join('');
+    }
+    if (moreBtn) moreBtn.classList.toggle('active', overflow.includes(selectedType));
+}
+
+function twToggleReqTypeMoreMenu(evt) {
+    evt.stopPropagation();
+    const menu = document.getElementById('tw-reqtype-more-menu');
+    if (!menu) return;
+    const showing = menu.style.display === 'block';
+    menu.style.display = showing ? 'none' : 'block';
+    if (!showing) {
+        const closeOnce = (e) => { menu.style.display = 'none'; document.removeEventListener('click', closeOnce); };
+        setTimeout(() => document.addEventListener('click', closeOnce), 0);
+    }
+}
+
+// Called when the admin clicks a Request Type tab (inline or from the "More" menu).
+// Re-renders card 2 with that type's field layout -- the record's actual Feishu
+// "Request Type" value is left untouched unless Save & Resolve is pressed while a
+// manual pick differs from the original, in which case twCollectFields() includes
+// the change so it's saved back to Feishu too (see twCollectFields).
+function twSelectRequestType(type) {
+    if (!ltActiveTicket) return;
+    twManualReqType = type;
+    const headerEl = document.getElementById('tw-req-type');
+    if (headerEl) headerEl.textContent = type.trim();
+    twRenderSection2(ltActiveTicket, type);
+    twRenderReqTypeTabs(type);
+    const menu = document.getElementById('tw-reqtype-more-menu');
+    if (menu) menu.style.display = 'none';
+}
+
 async function twOpenWorkspace(recordId) {
     document.getElementById('loadingOverlay').style.display = 'flex';
     try {
@@ -4816,44 +4948,15 @@ async function twOpenWorkspace(recordId) {
         
         const ticket = data.record;
         ltActiveTicket = ticket;
-        
+        twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
+
         document.getElementById('tw-record-id').value = recordId;
         document.getElementById('tw-title').textContent = `#${ticket.fields['Numbering'] || recordId.slice(-6)}`;
-        document.getElementById('tw-req-type').textContent = ticket.fields['Request Type'] || 'Request';
+        const actualReqType = (ticket.fields['Request Type'] || '').toString().trim();
+        document.getElementById('tw-req-type').textContent = actualReqType || 'Request';
 
         const sec1 = document.getElementById('tw-sec-1');
-        const sec2 = document.getElementById('tw-sec-2');
-        sec1.innerHTML = ''; sec2.innerHTML = '';
-
-        // Fields shown via their own dedicated controls elsewhere in the form
-        // (Duplicate Check card, Chinese Approval card, Audition Action card, header).
-        // ISSUE 4 FIX: "Mentioned Group" added here since it now has a dedicated
-        // dropdown (#tw-mentioned-group) instead of falling through to the generic
-        // dynamic-field renderer.
-        const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering', 'Create Way', 'Mentioned Group']);
-
-        // ISSUE 6 FIX: the Dynamic Request Section now mirrors the live Feishu form —
-        // when the Request Type has an exact field list (TICKET_DYNAMIC_FIELDS), only
-        // those fields are rendered (in that order, even if currently empty, so missing
-        // data can be filled in). Unmapped Request Types fall back to "every field that
-        // has a value and isn't a pure automation/system field" (TICKET_INTERNAL_FIELDS)
-        // instead of dumping every raw column including Formula/Lookup bot-wiring fields.
-        const reqType = (ticket.fields['Request Type'] || '').toString().trim();
-        const explicitList = TICKET_DYNAMIC_FIELDS[reqType];
-
-        let dynamicKeys;
-        if (explicitList) {
-            dynamicKeys = explicitList.filter(k => !LT_BASIC_KEYS.has(k));
-        } else {
-            dynamicKeys = Object.keys(ticket.fields).filter(key => {
-                const val = ticket.fields[key];
-                if (val === undefined || val === null || val === '') return false;
-                if (LT_PROCESSING_KEYS.has(key)) return false;
-                if (LT_BASIC_KEYS.has(key)) return false;
-                if (TICKET_INTERNAL_FIELDS.has(key)) return false;
-                return true;
-            });
-        }
+        sec1.innerHTML = '';
 
         Object.keys(ticket.fields).forEach(key => {
             const val = ticket.fields[key];
@@ -4862,13 +4965,15 @@ async function twOpenWorkspace(recordId) {
             if (!LT_BASIC_KEYS.has(key)) return; // dynamic-section fields handled below
             sec1.appendChild(createTwControl(key, val));
         });
-
-        dynamicKeys.forEach(key => {
-            sec2.appendChild(createTwControl(key, ticket.fields[key]));
-        });
-
         if(sec1.children.length === 0) sec1.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No basic information found.</div>';
-        if(sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
+
+        // ISSUE 6 FIX (still applies): the Dynamic Request Section mirrors the live
+        // Feishu form -- when the Request Type has an exact field list
+        // (TICKET_DYNAMIC_FIELDS), only those fields render (even if currently empty,
+        // so missing data can be filled in). Now also manually switchable via the tab
+        // strip above card 1 (twSelectRequestType) instead of purely automatic.
+        twRenderSection2(ticket, actualReqType);
+        twRenderReqTypeTabs(actualReqType);
 
         document.getElementById('tw-audition-approval').checked = ticket.fields['Approval'] || false;
         document.getElementById('tw-audition-status').value = typeof ticket.fields['Status'] === 'string' ? ticket.fields['Status'].trim() : (ticket.fields['Status']?.text?.trim() || '');
@@ -5044,6 +5149,107 @@ function twRenderAttachmentControl(wrap, label, key, meta, value) {
     return wrap;
 }
 
+// "Done by" and "Mentioned Person" get a real, searchable member picker (backed by
+// /api/members/search) instead of the readonly display every other User-type field
+// gets -- see createTwControl below and twRenderMemberPicker/twSearchMembers/
+// twPickMember/twClearUserPicker further down.
+const EDITABLE_USER_FIELDS = new Set(['Done by', 'Mentioned Person']);
+
+// Holds the last search results per picker instance so click handlers can look
+// results up by index instead of round-tripping JSON through onclick attributes.
+window.__twMemberResults = window.__twMemberResults || {};
+
+function twRenderMemberPicker(wrap, label, key, currentArr) {
+    const current = currentArr && currentArr[0] ? { open_id: currentArr[0].id, name: currentArr[0].name } : null;
+    wrap.dataset.userField = key;
+    wrap.dataset.userSelected = current ? JSON.stringify([{ id: current.open_id }]) : '';
+    const pickerId = 'twup-' + key.replace(/[^a-zA-Z0-9]/g, '') + '-' + Math.random().toString(36).slice(2, 8);
+    const initial = current ? escHtml((current.name || '?').slice(0, 1).toUpperCase()) : '';
+
+    wrap.innerHTML = `
+        ${label}
+        <div style="position:relative;">
+            <div id="${pickerId}-chip" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
+                <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</span>
+                <span style="flex:1;font-size:.85rem;">${current ? escHtml(current.name) : ''}</span>
+                <button type="button" onclick="twClearUserPicker('${pickerId}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0 4px;" title="Clear">✕</button>
+            </div>
+            <input type="text" id="${pickerId}-input" class="form-highlight-input" placeholder="Search for members" autocomplete="off"
+                   style="display:${current ? 'none' : 'block'};"
+                   oninput="twSearchMembers('${pickerId}', this.value)"
+                   onblur="setTimeout(function(){var m=document.getElementById('${pickerId}-menu'); if(m) m.style.display='none';}, 200)">
+            <div id="${pickerId}-menu" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:240px;overflow-y:auto;z-index:60;margin-top:4px;"></div>
+        </div>`;
+    return wrap;
+}
+
+let _twMemberSearchTimer = null;
+async function twSearchMembers(pickerId, query) {
+    clearTimeout(_twMemberSearchTimer);
+    const menu = document.getElementById(`${pickerId}-menu`);
+    if (!menu) return;
+    const q = (query || '').trim();
+    if (!q) { menu.style.display = 'none'; menu.innerHTML = ''; return; }
+
+    menu.style.display = 'block';
+    menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">Searching…</div>`;
+
+    _twMemberSearchTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (!data.success) {
+                menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(data.error || 'Member search unavailable')}</div>`;
+                return;
+            }
+            window.__twMemberResults[pickerId] = data.results || [];
+            if (!data.results || data.results.length === 0) {
+                menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">No members found.</div>`;
+                return;
+            }
+            menu.innerHTML = data.results.map((m, idx) => `
+                <div onmousedown="twPickMember('${pickerId}', ${idx})" style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;font-size:.85rem;" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
+                    <span style="width:26px;height:26px;border-radius:50%;background:var(--accent-purple);color:#000;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+                        ${m.avatar_url ? `<img src="${escHtml(m.avatar_url)}" style="width:100%;height:100%;object-fit:cover;">` : escHtml((m.name || '?').slice(0, 1).toUpperCase())}
+                    </span>
+                    <span>${escHtml(m.name)}</span>
+                </div>`).join('');
+        } catch (e) {
+            menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">Search failed: ${escHtml(e.message)}</div>`;
+        }
+    }, 300);
+}
+
+function twPickMember(pickerId, idx) {
+    const m = (window.__twMemberResults[pickerId] || [])[idx];
+    if (!m) return;
+    const inputEl = document.getElementById(`${pickerId}-input`);
+    const chip = document.getElementById(`${pickerId}-chip`);
+    const menu = document.getElementById(`${pickerId}-menu`);
+    const wrap = inputEl ? inputEl.closest('.control-group') : null;
+
+    if (wrap) wrap.dataset.userSelected = JSON.stringify([{ id: m.open_id }]);
+    if (chip) {
+        chip.style.display = 'flex';
+        chip.innerHTML = `
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escHtml((m.name || '?').slice(0, 1).toUpperCase())}</span>
+            <span style="flex:1;font-size:.85rem;">${escHtml(m.name)}</span>
+            <button type="button" onclick="twClearUserPicker('${pickerId}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0 4px;" title="Clear">✕</button>`;
+    }
+    if (inputEl) { inputEl.value = ''; inputEl.style.display = 'none'; }
+    if (menu) { menu.style.display = 'none'; menu.innerHTML = ''; }
+}
+
+function twClearUserPicker(pickerId) {
+    const inputEl = document.getElementById(`${pickerId}-input`);
+    const chip = document.getElementById(`${pickerId}-chip`);
+    const wrap = inputEl ? inputEl.closest('.control-group') : null;
+
+    if (wrap) wrap.dataset.userSelected = '';
+    if (chip) { chip.style.display = 'none'; chip.innerHTML = ''; }
+    if (inputEl) { inputEl.style.display = 'block'; inputEl.value = ''; inputEl.focus(); }
+}
+
 function createTwControl(key, value) {
     const wrap = document.createElement('div');
     wrap.className = 'control-group';
@@ -5064,26 +5270,29 @@ function createTwControl(key, value) {
         return twRenderAttachmentControl(wrap, label, key, meta, value);
     }
 
-    // User/Person fields (e.g. "Lock Owner", "Assigned Member", "Mentioned Person",
-    // "Done by") -> display-only. These are Feishu User-type fields; Feishu's API
-    // rejects writes to them unless sent as proper user objects, not plain text. This
-    // was the exact cause of "UserFieldConvFail" on Save/Duplicate Check -- this field
-    // was rendered as an ordinary editable text input, and whatever string ended up in
-    // it got sent back to Feishu as if it were a real value, which Feishu can't convert
-    // back into a user. Marked readonly here, and also stripped server-side as a second
-    // line of defense (see EXCLUDED_UPDATE_FIELDS in main.py).
+    // "Done by" and "Mentioned Person" are User-type fields that ARE meant to be
+    // set by hand (like the sheet's own person-picker) -- render the searchable
+    // member picker instead of a readonly box. Every other User field (Lock Owner,
+    // Assigned Member, Respondents) stays display-only below, since those are
+    // system-managed (assignment happens via Pull My Ticket) and Feishu's API
+    // rejects writes to them unless sent as proper user objects, not plain text --
+    // the exact cause of "UserFieldConvFail" on Save/Duplicate Check before.
+    if (EDITABLE_USER_FIELDS.has(key)) {
+        const currentArr = (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].id && value[0].name) ? value : null;
+        return twRenderMemberPicker(wrap, label, key, currentArr);
+    }
     if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].id && value[0].name) {
         const str = value.map(v => v.name).join(', ');
         wrap.innerHTML = label + `<input type="text" value="${escHtml(str)}" class="form-highlight-input" readonly style="opacity:.7;cursor:not-allowed;">`;
         return wrap;
     }
-    // ISSUE FIX: a User-type field with NO value yet (e.g. "Mentioned Person"/"Done by"
-    // before anyone's been assigned) used to fall through to the generic text-input
-    // branch below, which isn't in the readonly ui_type list -- so it rendered as an
-    // ordinary editable box. Typing into it and saving looked like it worked, but the
-    // backend silently drops User-type fields from every write (Feishu rejects
-    // plain-text writes to them), so the edit just vanished. Force readonly here too,
-    // with a placeholder, so it's honest about not being editable from this screen.
+    // ISSUE FIX: a User-type field with NO value yet used to fall through to the
+    // generic text-input branch below, which isn't in the readonly ui_type list --
+    // so it rendered as an ordinary editable box. Typing into it and saving looked
+    // like it worked, but the backend silently drops User-type fields from every
+    // write (Feishu rejects plain-text writes to them), so the edit just vanished.
+    // Force readonly here too, with a placeholder, so it's honest about not being
+    // editable from this screen.
     if (meta?.ui_type === 'User') {
         wrap.innerHTML = label + `<input type="text" value="" placeholder="Not set" class="form-highlight-input" readonly style="opacity:.7;cursor:not-allowed;">`;
         return wrap;
@@ -5121,6 +5330,17 @@ function createTwControl(key, value) {
     // through as raw "[{...}]" JSON in the UI.
     const readOnly = meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type);
     const valStr = feishuValueToString(value);
+
+    // FIX: "Formula" (fldsc0jlDq) renders a long, single-line summary sentence
+    // (e.g. "Agency Code: 23918 | Privilege: 30 Mics | Total Earned: 1 | ...") that
+    // was getting clipped inside a normal grid-cell-width text input. Give it its
+    // own full-width row and a wrapping, read-only textarea so the whole sentence
+    // is visible at once instead of scrolling inside a tiny box.
+    if (key === 'Formula') {
+        wrap.style.gridColumn = '1 / -1';
+        wrap.innerHTML = label + `<textarea class="form-highlight-input" rows="2" readonly style="opacity:.85;cursor:not-allowed;resize:vertical;font-family:inherit;white-space:pre-wrap;">${escHtml(valStr)}</textarea>`;
+        return wrap;
+    }
 
     // ISSUE FIX (multiple User IDs shown jammed together with no separator): Feishu
     // stores a multi-ID entry as one Text value with real newline characters between
@@ -5174,6 +5394,20 @@ function twCollectFields(form) {
             }
         } catch (e) { /* ignore malformed stash, nothing to merge */ }
     });
+    // Member picker fields ("Done by", "Mentioned Person" -- see twRenderMemberPicker).
+    // The picked user is stashed as `[{"id": open_id}]` JSON on the control-group's
+    // dataset by twPickMember/twClearUserPicker; pull it in here in the exact shape
+    // Feishu expects for a User-type field write. An empty string means "cleared" and
+    // is sent through as an empty array rather than skipped, so clearing the field in
+    // the UI actually clears it in Feishu too.
+    form.querySelectorAll('[data-user-field]').forEach(el => {
+        const key = el.dataset.userField;
+        if (!key) return;
+        try {
+            fields[key] = el.dataset.userSelected ? JSON.parse(el.dataset.userSelected) : [];
+        } catch (e) { /* malformed stash, skip rather than send garbage */ }
+    });
+
     const cbByName = {};
     form.querySelectorAll('input[type="checkbox"]').forEach(el => {
         if (!el.name) return;
@@ -5187,6 +5421,16 @@ function twCollectFields(form) {
             fields[name] = els[0].checked;
         }
     });
+
+    // If the admin manually switched Request Type tabs (twSelectRequestType) to a
+    // type different from the record's own current one, save that switch back to
+    // Feishu too -- otherwise the newly-filled-in dynamic fields would be attached
+    // to a record still labeled with its old Request Type.
+    const originalReqType = (ltActiveTicket?.fields?.['Request Type'] || '').toString().trim();
+    if (twManualReqType && twManualReqType !== originalReqType) {
+        fields['Request Type'] = twManualReqType;
+    }
+
     return fields;
 }
 
