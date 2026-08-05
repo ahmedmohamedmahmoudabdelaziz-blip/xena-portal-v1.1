@@ -2428,7 +2428,14 @@ def my_requests():
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
         
-        if not dt or dt < from_dt:
+        # BUG FIX (TypeError: can't compare offset-naive and offset-aware datetimes):
+        # cairo_now() (and therefore from_dt) carries tzinfo=utc, but parse_feishu_date()
+        # always returns a naive datetime (it strips tzinfo after shifting to Cairo
+        # time). Comparing the two directly crashed this endpoint with a 500 as soon as
+        # the /records/search fix above started actually returning matched items.
+        # Strip tzinfo from from_dt for this comparison only -- both sides already
+        # represent Cairo local time, so no shift is needed, just matching "naive-ness".
+        if not dt or dt < from_dt.replace(tzinfo=None):
             continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
