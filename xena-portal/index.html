@@ -1680,6 +1680,11 @@
                            Chinese Approval
                        </h4>
                        <div class="control-grid">
+                           <!-- "Mentioned Person" (fldgOgBYX7) lives here, matching the
+                                live Feishu form's "chinese approval" section -- it was
+                                previously mis-grouped into Basic Information. Filled in
+                                by twOpenWorkspace via twRenderMemberPicker(). -->
+                           <div class="control-group" id="tw-mentioned-person-wrap"></div>
                            <div class="control-group">
                                <label>Type of Action</label>
                                <select id="tw-chinese-action" name="Type of Action" data-feishu-field="Type of Action" class="form-highlight-input">
@@ -1725,6 +1730,11 @@
                                    <option value="">-- Select --</option>
                                </select>
                            </div>
+                           <!-- "Done by" (fld1fFCCbr) lives here, matching the live
+                                Feishu form's "Audition Action" section -- it was
+                                previously mis-grouped into Basic Information. Filled in
+                                by twOpenWorkspace via twRenderMemberPicker(). -->
+                           <div class="control-group" id="tw-done-by-wrap"></div>
                            <div class="control-group" style="grid-column: 1 / -1;">
                                <label>Audition Note</label>
                                <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input"></textarea>
@@ -4828,7 +4838,13 @@ function ltRenderQueue() {
 // workspace -- effectively "missing" fields. Adding them here shows them
 // (read-only, like Assigned Member already is, since they're Feishu User-type
 // fields) in the Basic Information card for every ticket, regardless of Request Type.
-const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','Acm Name (PK)','Acm Name (IN)','Acm','Assigned Member','Mentioned Person','Done by']);
+// "Mentioned Person" and "Done by" moved OUT of Basic Information -- they now get
+// their own dedicated picker slots in the Chinese Approval and Audition Action
+// cards respectively (#tw-mentioned-person-wrap / #tw-done-by-wrap below), matching
+// where they actually live on the live Feishu form. They're still excluded from
+// the generic Dynamic Request Section fallback via TICKET_INTERNAL_FIELDS, so they
+// won't leak into card 2 either.
+const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','Acm Name (PK)','Acm Name (IN)','Acm','Assigned Member']);
 
 // Fields shown via their own dedicated controls elsewhere in the form (Duplicate
 // Check card, Chinese Approval card, Audition Action card, header) -- moved to
