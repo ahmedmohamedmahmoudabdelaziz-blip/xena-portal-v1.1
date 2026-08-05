@@ -173,6 +173,109 @@ def get_table_schema(table_id, token, base_id, ttl=300):
         cached = _schema_cache["data"].get(table_id)
         return cached["fields"] if cached else set()
 
+_field_types_cache = {"data": {}, "lock": threading.Lock()}
+_FIELD_TYPES_REDIS_TTL = 300
+
+def get_field_ui_types(table_id, token, base_id, ttl=300):
+    """
+    BUG FIX (NumberFieldConvFail): Feishu Number-type fields (Base Points, Counter,
+    Point Balance, Quantities Input, Handle Time (Seconds), etc.) reject an empty
+    string "" -- but every plain <input type="number"> that the user left untouched
+    submits "" as its value, and update_request()/submit_request() were forwarding
+    that straight through to Feishu's PUT, which rejected the whole save with
+    "NumberFieldConvFail". To fix this at the source we need to know which fields are
+    actually Number-typed, so we can drop/convert them before the write -- this reuses
+    Feishu's /fields endpoint (cached the same way get_table_schema is, Redis-backed so
+    it survives cold starts) but keeps the per-field "ui_type" string instead of just
+    the name.
+    """
+    with _field_types_cache["lock"]:
+        cached = _field_types_cache["data"].get(table_id)
+        if cached and time.time() - cached["ts"] < ttl:
+            return cached["types"]
+
+    redis_key = f"xena:fieldtypes:{table_id}"
+    if REDIS_ENABLED:
+        cached_types = redis_get_json(redis_key)
+        if cached_types is not None:
+            with _field_types_cache["lock"]:
+                _field_types_cache["data"][table_id] = {"types": cached_types, "ts": time.time()}
+            return cached_types
+
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
+    try:
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
+        if resp.get("code") == 0:
+            types = {}
+            for f in resp.get("data", {}).get("items", []):
+                name = f.get("field_name")
+                # Fall back to the numeric "type" code (2 == Number) if "ui_type" isn't
+                # present on this API version, so this still works either way.
+                ui_type = f.get("ui_type") or ("Number" if f.get("type") == 2 else None)
+                if name and ui_type:
+                    types[name] = ui_type
+            with _field_types_cache["lock"]:
+                _field_types_cache["data"][table_id] = {"types": types, "ts": time.time()}
+            if REDIS_ENABLED:
+                redis_set_json(redis_key, types, ttl=_FIELD_TYPES_REDIS_TTL)
+            return types
+    except Exception as e:
+        logger.error("get_field_ui_types_failed", table_id=table_id, error=str(e))
+    with _field_types_cache["lock"]:
+        cached = _field_types_cache["data"].get(table_id)
+        return cached["types"] if cached else {}
+
+_NUMERIC_UI_TYPES = {"Number", "Currency", "Progress", "Rating"}
+
+# BUG FIX: "make sure you did not try to update automatic/filled/formula fields" --
+# these ui_types are all system-computed by Feishu itself (formulas, lookups, rollups,
+# auto-numbering, created/modified stamps). Writing to any of them is always rejected
+# by Feishu regardless of value, so they're stripped from every update/submit payload
+# by *type*, not just by a hand-maintained name list (EXCLUDED_UPDATE_FIELDS /
+# EXCLUDED_SUBMIT_FIELDS still apply too, as a second, independent line of defense --
+# useful for fields that are writable in Feishu but that we simply never want agents
+# editing directly, like "Numbering").
+READONLY_UI_TYPES = {
+    "Formula", "Lookup", "Rollup", "AutoNumber",
+    "CreatedTime", "ModifiedTime", "CreatedUser", "ModifiedUser",
+    "DuplexLink", "GroupChat",
+}
+
+def strip_readonly_fields(fields, field_types):
+    """Drops any key whose live ui_type marks it as Feishu-computed/automatic."""
+    dropped = [k for k in fields if field_types.get(k) in READONLY_UI_TYPES]
+    if dropped:
+        logger.warn("stripped_readonly_fields_before_write", fields=dropped)
+    return {k: v for k, v in fields.items() if field_types.get(k) not in READONLY_UI_TYPES}
+
+def coerce_number_fields(fields, field_types):
+    """
+    For every field the live schema says is Number-like: drop it entirely if the
+    incoming value is blank/None (so the write just leaves that cell alone instead of
+    trying to convert "" into a number), and convert numeric-looking strings into a
+    real int/float since Feishu's Number fields want an actual JSON number, not text.
+    Anything that can't be parsed as a number is dropped rather than sent, so one bad
+    field can't take down the whole save.
+    """
+    cleaned = {}
+    for k, v in fields.items():
+        ui_type = field_types.get(k)
+        if ui_type in _NUMERIC_UI_TYPES:
+            if v is None or (isinstance(v, str) and v.strip() == ""):
+                continue  # leave the cell untouched rather than sending ""
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                cleaned[k] = v
+                continue
+            try:
+                num = float(str(v).replace(",", "").strip())
+                cleaned[k] = int(num) if num.is_integer() else num
+            except (ValueError, TypeError):
+                logger.warn("dropping_unconvertible_number_field", field=k, value=v)
+                continue
+        else:
+            cleaned[k] = v
+    return cleaned
+
 class StructuredLogger:
     def __init__(self, name):
         self._log = logging.getLogger(name)
@@ -710,7 +813,7 @@ def generate_executive_insights(stats, cmp_stats=None):
 
     return insights
 
-def fetch_feishu_records(table_id, from_dt=None):
+def fetch_feishu_records(table_id, from_dt=None, max_seconds=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
@@ -724,14 +827,30 @@ def fetch_feishu_records(table_id, from_dt=None):
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records"
 
+    # BUG FIX ("Server timeout: Data too large or loading"): this loop used to have no
+    # wall-clock bound at all. When called with from_dt=None (the background cron sync
+    # does exactly this), the "stop once pages look old enough" heuristic below never
+    # triggers, so it would walk the *entire* table history every single cycle -- and as
+    # the table has grown that eventually runs past Vercel's function execution limit,
+    # which kills the request and returns a non-JSON timeout page instead of a normal
+    # error (that's what "Server timeout: Data too large or loading" actually means --
+    # it's the frontend's res.json() failing to parse whatever Vercel sent back).
+    # Records are fetched newest-first (sort "Numbering DESC"), so a time-boxed partial
+    # fetch still returns the most recent rows -- exactly what a 15-day lookback needs.
+    deadline = (time.time() + max_seconds) if max_seconds else None
+
     page_token = None
     for _ in range(200):
+        if deadline and time.time() > deadline:
+            fetch_complete, stop_reason = False, "Stopped early: time budget reached (partial results, newest records only)."
+            break
+
         params = {"page_size": 500, "automatic_fields": "true"} 
         if table_id == REQUESTS_TABLE_ID: params["sort"] = '["Numbering DESC"]'
         if page_token: params["page_token"] = page_token
         
         try:
-            resp = session.get(url, params=params, timeout=45) 
+            resp = session.get(url, params=params, timeout=20)
             if resp.status_code != 200:
                 fetch_complete, stop_reason = False, f"HTTP {resp.status_code}: {resp.text}"
                 break
@@ -839,13 +958,13 @@ def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeo
 REQUESTS_SHARD_COUNT = 10 
 REQUESTS_LOOKBACK_DAYS_DEFAULT = 365 * 3  
 
-def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT):
+def fetch_requests_sharded(from_dt=None, to_dt=None, field_names=REQUESTS_ANALYTICS_FIELDS, n_shards=REQUESTS_SHARD_COUNT, max_seconds=None):
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(300)
         keys = set(items[0]["fields"].keys()) if items else set()
         return items, keys, True, ""
 
-    items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt)
+    items, keys, fetch_complete, stop_reason = fetch_feishu_records(REQUESTS_TABLE_ID, from_dt=from_dt, max_seconds=max_seconds)
 
     filtered_items = []
     for item in items:
@@ -1227,12 +1346,25 @@ _bg_thread_lock = threading.Lock()
 
 REDIS_KEY_REQUESTS_SNAPSHOT = "xena:snapshot:requests_table"
 
+BACKGROUND_SYNC_FETCH_BUDGET_SECONDS = 50
+
 def _background_sync_requests_table():
     with _bg_sync_lock:
         if _bg_sync["syncing"]: return
         _bg_sync["syncing"] = True
     try:
-        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID)
+        # BUG FIX: this used to call fetch_feishu_records with no from_dt AND no time
+        # budget, which means "walk the entire table's history, every single cycle,
+        # with no way to stop early" (the early-stop heuristic only kicks in when
+        # from_dt is set). /api/sync/refresh calls this synchronously and blocks on the
+        # result, so an unbounded fetch here was very likely why the Redis snapshot
+        # was going stale/never populating -- the cron call itself was timing out on
+        # Vercel before it could finish and write anything to Redis, which in turn is
+        # why /api/my-requests kept falling through to the slow, also-timing-out cold
+        # path. Bounding this means the cron job reliably finishes and writes a
+        # (possibly partial, newest-first) snapshot every cycle instead of sometimes
+        # writing nothing at all.
+        items, keys, complete, reason = fetch_feishu_records(REQUESTS_TABLE_ID, max_seconds=BACKGROUND_SYNC_FETCH_BUDGET_SECONDS)
         now = time.time()
         with _bg_sync_lock:
             _bg_sync["requests_items"]  = items
@@ -1263,6 +1395,8 @@ def ensure_background_sync_started():
             threading.Thread(target=_background_sync_loop, daemon=True).start()
             _bg_thread_started = True
 
+GET_SNAPSHOT_COLD_FETCH_BUDGET_SECONDS = 20
+
 def get_requests_table_snapshot(from_dt=None):
     local_data = load_local_json("requests.json")
     if local_data:
@@ -1292,7 +1426,16 @@ def get_requests_table_snapshot(from_dt=None):
             threading.Thread(target=_background_sync_requests_table, daemon=True).start()
             return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
 
-    return fetch_requests_sharded(from_dt=from_dt) + (False,)
+    # BUG FIX ("Server timeout: Data too large or loading"): this is the true cold path
+    # (no warm in-process cache, no fresh Redis snapshot) -- give it a hard time budget
+    # so it always returns *something* as valid JSON well before Vercel's own function
+    # timeout can kill it and hand the frontend an unparseable error page. Since Feishu
+    # returns newest-first (Numbering DESC), a partial fetch under this budget still
+    # covers recent lookback windows like "my requests, last 15 days" correctly -- it
+    # just may not reach every record if the table is huge and cold-starting from zero.
+    # If you're on a Vercel plan with a longer configurable function duration, raise
+    # GET_SNAPSHOT_COLD_FETCH_BUDGET_SECONDS accordingly.
+    return fetch_requests_sharded(from_dt=from_dt, max_seconds=GET_SNAPSHOT_COLD_FETCH_BUDGET_SECONDS) + (False,)
 
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
 _bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
@@ -1638,6 +1781,16 @@ def update_request():
     if actual_fields:
         fields = {k: v for k, v in fields.items() if k in actual_fields and k not in EXCLUDED_UPDATE_FIELDS}
 
+    # BUG FIX (NumberFieldConvFail): drop/convert blank or non-numeric values for
+    # Number-type fields before they ever reach Feishu -- see coerce_number_fields().
+    field_types = get_field_ui_types(REQUESTS_TABLE_ID, tat, BASE_ID)
+    if field_types:
+        fields = coerce_number_fields(fields, field_types)
+        # BUG FIX: never write to Formula/Lookup/AutoNumber/CreatedTime/etc fields,
+        # even if one somehow made it this far (e.g. a future frontend regression like
+        # the "Assigned Member" one) -- see strip_readonly_fields().
+        fields = strip_readonly_fields(fields, field_types)
+
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -1737,6 +1890,14 @@ def submit_request():
         if dropped:
             logger.warn("submit_dropped_unknown_fields", fields=dropped)
         final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
+
+    # BUG FIX (NumberFieldConvFail): same coercion as update_request -- protects new
+    # submissions too, e.g. a Number field filled in with stray whitespace/commas.
+    field_types = get_field_ui_types(REQUESTS_TABLE_ID, tat, BASE_ID)
+    if field_types:
+        final_fields = coerce_number_fields(final_fields, field_types)
+        # BUG FIX: never write to Formula/Lookup/AutoNumber/CreatedTime/etc fields.
+        final_fields = strip_readonly_fields(final_fields, field_types)
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
@@ -2102,29 +2263,86 @@ def my_requests():
     if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
     
+    days_param = sanitize_text(request.args.get('days', '15'))
+    try:
+        lookback_days = max(1, min(int(days_param), 90))
+    except ValueError:
+        lookback_days = 15
+
     _cairo_now = cairo_now()
-    from_dt = _cairo_now - timedelta(days=15)
+    from_dt = _cairo_now - timedelta(days=lookback_days)
     user_clean = user.strip().lower()
 
-    # BUG FIX (was: "Server timeout: Data too large or loading"):
-    # The previous version of this endpoint tried to push the user filter down to
-    # Feishu via /records/search with a "contains" condition on "Respondents" (a
-    # CreatedUser-type field). That filter call was failing server-side, which tripped
-    # the full-table fallback scan (page_size 500, sequential pages) on *every* request
-    # -- and on Vercel that sequential full-table pull runs past the function's execution
-    # time limit, so Vercel kills it and returns a non-JSON timeout page instead of a
-    # normal error, which is exactly the "Server timeout: Data too large or loading"
-    # message (that message only ever means "res.json() couldn't parse the response").
+    # FIX: this is now a fully live, on-demand fetch -- no Redis/background snapshot
+    # involved at all, and the frontend only calls this endpoint when the person clicks
+    # "Search" (not automatically when the page opens), so a live round-trip to Feishu
+    # here is expected and acceptable rather than something to hide behind a cache.
     #
-    # Fix: stop hitting Feishu live for this at all. Reuse the same warm Requests-table
-    # snapshot that /api/sync/refresh keeps hot in Redis (get_requests_table_snapshot),
-    # which already backs the analytics/compare pages. Reading from that snapshot is a
-    # single Redis round-trip instead of N sequential Feishu page fetches, so it can't
-    # time out, and it sidesteps the "is this filter/operator actually supported"
-    # question entirely -- we're back to the same proven "download once, filter locally"
-    # approach this codebase already relies on elsewhere, just served from cache instead
-    # of re-fetched from Feishu on every click.
-    all_items, _keys, fetch_complete, stop_reason, served_from_cache = get_requests_table_snapshot(from_dt=from_dt)
+    # We use the classic List Records endpoint's formula-style `filter` query param
+    # (GET .../records?filter=...) rather than the /records/search POST endpoint, with
+    # a CurrentValue.[...] formula combining the Respondents membership check and the
+    # date range, matching Lark's documented filter syntax:
+    #   CurrentValue.[Respondents].contains("name") && CurrentValue.[Submitted on] >= "..."
+    # Max 100 records/page on this endpoint (per Feishu docs), paginated via page_token.
+    tat = get_tenant_access_token()
+    session = http_requests.Session()
+    session.headers.update({"Authorization": f"Bearer {tat}"})
+    list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+
+    from_str = from_dt.strftime("%Y-%m-%d %H:%M")
+    to_str = _cairo_now.strftime("%Y-%m-%d %H:%M")
+    user_escaped = user.replace('"', '\\"')
+
+    def _run_filter(filter_str):
+        """Runs the live paginated fetch for a given formula filter string. Returns
+        (items, complete, reason)."""
+        items, page_token, complete, reason = [], None, True, ""
+        for _ in range(50):  # 50 * 100 = 5,000 records hard ceiling as a sanity bound
+            params = {"page_size": 100, "automatic_fields": "true", "filter": filter_str}
+            if page_token:
+                params["page_token"] = page_token
+            try:
+                resp = session.get(list_url, params=params, timeout=15)
+                data = resp.json()
+                if data.get("code") != 0:
+                    complete, reason = False, f"{data.get('code')}: {data.get('msg')}"
+                    break
+                block = data.get("data", {})
+                items.extend(block.get("items", []))
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            except Exception as e:
+                complete, reason = False, str(e)
+                break
+        return items, complete, reason
+
+    combined_filter = (
+        f'CurrentValue.[Respondents].contains("{user_escaped}") && '
+        f'CurrentValue.[Submitted on] >= "{from_str}" && '
+        f'CurrentValue.[Submitted on] <= "{to_str}"'
+    )
+    all_items, fetch_complete, stop_reason = _run_filter(combined_filter)
+
+    # Fallback #1: date comparison on "Submitted on" not supported/erroring on this
+    # base -- drop the date bound and filter locally on the (now much smaller,
+    # per-user) result set instead of giving up.
+    if not fetch_complete:
+        respondents_only_filter = f'CurrentValue.[Respondents].contains("{user_escaped}")'
+        all_items, fetch_complete, stop_reason = _run_filter(respondents_only_filter)
+
+    # Fallback #2: even the Respondents "contains" formula filter failed (unexpected,
+    # but don't leave the user with a broken page) -- last resort, single unfiltered
+    # page pull with a hard 100-record ceiling so this can never hang.
+    if not fetch_complete:
+        try:
+            resp = session.get(list_url, params={"page_size": 100, "automatic_fields": "true", "sort": '["Numbering DESC"]'}, timeout=15)
+            data = resp.json()
+            if data.get("code") == 0:
+                all_items = data.get("data", {}).get("items", [])
+                fetch_complete, stop_reason = False, "Filter unavailable -- showing latest 100 records only, unfiltered by user."
+        except Exception as e:
+            all_items, fetch_complete, stop_reason = [], False, str(e)
 
     matched_items = []
     for it in all_items:
@@ -2134,6 +2352,7 @@ def my_requests():
         if user_clean in rp or user_clean in sb:
             matched_items.append(it)
     all_items = matched_items
+
 
     results = []
     
@@ -2188,7 +2407,8 @@ def my_requests():
         "count": len(results),
         "fetch_complete": fetch_complete,
         "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": served_from_cache,
+        "served_from_background_cache": False,  # always a live Feishu fetch now
+        "lookback_days": lookback_days,
     })
 
 @app.route('/api/live-queue', methods=['GET'])
