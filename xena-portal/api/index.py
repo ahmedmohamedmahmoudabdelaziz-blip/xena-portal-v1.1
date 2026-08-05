@@ -937,7 +937,7 @@ QUERY_RECORDS_FIELDS = [
     "Bd Code", "BD Code", "NID Number", "NID", "Status", "Request Status",
     "Reject Reason", "Rejection Reason", "Audition note", "Audition Note", "Duplicated Check",
     "Agency Code", "Agency Type", "Type of Agency",
-    "Closing Reason", "Closing Agencies Reason",
+    "Closing Reason", "Closing Agencies Reason", "Submitted By"
 ]
 
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
@@ -1780,24 +1780,41 @@ def update_request():
     tat = get_tenant_access_token()
     
     # Safely upload newly selected files
-    for field_name in request.files:
-        if field_name in EXCLUDED_UPDATE_FIELDS: continue
-        file_list = request.files.getlist(field_name)
-        tokens = []
-        for f in file_list:
-            if not f.filename: continue
-            file_bytes = f.read()
-            if not file_bytes: continue
-            try:
-                form_data = {'file_name': f.filename, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
-                files = {'file': (f.filename, file_bytes, f.mimetype)}
-                up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
-                if up_res.get("code") == 0:
-                    tokens.append({"file_token": up_res["data"]["file_token"]})
-            except Exception as e:
-                logger.error("file_upload_failed", error=str(e))
-        if tokens:
-            fields[field_name] = tokens
+    attach_fields = [f for f in request.files if f not in EXCLUDED_UPDATE_FIELDS]
+    if attach_fields:
+        # Get current record to merge attachments
+        cur_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+        cur_resp = http_requests.get(cur_url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        cur_data = cur_resp.json()
+        cur_fields = {}
+        if cur_data.get("code") == 0:
+            cur_fields = cur_data.get("data", {}).get("record", {}).get("fields", {})
+
+        for field_name in attach_fields:
+            file_list = request.files.getlist(field_name)
+            tokens = []
+            for f in file_list:
+                if not f.filename: continue
+                file_bytes = f.read()
+                if not file_bytes: continue
+                try:
+                    form_data = {'file_name': f.filename, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
+                    files = {'file': (f.filename, file_bytes, f.mimetype)}
+                    up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
+                    if up_res.get("code") == 0:
+                        tokens.append({"file_token": up_res["data"]["file_token"]})
+                except Exception as e:
+                    logger.error("file_upload_failed", error=str(e))
+            
+            existing_tokens = []
+            if field_name in cur_fields and isinstance(cur_fields[field_name], list):
+                existing_tokens = [t for t in cur_fields[field_name] if isinstance(t, dict) and t.get("file_token")]
+            
+            if tokens:
+                # Combine, avoiding duplicates by file_token
+                merged = existing_tokens + [t for t in tokens if t.get("file_token") and not any(e.get("file_token") == t["file_token"] for e in existing_tokens)]
+                if merged:
+                    fields[field_name] = merged
 
     # Drop read-only fields so Feishu doesn't reject the save attempt
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
@@ -2360,9 +2377,15 @@ def my_requests():
         "filter": {
             "conjunction": "and",
             "conditions": [
-                {"field_name": "Respondents", "operator": "contains", "value": [user]},
                 {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
                 {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
+                {
+                    "conjunction": "or",
+                    "conditions": [
+                        {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                        {"field_name": "Submitted By", "operator": "contains", "value": [user]}
+                    ]
+                }
             ],
         },
     }
@@ -2373,9 +2396,15 @@ def my_requests():
     # timestamps rather than a bare date string.
     if not fetch_complete:
         dt_conditions = [
-            {"field_name": "Respondents", "operator": "contains", "value": [user]},
             {"field_name": "Submitted on", "operator": ">=", "value": [from_dt.strftime("%Y-%m-%dT%H:%M:%S")]},
             {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
+            {
+                "conjunction": "or",
+                "conditions": [
+                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                    {"field_name": "Submitted By", "operator": "contains", "value": [user]}
+                ]
+            }
         ]
         dt_payload = {
             "page_size": 100,
@@ -2391,8 +2420,11 @@ def my_requests():
             "page_size": 100,
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {
-                "conjunction": "and",
-                "conditions": [{"field_name": "Respondents", "operator": "contains", "value": [user]}],
+                "conjunction": "or",
+                "conditions": [
+                    {"field_name": "Respondents", "operator": "contains", "value": [user]},
+                    {"field_name": "Submitted By", "operator": "contains", "value": [user]}
+                ],
             },
         }
         all_items, fetch_complete, stop_reason = _run_search(respondents_only_payload)
@@ -2898,6 +2930,8 @@ def proxy_attachment(file_token):
         tat = get_tenant_access_token()
         url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
         headers = {"Authorization": f"Bearer {tat}"}
+
+        logger.info("attachment_proxy_request", file_token=file_token, field_id=field_id, user=user)
 
         # ROOT CAUSE (Issue 8): with Advanced Permissions enabled on the base, Feishu's
         # media download endpoint requires an "extra" param identifying which Bitable
