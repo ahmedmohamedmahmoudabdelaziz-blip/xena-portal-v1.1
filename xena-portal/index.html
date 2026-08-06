@@ -1565,9 +1565,29 @@
                         <button type="button" class="btn" style="width:auto;" onclick="loadMyRequests()">🔍 Search</button>
                     </div>
                 </div>
-                
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+                    <span id="myReqResultCount" style="font-size:.9rem;color:var(--text-muted)"></span>
+                    <select id="myReqPageSize" onchange="myReqRenderPage(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
+                        <option value="25">25 / page</option>
+                        <option value="50" selected>50 / page</option>
+                        <option value="100">100 / page</option>
+                        <option value="200">200 / page</option>
+                    </select>
+                </div>
+
                 <div id="myReqResults" class="qy-grid"></div>
-                
+
+                <div id="myReqPagination" style="display:none;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px">
+                    <div style="font-size:.85rem;color:var(--text-muted)">
+                        Page <span id="myReqPageNum">1</span> of <span id="myReqTotalPages">1</span>
+                    </div>
+                    <div style="display:flex;gap:6px">
+                        <button onclick="myReqRenderPage(myReqCurrentPage-1)" id="myReqPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
+                        <button onclick="myReqRenderPage(myReqCurrentPage+1)" id="myReqNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
+                    </div>
+                </div>
+
                 <div id="myReqEmpty" style="display:none;text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
                     <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
                         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -3962,64 +3982,91 @@ async function runQuery(){
     }
 }
 
+let myReqAllResults = [], myReqCurrentPage = 1;
+
 async function loadMyRequests() {
     const resultsEl = document.getElementById('myReqResults');
     const emptyEl = document.getElementById('myReqEmpty');
     const daysSel = document.getElementById('myReqDaysSelect');
     const days = daysSel ? daysSel.value : '15';
-    
+
     if (resultsEl) resultsEl.innerHTML = '';
     if (emptyEl) { emptyEl.style.display = 'none'; emptyEl.querySelector('p').textContent = 'No requests found in that window.'; }
+    document.getElementById('myReqPagination').style.display = 'none';
     document.getElementById('loadingOverlay').style.display = 'flex';
-    
+
     try {
         // FIX: always a live, on-demand fetch (no snapshot/cache) triggered only by the
-        // Search button -- see /api/my-requests in main.py.
+        // Search button -- see /api/my-requests in main.py. Once SUBMITTED_BY_FIELD_NAME
+        // is a real Feishu column, this now runs a single fast targeted filter (same
+        // approach as the Query page) instead of scanning/matching locally, and results
+        // come back deduplicated.
         const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&days=${encodeURIComponent(days)}`);
         let data;
         try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
         if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
-        
+
         if (data.fetch_complete === false) {
             ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}.`, 'warning', 6000);
         }
-        
-        const results = data.results || [];
-        if (!results.length) {
+
+        myReqAllResults = data.results || [];
+        if (!myReqAllResults.length) {
             if (emptyEl) emptyEl.style.display = 'block';
             document.getElementById('loadingOverlay').style.display = 'none';
             return;
         }
-        
-        if (resultsEl) {
-            resultsEl.innerHTML = results.map(r => `
-                <div class="qy-card">
-                    <div class="qy-card-head">
-                        <div>
-                            <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
-                            <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
-                        </div>
-                        <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
-                    </div>
-                    ${qyRow('Submitted on', r.submitted_on)}
-                    ${qyRow('Respondents', r.respondents)}
-                    ${qyRow('User ID', r.user_id)}
-                    ${qyRow('Agency Code', r.agency_code)}
-                    ${qyRow('Agency Type', r.agency_type)}
-                    ${qyRow('Otherapp ID', r.otherapp_id)}
-                    ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
-                    ${qyRow('Bd Code', r.bd_code)}
-                    ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
-                    ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
-                    ${r.closing_reason && (r.request_type||'').toLowerCase().includes('closing') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
-                </div>
-            `).join('');
-        }
+
+        myReqRenderPage(1);
     } catch (e) {
         ToastManager.show('Failed to load my requests: ' + e.message, 'error');
         if (emptyEl) emptyEl.style.display = 'block';
     }
     document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function myReqRenderPage(page) {
+    const resultsEl = document.getElementById('myReqResults');
+    const pageSize = parseInt(document.getElementById('myReqPageSize')?.value || '50');
+    const totalPages = Math.max(1, Math.ceil(myReqAllResults.length / pageSize));
+    page = Math.min(Math.max(1, page || 1), totalPages);
+    myReqCurrentPage = page;
+
+    const start = (page - 1) * pageSize;
+    const pageResults = myReqAllResults.slice(start, start + pageSize);
+
+    document.getElementById('myReqResultCount').textContent = `${myReqAllResults.length} request${myReqAllResults.length === 1 ? '' : 's'} found`;
+
+    if (resultsEl) {
+        resultsEl.innerHTML = pageResults.map(r => `
+            <div class="qy-card">
+                <div class="qy-card-head">
+                    <div>
+                        <div class="qy-card-num">#${escHtml(r.numbering||'—')}</div>
+                        <div class="qy-card-type">${escHtml(r.request_type||'Request')}</div>
+                    </div>
+                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status||'—')}</span>
+                </div>
+                ${qyRow('Submitted on', r.submitted_on)}
+                ${qyRow('Respondents', r.respondents)}
+                ${qyRow('User ID', r.user_id)}
+                ${qyRow('Agency Code', r.agency_code)}
+                ${qyRow('Agency Type', r.agency_type)}
+                ${qyRow('Otherapp ID', r.otherapp_id)}
+                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                ${qyRow('Bd Code', r.bd_code)}
+                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+                ${r.closing_reason && (r.request_type||'').toLowerCase().includes('closing') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('myReqPageNum').textContent = page;
+    document.getElementById('myReqTotalPages').textContent = totalPages;
+    document.getElementById('myReqPrevBtn').disabled = page <= 1;
+    document.getElementById('myReqNextBtn').disabled = page >= totalPages;
+    document.getElementById('myReqPagination').style.display = 'flex';
 }
 
 let prCurrentPage = 1, prAllData = [], prDebounceTimer = null;
