@@ -4991,6 +4991,27 @@ async function twOpenWorkspace(recordId) {
         twRenderSection2(ticket, actualReqType);
         twRenderReqTypeTabs(actualReqType);
 
+        // "Mentioned Person" (Chinese Approval card) and "Done by" (Audition Action
+        // card) moved out of Basic Information into their real sections -- filled in
+        // with the same searchable member picker used everywhere else (see
+        // twRenderMemberPicker). Each wrap needs the control-group class re-applied
+        // since twOpenWorkspace can run again on the same ticket (Back to Queue -> Pull
+        // again) and twRenderMemberPicker fully replaces the wrap's innerHTML each time.
+        const mpWrap = document.getElementById('tw-mentioned-person-wrap');
+        if (mpWrap) {
+            mpWrap.classList.add('control-group');
+            const mpVal = ticket.fields['Mentioned Person'];
+            const mpArr = (Array.isArray(mpVal) && mpVal.length > 0 && mpVal[0] && typeof mpVal[0] === 'object' && mpVal[0].id && mpVal[0].name) ? mpVal : null;
+            twRenderMemberPicker(mpWrap, '<label>Mentioned Person</label>', 'Mentioned Person', mpArr);
+        }
+        const dbWrap = document.getElementById('tw-done-by-wrap');
+        if (dbWrap) {
+            dbWrap.classList.add('control-group');
+            const dbVal = ticket.fields['Done by'];
+            const dbArr = (Array.isArray(dbVal) && dbVal.length > 0 && dbVal[0] && typeof dbVal[0] === 'object' && dbVal[0].id && dbVal[0].name) ? dbVal : null;
+            twRenderMemberPicker(dbWrap, '<label>Done by</label>', 'Done by', dbArr);
+        }
+
         document.getElementById('tw-audition-approval').checked = ticket.fields['Approval'] || false;
         document.getElementById('tw-audition-status').value = typeof ticket.fields['Status'] === 'string' ? ticket.fields['Status'].trim() : (ticket.fields['Status']?.text?.trim() || '');
         document.getElementById('tw-audition-note').value = ticket.fields['Audition note'] || '';
@@ -5367,7 +5388,10 @@ function createTwControl(key, value) {
     // multi-line entries display correctly and stay editable one-per-line); any other
     // Text field is upgraded to one too if its current value already contains a
     // newline, so the same problem can't hide in a field we didn't anticipate.
-    const MULTI_LINE_TEXT_FIELDS = new Set(['User ID', 'Rejected Ids']);
+    // "raw_text" (Audit request type's pasted-ticket-text field) gets the same
+    // multi-line textarea treatment as "User ID" instead of a single-line input that
+    // clips long pasted text.
+    const MULTI_LINE_TEXT_FIELDS = new Set(['User ID', 'Rejected Ids', 'raw_text']);
     if (!readOnly && (MULTI_LINE_TEXT_FIELDS.has(key) || valStr.includes('\n'))) {
         wrap.innerHTML = label + `<textarea name="${escHtml(key)}" class="form-highlight-input" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
         return wrap;
