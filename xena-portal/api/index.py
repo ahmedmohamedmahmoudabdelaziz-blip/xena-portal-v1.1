@@ -2407,16 +2407,36 @@ def my_requests():
     from_str = from_dt.strftime("%Y-%m-%d")
     to_str = _cairo_now.strftime("%Y-%m-%d")
 
-    def _run_search(payload):
+    # BUG FIX ("Vercel Runtime Timeout Error: Task timed out after 60 seconds" /
+    # /api/my-requests spins forever, nothing shows): the three fetch stages below
+    # (primary "Submitted on Copy" search, fallback "Submitted on" search, fallback
+    # raw-pagination search) used to run one after another with NO overall time
+    # limit -- each stage could burn up to 50 sequential page requests at 15s apiece,
+    # so a single request could legally take many minutes end-to-end before Vercel's
+    # function timeout finally killed it with an unhandled 504 (which is why the
+    # frontend just spun -- it never got back valid JSON to render). Everything below
+    # now shares one wall-clock deadline: each stage stops fetching more pages once
+    # it's spent, and later stages are skipped entirely if there's no time left, so
+    # the endpoint always returns *something* (partial results + fetch_complete:false)
+    # comfortably before the platform timeout instead of never returning at all.
+    MY_REQUESTS_TIME_BUDGET_SECONDS = 45  # leaves ~15s headroom under Vercel's 60s cap
+    _deadline = time.time() + MY_REQUESTS_TIME_BUDGET_SECONDS
+
+    def _run_search(payload, deadline):
         """Runs the live paginated /records/search fetch for a given payload. Returns
-        (items, complete, reason)."""
+        (items, complete, reason). Stops early (complete=False) once `deadline` is hit,
+        even mid-pagination, rather than continuing to burn the request's time budget."""
         items, page_token, complete, reason = [], None, True, ""
         for _ in range(50):  # 50 * 100 = 5,000 records hard ceiling as a sanity bound
+            if time.time() >= deadline:
+                complete, reason = False, "time_budget_exceeded"
+                break
             body = dict(payload)
             if page_token:
                 body["page_token"] = page_token
             try:
-                resp = session.post(search_url, json=body, timeout=15)
+                remaining = max(3, min(15, deadline - time.time()))
+                resp = session.post(search_url, json=body, timeout=remaining)
                 data = resp.json()
                 if data.get("code") != 0:
                     complete, reason = False, f"{data.get('code')}: {data.get('msg')}"
@@ -2461,12 +2481,15 @@ def my_requests():
             ],
         },
     }
-    all_items, fetch_complete, stop_reason = _run_search(base_payload)
+    all_items, fetch_complete, stop_reason = _run_search(base_payload, _deadline)
 
     # Fallback #1: "Submitted on Copy" not present/erroring on this base -- retry
     # against the DateTime "Submitted on" field instead, which needs full ISO-8601
     # timestamps rather than a bare date string.
-    if not fetch_complete:
+    # Only bother if the primary stage failed for a REAL reason (bad field/filter),
+    # not because we simply ran out of time -- retrying a second full pagination
+    # sweep after already burning the whole budget would just guarantee a timeout.
+    if not fetch_complete and stop_reason != "time_budget_exceeded" and time.time() < _deadline:
         dt_conditions = [
             {"field_name": "Submitted on", "operator": ">=", "value": [from_dt.strftime("%Y-%m-%dT%H:%M:%S")]},
             {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
@@ -2476,7 +2499,7 @@ def my_requests():
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {"conjunction": "and", "conditions": dt_conditions},
         }
-        all_items, fetch_complete, stop_reason = _run_search(dt_payload)
+        all_items, fetch_complete, stop_reason = _run_search(dt_payload, _deadline)
 
     # Fallback #2: date filtering unavailable on both fields -- paginate the raw table
     # (still sorted newest-first, NOT capped to a single page) and let the local
@@ -2487,15 +2510,19 @@ def my_requests():
     # whole table. THIS is the part that was previously silently capped at a single
     # unfiltered page of 100 records, which is why some agents' own history looked
     # incomplete -- it's now a real, bounded pagination loop.
-    if not fetch_complete:
+    if not fetch_complete and stop_reason != "time_budget_exceeded" and time.time() < _deadline:
         try:
             raw_items, page_token = [], None
             threshold = from_dt.replace(tzinfo=None)
             for _ in range(50):  # 50 * 100 = 5,000 record hard ceiling, same bound as _run_search
+                if time.time() >= _deadline:
+                    fetch_complete, stop_reason = False, "time_budget_exceeded"
+                    break
                 body = {"page_size": 100, "sort": [{"field_name": "Numbering", "desc": True}]}
                 if page_token:
                     body["page_token"] = page_token
-                resp = session.post(search_url, json=body, timeout=15)
+                remaining = max(3, min(15, _deadline - time.time()))
+                resp = session.post(search_url, json=body, timeout=remaining)
                 data = resp.json()
                 if data.get("code") != 0:
                     break
@@ -2516,7 +2543,8 @@ def my_requests():
                 if not page_token or not block.get("has_more", False):
                     break
             all_items = raw_items
-            fetch_complete, stop_reason = False, "Filter unavailable -- results gathered by paginating and matching locally, may include a few extra days at the boundary."
+            if stop_reason != "time_budget_exceeded":
+                fetch_complete, stop_reason = False, "Filter unavailable -- results gathered by paginating and matching locally, may include a few extra days at the boundary."
         except Exception as e:
             all_items, fetch_complete, stop_reason = [], False, str(e)
 
