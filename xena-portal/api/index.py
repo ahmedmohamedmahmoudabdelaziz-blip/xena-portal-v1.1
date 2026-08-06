@@ -25,6 +25,20 @@ AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
+# BUG FIX (silent identity loss): submit_request() used to write the real submitter's
+# name into a field called "Submitted By". That field does NOT exist anywhere in the
+# live Feishu schema (confirmed against the table's actual field list) -- so every
+# single submission silently dropped it in the "actual_fields" whitelist filter further
+# down, and it never reached Feishu at all. That's why the fallback that was supposed
+# to reliably show who really submitted a ticket (for agents whose token isn't allowed
+# to create records under their own identity, so "Respondents" gets stamped with the
+# app/tenant identity instead) never actually worked -- there was nothing to fall back
+# to. To fix this for real, add a plain Text column to the Requests table in Feishu
+# (any name is fine) and put that exact name here. Until that column exists, this
+# still degrades gracefully: get_table_schema() drops the key and logs a warning
+# (see submit_request), so nothing crashes, but attribution stays unreliable.
+SUBMITTED_BY_FIELD_NAME = "Submitted By"
+
 PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham",
             "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
 IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
@@ -1996,13 +2010,23 @@ def submit_request():
             final_fields[field_name] = tokens
 
     final_fields["Request Status"] = "Pending"
-    final_fields["Submitted By"] = user
+    final_fields[SUBMITTED_BY_FIELD_NAME] = user
 
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
         dropped = [k for k in final_fields if k not in actual_fields]
         if dropped:
             logger.warn("submit_dropped_unknown_fields", fields=dropped)
+        if SUBMITTED_BY_FIELD_NAME in dropped:
+            # This is the one that matters most: if it's silently dropped, the real
+            # submitter's name is lost for this ticket the moment "Respondents" can't
+            # carry it (see SUBMITTED_BY_FIELD_NAME comment above). Surface it loudly
+            # in the audit log instead of only in server logs, since that's the one
+            # place someone is likely to actually notice a pattern of missing names.
+            audit.log(user, "SUBMITTED_BY_FIELD_MISSING",
+                      f"'{SUBMITTED_BY_FIELD_NAME}' is not a real column on this table -- "
+                      f"real submitter name for this ticket was not saved anywhere.",
+                      severity="Warning")
         final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
 
     # BUG FIX (NumberFieldConvFail): same coercion as update_request -- protects new
@@ -2060,6 +2084,24 @@ def submit_request():
             if update_data.get("code") == 0:
                 success = True
             else:
+                # BUG FIX (orphaned blank tickets): previously, if this Patch step
+                # failed for any reason, the exception below was raised and an error
+                # was returned to the user -- but the blank row created by the Primary
+                # Attempt just above was NEVER cleaned up. That blank row (Request
+                # Status: Pending, every other field empty, Respondents stamped by
+                # whichever token created it) stayed in the sheet forever, which is
+                # exactly the "record with no info in it" agents and admins were
+                # seeing. Since the create+patch isn't a real atomic transaction on
+                # Feishu's side, we now delete the orphaned blank record ourselves
+                # before surfacing the error, so a failed submission never leaves a
+                # ghost row behind.
+                try:
+                    del_headers = {"Authorization": f"Bearer {tat}"}
+                    http_requests.delete(f"{url}/{record_id}", headers=del_headers, timeout=15)
+                    logger.warn("submit_patch_failed_rolled_back", record_id=record_id,
+                                feishu_msg=update_data.get("msg"))
+                except Exception as del_e:
+                    logger.error("submit_rollback_delete_failed", record_id=record_id, error=str(del_e))
                 raise Exception(f"System Patch failed: {update_data.get('msg')}")
         else:
             raise Exception(f"Primary Creation failed: {data.get('msg')}")
@@ -2407,6 +2449,31 @@ def my_requests():
     from_str = from_dt.strftime("%Y-%m-%d")
     to_str = _cairo_now.strftime("%Y-%m-%d")
 
+    # SPEED FIX: mirror /api/query -- try one targeted server-side filter on the
+    # reliable submitter field FIRST, exactly like the fast Query page does for
+    # Agency Code / User ID / etc. This returns only this person's own records
+    # straight from Feishu (no full-table scan, no 45s budget, no local matching),
+    # so it's just as fast as Query. This only works once SUBMITTED_BY_FIELD_NAME is
+    # a real column in the base (see the comment near its definition) -- until then
+    # Feishu returns FieldNameNotFound (1254045) and we fall through to the existing
+    # slower scan-and-match stages below untouched, so nothing breaks in the meantime.
+    fast_items, fast_ok = [], False
+    try:
+        fast_payload = {
+            "page_size": 500,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {"conjunction": "and", "conditions": [
+                {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]},
+            ]},
+        }
+        fast_resp = session.post(search_url, json=fast_payload, timeout=12)
+        fast_data = fast_resp.json()
+        if fast_data.get("code") == 0:
+            fast_items = fast_data.get("data", {}).get("items", [])
+            fast_ok = True
+    except Exception as e:
+        logger.warn("my_requests_fast_path_failed", error=str(e))
+
     # BUG FIX ("Vercel Runtime Timeout Error: Task timed out after 60 seconds" /
     # /api/my-requests spins forever, nothing shows): the three fetch stages below
     # (primary "Submitted on Copy" search, fallback "Submitted on" search, fallback
@@ -2470,18 +2537,21 @@ def my_requests():
     # date server-side (cheap, reliable), and let the local matched_items loop
     # below (which already checks Respondents/Submitted By by display name) do the
     # per-user filtering safely.
-    base_payload = {
-        "page_size": 100,
-        "sort": [{"field_name": "Numbering", "desc": True}],
-        "filter": {
-            "conjunction": "and",
-            "conditions": [
-                {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
-                {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
-            ],
-        },
-    }
-    all_items, fetch_complete, stop_reason = _run_search(base_payload, _deadline)
+    if fast_ok:
+        all_items, fetch_complete, stop_reason = fast_items, True, ""
+    else:
+        base_payload = {
+            "page_size": 100,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {
+                "conjunction": "and",
+                "conditions": [
+                    {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
+                    {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
+                ],
+            },
+        }
+        all_items, fetch_complete, stop_reason = _run_search(base_payload, _deadline)
 
     # Fallback #1: "Submitted on Copy" not present/erroring on this base -- retry
     # against the DateTime "Submitted on" field instead, which needs full ISO-8601
@@ -2548,13 +2618,35 @@ def my_requests():
         except Exception as e:
             all_items, fetch_complete, stop_reason = [], False, str(e)
 
-    matched_items = []
+    # BUG FIX (duplicate cards): the same record could legitimately come back more
+    # than once across the fallback stages above (e.g. a page re-requested after a
+    # retry, or overlap between stages), and nothing downstream ever deduplicated by
+    # record_id -- which is exactly the "one request repeated so many times" symptom.
+    # Dedup by record_id up front, before any per-user matching, regardless of which
+    # stage produced the data.
+    seen_ids, deduped_items = set(), []
     for it in all_items:
-        f = it.get("fields", {})
-        rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
-        sb = extract_field_text(get_field_local(f, "Submitted By")).lower()
-        if user_clean in rp or user_clean in sb:
-            matched_items.append(it)
+        rid = it.get("record_id")
+        if rid and rid in seen_ids:
+            continue
+        if rid:
+            seen_ids.add(rid)
+        deduped_items.append(it)
+    all_items = deduped_items
+
+    if fast_ok:
+        # Already filtered server-side by the real submitter -- no need to re-match
+        # locally by name (and shouldn't, since local text-matching by display name is
+        # the less precise path we're trying to move away from).
+        matched_items = all_items
+    else:
+        matched_items = []
+        for it in all_items:
+            f = it.get("fields", {})
+            rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+            sb = extract_field_text(get_field_local(f, SUBMITTED_BY_FIELD_NAME)).lower()
+            if user_clean in rp or user_clean in sb:
+                matched_items.append(it)
     all_items = matched_items
 
 
@@ -2573,7 +2665,12 @@ def my_requests():
         # the /records/search fix above started actually returning matched items.
         # Strip tzinfo from from_dt for this comparison only -- both sides already
         # represent Cairo local time, so no shift is needed, just matching "naive-ness".
-        if not dt or dt < from_dt.replace(tzinfo=None):
+        #
+        # On the fast path (fast_ok) we already asked Feishu for every record this
+        # person ever submitted, with no date condition -- that's the "show all, no
+        # limit" behavior that was requested. Only apply the lookback cutoff on the
+        # slower fallback stages, where it's still needed to keep those bounded.
+        if not fast_ok and (not dt or dt < from_dt.replace(tzinfo=None)):
             continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
@@ -2585,7 +2682,7 @@ def my_requests():
             elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
         acm = (acm_in if region == "in" else acm_pk) or acm_fb
         
-        submitted_by = extract_field_text(get_field_local(fields, "Submitted By"))
+        submitted_by = extract_field_text(get_field_local(fields, SUBMITTED_BY_FIELD_NAME))
         respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
         
         results.append({
@@ -2620,6 +2717,7 @@ def my_requests():
         "stop_reason": ("" if fetch_complete else stop_reason),
         "served_from_background_cache": False,  # always a live Feishu fetch now
         "lookback_days": lookback_days,
+        "fast_path_used": fast_ok,  # true once SUBMITTED_BY_FIELD_NAME exists in Feishu
     })
 
 @app.route('/api/live-queue', methods=['GET'])
