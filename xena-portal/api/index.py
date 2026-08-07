@@ -2603,7 +2603,7 @@ def my_requests():
         # Person fields elsewhere in this file (see Done by / Mentioned Person), and
         # using "open_id" here is what threw code 9499 "Invalid parameter value".
         identity_condition = (
-            {"field_name": "Respondents", "operator": "is", "value": [{"id": open_id}]}
+            {"field_name": "Respondents", "operator": "is", "value": [open_id]}
             if open_id else
             {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
         )
