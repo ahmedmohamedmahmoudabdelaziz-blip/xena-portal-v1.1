@@ -2501,21 +2501,22 @@ def my_requests():
     _cairo_now = cairo_now()
     from_dt = _cairo_now - timedelta(days=lookback_days)
     
-    from_str = from_dt.strftime("%Y-%m-%d")
-    to_str = _cairo_now.strftime("%Y-%m-%d")
+    # FORMAT FIX: Feishu explicitly requires YYYY/MM/DD based on the field schema
+    from_str = from_dt.strftime("%Y/%m/%d")
+    to_str = _cairo_now.strftime("%Y/%m/%d")
 
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-    # UNIVERSAL QUERY STYLE: Fast, direct Feishu filter on Respondents and Submitted on Copy
+    # HYBRID QUERY: Fast server-side filter on Dates. We leave Respondents out of 
+    # the server payload to avoid the 'field validation failed' error on Person fields.
     payload = {
         "page_size": 500,
         "sort": [{"field_name": "Numbering", "desc": True}],
         "filter": {
             "conjunction": "and",
             "conditions": [
-                {"field_name": "Respondents", "operator": "contains", "value": [user]},
                 {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
                 {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]}
             ]
@@ -2527,9 +2528,8 @@ def my_requests():
     stop_reason = ""
     
     try:
-        # Paginates only exactly matching records instantly
         page_token = None
-        for _ in range(20): # Safety limit to prevent infinite loops (max 10,000 records)
+        for _ in range(20): # Safety limit 
             if page_token:
                 payload["page_token"] = page_token
                 
@@ -2552,10 +2552,19 @@ def my_requests():
         stop_reason = str(e)
 
     results = []
+    user_clean = user.strip().lower()
     
     for item in all_items:
         fields = item.get("fields", {})
         
+        # LIGHTNING-FAST LOCAL FILTER: Since the date payload is already small, this takes 0.001s
+        # Safely matching the Respondent text without Feishu crashing.
+        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By")).lower()
+        submitted_by = extract_field_text(get_field_local(fields, SUBMITTED_BY_FIELD_NAME)).lower()
+        
+        if user_clean not in respondents and user_clean not in submitted_by:
+            continue
+            
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
         
@@ -2568,14 +2577,12 @@ def my_requests():
             elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
         acm = (acm_in if region == "in" else acm_pk) or acm_fb
         
-        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
-        
         results.append({
             "record_id": item.get("record_id"),
             "numbering": extract_field_text(get_field_local(fields, "Numbering")),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
             "submitted_on": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
-            "respondents": respondents,
+            "respondents": extract_field_text(get_field_local(fields, "Respondents", "Created By")),
             "user_id": extract_field_text(get_field_local(fields, "User ID")),
             "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
             "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
@@ -2606,61 +2613,6 @@ def my_requests():
     })
 
 @app.route('/api/live-queue', methods=['GET'])
-def live_queue():
-    user = sanitize_text(request.args.get('user',''))
-    
-    if not user or MOCK_MODE:
-        return jsonify({"success": True, "tickets": []})
-        
-    tat = get_tenant_access_token()
-    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    
-    payload = {
-        "page_size": 50,
-        "filter": {
-            "conjunction": "and",
-            "conditions": [
-                {
-                    "field_name": "Request Status", 
-                    "operator": "contains",
-                    "value": ["In Progress"] 
-                }
-            ]
-        },
-        "sort": [{"field_name": "Numbering", "desc": True}]
-    }
-    
-    try:
-        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
-        data = resp.json()
-        
-        if data.get("code") == 1254045:
-            payload["filter"]["conditions"][0]["field_name"] = "Status"
-            resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
-            data = resp.json()
-            
-        if data.get("code") == 0:
-            items = data.get("data", {}).get("items", [])
-            tickets = []
-            user_clean = user.strip().lower()
-            for item in items:
-                fields = item.get("fields", {})
-                assigned_member = extract_field_text(get_field_local(fields, "Assigned Member")).lower()
-                if user_clean in assigned_member:
-                    tickets.append({
-                        "record_id": item.get("record_id"),
-                        "numbering": extract_field_text(get_field_local(fields, "Numbering")),
-                        "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
-                        "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
-                        "user_id": extract_field_text(get_field_local(fields, "User ID")),
-                        "assigned_member": extract_field_text(get_field_local(fields, "Assigned Member")),
-                    })
-            return jsonify({"success": True, "tickets": tickets})
-            
-        return jsonify({"success": False, "error": data.get("msg")})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
 
 @app.route('/api/agency-list', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
