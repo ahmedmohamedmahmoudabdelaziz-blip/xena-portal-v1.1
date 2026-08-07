@@ -289,6 +289,46 @@ def strip_invalid_attachment_fields(fields, field_types):
         logger.warn("stripped_invalid_attachment_fields", fields=dropped)
     return cleaned
 
+def strip_invalid_user_fields(fields, field_types, actor=None, audit_on_bad_submitted_by=True):
+    """
+    BUG FIX (UserFieldConvFail on Create New Request): Feishu's User/Person-type
+    fields only accept a list of {"id": open_id} objects (see EDITABLE_USER_FIELDS /
+    twRenderMemberPicker in the frontend for "Done by" and "Mentioned Person") --
+    never a plain display-name string. If ANY field the live schema reports as
+    ui_type "User" shows up in the outgoing payload with a plain string (or anything
+    else that isn't already a well-formed [{"id": ...}] list), Feishu rejects the
+    *entire* write with "System Patch failed: UserFieldConvFail" -- which is exactly
+    what was happening on every "Create New Request" submission.
+    Root cause: SUBMITTED_BY_FIELD_NAME ("Submitted By") is written as a plain
+    display-name string by design (see submit_request()) on the assumption that it's
+    a Text column in Feishu. If that column was actually created as a Person/User
+    field in the live base instead of Text, every single submission would hit this
+    exact error, since final_fields[SUBMITTED_BY_FIELD_NAME] = user is always a bare
+    string. Rather than let that take down the whole submission, drop just that field
+    and log/audit it loudly so it's obvious the Feishu column type needs fixing --
+    same "fail soft, don't fail loud" approach as strip_invalid_attachment_fields().
+    """
+    cleaned, dropped = {}, []
+    for k, v in fields.items():
+        if field_types.get(k) == "User":
+            well_formed = isinstance(v, list) and v and all(isinstance(x, dict) and x.get("id") for x in v)
+            if well_formed:
+                cleaned[k] = v
+            else:
+                dropped.append(k)
+            continue
+        cleaned[k] = v
+    if dropped:
+        logger.warn("stripped_invalid_user_fields", fields=dropped)
+        if audit_on_bad_submitted_by and SUBMITTED_BY_FIELD_NAME in dropped:
+            audit.log(actor or "system", "SUBMITTED_BY_WRONG_FIELD_TYPE",
+                      f"'{SUBMITTED_BY_FIELD_NAME}' is a Feishu User/Person field, not "
+                      f"Text -- writes to it as a plain name always fail with "
+                      f"UserFieldConvFail. Change this column's type to Text in Feishu "
+                      f"to fix both this and slow/incomplete My Recent Requests.",
+                      severity="Warning")
+    return cleaned
+
 def coerce_number_fields(fields, field_types):
     """
     For every field the live schema says is Number-like: drop it entirely if the
@@ -1844,6 +1884,35 @@ def search_members():
         logger.error("member_search_failed", error=str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/requests/update', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def update_request():
+    """
+    Ticket workspace "Save & Resolve" / "Run Duplicate Check" patch endpoint --
+    see twSaveWorkspace() / twRunVerify() in the frontend, which POST
+    multipart/form-data with `user`, `record_id`, a JSON-encoded `fields` blob,
+    and any newly attached files keyed by their field name.
+
+    BUG FIX (missing route): this endpoint's own @app.route/def line had been lost
+    in an earlier edit, leaving everything below as dead, unreachable code sitting
+    inside search_members() -- every "Save & Resolve" call was hitting a plain 404
+    instead of ever running any of this handling. Restored here.
+    """
+    user = sanitize_text(request.form.get('user', ''))
+    record_id = sanitize_text(request.form.get('record_id', ''))
+
+    if not user:
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+
+    try:
+        fields = json.loads(request.form.get('fields', '{}'))
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Invalid fields JSON: {str(e)}"}), 400
+
+    fields = {k: v for k, v in fields.items() if k not in EXCLUDED_UPDATE_FIELDS}
+
     tat = get_tenant_access_token()
     
     # Safely upload newly selected files
@@ -1908,6 +1977,13 @@ def search_members():
         # valid list of file tokens (e.g. a stale echoed-back value) -- see
         # strip_invalid_attachment_fields().
         fields = strip_invalid_attachment_fields(fields, field_types)
+        # DEFENSIVE (UserFieldConvFail): same protection as submit_request() -- if any
+        # field reaching here is actually a Feishu User/Person column and its value
+        # isn't already a well-formed [{"id": open_id}] list (e.g. a stale echoed-back
+        # display name), drop it instead of letting it take down the whole ticket save.
+        # audit_on_bad_submitted_by=False here since "Submitted By" isn't editable from
+        # this workspace -- that specific alert only matters on the create path.
+        fields = strip_invalid_user_fields(fields, field_types, actor=user, audit_on_bad_submitted_by=False)
 
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
@@ -2028,6 +2104,11 @@ def submit_request():
         final_fields = coerce_number_fields(final_fields, field_types)
         # BUG FIX: never write to Formula/Lookup/AutoNumber/CreatedTime/etc fields.
         final_fields = strip_readonly_fields(final_fields, field_types)
+        # BUG FIX (UserFieldConvFail on Create New Request): if "Submitted By" (or any
+        # other field reaching here) is actually a Feishu User/Person column rather
+        # than Text, drop it instead of letting it take down the whole submission --
+        # see strip_invalid_user_fields() for the full story.
+        final_fields = strip_invalid_user_fields(final_fields, field_types, actor=user)
 
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
@@ -2432,7 +2513,7 @@ def my_requests():
     # Copy" is a plain Date field (no time component), so ">=" / "<=" against a bare
     # "YYYY-MM-DD" string is the fast, low-error path. "Submitted on" is the DateTime
     # twin of that field and needs full ISO-8601 timestamps if we ever have to fall
-    # back to it. Max 100 records/page on this endpoint, paginated via page_token.
+    # back to it. Max 500 records/page on this endpoint, paginated via page_token.
     tat = get_tenant_access_token()
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
@@ -2533,7 +2614,13 @@ def my_requests():
         all_items, fetch_complete, stop_reason = fast_items, True, ""
     else:
         base_payload = {
-            "page_size": 100,
+            # SPEED FIX: this endpoint accepts page_size up to 500 (same endpoint
+            # already used at 500 by the fast_payload right above and by
+            # /api/query's try_combo) -- the old value of 100 meant 5x more round
+            # trips than necessary per page, which is most of why this fallback
+            # scan was blowing through the time budget and returning partial
+            # results ("39 requests found", time_budget_exceeded).
+            "page_size": 500,
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {
                 "conjunction": "and",
@@ -2557,7 +2644,7 @@ def my_requests():
             {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
         ]
         dt_payload = {
-            "page_size": 100,
+            "page_size": 500,  # SPEED FIX: see base_payload comment above
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {"conjunction": "and", "conditions": dt_conditions},
         }
@@ -2576,11 +2663,11 @@ def my_requests():
         try:
             raw_items, page_token = [], None
             threshold = from_dt.replace(tzinfo=None)
-            for _ in range(50):  # 50 * 100 = 5,000 record hard ceiling, same bound as _run_search
+            for _ in range(50):  # 50 * 500 = 25,000 record hard ceiling, same bound as _run_search
                 if time.time() >= _deadline:
                     fetch_complete, stop_reason = False, "time_budget_exceeded"
                     break
-                body = {"page_size": 100, "sort": [{"field_name": "Numbering", "desc": True}]}
+                body = {"page_size": 500, "sort": [{"field_name": "Numbering", "desc": True}]}  # SPEED FIX: see base_payload comment above
                 if page_token:
                     body["page_token"] = page_token
                 remaining = max(3, min(15, _deadline - time.time()))
