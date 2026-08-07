@@ -2498,27 +2498,27 @@ def my_requests():
     except ValueError:
         lookback_days = 15
 
-    _cairo_now = cairo_now()
-    from_dt = _cairo_now - timedelta(days=lookback_days)
-    
-    # FORMAT FIX: Feishu explicitly requires YYYY/MM/DD based on the field schema
-    from_str = from_dt.strftime("%Y/%m/%d")
-    to_str = _cairo_now.strftime("%Y/%m/%d")
+    # FIXED: Feishu 'CreatedTime' and 'Date' fields STRICTLY require 
+    # absolute Unix Timestamps in milliseconds (as strings) for API filters.
+    # They will reject human-readable strings like '2026/01/30'.
+    now_ts = time.time()
+    from_ts = str(int((now_ts - (lookback_days * 86400)) * 1000))
+    to_ts = str(int(now_ts * 1000))
 
     tat = get_tenant_access_token()
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-    # HYBRID QUERY: Fast server-side filter on Dates. We leave Respondents out of 
-    # the server payload to avoid the 'field validation failed' error on Person fields.
+    # HYBRID QUERY: Fast server-side filter on Dates using Milliseconds. 
+    # We match Respondents locally because Feishu blocks text searches on Person fields.
     payload = {
         "page_size": 500,
         "sort": [{"field_name": "Numbering", "desc": True}],
         "filter": {
             "conjunction": "and",
             "conditions": [
-                {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
-                {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]}
+                {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_ts]},
+                {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_ts]}
             ]
         }
     }
@@ -2529,7 +2529,7 @@ def my_requests():
     
     try:
         page_token = None
-        for _ in range(20): # Safety limit 
+        for _ in range(20): # Safety limit (20 * 500 = 10,000 records max)
             if page_token:
                 payload["page_token"] = page_token
                 
@@ -2557,8 +2557,8 @@ def my_requests():
     for item in all_items:
         fields = item.get("fields", {})
         
-        # LIGHTNING-FAST LOCAL FILTER: Since the date payload is already small, this takes 0.001s
-        # Safely matching the Respondent text without Feishu crashing.
+        # LIGHTNING-FAST LOCAL FILTER: Since the date payload is already small, this is instantaneous.
+        # This safely matches the Respondent (Person field) text without Feishu validation crashing.
         respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By")).lower()
         submitted_by = extract_field_text(get_field_local(fields, SUBMITTED_BY_FIELD_NAME)).lower()
         
@@ -2611,6 +2611,8 @@ def my_requests():
         "lookback_days": lookback_days,
         "fast_path_used": True
     })
+
+@app.route('/api/live-queue', methods=['GET'])
 
 @app.route('/api/live-queue', methods=['GET'])
 
