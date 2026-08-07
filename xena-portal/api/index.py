@@ -2524,57 +2524,13 @@ def my_requests():
     from_str = from_dt.strftime("%Y-%m-%d")
     to_str = _cairo_now.strftime("%Y-%m-%d")
 
-    # SPEED FIX: mirror /api/query -- try one targeted server-side filter on the
-    # reliable submitter field FIRST, exactly like the fast Query page does for
-    # Agency Code / User ID / etc. This returns only this person's own records
-    # straight from Feishu (no full-table scan, no 45s budget, no local matching),
-    # so it's just as fast as Query. This only works once SUBMITTED_BY_FIELD_NAME is
-    # a real column in the base (see the comment near its definition) -- until then
-    # Feishu returns FieldNameNotFound (1254045) and we fall through to the existing
-    # slower scan-and-match stages below untouched, so nothing breaks in the meantime.
-    fast_items, fast_ok = [], False
-    try:
-        # If we have the caller's Feishu open_id (passed from /api/callback via
-        # localStorage), prefer a native filter on "Respondents" using it directly --
-        # this is the same Person-type field Feishu auto-stamps on every record, and
-        # matching on open_id (rather than the display-name text match below) sidesteps
-        # the identity-attribution bug where records created by agents without native
-        # Bitable permission get stamped with the app's identity in other text fields.
-        conditions = []
-        if open_id:
-            conditions.append({
-                "field_name": "Respondents",
-                "operator": "is",
-                "value": [{"open_id": open_id}]
-            })
-        else:
-            conditions.append({"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]})
-
-        fast_payload = {
-            "page_size": 500,
-            "sort": [{"field_name": "Numbering", "desc": True}],
-            "filter": {"conjunction": "and", "conditions": conditions},
-        }
-        fast_resp = session.post(search_url, json=fast_payload, timeout=12)
-        fast_data = fast_resp.json()
-        if fast_data.get("code") == 0:
-            fast_items = fast_data.get("data", {}).get("items", [])
-            fast_ok = True
-    except Exception as e:
-        logger.warn("my_requests_fast_path_failed", error=str(e))
-
     # BUG FIX ("Vercel Runtime Timeout Error: Task timed out after 60 seconds" /
-    # /api/my-requests spins forever, nothing shows): the three fetch stages below
-    # (primary "Submitted on Copy" search, fallback "Submitted on" search, fallback
-    # raw-pagination search) used to run one after another with NO overall time
-    # limit -- each stage could burn up to 50 sequential page requests at 15s apiece,
-    # so a single request could legally take many minutes end-to-end before Vercel's
-    # function timeout finally killed it with an unhandled 504 (which is why the
-    # frontend just spun -- it never got back valid JSON to render). Everything below
-    # now shares one wall-clock deadline: each stage stops fetching more pages once
-    # it's spent, and later stages are skipped entirely if there's no time left, so
-    # the endpoint always returns *something* (partial results + fetch_complete:false)
-    # comfortably before the platform timeout instead of never returning at all.
+    # /api/my-requests spins forever, nothing shows): every fetch stage below shares
+    # one wall-clock deadline. Each stage stops fetching more pages once it's spent,
+    # and later stages are skipped entirely if there's no time left, so the endpoint
+    # always returns *something* (partial results + fetch_complete:false) comfortably
+    # before the platform timeout instead of never returning at all. Defined before
+    # the fast path now, because the fast path is paginated too (see below).
     MY_REQUESTS_TIME_BUDGET_SECONDS = 45  # leaves ~15s headroom under Vercel's 60s cap
     _deadline = time.time() + MY_REQUESTS_TIME_BUDGET_SECONDS
 
@@ -2607,6 +2563,66 @@ def my_requests():
                 break
         return items, complete, reason
 
+    # SPEED FIX: mirror /api/query -- try one targeted server-side filter on the
+    # reliable submitter field FIRST, exactly like the fast Query page does for
+    # Agency Code / User ID / etc. This returns only this person's own records
+    # straight from Feishu (no full-table scan, no local matching), so it's just as
+    # fast as Query. This only works once SUBMITTED_BY_FIELD_NAME is a real column
+    # in the base (see the comment near its definition) -- until then Feishu returns
+    # FieldNameNotFound (1254045) and we fall through to the existing slower
+    # scan-and-match stages below untouched, so nothing breaks in the meantime.
+    #
+    # BUG FIX (this endpoint crawling the caller's *entire* history instead of just
+    # the requested window, then timing out and returning a truncated/stale page):
+    # the identity condition used to be sent completely on its own, with no date
+    # bound in the same call at all -- so for anyone with a long history this was
+    # effectively "give me every request this person has ever submitted," which is
+    # exactly what was blowing the time budget and coming back partial. The identity
+    # and date conditions are now ANDed into ONE payload, and run through the same
+    # bounded/paginated _run_search() as every other stage below (not a single
+    # unpaginated POST), so a person with >500 matching records in-window still gets
+    # a complete result instead of silently capping at the first page.
+    #
+    # Date bound uses "Submitted on" (the DateTime twin of "Submitted on Copy") with
+    # whole-millisecond Unix epoch timestamps as strings -- Feishu's own required
+    # format for DateTime field comparisons. Passing a bare "YYYY-MM-DD" string (or
+    # anything else) against this field is what throws Feishu's "field validation
+    # failed" error; "Submitted on Copy" is fine with bare dates but is a plain Date
+    # field with no time component, so it stays reserved for the fallback stage below.
+    from_ms = str(int(from_dt.timestamp() * 1000))
+    to_ms = str(int(_cairo_now.timestamp() * 1000))
+
+    fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
+    try:
+        # If we have the caller's Feishu open_id (passed from /api/callback via
+        # localStorage), prefer a native filter on "Respondents" using it directly --
+        # this is the same Person-type field Feishu auto-stamps on every record, and
+        # matching on open_id (rather than the display-name text match below) sidesteps
+        # the identity-attribution bug where records created by agents without native
+        # Bitable permission get stamped with the app's identity in other text fields.
+        identity_condition = (
+            {"field_name": "Respondents", "operator": "is", "value": [{"open_id": open_id}]}
+            if open_id else
+            {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
+        )
+        fast_payload = {
+            "page_size": 500,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {"conjunction": "and", "conditions": [
+                identity_condition,
+                {"field_name": "Submitted on", "operator": ">=", "value": [from_ms]},
+                {"field_name": "Submitted on", "operator": "<=", "value": [to_ms]},
+            ]},
+        }
+        fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
+        # A real filter error (bad field/operator, e.g. FieldNameNotFound) should fall
+        # through to the legacy stages below; running out of time on this already-
+        # combined, already-fast query should not -- there's nothing a slower stage
+        # could do in the time remaining that this one hasn't already done better.
+        fast_ok = fast_complete or fast_reason == "time_budget_exceeded"
+    except Exception as e:
+        logger.warn("my_requests_fast_path_failed", error=str(e))
+
     # NOTE on "Respondents": Feishu's own auto-populated creator column. For an
     # agent whose account doesn't have native Bitable record-create permission on
     # this table, this column is stamped with the app's own identity instead of the
@@ -2627,7 +2643,7 @@ def my_requests():
     # below (which already checks Respondents/Submitted By by display name) do the
     # per-user filtering safely.
     if fast_ok:
-        all_items, fetch_complete, stop_reason = fast_items, True, ""
+        all_items, fetch_complete, stop_reason = fast_items, fast_complete, fast_reason
     else:
         base_payload = {
             # SPEED FIX: this endpoint accepts page_size up to 500 (same endpoint
