@@ -1789,101 +1789,57 @@ def get_single_request():
 @rate_limit(*RATE_LIMIT_RECORDS)
 def search_members():
     """
-    Backs the "Done by" / "Mentioned Person" user picker in the ticket workspace
-    (mirrors Feishu's own @-mention/person-field picker).
-    
-    Updated to dynamically fetch authorized departments/users using the /scopes API
-    to avoid the "40004: no dept. authority" error if the app hasn't been granted
-    "All Employees" access in the Feishu Developer Console.
+    Backs the "Done by" / "Mentioned Person" user picker in the ticket workspace.
+    Uses Feishu's native user search API to automatically handle sub-departments 
+    and respect localized app data permissions without throwing 40004 errors.
     """
-    query = sanitize_text(request.args.get('q', '')).strip().lower()
+    query = sanitize_text(request.args.get('q', '')).strip()
 
-    cache_key = cache_make_key("members_directory")
-    members = cache_get(cache_key)
+    # The frontend only calls this when typing, but guard against empty queries
+    if not query:
+        return jsonify({"success": True, "results": [], "count": 0})
+
+    tat = get_tenant_access_token()
+    url = "https://open.feishu.cn/open-apis/contact/v3/users/search?user_id_type=open_id"
+    headers = {
+        "Authorization": f"Bearer {tat}",
+        "Content-Type": "application/json"
+    }
     
-    if members is None:
-        tat = get_tenant_access_token()
+    payload = {
+        "query": query,
+        "page_size": 50
+    }
+
+    try:
+        resp = http_requests.post(url, headers=headers, json=payload, timeout=10)
+        data = resp.json()
+
+        if data.get("code") != 0:
+            return jsonify({
+                "success": False, 
+                "error": f"{data.get('code')}: {data.get('msg')}"
+            }), 400
+
         members = []
-        seen_open_ids = set()
-        
-        # Step 1: Get the communication scope (allowed departments & users)
-        scopes_url = "https://open.feishu.cn/open-apis/contact/v3/scopes"
-        try:
-            scopes_resp = http_requests.get(scopes_url, headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
-            if scopes_resp.get("code") != 0:
-                return jsonify({"success": False, "error": f"{scopes_resp.get('code')}: {scopes_resp.get('msg')}",
-                                "hint": "Failed to get allowed scopes. Please check Contacts permissions in Feishu Developer Console."}), 400
+        for u in data.get("data", {}).get("items", []):
+            open_id = u.get("open_id")
+            name = u.get("name")
+            if not open_id or not name:
+                continue
+            
+            members.append({
+                "open_id": open_id, 
+                "name": name, 
+                "avatar_url": (u.get("avatar") or {}).get("avatar_72", "")
+            })
+
+        return jsonify({"success": True, "results": members, "count": len(members)})
+
+    except Exception as e:
+        logger.error("member_search_failed", error=str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
                 
-            allowed_dept_ids = scopes_resp.get("data", {}).get("department_ids", [])
-            allowed_user_ids = scopes_resp.get("data", {}).get("user_ids", [])
-            
-            if not allowed_dept_ids and not allowed_user_ids:
-                return jsonify({"success": False, "error": "App has no Contacts permissions configured.", "hint": "Please add users or departments to Data Permissions -> Contacts."}), 400
-            
-            # Step 2: Fetch users for each allowed department
-            for dept_id in allowed_dept_ids:
-                page_token = None
-                for _ in range(20):  # limit to 1000 users per dept
-                    url = "https://open.feishu.cn/open-apis/contact/v3/users/find_by_department"
-                    params = {"department_id": dept_id, "user_id_type": "open_id", "page_size": 50}
-                    if page_token:
-                        params["page_token"] = page_token
-                        
-                    resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, params=params, timeout=10)
-                    data = resp.json()
-                    
-                    if data.get("code") != 0:
-                        logger.warn("dept_fetch_failed", dept_id=dept_id, error=data.get('msg'))
-                        break
-                        
-                    block = data.get("data", {})
-                    for u in block.get("items", []):
-                        open_id = u.get("open_id")
-                        name = u.get("name")
-                        if not open_id or not name or open_id in seen_open_ids:
-                            continue
-                        seen_open_ids.add(open_id)
-                        members.append({"open_id": open_id, "name": name, "avatar_url": (u.get("avatar") or {}).get("avatar_72", "")})
-                        
-                    page_token = block.get("page_token")
-                    if not page_token or not block.get("has_more", False):
-                        break
-                        
-            # Step 3: Fetch individually allowed users (if any were specifically granted)
-            if allowed_user_ids:
-                for i in range(0, len(allowed_user_ids), 50):
-                    batch_ids = allowed_user_ids[i:i+50]
-                    batch_url = "https://open.feishu.cn/open-apis/contact/v3/users/batch"
-                    # Using a list of tuples so requests formats it as user_ids=id1&user_ids=id2
-                    params = [("user_id_type", "open_id")] + [("user_ids", uid) for uid in batch_ids]
-                    
-                    resp = http_requests.get(batch_url, headers={"Authorization": f"Bearer {tat}"}, params=params, timeout=10)
-                    data = resp.json()
-                    
-                    if data.get("code") == 0:
-                        for u in data.get("data", {}).get("items", []):
-                            open_id = u.get("open_id")
-                            name = u.get("name")
-                            if not open_id or not name or open_id in seen_open_ids:
-                                continue
-                            seen_open_ids.add(open_id)
-                            members.append({"open_id": open_id, "name": name, "avatar_url": (u.get("avatar") or {}).get("avatar_72", "")})
-                    else:
-                        logger.warn("user_batch_fetch_failed", error=data.get('msg'))
-            
-            # Cache the assembled authorized list so subsequent searches are instant
-            cache_set(cache_key, members, ttl=300)
-            
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
-
-    # Step 4: Perform local search against the safe, authorized list
-    if query:
-        results = [m for m in members if query in m["name"].lower()]
-    else:
-        results = members
-
-    return jsonify({"success": True, "results": results[:30], "count": len(results)})
 @app.route('/api/requests/update', methods=['POST'])
 def update_request():
     user = sanitize_text(request.form.get('user', ''))
