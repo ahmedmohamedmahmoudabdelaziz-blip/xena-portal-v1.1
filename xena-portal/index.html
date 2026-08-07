@@ -5280,7 +5280,7 @@ async function twSearchMembers(pickerId, query) {
 
     _twMemberSearchTimer = setTimeout(async () => {
         try {
-            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}`);
+            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}&uat=${encodeURIComponent(loggedUat)}`);
             const data = await res.json();
             if (!data.success) {
                 menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(data.error || 'Member search unavailable')}</div>`;
