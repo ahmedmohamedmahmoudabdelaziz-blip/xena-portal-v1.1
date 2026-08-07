@@ -1789,20 +1789,24 @@ def get_single_request():
 @rate_limit(*RATE_LIMIT_RECORDS)
 def search_members():
     """
-    Backs the "Done by" / "Mentioned Person" user picker in the ticket workspace.
-    Uses Feishu's native user search API to automatically handle sub-departments 
-    and respect localized app data permissions without throwing 40004 errors.
+    Backs the "Done by" / "Mentioned Person" user picker.
+    Uses Feishu's native user search API with User Access Token (UAT) to instantly 
+    search all allowed sub-departments without triggering 40004 or 99991663 errors.
     """
     query = sanitize_text(request.args.get('q', '')).strip()
-
+    uat = request.args.get('uat', '')
+    
     # The frontend only calls this when typing, but guard against empty queries
     if not query:
         return jsonify({"success": True, "results": [], "count": 0})
+        
+    if not uat:
+        return jsonify({"success": False, "error": "Missing User Access Token. Please refresh the page."}), 400
 
-    tat = get_tenant_access_token()
+    # MUST use user_access_token (UAT) to avoid 99991663 error
     url = "https://open.feishu.cn/open-apis/contact/v3/users/search?user_id_type=open_id"
     headers = {
-        "Authorization": f"Bearer {tat}",
+        "Authorization": f"Bearer {uat}",
         "Content-Type": "application/json"
     }
     
@@ -1839,16 +1843,6 @@ def search_members():
     except Exception as e:
         logger.error("member_search_failed", error=str(e))
         return jsonify({"success": False, "error": str(e)}), 500
-                
-@app.route('/api/requests/update', methods=['POST'])
-def update_request():
-    user = sanitize_text(request.form.get('user', ''))
-    record_id = sanitize_text(request.form.get('record_id', ''))
-    
-    try:
-        fields = json.loads(request.form.get('fields', '{}'))
-    except:
-        return jsonify({"success": False, "error": "Invalid fields JSON format"}), 400
 
     tat = get_tenant_access_token()
     
