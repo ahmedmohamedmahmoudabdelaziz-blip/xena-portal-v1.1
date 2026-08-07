@@ -2311,11 +2311,13 @@ if (urlParams.get('user') && urlParams.get('uat')) {
     loggedEmail = urlParams.get('email') || '';
     loggedUat   = urlParams.get('uat');    
     const avatar = urlParams.get('avatar');
+    const openId = urlParams.get('open_id');
     
     localStorage.setItem('xenaUser',  loggedUser);
     localStorage.setItem('xenaEmail', loggedEmail);
     localStorage.setItem('xenaUat',   loggedUat);
     if(avatar) localStorage.setItem('xenaAvatar', avatar);
+    if(openId) localStorage.setItem('xenaOpenId', openId);
     
     localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
     window.history.replaceState({},'',window.location.href.split('?')[0].split('#')[0]);   
@@ -4001,7 +4003,8 @@ async function loadMyRequests() {
         // is a real Feishu column, this now runs a single fast targeted filter (same
         // approach as the Query page) instead of scanning/matching locally, and results
         // come back deduplicated.
-        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&days=${encodeURIComponent(days)}`);
+        const openId = localStorage.getItem('xenaOpenId') || '';
+        const resp = await fetch(`/api/my-requests?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&days=${encodeURIComponent(days)}&open_id=${encodeURIComponent(openId)}`);
         let data;
         try { data = await resp.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
         if (!resp.ok) throw new Error(data.error || 'Failed to load requests');
