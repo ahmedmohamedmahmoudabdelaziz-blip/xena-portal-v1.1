@@ -2603,23 +2603,23 @@ def my_requests():
         # Person fields elsewhere in this file (see Done by / Mentioned Person), and
         # using "open_id" here is what threw code 9499 "Invalid parameter value".
         identity_condition = (
-    {"field_name": "Respondents", "operator": "is", "value": [open_id]}
-    if open_id else
-    {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
-)
+        {"field_name": "Respondents", "operator": "is", "value": [{"id": open_id}]}
+        if open_id else
+        {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
+    )
 
-fast_payload = {
-    "page_size": 500,
-    "sort": [{"field_name": "Numbering", "desc": True}],
-    "filter": {
-        "conjunction": "and",
-        "conditions": [
-            identity_condition,
-            {"field_name": "Submitted on Copy", "operator": "isGreaterEqual", "value": [from_date_str]},
-            {"field_name": "Submitted on Copy", "operator": "isLessEqual", "value": [to_date_str]},
-        ]
-    },
-}
+    fast_payload = {
+        "page_size": 500,
+        "sort": [{"field_name": "Numbering", "desc": True}],
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                identity_condition,
+                {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_ts]},
+                {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_ts]},
+            ]
+        },
+    }
         fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
         # Running out of time on this already-combined, single search should still
         # be reported as "fast path used" (there's no other stage left to try) --
