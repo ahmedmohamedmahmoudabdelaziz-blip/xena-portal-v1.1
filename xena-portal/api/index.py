@@ -2502,139 +2502,77 @@ def my_requests():
 
     _cairo_now = cairo_now()
     from_dt = _cairo_now - timedelta(days=lookback_days)
+    user_clean = user.strip().lower()
 
-    # FIX: this is now a fully live, on-demand fetch -- no Redis/background snapshot
-    # involved at all, and the frontend only calls this endpoint when the person clicks
-    # "Search" (not automatically when the page opens), so a live round-trip to Feishu
-    # here is expected and acceptable rather than something to hide behind a cache.
-    #
-    # We use the /records/search POST endpoint (not the classic GET .../records?filter=
-    # formula endpoint) because its structured filter conditions are far more reliable
-    # against this base than the CurrentValue.[...] formula string was. Max 500
-    # records/page on this endpoint, paginated via page_token.
+    # Convert absolute datetime to milliseconds as a string for Feishu API
+    from_ts = str(int(from_dt.timestamp() * 1000))
+    to_ts = str(int(_cairo_now.timestamp() * 1000))
+
     tat = get_tenant_access_token()
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
 
-    # BUG FIX ("Vercel Runtime Timeout Error: Task timed out after 60 seconds" /
-    # /api/my-requests spins forever, nothing shows): every fetch stage below shares
-    # one wall-clock deadline. Each stage stops fetching more pages once it's spent,
-    # and later stages are skipped entirely if there's no time left, so the endpoint
-    # always returns *something* (partial results + fetch_complete:false) comfortably
-    # before the platform timeout instead of never returning at all. Defined before
-    # the fast path now, because the fast path is paginated too (see below).
-    MY_REQUESTS_TIME_BUDGET_SECONDS = 45  # leaves ~15s headroom under Vercel's 60s cap
+    # BUILD SINGLE UNIFIED FAST PAYLOAD
+    # Combine the Millisecond Timestamp conditions and the Open ID (or user) into one call.
+    conditions = [
+        {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_ts]},
+        {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_ts]}
+    ]
+
+    if open_id:
+        conditions.append({
+            "field_name": "Respondents",
+            "operator": "is",
+            "value": [{"open_id": open_id}]
+        })
+    else:
+        # Fallback if open_id isn't available
+        conditions.append({"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]})
+
+    payload = {
+        "page_size": 500,
+        "sort": [{"field_name": "Numbering", "desc": True}],
+        "filter": {"conjunction": "and", "conditions": conditions},
+    }
+
+    # Bounded pagination
+    MY_REQUESTS_TIME_BUDGET_SECONDS = 45 
     _deadline = time.time() + MY_REQUESTS_TIME_BUDGET_SECONDS
 
-    def _run_search(payload, deadline):
-        """Runs the live paginated /records/search fetch for a given payload. Returns
-        (items, complete, reason). Stops early (complete=False) once `deadline` is hit,
-        even mid-pagination, rather than continuing to burn the request's time budget."""
-        items, page_token, complete, reason = [], None, True, ""
-        for _ in range(50):  # 50 * 100 = 5,000 records hard ceiling as a sanity bound
-            if time.time() >= deadline:
-                complete, reason = False, "time_budget_exceeded"
+    all_items = []
+    page_token = None
+    fetch_complete = True
+    stop_reason = ""
+
+    try:
+        for _ in range(50):
+            if time.time() >= _deadline:
+                fetch_complete, stop_reason = False, "time_budget_exceeded"
                 break
+            
             body = dict(payload)
             if page_token:
                 body["page_token"] = page_token
-            try:
-                remaining = max(3, min(15, deadline - time.time()))
-                resp = session.post(search_url, json=body, timeout=remaining)
-                data = resp.json()
-                if data.get("code") != 0:
-                    complete, reason = False, f"{data.get('code')}: {data.get('msg')}"
-                    break
-                block = data.get("data", {})
-                items.extend(block.get("items", []))
-                page_token = block.get("page_token")
-                if not page_token or not block.get("has_more", False):
-                    break
-            except Exception as e:
-                complete, reason = False, str(e)
+            
+            remaining = max(3, min(15, _deadline - time.time()))
+            resp = session.post(search_url, json=body, timeout=remaining)
+            data = resp.json()
+            
+            if data.get("code") != 0:
+                fetch_complete, stop_reason = False, f"{data.get('code')}: {data.get('msg')}"
                 break
-        return items, complete, reason
-
-    # SPEED FIX: mirror /api/query -- try one targeted server-side filter on the
-    # reliable submitter field FIRST, exactly like the fast Query page does for
-    # Agency Code / User ID / etc. This returns only this person's own records
-    # straight from Feishu (no full-table scan, no local matching), so it's just as
-    # fast as Query. Requires SUBMITTED_BY_FIELD_NAME to be a real column in the base
-    # (see the comment near its definition) when no open_id is available -- if it
-    # isn't yet, Feishu returns FieldNameNotFound (1254045) and that's surfaced
-    # directly to the caller as fetch_complete:false, not silently retried.
-    #
-    # BUG FIX (this endpoint crawling the caller's *entire* history instead of just
-    # the requested window, then timing out and returning a truncated/stale page):
-    # the identity condition used to be sent completely on its own, with no date
-    # bound in the same call at all -- so for anyone with a long history this was
-    # effectively "give me every request this person has ever submitted," which is
-    # exactly what was blowing the time budget and coming back partial. The identity
-    # and date conditions are now ANDed into ONE payload, and run through the same
-    # bounded/paginated _run_search() as every other stage below (not a single
-    # unpaginated POST), so a person with >500 matching records in-window still gets
-    # a complete result instead of silently capping at the first page.
-    #
-    # Date bound uses "Submitted on" (the DateTime twin of "Submitted on Copy") with
-    # whole-millisecond Unix epoch timestamps as strings -- Feishu's own required
-    # format for DateTime field comparisons. Passing a bare "YYYY-MM-DD" string (or
-    # anything else) against this field is what throws Feishu's "field validation
-    # failed" error; "Submitted on Copy" is fine with bare dates but is a plain Date
-    # field with no time component, so it stays reserved for the fallback stage below.
-    from_ms = str(int(from_dt.timestamp() * 1000))
-    to_ms = str(int(_cairo_now.timestamp() * 1000))
-
-    fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
-    try:
-        # If we have the caller's Feishu open_id (passed from /api/callback via
-        # localStorage), prefer a native filter on "Respondents" using it directly --
-        # this is the same Person-type field Feishu auto-stamps on every record, and
-        # matching on open_id (rather than the display-name text match below) sidesteps
-        # the identity-attribution bug where records created by agents without native
-        # Bitable permission get stamped with the app's identity in other text fields.
-        identity_condition = (
-            {"field_name": "Respondents", "operator": "is", "value": [{"open_id": open_id}]}
-            if open_id else
-            {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
-        )
-        fast_payload = {
-            "page_size": 500,
-            "sort": [{"field_name": "Numbering", "desc": True}],
-            "filter": {"conjunction": "and", "conditions": [
-                identity_condition,
-                {"field_name": "Submitted on", "operator": ">=", "value": [from_ms]},
-                {"field_name": "Submitted on", "operator": "<=", "value": [to_ms]},
-            ]},
-        }
-        fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
-        # Running out of time on this already-combined, single search should still
-        # be reported as "fast path used" (there's no other stage left to try) --
-        # only a hard exception below leaves fast_ok False.
-        fast_ok = True
+            
+            block = data.get("data", {})
+            all_items.extend(block.get("items", []))
+            
+            page_token = block.get("page_token")
+            if not page_token or not block.get("has_more", False):
+                break
     except Exception as e:
-        fast_ok = False
-        fast_reason = str(e)
-        logger.warn("my_requests_fast_path_failed", error=str(e))
+        fetch_complete, stop_reason = False, str(e)
 
-    # The combined identity+date search above is now the ONLY fetch path -- the old
-    # three-stage fallback chain ("Submitted on Copy" bare-date search, then a
-    # "Submitted on" ISO-string retry, then a raw full-table paginate-and-match-
-    # locally scan) is deleted. It existed to work around SUBMITTED_BY_FIELD_NAME
-    # not existing yet / bare-date filters being unreliable, but it's also exactly
-    # what caused the "field validation failed" errors (bare "YYYY-MM-DD" and
-    # ISO-8601 strings are NOT valid values for "Submitted on", which is a DateTime
-    # field requiring millisecond epoch values -- see the fast-path comment above)
-    # and the multi-minute worst case that blew through the Vercel time budget. If
-    # the fast path itself failed for a real reason (bad field/filter, not just
-    # running out of time), we now surface that directly instead of masking it
-    # behind further slow, similarly-fragile retries.
-    all_items, fetch_complete, stop_reason = fast_items, fast_complete, fast_reason
-
-    # BUG FIX (duplicate cards): the same record could legitimately come back more
-    # than once across pages (e.g. a page re-requested after a retry), and nothing
-    # downstream ever deduplicated by record_id -- which is exactly the "one
-    # request repeated so many times" symptom. Dedup by record_id up front.
+    # Deduplicate results by record_id
     seen_ids, deduped_items = set(), []
     for it in all_items:
         rid = it.get("record_id")
@@ -2645,9 +2583,21 @@ def my_requests():
         deduped_items.append(it)
     all_items = deduped_items
 
+    # Safe Local Matching Fallback ONLY if open_id was not provided
+    matched_items = []
+    if open_id:
+        matched_items = all_items
+    else:
+        for it in all_items:
+            f = it.get("fields", {})
+            rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+            sb = extract_field_text(get_field_local(f, SUBMITTED_BY_FIELD_NAME)).lower()
+            if user_clean in rp or user_clean in sb:
+                matched_items.append(it)
+
     results = []
     
-    for item in all_items:
+    for item in matched_items:
         fields = item.get("fields", {})
         
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
@@ -2695,9 +2645,9 @@ def my_requests():
         "count": len(results),
         "fetch_complete": fetch_complete,
         "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": False,  # always a live Feishu fetch now
+        "served_from_background_cache": False,
         "lookback_days": lookback_days,
-        "fast_path_used": fast_ok,  # false only if the single combined search itself threw
+        "fast_path_used": bool(open_id),
     })
 
 @app.route('/api/live-queue', methods=['GET'])
