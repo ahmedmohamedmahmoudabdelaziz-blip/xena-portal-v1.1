@@ -1646,11 +1646,12 @@ def callback():
         lark_name  = user_data.get("name", "Unknown User")
         lark_email = user_data.get("email") or user_data.get("enterprise_email") or ""
         avatar_url = user_data.get("avatar_72") or user_data.get("avatar_url") or ""
+        lark_open_id = user_data.get("open_id") or ""
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
         
-        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}&avatar={urllib.parse.quote(avatar_url, safe='')}")
+        return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}&avatar={urllib.parse.quote(avatar_url, safe='')}&open_id={urllib.parse.quote(lark_open_id, safe='')}")
 
     except Exception as exc:
         return redirect("/?auth_error=" + urllib.parse.quote(f"Login error: {str(exc)[:120]}", safe=''))
@@ -2486,6 +2487,7 @@ def query_records():
 def my_requests():
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
+    open_id = sanitize_text(request.args.get('open_id', ''))
     perms = get_user_permissions(email, user)
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     
@@ -2498,75 +2500,273 @@ def my_requests():
     except ValueError:
         lookback_days = 15
 
-    # FIXED: Feishu 'CreatedTime' and 'Date' fields STRICTLY require 
-    # absolute Unix Timestamps in milliseconds (as strings) for API filters.
-    # They will reject human-readable strings like '2026/01/30'.
-    now_ts = time.time()
-    from_ts = str(int((now_ts - (lookback_days * 86400)) * 1000))
-    to_ts = str(int(now_ts * 1000))
+    _cairo_now = cairo_now()
+    from_dt = _cairo_now - timedelta(days=lookback_days)
+    user_clean = user.strip().lower()
 
+    # FIX: this is now a fully live, on-demand fetch -- no Redis/background snapshot
+    # involved at all, and the frontend only calls this endpoint when the person clicks
+    # "Search" (not automatically when the page opens), so a live round-trip to Feishu
+    # here is expected and acceptable rather than something to hide behind a cache.
+    #
+    # We use the /records/search POST endpoint (not the classic GET .../records?filter=
+    # formula endpoint) because its structured filter conditions are far more reliable
+    # against this base than the CurrentValue.[...] formula string was. "Submitted on
+    # Copy" is a plain Date field (no time component), so ">=" / "<=" against a bare
+    # "YYYY-MM-DD" string is the fast, low-error path. "Submitted on" is the DateTime
+    # twin of that field and needs full ISO-8601 timestamps if we ever have to fall
+    # back to it. Max 500 records/page on this endpoint, paginated via page_token.
     tat = get_tenant_access_token()
+    session = http_requests.Session()
+    session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
     search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
-    # HYBRID QUERY: Fast server-side filter on Dates using Milliseconds. 
-    # We match Respondents locally because Feishu blocks text searches on Person fields.
-    payload = {
-        "page_size": 500,
-        "sort": [{"field_name": "Numbering", "desc": True}],
-        "filter": {
-            "conjunction": "and",
-            "conditions": [
-                {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_ts]},
-                {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_ts]}
-            ]
-        }
-    }
+    from_str = from_dt.strftime("%Y-%m-%d")
+    to_str = _cairo_now.strftime("%Y-%m-%d")
 
-    all_items = []
-    fetch_complete = True
-    stop_reason = ""
-    
+    # SPEED FIX: mirror /api/query -- try one targeted server-side filter on the
+    # reliable submitter field FIRST, exactly like the fast Query page does for
+    # Agency Code / User ID / etc. This returns only this person's own records
+    # straight from Feishu (no full-table scan, no 45s budget, no local matching),
+    # so it's just as fast as Query. This only works once SUBMITTED_BY_FIELD_NAME is
+    # a real column in the base (see the comment near its definition) -- until then
+    # Feishu returns FieldNameNotFound (1254045) and we fall through to the existing
+    # slower scan-and-match stages below untouched, so nothing breaks in the meantime.
+    fast_items, fast_ok = [], False
     try:
-        page_token = None
-        for _ in range(20): # Safety limit (20 * 500 = 10,000 records max)
-            if page_token:
-                payload["page_token"] = page_token
-                
-            resp = http_requests.post(search_url, headers=headers, json=payload, timeout=15)
-            data = resp.json()
-            
-            if data.get("code") != 0:
-                fetch_complete = False
-                stop_reason = f"Feishu Error: {data.get('msg')}"
-                break
-                
-            block = data.get("data", {})
-            all_items.extend(block.get("items", []))
-            
-            page_token = block.get("page_token")
-            if not page_token or not block.get("has_more", False):
-                break
+        # If we have the caller's Feishu open_id (passed from /api/callback via
+        # localStorage), prefer a native filter on "Respondents" using it directly --
+        # this is the same Person-type field Feishu auto-stamps on every record, and
+        # matching on open_id (rather than the display-name text match below) sidesteps
+        # the identity-attribution bug where records created by agents without native
+        # Bitable permission get stamped with the app's identity in other text fields.
+        conditions = []
+        if open_id:
+            conditions.append({
+                "field_name": "Respondents",
+                "operator": "is",
+                "value": [{"open_id": open_id}]
+            })
+        else:
+            conditions.append({"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]})
+
+        fast_payload = {
+            "page_size": 500,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {"conjunction": "and", "conditions": conditions},
+        }
+        fast_resp = session.post(search_url, json=fast_payload, timeout=12)
+        fast_data = fast_resp.json()
+        if fast_data.get("code") == 0:
+            fast_items = fast_data.get("data", {}).get("items", [])
+            fast_ok = True
     except Exception as e:
-        fetch_complete = False
-        stop_reason = str(e)
+        logger.warn("my_requests_fast_path_failed", error=str(e))
+
+    # BUG FIX ("Vercel Runtime Timeout Error: Task timed out after 60 seconds" /
+    # /api/my-requests spins forever, nothing shows): the three fetch stages below
+    # (primary "Submitted on Copy" search, fallback "Submitted on" search, fallback
+    # raw-pagination search) used to run one after another with NO overall time
+    # limit -- each stage could burn up to 50 sequential page requests at 15s apiece,
+    # so a single request could legally take many minutes end-to-end before Vercel's
+    # function timeout finally killed it with an unhandled 504 (which is why the
+    # frontend just spun -- it never got back valid JSON to render). Everything below
+    # now shares one wall-clock deadline: each stage stops fetching more pages once
+    # it's spent, and later stages are skipped entirely if there's no time left, so
+    # the endpoint always returns *something* (partial results + fetch_complete:false)
+    # comfortably before the platform timeout instead of never returning at all.
+    MY_REQUESTS_TIME_BUDGET_SECONDS = 45  # leaves ~15s headroom under Vercel's 60s cap
+    _deadline = time.time() + MY_REQUESTS_TIME_BUDGET_SECONDS
+
+    def _run_search(payload, deadline):
+        """Runs the live paginated /records/search fetch for a given payload. Returns
+        (items, complete, reason). Stops early (complete=False) once `deadline` is hit,
+        even mid-pagination, rather than continuing to burn the request's time budget."""
+        items, page_token, complete, reason = [], None, True, ""
+        for _ in range(50):  # 50 * 100 = 5,000 records hard ceiling as a sanity bound
+            if time.time() >= deadline:
+                complete, reason = False, "time_budget_exceeded"
+                break
+            body = dict(payload)
+            if page_token:
+                body["page_token"] = page_token
+            try:
+                remaining = max(3, min(15, deadline - time.time()))
+                resp = session.post(search_url, json=body, timeout=remaining)
+                data = resp.json()
+                if data.get("code") != 0:
+                    complete, reason = False, f"{data.get('code')}: {data.get('msg')}"
+                    break
+                block = data.get("data", {})
+                items.extend(block.get("items", []))
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            except Exception as e:
+                complete, reason = False, str(e)
+                break
+        return items, complete, reason
+
+    # NOTE on "Respondents": Feishu's own auto-populated creator column. For an
+    # agent whose account doesn't have native Bitable record-create permission on
+    # this table, this column is stamped with the app's own identity instead of the
+    # agent's -- see the note above submit_request()'s Primary Attempt for why, and
+    # the message to the team about the only real fix (granting those agents
+    # edit/create permission on the table in Feishu directly). That's a separate,
+    # platform-level issue from what this filter/fallback chain below is about:
+    # making sure a *complete* search actually runs, not silently capping at 100
+    # unfiltered records.
+    #
+    # We deliberately do NOT filter server-side on "Respondents" here.
+    # "Respondents" is a Feishu Person-type field, and Feishu's `contains` operator
+    # on Person fields matches against open_id, not the plain display name we have
+    # in `user`. That filter doesn't error (code stays 0), it just silently matches
+    # almost nothing -- which caused this endpoint to "succeed" with 1-2 stray
+    # records instead of falling through to a real fallback. So: filter only on
+    # date server-side (cheap, reliable), and let the local matched_items loop
+    # below (which already checks Respondents/Submitted By by display name) do the
+    # per-user filtering safely.
+    if fast_ok:
+        all_items, fetch_complete, stop_reason = fast_items, True, ""
+    else:
+        base_payload = {
+            # SPEED FIX: this endpoint accepts page_size up to 500 (same endpoint
+            # already used at 500 by the fast_payload right above and by
+            # /api/query's try_combo) -- the old value of 100 meant 5x more round
+            # trips than necessary per page, which is most of why this fallback
+            # scan was blowing through the time budget and returning partial
+            # results ("39 requests found", time_budget_exceeded).
+            "page_size": 500,
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {
+                "conjunction": "and",
+                "conditions": [
+                    {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_str]},
+                    {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_str]},
+                ],
+            },
+        }
+        all_items, fetch_complete, stop_reason = _run_search(base_payload, _deadline)
+
+    # Fallback #1: "Submitted on Copy" not present/erroring on this base -- retry
+    # against the DateTime "Submitted on" field instead, which needs full ISO-8601
+    # timestamps rather than a bare date string.
+    # Only bother if the primary stage failed for a REAL reason (bad field/filter),
+    # not because we simply ran out of time -- retrying a second full pagination
+    # sweep after already burning the whole budget would just guarantee a timeout.
+    if not fetch_complete and stop_reason != "time_budget_exceeded" and time.time() < _deadline:
+        dt_conditions = [
+            {"field_name": "Submitted on", "operator": ">=", "value": [from_dt.strftime("%Y-%m-%dT%H:%M:%S")]},
+            {"field_name": "Submitted on", "operator": "<=", "value": [_cairo_now.strftime("%Y-%m-%dT%H:%M:%S")]},
+        ]
+        dt_payload = {
+            "page_size": 500,  # SPEED FIX: see base_payload comment above
+            "sort": [{"field_name": "Numbering", "desc": True}],
+            "filter": {"conjunction": "and", "conditions": dt_conditions},
+        }
+        all_items, fetch_complete, stop_reason = _run_search(dt_payload, _deadline)
+
+    # Fallback #2: date filtering unavailable on both fields -- paginate the raw table
+    # (still sorted newest-first, NOT capped to a single page) and let the local
+    # matching loop below pick out this user's own tickets by "Submitted By" OR
+    # "Respondents"/"Created By". Stops as soon as a page's oldest record falls
+    # outside the requested date window, since further pages (newest-first) will only
+    # be older still -- keeps this bounded and fast instead of always walking the
+    # whole table. THIS is the part that was previously silently capped at a single
+    # unfiltered page of 100 records, which is why some agents' own history looked
+    # incomplete -- it's now a real, bounded pagination loop.
+    if not fetch_complete and stop_reason != "time_budget_exceeded" and time.time() < _deadline:
+        try:
+            raw_items, page_token = [], None
+            threshold = from_dt.replace(tzinfo=None)
+            for _ in range(50):  # 50 * 500 = 25,000 record hard ceiling, same bound as _run_search
+                if time.time() >= _deadline:
+                    fetch_complete, stop_reason = False, "time_budget_exceeded"
+                    break
+                body = {"page_size": 500, "sort": [{"field_name": "Numbering", "desc": True}]}  # SPEED FIX: see base_payload comment above
+                if page_token:
+                    body["page_token"] = page_token
+                remaining = max(3, min(15, _deadline - time.time()))
+                resp = session.post(search_url, json=body, timeout=remaining)
+                data = resp.json()
+                if data.get("code") != 0:
+                    break
+                block = data.get("data", {})
+                page_items = block.get("items", [])
+                raw_items.extend(page_items)
+
+                oldest_in_page = None
+                for it in page_items:
+                    raw_d = get_field_local(it.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time")
+                    d = parse_feishu_date(raw_d)
+                    if d and (oldest_in_page is None or d < oldest_in_page):
+                        oldest_in_page = d
+                if oldest_in_page and oldest_in_page < threshold:
+                    break
+
+                page_token = block.get("page_token")
+                if not page_token or not block.get("has_more", False):
+                    break
+            all_items = raw_items
+            if stop_reason != "time_budget_exceeded":
+                fetch_complete, stop_reason = False, "Filter unavailable -- results gathered by paginating and matching locally, may include a few extra days at the boundary."
+        except Exception as e:
+            all_items, fetch_complete, stop_reason = [], False, str(e)
+
+    # BUG FIX (duplicate cards): the same record could legitimately come back more
+    # than once across the fallback stages above (e.g. a page re-requested after a
+    # retry, or overlap between stages), and nothing downstream ever deduplicated by
+    # record_id -- which is exactly the "one request repeated so many times" symptom.
+    # Dedup by record_id up front, before any per-user matching, regardless of which
+    # stage produced the data.
+    seen_ids, deduped_items = set(), []
+    for it in all_items:
+        rid = it.get("record_id")
+        if rid and rid in seen_ids:
+            continue
+        if rid:
+            seen_ids.add(rid)
+        deduped_items.append(it)
+    all_items = deduped_items
+
+    if fast_ok:
+        # Already filtered server-side by the real submitter -- no need to re-match
+        # locally by name (and shouldn't, since local text-matching by display name is
+        # the less precise path we're trying to move away from).
+        matched_items = all_items
+    else:
+        matched_items = []
+        for it in all_items:
+            f = it.get("fields", {})
+            rp = extract_field_text(get_field_local(f, "Respondents", "Created By")).lower()
+            sb = extract_field_text(get_field_local(f, SUBMITTED_BY_FIELD_NAME)).lower()
+            if user_clean in rp or user_clean in sb:
+                matched_items.append(it)
+    all_items = matched_items
+
 
     results = []
-    user_clean = user.strip().lower()
     
     for item in all_items:
         fields = item.get("fields", {})
         
-        # LIGHTNING-FAST LOCAL FILTER: Since the date payload is already small, this is instantaneous.
-        # This safely matches the Respondent (Person field) text without Feishu validation crashing.
-        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By")).lower()
-        submitted_by = extract_field_text(get_field_local(fields, SUBMITTED_BY_FIELD_NAME)).lower()
-        
-        if user_clean not in respondents and user_clean not in submitted_by:
-            continue
-            
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         dt = parse_feishu_date(raw_date)
+        
+        # BUG FIX (TypeError: can't compare offset-naive and offset-aware datetimes):
+        # cairo_now() (and therefore from_dt) carries tzinfo=utc, but parse_feishu_date()
+        # always returns a naive datetime (it strips tzinfo after shifting to Cairo
+        # time). Comparing the two directly crashed this endpoint with a 500 as soon as
+        # the /records/search fix above started actually returning matched items.
+        # Strip tzinfo from from_dt for this comparison only -- both sides already
+        # represent Cairo local time, so no shift is needed, just matching "naive-ness".
+        #
+        # On the fast path (fast_ok) we already asked Feishu for every record this
+        # person ever submitted, with no date condition -- that's the "show all, no
+        # limit" behavior that was requested. Only apply the lookback cutoff on the
+        # slower fallback stages, where it's still needed to keep those bounded.
+        if not fast_ok and (not dt or dt < from_dt.replace(tzinfo=None)):
+            continue
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
@@ -2577,12 +2777,15 @@ def my_requests():
             elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
         acm = (acm_in if region == "in" else acm_pk) or acm_fb
         
+        submitted_by = extract_field_text(get_field_local(fields, SUBMITTED_BY_FIELD_NAME))
+        respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
+        
         results.append({
             "record_id": item.get("record_id"),
             "numbering": extract_field_text(get_field_local(fields, "Numbering")),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
             "submitted_on": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
-            "respondents": extract_field_text(get_field_local(fields, "Respondents", "Created By")),
+            "respondents": submitted_by or respondents,
             "user_id": extract_field_text(get_field_local(fields, "User ID")),
             "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
             "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
@@ -2607,14 +2810,67 @@ def my_requests():
         "count": len(results),
         "fetch_complete": fetch_complete,
         "stop_reason": ("" if fetch_complete else stop_reason),
-        "served_from_background_cache": False, 
+        "served_from_background_cache": False,  # always a live Feishu fetch now
         "lookback_days": lookback_days,
-        "fast_path_used": True
+        "fast_path_used": fast_ok,  # true once SUBMITTED_BY_FIELD_NAME exists in Feishu
     })
 
 @app.route('/api/live-queue', methods=['GET'])
-
-@app.route('/api/live-queue', methods=['GET'])
+def live_queue():
+    user = sanitize_text(request.args.get('user',''))
+    
+    if not user or MOCK_MODE:
+        return jsonify({"success": True, "tickets": []})
+        
+    tat = get_tenant_access_token()
+    search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    
+    payload = {
+        "page_size": 50,
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {
+                    "field_name": "Request Status", 
+                    "operator": "contains",
+                    "value": ["In Progress"] 
+                }
+            ]
+        },
+        "sort": [{"field_name": "Numbering", "desc": True}]
+    }
+    
+    try:
+        resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
+        data = resp.json()
+        
+        if data.get("code") == 1254045:
+            payload["filter"]["conditions"][0]["field_name"] = "Status"
+            resp = http_requests.post(search_url, headers=headers, json=payload, timeout=5)
+            data = resp.json()
+            
+        if data.get("code") == 0:
+            items = data.get("data", {}).get("items", [])
+            tickets = []
+            user_clean = user.strip().lower()
+            for item in items:
+                fields = item.get("fields", {})
+                assigned_member = extract_field_text(get_field_local(fields, "Assigned Member")).lower()
+                if user_clean in assigned_member:
+                    tickets.append({
+                        "record_id": item.get("record_id"),
+                        "numbering": extract_field_text(get_field_local(fields, "Numbering")),
+                        "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
+                        "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
+                        "user_id": extract_field_text(get_field_local(fields, "User ID")),
+                        "assigned_member": extract_field_text(get_field_local(fields, "Assigned Member")),
+                    })
+            return jsonify({"success": True, "tickets": tickets})
+            
+        return jsonify({"success": False, "error": data.get("msg")})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 @app.route('/api/agency-list', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
