@@ -2596,11 +2596,14 @@ def my_requests():
         # If we have the caller's Feishu open_id (passed from /api/callback via
         # localStorage), prefer a native filter on "Respondents" using it directly --
         # this is the same Person-type field Feishu auto-stamps on every record, and
-        # matching on open_id (rather than the display-name text match below) sidesteps
+        # matching on it (rather than the display-name text match below) sidesteps
         # the identity-attribution bug where records created by agents without native
         # Bitable permission get stamped with the app's identity in other text fields.
+        # Value key is "id" (not "open_id") -- same shape Feishu expects when WRITING
+        # Person fields elsewhere in this file (see Done by / Mentioned Person), and
+        # using "open_id" here is what threw code 9499 "Invalid parameter value".
         identity_condition = (
-            {"field_name": "Respondents", "operator": "is", "value": [{"open_id": open_id}]}
+            {"field_name": "Respondents", "operator": "is", "value": [{"id": open_id}]}
             if open_id else
             {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
         )
