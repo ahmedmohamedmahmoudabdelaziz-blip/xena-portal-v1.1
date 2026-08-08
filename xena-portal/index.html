@@ -1556,6 +1556,7 @@
                         <div class="control-group" style="margin:0; min-width:160px;">
                             <label style="font-size:.8rem;">Lookback window</label>
                             <select id="myReqDaysSelect" class="form-highlight-input">
+                                <option value="today">Today</option>
                                 <option value="15" selected>Last 15 days</option>
                                 <option value="30">Last 30 days</option>
                                 <option value="60">Last 60 days</option>
@@ -1614,9 +1615,6 @@
                                 <span id="ltConnLabel">Connecting…</span>
                             </span>
                         </div>
-                    </div>
-                    <div id="ltDisabledNote" style="display:none;font-size:.78rem;color:var(--accent-amber);background:rgba(255,171,0,.08);border:1px solid rgba(255,171,0,.25);border-radius:8px;padding:8px 12px;margin-top:14px">
-                        No live Pusher connection configured yet — set <code>LT_PUSHER_KEY</code> / <code>LT_PUSHER_CLUSTER</code> in the script to go live.
                     </div>
                 </div>
 
