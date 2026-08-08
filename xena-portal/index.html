@@ -165,186 +165,65 @@
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
 
-        /* Samurai intro sequence (plays every time the app shell is about to show --
-           after a fresh login AND after every page refresh while already logged in,
-           see playSamuraiIntro()). This is a genuine articulated rig, not a single
-           rotating sword icon: #samBody (whole figure -- weight shift/lunge/step),
-           #samArm (shoulder swing), and #samKatana (wrist snap + blade extension)
-           are three nested transform layers that compose together, so the strike
-           and the final thrust both read as full-body movement. Timeline (~4.2s):
-           0.00-0.30s overlay fades in, subtle camera settle (scale 1.06 -> 1)
-           0.30-0.88s figure fades/scales in, held in a loaded guard stance
-           1.20-1.90s wind-up + strike 1 -- body torques, shoulder swings, wrist
-                      snaps, motion-blur pulses on the blade, slash trail + 2 letters land
-           1.90-2.50s wind-up + strike 2 -- same layered motion, criss-crossing the
-                      first slash, remaining letters land
-           2.50-3.00s assembled word holds with a soft glow pulse
-           3.00-3.30s body coils back, then LUNGES forward as the arm extends and the
-                      katana scales into a thrust -- a full-screen flash + vertical
-                      beam punch out at the instant of impact, reading as the blade
-                      being driven into the middle of the screen
-           3.30-3.70s figure + word vanish together (fade + expand)
-           3.70-4.20s whole overlay fades out (JS then hides it and reveals the app) */
-        #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;background:radial-gradient(ellipse at 50% 40%, #0f1522 0%, #05060a 70%);justify-content:center;align-items:center;flex-direction:column;animation:samOverlayFade 4.2s ease forwards}
-        #samuraiIntro.playing{display:flex}
-        @keyframes samOverlayFade{
-            0%{opacity:0}
-            7%{opacity:1}
-            93%{opacity:1}
-            100%{opacity:0}
+        /* Samurai Intro Animation */
+        #samuraiIntro { display:none; position:fixed; inset:0; z-index:600; background:radial-gradient(ellipse at 50% 50%, #0a0d14 0%, #030407 100%); justify-content:center; align-items:center; flex-direction:column; animation:samOverlayFade 4s ease forwards; perspective: 1000px; }
+        #samuraiIntro.playing { display:flex; }
+        @keyframes samOverlayFade { 0%{opacity:1} 85%{opacity:1} 100%{opacity:0; visibility:hidden;} }
+        
+        #samStage { display:flex; flex-direction:column; align-items:center; transform-style: preserve-3d; animation: samStageAction 4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        
+        @keyframes samStageAction {
+            0% { transform: translateZ(-200px); opacity: 0; }
+            10% { transform: translateZ(0); opacity: 1; }
+            70% { transform: translateZ(50px); opacity: 1; }
+            80% { transform: translateZ(600px); opacity: 1; filter: blur(2px); } /* Last move: push sword into middle of screen */
+            90% { transform: translateZ(800px); opacity: 0; filter: blur(10px); } /* Vanish */
+            100% { transform: translateZ(800px); opacity: 0; }
         }
-        #samStage{display:flex;flex-direction:column;align-items:center;animation:samStageZoom 4.2s cubic-bezier(.22,1,.36,1) forwards}
-        @keyframes samStageZoom{
-            0%{transform:scale(1.06)}
-            21%{transform:scale(1.06)}
-            55%{transform:scale(1)}
-            100%{transform:scale(1)}
+
+        #samuraiFigure { width: 240px; height: auto; transform-origin: center bottom; }
+        
+        #samArm { transform-origin: 136px 148px; animation: samArmSwing 4s ease forwards; }
+        @keyframes samArmSwing {
+            0% { transform: rotate(-30deg); }
+            15% { transform: rotate(40deg); } /* First strike */
+            30% { transform: rotate(-20deg); } /* Second strike */
+            45% { transform: rotate(10deg); }
+            70% { transform: rotate(10deg); } /* Hold */
+            80% { transform: rotate(-10deg); } /* Thrust forward */
+            100% { transform: rotate(-10deg); }
         }
-        #samuraiFigure{width:min(46vw,260px);height:auto;overflow:visible;opacity:0;animation:samFigureLife 4.2s ease forwards}
-        @keyframes samFigureLife{
-            0%{opacity:0}
-            7%{opacity:0}
-            21%{opacity:1}
-            64%{opacity:1}
-            79%{opacity:1}
-            88%{opacity:0}
-            100%{opacity:0}
+
+        #samKatana { transform-origin: 128px 172px; animation: samKatanaSwing 4s ease forwards; }
+        @keyframes samKatanaSwing {
+            0% { transform: rotate(-40deg); }
+            15% { transform: rotate(50deg); } 
+            30% { transform: rotate(-30deg); } 
+            45% { transform: rotate(15deg); }
+            70% { transform: rotate(15deg); } 
+            80% { transform: rotate(-5deg) scale(1.5); } /* Push sword forward */
+            100% { transform: rotate(-5deg) scale(1.5); }
         }
-        /* whole-figure weight shift: settles in, torques into each strike, coils
-           back then lunges forward on the thrust -- this is the "body actually
-           moves" layer, independent of the arm/blade rotating on top of it */
-        #samBody{transform-origin:112px 300px;animation:samBodyLunge 4.2s cubic-bezier(.22,1,.36,1) forwards}
-        @keyframes samBodyLunge{
-            0%{transform:scale(.92) translateY(8px) translateX(0) rotate(0deg)}
-            7%{transform:scale(.92) translateY(8px) translateX(0) rotate(0deg)}
-            21%{transform:scale(1) translateY(0) translateX(0) rotate(0deg)}
-            29%{transform:scale(1) translateY(0) translateX(-2px) rotate(-1deg)}
-            31%{transform:scale(1) translateY(0) translateX(-4px) rotate(-2deg)}
-            36%{transform:scale(1) translateY(0) translateX(3px) rotate(2deg)}
-            40%{transform:scale(1) translateY(0) translateX(-2px) rotate(-1deg)}
-            45%{transform:scale(1) translateY(0) translateX(4px) rotate(3deg)}
-            50%{transform:scale(1) translateY(0) translateX(-1px) rotate(-1deg)}
-            55%{transform:scale(1) translateY(0) translateX(0) rotate(0deg)}
-            64%{transform:scale(1) translateY(0) translateX(0) rotate(0deg)}
-            71%{transform:scale(1) translateY(0) translateX(-7px) rotate(-3deg)}
-            79%{transform:scale(1.04) translateY(-3px) translateX(15px) rotate(2deg)}
-            83%{transform:scale(1.04) translateY(-3px) translateX(17px) rotate(2deg)}
-            88%{transform:scale(1.12) translateY(-8px) translateX(17px) rotate(2deg)}
-            100%{transform:scale(1.12) translateY(-8px) translateX(17px) rotate(2deg)}
+
+        #samThrustFlash { position:fixed; inset:0; z-index:601; pointer-events:none; opacity:0; background:radial-gradient(circle at 50% 50%, rgba(255,255,255,1) 0%, rgba(0,212,255,0.8) 30%, transparent 70%); animation:samThrustFlashAnim 4s ease forwards; }
+        @keyframes samThrustFlashAnim { 0%, 75% {opacity:0; transform:scale(0.1)} 80% {opacity:1; transform:scale(1.2)} 90%, 100% {opacity:0; transform:scale(2)} }
+
+        #samuraiWordmark { margin-top: 30px; font-size: 3rem; font-weight: 800; letter-spacing: 0.3em; color: var(--accent-cyan); display:flex; gap:8px; text-shadow: 0 0 20px rgba(0,212,255,0.6); animation: samWordAction 4s ease forwards; }
+        
+        @keyframes samWordAction {
+            0%, 70% { opacity: 1; transform: scale(1); filter: blur(0); }
+            80% { opacity: 0.8; transform: scale(1.5); filter: blur(4px); } /* Dissolve when sword pushes */
+            90%, 100% { opacity: 0; transform: scale(2); filter: blur(10px); }
         }
-        /* shoulder joint: swings the whole arm+blade assembly */
-        #samArm{transform-origin:136px 148px;animation:samArmSwing 4.2s cubic-bezier(.22,1,.36,1) forwards}
-        @keyframes samArmSwing{
-            0%{transform:rotate(-18deg) translateY(0)}
-            21%{transform:rotate(-18deg) translateY(0)}
-            29%{transform:rotate(-18deg) translateY(0)}
-            31%{transform:rotate(-30deg) translateY(0)}
-            36%{transform:rotate(14deg) translateY(0)}
-            40%{transform:rotate(-6deg) translateY(0)}
-            45%{transform:rotate(18deg) translateY(0)}
-            50%{transform:rotate(-2deg) translateY(0)}
-            55%{transform:rotate(4deg) translateY(0)}
-            64%{transform:rotate(3deg) translateY(0)}
-            71%{transform:rotate(-16deg) translateY(0)}
-            79%{transform:rotate(6deg) translateY(-6px)}
-            83%{transform:rotate(6deg) translateY(-8px)}
-            100%{transform:rotate(6deg) translateY(-8px)}
+
+        .sam-letter { display: inline-block; opacity: 0; animation: samLetterFly 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes samLetterFly {
+            0% { opacity: 0; transform: translateY(-40px) scale(1.5); filter: blur(8px); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
-        /* wrist: the fastest-moving layer -- adds the final snap on top of the
-           shoulder swing, plus the blade-extension scale on the thrust; motion-blur
-           pulses right on the strike/thrust frames for a bit of cinematic weight */
-        #samKatana{transform-origin:128px 172px;animation:samKatanaSwing 4.2s cubic-bezier(.3,.05,.15,1) forwards}
-        @keyframes samKatanaSwing{
-            0%{transform:rotate(-24deg) scale(1);filter:blur(0px)}
-            29%{transform:rotate(-24deg) scale(1)}
-            30%{filter:blur(0px)}
-            31%{transform:rotate(-28deg) scale(1)}
-            32%{filter:blur(2px)}
-            34%{filter:blur(.5px)}
-            35%{filter:blur(0px)}
-            36%{transform:rotate(8deg) scale(1)}
-            40%{transform:rotate(-2deg) scale(1);filter:blur(0px)}
-            43%{filter:blur(2px)}
-            44.5%{filter:blur(.5px)}
-            45%{transform:rotate(10deg) scale(1)}
-            46%{filter:blur(0px)}
-            50%{transform:rotate(-2deg) scale(1)}
-            55%{transform:rotate(4deg) scale(1)}
-            64%{transform:rotate(3deg) scale(1)}
-            71%{transform:rotate(-6deg) scale(1.05)}
-            78%{filter:blur(0px)}
-            79%{transform:rotate(-2deg) scale(1.3);filter:blur(3px)}
-            81%{filter:blur(.5px)}
-            83%{transform:rotate(-2deg) scale(1.35);filter:blur(0px)}
-            100%{transform:rotate(-2deg) scale(1.35);filter:blur(0px)}
-        }
-        #samSlashTrail1{opacity:0;animation:samSlash1Flash 4.2s ease forwards}
-        @keyframes samSlash1Flash{
-            0%{opacity:0}
-            35%{opacity:0}
-            36%{opacity:1}
-            39%{opacity:0}
-            100%{opacity:0}
-        }
-        #samSlashTrail2{opacity:0;animation:samSlash2Flash 4.2s ease forwards}
-        @keyframes samSlash2Flash{
-            0%{opacity:0}
-            44%{opacity:0}
-            45%{opacity:1}
-            48%{opacity:0}
-            100%{opacity:0}
-        }
-        /* vertical light beam that punches up from the blade tip at the instant of
-           the thrust, reinforcing the "pushed toward the viewer/center" reading */
-        #samThrustBeam{opacity:0;transform-origin:130px 130px;animation:samThrustBeamAnim 4.2s ease forwards}
-        @keyframes samThrustBeamAnim{
-            0%{opacity:0;transform:scaleY(.3) scaleX(.4)}
-            78%{opacity:0;transform:scaleY(.3) scaleX(.4)}
-            79%{opacity:1;transform:scaleY(1) scaleX(1.4)}
-            85%{opacity:0;transform:scaleY(1.3) scaleX(.6)}
-            100%{opacity:0;transform:scaleY(1.3) scaleX(.6)}
-        }
-        .samEmber{fill:#7fe8ff;opacity:0;animation:samEmberDrift 900ms ease-out forwards}
-        @keyframes samEmberDrift{
-            0%{opacity:0;transform:translate(0,0) scale(.6)}
-            18%{opacity:.85}
-            100%{opacity:0;transform:translate(7px,-36px) scale(1.3)}
-        }
-        /* full-screen radial flash that punches out at the instant of the katana's
-           final thrust -- reads as the blade being pushed into the middle of the
-           screen rather than just a figure-local animation */
-        #samThrustFlash{position:fixed;inset:0;z-index:601;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 46%, rgba(255,255,255,.92) 0%, rgba(0,212,255,.4) 28%, rgba(0,212,255,0) 62%);animation:samThrustFlashAnim 4.2s ease forwards}
-        @keyframes samThrustFlashAnim{
-            0%{opacity:0;transform:scale(.25)}
-            77%{opacity:0;transform:scale(.25)}
-            79%{opacity:1;transform:scale(1)}
-            84%{opacity:0;transform:scale(1.5)}
-            100%{opacity:0;transform:scale(1.5)}
-        }
-        #samuraiWordmark{margin-top:28px;font-size:clamp(1.8rem,5vw,3rem);font-weight:800;letter-spacing:.5em;color:var(--accent-cyan);opacity:1;animation:samWordGlow 4.2s ease forwards}
-        @keyframes samWordGlow{
-            0%{text-shadow:0 0 0 rgba(0,212,255,0);transform:scale(1)}
-            54%{text-shadow:0 0 0 rgba(0,212,255,0);transform:scale(1)}
-            62%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25);transform:scale(1)}
-            71%{text-shadow:0 0 28px rgba(0,212,255,.85),0 0 60px rgba(0,212,255,.45);transform:scale(1)}
-            78%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25);transform:scale(1)}
-            79%{transform:scale(1.05)}
-            88%{opacity:0;transform:scale(1.24)}
-            100%{opacity:0;transform:scale(1.24)}
-        }
-        /* each letter starts scattered off-screen (offset/rotation set per-letter via
-           --tx/--ty/--rot inline custom props) and flies into place with a soft
-           spring overshoot -- animation-delay (set per-letter inline) staggers the
-           arrivals across the two strikes so the word visibly assembles in sync
-           with the swings rather than fading in all at once */
-        #samuraiWordmark .sam-letter{display:inline-block;opacity:0;animation:samLetterFly 600ms cubic-bezier(.34,1.56,.64,1) both}
-        @keyframes samLetterFly{
-            0%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(.4)}
-            70%{opacity:1;transform:translate(calc(var(--tx)*0.04),calc(var(--ty)*0.04)) rotate(calc(var(--rot)*0.08)) scale(1.04)}
-            100%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}
-        }
+
         @media (prefers-reduced-motion: reduce){
-            #samuraiIntro,#samStage,#samuraiFigure,#samBody,#samArm,#samKatana,#samSlashTrail1,#samSlashTrail2,#samThrustBeam,.samEmber,#samThrustFlash,#samuraiWordmark,#samuraiWordmark .sam-letter{animation-duration:.01ms!important;animation-delay:0s!important}
+            #samuraiIntro, #samStage, #samArm, #samKatana, #samThrustFlash, #samuraiWordmark, .sam-letter { animation: none !important; display: none !important; }
         }
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -712,52 +591,42 @@
     </div>
 </div>
 
-<!-- Samurai intro sequence: plays before the app shell is revealed EVERY time --
-     a fresh login and every subsequent page refresh while already logged in (see
-     playSamuraiIntro() at the bottom of the script). Pure CSS/SVG animation
-     (original silhouette, not a reproduction of any existing artwork): the katana
-     winds up and swings while the 7 letters of "SAMURAI" fly in from scattered
-     directions and assemble, then the katana thrusts forward -- punching out a
-     full-screen flash, as if the blade is pushed into the middle of the screen --
-     and finally the whole word + figure vanish before the overlay dissolves into
-     the app shell. -->
 <div id="samuraiIntro">
-    <svg id="samuraiFigure" viewBox="0 0 220 320" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <radialGradient id="samMoonGlow" cx="50%" cy="38%" r="55%">
-                <stop offset="0%" stop-color="#ff6a3d" stop-opacity="0.55"/>
-                <stop offset="55%" stop-color="#ff6a3d" stop-opacity="0.18"/>
-                <stop offset="100%" stop-color="#ff6a3d" stop-opacity="0"/>
-            </radialGradient>
-            <linearGradient id="samSlashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#00d4ff" stop-opacity="0"/>
-                <stop offset="50%" stop-color="#e8fbff" stop-opacity="0.95"/>
-                <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
-            </linearGradient>
-        </defs>
-        <circle cx="110" cy="115" r="95" fill="url(#samMoonGlow)"/>
-        <!-- silhouette: kabuto helmet, torso/armor, legs -->
-        <g id="samSilhouette" fill="#050608">
-            <path d="M110 118 C88 118 74 132 72 152 L70 180 C70 186 74 190 80 190 L140 190 C146 190 150 186 150 180 L148 152 C146 132 132 118 110 118 Z"/>
-            <path d="M78 150 C78 128 92 108 110 108 C128 108 142 128 142 150 L146 156 C148 148 149 138 148 130 C144 104 130 90 110 90 C90 90 76 104 72 130 C71 138 72 148 74 156 Z"/>
-            <path d="M96 92 C98 78 104 66 110 60 C116 66 122 78 124 92 C118 88 102 88 96 92 Z"/>
-            <rect x="66" y="188" width="88" height="14" rx="4"/>
-            <path d="M74 202 L146 202 L150 260 C150 270 142 278 132 278 L88 278 C78 278 70 270 70 260 Z"/>
-            <path d="M84 278 L96 278 L92 316 L80 316 Z"/>
-            <path d="M124 278 L136 278 L140 316 L128 316 Z"/>
-        </g>
-        <!-- katana: rotates from a raised guard position, through two swings, then
-             into a scaled/translated forward thrust (see #samKatana keyframes) -->
-        <g id="samKatana" transform-origin="128px 172px">
-            <rect x="126" y="60" width="5" height="118" rx="2.5" fill="#dfe7ea"/>
-            <rect x="120" y="168" width="17" height="10" rx="2" fill="#1a1c22"/>
-        </g>
-        <!-- transient slash trail, flashes on each swing -->
-        <path id="samSlashTrail" d="M46 96 A128 128 0 0 1 176 218" fill="none" stroke="url(#samSlashGrad)" stroke-width="5" stroke-linecap="round"/>
-    </svg>
-    <div id="samuraiWordmark"><span class="sam-letter" style="--tx:-170px;--ty:-70px;--rot:-70deg;animation-delay:1.30s">S</span><span class="sam-letter" style="--tx:-40px;--ty:-150px;--rot:50deg;animation-delay:1.42s">A</span><span class="sam-letter" style="--tx:90px;--ty:-160px;--rot:-60deg;animation-delay:1.54s">M</span><span class="sam-letter" style="--tx:190px;--ty:-40px;--rot:65deg;animation-delay:1.66s">U</span><span class="sam-letter" style="--tx:170px;--ty:90px;--rot:-55deg;animation-delay:1.78s">R</span><span class="sam-letter" style="--tx:-90px;--ty:130px;--rot:60deg;animation-delay:1.90s">A</span><span class="sam-letter" style="--tx:-190px;--ty:60px;--rot:-50deg;animation-delay:2.02s">I</span></div>
+    <div id="samStage">
+        <svg id="samuraiFigure" viewBox="0 0 220 320" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="samMoonGlow" cx="50%" cy="38%" r="55%">
+                    <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.3"/>
+                    <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+                </radialGradient>
+            </defs>
+            <circle cx="110" cy="115" r="100" fill="url(#samMoonGlow)"/>
+            <g id="samSilhouette" fill="#050608" stroke="#00d4ff" stroke-width="1.5">
+                <path d="M110 118 C88 118 74 132 72 152 L70 180 C70 186 74 190 80 190 L140 190 C146 190 150 186 150 180 L148 152 C146 132 132 118 110 118 Z"/>
+                <path d="M78 150 C78 128 92 108 110 108 C128 108 142 128 142 150 L146 156 C148 148 149 138 148 130 C144 104 130 90 110 90 C90 90 76 104 72 130 C71 138 72 148 74 156 Z"/>
+                <path d="M96 92 C98 78 104 66 110 60 C116 66 122 78 124 92 C118 88 102 88 96 92 Z"/>
+                <rect x="66" y="188" width="88" height="14" rx="4"/>
+                <path d="M74 202 L146 202 L150 260 C150 270 142 278 132 278 L88 278 C78 278 70 270 70 260 Z"/>
+            </g>
+            <g id="samArm">
+                <g id="samKatana">
+                    <rect x="126" y="60" width="4" height="118" rx="2" fill="#fff" filter="drop-shadow(0 0 4px #00d4ff)"/>
+                    <rect x="120" y="168" width="16" height="8" rx="2" fill="#00d4ff"/>
+                </g>
+            </g>
+        </svg>
+        <div id="samuraiWordmark">
+            <span class="sam-letter" style="animation-delay:0.2s">S</span>
+            <span class="sam-letter" style="animation-delay:0.4s">A</span>
+            <span class="sam-letter" style="animation-delay:0.6s">M</span>
+            <span class="sam-letter" style="animation-delay:0.8s">U</span>
+            <span class="sam-letter" style="animation-delay:1.0s">R</span>
+            <span class="sam-letter" style="animation-delay:1.2s">A</span>
+            <span class="sam-letter" style="animation-delay:1.4s">I</span>
+        </div>
+    </div>
+    <div id="samThrustFlash"></div>
 </div>
-<div id="samThrustFlash"></div>
 
 <div class="app-shell" id="mainApp">
     <aside class="sidebar" id="sidebar">
@@ -2553,15 +2422,7 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
-// Samurai intro sequence -- see #samuraiIntro markup/CSS for the actual animation
-// (katana winds up and swings while "SAMURAI" assembles letter by letter, then a
-// forward thrust flashes the screen, then everything vanishes into the app).
-// Plays every single time this runs -- a fresh login AND every subsequent page
-// refresh while already logged in -- since this call only happens right before the
-// app-shell is revealed. All of the existing permissions/data bootstrap logic right
-// after this call is untouched and keeps running in parallel underneath -- this
-// only delays when the app-shell becomes VISIBLE, not when its data starts loading.
-const SAMURAI_INTRO_MS = 4200;
+const SAMURAI_INTRO_MS = 4000;
 function playSamuraiIntro() {
     const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
