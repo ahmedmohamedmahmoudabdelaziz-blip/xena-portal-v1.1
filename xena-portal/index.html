@@ -2404,31 +2404,6 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
-// Samurai cinematic intro -- see #samuraiIntro markup/CSS for the scene itself.
-// A sequence of CSS "stage" classes (idle -> ready -> slash1 -> slash2 -> settle ->
-// letters -> hold -> attack -> impact -> out) is applied to #samuraiIntro at precise
-// offsets below, rather than one long CSS animation, specifically so the canvas
-// particle shatter can be fired at the exact moment the final strike visually lands
-// (samShatterTitle(), called from the 'impact' stage). Runs on EVERY full page
-// load/refresh while authenticated, and once right after a fresh login -- never on
-// internal SPA tab navigation, since this code only executes from the one-time
-// bootstrap block at the bottom of the script, not from executePageLogic().
-const SAM_TIMELINE = [
-    { cls: 'st-in',      at: 0 },
-    { cls: 'st-idle',    at: 150 },
-    { cls: 'st-ready',   at: 900 },
-    { cls: 'st-slash1',  at: 2100 },
-    { cls: 'st-slash2',  at: 2650 },
-    { cls: 'st-settle',  at: 3200 },
-    { cls: 'st-push',    at: 3200 },
-    { cls: 'st-letters', at: 4400 },
-    { cls: 'st-hold',    at: 5750 },
-    { cls: 'st-attack',  at: 6550 },
-    { cls: 'st-impact',  at: 6950, shatter: true },
-    { cls: 'st-out',     at: 7550 },
-];
-const SAM_REVEAL_AT_MS = 8150;
-
 function playSamuraiIntro() {
     const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
