@@ -109,6 +109,26 @@ CAIRO_OFFSET = timedelta(hours=3)
 def cairo_now():
     return datetime.now(timezone.utc) + CAIRO_OFFSET
 
+def cairo_epoch_ms(cairo_dt):
+    """
+    BUG FIX ("Today" filter in /api/my-requests returning empty/wrong results):
+    cairo_now() (and anything derived from it, like from_dt) is tagged tzinfo=utc but
+    its actual VALUE has already been shifted +3h to represent Cairo local time --
+    it's "UTC" in label only. Calling .timestamp() directly on a value like that makes
+    Python treat the shifted value AS IF it were actually UTC, silently adding a
+    spurious 3h to the resulting epoch. For wide windows (15/30/90 days) that 3h error is lost in
+    the noise; for a single day like "Today" it's large enough relative to the window
+    to skew or empty out results entirely. Subtracting CAIRO_OFFSET first undoes the
+    mislabeling and recovers the true UTC instant before converting to epoch millis.
+    """
+    return int((cairo_dt - CAIRO_OFFSET).timestamp() * 1000)
+
+def _safe_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
 # SPEED FIX (Live Ticket Queue feels slow to open a ticket / run duplicate check):
@@ -2505,19 +2525,18 @@ def my_requests():
     if not perms.get("is_super_admin") and not any("submit_my_requests" in m or "submit" in m for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
     
-    days_param = sanitize_text(request.args.get('days', '15'))
+    # Preset values are now the number of FULL PRIOR days beyond today, not a total
+    # window size -- "Today" is 0, "Last 3 days" is 3 (meaning today + the 3 calendar
+    # days before it = 4 days shown total: e.g. if today is Saturday, that's Sat, Fri,
+    # Thu, Wed). Every preset always includes today. Accepts the old 'today' string
+    # too, as an alias for 0, for any stale cached frontend still sending it.
+    days_param = sanitize_text(request.args.get('days', '0'))
+    prior_days = 0 if days_param == 'today' else max(0, min(_safe_int(days_param, 0), 90))
+
     _cairo_now = cairo_now()
-    if days_param == 'today':
-        # "Today" means the calendar day in Cairo local time, not a rolling 24h
-        # window -- start of window is today's midnight, not "24 hours ago".
-        from_dt = _cairo_now.replace(hour=0, minute=0, second=0, microsecond=0)
-        lookback_days = 0  # for the response payload only; from_dt above is authoritative
-    else:
-        try:
-            lookback_days = max(1, min(int(days_param), 90))
-        except ValueError:
-            lookback_days = 15
-        from_dt = _cairo_now - timedelta(days=lookback_days)
+    _cairo_midnight_today = _cairo_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    from_dt = _cairo_midnight_today - timedelta(days=prior_days)
+    lookback_days = prior_days  # kept in the response payload for the frontend label
 
     # FIX: this is now a fully live, on-demand fetch -- no Redis/background snapshot
     # involved at all, and the frontend only calls this endpoint when the person clicks
@@ -2602,8 +2621,12 @@ def my_requests():
     # isGreater/isLess are exclusive bounds, so records sitting exactly on the window
     # edge would otherwise be silently dropped -- pad by 1s on each side rather than
     # relying on unverified isGreaterEqual/isLessEqual operator names.
-    from_ms = str(int(from_dt.timestamp() * 1000) - 1000)
-    to_ms = str(int(_cairo_now.timestamp() * 1000) + 1000)
+    # BUG FIX: previously called .timestamp() directly on from_dt/_cairo_now, which
+    # (per cairo_epoch_ms's docstring above) silently added a spurious 3h to both
+    # bounds -- invisible for wide windows, but large enough to skew/empty out the
+    # "Today" preset. cairo_epoch_ms() undoes that mislabeling first.
+    from_ms = str(cairo_epoch_ms(from_dt) - 1000)
+    to_ms = str(cairo_epoch_ms(_cairo_now) + 1000)
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
