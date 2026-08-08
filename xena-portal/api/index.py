@@ -2577,12 +2577,12 @@ def my_requests():
     # a complete result instead of silently capping at the first page.
     #
     # Date bound uses "Submitted on" (the DateTime twin of "Submitted on Copy") with
-    # whole-millisecond Unix epoch timestamps as plain strings. Per Lark's own
-    # records/search docs, `value` is always `string[]` for every field type on this
-    # endpoint -- there is no `{"type": "ExactDate", ...}` wrapper object here (that
-    # shape belongs to a different API). Wrapping it is what threw code 9499
-    # "Invalid parameter value" the last time. Operator is isGreater/isLess (per the
-    # same docs' operator table) rather than ">="/"<=", which aren't valid values.
+    # whole-millisecond Unix epoch timestamps. Per Lark's Record Filter Guide, Date
+    # field values are a TWO-element array -- ["ExactDate", "<ms>"] -- not a bare
+    # single-element timestamp array; that mismatch is what threw code 1254018
+    # "InvalidFilter". The guide also confirms date filtering only supports the
+    # operators is/isEmpty/isNotEmpty/isGreater/isLess (isGreaterEqual/isLessEqual
+    # are NOT valid for date fields), so isGreater/isLess is correct here.
     # isGreater/isLess are exclusive bounds, so records sitting exactly on the window
     # edge would otherwise be silently dropped -- pad by 1s on each side rather than
     # relying on unverified isGreaterEqual/isLessEqual operator names.
@@ -2615,8 +2615,8 @@ def my_requests():
                "conjunction": "and",
                "conditions": [
                    identity_condition,
-                   {"field_name": "Submitted on", "operator": "isGreater", "value": [from_ms]},
-                   {"field_name": "Submitted on", "operator": "isLess", "value": [to_ms]},
+                   {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", from_ms]},
+                   {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", to_ms]},
                ]
             },
          }   
