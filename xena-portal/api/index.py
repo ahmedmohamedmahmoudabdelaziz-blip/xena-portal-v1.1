@@ -2599,11 +2599,13 @@ def my_requests():
         # matching on it (rather than the display-name text match below) sidesteps
         # the identity-attribution bug where records created by agents without native
         # Bitable permission get stamped with the app's identity in other text fields.
-        # Value key is "id" (not "open_id") -- same shape Feishu expects when WRITING
-        # Person fields elsewhere in this file (see Done by / Mentioned Person), and
-        # using "open_id" here is what threw code 9499 "Invalid parameter value".
+        # Value is a bare open_id string in an array -- both {"open_id": ...} and
+        # {"id": ...} wrapped forms were rejected by Feishu with code 9499 "Invalid
+        # parameter value" when actually tested against this base's Respondents
+        # field, so despite matching the write-format convention used elsewhere in
+        # this file, wrapping is wrong specifically for this filter's value shape.
         identity_condition = (
-            {"field_name": "Respondents", "operator": "is", "value": [{"id": open_id}]}
+            {"field_name": "Respondents", "operator": "is", "value": [open_id]}
             if open_id else
             {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
         )
@@ -2615,8 +2617,8 @@ def my_requests():
                "conjunction": "and",
                "conditions": [
                    identity_condition,
-                   {"field_name": "Submitted on Copy", "operator": ">=", "value": [from_ts]},
-                   {"field_name": "Submitted on Copy", "operator": "<=", "value": [to_ts]},
+                   {"field_name": "Submitted on", "operator": "isGreater", "value": [{"type": "ExactDate", "value": from_ms}]},
+                   {"field_name": "Submitted on", "operator": "isLess", "value": [{"type": "ExactDate", "value": to_ms}]},
                ]
             },
          }   
