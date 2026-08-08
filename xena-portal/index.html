@@ -165,62 +165,106 @@
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
 
-        /* Samurai intro sequence (login -> homepage transition). Timeline (~3.3s total):
+        /* Samurai intro sequence (plays every time the app shell is about to show --
+           after a fresh login AND after every page refresh while already logged in,
+           see playSamuraiIntro()). Timeline (~4.2s total):
            0.00-0.30s overlay fades in
-           0.20-0.85s silhouette fades/scales in, katana held raised
-           0.85-1.10s katana swings through its arc, slash trail flashes once
-           1.10-1.55s silhouette dissolves out
-           1.55-2.05s "SAMURAI" wordmark fades/tracks in
-           2.05-2.65s wordmark holds with a soft glow pulse
-           2.65-3.00s wordmark fades out
-           3.00-3.30s whole overlay fades out (JS then hides it and reveals the app) */
-        #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;background:radial-gradient(ellipse at 50% 40%, #0f1522 0%, #05060a 70%);justify-content:center;align-items:center;flex-direction:column;animation:samOverlayFade 3.3s ease forwards}
+           0.30-0.88s silhouette fades/scales in, katana held raised in guard
+           1.20-2.50s katana winds up and swings twice (slash trail flashes each time)
+                      while the 7 letters of "SAMURAI" fly in one after another from
+                      scattered directions/rotations and lock into place
+           2.50-3.00s assembled word holds with a soft glow pulse
+           3.00-3.30s katana winds back, then THRUSTS forward/up -- a full-screen
+                      radial flash punches out at the moment of impact, reading as the
+                      blade being pushed into the middle of the screen
+           3.30-3.70s figure + word vanish together (fade + expand)
+           3.70-4.20s whole overlay fades out (JS then hides it and reveals the app) */
+        #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;background:radial-gradient(ellipse at 50% 40%, #0f1522 0%, #05060a 70%);justify-content:center;align-items:center;flex-direction:column;animation:samOverlayFade 4.2s ease forwards}
         #samuraiIntro.playing{display:flex}
         @keyframes samOverlayFade{
             0%{opacity:0}
-            9%{opacity:1}
-            91%{opacity:1}
+            7%{opacity:1}
+            93%{opacity:1}
             100%{opacity:0}
         }
-        #samuraiFigure{width:min(46vw,260px);height:auto;overflow:visible;opacity:0;animation:samFigureLife 3.3s ease forwards}
+        #samuraiFigure{width:min(46vw,260px);height:auto;overflow:visible;opacity:0;animation:samFigureLife 4.2s ease forwards}
         @keyframes samFigureLife{
             0%{opacity:0;transform:scale(.9) translateY(10px)}
-            6%{opacity:0;transform:scale(.9) translateY(10px)}
-            26%{opacity:1;transform:scale(1) translateY(0)}
-            33%{transform:scale(1.015) translateY(0)}
-            38%{opacity:1;transform:scale(1) translateY(0)}
-            47%{opacity:0;transform:scale(1.04) translateY(-6px)}
-            100%{opacity:0;transform:scale(1.04) translateY(-6px)}
+            7%{opacity:0;transform:scale(.9) translateY(10px)}
+            21%{opacity:1;transform:scale(1) translateY(0)}
+            29%{transform:scale(1.015) translateY(0)}
+            64%{opacity:1;transform:scale(1) translateY(0)}
+            79%{opacity:1;transform:scale(1.08) translateY(-4px)}
+            88%{opacity:0;transform:scale(1.2) translateY(-10px)}
+            100%{opacity:0;transform:scale(1.2) translateY(-10px)}
         }
-        #samKatana{animation:samKatanaSwing 3.3s ease forwards}
+        /* katana: raised guard -> two wind-up/swing cycles (timed to the letters
+           landing) -> pulls back -> thrusts up/forward into an extended lunge
+           (scale+translate around the hilt origin reads as the blade being driven
+           toward the viewer/center of the screen) -> vanishes with the figure */
+        #samKatana{animation:samKatanaSwing 4.2s cubic-bezier(.3,.1,.2,1) forwards}
         @keyframes samKatanaSwing{
-            0%{transform:rotate(-42deg)}
-            26%{transform:rotate(-42deg)}
-            33%{transform:rotate(18deg)}
-            38%{transform:rotate(14deg)}
-            100%{transform:rotate(14deg)}
+            0%{transform:rotate(-42deg) scale(1) translateY(0)}
+            29%{transform:rotate(-42deg) scale(1) translateY(0)}
+            31%{transform:rotate(-58deg) scale(1) translateY(0)}
+            36%{transform:rotate(22deg) scale(1) translateY(0)}
+            40%{transform:rotate(-8deg) scale(1) translateY(0)}
+            45%{transform:rotate(28deg) scale(1) translateY(0)}
+            50%{transform:rotate(-4deg) scale(1) translateY(0)}
+            55%{transform:rotate(8deg) scale(1) translateY(0)}
+            64%{transform:rotate(6deg) scale(1) translateY(0)}
+            71%{transform:rotate(-22deg) scale(1.05) translateY(2px)}
+            79%{transform:rotate(4deg) scale(1.35) translateY(-14px)}
+            83%{transform:rotate(4deg) scale(1.4) translateY(-16px)}
+            88%{opacity:0;transform:rotate(4deg) scale(1.4) translateY(-16px)}
+            100%{opacity:0;transform:rotate(4deg) scale(1.4) translateY(-16px)}
         }
-        #samSlashTrail{opacity:0;animation:samSlashFlash 3.3s ease forwards}
+        #samSlashTrail{opacity:0;animation:samSlashFlash 4.2s ease forwards}
         @keyframes samSlashFlash{
             0%{opacity:0}
-            31%{opacity:0}
-            33%{opacity:1}
-            40%{opacity:0}
+            35%{opacity:0}
+            36%{opacity:1}
+            39%{opacity:0}
+            44%{opacity:0}
+            45%{opacity:1}
+            48%{opacity:0}
             100%{opacity:0}
         }
-        #samuraiWordmark{margin-top:28px;font-size:clamp(1.8rem,5vw,3rem);font-weight:800;letter-spacing:.4em;color:var(--accent-cyan);text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25);opacity:0;animation:samWordLife 3.3s ease forwards}
-        @keyframes samWordLife{
-            0%{opacity:0;letter-spacing:1.1em;transform:scale(.96)}
-            46%{opacity:0;letter-spacing:1.1em;transform:scale(.96)}
-            62%{opacity:1;letter-spacing:.4em;transform:scale(1)}
-            72%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25)}
-            79%{text-shadow:0 0 28px rgba(0,212,255,.85),0 0 60px rgba(0,212,255,.45)}
-            85%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25)}
-            92%{opacity:0;letter-spacing:.65em}
-            100%{opacity:0;letter-spacing:.65em}
+        /* full-screen radial flash that punches out at the instant of the katana's
+           final thrust -- reads as the blade being pushed into the middle of the
+           screen rather than just a figure-local animation */
+        #samThrustFlash{position:fixed;inset:0;z-index:601;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 46%, rgba(255,255,255,.92) 0%, rgba(0,212,255,.4) 28%, rgba(0,212,255,0) 62%);animation:samThrustFlashAnim 4.2s ease forwards}
+        @keyframes samThrustFlashAnim{
+            0%{opacity:0;transform:scale(.25)}
+            77%{opacity:0;transform:scale(.25)}
+            79%{opacity:1;transform:scale(1)}
+            84%{opacity:0;transform:scale(1.5)}
+            100%{opacity:0;transform:scale(1.5)}
+        }
+        #samuraiWordmark{margin-top:28px;font-size:clamp(1.8rem,5vw,3rem);font-weight:800;letter-spacing:.5em;color:var(--accent-cyan);opacity:1;animation:samWordGlow 4.2s ease forwards}
+        @keyframes samWordGlow{
+            0%{text-shadow:0 0 0 rgba(0,212,255,0);transform:scale(1)}
+            54%{text-shadow:0 0 0 rgba(0,212,255,0);transform:scale(1)}
+            62%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25);transform:scale(1)}
+            71%{text-shadow:0 0 28px rgba(0,212,255,.85),0 0 60px rgba(0,212,255,.45);transform:scale(1)}
+            78%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25);transform:scale(1)}
+            79%{transform:scale(1.05)}
+            88%{opacity:0;transform:scale(1.24)}
+            100%{opacity:0;transform:scale(1.24)}
+        }
+        /* each letter starts scattered off-screen (offset/rotation set per-letter via
+           --tx/--ty/--rot inline custom props) and flies into place -- animation-delay
+           (set per-letter inline) staggers the arrivals across the swing phase so the
+           word visibly assembles one letter at a time rather than fading in at once */
+        #samuraiWordmark .sam-letter{display:inline-block;opacity:0;animation:samLetterFly 550ms cubic-bezier(.17,.84,.44,1) both}
+        @keyframes samLetterFly{
+            0%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(.4)}
+            65%{opacity:1;transform:translate(calc(var(--tx)*0.06),calc(var(--ty)*0.06)) rotate(calc(var(--rot)*0.12)) scale(1.1)}
+            85%{opacity:1;transform:translate(0,0) rotate(0deg) scale(.97)}
+            100%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}
         }
         @media (prefers-reduced-motion: reduce){
-            #samuraiIntro,#samuraiFigure,#samKatana,#samSlashTrail,#samuraiWordmark{animation-duration:.01ms!important}
+            #samuraiIntro,#samuraiFigure,#samKatana,#samSlashTrail,#samThrustFlash,#samuraiWordmark,#samuraiWordmark .sam-letter{animation-duration:.01ms!important;animation-delay:0s!important}
         }
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -588,11 +632,15 @@
     </div>
 </div>
 
-<!-- Samurai intro sequence: plays once after login, between the loading screen and the
-     homepage revealing. Pure CSS/SVG animation (original silhouette, not a reproduction
-     of any existing artwork) -- a katana swing/slash, then the "SAMURAI" wordmark fades
-     in and out, then the whole overlay dissolves into the app shell. See
-     playSamuraiIntro() at the bottom of the script for the timing/trigger. -->
+<!-- Samurai intro sequence: plays before the app shell is revealed EVERY time --
+     a fresh login and every subsequent page refresh while already logged in (see
+     playSamuraiIntro() at the bottom of the script). Pure CSS/SVG animation
+     (original silhouette, not a reproduction of any existing artwork): the katana
+     winds up and swings while the 7 letters of "SAMURAI" fly in from scattered
+     directions and assemble, then the katana thrusts forward -- punching out a
+     full-screen flash, as if the blade is pushed into the middle of the screen --
+     and finally the whole word + figure vanish before the overlay dissolves into
+     the app shell. -->
 <div id="samuraiIntro">
     <svg id="samuraiFigure" viewBox="0 0 220 320" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -618,16 +666,18 @@
             <path d="M84 278 L96 278 L92 316 L80 316 Z"/>
             <path d="M124 278 L136 278 L140 316 L128 316 Z"/>
         </g>
-        <!-- katana: rotates from a raised guard position into the slash -->
+        <!-- katana: rotates from a raised guard position, through two swings, then
+             into a scaled/translated forward thrust (see #samKatana keyframes) -->
         <g id="samKatana" transform-origin="128px 172px">
             <rect x="126" y="60" width="5" height="118" rx="2.5" fill="#dfe7ea"/>
             <rect x="120" y="168" width="17" height="10" rx="2" fill="#1a1c22"/>
         </g>
-        <!-- transient slash trail, flashes once as the katana completes its arc -->
+        <!-- transient slash trail, flashes on each swing -->
         <path id="samSlashTrail" d="M46 96 A128 128 0 0 1 176 218" fill="none" stroke="url(#samSlashGrad)" stroke-width="5" stroke-linecap="round"/>
     </svg>
-    <div id="samuraiWordmark">SAMURAI</div>
+    <div id="samuraiWordmark"><span class="sam-letter" style="--tx:-170px;--ty:-70px;--rot:-70deg;animation-delay:1.30s">S</span><span class="sam-letter" style="--tx:-40px;--ty:-150px;--rot:50deg;animation-delay:1.42s">A</span><span class="sam-letter" style="--tx:90px;--ty:-160px;--rot:-60deg;animation-delay:1.54s">M</span><span class="sam-letter" style="--tx:190px;--ty:-40px;--rot:65deg;animation-delay:1.66s">U</span><span class="sam-letter" style="--tx:170px;--ty:90px;--rot:-55deg;animation-delay:1.78s">R</span><span class="sam-letter" style="--tx:-90px;--ty:130px;--rot:60deg;animation-delay:1.90s">A</span><span class="sam-letter" style="--tx:-190px;--ty:60px;--rot:-50deg;animation-delay:2.02s">I</span></div>
 </div>
+<div id="samThrustFlash"></div>
 
 <div class="app-shell" id="mainApp">
     <aside class="sidebar" id="sidebar">
@@ -2424,24 +2474,18 @@ const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
 // Samurai intro sequence -- see #samuraiIntro markup/CSS for the actual animation
-// (a katana swing/slash, then the "SAMURAI" wordmark, then a fade into the app).
-// Plays once per browser tab session (not on every tab switch or re-render within
-// the same session) so refreshing the page repeatedly doesn't replay a 3.3s
-// cinematic every time; a fresh login/new tab always gets it again. All of the
-// existing permissions/data bootstrap logic right after this call is untouched and
-// keeps running in parallel underneath -- this only delays when the app-shell
-// becomes VISIBLE, not when its data starts loading.
-const SAMURAI_INTRO_MS = 3300;
+// (katana winds up and swings while "SAMURAI" assembles letter by letter, then a
+// forward thrust flashes the screen, then everything vanishes into the app).
+// Plays every single time this runs -- a fresh login AND every subsequent page
+// refresh while already logged in -- since this call only happens right before the
+// app-shell is revealed. All of the existing permissions/data bootstrap logic right
+// after this call is untouched and keeps running in parallel underneath -- this
+// only delays when the app-shell becomes VISIBLE, not when its data starts loading.
+const SAMURAI_INTRO_MS = 4200;
 function playSamuraiIntro() {
     const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
     if (!intro) { if (appShell) appShell.style.display = 'flex'; return; }
-
-    if (sessionStorage.getItem('xenaSamuraiIntroPlayed')) {
-        appShell.style.display = 'flex';
-        return;
-    }
-    sessionStorage.setItem('xenaSamuraiIntroPlayed', '1');
 
     intro.classList.add('playing');
     setTimeout(() => {
@@ -2453,7 +2497,6 @@ function playSamuraiIntro() {
 function logout() { 
     logFrontendAction("LOGOUT", "User Session");
     localStorage.clear(); 
-    sessionStorage.removeItem('xenaSamuraiIntroPlayed');
     location.reload(); 
 }
 
@@ -4109,7 +4152,7 @@ async function runQuery(){
     }
 }
 
-let myReqAllResults = [], myReqCurrentPage = 1;
+let myReqAllResults = [], myReqCurrentPage = 1, myReqWindowLabel = '';
 
 async function loadMyRequests() {
     const resultsEl = document.getElementById('myReqResults');
@@ -4139,8 +4182,14 @@ async function loadMyRequests() {
         }
 
         myReqAllResults = data.results || [];
+        myReqWindowLabel = (data.window_from && data.window_to) ? `${data.window_from} → ${data.window_to} (Cairo time)` : '';
         if (!myReqAllResults.length) {
-            if (emptyEl) emptyEl.style.display = 'block';
+            if (emptyEl) {
+                emptyEl.style.display = 'block';
+                emptyEl.querySelector('p').textContent = myReqWindowLabel
+                    ? `No requests found for ${myReqWindowLabel}.`
+                    : 'No requests found in that window.';
+            }
             document.getElementById('loadingOverlay').style.display = 'none';
             return;
         }
@@ -4163,7 +4212,7 @@ function myReqRenderPage(page) {
     const start = (page - 1) * pageSize;
     const pageResults = myReqAllResults.slice(start, start + pageSize);
 
-    document.getElementById('myReqResultCount').textContent = `${myReqAllResults.length} request${myReqAllResults.length === 1 ? '' : 's'} found`;
+    document.getElementById('myReqResultCount').textContent = `${myReqAllResults.length} request${myReqAllResults.length === 1 ? '' : 's'} found` + (myReqWindowLabel ? ` for ${myReqWindowLabel}` : '');
 
     if (resultsEl) {
         resultsEl.innerHTML = pageResults.map(r => `
