@@ -167,16 +167,22 @@
 
         /* Samurai intro sequence (plays every time the app shell is about to show --
            after a fresh login AND after every page refresh while already logged in,
-           see playSamuraiIntro()). Timeline (~4.2s total):
-           0.00-0.30s overlay fades in
-           0.30-0.88s silhouette fades/scales in, katana held raised in guard
-           1.20-2.50s katana winds up and swings twice (slash trail flashes each time)
-                      while the 7 letters of "SAMURAI" fly in one after another from
-                      scattered directions/rotations and lock into place
+           see playSamuraiIntro()). This is a genuine articulated rig, not a single
+           rotating sword icon: #samBody (whole figure -- weight shift/lunge/step),
+           #samArm (shoulder swing), and #samKatana (wrist snap + blade extension)
+           are three nested transform layers that compose together, so the strike
+           and the final thrust both read as full-body movement. Timeline (~4.2s):
+           0.00-0.30s overlay fades in, subtle camera settle (scale 1.06 -> 1)
+           0.30-0.88s figure fades/scales in, held in a loaded guard stance
+           1.20-1.90s wind-up + strike 1 -- body torques, shoulder swings, wrist
+                      snaps, motion-blur pulses on the blade, slash trail + 2 letters land
+           1.90-2.50s wind-up + strike 2 -- same layered motion, criss-crossing the
+                      first slash, remaining letters land
            2.50-3.00s assembled word holds with a soft glow pulse
-           3.00-3.30s katana winds back, then THRUSTS forward/up -- a full-screen
-                      radial flash punches out at the moment of impact, reading as the
-                      blade being pushed into the middle of the screen
+           3.00-3.30s body coils back, then LUNGES forward as the arm extends and the
+                      katana scales into a thrust -- a full-screen flash + vertical
+                      beam punch out at the instant of impact, reading as the blade
+                      being driven into the middle of the screen
            3.30-3.70s figure + word vanish together (fade + expand)
            3.70-4.20s whole overlay fades out (JS then hides it and reveals the app) */
         #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;background:radial-gradient(ellipse at 50% 40%, #0f1522 0%, #05060a 70%);justify-content:center;align-items:center;flex-direction:column;animation:samOverlayFade 4.2s ease forwards}
@@ -187,48 +193,122 @@
             93%{opacity:1}
             100%{opacity:0}
         }
+        #samStage{display:flex;flex-direction:column;align-items:center;animation:samStageZoom 4.2s cubic-bezier(.22,1,.36,1) forwards}
+        @keyframes samStageZoom{
+            0%{transform:scale(1.06)}
+            21%{transform:scale(1.06)}
+            55%{transform:scale(1)}
+            100%{transform:scale(1)}
+        }
         #samuraiFigure{width:min(46vw,260px);height:auto;overflow:visible;opacity:0;animation:samFigureLife 4.2s ease forwards}
         @keyframes samFigureLife{
-            0%{opacity:0;transform:scale(.9) translateY(10px)}
-            7%{opacity:0;transform:scale(.9) translateY(10px)}
-            21%{opacity:1;transform:scale(1) translateY(0)}
-            29%{transform:scale(1.015) translateY(0)}
-            64%{opacity:1;transform:scale(1) translateY(0)}
-            79%{opacity:1;transform:scale(1.08) translateY(-4px)}
-            88%{opacity:0;transform:scale(1.2) translateY(-10px)}
-            100%{opacity:0;transform:scale(1.2) translateY(-10px)}
+            0%{opacity:0}
+            7%{opacity:0}
+            21%{opacity:1}
+            64%{opacity:1}
+            79%{opacity:1}
+            88%{opacity:0}
+            100%{opacity:0}
         }
-        /* katana: raised guard -> two wind-up/swing cycles (timed to the letters
-           landing) -> pulls back -> thrusts up/forward into an extended lunge
-           (scale+translate around the hilt origin reads as the blade being driven
-           toward the viewer/center of the screen) -> vanishes with the figure */
-        #samKatana{animation:samKatanaSwing 4.2s cubic-bezier(.3,.1,.2,1) forwards}
+        /* whole-figure weight shift: settles in, torques into each strike, coils
+           back then lunges forward on the thrust -- this is the "body actually
+           moves" layer, independent of the arm/blade rotating on top of it */
+        #samBody{transform-origin:112px 300px;animation:samBodyLunge 4.2s cubic-bezier(.22,1,.36,1) forwards}
+        @keyframes samBodyLunge{
+            0%{transform:scale(.92) translateY(8px) translateX(0) rotate(0deg)}
+            7%{transform:scale(.92) translateY(8px) translateX(0) rotate(0deg)}
+            21%{transform:scale(1) translateY(0) translateX(0) rotate(0deg)}
+            29%{transform:scale(1) translateY(0) translateX(-2px) rotate(-1deg)}
+            31%{transform:scale(1) translateY(0) translateX(-4px) rotate(-2deg)}
+            36%{transform:scale(1) translateY(0) translateX(3px) rotate(2deg)}
+            40%{transform:scale(1) translateY(0) translateX(-2px) rotate(-1deg)}
+            45%{transform:scale(1) translateY(0) translateX(4px) rotate(3deg)}
+            50%{transform:scale(1) translateY(0) translateX(-1px) rotate(-1deg)}
+            55%{transform:scale(1) translateY(0) translateX(0) rotate(0deg)}
+            64%{transform:scale(1) translateY(0) translateX(0) rotate(0deg)}
+            71%{transform:scale(1) translateY(0) translateX(-7px) rotate(-3deg)}
+            79%{transform:scale(1.04) translateY(-3px) translateX(15px) rotate(2deg)}
+            83%{transform:scale(1.04) translateY(-3px) translateX(17px) rotate(2deg)}
+            88%{transform:scale(1.12) translateY(-8px) translateX(17px) rotate(2deg)}
+            100%{transform:scale(1.12) translateY(-8px) translateX(17px) rotate(2deg)}
+        }
+        /* shoulder joint: swings the whole arm+blade assembly */
+        #samArm{transform-origin:136px 148px;animation:samArmSwing 4.2s cubic-bezier(.22,1,.36,1) forwards}
+        @keyframes samArmSwing{
+            0%{transform:rotate(-18deg) translateY(0)}
+            21%{transform:rotate(-18deg) translateY(0)}
+            29%{transform:rotate(-18deg) translateY(0)}
+            31%{transform:rotate(-30deg) translateY(0)}
+            36%{transform:rotate(14deg) translateY(0)}
+            40%{transform:rotate(-6deg) translateY(0)}
+            45%{transform:rotate(18deg) translateY(0)}
+            50%{transform:rotate(-2deg) translateY(0)}
+            55%{transform:rotate(4deg) translateY(0)}
+            64%{transform:rotate(3deg) translateY(0)}
+            71%{transform:rotate(-16deg) translateY(0)}
+            79%{transform:rotate(6deg) translateY(-6px)}
+            83%{transform:rotate(6deg) translateY(-8px)}
+            100%{transform:rotate(6deg) translateY(-8px)}
+        }
+        /* wrist: the fastest-moving layer -- adds the final snap on top of the
+           shoulder swing, plus the blade-extension scale on the thrust; motion-blur
+           pulses right on the strike/thrust frames for a bit of cinematic weight */
+        #samKatana{transform-origin:128px 172px;animation:samKatanaSwing 4.2s cubic-bezier(.3,.05,.15,1) forwards}
         @keyframes samKatanaSwing{
-            0%{transform:rotate(-42deg) scale(1) translateY(0)}
-            29%{transform:rotate(-42deg) scale(1) translateY(0)}
-            31%{transform:rotate(-58deg) scale(1) translateY(0)}
-            36%{transform:rotate(22deg) scale(1) translateY(0)}
-            40%{transform:rotate(-8deg) scale(1) translateY(0)}
-            45%{transform:rotate(28deg) scale(1) translateY(0)}
-            50%{transform:rotate(-4deg) scale(1) translateY(0)}
-            55%{transform:rotate(8deg) scale(1) translateY(0)}
-            64%{transform:rotate(6deg) scale(1) translateY(0)}
-            71%{transform:rotate(-22deg) scale(1.05) translateY(2px)}
-            79%{transform:rotate(4deg) scale(1.35) translateY(-14px)}
-            83%{transform:rotate(4deg) scale(1.4) translateY(-16px)}
-            88%{opacity:0;transform:rotate(4deg) scale(1.4) translateY(-16px)}
-            100%{opacity:0;transform:rotate(4deg) scale(1.4) translateY(-16px)}
+            0%{transform:rotate(-24deg) scale(1);filter:blur(0px)}
+            29%{transform:rotate(-24deg) scale(1)}
+            30%{filter:blur(0px)}
+            31%{transform:rotate(-28deg) scale(1)}
+            32%{filter:blur(2px)}
+            34%{filter:blur(.5px)}
+            35%{filter:blur(0px)}
+            36%{transform:rotate(8deg) scale(1)}
+            40%{transform:rotate(-2deg) scale(1);filter:blur(0px)}
+            43%{filter:blur(2px)}
+            44.5%{filter:blur(.5px)}
+            45%{transform:rotate(10deg) scale(1)}
+            46%{filter:blur(0px)}
+            50%{transform:rotate(-2deg) scale(1)}
+            55%{transform:rotate(4deg) scale(1)}
+            64%{transform:rotate(3deg) scale(1)}
+            71%{transform:rotate(-6deg) scale(1.05)}
+            78%{filter:blur(0px)}
+            79%{transform:rotate(-2deg) scale(1.3);filter:blur(3px)}
+            81%{filter:blur(.5px)}
+            83%{transform:rotate(-2deg) scale(1.35);filter:blur(0px)}
+            100%{transform:rotate(-2deg) scale(1.35);filter:blur(0px)}
         }
-        #samSlashTrail{opacity:0;animation:samSlashFlash 4.2s ease forwards}
-        @keyframes samSlashFlash{
+        #samSlashTrail1{opacity:0;animation:samSlash1Flash 4.2s ease forwards}
+        @keyframes samSlash1Flash{
             0%{opacity:0}
             35%{opacity:0}
             36%{opacity:1}
             39%{opacity:0}
+            100%{opacity:0}
+        }
+        #samSlashTrail2{opacity:0;animation:samSlash2Flash 4.2s ease forwards}
+        @keyframes samSlash2Flash{
+            0%{opacity:0}
             44%{opacity:0}
             45%{opacity:1}
             48%{opacity:0}
             100%{opacity:0}
+        }
+        /* vertical light beam that punches up from the blade tip at the instant of
+           the thrust, reinforcing the "pushed toward the viewer/center" reading */
+        #samThrustBeam{opacity:0;transform-origin:130px 130px;animation:samThrustBeamAnim 4.2s ease forwards}
+        @keyframes samThrustBeamAnim{
+            0%{opacity:0;transform:scaleY(.3) scaleX(.4)}
+            78%{opacity:0;transform:scaleY(.3) scaleX(.4)}
+            79%{opacity:1;transform:scaleY(1) scaleX(1.4)}
+            85%{opacity:0;transform:scaleY(1.3) scaleX(.6)}
+            100%{opacity:0;transform:scaleY(1.3) scaleX(.6)}
+        }
+        .samEmber{fill:#7fe8ff;opacity:0;animation:samEmberDrift 900ms ease-out forwards}
+        @keyframes samEmberDrift{
+            0%{opacity:0;transform:translate(0,0) scale(.6)}
+            18%{opacity:.85}
+            100%{opacity:0;transform:translate(7px,-36px) scale(1.3)}
         }
         /* full-screen radial flash that punches out at the instant of the katana's
            final thrust -- reads as the blade being pushed into the middle of the
@@ -253,18 +333,18 @@
             100%{opacity:0;transform:scale(1.24)}
         }
         /* each letter starts scattered off-screen (offset/rotation set per-letter via
-           --tx/--ty/--rot inline custom props) and flies into place -- animation-delay
-           (set per-letter inline) staggers the arrivals across the swing phase so the
-           word visibly assembles one letter at a time rather than fading in at once */
-        #samuraiWordmark .sam-letter{display:inline-block;opacity:0;animation:samLetterFly 550ms cubic-bezier(.17,.84,.44,1) both}
+           --tx/--ty/--rot inline custom props) and flies into place with a soft
+           spring overshoot -- animation-delay (set per-letter inline) staggers the
+           arrivals across the two strikes so the word visibly assembles in sync
+           with the swings rather than fading in all at once */
+        #samuraiWordmark .sam-letter{display:inline-block;opacity:0;animation:samLetterFly 600ms cubic-bezier(.34,1.56,.64,1) both}
         @keyframes samLetterFly{
             0%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(.4)}
-            65%{opacity:1;transform:translate(calc(var(--tx)*0.06),calc(var(--ty)*0.06)) rotate(calc(var(--rot)*0.12)) scale(1.1)}
-            85%{opacity:1;transform:translate(0,0) rotate(0deg) scale(.97)}
+            70%{opacity:1;transform:translate(calc(var(--tx)*0.04),calc(var(--ty)*0.04)) rotate(calc(var(--rot)*0.08)) scale(1.04)}
             100%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}
         }
         @media (prefers-reduced-motion: reduce){
-            #samuraiIntro,#samuraiFigure,#samKatana,#samSlashTrail,#samThrustFlash,#samuraiWordmark,#samuraiWordmark .sam-letter{animation-duration:.01ms!important;animation-delay:0s!important}
+            #samuraiIntro,#samStage,#samuraiFigure,#samBody,#samArm,#samKatana,#samSlashTrail1,#samSlashTrail2,#samThrustBeam,.samEmber,#samThrustFlash,#samuraiWordmark,#samuraiWordmark .sam-letter{animation-duration:.01ms!important;animation-delay:0s!important}
         }
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -4162,6 +4242,13 @@ async function loadMyRequests() {
 
     if (resultsEl) resultsEl.innerHTML = '';
     if (emptyEl) { emptyEl.style.display = 'none'; emptyEl.querySelector('p').textContent = 'No requests found in that window.'; }
+    // BUG FIX (header showing a stale "N requests found for <old window>" from the
+    // previous search while the body below correctly said "No requests found for
+    // <new window>"): the header text is only ever set inside myReqRenderPage(),
+    // which is skipped entirely on the empty-results path -- so a prior non-empty
+    // search's header text was left on screen forever after a later empty search.
+    // Clear it up front on every search so there's never a mismatched leftover.
+    document.getElementById('myReqResultCount').textContent = 'Searching…';
     document.getElementById('myReqPagination').style.display = 'none';
     document.getElementById('loadingOverlay').style.display = 'flex';
 
@@ -4180,15 +4267,21 @@ async function loadMyRequests() {
         if (data.fetch_complete === false) {
             ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}.`, 'warning', 6000);
         }
+        if (data.identity_diagnostic) {
+            console.warn('[my-requests diagnostic]', data.identity_diagnostic);
+        }
 
         myReqAllResults = data.results || [];
         myReqWindowLabel = (data.window_from && data.window_to) ? `${data.window_from} → ${data.window_to} (Cairo time)` : '';
         if (!myReqAllResults.length) {
+            document.getElementById('myReqResultCount').textContent = '0 requests found' + (myReqWindowLabel ? ` for ${myReqWindowLabel}` : '');
             if (emptyEl) {
                 emptyEl.style.display = 'block';
-                emptyEl.querySelector('p').textContent = myReqWindowLabel
-                    ? `No requests found for ${myReqWindowLabel}.`
-                    : 'No requests found in that window.';
+                let msg = myReqWindowLabel ? `No requests found for ${myReqWindowLabel}.` : 'No requests found in that window.';
+                if (typeof data.identity_diagnostic === 'number' && data.identity_diagnostic > 0) {
+                    msg += ` (${data.identity_diagnostic} other request${data.identity_diagnostic===1?'':'s'} exist in this window but didn't match your account identity -- if that looks wrong, this points at an identity-matching issue rather than a missing-data one.)`;
+                }
+                emptyEl.querySelector('p').textContent = msg;
             }
             document.getElementById('loadingOverlay').style.display = 'none';
             return;
