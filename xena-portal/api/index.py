@@ -109,6 +109,20 @@ CAIRO_OFFSET = timedelta(hours=3)
 def cairo_now():
     return datetime.now(timezone.utc) + CAIRO_OFFSET
 
+def cairo_epoch_ms(cairo_dt):
+    """
+    BUG FIX ("Today" filter in /api/my-requests returning empty/wrong results):
+    cairo_now() (and anything derived from it, like from_dt) is tagged tzinfo=utc but
+    its actual VALUE has already been shifted +3h to represent Cairo local time --
+    it's "UTC" in label only. Calling .timestamp() directly on a value like that makes
+    Python treat the shifted value AS IF it were actually UTC, silently adding a
+    spurious 3h to the resulting epoch. For wide windows (15/30/90 days) that 3h error is lost in
+    the noise; for a single day like "Today" it's large enough relative to the window
+    to skew or empty out results entirely. Subtracting CAIRO_OFFSET first undoes the
+    mislabeling and recovers the true UTC instant before converting to epoch millis.
+    """
+    return int((cairo_dt - CAIRO_OFFSET).timestamp() * 1000)
+
 def _safe_int(value, default):
     try:
         return int(value)
@@ -782,16 +796,24 @@ def parse_feishu_date(date_val):
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
     try:
+        # BUG FIX (every card showing "00:00" regardless of real submission time,
+        # and same-day records sorting in an arbitrary order): this used to call
+        # .replace(hour=0, minute=0, second=0, ...) unconditionally, discarding the
+        # actual time-of-day the epoch-ms value carried. Millisecond-epoch values
+        # (the normal case for CreatedTime/DateTime fields like "Submitted on" /
+        # "Submitted on Copy") now keep their real Cairo-local hour/minute/second;
+        # only the bare "YYYY-MM-DD" string fallback below is genuinely date-only
+        # and has no time component to preserve.
         if isinstance(date_val, (int, float)):
             dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
             dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return dt_cairo.replace(tzinfo=None)
             
         date_str = str(date_val).strip()
         if date_str.isdigit():
             dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
             dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return dt_cairo.replace(tzinfo=None)
         
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
@@ -2586,23 +2608,33 @@ def my_requests():
     # isn't yet, Feishu returns FieldNameNotFound (1254045) and that's surfaced
     # directly to the caller as fetch_complete:false, not silently retried.
     #
-    # BUG FIX (Today/Last-N-days showing wrong or missing records, e.g. only
-    # yesterday's records appearing): every attempt at a server-side Feishu date
-    # filter on this endpoint hit a different wall -- 99992402 (bad value shape),
-    # 9499 (bad Person-field value), 1254018 (wrong ExactDate array shape), and even
-    # once those were fixed, "Submitted on" doesn't reliably reflect true submission
-    # time the same way "Submitted on Copy" does elsewhere in this app. Analytics
-    # (run_analytics) never sends a date filter to Feishu at all -- it fetches by
-    # scope, then filters dates LOCALLY in Python using parse_feishu_date() (which
-    # already correctly converts epoch ms -> Cairo calendar day) compared against
-    # plain day-truncated datetimes. This endpoint now does exactly the same thing:
-    # Feishu only filters by IDENTITY (fast, reliable, already proven working), and
-    # the date window is applied afterward with the same logic Analytics uses --
-    # so "Today" and every preset behave identically to how Analytics already works
-    # correctly today.
-    _cairo_midnight_tomorrow = _cairo_midnight_today + timedelta(days=1)
-    from_dt_naive = from_dt.replace(tzinfo=None)
-    to_dt_exclusive_naive = _cairo_midnight_tomorrow.replace(tzinfo=None)  # exclusive upper bound, same convention as run_analytics
+    # BUG FIX (this endpoint crawling the caller's *entire* history instead of just
+    # the requested window, then timing out and returning a truncated/stale page):
+    # the identity condition used to be sent completely on its own, with no date
+    # bound in the same call at all -- so for anyone with a long history this was
+    # effectively "give me every request this person has ever submitted," which is
+    # exactly what was blowing the time budget and coming back partial. The identity
+    # and date conditions are now ANDed into ONE payload, and run through the same
+    # bounded/paginated _run_search() as every other stage below (not a single
+    # unpaginated POST), so a person with >500 matching records in-window still gets
+    # a complete result instead of silently capping at the first page.
+    #
+    # Date bound uses "Submitted on" (the DateTime twin of "Submitted on Copy") with
+    # whole-millisecond Unix epoch timestamps. Per Lark's Record Filter Guide, Date
+    # field values are a TWO-element array -- ["ExactDate", "<ms>"] -- not a bare
+    # single-element timestamp array; that mismatch is what threw code 1254018
+    # "InvalidFilter". The guide also confirms date filtering only supports the
+    # operators is/isEmpty/isNotEmpty/isGreater/isLess (isGreaterEqual/isLessEqual
+    # are NOT valid for date fields), so isGreater/isLess is correct here.
+    # isGreater/isLess are exclusive bounds, so records sitting exactly on the window
+    # edge would otherwise be silently dropped -- pad by 1s on each side rather than
+    # relying on unverified isGreaterEqual/isLessEqual operator names.
+    # BUG FIX: previously called .timestamp() directly on from_dt/_cairo_now, which
+    # (per cairo_epoch_ms's docstring above) silently added a spurious 3h to both
+    # bounds -- invisible for wide windows, but large enough to skew/empty out the
+    # "Today" preset. cairo_epoch_ms() undoes that mislabeling first.
+    from_ms = str(cairo_epoch_ms(from_dt) - 1000)
+    to_ms = str(cairo_epoch_ms(_cairo_now) + 1000)
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
@@ -2628,17 +2660,14 @@ def my_requests():
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {
                "conjunction": "and",
-               "conditions": [identity_condition]
+               "conditions": [
+                   identity_condition,
+                   {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", from_ms]},
+                   {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", to_ms]},
+               ]
             },
          }   
-        raw_fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
-        # Date window applied locally now -- see the comment block above. Mirrors
-        # run_analytics's own from_dt <= record_dt < to_dt (exclusive) convention.
-        fast_items = []
-        for it in raw_fast_items:
-            record_dt = parse_feishu_date(get_field_local(it.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
-            if record_dt and from_dt_naive <= record_dt < to_dt_exclusive_naive:
-                fast_items.append(it)
+        fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
         # Running out of time on this already-combined, single search should still
         # be reported as "fast path used" (there's no other stage left to try) --
         # only a hard exception below leaves fast_ok False.
@@ -2652,12 +2681,43 @@ def my_requests():
     # three-stage fallback chain ("Submitted on Copy" bare-date search, then a
     # "Submitted on" ISO-string retry, then a raw full-table paginate-and-match-
     # locally scan) is deleted. It existed to work around SUBMITTED_BY_FIELD_NAME
-    # not existing yet / bare-date filters being unreliable. Feishu-side date
-    # filtering is no longer attempted at all -- see the comment above the fast
-    # path for why (it's what caused every one of 99992402/9499/1254018). Only a
-    # real identity-filter failure (bad field name, permissions, etc.) surfaces
-    # here now, not a date-shape error, since dates are no longer sent to Feishu.
+    # not existing yet / bare-date filters being unreliable, but it's also exactly
+    # what caused the "field validation failed" errors (bare "YYYY-MM-DD" and
+    # ISO-8601 strings are NOT valid values for "Submitted on", which is a DateTime
+    # field requiring millisecond epoch values -- see the fast-path comment above)
+    # and the multi-minute worst case that blew through the Vercel time budget. If
+    # the fast path itself failed for a real reason (bad field/filter, not just
+    # running out of time), we now surface that directly instead of masking it
+    # behind further slow, similarly-fragile retries.
     all_items, fetch_complete, stop_reason = fast_items, fast_complete, fast_reason
+
+    # DIAGNOSTIC (only runs when the identity+date search above found nothing, and
+    # only spends leftover time budget): re-run the SAME date-range bound with the
+    # identity condition dropped, capped to a single small page, purely to answer
+    # "does *anything* exist in this window at all?" -- not to expose other people's
+    # records (we only ever return a count, never these items) but to tell apart
+    # "genuinely no requests in this window" from "the identity condition (open_id /
+    # SUBMITTED_BY_FIELD_NAME match -- see the attribution-bug comment above) is
+    # wrongly excluding records that really are this caller's". A non-zero count
+    # here with the identity+date search returning zero is a strong signal the
+    # identity filter, not the date filter, is the actual bug.
+    identity_diagnostic = None
+    if not all_items and fetch_complete and time.time() < _deadline:
+        try:
+            diag_payload = {
+                "page_size": 50,
+                "filter": {
+                    "conjunction": "and",
+                    "conditions": [
+                        {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", from_ms]},
+                        {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", to_ms]},
+                    ]
+                },
+            }
+            diag_items, _, _ = _run_search(diag_payload, min(_deadline, time.time() + 8))
+            identity_diagnostic = len(diag_items)
+        except Exception as e:
+            logger.warn("my_requests_identity_diagnostic_failed", error=str(e))
 
     # BUG FIX (duplicate cards): the same record could legitimately come back more
     # than once across pages (e.g. a page re-requested after a retry), and nothing
@@ -2726,6 +2786,12 @@ def my_requests():
         "served_from_background_cache": False,  # always a live Feishu fetch now
         "lookback_days": lookback_days,
         "fast_path_used": fast_ok,  # false only if the single combined search itself threw
+        # Exact window that was searched (Cairo-local), so the frontend can show the
+        # user precisely what range came back empty/short instead of leaving them to
+        # guess whether "no results" means "no data in that window" or a real bug.
+        "window_from": from_dt.strftime("%Y-%m-%d %H:%M"),
+        "window_to": _cairo_now.strftime("%Y-%m-%d %H:%M"),
+        "identity_diagnostic": identity_diagnostic,
     })
 
 @app.route('/api/live-queue', methods=['GET'])
