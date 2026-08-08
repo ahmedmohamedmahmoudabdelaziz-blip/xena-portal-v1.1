@@ -2542,7 +2542,8 @@ def my_requests():
     prior_days = 0 if days_param == 'today' else max(0, min(_safe_int(days_param, 0), 90))
 
     _cairo_now = cairo_now()
-    _cairo_midnight_today = _cairo_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    _cairo_naive = _cairo_now.replace(tzinfo=None)          # naive datetime in Cairo local time
+    _cairo_midnight_today = _cairo_naive.replace(hour=0, minute=0, second=0, microsecond=0)
     from_dt = _cairo_midnight_today - timedelta(days=prior_days)
     lookback_days = prior_days  # kept in the response payload for the frontend label
 
