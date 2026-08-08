@@ -2577,14 +2577,12 @@ def my_requests():
     # a complete result instead of silently capping at the first page.
     #
     # Date bound uses "Submitted on" (the DateTime twin of "Submitted on Copy") with
-    # whole-millisecond Unix epoch timestamps. Feishu's records/search filter does NOT
-    # accept a bare timestamp (or date string) as the value for a Date/DateTime field
-    # -- that's exactly what throws code 99992402 "field validation failed". It needs
-    # a typed date-value object instead: {"type": "ExactDate", "value": "<ms>"},
-    # paired with the isGreater*/isLess* operator family (not ">="/"<=", which are for
-    # Number fields). "Submitted on Copy" is a plain Date field with no time component
-    # and takes bare "YYYY-MM-DD" strings instead, but it's not used here since
-    # "Submitted on" is the reliable one for millisecond-precision filtering.
+    # whole-millisecond Unix epoch timestamps as plain strings. Per Lark's own
+    # records/search docs, `value` is always `string[]` for every field type on this
+    # endpoint -- there is no `{"type": "ExactDate", ...}` wrapper object here (that
+    # shape belongs to a different API). Wrapping it is what threw code 9499
+    # "Invalid parameter value" the last time. Operator is isGreater/isLess (per the
+    # same docs' operator table) rather than ">="/"<=", which aren't valid values.
     # isGreater/isLess are exclusive bounds, so records sitting exactly on the window
     # edge would otherwise be silently dropped -- pad by 1s on each side rather than
     # relying on unverified isGreaterEqual/isLessEqual operator names.
@@ -2617,8 +2615,8 @@ def my_requests():
                "conjunction": "and",
                "conditions": [
                    identity_condition,
-                   {"field_name": "Submitted on", "operator": "isGreater", "value": [{"type": "ExactDate", "value": from_ms}]},
-                   {"field_name": "Submitted on", "operator": "isLess", "value": [{"type": "ExactDate", "value": to_ms}]},
+                   {"field_name": "Submitted on", "operator": "isGreater", "value": [from_ms]},
+                   {"field_name": "Submitted on", "operator": "isLess", "value": [to_ms]},
                ]
             },
          }   
