@@ -164,6 +164,64 @@
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
+
+        /* Samurai intro sequence (login -> homepage transition). Timeline (~3.3s total):
+           0.00-0.30s overlay fades in
+           0.20-0.85s silhouette fades/scales in, katana held raised
+           0.85-1.10s katana swings through its arc, slash trail flashes once
+           1.10-1.55s silhouette dissolves out
+           1.55-2.05s "SAMURAI" wordmark fades/tracks in
+           2.05-2.65s wordmark holds with a soft glow pulse
+           2.65-3.00s wordmark fades out
+           3.00-3.30s whole overlay fades out (JS then hides it and reveals the app) */
+        #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;background:radial-gradient(ellipse at 50% 40%, #0f1522 0%, #05060a 70%);justify-content:center;align-items:center;flex-direction:column;animation:samOverlayFade 3.3s ease forwards}
+        #samuraiIntro.playing{display:flex}
+        @keyframes samOverlayFade{
+            0%{opacity:0}
+            9%{opacity:1}
+            91%{opacity:1}
+            100%{opacity:0}
+        }
+        #samuraiFigure{width:min(46vw,260px);height:auto;overflow:visible;opacity:0;animation:samFigureLife 3.3s ease forwards}
+        @keyframes samFigureLife{
+            0%{opacity:0;transform:scale(.9) translateY(10px)}
+            6%{opacity:0;transform:scale(.9) translateY(10px)}
+            26%{opacity:1;transform:scale(1) translateY(0)}
+            33%{transform:scale(1.015) translateY(0)}
+            38%{opacity:1;transform:scale(1) translateY(0)}
+            47%{opacity:0;transform:scale(1.04) translateY(-6px)}
+            100%{opacity:0;transform:scale(1.04) translateY(-6px)}
+        }
+        #samKatana{animation:samKatanaSwing 3.3s ease forwards}
+        @keyframes samKatanaSwing{
+            0%{transform:rotate(-42deg)}
+            26%{transform:rotate(-42deg)}
+            33%{transform:rotate(18deg)}
+            38%{transform:rotate(14deg)}
+            100%{transform:rotate(14deg)}
+        }
+        #samSlashTrail{opacity:0;animation:samSlashFlash 3.3s ease forwards}
+        @keyframes samSlashFlash{
+            0%{opacity:0}
+            31%{opacity:0}
+            33%{opacity:1}
+            40%{opacity:0}
+            100%{opacity:0}
+        }
+        #samuraiWordmark{margin-top:28px;font-size:clamp(1.8rem,5vw,3rem);font-weight:800;letter-spacing:.4em;color:var(--accent-cyan);text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25);opacity:0;animation:samWordLife 3.3s ease forwards}
+        @keyframes samWordLife{
+            0%{opacity:0;letter-spacing:1.1em;transform:scale(.96)}
+            46%{opacity:0;letter-spacing:1.1em;transform:scale(.96)}
+            62%{opacity:1;letter-spacing:.4em;transform:scale(1)}
+            72%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25)}
+            79%{text-shadow:0 0 28px rgba(0,212,255,.85),0 0 60px rgba(0,212,255,.45)}
+            85%{text-shadow:0 0 18px rgba(0,212,255,.55),0 0 40px rgba(0,212,255,.25)}
+            92%{opacity:0;letter-spacing:.65em}
+            100%{opacity:0;letter-spacing:.65em}
+        }
+        @media (prefers-reduced-motion: reduce){
+            #samuraiIntro,#samuraiFigure,#samKatana,#samSlashTrail,#samuraiWordmark{animation-duration:.01ms!important}
+        }
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -528,6 +586,47 @@
         <p id="loginErrMsg" style="display:none;color:#ff6b8a;font-size:.82rem;margin-top:14px;max-width:320px;text-align:center;line-height:1.5"></p>
         <p style="color:#555a78;font-size:.72rem;margin-top:16px">Secure SSO via Feishu</p>
     </div>
+</div>
+
+<!-- Samurai intro sequence: plays once after login, between the loading screen and the
+     homepage revealing. Pure CSS/SVG animation (original silhouette, not a reproduction
+     of any existing artwork) -- a katana swing/slash, then the "SAMURAI" wordmark fades
+     in and out, then the whole overlay dissolves into the app shell. See
+     playSamuraiIntro() at the bottom of the script for the timing/trigger. -->
+<div id="samuraiIntro">
+    <svg id="samuraiFigure" viewBox="0 0 220 320" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <radialGradient id="samMoonGlow" cx="50%" cy="38%" r="55%">
+                <stop offset="0%" stop-color="#ff6a3d" stop-opacity="0.55"/>
+                <stop offset="55%" stop-color="#ff6a3d" stop-opacity="0.18"/>
+                <stop offset="100%" stop-color="#ff6a3d" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="samSlashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00d4ff" stop-opacity="0"/>
+                <stop offset="50%" stop-color="#e8fbff" stop-opacity="0.95"/>
+                <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+            </linearGradient>
+        </defs>
+        <circle cx="110" cy="115" r="95" fill="url(#samMoonGlow)"/>
+        <!-- silhouette: kabuto helmet, torso/armor, legs -->
+        <g id="samSilhouette" fill="#050608">
+            <path d="M110 118 C88 118 74 132 72 152 L70 180 C70 186 74 190 80 190 L140 190 C146 190 150 186 150 180 L148 152 C146 132 132 118 110 118 Z"/>
+            <path d="M78 150 C78 128 92 108 110 108 C128 108 142 128 142 150 L146 156 C148 148 149 138 148 130 C144 104 130 90 110 90 C90 90 76 104 72 130 C71 138 72 148 74 156 Z"/>
+            <path d="M96 92 C98 78 104 66 110 60 C116 66 122 78 124 92 C118 88 102 88 96 92 Z"/>
+            <rect x="66" y="188" width="88" height="14" rx="4"/>
+            <path d="M74 202 L146 202 L150 260 C150 270 142 278 132 278 L88 278 C78 278 70 270 70 260 Z"/>
+            <path d="M84 278 L96 278 L92 316 L80 316 Z"/>
+            <path d="M124 278 L136 278 L140 316 L128 316 Z"/>
+        </g>
+        <!-- katana: rotates from a raised guard position into the slash -->
+        <g id="samKatana" transform-origin="128px 172px">
+            <rect x="126" y="60" width="5" height="118" rx="2.5" fill="#dfe7ea"/>
+            <rect x="120" y="168" width="17" height="10" rx="2" fill="#1a1c22"/>
+        </g>
+        <!-- transient slash trail, flashes once as the katana completes its arc -->
+        <path id="samSlashTrail" d="M46 96 A128 128 0 0 1 176 218" fill="none" stroke="url(#samSlashGrad)" stroke-width="5" stroke-linecap="round"/>
+    </svg>
+    <div id="samuraiWordmark">SAMURAI</div>
 </div>
 
 <div class="app-shell" id="mainApp">
@@ -1556,11 +1655,11 @@
                         <div class="control-group" style="margin:0; min-width:160px;">
                             <label style="font-size:.8rem;">Lookback window</label>
                             <select id="myReqDaysSelect" class="form-highlight-input">
-                                <option value="today">Today</option>
-                                <option value="15" selected>Last 15 days</option>
-                                <option value="30">Last 30 days</option>
-                                <option value="60">Last 60 days</option>
-                                <option value="90">Last 90 days</option>
+                                <option value="0" selected>Today</option>
+                                <option value="3">Last 3 days</option>
+                                <option value="7">Last 7 days</option>
+                                <option value="10">Last 10 days</option>
+                                <option value="15">Last 15 days</option>
                             </select>
                         </div>
                         <button type="button" class="btn" style="width:auto;" onclick="loadMyRequests()">🔍 Search</button>
@@ -2324,9 +2423,37 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
+// Samurai intro sequence -- see #samuraiIntro markup/CSS for the actual animation
+// (a katana swing/slash, then the "SAMURAI" wordmark, then a fade into the app).
+// Plays once per browser tab session (not on every tab switch or re-render within
+// the same session) so refreshing the page repeatedly doesn't replay a 3.3s
+// cinematic every time; a fresh login/new tab always gets it again. All of the
+// existing permissions/data bootstrap logic right after this call is untouched and
+// keeps running in parallel underneath -- this only delays when the app-shell
+// becomes VISIBLE, not when its data starts loading.
+const SAMURAI_INTRO_MS = 3300;
+function playSamuraiIntro() {
+    const intro = document.getElementById('samuraiIntro');
+    const appShell = document.querySelector('.app-shell');
+    if (!intro) { if (appShell) appShell.style.display = 'flex'; return; }
+
+    if (sessionStorage.getItem('xenaSamuraiIntroPlayed')) {
+        appShell.style.display = 'flex';
+        return;
+    }
+    sessionStorage.setItem('xenaSamuraiIntroPlayed', '1');
+
+    intro.classList.add('playing');
+    setTimeout(() => {
+        intro.classList.remove('playing');
+        appShell.style.display = 'flex';
+    }, SAMURAI_INTRO_MS);
+}
+
 function logout() { 
     logFrontendAction("LOGOUT", "User Session");
     localStorage.clear(); 
+    sessionStorage.removeItem('xenaSamuraiIntroPlayed');
     location.reload(); 
 }
 
@@ -3988,7 +4115,7 @@ async function loadMyRequests() {
     const resultsEl = document.getElementById('myReqResults');
     const emptyEl = document.getElementById('myReqEmpty');
     const daysSel = document.getElementById('myReqDaysSelect');
-    const days = daysSel ? daysSel.value : '15';
+    const days = daysSel ? daysSel.value : '0';
 
     if (resultsEl) resultsEl.innerHTML = '';
     if (emptyEl) { emptyEl.style.display = 'none'; emptyEl.querySelector('p').textContent = 'No requests found in that window.'; }
@@ -5655,6 +5782,18 @@ function ltConnectPusher() {
 }
 
 function initLiveTicketWorkspace() {
+    // BUG FIX (Live Ticket Queue "stuck" showing Crunching Feishu data... for 7-10s):
+    // this function makes ZERO network calls of its own -- ltRenderQueue() is a
+    // pure client-side render of the already-in-memory ltQueue array, and
+    // ltConnectPusher() short-circuits instantly (no live Pusher key configured).
+    // So arriving on this tab is inherently instant. The overlay div is a single
+    // page-wide element, not scoped to any one tab -- if it was left showing by a
+    // still-in-flight fetch on a DIFFERENT tab (e.g. a wide-window My Requests
+    // search) right before switching over here, it stays stuck visible on top of
+    // this tab too until that unrelated fetch finally resolves, even though this
+    // page itself has nothing to wait on. Since this page never needs the overlay,
+    // clear it unconditionally on arrival.
+    document.getElementById('loadingOverlay').style.display = 'none';
     ltRenderQueue();
     if (!ltInitialized) {
         ltInitialized = true;
@@ -6071,7 +6210,7 @@ async function submitReqForm(e) {
 
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
-    document.querySelector('.app-shell').style.display='flex';
+    playSamuraiIntro();
     
     document.getElementById('sidebarUsername').textContent = loggedUser;
     
