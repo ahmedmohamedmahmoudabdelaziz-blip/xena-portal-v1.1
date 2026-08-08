@@ -110,6 +110,17 @@ def cairo_now():
     return datetime.now(timezone.utc) + CAIRO_OFFSET
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
+
+# SPEED FIX (Live Ticket Queue feels slow to open a ticket / run duplicate check):
+# every http_requests.get/post/put call to Feishu was opening a brand new TCP+TLS
+# connection from scratch, even on a warm serverless instance handling back-to-back
+# requests to the same open.feishu.cn host. requests.Session() pools and reuses
+# connections across calls on the same warm instance (the same pattern already
+# proven out in /api/my-requests's own Session), cutting handshake latency on the
+# hot paths below without changing any request/response behavior -- .get/.post/.put
+# on a Session have the exact same signature and return value as the bare module
+# functions, so this is purely a performance change.
+feishu_session = http_requests.Session()
 _TOKEN_REDIS_KEY = "xena:tenant_access_token"
 
 def get_tenant_access_token():
@@ -1818,7 +1829,7 @@ def get_single_request():
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
         data = resp.json()
         if data.get("code") == 0:
             return jsonify({"success": True, "record": data["data"]["record"]})
@@ -1992,7 +2003,7 @@ def update_request():
 
     logger.info("update_fields_payload", record_id=record_id, fields=fields)
     try:
-        resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=15)
+        resp = feishu_session.put(url, headers=headers, json={"fields": fields}, timeout=15)
         data = resp.json()
         logger.info("update_feishu_response", record_id=record_id, response=data)
         if data.get("code") == 0:
@@ -2495,13 +2506,18 @@ def my_requests():
         return jsonify({"error":"Access denied"}), 403
     
     days_param = sanitize_text(request.args.get('days', '15'))
-    try:
-        lookback_days = max(1, min(int(days_param), 90))
-    except ValueError:
-        lookback_days = 15
-
     _cairo_now = cairo_now()
-    from_dt = _cairo_now - timedelta(days=lookback_days)
+    if days_param == 'today':
+        # "Today" means the calendar day in Cairo local time, not a rolling 24h
+        # window -- start of window is today's midnight, not "24 hours ago".
+        from_dt = _cairo_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        lookback_days = 0  # for the response payload only; from_dt above is authoritative
+    else:
+        try:
+            lookback_days = max(1, min(int(days_param), 90))
+        except ValueError:
+            lookback_days = 15
+        from_dt = _cairo_now - timedelta(days=lookback_days)
 
     # FIX: this is now a fully live, on-demand fetch -- no Redis/background snapshot
     # involved at all, and the frontend only calls this endpoint when the person clicks
@@ -3142,7 +3158,7 @@ def proxy_attachment(file_token):
                         "fieldId": field_id,
                     }
                 })
-            return http_requests.get(url, headers=headers, params=params, timeout=20, stream=True)
+            return feishu_session.get(url, headers=headers, params=params, timeout=20, stream=True)
 
         resp = _attempt(with_extra=True)
         if resp.status_code != 200 and field_id:
@@ -3153,7 +3169,16 @@ def proxy_attachment(file_token):
         if resp.status_code != 200:
             logger.error("attachment_proxy_failed", file_token=file_token, field_id=field_id, status=resp.status_code, body=resp.text[:300])
             return jsonify({"error": "Could not fetch attachment"}), 502
-        return Response(resp.content, content_type=resp.headers.get("Content-Type", "application/octet-stream"))
+        # SPEED FIX (Live Ticket Queue feels slow to open/re-open): a given file_token's
+        # bytes never change once uploaded, but this endpoint had zero cache headers --
+        # every single view of a ticket (and every re-render after Run Duplicate Check,
+        # which reopens the whole workspace) re-fetched every attachment image from
+        # Feishu from scratch, even for the exact same ticket seconds apart. Purely
+        # additive: doesn't change what's returned or any existing behavior, just lets
+        # the browser reuse what it already downloaded instead of asking again.
+        response = Response(resp.content, content_type=resp.headers.get("Content-Type", "application/octet-stream"))
+        response.headers["Cache-Control"] = "private, max-age=86400, immutable"
+        return response
     except Exception as e:
         logger.error("attachment_proxy_failed", file_token=file_token, error=str(e))
         return jsonify({"error": str(e)}), 500
