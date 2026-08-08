@@ -796,16 +796,24 @@ def parse_feishu_date(date_val):
     if isinstance(date_val, list) and len(date_val) > 0: date_val = date_val[0]
     if isinstance(date_val, dict): date_val = date_val.get('value', date_val.get('text', ''))
     try:
+        # BUG FIX (every card showing "00:00" regardless of real submission time,
+        # and same-day records sorting in an arbitrary order): this used to call
+        # .replace(hour=0, minute=0, second=0, ...) unconditionally, discarding the
+        # actual time-of-day the epoch-ms value carried. Millisecond-epoch values
+        # (the normal case for CreatedTime/DateTime fields like "Submitted on" /
+        # "Submitted on Copy") now keep their real Cairo-local hour/minute/second;
+        # only the bare "YYYY-MM-DD" string fallback below is genuinely date-only
+        # and has no time component to preserve.
         if isinstance(date_val, (int, float)):
             dt_utc = datetime.fromtimestamp(date_val / 1000.0, tz=timezone.utc)
             dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return dt_cairo.replace(tzinfo=None)
             
         date_str = str(date_val).strip()
         if date_str.isdigit():
             dt_utc = datetime.fromtimestamp(int(date_str) / 1000.0, tz=timezone.utc)
             dt_cairo = dt_utc + timedelta(hours=3)
-            return dt_cairo.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            return dt_cairo.replace(tzinfo=None)
         
         clean_str = date_str[:10].replace('/', '-').replace('.', '-')
         return datetime.strptime(clean_str, "%Y-%m-%d")
@@ -2750,6 +2758,11 @@ def my_requests():
         "served_from_background_cache": False,  # always a live Feishu fetch now
         "lookback_days": lookback_days,
         "fast_path_used": fast_ok,  # false only if the single combined search itself threw
+        # Exact window that was searched (Cairo-local), so the frontend can show the
+        # user precisely what range came back empty/short instead of leaving them to
+        # guess whether "no results" means "no data in that window" or a real bug.
+        "window_from": from_dt.strftime("%Y-%m-%d %H:%M"),
+        "window_to": _cairo_now.strftime("%Y-%m-%d %H:%M"),
     })
 
 @app.route('/api/live-queue', methods=['GET'])
