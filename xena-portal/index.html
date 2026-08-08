@@ -2418,6 +2418,24 @@ function playSamuraiIntro() {
         return; 
     }
 
+    // If video fails to load, abort after 5 seconds
+    const timeout = setTimeout(() => {
+        intro.classList.remove('playing');
+        if (appShell) appShell.style.display = 'flex';
+        video.pause();
+    }, 5000);
+
+    video.addEventListener('canplay', () => {
+        clearTimeout(timeout);
+        video.classList.add('ready');
+    }, { once: true });
+
+    video.addEventListener('error', () => {
+        clearTimeout(timeout);
+        intro.classList.remove('playing');
+        if (appShell) appShell.style.display = 'flex';
+    });
+
     intro.classList.add('playing');
     appShell.style.display = 'none';
 
@@ -2573,9 +2591,6 @@ function playSamuraiIntro() {
         }
     };
 
-    // Start video gracefully
-    video.addEventListener('canplay', () => video.classList.add('ready'), {once:true});
-    
     video.play().catch(e => {
         // If strict browser policies block autoplay, fallback safely to the app instantly
         console.warn("Cinematic Intro autoplay blocked:", e);
