@@ -165,15 +165,141 @@
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
 
-        #cinematicIntro { position: fixed; inset: 0; z-index: 9999; background: #020408; overflow: hidden; display: none; perspective: 1000px; }
-        #cinematicIntro.playing { display: block; }
-        
-        .cinematic-bg { position: absolute; inset: -10%; z-index: 1; transform-origin: 50% 60%; will-change: transform, filter; }
-        #samuraiRefImage { width: 100%; height: 100%; object-fit: cover; filter: brightness(0.8) contrast(1.1) saturate(1.1); }
-        
-        #cinematicCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-        
-        .cinematic-vignette { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(circle at 50% 40%, transparent 20%, rgba(2,4,8,0.8) 70%, #000 100%); box-shadow: inset 0 0 150px rgba(0,0,0,1); }
+        /* ============================================================
+           SAMURAI CINEMATIC INTRO
+           Plays after login and on every full page reload (see
+           playSamuraiIntro() at the bottom of the script). JS drives a
+           sequence of "stage" classes on #samuraiIntro at precise offsets
+           (SAM_TIMELINE) rather than one long CSS animation, so the
+           canvas particle shatter at the end can be fired at the exact
+           moment the strike lands. Every visual piece below reacts to
+           whichever stage class is currently present.
+           ============================================================ */
+        #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;overflow:hidden;background:#020204;opacity:0;transition:opacity .5s ease}
+        #samuraiIntro.playing{display:flex;justify-content:center;align-items:center}
+        #samuraiIntro.st-in{opacity:1}
+        #samuraiIntro.st-out{opacity:0}
+
+        .sam-bar{position:absolute;left:0;right:0;height:12%;background:#000;z-index:40;transition:transform 1s cubic-bezier(.16,1,.3,1)}
+        .sam-bar-top{top:0;transform:translateY(-100%)}
+        .sam-bar-bottom{bottom:0;transform:translateY(100%)}
+        #samuraiIntro.st-in .sam-bar-top{transform:translateY(0)}
+        #samuraiIntro.st-in .sam-bar-bottom{transform:translateY(0)}
+        #samuraiIntro.st-out .sam-bar-top{transform:translateY(-100%)}
+        #samuraiIntro.st-out .sam-bar-bottom{transform:translateY(100%)}
+
+        .sam-vignette{position:absolute;inset:0;z-index:30;pointer-events:none;background:radial-gradient(ellipse at 50% 48%,transparent 35%,rgba(0,0,0,.55) 78%,rgba(0,0,0,.92) 100%)}
+        .sam-grain{position:absolute;inset:-20%;z-index:32;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");animation:samGrainShift 1.1s steps(4) infinite}
+        @keyframes samGrainShift{0%{transform:translate(0,0)}25%{transform:translate(-2%,1%)}50%{transform:translate(1%,-2%)}75%{transform:translate(-1%,-1%)}100%{transform:translate(0,0)}}
+
+        .sam-fog{position:absolute;bottom:6%;height:26%;width:70%;border-radius:50%;background:radial-gradient(ellipse at center,rgba(140,160,190,.10) 0%,rgba(140,160,190,0) 72%);filter:blur(6px);z-index:20;opacity:0;transition:opacity 1.4s ease}
+        .sam-fog-1{left:-15%;animation:samFogDrift1 22s linear infinite}
+        .sam-fog-2{right:-20%;bottom:2%;width:85%;height:22%;animation:samFogDrift2 28s linear infinite}
+        #samuraiIntro.st-in .sam-fog{opacity:1}
+        @keyframes samFogDrift1{0%{transform:translateX(0)}100%{transform:translateX(8%)}}
+        @keyframes samFogDrift2{0%{transform:translateX(0)}100%{transform:translateX(-8%)}}
+
+        .sam-scene{position:relative;width:min(60vw,420px);height:min(78vh,560px);display:flex;justify-content:center;align-items:flex-end;z-index:25;transform:scale(1);transition:transform 9.4s linear}
+        #samuraiIntro.st-push .sam-scene{transform:scale(1.09)}
+
+        .sam-moon{position:absolute;top:6%;left:50%;width:62%;padding-top:62%;transform:translateX(-50%);border-radius:50%;z-index:1;
+            background:radial-gradient(circle at 42% 40%,#ffb37a 0%,#ff7a3d 28%,#e8501f 52%,#a02a10 74%,rgba(160,42,16,0) 100%);
+            box-shadow:0 0 90px 30px rgba(255,106,61,.35),0 0 220px 90px rgba(255,90,45,.18);
+            opacity:0;transition:opacity 2.6s ease,transform 9s ease}
+        #samuraiIntro.st-in .sam-moon{opacity:1}
+        #samuraiIntro.st-push .sam-moon{transform:translateX(-50%) scale(1.06)}
+
+        .sam-figure{position:relative;z-index:5;width:auto;height:92%;overflow:visible;opacity:0;filter:drop-shadow(0 18px 26px rgba(0,0,0,.6));transition:opacity 1.2s ease}
+        #samuraiIntro.st-in .sam-figure{opacity:1}
+
+        /* Joint chain: torso (hip pivot) -> shoulder (shoulder pivot) -> forearm (elbow pivot) -> katana (wrist pivot).
+           Each nested group inherits its parent's rotation, so torso+shoulder+forearm compose into one
+           physically-plausible arc instead of a single rigid rotation -- the actual technique 2D cutout
+           rigs (Character Animator, South Park-style) use for readable body performance. */
+        .sam-torso{transform-box:fill-box;transform-origin:50% 78%;transition:transform 1.1s cubic-bezier(.33,0,.2,1)}
+        .sam-shoulder{transform-box:fill-box;transform-origin:63% 34%;transition:transform 1s cubic-bezier(.33,0,.2,1)}
+        .sam-forearm{transform-box:fill-box;transform-origin:58% 30%;transition:transform .85s cubic-bezier(.33,0,.2,1)}
+        .sam-katana-grp{transform-box:fill-box;transform-origin:50% 92%;transition:transform .7s cubic-bezier(.33,0,.2,1)}
+        .sam-head{transform-box:fill-box;transform-origin:50% 85%;transition:transform 1s cubic-bezier(.33,0,.2,1)}
+
+        /* idle: subtle breathing sway, looping until the first stage advances it */
+        #samuraiIntro.st-idle .sam-torso{animation:samBreathe 2.6s ease-in-out infinite}
+        @keyframes samBreathe{0%,100%{transform:rotate(0deg) translateY(0)}50%{transform:rotate(.6deg) translateY(-2px)}}
+
+        #samuraiIntro.st-ready .sam-torso{transform:rotate(-4deg)}
+        #samuraiIntro.st-ready .sam-shoulder{transform:rotate(-38deg)}
+        #samuraiIntro.st-ready .sam-forearm{transform:rotate(-22deg)}
+        #samuraiIntro.st-ready .sam-katana-grp{transform:rotate(-8deg)}
+        #samuraiIntro.st-ready .sam-head{transform:rotate(-2deg)}
+
+        #samuraiIntro.st-slash1 .sam-torso{transform:rotate(14deg);transition-duration:.42s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash1 .sam-shoulder{transform:rotate(52deg);transition-duration:.42s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash1 .sam-forearm{transform:rotate(38deg);transition-duration:.36s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash1 .sam-katana-grp{transform:rotate(22deg);transition-duration:.3s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash1 .sam-head{transform:rotate(4deg);transition-duration:.42s}
+
+        #samuraiIntro.st-slash2 .sam-torso{transform:rotate(-16deg);transition-duration:.42s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash2 .sam-shoulder{transform:rotate(-58deg);transition-duration:.42s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash2 .sam-forearm{transform:rotate(-34deg);transition-duration:.36s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash2 .sam-katana-grp{transform:rotate(-18deg);transition-duration:.3s;transition-timing-function:cubic-bezier(.2,.9,.3,1)}
+        #samuraiIntro.st-slash2 .sam-head{transform:rotate(-5deg);transition-duration:.42s}
+
+        #samuraiIntro.st-settle .sam-torso{transform:rotate(2deg)}
+        #samuraiIntro.st-settle .sam-shoulder{transform:rotate(-10deg)}
+        #samuraiIntro.st-settle .sam-forearm{transform:rotate(-4deg)}
+        #samuraiIntro.st-settle .sam-katana-grp{transform:rotate(2deg)}
+        #samuraiIntro.st-settle .sam-head{transform:rotate(1deg)}
+
+        #samuraiIntro.st-attack .sam-torso{transform:rotate(-8deg) translateX(-4px);transition-duration:.32s;transition-timing-function:cubic-bezier(.6,0,.9,0)}
+        #samuraiIntro.st-attack .sam-shoulder{transform:rotate(4deg) scale(1.03);transition-duration:.32s;transition-timing-function:cubic-bezier(.6,0,.9,0)}
+        #samuraiIntro.st-attack .sam-forearm{transform:rotate(58deg);transition-duration:.32s;transition-timing-function:cubic-bezier(.6,0,.9,0)}
+        #samuraiIntro.st-attack .sam-katana-grp{transform:rotate(70deg) scale(1.35);transition-duration:.32s;transition-timing-function:cubic-bezier(.6,0,.9,0)}
+
+        /* motion trail: a blurred duplicate of the blade, flashed briefly on each slash via opacity */
+        .sam-blade-trail{opacity:0;transition:opacity .08s linear}
+        #samuraiIntro.st-slash1 .sam-blade-trail,#samuraiIntro.st-slash2 .sam-blade-trail,#samuraiIntro.st-attack .sam-blade-trail{opacity:.85;transition:opacity .02s linear}
+
+        .sam-slash-flash{position:absolute;inset:0;z-index:15;pointer-events:none;background:radial-gradient(ellipse at 60% 45%,rgba(232,251,255,.9) 0%,rgba(232,251,255,0) 45%);opacity:0}
+        #samuraiIntro.st-slash1 .sam-slash-flash,#samuraiIntro.st-slash2 .sam-slash-flash{animation:samFlashPulse .35s ease-out}
+        #samuraiIntro.st-impact .sam-slash-flash{background:radial-gradient(ellipse at 50% 42%,rgba(255,235,220,.98) 0%,rgba(255,120,60,.5) 30%,rgba(255,120,60,0) 60%);animation:samFlashPulse .5s ease-out}
+        @keyframes samFlashPulse{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+
+        #samuraiIntro.st-impact .sam-scene{animation:samCameraShake .4s linear}
+        @keyframes samCameraShake{0%,100%{transform:translate(0,0) scale(1.09)}20%{transform:translate(-6px,3px) scale(1.09)}40%{transform:translate(5px,-4px) scale(1.09)}60%{transform:translate(-4px,-2px) scale(1.09)}80%{transform:translate(3px,4px) scale(1.09)}}
+
+        .sam-title{position:absolute;z-index:26;display:flex;gap:clamp(4px,1.4vw,14px);font-family:'Georgia','Times New Roman',serif;font-weight:700;font-size:clamp(2rem,6.4vw,4.4rem);letter-spacing:.06em;color:#f2ede2;text-shadow:0 0 24px rgba(255,140,80,.35),0 2px 3px rgba(0,0,0,.8)}
+        .sam-letter{display:inline-block;opacity:0;will-change:transform,opacity;transition:transform .85s cubic-bezier(.16,1,.3,1),opacity .5s ease,filter .5s ease;filter:blur(6px)}
+        #samuraiIntro.st-letters .sam-letter{opacity:1;transform:translate(0,0) rotate(0deg);filter:blur(0)}
+        #samuraiIntro.st-shatter .sam-title{opacity:0;transition:opacity .05s linear}
+        /* each letter's off-screen starting point/rotation, per the "arrive from different directions" spec */
+        .sam-letter[data-i="0"]{transform:translate(-70px,-90px) rotate(-40deg)}
+        .sam-letter[data-i="1"]{transform:translate(70px,-90px) rotate(38deg)}
+        .sam-letter[data-i="2"]{transform:translate(-110px,10px) rotate(-18deg)}
+        .sam-letter[data-i="3"]{transform:translate(110px,10px) rotate(20deg)}
+        .sam-letter[data-i="4"]{transform:translate(-70px,90px) rotate(30deg)}
+        .sam-letter[data-i="5"]{transform:translate(70px,90px) rotate(-32deg)}
+        .sam-letter[data-i="6"]{transform:translate(0,-100px) rotate(12deg)}
+        #samuraiIntro.st-letters .sam-letter[data-i="0"]{transition-delay:.02s}
+        #samuraiIntro.st-letters .sam-letter[data-i="1"]{transition-delay:.09s}
+        #samuraiIntro.st-letters .sam-letter[data-i="2"]{transition-delay:.16s}
+        #samuraiIntro.st-letters .sam-letter[data-i="3"]{transition-delay:.23s}
+        #samuraiIntro.st-letters .sam-letter[data-i="4"]{transition-delay:.30s}
+        #samuraiIntro.st-letters .sam-letter[data-i="5"]{transition-delay:.37s}
+        #samuraiIntro.st-letters .sam-letter[data-i="6"]{transition-delay:.44s}
+        #samuraiIntro.st-hold .sam-title{animation:samTitleGlow 1.1s ease-in-out}
+        @keyframes samTitleGlow{0%,100%{text-shadow:0 0 24px rgba(255,140,80,.35),0 2px 3px rgba(0,0,0,.8)}50%{text-shadow:0 0 40px rgba(255,170,110,.65),0 2px 3px rgba(0,0,0,.8)}}
+
+        #samShatterCanvas{position:absolute;inset:0;z-index:27;pointer-events:none}
+
+        @media (prefers-reduced-motion: reduce){
+            #samuraiIntro *{transition-duration:.01ms!important;animation-duration:.01ms!important}
+        }
+        @media (max-width:640px){
+            .sam-scene{width:78vw;height:64vh}
+            .sam-title{gap:3px}
+        }
+        .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
 
         /* Custom Agency List Table */
         .al-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
@@ -538,12 +664,76 @@
     </div>
 </div>
 
-<div id="cinematicIntro">
-    <div class="cinematic-bg" id="cineBg">
-        <img src="image_405f45.jpg" id="samuraiRefImage" alt="Cinematic Samurai">
+<!-- Samurai cinematic intro: plays after login and on every full page reload (see
+     playSamuraiIntro() at the bottom of the script). An original stylized silhouette
+     (not a reproduction of any existing artwork) with a real joint-chain rig --
+     torso -> shoulder -> forearm -> blade, each nested group inheriting its parent's
+     rotation -- composited with a moon, fog, grain and letterbox bars for atmosphere.
+     JS (see SAM_TIMELINE) drives a sequence of stage classes on #samuraiIntro; the
+     final strike triggers a canvas particle shatter on the title (samShatterTitle()). -->
+<div id="samuraiIntro">
+    <div class="sam-bar sam-bar-top"></div>
+    <div class="sam-bar sam-bar-bottom"></div>
+    <div class="sam-fog sam-fog-1"></div>
+    <div class="sam-fog sam-fog-2"></div>
+
+    <div class="sam-scene">
+        <div class="sam-moon"></div>
+        <svg class="sam-figure" viewBox="0 0 300 460" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet">
+            <defs>
+                <linearGradient id="samBladeGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#f2f8fa"/>
+                    <stop offset="45%" stop-color="#c9d8dc"/>
+                    <stop offset="100%" stop-color="#818f93"/>
+                </linearGradient>
+            </defs>
+
+            <!-- legs / hakama base (static) -->
+            <g fill="#040404">
+                <path d="M118 358 C110 358 104 366 103 378 L96 452 C95 457 99 460 104 460 L128 460 C132 460 135 457 135 452 L136 384 C136 370 129 358 118 358 Z"/>
+                <path d="M182 358 C190 358 196 366 197 378 L204 452 C205 457 201 460 196 460 L172 460 C168 460 165 457 165 452 L164 384 C164 370 171 358 182 358 Z"/>
+                <path d="M96 340 C96 320 118 300 150 300 C182 300 204 320 204 340 L206 366 C206 372 200 376 194 374 C176 368 124 368 106 374 C100 376 94 372 94 366 Z"/>
+            </g>
+
+            <!-- torso: hip-pivoted root of the whole upper-body chain -->
+            <g class="sam-torso">
+                <g fill="#040404">
+                    <path d="M104 228 C100 260 98 292 100 316 C124 306 176 306 200 316 C202 292 200 260 196 228 C196 200 178 178 150 178 C122 178 104 200 104 228 Z"/>
+                    <path d="M92 224 L100 226 C98 250 97 274 99 296 L88 300 C82 272 84 246 92 224 Z"/>
+                </g>
+
+                <!-- helmet, own joint for subtle follow-through -->
+                <g class="sam-head" fill="#040404">
+                    <path d="M150 88 C130 88 116 104 114 124 C113 136 116 148 122 156 L124 168 C124 174 128 178 134 178 L166 178 C172 178 176 174 176 168 L178 156 C184 148 187 136 186 124 C184 104 170 88 150 88 Z"/>
+                    <path d="M118 118 C120 96 132 78 150 78 C168 78 180 96 182 118 C172 110 128 110 118 118 Z"/>
+                    <path d="M144 70 C146 58 148 48 150 40 C152 48 154 58 156 70 C152 66 148 66 144 70 Z"/>
+                </g>
+
+                <!-- sword arm: shoulder -> forearm -> katana, each pivoting from its parent's motion -->
+                <g class="sam-shoulder" fill="#040404">
+                    <path d="M188 196 C204 196 216 208 218 224 L224 248 C226 256 220 262 213 259 L196 250 C192 236 190 216 188 196 Z"/>
+                    <g class="sam-forearm">
+                        <path d="M213 246 C224 250 232 260 232 272 L236 296 C237 304 230 309 224 305 L210 292 C209 278 210 260 213 246 Z"/>
+                        <g class="sam-katana-grp">
+                            <path class="sam-blade-trail" d="M224 294 L302 206" stroke="url(#samBladeGrad)" stroke-width="12" stroke-linecap="round" filter="blur(7px)"/>
+                            <rect x="216" y="288" width="10" height="26" rx="3" transform="rotate(-42 221 301)" fill="#1b1c1f"/>
+                            <circle cx="223" cy="312" r="5" fill="#2a2b2e"/>
+                            <path d="M222 292 L296 208 C298 206 301 208 300 211 L232 300 C229 303 220 296 222 292 Z" fill="url(#samBladeGrad)"/>
+                            <path d="M224 292 L297 210" stroke="#fff" stroke-width="1" opacity=".5"/>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </svg>
+        <div class="sam-slash-flash"></div>
     </div>
-    <canvas id="cinematicCanvas"></canvas>
-    <div class="cinematic-vignette" id="cineVig"></div>
+
+    <div class="sam-title" id="samTitle">
+        <span class="sam-letter" data-i="0">S</span><span class="sam-letter" data-i="1">A</span><span class="sam-letter" data-i="2">M</span><span class="sam-letter" data-i="3">U</span><span class="sam-letter" data-i="4">R</span><span class="sam-letter" data-i="5">A</span><span class="sam-letter" data-i="6">I</span>
+    </div>
+    <canvas id="samShatterCanvas"></canvas>
+    <div class="sam-vignette"></div>
+    <div class="sam-grain"></div>
 </div>
 
 <div class="app-shell" id="mainApp">
@@ -2340,262 +2530,122 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
+// Samurai cinematic intro -- see #samuraiIntro markup/CSS for the scene itself.
+// A sequence of CSS "stage" classes (idle -> ready -> slash1 -> slash2 -> settle ->
+// letters -> hold -> attack -> impact -> out) is applied to #samuraiIntro at precise
+// offsets below, rather than one long CSS animation, specifically so the canvas
+// particle shatter can be fired at the exact moment the final strike visually lands
+// (samShatterTitle(), called from the 'impact' stage). Runs on EVERY full page
+// load/refresh while authenticated, and once right after a fresh login -- never on
+// internal SPA tab navigation, since this code only executes from the one-time
+// bootstrap block at the bottom of the script, not from executePageLogic().
+const SAM_TIMELINE = [
+    { cls: 'st-in',      at: 0 },
+    { cls: 'st-idle',    at: 150 },
+    { cls: 'st-ready',   at: 900 },
+    { cls: 'st-slash1',  at: 2100 },
+    { cls: 'st-slash2',  at: 2650 },
+    { cls: 'st-settle',  at: 3200 },
+    { cls: 'st-push',    at: 3200 },
+    { cls: 'st-letters', at: 4400 },
+    { cls: 'st-hold',    at: 5750 },
+    { cls: 'st-attack',  at: 6550 },
+    { cls: 'st-impact',  at: 6950, shatter: true },
+    { cls: 'st-out',     at: 7550 },
+];
+const SAM_REVEAL_AT_MS = 8150;
+
 function playSamuraiIntro() {
-    const intro = document.getElementById('cinematicIntro');
+    const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
-    if (!intro) { if (appShell) appShell.style.display = 'flex'; return; }
+    if (!intro || !appShell) { if (appShell) appShell.style.display = 'flex'; return; }
 
-    intro.classList.add('playing');
-    if (appShell) appShell.style.display = 'none';
+    // fresh run every time: clear any classes/canvas state left from a previous play
+    intro.className = 'playing';
+    const canvas = document.getElementById('samShatterCanvas');
+    if (canvas) { const ctx = canvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
-    const canvas = document.getElementById('cinematicCanvas');
-    const ctx = canvas.getContext('2d', { alpha: true });
-    let w = canvas.width = window.innerWidth;
-    let h = canvas.height = window.innerHeight;
-
-    const cineBg = document.getElementById('cineBg');
-    const cineVig = document.getElementById('cineVig');
-
-    let particles = [];
-    let slashes = [];
-    let startTime = performance.now();
-    let isShattered = false;
-    let screenFlash = 0;
-
-    // Configuration
-    const introDuration = 9500;
-    const textStart = 5000;
-    const impactTime = 8400;
-
-    // Resize handler
-    window.addEventListener('resize', () => {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
+    const timers = [];
+    SAM_TIMELINE.forEach(stage => {
+        timers.push(setTimeout(() => {
+            intro.classList.add(stage.cls);
+            if (stage.shatter) samShatterTitle();
+        }, stage.at));
     });
 
-    // Extract Text Particles
-    function initParticles() {
-        const offscreen = document.createElement('canvas');
-        offscreen.width = w;
-        offscreen.height = h;
-        const octx = offscreen.getContext('2d');
-        
-        octx.fillStyle = '#ffffff';
-        octx.textBaseline = 'middle';
-        octx.textAlign = 'center';
-        
-        // Premium Cinematic Typography
-        const fontSize = Math.min(w / 7, 140);
-        octx.font = `800 ${fontSize}px "Times New Roman", "Playfair Display", serif`;
-        octx.letterSpacing = '14px';
-        octx.fillText('SAMURAI', w / 2, h / 2 + 100);
+    timers.push(setTimeout(() => {
+        intro.classList.remove('playing');
+        appShell.style.display = 'flex';
+    }, SAM_REVEAL_AT_MS));
+}
 
-        const imgData = octx.getImageData(0, 0, w, h).data;
-        const step = w > 800 ? 3 : 2; // Particle density
-        
-        const letterWidth = w / 7;
+// Canvas particle burst that "shatters" the SAMURAI title at the moment of impact.
+// Self-contained: grabs its own rAF handle and cancels it when the burst finishes,
+// clears the canvas afterward, and never leaves timers/listeners running -- nothing
+// to clean up externally.
+function samShatterTitle() {
+    const intro = document.getElementById('samuraiIntro');
+    const titleEl = document.getElementById('samTitle');
+    const canvas = document.getElementById('samShatterCanvas');
+    if (!intro || !titleEl || !canvas || !canvas.getContext) return;
 
-        for (let y = 0; y < h; y += step) {
-            for (let x = 0; x < w; x += step) {
-                const i = (y * w + x) * 4;
-                if (imgData[i + 3] > 128) {
-                    // Determine letter group (0-6)
-                    const letterIndex = Math.floor(x / letterWidth);
-                    
-                    // Assign random starting positions based on letter to simulate gathering from all directions
-                    let sx, sy;
-                    switch(letterIndex) {
-                        case 0: sx = Math.random() * w * 0.3; sy = -100; break;
-                        case 1: sx = w * 0.7 + Math.random() * w * 0.3; sy = -100; break;
-                        case 2: sx = -100; sy = Math.random() * h; break;
-                        case 3: sx = w + 100; sy = Math.random() * h; break;
-                        case 4: sx = Math.random() * w * 0.3; sy = h + 100; break;
-                        case 5: sx = w * 0.7 + Math.random() * w * 0.3; sy = h + 100; break;
-                        case 6: sx = w / 2; sy = -200; break;
-                        default: sx = Math.random() * w; sy = Math.random() * h;
-                    }
+    const introRect = intro.getBoundingClientRect();
+    const titleRect = titleEl.getBoundingClientRect();
+    canvas.width = introRect.width;
+    canvas.height = introRect.height;
+    const ctx = canvas.getContext('2d');
 
-                    particles.push({
-                        tx: x, ty: y,               // Target pos
-                        x: sx, y: sy,               // Current pos
-                        vx: 0, vy: 0, vz: 0,        // Shatter velocities
-                        z: 1,                       // Scale/depth
-                        group: letterIndex,
-                        delay: textStart + (letterIndex * 200) + Math.random() * 300,
-                        color: Math.random() > 0.8 ? '#ff4d6d' : (Math.random() > 0.5 ? '#e0e0e0' : '#ffffff'),
-                        active: false
-                    });
-                }
-            }
-        }
+    const cx = (titleRect.left - introRect.left) + titleRect.width * 0.72;  // impact lands from the sword-arm side
+    const cy = (titleRect.top - introRect.top) + titleRect.height * 0.5;
+    const palette = ['#f2ede2', '#ffd9b0', '#ff9a5c', '#ffb37a', '#c9d8dc'];
+    const particles = [];
+    const count = 160;
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 60 + Math.random() * 260;
+        particles.push({
+            x: cx + (Math.random() - 0.5) * titleRect.width * 0.5,
+            y: cy + (Math.random() - 0.5) * titleRect.height * 0.6,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 40,
+            size: 2 + Math.random() * 5,
+            rot: Math.random() * Math.PI,
+            vrot: (Math.random() - 0.5) * 12,
+            color: palette[i % palette.length],
+            life: 0.55 + Math.random() * 0.35,
+        });
     }
 
-    // Add cinematic light slashes
-    function addSlash(x1, y1, x2, y2, startT, duration) {
-        slashes.push({ x1, y1, x2, y2, startT, duration, active: true });
-    }
-
-    // Choreographed Strikes
-    addSlash(w*0.1, h*0.2, w*0.9, h*0.8, 2000, 300); // Slash 1
-    addSlash(w*0.8, h*0.9, w*0.2, h*0.1, 3200, 300); // Slash 2
-    addSlash(0, h*0.5, w, h*0.4, 4400, 300);         // Slash 3
-
-    initParticles();
-
-    // Main Render Loop
-    function render(time) {
-        const elapsed = time - startTime;
-        ctx.clearRect(0, 0, w, h);
-
-        // --- 1. Camera & Breathing Control ---
-        let scale = 1.05;
-        let transX = 0;
-        let transY = Math.sin(elapsed * 0.001) * 5; // Subtle breathing
-        let blur = 0;
-
-        if (elapsed < 2000) {
-            // Initial reveal push in
-            scale = 1.0 + (elapsed / 2000) * 0.05;
-            cineVig.style.opacity = 1 - (elapsed/2000) * 0.2;
-        } else if (elapsed > 2000 && elapsed < 8000) {
-            // Holds and strikes
-            scale = 1.05;
-            // Screen shake on slashes
-            if (elapsed > 2000 && elapsed < 2300) { transX = (Math.random()-0.5)*20; transY = (Math.random()-0.5)*20; blur = 2; }
-            if (elapsed > 3200 && elapsed < 3500) { transX = (Math.random()-0.5)*20; transY = (Math.random()-0.5)*20; blur = 2; }
-            if (elapsed > 4400 && elapsed < 4700) { transX = (Math.random()-0.5)*20; transY = (Math.random()-0.5)*20; blur = 2; }
-        } else if (elapsed > 8000 && elapsed < impactTime) {
-            // Wind up for final strike
-            const progress = (elapsed - 8000) / 400;
-            scale = 1.05 - (progress * 0.03); // pull back
-            transX = -10 * progress;
-            transY = 15 * progress;
-        } else if (elapsed >= impactTime && elapsed < impactTime + 300) {
-            // Impact Lunge
-            const progress = (elapsed - impactTime) / 300;
-            scale = 1.02 + (progress * 0.15); // massive push forward
-            transX = (Math.random()-0.5)*40;
-            transY = (Math.random()-0.5)*40;
-            blur = 4;
-        } else if (elapsed >= impactTime + 300) {
-            // Fade out phase
-            scale = 1.17;
-            cineBg.style.opacity = 1 - ((elapsed - (impactTime + 300)) / 800);
+    const start = performance.now();
+    let rafId = null;
+    function tick(now) {
+        const t = (now - start) / 1000;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let anyAlive = false;
+        for (const p of particles) {
+            if (t >= p.life) continue;
+            anyAlive = true;
+            const pt = t / p.life;
+            const ease = 1 - Math.pow(1 - pt, 2);
+            const px = p.x + p.vx * ease;
+            const py = p.y + p.vy * ease + 220 * pt * pt; // slight gravity
+            const alpha = 1 - pt;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(p.rot + p.vrot * t);
+            ctx.globalAlpha = Math.max(0, alpha);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+            ctx.restore();
         }
-
-        cineBg.style.transform = `scale(${scale}) translate(${transX}px, ${transY}px)`;
-        cineBg.style.filter = `blur(${blur}px) brightness(${elapsed >= impactTime && elapsed < impactTime+100 ? 1.5 : 0.8})`;
-
-        // --- 2. Render Slashes ---
-        ctx.lineCap = 'round';
-        slashes.forEach(s => {
-            if (elapsed >= s.startT && elapsed <= s.startT + s.duration) {
-                const p = (elapsed - s.startT) / s.duration;
-                // Easing for whip effect
-                const easeP = 1 - Math.pow(1 - p, 4);
-                
-                ctx.beginPath();
-                ctx.moveTo(s.x1, s.y1);
-                ctx.lineTo(s.x1 + (s.x2 - s.x1) * easeP, s.y1 + (s.y2 - s.y1) * easeP);
-                
-                // Outer glow
-                ctx.strokeStyle = `rgba(255, 100, 100, ${1 - p})`;
-                ctx.lineWidth = 15 + Math.random() * 10;
-                ctx.stroke();
-
-                // Core flash
-                ctx.strokeStyle = `rgba(255, 255, 255, ${1 - p})`;
-                ctx.lineWidth = 4 + Math.random() * 4;
-                ctx.stroke();
-            }
-        });
-
-        // --- 3. Render Particles (Text Assembly & Shatter) ---
-        // Trigger impact shatter
-        if (elapsed >= impactTime && !isShattered) {
-            isShattered = true;
-            screenFlash = 1.0;
-            const cx = w / 2;
-            const cy = h / 2 + 100;
-            
-            particles.forEach(p => {
-                const dx = p.x - cx;
-                const dy = p.y - cy;
-                const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                // Intense outward and forward (Z) velocity
-                const force = (Math.random() * 40 + 20) / (dist * 0.05);
-                p.vx = (dx / dist) * force * 2;
-                p.vy = (dy / dist) * force * 2;
-                p.vz = Math.random() * 0.2 + 0.05; // Growth rate (Z depth)
-            });
-        }
-
-        ctx.fillStyle = '#fff';
-        particles.forEach(p => {
-            if (elapsed < p.delay) return; // Wait for staggered entrance
-
-            if (!isShattered) {
-                // Assembly Phase
-                const speed = 0.06;
-                p.x += (p.tx - p.x) * speed;
-                p.y += (p.ty - p.y) * speed;
-                
-                // Add a slight glow as they settle
-                const dist = Math.abs(p.tx - p.x) + Math.abs(p.ty - p.y);
-                if (dist < 2) p.active = true;
-                
-                ctx.fillStyle = p.active ? p.color : 'rgba(255,100,100,0.8)';
-                ctx.fillRect(p.x, p.y, 2.5, 2.5);
-
-            } else {
-                // Shatter Phase
-                p.x += p.vx;
-                p.y += p.vy;
-                p.z += p.vz; // Simulate 3D depth by growing
-                
-                p.vx *= 0.95; // Friction
-                p.vy *= 0.95;
-
-                const alpha = Math.max(0, 1 - (elapsed - impactTime) / 800);
-                
-                ctx.save();
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = p.color;
-                // Draw rotating shattered fragments
-                ctx.translate(p.x, p.y);
-                ctx.rotate((p.vx + p.vy) * 0.1);
-                ctx.fillRect(-p.z, -p.z, p.z * 2, p.z * 2);
-                ctx.restore();
-            }
-        });
-
-        // --- 4. Impact Flash ---
-        if (screenFlash > 0) {
-            const grad = ctx.createRadialGradient(w/2, h/2+100, 0, w/2, h/2+100, w);
-            grad.addColorStop(0, `rgba(255, 255, 255, ${screenFlash})`);
-            grad.addColorStop(0.3, `rgba(255, 100, 100, ${screenFlash * 0.6})`);
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, h);
-            screenFlash -= 0.05;
-        }
-
-        // --- 5. Timeline Control ---
-        if (elapsed < introDuration) {
-            requestAnimationFrame(render);
+        if (anyAlive) {
+            rafId = requestAnimationFrame(tick);
         } else {
-            // Clean up and reveal app
-            intro.classList.remove('playing');
-            if (appShell) appShell.style.display = 'flex';
-            
-            // Release memory
-            particles = null;
-            slashes = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (rafId) cancelAnimationFrame(rafId);
         }
     }
-
-    requestAnimationFrame(render);
+    rafId = requestAnimationFrame(tick);
 }
 
 function logout() { 
@@ -4256,7 +4306,7 @@ async function runQuery(){
     }
 }
 
-let myReqAllResults = [], myReqCurrentPage = 1, myReqWindowLabel = '';
+let myReqAllResults = [], myReqCurrentPage = 1;
 
 async function loadMyRequests() {
     const resultsEl = document.getElementById('myReqResults');
@@ -4266,13 +4316,6 @@ async function loadMyRequests() {
 
     if (resultsEl) resultsEl.innerHTML = '';
     if (emptyEl) { emptyEl.style.display = 'none'; emptyEl.querySelector('p').textContent = 'No requests found in that window.'; }
-    // BUG FIX (header showing a stale "N requests found for <old window>" from the
-    // previous search while the body below correctly said "No requests found for
-    // <new window>"): the header text is only ever set inside myReqRenderPage(),
-    // which is skipped entirely on the empty-results path -- so a prior non-empty
-    // search's header text was left on screen forever after a later empty search.
-    // Clear it up front on every search so there's never a mismatched leftover.
-    document.getElementById('myReqResultCount').textContent = 'Searching…';
     document.getElementById('myReqPagination').style.display = 'none';
     document.getElementById('loadingOverlay').style.display = 'flex';
 
@@ -4291,22 +4334,10 @@ async function loadMyRequests() {
         if (data.fetch_complete === false) {
             ToastManager.show(`Data may be incomplete. Reason: ${data.stop_reason||'unknown'}.`, 'warning', 6000);
         }
-        if (data.identity_diagnostic) {
-            console.warn('[my-requests diagnostic]', data.identity_diagnostic);
-        }
 
         myReqAllResults = data.results || [];
-        myReqWindowLabel = (data.window_from && data.window_to) ? `${data.window_from} → ${data.window_to} (Cairo time)` : '';
         if (!myReqAllResults.length) {
-            document.getElementById('myReqResultCount').textContent = '0 requests found' + (myReqWindowLabel ? ` for ${myReqWindowLabel}` : '');
-            if (emptyEl) {
-                emptyEl.style.display = 'block';
-                let msg = myReqWindowLabel ? `No requests found for ${myReqWindowLabel}.` : 'No requests found in that window.';
-                if (typeof data.identity_diagnostic === 'number' && data.identity_diagnostic > 0) {
-                    msg += ` (${data.identity_diagnostic} other request${data.identity_diagnostic===1?'':'s'} exist in this window but didn't match your account identity -- if that looks wrong, this points at an identity-matching issue rather than a missing-data one.)`;
-                }
-                emptyEl.querySelector('p').textContent = msg;
-            }
+            if (emptyEl) emptyEl.style.display = 'block';
             document.getElementById('loadingOverlay').style.display = 'none';
             return;
         }
@@ -4329,7 +4360,7 @@ function myReqRenderPage(page) {
     const start = (page - 1) * pageSize;
     const pageResults = myReqAllResults.slice(start, start + pageSize);
 
-    document.getElementById('myReqResultCount').textContent = `${myReqAllResults.length} request${myReqAllResults.length === 1 ? '' : 's'} found` + (myReqWindowLabel ? ` for ${myReqWindowLabel}` : '');
+    document.getElementById('myReqResultCount').textContent = `${myReqAllResults.length} request${myReqAllResults.length === 1 ? '' : 's'} found`;
 
     if (resultsEl) {
         resultsEl.innerHTML = pageResults.map(r => `
