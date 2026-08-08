@@ -2691,6 +2691,34 @@ def my_requests():
     # behind further slow, similarly-fragile retries.
     all_items, fetch_complete, stop_reason = fast_items, fast_complete, fast_reason
 
+    # DIAGNOSTIC (only runs when the identity+date search above found nothing, and
+    # only spends leftover time budget): re-run the SAME date-range bound with the
+    # identity condition dropped, capped to a single small page, purely to answer
+    # "does *anything* exist in this window at all?" -- not to expose other people's
+    # records (we only ever return a count, never these items) but to tell apart
+    # "genuinely no requests in this window" from "the identity condition (open_id /
+    # SUBMITTED_BY_FIELD_NAME match -- see the attribution-bug comment above) is
+    # wrongly excluding records that really are this caller's". A non-zero count
+    # here with the identity+date search returning zero is a strong signal the
+    # identity filter, not the date filter, is the actual bug.
+    identity_diagnostic = None
+    if not all_items and fetch_complete and time.time() < _deadline:
+        try:
+            diag_payload = {
+                "page_size": 50,
+                "filter": {
+                    "conjunction": "and",
+                    "conditions": [
+                        {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", from_ms]},
+                        {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", to_ms]},
+                    ]
+                },
+            }
+            diag_items, _, _ = _run_search(diag_payload, min(_deadline, time.time() + 8))
+            identity_diagnostic = len(diag_items)
+        except Exception as e:
+            logger.warn("my_requests_identity_diagnostic_failed", error=str(e))
+
     # BUG FIX (duplicate cards): the same record could legitimately come back more
     # than once across pages (e.g. a page re-requested after a retry), and nothing
     # downstream ever deduplicated by record_id -- which is exactly the "one
@@ -2763,6 +2791,7 @@ def my_requests():
         # guess whether "no results" means "no data in that window" or a real bug.
         "window_from": from_dt.strftime("%Y-%m-%d %H:%M"),
         "window_to": _cairo_now.strftime("%Y-%m-%d %H:%M"),
+        "identity_diagnostic": identity_diagnostic,
     })
 
 @app.route('/api/live-queue', methods=['GET'])
