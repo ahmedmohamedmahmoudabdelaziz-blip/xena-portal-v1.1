@@ -6,15 +6,11 @@
     <title>Xena Data Portal</title>
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><circle cx='50' cy='50' r='38' fill='%23841b2d' stroke='%23841b2d' stroke-width='16' stroke-dasharray='0 14.92' stroke-linecap='round'/><circle cx='50' cy='50' r='29' fill='%232a2c30'/><text x='47' y='66' font-family='Times New Roman, serif' font-size='52' font-weight='bold' fill='%23841b2d' text-anchor='middle' font-style='italic'>S</text><path d='M 32 60 L 46 72 L 85 25 L 80 20 L 46 60 L 36 52 Z' fill='%23841b2d' stroke='%232a2c30' stroke-width='2' stroke-linejoin='round'/></svg>">
-    
-    <!-- Preload Cinematic Samurai Intro & Premium Typography -->
-    <link rel="preload" href="sam.mp4" as="video" type="video/mp4">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&display=swap" rel="stylesheet">
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" as="video" href="/api/samurai-video" type="video/mp4">
     <style>
         :root {
             --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
@@ -170,54 +166,74 @@
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
 
-        /* EPIC CINEMATIC SAMURAI ENGINE (sam.mp4) */
-        #samuraiIntro { display: none; position: fixed; inset: 0; z-index: 9999; background: #02040a; overflow: hidden; transition: opacity 1s ease, filter 1s ease; }
-        #samuraiIntro.playing { display: block; }
-        
-        /* Video Foundation */
-        #samVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; pointer-events: none; z-index: 1; opacity: 0; transition: opacity 0.5s ease; }
-        #samVideo.ready { opacity: 1; }
-        
-        /* Subtle Cinematic Grading Overlay */
-        #samOverlay { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(circle at center, transparent 0%, rgba(2, 4, 10, 0.4) 80%, rgba(2, 4, 10, 0.8) 100%); }
+        /* ============================================================
+           SAMURAI CINEMATIC INTRO (video-based)
+           sam.mp4 IS the Samurai -- no SVG/CSS body is drawn anymore.
+           Plays after login and on every full page reload (see
+           playSamuraiIntro() at the bottom of the script). JS drives a
+           sequence of "stage" classes on #samuraiIntro at offsets matched
+           to the actual choreography in the footage (see SAM_TIMELINE),
+           so the title/particle layers stay in sync with the real video
+           instead of an arbitrary guess.
+           ============================================================ */
+        #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;overflow:hidden;background:#000;opacity:0;transition:opacity .6s ease}
+        #samuraiIntro.playing{display:flex;justify-content:center;align-items:center}
+        #samuraiIntro.st-in{opacity:1}
+        #samuraiIntro.st-out{opacity:0}
 
-        /* Typography / Gathering Particles */
-        #samTextContainer { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; z-index: 3; pointer-events: none; perspective: 1200px; gap: 4px; }
-        .sam-letter { 
-            font-family: "Cinzel", "Times New Roman", "Playfair Display", serif; 
-            font-size: clamp(3rem, 10vw, 8rem); 
-            font-weight: 600; 
-            letter-spacing: 0.1em; 
-            color: #f0f4f8; 
-            text-shadow: 0 0 15px rgba(255, 60, 0, 0.6), 0 0 40px rgba(255, 60, 0, 0.3), inset 0 0 5px rgba(255,255,255,0.8);
-            display: inline-block;
-            opacity: 0;
-            filter: blur(15px);
-            /* Transform set per-letter dynamically via var() */
-            transform: translate3d(var(--tx), var(--ty), var(--tz)) rotate(var(--rot)) scale(1.8);
-            transition: all 2.2s cubic-bezier(0.16, 1, 0.3, 1); /* Elegant, cinematic ease out */
-        }
-        #samTextContainer.assembling .sam-letter {
-            opacity: 1;
-            transform: translate3d(0, 0, 0) rotate(0) scale(1);
-            filter: blur(0);
-        }
+        #samVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;z-index:1;background:#000}
 
-        /* Shatter Canvas & Effects */
-        #samParticleCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
-        
-        #samFlash { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(circle at center, rgba(255,255,255,1) 0%, rgba(255,60,0,0.8) 30%, transparent 80%); opacity: 0; mix-blend-mode: screen; transform: scale(0.5); }
-        #samFlash.active { animation: cinematicBlast 1s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
-        @keyframes cinematicBlast { 0% { opacity: 1; transform: scale(0.5); } 100% { opacity: 0; transform: scale(2.5); } }
-        
-        /* Camera Shake on Impact */
-        .cinematic-shake { animation: camShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
-        @keyframes camShake { 
-            0%, 100% { transform: translate3d(0, 0, 0); }
-            10%, 30%, 50%, 70%, 90% { transform: translate3d(-15px, 8px, 0) rotate(-1.5deg); }
-            20%, 40%, 60%, 80% { transform: translate3d(15px, -8px, 0) rotate(1.5deg); }
-        }
+        /* Deliberately subtle -- NOT a flat dark overlay over the whole video (that was
+           explicitly called out as destroying visual quality). Just enough grade/vignette
+           to help the title sit on top of the footage without washing the video out. */
+        .sam-grade{position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(ellipse at 50% 42%,transparent 45%,rgba(0,0,0,.28) 100%);mix-blend-mode:multiply;opacity:0;transition:opacity 1.5s ease}
+        #samuraiIntro.st-in .sam-grade{opacity:1}
+        #samuraiIntro.st-letters .sam-grade,#samuraiIntro.st-hold .sam-grade{opacity:1;background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,.05) 30%,rgba(0,0,0,.4) 100%)}
 
+        .sam-grain{position:absolute;inset:-20%;z-index:8;pointer-events:none;opacity:.035;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");animation:samGrainShift 1.1s steps(4) infinite}
+        @keyframes samGrainShift{0%{transform:translate(0,0)}25%{transform:translate(-2%,1%)}50%{transform:translate(1%,-2%)}75%{transform:translate(-1%,-1%)}100%{transform:translate(0,0)}}
+
+        .sam-slash-flash{position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,rgba(255,235,220,.9) 0%,rgba(255,140,70,.35) 30%,rgba(255,140,70,0) 60%);opacity:0}
+        #samuraiIntro.st-impact .sam-slash-flash{animation:samFlashPulse .5s ease-out}
+        @keyframes samFlashPulse{0%{opacity:0}14%{opacity:1}100%{opacity:0}}
+        #samuraiIntro.st-impact #samVideo{animation:samCameraShake .4s linear}
+        @keyframes samCameraShake{0%,100%{transform:translate(0,0) scale(1.02)}20%{transform:translate(-5px,3px) scale(1.02)}40%{transform:translate(4px,-3px) scale(1.02)}60%{transform:translate(-3px,-2px) scale(1.02)}80%{transform:translate(3px,3px) scale(1.02)}}
+
+        .sam-title{position:absolute;z-index:10;display:flex;gap:clamp(4px,1.4vw,14px);font-family:'Georgia','Times New Roman',serif;font-weight:700;font-size:clamp(2rem,6.4vw,4.4rem);letter-spacing:.06em;color:#f4efe4;text-shadow:0 0 22px rgba(255,140,80,.4),0 2px 4px rgba(0,0,0,.85)}
+        .sam-letter{display:inline-block;opacity:0;will-change:transform,opacity;transition:transform .85s cubic-bezier(.16,1,.3,1),opacity .5s ease,filter .5s ease;filter:blur(6px)}
+        #samuraiIntro.st-letters .sam-letter{opacity:1;transform:translate(0,0) rotate(0deg);filter:blur(0)}
+        #samuraiIntro.st-shatter .sam-title{opacity:0;transition:opacity .05s linear}
+        /* each letter's off-screen starting point/rotation -- arrives from a different direction */
+        .sam-letter[data-i="0"]{transform:translate(-70px,-90px) rotate(-40deg)}
+        .sam-letter[data-i="1"]{transform:translate(70px,-90px) rotate(38deg)}
+        .sam-letter[data-i="2"]{transform:translate(-110px,10px) rotate(-18deg)}
+        .sam-letter[data-i="3"]{transform:translate(110px,10px) rotate(20deg)}
+        .sam-letter[data-i="4"]{transform:translate(-70px,90px) rotate(30deg)}
+        .sam-letter[data-i="5"]{transform:translate(70px,90px) rotate(-32deg)}
+        .sam-letter[data-i="6"]{transform:translate(0,-100px) rotate(12deg)}
+        #samuraiIntro.st-letters .sam-letter[data-i="0"]{transition-delay:.02s}
+        #samuraiIntro.st-letters .sam-letter[data-i="1"]{transition-delay:.09s}
+        #samuraiIntro.st-letters .sam-letter[data-i="2"]{transition-delay:.16s}
+        #samuraiIntro.st-letters .sam-letter[data-i="3"]{transition-delay:.23s}
+        #samuraiIntro.st-letters .sam-letter[data-i="4"]{transition-delay:.30s}
+        #samuraiIntro.st-letters .sam-letter[data-i="5"]{transition-delay:.37s}
+        #samuraiIntro.st-letters .sam-letter[data-i="6"]{transition-delay:.44s}
+        #samuraiIntro.st-hold .sam-title{animation:samTitleGlow 1.4s ease-in-out infinite}
+        @keyframes samTitleGlow{0%,100%{text-shadow:0 0 22px rgba(255,140,80,.4),0 2px 4px rgba(0,0,0,.85)}50%{text-shadow:0 0 36px rgba(255,170,110,.7),0 2px 4px rgba(0,0,0,.85)}}
+
+        #samShatterCanvas{position:absolute;inset:0;z-index:11;pointer-events:none}
+
+        .sam-loading-dot{position:absolute;top:50%;left:50%;z-index:20;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(244,239,228,.7);opacity:0;animation:samDotPulse 1.1s ease-in-out infinite}
+        #samuraiIntro.st-waiting .sam-loading-dot{opacity:1}
+        @keyframes samDotPulse{0%,100%{transform:scale(.7);opacity:.3}50%{transform:scale(1.15);opacity:.9}}
+
+        @media (prefers-reduced-motion: reduce){
+            #samuraiIntro *{transition-duration:.01ms!important;animation-duration:.01ms!important}
+        }
+        @media (max-width:640px){
+            #samVideo{object-position:center 35%}
+            .sam-title{gap:3px}
+        }
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -584,30 +600,22 @@
     </div>
 </div>
 
+<!-- Samurai cinematic intro: plays after login and on every full page reload (see
+     playSamuraiIntro() at the bottom of the script). sam.mp4 IS the Samurai -- no
+     drawn body/sword anymore. JS (SAM_TIMELINE) drives stage classes on
+     #samuraiIntro at offsets matched to the real choreography in the footage; the
+     final stage triggers a canvas particle shatter on the title (samShatterTitle()). -->
 <div id="samuraiIntro">
-    <!-- Layer 1: The Source Video -->
-    <video id="samVideo" src="sam.mp4" playsinline muted preload="auto"></video>
-    
-    <!-- Layer 2: Atmospheric Overlay -->
-    <div id="samOverlay"></div>
-    
-    <!-- Layer 3: Gathering Typography -->
-    <div id="samTextContainer">
-        <!-- Transforms ensure letters fly in beautifully from off-screen depths -->
-        <span class="sam-letter" style="--tx:-30vw; --ty:-30vh; --tz:-200px; --rot:-60deg; transition-delay:0.0s;">S</span>
-        <span class="sam-letter" style="--tx:20vw; --ty:-40vh; --tz:-100px; --rot:45deg; transition-delay:0.2s;">A</span>
-        <span class="sam-letter" style="--tx:-40vw; --ty:10vh; --tz:100px; --rot:-80deg; transition-delay:0.4s;">M</span>
-        <span class="sam-letter" style="--tx:40vw; --ty:20vh; --tz:-300px; --rot:70deg; transition-delay:0.6s;">U</span>
-        <span class="sam-letter" style="--tx:-20vw; --ty:40vh; --tz:200px; --rot:-40deg; transition-delay:0.8s;">R</span>
-        <span class="sam-letter" style="--tx:25vw; --ty:35vh; --tz:-50px; --rot:55deg; transition-delay:1.0s;">A</span>
-        <span class="sam-letter" style="--tx:0vw; --ty:-50vh; --tz:300px; --rot:90deg; transition-delay:1.2s;">I</span>
+    <video id="samVideo" src="/api/samurai-video" preload="auto" muted playsinline webkit-playsinline></video>
+    <div class="sam-grade"></div>
+    <div class="sam-slash-flash"></div>
+
+    <div class="sam-title" id="samTitle">
+        <span class="sam-letter" data-i="0">S</span><span class="sam-letter" data-i="1">A</span><span class="sam-letter" data-i="2">M</span><span class="sam-letter" data-i="3">U</span><span class="sam-letter" data-i="4">R</span><span class="sam-letter" data-i="5">A</span><span class="sam-letter" data-i="6">I</span>
     </div>
-    
-    <!-- Layer 4: Particle Shatter Canvas -->
-    <canvas id="samParticleCanvas"></canvas>
-    
-    <!-- Layer 5: Impact Flash -->
-    <div id="samFlash"></div>
+    <canvas id="samShatterCanvas"></canvas>
+    <div class="sam-grain"></div>
+    <div class="sam-loading-dot"></div>
 </div>
 
 <div class="app-shell" id="mainApp">
@@ -2404,199 +2412,185 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
+// Samurai cinematic intro -- sam.mp4 IS the Samurai (no drawn body/sword). The video
+// plays through its real choreography untouched; a sequence of CSS "stage" classes is
+// applied to #samuraiIntro at offsets MEASURED AGAINST THE ACTUAL FOOTAGE (not guessed
+// blind) so the title/particle layers land in sync with what's really happening on
+// screen. Footage is 10.005s @ 24fps, 1280x720. Frame-by-frame inspection found:
+//   - real sword swings with motion blur around ~3.5s and ~5.5s, a dramatic raised
+//     two-handed pose at ~6.0s where the camera also settles into a closer framing
+//   - a held, static guard pose from ~7.5s all the way to the end at 10.0s -- NOT an
+//     additional strike. There is no separate "final lunge" in this footage, so the
+//     impact/shatter effect below is synthesized (flash+shake+particles) rather than
+//     pretending a strike exists that isn't there.
+// Runs on EVERY full page load/refresh while authenticated, and once right after a
+// fresh login -- never on internal SPA tab navigation, since this only executes from
+// the one-time bootstrap block at the bottom of the script, not from executePageLogic().
+const SAM_TIMELINE = [
+    { cls: 'st-in',      at: 0 },       // video starts, subtle grade fades up
+    { cls: 'st-letters', at: 6100 },    // right as the dramatic raised-sword pose lands
+    { cls: 'st-hold',    at: 7700 },    // title complete, footage settles into its held pose
+    { cls: 'st-impact',  at: 9300, shatter: true },
+    { cls: 'st-out',     at: 9750 },
+];
+const SAM_VIDEO_DURATION_MS = 10005;
+const SAM_REVEAL_AT_MS = SAM_VIDEO_DURATION_MS + 550; // ~550ms after the clip ends for the fade-out to land
+
+let samTimers = [];
+function samClearTimers() { samTimers.forEach(clearTimeout); samTimers = []; }
+
 function playSamuraiIntro() {
     const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
     const video = document.getElementById('samVideo');
-    const textContainer = document.getElementById('samTextContainer');
-    const flash = document.getElementById('samFlash');
-    const canvas = document.getElementById('samParticleCanvas');
+    if (!intro || !appShell) { if (appShell) appShell.style.display = 'flex'; return; }
+    if (!video) { appShell.style.display = 'flex'; return; }
 
-    // If components are missing or video path fails instantly, safely fallback to the app
-    if (!intro || !video) { 
-        if (appShell) appShell.style.display = 'flex'; 
-        return; 
+    // Reduced motion: a 10s autoplaying cinematic video is itself the main motion
+    // concern here, not just the CSS transitions -- skip straight to the homepage
+    // with a brief elegant fade rather than forcing the full sequence.
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        intro.className = 'playing st-in';
+        setTimeout(() => { intro.classList.add('st-out'); }, 200);
+        setTimeout(() => { intro.classList.remove('playing'); appShell.style.display = 'flex'; }, 700);
+        return;
     }
 
-    // If video fails to load, abort after 5 seconds
-    const timeout = setTimeout(() => {
-        intro.classList.remove('playing');
-        if (appShell) appShell.style.display = 'flex';
-        video.pause();
-    }, 5000);
+    // fresh run every time: clear any classes/canvas/timer state left from a previous play
+    samClearTimers();
+    intro.className = 'playing';
+    const canvas = document.getElementById('samShatterCanvas');
+    if (canvas) { const ctx = canvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
-    video.addEventListener('canplay', () => {
-        clearTimeout(timeout);
-        video.classList.add('ready');
-    }, { once: true });
-
-    video.addEventListener('error', () => {
-        clearTimeout(timeout);
-        intro.classList.remove('playing');
-        if (appShell) appShell.style.display = 'flex';
-    });
-
-    intro.classList.add('playing');
-    appShell.style.display = 'none';
-
-    let animFrame = null;
-    let particles = [];
-    let state = 0; // 0: video playing, 1: text assembling, 2: shattered, 3: completed transition
-
-    // Ensure state is clean for potential re-runs (on refresh)
-    intro.style.opacity = '1';
-    intro.style.filter = 'blur(0)';
-    intro.classList.remove('cinematic-shake');
-    textContainer.classList.remove('assembling');
-    textContainer.style.display = 'flex';
-    flash.classList.remove('active');
-    
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    
-    // Core Particle Render Loop for the Shatter Effect
-    function renderParticles() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        let alive = false;
-        
-        particles.forEach(p => {
-            if (p.life <= 0) return;
-            alive = true;
-            
-            p.x += p.vx;
-            p.y += p.vy;
-            // Cinematic drag & subtle gravity
-            p.vx *= 0.98;
-            p.vy *= 0.98;
-            p.vy += 0.3; 
-            
-            p.rotation += p.rotSpeed;
-            p.life -= p.decay;
-
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rotation);
-            ctx.globalAlpha = Math.max(0, p.life);
-            // Mixed coloring to simulate hot embers cooling to metal
-            const isHot = p.life > 0.6;
-            ctx.fillStyle = isHot ? (Math.random() > 0.5 ? '#ff3c00' : '#ffffff') : '#8b8fa3';
-            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
-            ctx.restore();
-        });
-        
-        if (alive) {
-            animFrame = requestAnimationFrame(renderParticles);
-        }
-    }
-
-    // Time synchronization engine locked to the video's actual playback
-    video.ontimeupdate = () => {
-        const t = video.currentTime;
-        
-        // At 6.0 seconds: Start assembling the SAMURAI text like leaves in the wind
-        if (t >= 6.0 && state === 0) {
-            state = 1;
-            textContainer.classList.add('assembling');
-        }
-        
-        // At 8.4 seconds: The final sword strike impacts
-        // Fire slightly early (8.35s) so the visual shatter hits exactly on the visual impact
-        if (t >= 8.35 && state === 1) {
-            state = 2;
-            
-            // 1. Trigger Screen Impact
-            flash.classList.add('active');
-            intro.classList.add('cinematic-shake');
-            
-            // 2. Prepare Canvas for Pixel Extraction
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            
-            // Dynamically match the exact font and style of the DOM letters
-            const computedStyle = window.getComputedStyle(document.querySelector('.sam-letter'));
-            ctx.font = `600 ${computedStyle.fontSize} "Cinzel", "Times New Roman", serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillStyle = "#ffffff";
-            
-            // Draw the text to canvas to create the shatter map
-            // Adding hair spaces mimics tracking/letter-spacing for accurate shattering
-            const spacedText = "SAMURAI".split('').join(String.fromCharCode(8202));
-            ctx.fillText(spacedText, canvas.width/2, canvas.height/2);
-            
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Wipe text
-            
-            // Hide the real DOM text instantly
-            textContainer.style.display = 'none';
-
-            // 3. Extract Pixels into Particles (Performance optimized)
-            const w = canvas.width, h = canvas.height;
-            const scanW = Math.min(w, window.innerWidth > 900 ? 1000 : 600);
-            const scanH = Math.min(h, 400);
-            const startX = Math.floor((w - scanW)/2);
-            const startY = Math.floor((h - scanH)/2);
-            const step = w > 1000 ? 5 : 4; // Skip pixels to maintain high fps
-            
-            for (let y = startY; y < startY + scanH; y += step) {
-                for (let x = startX; x < startX + scanW; x += step) {
-                    const idx = (y * w + x) * 4;
-                    // If pixel isn't transparent, spawn a particle
-                    if (imgData[idx + 3] > 128) {
-                        const dx = x - w/2;
-                        const dy = y - h/2;
-                        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-                        
-                        // Explode outward with varying depths/speeds
-                        particles.push({
-                            x: x, y: y,
-                            vx: (dx / dist) * (Math.random() * 25 + 10),
-                            vy: (dy / dist) * (Math.random() * 25 + 5) + (Math.random() * -15),
-                            size: Math.random() * 4 + 1.5,
-                            life: 1.0 + Math.random() * 0.4,
-                            decay: Math.random() * 0.03 + 0.02,
-                            rotation: Math.random() * Math.PI,
-                            rotSpeed: (Math.random() - 0.5) * 0.5
-                        });
-                    }
-                }
-            }
-            // Launch the shatter loop
-            animFrame = requestAnimationFrame(renderParticles);
-        }
-        
-        // At 9.5s: Initiate crossfade transition to the actual Home Page
-        if (t >= 9.5 && state === 2) {
-            state = 3;
-            intro.style.opacity = '0';
-            intro.style.filter = 'blur(10px)';
-            
-            setTimeout(() => {
-                intro.classList.remove('playing');
-                appShell.style.display = 'flex';
-                cancelAnimationFrame(animFrame);
-            }, 1000); // 1s cinematic crossfade
-        }
-    };
-
-    // Failsafe: if video ends unexpectedly or duration differs
-    video.onended = () => {
-        if (state !== 3) {
-            state = 3;
-            intro.style.opacity = '0';
-            setTimeout(() => {
-                intro.classList.remove('playing');
-                appShell.style.display = 'flex';
-                cancelAnimationFrame(animFrame);
-            }, 500);
-        }
-    };
-
-    video.play().catch(e => {
-        // If strict browser policies block autoplay, fallback safely to the app instantly
-        console.warn("Cinematic Intro autoplay blocked:", e);
+    let revealed = false;
+    function revealHomepage() {
+        if (revealed) return;
+        revealed = true;
+        samClearTimers();
         intro.classList.remove('playing');
         appShell.style.display = 'flex';
-    });
+        // release the decoded video from memory now that the intro is done
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+    }
+
+    function runChoreographedTimeline() {
+        SAM_TIMELINE.forEach(stage => {
+            samTimers.push(setTimeout(() => {
+                intro.classList.add(stage.cls);
+                if (stage.shatter) samShatterTitle();
+            }, stage.at));
+        });
+        // safety net: if for any reason the scripted timeline above stalls (e.g. tab
+        // was backgrounded and timers got throttled), the video's own 'ended' event
+        // (registered below) or this hard fallback still guarantees we reach the
+        // homepage instead of leaving the intro stuck on screen forever.
+        samTimers.push(setTimeout(revealHomepage, SAM_REVEAL_AT_MS));
+    }
+
+    function startPlayback() {
+        intro.classList.remove('st-waiting');
+        const playPromise = video.play();
+        if (playPromise && playPromise.catch) {
+            playPromise.catch(() => {
+                // Autoplay was blocked (rare with muted+playsinline, but handle it
+                // gracefully per spec rather than leaving a stuck black screen) --
+                // skip straight to the homepage instead of hanging.
+                revealHomepage();
+            });
+        }
+        runChoreographedTimeline();
+    }
+
+    // Video's own 'ended' event as an additional safety net -- guarantees the reveal
+    // fires even if SAM_REVEAL_AT_MS drifts slightly from the video's real duration.
+    video.addEventListener('ended', revealHomepage, { once: true });
+
+    if (video.readyState >= 3) {  // HAVE_FUTURE_DATA -- already buffered enough to play smoothly
+        startPlayback();
+    } else {
+        // Not buffered yet: show a minimal elegant loading state (not an ugly browser
+        // spinner) instead of a black screen, and start the moment it's ready.
+        intro.classList.add('playing', 'st-waiting');
+        const onReady = () => { video.removeEventListener('canplay', onReady); startPlayback(); };
+        video.addEventListener('canplay', onReady, { once: true });
+        video.load();
+        // absolute fallback: if the video still hasn't loaded after 6s (bad network,
+        // 404, etc.), don't leave the person stuck -- reveal the homepage anyway.
+        samTimers.push(setTimeout(() => {
+            if (!revealed && video.readyState < 3) revealHomepage();
+        }, 6000));
+    }
+}
+
+// Canvas particle burst that "shatters" the SAMURAI title at the moment of impact.
+// Self-contained: grabs its own rAF handle and cancels it when the burst finishes,
+// clears the canvas afterward, and never leaves timers/listeners running -- nothing
+// to clean up externally.
+function samShatterTitle() {
+    const intro = document.getElementById('samuraiIntro');
+    const titleEl = document.getElementById('samTitle');
+    const canvas = document.getElementById('samShatterCanvas');
+    if (!intro || !titleEl || !canvas || !canvas.getContext) return;
+
+    const introRect = intro.getBoundingClientRect();
+    const titleRect = titleEl.getBoundingClientRect();
+    canvas.width = introRect.width;
+    canvas.height = introRect.height;
+    const ctx = canvas.getContext('2d');
+
+    const cx = (titleRect.left - introRect.left) + titleRect.width * 0.72;  // impact lands from the sword-arm side
+    const cy = (titleRect.top - introRect.top) + titleRect.height * 0.5;
+    const palette = ['#f2ede2', '#ffd9b0', '#ff9a5c', '#ffb37a', '#c9d8dc'];
+    const particles = [];
+    const count = 160;
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 60 + Math.random() * 260;
+        particles.push({
+            x: cx + (Math.random() - 0.5) * titleRect.width * 0.5,
+            y: cy + (Math.random() - 0.5) * titleRect.height * 0.6,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 40,
+            size: 2 + Math.random() * 5,
+            rot: Math.random() * Math.PI,
+            vrot: (Math.random() - 0.5) * 12,
+            color: palette[i % palette.length],
+            life: 0.55 + Math.random() * 0.35,
+        });
+    }
+
+    const start = performance.now();
+    let rafId = null;
+    function tick(now) {
+        const t = (now - start) / 1000;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let anyAlive = false;
+        for (const p of particles) {
+            if (t >= p.life) continue;
+            anyAlive = true;
+            const pt = t / p.life;
+            const ease = 1 - Math.pow(1 - pt, 2);
+            const px = p.x + p.vx * ease;
+            const py = p.y + p.vy * ease + 220 * pt * pt; // slight gravity
+            const alpha = 1 - pt;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(p.rot + p.vrot * t);
+            ctx.globalAlpha = Math.max(0, alpha);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+            ctx.restore();
+        }
+        if (anyAlive) {
+            rafId = requestAnimationFrame(tick);
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (rafId) cancelAnimationFrame(rafId);
+        }
+    }
+    rafId = requestAnimationFrame(tick);
 }
 
 function logout() { 
