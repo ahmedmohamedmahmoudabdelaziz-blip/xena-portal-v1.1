@@ -109,6 +109,16 @@ CAIRO_OFFSET = timedelta(hours=3)
 def cairo_now():
     return datetime.now(timezone.utc) + CAIRO_OFFSET
 
+def cairo_epoch_ms(cairo_dt):
+    """Converts a datetime produced by cairo_now()/derived from it (aware, but
+    deliberately mislabeled tzinfo=utc while its wall-clock value is actually Cairo
+    local time) back into the real, true UTC epoch millisecond it represents.
+    Undoing CAIRO_OFFSET before calling .timestamp() -- on an *aware* datetime, so
+    this is pure explicit arithmetic and never depends on the host machine's own
+    local timezone setting -- is what makes this safe to feed straight to Feishu as
+    a real epoch ms value."""
+    return int((cairo_dt - CAIRO_OFFSET).timestamp() * 1000)
+
 def _safe_int(value, default):
     try:
         return int(value)
@@ -2604,22 +2614,26 @@ def my_requests():
     # directly to the caller as fetch_complete:false, not silently retried.
     #
     # BUG FIX (Today/Last-N-days showing wrong or missing records, e.g. only
-    # yesterday's records appearing): every attempt at a server-side Feishu date
-    # filter on this endpoint hit a different wall -- 99992402 (bad value shape),
-    # 9499 (bad Person-field value), 1254018 (wrong ExactDate array shape), and even
-    # once those were fixed, "Submitted on" doesn't reliably reflect true submission
-    # time the same way "Submitted on Copy" does elsewhere in this app. Analytics
-    # (run_analytics) never sends a date filter to Feishu at all -- it fetches by
-    # scope, then filters dates LOCALLY in Python using parse_feishu_date() (which
-    # already correctly converts epoch ms -> Cairo calendar day) compared against
-    # plain day-truncated datetimes. This endpoint now does exactly the same thing:
-    # Feishu only filters by IDENTITY (fast, reliable, already proven working), and
-    # the date window is applied afterward with the same logic Analytics uses --
-    # so "Today" and every preset behave identically to how Analytics already works
-    # correctly today.
+    # yesterday's records appearing): the previous 1254018 "wrong ExactDate array
+    # shape" error came from sending the ms boundary as a JSON *number*. Feishu's own
+    # filter docs give the value as a two-element array whose second element is the
+    # ms timestamp as a STRING -- e.g. ["ExactDate", "1740441600000"] -- not an int.
+    # That's the actual shape mismatch; the filter itself is otherwise exactly the
+    # right tool for this. "Submitted on" was also unreliable (per earlier
+    # comments/testing) -- "Submitted on Copy" is the field this app already writes
+    # a real epoch-ms DateTime value to on submission (see the mock-write path
+    # above), so that's the one to filter on here, matching what every other read
+    # path in this file already prefers via get_field_local(..., "Submitted on
+    # Copy", "Submitted on", "Created Time").
+    #
+    # Bounds: isGreater is a strict '>', so the lower bound is nudged 1ms earlier
+    # than from_dt's true epoch to make it effectively inclusive of records stamped
+    # exactly at the start of the window. isLess against the *next* midnight gives a
+    # clean, inclusive "through end of today" upper bound without needing to guess
+    # at "now" down to the millisecond.
     _cairo_midnight_tomorrow = _cairo_midnight_today + timedelta(days=1)
-    from_dt_naive = from_dt.replace(tzinfo=None)
-    to_dt_exclusive_naive = _cairo_midnight_tomorrow.replace(tzinfo=None)  # exclusive upper bound, same convention as run_analytics
+    from_ms = cairo_epoch_ms(from_dt) - 1
+    to_ms_exclusive = cairo_epoch_ms(_cairo_midnight_tomorrow)
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
@@ -2639,41 +2653,37 @@ def my_requests():
             if open_id else
             {"field_name": SUBMITTED_BY_FIELD_NAME, "operator": "is", "value": [user]}
         )
+        date_from_condition = {"field_name": "Submitted on Copy", "operator": "isGreater", "value": ["ExactDate", str(from_ms)]}
+        date_to_condition = {"field_name": "Submitted on Copy", "operator": "isLess", "value": ["ExactDate", str(to_ms_exclusive)]}
 
         fast_payload = {
             "page_size": 500,
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {
                "conjunction": "and",
-               "conditions": [identity_condition]
+               "conditions": [identity_condition, date_from_condition, date_to_condition]
             },
          }   
-        raw_fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
-        # Date window applied locally now -- see the comment block above. Mirrors
-        # run_analytics's own from_dt <= record_dt < to_dt (exclusive) convention.
-        fast_items = []
-        for it in raw_fast_items:
-            record_dt = parse_feishu_date(get_field_local(it.get("fields", {}), "Submitted on Copy", "Submitted on", "Created Time"))
-            if record_dt and from_dt_naive <= record_dt < to_dt_exclusive_naive:
-                fast_items.append(it)
-        # Running out of time on this already-combined, single search should still
-        # be reported as "fast path used" (there's no other stage left to try) --
-        # only a hard exception below leaves fast_ok False.
+        fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
+        # If Feishu rejects the combined filter (a genuinely different shape/field
+        # error than 1254018, e.g. this base's "Submitted on Copy" isn't a DateTime-
+        # typed field after all), fast_reason carries the real "<code>: <msg>" from
+        # _run_search so it surfaces to the caller via stop_reason instead of being
+        # silently swallowed into wrong results.
         fast_ok = True
     except Exception as e:
         fast_ok = False
         fast_reason = str(e)
         logger.warn("my_requests_fast_path_failed", error=str(e))
+        fast_items, fast_complete = [], False
 
-    # The combined identity+date search above is now the ONLY fetch path -- the old
-    # three-stage fallback chain ("Submitted on Copy" bare-date search, then a
-    # "Submitted on" ISO-string retry, then a raw full-table paginate-and-match-
-    # locally scan) is deleted. It existed to work around SUBMITTED_BY_FIELD_NAME
-    # not existing yet / bare-date filters being unreliable. Feishu-side date
-    # filtering is no longer attempted at all -- see the comment above the fast
-    # path for why (it's what caused every one of 99992402/9499/1254018). Only a
-    # real identity-filter failure (bad field name, permissions, etc.) surfaces
-    # here now, not a date-shape error, since dates are no longer sent to Feishu.
+    # The combined identity+date search above is now the ONLY fetch path -- both
+    # filters run server-side in Feishu itself (see date_from_condition/
+    # date_to_condition above for the corrected ExactDate value shape: the ms bound
+    # must be a JSON string, not a number -- that was the real cause of the old
+    # 1254018 error, not the filter being unusable). No local Python date
+    # re-filtering happens below anymore; whatever Feishu returns here is the final
+    # window.
     all_items, fetch_complete, stop_reason = fast_items, fast_complete, fast_reason
 
     # BUG FIX (duplicate cards): the same record could legitimately come back more
