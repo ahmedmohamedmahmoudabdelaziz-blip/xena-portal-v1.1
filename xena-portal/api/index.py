@@ -1658,6 +1658,19 @@ def samurai_video():
     response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
     return response
 
+@app.route('/api/samurai-image', methods=['GET'])
+def samurai_image():
+    # Serves the intro's still image (samurai silhouetted against the moon), replacing
+    # the old video-based intro. Same serving pattern as samurai_video() above -- deploy
+    # samurai_moon.png at the project root alongside index.html and sam.mp4.
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    image_path = os.path.join(root_dir, 'samurai_moon.png')
+    if not os.path.exists(image_path):
+        return jsonify({"error": "samurai_moon.png not found at project root -- deploy it alongside index.html"}), 404
+    response = send_file(image_path, mimetype='image/png', conditional=True)
+    response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+    return response
+
 @app.route('/api/login', methods=['GET'])
 def login():
     if MOCK_MODE: return redirect(f"/?user=Test%20User&email=test@example.com&uat=mock_token_123&avatar=https://ui-avatars.com/api/?name=Test+User")
