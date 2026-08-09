@@ -1653,6 +1653,21 @@ def home():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return send_file(os.path.join(root_dir, 'index.html'))
 
+# BUG FIX (Samurai intro never shown): index.html's <video id="samVideo"
+# src="sam.mp4"> requests GET /sam.mp4 relative to the page, but this Flask app
+# never had ANY route for it -- Flask() here isn't configured with a static
+# folder covering the site root, so that request 404'd every time. The video
+# element's own 'error' listener (see playSamuraiIntro() in index.html) then
+# fires immediately on that 404 and aborts the intro straight back to the app,
+# which is exactly "the intro doesn't play" -- there was nothing broken in the
+# animation code itself, the video file was simply never reachable. Adding an
+# explicit route to serve it fixes this; conditional=True (Flask's default)
+# also enables HTTP Range requests, which <video> needs for smooth seeking.
+@app.route('/sam.mp4', methods=['GET'])
+def serve_samurai_video():
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return send_file(os.path.join(root_dir, 'sam.mp4'), mimetype='video/mp4', conditional=True)
+
 @app.route('/api/login', methods=['GET'])
 def login():
     if MOCK_MODE: return redirect(f"/?user=Test%20User&email=test@example.com&uat=mock_token_123&avatar=https://ui-avatars.com/api/?name=Test+User")
@@ -2542,8 +2557,23 @@ def my_requests():
     prior_days = 0 if days_param == 'today' else max(0, min(_safe_int(days_param, 0), 90))
 
     _cairo_now = cairo_now()
-    _cairo_naive = _cairo_now.replace(tzinfo=None)          # naive datetime in Cairo local time
-    _cairo_midnight_today = _cairo_naive.replace(hour=0, minute=0, second=0, microsecond=0)
+    # BUG FIX (date filter shifted back by ~1 day, e.g. "Today" showing yesterday's
+    # requests): this used to strip tzinfo off with .replace(tzinfo=None) to build
+    # from_dt, which broke the whole point of cairo_epoch_ms(). cairo_now() returns a
+    # datetime that is *aware* but deliberately mislabeled as UTC (its value is
+    # actually Cairo local time) -- cairo_epoch_ms() only recovers the correct real
+    # UTC instant because it operates on an *aware* datetime, where subtracting
+    # CAIRO_OFFSET and calling .timestamp() is pure, explicit math. Once from_dt was
+    # made naive here, .timestamp() inside cairo_epoch_ms() silently stopped using
+    # that explicit math and instead fell back to interpreting the naive value in
+    # whatever local timezone the server process happens to be running in -- which is
+    # not guaranteed to be UTC. Any mismatch there shifts from_ms by that server's
+    # local offset, which (depending on time of day) is enough to push the window's
+    # start into the previous calendar day. _cairo_now never had this problem because
+    # it stayed aware all the way to cairo_epoch_ms(). Keeping from_dt aware (same
+    # mislabeled-as-UTC convention) makes both bounds go through identical, explicit
+    # UTC arithmetic -- no dependence on the host machine's local timezone at all.
+    _cairo_midnight_today = _cairo_now.replace(hour=0, minute=0, second=0, microsecond=0)
     from_dt = _cairo_midnight_today - timedelta(days=prior_days)
     lookback_days = prior_days  # kept in the response payload for the frontend label
 
