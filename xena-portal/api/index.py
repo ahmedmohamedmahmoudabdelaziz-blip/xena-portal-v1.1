@@ -2645,8 +2645,8 @@ def my_requests():
     # clean, inclusive "through end of today" upper bound without needing to guess
     # at "now" down to the millisecond.
     _cairo_midnight_tomorrow = _cairo_midnight_today + timedelta(days=1)
-    from_ms = cairo_epoch_ms(from_dt) - 1
-    to_ms_exclusive = cairo_epoch_ms(_cairo_midnight_tomorrow)
+    from_ms = int(from_dt.timestamp() * 1000)
+    to_ms_exclusive = int(_cairo_midnight_tomorrow.timestamp() * 1000)
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
