@@ -1660,13 +1660,21 @@ def samurai_video():
 
 @app.route('/api/samurai-image', methods=['GET'])
 def samurai_image():
-    # Serves the intro's still image (samurai silhouetted against the moon), replacing
-    # the old video-based intro. Same serving pattern as samurai_video() above -- deploy
-    # samurai_moon.png at the project root alongside index.html and sam.mp4.
+    # Serves the intro's still image (samurai silhouetted against the moon).
+    # Two variants now exist -- a portrait composition (full standing figure,
+    # shot for tall/mobile screens) and a landscape composition (shot for wide
+    # desktop screens) -- so each device gets an image natively shaped for its
+    # viewport instead of one image being cropped or letterboxed to fit both.
+    # ?variant=portrait|landscape selects which; the frontend (playSamuraiIntro
+    # in index.html) picks based on window.innerWidth before requesting.
+    # Deploy BOTH samurai_moon_portrait.png and samurai_moon_landscape.png at
+    # the project root, alongside index.html and sam.mp4.
+    variant = request.args.get('variant', 'portrait')
+    filename = 'samurai_moon_landscape.png' if variant == 'landscape' else 'samurai_moon_portrait.png'
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    image_path = os.path.join(root_dir, 'samurai_moon.png')
+    image_path = os.path.join(root_dir, filename)
     if not os.path.exists(image_path):
-        return jsonify({"error": "samurai_moon.png not found at project root -- deploy it alongside index.html"}), 404
+        return jsonify({"error": f"{filename} not found at project root -- deploy it alongside index.html"}), 404
     response = send_file(image_path, mimetype='image/png', conditional=True)
     response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
     return response
@@ -1918,6 +1926,17 @@ def search_members():
         data = resp.json()
 
         if data.get("code") != 0:
+            # A friendlier message specifically for the missing-scope case (99991672) --
+            # this doesn't grant the scope, that has to be done in the Feishu Developer
+            # Console (Permissions -> add contact:user:search -> publish a new version
+            # -> users must log out/back in for a token carrying the new scope). This
+            # just makes it obvious in the UI what's actually missing if it recurs,
+            # instead of a bare numeric error code.
+            if data.get("code") == 99991672:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing Feishu permission 'contact:user:search' (Search user's information in the address book). Add it in the Feishu Developer Console under Permissions, publish a new app version, then log out and back in."
+                }), 400
             return jsonify({
                 "success": False, 
                 "error": f"{data.get('code')}: {data.get('msg')}"
@@ -2645,8 +2664,8 @@ def my_requests():
     # clean, inclusive "through end of today" upper bound without needing to guess
     # at "now" down to the millisecond.
     _cairo_midnight_tomorrow = _cairo_midnight_today + timedelta(days=1)
-    from_ms = int(from_dt.timestamp() * 1000)
-    to_ms_exclusive = int(_cairo_midnight_tomorrow.timestamp() * 1000)
+    from_ms = cairo_epoch_ms(from_dt) - 1
+    to_ms_exclusive = cairo_epoch_ms(_cairo_midnight_tomorrow)
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
