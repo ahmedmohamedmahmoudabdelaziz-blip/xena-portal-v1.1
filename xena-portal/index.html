@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="preload" as="video" href="/api/samurai-video" type="video/mp4">
+    <link rel="preload" as="image" href="/api/samurai-image">
     <style>
         :root {
             --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
@@ -167,25 +167,25 @@
         .loading-overlay{display:none;position:fixed;inset:0;background:rgba(11,12,16,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:500;justify-content:center;align-items:center;flex-direction:column;gap:16px}
 
         /* ============================================================
-           SAMURAI CINEMATIC INTRO (video-based)
-           sam.mp4 IS the Samurai -- no SVG/CSS body is drawn anymore.
-           Plays after login and on every full page reload (see
-           playSamuraiIntro() at the bottom of the script). JS drives a
-           sequence of "stage" classes on #samuraiIntro at offsets matched
-           to the actual choreography in the footage (see SAM_TIMELINE),
-           so the title/particle layers stay in sync with the real video
-           instead of an arbitrary guess.
+           SAMURAI CINEMATIC INTRO (still image + converging letters)
+           Static image (samurai silhouetted against a blood moon) with a
+           slow Ken Burns zoom, the "SAMURAI" letters flying in from
+           different directions to assemble, a brief hold/glow, then a
+           fade into the homepage. Plays after login and on every full
+           page reload (see playSamuraiIntro() at the bottom of the
+           script).
            ============================================================ */
         #samuraiIntro{display:none;position:fixed;inset:0;z-index:600;overflow:hidden;background:#000;opacity:0;transition:opacity .6s ease}
         #samuraiIntro.playing{display:flex;justify-content:center;align-items:center}
         #samuraiIntro.st-in{opacity:1}
         #samuraiIntro.st-out{opacity:0}
 
-        #samVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;z-index:1;background:#000}
+        #samImage{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;z-index:1;background:#000;transform:scale(1.08);opacity:0;transition:opacity 1.1s ease,transform 4.6s cubic-bezier(.16,1,.3,1)}
+        #samuraiIntro.st-in #samImage{opacity:1;transform:scale(1)}
 
-        /* Deliberately subtle -- NOT a flat dark overlay over the whole video (that was
-           explicitly called out as destroying visual quality). Just enough grade/vignette
-           to help the title sit on top of the footage without washing the video out. */
+        /* Deliberately subtle -- NOT a flat dark overlay over the whole image. Just
+           enough grade/vignette to help the title sit on top without washing out
+           the moon/silhouette. */
         .sam-grade{position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(ellipse at 50% 42%,transparent 45%,rgba(0,0,0,.28) 100%);mix-blend-mode:multiply;opacity:0;transition:opacity 1.5s ease}
         #samuraiIntro.st-in .sam-grade{opacity:1}
         #samuraiIntro.st-letters .sam-grade,#samuraiIntro.st-hold .sam-grade{opacity:1;background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,.05) 30%,rgba(0,0,0,.4) 100%)}
@@ -196,8 +196,6 @@
         .sam-slash-flash{position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,rgba(255,235,220,.9) 0%,rgba(255,140,70,.35) 30%,rgba(255,140,70,0) 60%);opacity:0}
         #samuraiIntro.st-impact .sam-slash-flash{animation:samFlashPulse .5s ease-out}
         @keyframes samFlashPulse{0%{opacity:0}14%{opacity:1}100%{opacity:0}}
-        #samuraiIntro.st-impact #samVideo{animation:samCameraShake .4s linear}
-        @keyframes samCameraShake{0%,100%{transform:translate(0,0) scale(1.02)}20%{transform:translate(-5px,3px) scale(1.02)}40%{transform:translate(4px,-3px) scale(1.02)}60%{transform:translate(-3px,-2px) scale(1.02)}80%{transform:translate(3px,3px) scale(1.02)}}
 
         .sam-title{position:absolute;z-index:10;display:flex;gap:clamp(4px,1.4vw,14px);font-family:'Georgia','Times New Roman',serif;font-weight:700;font-size:clamp(2rem,6.4vw,4.4rem);letter-spacing:.06em;color:#f4efe4;text-shadow:0 0 22px rgba(255,140,80,.4),0 2px 4px rgba(0,0,0,.85)}
         .sam-letter{display:inline-block;opacity:0;will-change:transform,opacity;transition:transform .85s cubic-bezier(.16,1,.3,1),opacity .5s ease,filter .5s ease;filter:blur(6px)}
@@ -231,7 +229,7 @@
             #samuraiIntro *{transition-duration:.01ms!important;animation-duration:.01ms!important}
         }
         @media (max-width:640px){
-            #samVideo{object-position:center 35%}
+            #samImage{object-position:center 30%}
             .sam-title{gap:3px}
         }
         .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite}
@@ -601,12 +599,12 @@
 </div>
 
 <!-- Samurai cinematic intro: plays after login and on every full page reload (see
-     playSamuraiIntro() at the bottom of the script). sam.mp4 IS the Samurai -- no
-     drawn body/sword anymore. JS (SAM_TIMELINE) drives stage classes on
-     #samuraiIntro at offsets matched to the real choreography in the footage; the
-     final stage triggers a canvas particle shatter on the title (samShatterTitle()). -->
+     playSamuraiIntro() at the bottom of the script). Still image (samurai
+     silhouetted against a blood moon) with a slow zoom; the SAMURAI title
+     letters fly in from different directions to assemble, hold with a glow,
+     then shatter/fade to reveal the homepage (samShatterTitle()). -->
 <div id="samuraiIntro">
-    <video id="samVideo" src="/api/samurai-video" preload="auto" muted playsinline webkit-playsinline></video>
+    <img id="samImage" src="/api/samurai-image" alt="" />
     <div class="sam-grade"></div>
     <div class="sam-slash-flash"></div>
 
@@ -2412,29 +2410,23 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
-// Samurai cinematic intro -- sam.mp4 IS the Samurai (no drawn body/sword). The video
-// plays through its real choreography untouched; a sequence of CSS "stage" classes is
-// applied to #samuraiIntro at offsets MEASURED AGAINST THE ACTUAL FOOTAGE (not guessed
-// blind) so the title/particle layers land in sync with what's really happening on
-// screen. Footage is 10.005s @ 24fps, 1280x720. Frame-by-frame inspection found:
-//   - real sword swings with motion blur around ~3.5s and ~5.5s, a dramatic raised
-//     two-handed pose at ~6.0s where the camera also settles into a closer framing
-//   - a held, static guard pose from ~7.5s all the way to the end at 10.0s -- NOT an
-//     additional strike. There is no separate "final lunge" in this footage, so the
-//     impact/shatter effect below is synthesized (flash+shake+particles) rather than
-//     pretending a strike exists that isn't there.
+// Samurai cinematic intro -- a still image (samurai silhouetted against a blood
+// moon) with a slow Ken Burns zoom, driven by CSS "stage" classes on
+// #samuraiIntro. No video/audio to sync against anymore, so the timeline below is
+// just a deliberately-chosen pacing: image settles in, the SAMURAI letters fly in
+// from different directions and assemble, a brief glowing hold, a flash "impact"
+// with a canvas particle shatter on the title, then fade to reveal the homepage.
 // Runs on EVERY full page load/refresh while authenticated, and once right after a
 // fresh login -- never on internal SPA tab navigation, since this only executes from
 // the one-time bootstrap block at the bottom of the script, not from executePageLogic().
 const SAM_TIMELINE = [
-    { cls: 'st-in',      at: 0 },       // video starts, subtle grade fades up
-    { cls: 'st-letters', at: 6100 },    // right as the dramatic raised-sword pose lands
-    { cls: 'st-hold',    at: 7700 },    // title complete, footage settles into its held pose
-    { cls: 'st-impact',  at: 9300, shatter: true },
-    { cls: 'st-out',     at: 9750 },
+    { cls: 'st-in',      at: 0 },       // image fades up, Ken Burns zoom begins
+    { cls: 'st-letters', at: 900 },     // letters begin flying in and assembling
+    { cls: 'st-hold',    at: 2100 },    // title complete, gentle glow pulse
+    { cls: 'st-impact',  at: 3300, shatter: true },
+    { cls: 'st-out',     at: 3750 },
 ];
-const SAM_VIDEO_DURATION_MS = 10005;
-const SAM_REVEAL_AT_MS = SAM_VIDEO_DURATION_MS + 550; // ~550ms after the clip ends for the fade-out to land
+const SAM_REVEAL_AT_MS = 4300; // after the fade-out finishes
 
 let samTimers = [];
 function samClearTimers() { samTimers.forEach(clearTimeout); samTimers = []; }
@@ -2442,13 +2434,12 @@ function samClearTimers() { samTimers.forEach(clearTimeout); samTimers = []; }
 function playSamuraiIntro() {
     const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
-    const video = document.getElementById('samVideo');
+    const image = document.getElementById('samImage');
     if (!intro || !appShell) { if (appShell) appShell.style.display = 'flex'; return; }
-    if (!video) { appShell.style.display = 'flex'; return; }
+    if (!image) { appShell.style.display = 'flex'; return; }
 
-    // Reduced motion: a 10s autoplaying cinematic video is itself the main motion
-    // concern here, not just the CSS transitions -- skip straight to the homepage
-    // with a brief elegant fade rather than forcing the full sequence.
+    // Reduced motion: skip straight to the homepage with a brief elegant fade
+    // rather than forcing the full letter-assembly sequence.
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         intro.className = 'playing st-in';
         setTimeout(() => { intro.classList.add('st-out'); }, 200);
@@ -2469,10 +2460,6 @@ function playSamuraiIntro() {
         samClearTimers();
         intro.classList.remove('playing');
         appShell.style.display = 'flex';
-        // release the decoded video from memory now that the intro is done
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
     }
 
     function runChoreographedTimeline() {
@@ -2482,44 +2469,25 @@ function playSamuraiIntro() {
                 if (stage.shatter) samShatterTitle();
             }, stage.at));
         });
-        // safety net: if for any reason the scripted timeline above stalls (e.g. tab
-        // was backgrounded and timers got throttled), the video's own 'ended' event
-        // (registered below) or this hard fallback still guarantees we reach the
-        // homepage instead of leaving the intro stuck on screen forever.
+        // safety net: guarantees the reveal fires even if something stalls (e.g. tab
+        // backgrounded and timers throttled) instead of leaving the intro stuck.
         samTimers.push(setTimeout(revealHomepage, SAM_REVEAL_AT_MS));
     }
 
-    function startPlayback() {
-        intro.classList.remove('st-waiting');
-        const playPromise = video.play();
-        if (playPromise && playPromise.catch) {
-            playPromise.catch(() => {
-                // Autoplay was blocked (rare with muted+playsinline, but handle it
-                // gracefully per spec rather than leaving a stuck black screen) --
-                // skip straight to the homepage instead of hanging.
-                revealHomepage();
-            });
-        }
+    if (image.complete && image.naturalWidth > 0) {  // already decoded/cached
         runChoreographedTimeline();
-    }
-
-    // Video's own 'ended' event as an additional safety net -- guarantees the reveal
-    // fires even if SAM_REVEAL_AT_MS drifts slightly from the video's real duration.
-    video.addEventListener('ended', revealHomepage, { once: true });
-
-    if (video.readyState >= 3) {  // HAVE_FUTURE_DATA -- already buffered enough to play smoothly
-        startPlayback();
     } else {
-        // Not buffered yet: show a minimal elegant loading state (not an ugly browser
+        // Not loaded yet: show a minimal elegant loading state (not an ugly browser
         // spinner) instead of a black screen, and start the moment it's ready.
         intro.classList.add('playing', 'st-waiting');
-        const onReady = () => { video.removeEventListener('canplay', onReady); startPlayback(); };
-        video.addEventListener('canplay', onReady, { once: true });
-        video.load();
-        // absolute fallback: if the video still hasn't loaded after 6s (bad network,
-        // 404, etc.), don't leave the person stuck -- reveal the homepage anyway.
+        const onReady = () => { intro.classList.remove('st-waiting'); runChoreographedTimeline(); };
+        image.addEventListener('load', onReady, { once: true });
+        // If the image fails outright (404, bad network), don't leave the person
+        // stuck on a black screen -- reveal the homepage instead.
+        image.addEventListener('error', revealHomepage, { once: true });
+        // absolute fallback: if it still hasn't loaded after 6s, reveal anyway.
         samTimers.push(setTimeout(() => {
-            if (!revealed && video.readyState < 3) revealHomepage();
+            if (!revealed && !(image.complete && image.naturalWidth > 0)) revealHomepage();
         }, 6000));
     }
 }
