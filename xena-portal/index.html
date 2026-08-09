@@ -10,7 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Shippori+Mincho:wght@700;800&display=swap" rel="stylesheet">
-    <link rel="preload" as="image" href="/api/samurai-image">
+    <link rel="preload" as="image" media="(min-width: 641px)" href="/api/samurai-image?variant=landscape">
+    <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait">
     <style>
         :root {
             --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
@@ -637,8 +638,8 @@
      assemble, hold with a soft glow, then dissolve gracefully into light to
      reveal the homepage underneath. -->
 <div id="samuraiIntro">
-    <img id="samImageBackdrop" src="/api/samurai-image" alt="" aria-hidden="true" />
-    <img id="samImage" src="/api/samurai-image" alt="" />
+    <img id="samImageBackdrop" alt="" aria-hidden="true" />
+    <img id="samImage" alt="" />
     <div class="sam-grade"></div>
     <div class="sam-bloom"></div>
 
@@ -2470,8 +2471,20 @@ function playSamuraiIntro() {
     const intro = document.getElementById('samuraiIntro');
     const appShell = document.querySelector('.app-shell');
     const image = document.getElementById('samImage');
+    const backdrop = document.getElementById('samImageBackdrop');
     if (!intro || !appShell) { if (appShell) appShell.style.display = 'flex'; return; }
     if (!image) { appShell.style.display = 'flex'; return; }
+
+    // Pick the image shot for this device's viewport shape (matches the same
+    // 640px breakpoint used elsewhere, and the preload <link media> queries in
+    // <head>) -- landscape composition for wide/desktop screens, portrait
+    // composition (full standing figure) for narrow/mobile screens. Setting src
+    // here, matching what the media-conditional <link rel=preload> already
+    // fetched, means this hits the browser's cache instead of a second request.
+    const variant = window.innerWidth > 640 ? 'landscape' : 'portrait';
+    const src = `/api/samurai-image?variant=${variant}`;
+    if (image.getAttribute('src') !== src) image.src = src;
+    if (backdrop && backdrop.getAttribute('src') !== src) backdrop.src = src;
 
     // Reduced motion: skip straight to the homepage with a brief elegant fade
     // rather than forcing the full letter-assembly sequence.
