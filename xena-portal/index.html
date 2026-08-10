@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Yuji+Syuku&family=Shippori+Mincho:wght@700;800&display=swap" rel="stylesheet">
     <link rel="preload" as="image" media="(min-width: 641px)" href="/api/samurai-image?variant=landscape">
     <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait">
@@ -506,12 +507,14 @@
         /* Manual Request Type tab strip in the ticket workspace -- lets an admin pick
            which Request Type's field layout to render in the Dynamic Request Section,
            instead of always trusting the record's own "Request Type" value. */
-        .tw-reqtype-tab{flex-shrink:0;padding:8px 14px;border:none;background:transparent;color:var(--text-muted);font-family:inherit;font-weight:500;font-size:.82rem;cursor:pointer;border-radius:7px;white-space:nowrap;transition:all .15s;border-bottom:2px solid transparent}
+        .tw-reqtype-tabs-wrap{display:flex;flex-wrap:wrap;gap:6px;}
+        .tw-reqtype-tab{padding:8px 14px;border:1px solid transparent;background:transparent;color:var(--text-muted);font-family:inherit;font-weight:500;font-size:.82rem;cursor:pointer;border-radius:7px;white-space:nowrap;transition:all .15s;}
         .tw-reqtype-tab:hover{color:var(--text);background:rgba(255,255,255,.05)}
-        .tw-reqtype-tab.active{color:var(--accent-cyan);background:rgba(0,212,255,.08);border-bottom:2px solid var(--accent-cyan)}
-        .tw-reqtype-more-item{padding:10px 14px;font-size:.82rem;color:var(--text-muted);cursor:pointer;white-space:nowrap}
-        .tw-reqtype-more-item:hover{background:var(--surface-hover);color:var(--text)}
-        .tw-reqtype-more-item.active{color:var(--accent-cyan);font-weight:600}
+        .tw-reqtype-tab.active{color:var(--accent-cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.35)}
+        .tw-reqtype-hint{font-size:.72rem;color:var(--text-muted);padding:0 4px 8px;opacity:.85}
+        .tw-head-meta{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;}
+        .tw-head-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.25);color:var(--text);padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap;}
+        .tw-head-chip-label{color:var(--text-muted);font-weight:500;text-transform:uppercase;font-size:.65rem;letter-spacing:.4px;}
 
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
@@ -547,7 +550,7 @@
         }
         .img-lightbox-overlay.active{display:flex}
         .img-lightbox-toolbar{
-            position:absolute;top:14px;right:18px;display:flex;gap:8px;z-index:2;
+            position:absolute;top:14px;right:18px;display:flex;gap:8px;z-index:3;
         }
         .img-lightbox-toolbar button{
             background:rgba(255,255,255,0.08);border:1px solid var(--border,rgba(255,255,255,0.15));
@@ -555,14 +558,35 @@
             display:flex;align-items:center;justify-content:center;transition:background .15s;
         }
         .img-lightbox-toolbar button:hover{background:rgba(255,255,255,0.18)}
+        .img-lightbox-toolbar button.active{background:rgba(0,212,255,0.28);border-color:var(--accent-cyan,#00d4ff)}
+        .img-lightbox-counter{
+            position:absolute;top:14px;left:18px;z-index:3;color:#fff;font-size:.78rem;font-weight:600;
+            background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:6px 14px;border-radius:20px;
+        }
+        .img-lightbox-nav{
+            position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;
+            border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-size:22px;
+            line-height:1;cursor:pointer;align-items:center;justify-content:center;z-index:3;transition:background .15s;
+        }
+        .img-lightbox-nav:hover{background:rgba(255,255,255,.22)}
+        .img-lightbox-nav-prev{left:18px}
+        .img-lightbox-nav-next{right:18px}
         .img-lightbox-stage{
-            width:90vw;height:82vh;display:flex;align-items:center;justify-content:center;overflow:hidden;
+            width:90vw;height:82vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
         }
-        .img-lightbox-stage img{
-            max-width:100%;max-height:100%;object-fit:contain;user-select:none;pointer-events:none;
-            transition:transform .12s ease-out;
+        .img-lightbox-canvas{
+            position:relative;display:inline-block;cursor:grab;transition:transform .12s ease-out;touch-action:none;
         }
-        .img-lightbox-hint{color:var(--text-muted,#8a8fa3);font-size:.75rem;margin-top:10px}
+        .img-lightbox-canvas.dragging{cursor:grabbing;transition:none;}
+        .img-lightbox-canvas img{
+            display:block;max-width:85vw;max-height:78vh;object-fit:contain;user-select:none;-webkit-user-drag:none;
+        }
+        .img-lightbox-text-layer{position:absolute;inset:0;}
+        .img-lightbox-text-layer span{
+            position:absolute;color:transparent;cursor:text;user-select:text;line-height:1;white-space:pre;
+        }
+        .img-lightbox-text-layer span::selection{background:rgba(0,212,255,.45);color:transparent}
+        .img-lightbox-hint{color:var(--text-muted,#8a8fa3);font-size:.75rem;margin-top:10px;display:flex;align-items:center;gap:6px}
         .img-attach-thumb{
             display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;
             border:1px solid var(--border,rgba(255,255,255,0.15));cursor:zoom-in;background:none;padding:0;
@@ -601,19 +625,29 @@
 
 <!-- ISSUE 2 FIX: image lightbox/modal, replaces target="_blank" attachment links -->
 <div id="imgLightboxOverlay" class="img-lightbox-overlay" onclick="if(event.target===this) closeImageLightbox()">
+    <span id="imgLightboxCounter" class="img-lightbox-counter" style="display:none;"></span>
     <div class="img-lightbox-toolbar" onclick="event.stopPropagation()">
         <button type="button" onclick="lightboxZoom(0.25)" title="Zoom in">➕</button>
         <button type="button" onclick="lightboxZoom(-0.25)" title="Zoom out">➖</button>
         <button type="button" onclick="lightboxRotate(-90)" title="Rotate left">↺</button>
         <button type="button" onclick="lightboxRotate(90)" title="Rotate right">↻</button>
-        <button type="button" onclick="lightboxReset()" title="Reset">⟲</button>
+        <button type="button" onclick="lightboxReset()" title="Reset pan/zoom">⟲</button>
+        <button type="button" id="imgLightboxOcrBtn" class="active" onclick="lightboxToggleOcr()" title="Toggle selectable text (OCR)">🔤</button>
         <button type="button" onclick="lightboxDownload()" title="Download">⬇️</button>
         <button type="button" onclick="closeImageLightbox()" title="Close">✕</button>
     </div>
-    <div class="img-lightbox-stage">
-        <img id="imgLightboxImg" src="" alt="Attachment preview">
+    <button type="button" id="imgLightboxPrevBtn" class="img-lightbox-nav img-lightbox-nav-prev" style="display:none;" onclick="event.stopPropagation(); lightboxPrev()" title="Previous image">‹</button>
+    <button type="button" id="imgLightboxNextBtn" class="img-lightbox-nav img-lightbox-nav-next" style="display:none;" onclick="event.stopPropagation(); lightboxNext()" title="Next image">›</button>
+    <div class="img-lightbox-stage" id="imgLightboxStage" onclick="if(event.target===this) closeImageLightbox()">
+        <div class="img-lightbox-canvas" id="imgLightboxCanvas">
+            <img id="imgLightboxImg" src="" alt="Attachment preview" draggable="false">
+            <div class="img-lightbox-text-layer" id="imgLightboxTextLayer"></div>
+        </div>
     </div>
-    <div class="img-lightbox-hint">Scroll to zoom · Click outside or press Esc to close</div>
+    <div class="img-lightbox-hint">
+        <span id="imgLightboxOcrStatus" style="display:none;color:var(--accent-cyan);"></span>
+        <span>🖐️ Drag to pan · Scroll to zoom · 🔤 select text in image · Click outside or press Esc to close</span>
+    </div>
 </div>
 
 <div class="loading-overlay" id="loadingOverlay">
@@ -1761,23 +1795,23 @@
                <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding: 16px 24px; margin-bottom:16px; border-bottom: 2px solid var(--accent-cyan); background: linear-gradient(180deg, var(--surface) 0%, rgba(0,212,255,0.02) 100%);">
                    <button class="btn btn-outline" onclick="twCloseWorkspace()" style="width:auto; padding:8px 16px;">← Back to Queue</button>
                    <div style="text-align:center;">
-                       <h3 id="tw-title" style="margin-bottom:4px; font-size:1.3rem;">Ticket ID</h3>
-                       <span id="tw-req-type" style="font-size:0.85rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Type</span>
+                       <h3 id="tw-title" style="margin-bottom:8px; font-size:1.3rem;">Ticket ID</h3>
+                       <!-- Fixed ticket-head info -- always these three, regardless of
+                            Request Type: Mention this Group, Numbering (shown above as
+                            the #ticket id) and Submitted on. Populated by twRenderHeadMeta(). -->
+                       <div id="tw-head-meta" class="tw-head-meta"></div>
                    </div>
                    <button id="twSaveBtn" class="btn btn-primary" onclick="twSaveWorkspace()" style="width:auto; padding:10px 24px;">💾 Save &amp; Resolve</button>
                </div>
                
-               <!-- Manual Request Type picker: switches which field set the Dynamic
-                    Request Section (card 2) renders, by hand, instead of relying only
-                    on whatever "Request Type" the record already has. -->
-               <div class="card" style="padding:8px; margin-bottom:16px;">
-                   <div style="display:flex; align-items:center; gap:4px;">
-                       <div id="tw-reqtype-tabs" style="display:flex; gap:2px; overflow-x:auto; flex:1;"></div>
-                       <div id="tw-reqtype-more-wrap" style="position:relative; flex-shrink:0;">
-                           <button type="button" id="tw-reqtype-more-btn" class="tw-reqtype-tab" onclick="twToggleReqTypeMoreMenu(event)">More ▾</button>
-                           <div id="tw-reqtype-more-menu" style="display:none; position:absolute; top:110%; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.35); min-width:240px; max-height:320px; overflow-y:auto; z-index:50;"></div>
-                       </div>
-                   </div>
+               <!-- Request Type field-layout preview: purely a viewer switch for which
+                    field set shows in the Dynamic Request Section (card 2) below -- picking
+                    a tab does NOT change the ticket's actual saved Request Type. All types
+                    are shown (no hidden "More" menu), wrapped elegantly. To actually change
+                    the Request Type, edit the "Request Type" field in Basic Information. -->
+               <div class="card" style="padding:10px 12px; margin-bottom:16px;">
+                   <div class="tw-reqtype-hint">👁️ Preview field layout for a Request Type (doesn't change the ticket's saved type):</div>
+                   <div id="tw-reqtype-tabs" class="tw-reqtype-tabs-wrap"></div>
                </div>
 
                <form id="tw-form">
@@ -4876,20 +4910,20 @@ const TICKET_DYNAMIC_FIELDS = {
     "Audit": [
         "raw_text"
     ],
-    "Agency applied already by ACM or BD link ( follow-up )": [
+    "Agency creation by AC (Walkin)": [
         "Region",
         "User ID",
         "Evidence Screen 2"
     ],
     "Closing Agency": [
         "User ID",
-        "Closing Reason",
         "Agency Code",
-        "Evidence Screen",
         "Old ID",
         "Reporter ID",
-        "New ID",
         "NID Number",
+        "Closing Reason",
+        "Evidence Screen",
+        "New ID",
         "Host Number Before close the agency",
         "Agency Name"
     ],
@@ -5205,7 +5239,12 @@ function ltRenderQueue() {
 // where they actually live on the live Feishu form. They're still excluded from
 // the generic Dynamic Request Section fallback via TICKET_INTERNAL_FIELDS, so they
 // won't leak into card 2 either.
-const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','Acm Name (PK)','Acm Name (IN)','Acm','Assigned Member']);
+// Basic Information (card 1) is a FIXED set of fields, in this exact order --
+// always shown for every ticket regardless of Request Type or whether the record
+// currently has a value for a given field (createTwControl renders it empty rather
+// than the field disappearing). Not derived from whatever the record happens to have.
+const LT_BASIC_KEYS_ORDERED = ['Region', 'Request Type', 'Respondents', 'User ID', 'Applier Note', 'Acm Name (IN)', 'Acm Name (PK)', 'Parenet sub agency'];
+const LT_BASIC_KEYS = new Set(LT_BASIC_KEYS_ORDERED);
 
 // Fields shown via their own dedicated controls elsewhere in the form (Duplicate
 // Check card, Chinese Approval card, Audition Action card, header) -- moved to
@@ -5213,10 +5252,11 @@ const LT_BASIC_KEYS = new Set(['Region','User ID','Agency Code','Agency Name','A
 // tab switches) share the exact same exclusion list.
 const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Duplicated Check','Request Type','Approval','Type of Action','chinese Note', 'Numbering', 'Create Way', 'Mentioned Group']);
 
-// The Request Type the admin has manually picked via the tab strip (card 1.5),
-// overriding the record's own "Request Type" for purposes of which fields render
-// in the Dynamic Request Section. null = "just use the record's own type" (default).
-// Reset to null every time a fresh ticket is opened.
+// The Request Type the admin has manually picked via the tab strip (card 1.5), used
+// ONLY to decide which fields render in the Dynamic Request Section preview -- it
+// never touches the record's actual "Request Type" value or the ticket header.
+// null = "just use the record's own type" (default). Reset every time a fresh
+// ticket is opened.
 let twManualReqType = null;
 
 // Renders the Dynamic Request Section (card 2) for a given ticket, using
@@ -5252,68 +5292,50 @@ function twRenderSection2(ticket, reqTypeOverride) {
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
 }
 
-// Picks which Request Type tabs are shown inline vs. tucked into the "More ▾"
-// menu. Keeps a fixed number of tabs visible, but always makes sure the currently
-// selected type is one of the visible ones (swapping the last visible tab into the
-// overflow menu to make room for it if needed) -- same behaviour as the screenshot
-// where "Agency Target Privilege" stays visible/underlined once picked.
-const TW_REQTYPE_VISIBLE_COUNT = 8;
-function twReqTypeTabLayout(selected) {
-    const all = Object.keys(TICKET_DYNAMIC_FIELDS);
-    let visible = all.slice(0, TW_REQTYPE_VISIBLE_COUNT);
-    if (selected && all.includes(selected) && !visible.includes(selected)) {
-        visible = visible.slice(0, TW_REQTYPE_VISIBLE_COUNT - 1).concat([selected]);
-    }
-    const overflow = all.filter(t => !visible.includes(t));
-    return { visible, overflow };
-}
-
+// Every Request Type gets its own tab -- shown all at once, wrapped onto as many
+// rows as needed (no hidden "More ▾" menu). Picking a tab is purely a viewer: it
+// swaps which field set the Dynamic Request Section (card 2) shows, nothing else.
 function twRenderReqTypeTabs(selectedType) {
     const tabsEl = document.getElementById('tw-reqtype-tabs');
-    const moreMenu = document.getElementById('tw-reqtype-more-menu');
-    const moreBtn = document.getElementById('tw-reqtype-more-btn');
     if (!tabsEl) return;
-
-    const { visible, overflow } = twReqTypeTabLayout(selectedType);
-
-    tabsEl.innerHTML = visible.map(t => `
+    const all = Object.keys(TICKET_DYNAMIC_FIELDS);
+    tabsEl.innerHTML = all.map(t => `
         <button type="button" class="tw-reqtype-tab ${t === selectedType ? 'active' : ''}" onclick="twSelectRequestType('${t.replace(/'/g, "\\'")}')" title="${escHtml(t.trim())}">${escHtml(t.trim())}</button>
     `).join('');
-
-    if (moreMenu) {
-        moreMenu.innerHTML = overflow.map(t => `
-            <div class="tw-reqtype-more-item ${t === selectedType ? 'active' : ''}" onclick="twSelectRequestType('${t.replace(/'/g, "\\'")}')">${escHtml(t.trim())}</div>
-        `).join('');
-    }
-    if (moreBtn) moreBtn.classList.toggle('active', overflow.includes(selectedType));
 }
 
-function twToggleReqTypeMoreMenu(evt) {
-    evt.stopPropagation();
-    const menu = document.getElementById('tw-reqtype-more-menu');
-    if (!menu) return;
-    const showing = menu.style.display === 'block';
-    menu.style.display = showing ? 'none' : 'block';
-    if (!showing) {
-        const closeOnce = (e) => { menu.style.display = 'none'; document.removeEventListener('click', closeOnce); };
-        setTimeout(() => document.addEventListener('click', closeOnce), 0);
-    }
-}
-
-// Called when the admin clicks a Request Type tab (inline or from the "More" menu).
-// Re-renders card 2 with that type's field layout -- the record's actual Feishu
-// "Request Type" value is left untouched unless Save & Resolve is pressed while a
-// manual pick differs from the original, in which case twCollectFields() includes
-// the change so it's saved back to Feishu too (see twCollectFields).
+// Called when the admin clicks a Request Type tab. Re-renders card 2 with that
+// type's field layout ONLY -- purely a preview of which fields to fill in. It does
+// NOT change the ticket header and does NOT change the record's actual saved
+// Request Type; twCollectFields() no longer reads twManualReqType at all. To really
+// change a ticket's Request Type, edit the "Request Type" select in Basic
+// Information (card 1) directly -- that's a normal, honest field edit like any other.
 function twSelectRequestType(type) {
     if (!ltActiveTicket) return;
     twManualReqType = type;
-    const headerEl = document.getElementById('tw-req-type');
-    if (headerEl) headerEl.textContent = type.trim();
     twRenderSection2(ltActiveTicket, type);
     twRenderReqTypeTabs(type);
-    const menu = document.getElementById('tw-reqtype-more-menu');
-    if (menu) menu.style.display = 'none';
+}
+
+// Fixed ticket-head info, always these two chips (Numbering is already shown as the
+// "#..." title above them) -- Mention this Group and Submitted on. Shown regardless
+// of Request Type or whether the record actually has a value for either.
+function twRenderHeadMeta(ticket) {
+    const metaEl = document.getElementById('tw-head-meta');
+    if (!metaEl) return;
+    const groupVal = feishuValueToString(ticket.fields['Mention this Group']) || '—';
+    const submittedRaw = ticket.fields['Submitted on'];
+    let submittedVal = '—';
+    if (typeof submittedRaw === 'number' && submittedRaw > 0) {
+        const d = new Date(submittedRaw);
+        if (!isNaN(d.getTime())) submittedVal = d.toLocaleString();
+    } else if (submittedRaw) {
+        submittedVal = feishuValueToString(submittedRaw) || '—';
+    }
+    metaEl.innerHTML = `
+        <span class="tw-head-chip"><span class="tw-head-chip-label">Group</span>${escHtml(groupVal)}</span>
+        <span class="tw-head-chip"><span class="tw-head-chip-label">Submitted</span>${escHtml(submittedVal)}</span>
+    `;
 }
 
 async function twOpenWorkspace(recordId) {
@@ -5330,19 +5352,16 @@ async function twOpenWorkspace(recordId) {
         document.getElementById('tw-record-id').value = recordId;
         document.getElementById('tw-title').textContent = `#${ticket.fields['Numbering'] || recordId.slice(-6)}`;
         const actualReqType = (ticket.fields['Request Type'] || '').toString().trim();
-        document.getElementById('tw-req-type').textContent = actualReqType || 'Request';
+        twRenderHeadMeta(ticket);
 
+        // Basic Information (card 1) is the fixed LT_BASIC_KEYS_ORDERED list, always
+        // rendered in that order regardless of Request Type or whether a given field
+        // is currently empty on this record -- see LT_BASIC_KEYS_ORDERED above.
         const sec1 = document.getElementById('tw-sec-1');
         sec1.innerHTML = '';
-
-        Object.keys(ticket.fields).forEach(key => {
-            const val = ticket.fields[key];
-            if (val === undefined || val === null || val === '') return;
-            if (LT_PROCESSING_KEYS.has(key)) return;
-            if (!LT_BASIC_KEYS.has(key)) return; // dynamic-section fields handled below
-            sec1.appendChild(createTwControl(key, val));
+        LT_BASIC_KEYS_ORDERED.forEach(key => {
+            sec1.appendChild(createTwControl(key, ticket.fields[key]));
         });
-        if(sec1.children.length === 0) sec1.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No basic information found.</div>';
 
         // ISSUE 6 FIX (still applies): the Dynamic Request Section mirrors the live
         // Feishu form -- when the Request Type has an exact field list
@@ -5429,24 +5448,93 @@ async function twOpenWorkspace(recordId) {
     document.getElementById('loadingOverlay').style.display = 'none';
 }
 
-// ISSUE 2 FIX: image lightbox/modal with zoom + rotate, mirroring Feishu/Lark's inline
-// attachment viewer. No target="_blank" is used anywhere for attachment thumbnails.
+// ISSUE 2 FIX: image lightbox/modal with zoom + rotate + pan + gallery nav + OCR text
+// selection, mirroring Feishu/Lark's inline attachment viewer. No target="_blank" is
+// used anywhere for attachment thumbnails.
+let lightboxGalleries = {};   // galleryId -> [{src, filename}, ...], filled in by twRenderAttachmentControl
+let lightboxGallery = [];     // the gallery currently open
+let lightboxIndex = 0;        // position within lightboxGallery
 let lightboxZoomLevel = 1;
 let lightboxRotation = 0;
+let lightboxPanX = 0;
+let lightboxPanY = 0;
 let lightboxFilename = 'attachment';
+let lightboxOcrEnabled = true;
+let lightboxOcrCache = {};    // src -> { words, naturalWidth, naturalHeight }
+let lightboxOcrRunToken = 0;  // bumped on every image switch so a stale OCR result never renders over the wrong image
+let lightboxDragState = null;
 
+// Single-image entry point (kept for backwards compatibility / one-off callers) --
+// just wraps the src into a one-item gallery so Next/Prev quietly no-op.
 function openImageLightbox(src, filename) {
+    openImageLightboxGallery([{ src, filename: filename || 'attachment' }], 0);
+}
+
+// Main entry point: opens the lightbox on a set of images (e.g. every attachment in
+// one field) starting at `index`, with Next/Prev navigation between them.
+function openImageLightboxGallery(gallery, index) {
+    if (!Array.isArray(gallery) || gallery.length === 0) return;
     const overlay = document.getElementById('imgLightboxOverlay');
-    const img = document.getElementById('imgLightboxImg');
-    if (!overlay || !img) return;
-    lightboxZoomLevel = 1;
-    lightboxRotation = 0;
-    lightboxFilename = filename || 'attachment';
-    img.style.transform = 'scale(1) rotate(0deg)';
-    img.src = src;
+    if (!overlay) return;
+    lightboxGallery = gallery;
+    lightboxIndex = ((index % gallery.length) + gallery.length) % gallery.length;
     overlay.classList.add('active');
+    lightboxInitDrag();
+    lightboxLoadCurrent();
     document.addEventListener('keydown', lightboxKeyHandler);
     overlay.addEventListener('wheel', lightboxWheelHandler, { passive: false });
+}
+
+// Called from each thumbnail button (data-gallery-id / data-gallery-index) instead of
+// baking the raw URL into the onclick attribute -- keeps escaping simple and lets many
+// thumbnails share one gallery array.
+function openImageLightboxFromThumb(btn) {
+    const galleryId = btn.dataset.galleryId;
+    const idx = parseInt(btn.dataset.galleryIndex, 10) || 0;
+    const gallery = lightboxGalleries[galleryId];
+    if (gallery) openImageLightboxGallery(gallery, idx);
+}
+
+function lightboxLoadCurrent() {
+    const img = document.getElementById('imgLightboxImg');
+    const item = lightboxGallery[lightboxIndex];
+    if (!img || !item) return;
+    lightboxZoomLevel = 1;
+    lightboxRotation = 0;
+    lightboxPanX = 0;
+    lightboxPanY = 0;
+    lightboxFilename = item.filename || 'attachment';
+    lightboxApplyTransform();
+    lightboxClearTextLayer();
+    lightboxSetOcrStatus('');
+    img.src = item.src;
+    lightboxUpdateNav();
+    lightboxRunOcr(item.src);
+}
+
+function lightboxUpdateNav() {
+    const prevBtn = document.getElementById('imgLightboxPrevBtn');
+    const nextBtn = document.getElementById('imgLightboxNextBtn');
+    const counter = document.getElementById('imgLightboxCounter');
+    const multi = lightboxGallery.length > 1;
+    if (prevBtn) prevBtn.style.display = multi ? 'flex' : 'none';
+    if (nextBtn) nextBtn.style.display = multi ? 'flex' : 'none';
+    if (counter) {
+        counter.style.display = multi ? 'inline-flex' : 'none';
+        counter.textContent = `${lightboxIndex + 1} / ${lightboxGallery.length}`;
+    }
+}
+
+function lightboxNext() {
+    if (lightboxGallery.length < 2) return;
+    lightboxIndex = (lightboxIndex + 1) % lightboxGallery.length;
+    lightboxLoadCurrent();
+}
+
+function lightboxPrev() {
+    if (lightboxGallery.length < 2) return;
+    lightboxIndex = (lightboxIndex - 1 + lightboxGallery.length) % lightboxGallery.length;
+    lightboxLoadCurrent();
 }
 
 // ISSUE FIX: the lightbox that replaced target="_blank" attachment links never got a
@@ -5480,6 +5568,12 @@ function closeImageLightbox() {
     if (!overlay) return;
     overlay.classList.remove('active');
     if (img) img.src = '';
+    lightboxGallery = [];
+    lightboxIndex = 0;
+    lightboxOcrRunToken++; // invalidate any OCR run still in flight for the closed image
+    lightboxClearTextLayer();
+    lightboxSetOcrStatus('');
+    lightboxDragEnd();
     document.removeEventListener('keydown', lightboxKeyHandler);
     overlay.removeEventListener('wheel', lightboxWheelHandler);
 }
@@ -5497,12 +5591,16 @@ function lightboxRotate(deg) {
 function lightboxReset() {
     lightboxZoomLevel = 1;
     lightboxRotation = 0;
+    lightboxPanX = 0;
+    lightboxPanY = 0;
     lightboxApplyTransform();
 }
 
+// Transform is applied to the CANVAS wrapper (image + OCR text layer together) so the
+// selectable text stays pixel-aligned with the picture through every pan/zoom/rotate.
 function lightboxApplyTransform() {
-    const img = document.getElementById('imgLightboxImg');
-    if (img) img.style.transform = `scale(${lightboxZoomLevel}) rotate(${lightboxRotation}deg)`;
+    const canvas = document.getElementById('imgLightboxCanvas');
+    if (canvas) canvas.style.transform = `translate(${lightboxPanX}px, ${lightboxPanY}px) scale(${lightboxZoomLevel}) rotate(${lightboxRotation}deg)`;
 }
 
 function lightboxKeyHandler(e) {
@@ -5510,6 +5608,121 @@ function lightboxKeyHandler(e) {
     else if (e.key === '+' || e.key === '=') lightboxZoom(0.25);
     else if (e.key === '-') lightboxZoom(-0.25);
     else if (e.key === 'r' || e.key === 'R') lightboxRotate(90);
+    else if (e.key === 'ArrowRight') lightboxNext();
+    else if (e.key === 'ArrowLeft') lightboxPrev();
+}
+
+// --- Draggable pan --------------------------------------------------------------
+// Click-and-hold on the picture and drag to move it around the stage. Wired up once
+// (idempotent via dataset flag) since the canvas element itself never gets replaced.
+function lightboxInitDrag() {
+    const canvas = document.getElementById('imgLightboxCanvas');
+    if (!canvas || canvas.dataset.dragInit) return;
+    canvas.dataset.dragInit = '1';
+    canvas.addEventListener('mousedown', lightboxDragStart);
+}
+
+function lightboxDragStart(e) {
+    // Let normal text selection happen when the mousedown lands on a selectable OCR
+    // word -- don't hijack it into a pan drag.
+    if (e.target.closest && e.target.closest('.img-lightbox-text-layer span')) return;
+    e.preventDefault();
+    lightboxDragState = { startX: e.clientX, startY: e.clientY, panX: lightboxPanX, panY: lightboxPanY };
+    const canvas = document.getElementById('imgLightboxCanvas');
+    if (canvas) canvas.classList.add('dragging');
+    document.addEventListener('mousemove', lightboxDragMove);
+    document.addEventListener('mouseup', lightboxDragEnd);
+}
+
+function lightboxDragMove(e) {
+    if (!lightboxDragState) return;
+    lightboxPanX = lightboxDragState.panX + (e.clientX - lightboxDragState.startX);
+    lightboxPanY = lightboxDragState.panY + (e.clientY - lightboxDragState.startY);
+    lightboxApplyTransform();
+}
+
+function lightboxDragEnd() {
+    lightboxDragState = null;
+    const canvas = document.getElementById('imgLightboxCanvas');
+    if (canvas) canvas.classList.remove('dragging');
+    document.removeEventListener('mousemove', lightboxDragMove);
+    document.removeEventListener('mouseup', lightboxDragEnd);
+}
+
+// --- OCR text layer (Tesseract.js) ----------------------------------------------
+// Recognizes the text in the current image and overlays a transparent, selectable
+// <span> per word at the word's on-screen position, so the person can drag-select and
+// copy text straight out of the picture like it was real page text.
+function lightboxSetOcrStatus(text) {
+    const el = document.getElementById('imgLightboxOcrStatus');
+    if (!el) return;
+    if (text) { el.style.display = 'inline'; el.textContent = '🔤 ' + text; }
+    else el.style.display = 'none';
+}
+
+function lightboxClearTextLayer() {
+    const layer = document.getElementById('imgLightboxTextLayer');
+    if (layer) layer.innerHTML = '';
+}
+
+function lightboxToggleOcr() {
+    lightboxOcrEnabled = !lightboxOcrEnabled;
+    const layer = document.getElementById('imgLightboxTextLayer');
+    const btn = document.getElementById('imgLightboxOcrBtn');
+    if (layer) layer.style.display = lightboxOcrEnabled ? '' : 'none';
+    if (btn) btn.classList.toggle('active', lightboxOcrEnabled);
+}
+
+async function lightboxRunOcr(src) {
+    const layer = document.getElementById('imgLightboxTextLayer');
+    if (!layer) return;
+    const myToken = ++lightboxOcrRunToken;
+    layer.innerHTML = '';
+
+    if (lightboxOcrCache[src]) {
+        lightboxRenderTextLayer(lightboxOcrCache[src], myToken);
+        return;
+    }
+    if (typeof Tesseract === 'undefined') return; // library failed to load -- fail silently, viewing still works fine
+
+    lightboxSetOcrStatus('Reading text…');
+    try {
+        const img = document.getElementById('imgLightboxImg');
+        await new Promise(resolve => {
+            if (img.complete && img.naturalWidth) resolve();
+            else img.onload = resolve;
+        });
+        if (myToken !== lightboxOcrRunToken) return; // navigated away while the image itself was still loading
+
+        const { data } = await Tesseract.recognize(src, 'eng');
+        if (myToken !== lightboxOcrRunToken) return; // stale result -- user already moved to another image
+
+        const words = (data.words || []).filter(w => w.text && w.text.trim() && w.bbox);
+        const result = { words, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+        lightboxOcrCache[src] = result;
+        lightboxRenderTextLayer(result, myToken);
+    } catch (e) {
+        // OCR is a nice-to-have on top of viewing the image -- never blocks or errors out loud.
+    } finally {
+        if (myToken === lightboxOcrRunToken) lightboxSetOcrStatus('');
+    }
+}
+
+function lightboxRenderTextLayer(result, myToken) {
+    if (myToken !== lightboxOcrRunToken) return;
+    const layer = document.getElementById('imgLightboxTextLayer');
+    const img = document.getElementById('imgLightboxImg');
+    if (!layer || !img || !result || !result.words.length) return;
+    const rw = img.clientWidth, rh = img.clientHeight;
+    if (!rw || !rh || !result.naturalWidth || !result.naturalHeight) return;
+    const scaleX = rw / result.naturalWidth, scaleY = rh / result.naturalHeight;
+    layer.innerHTML = result.words.map(w => {
+        const { x0, y0, x1, y1 } = w.bbox;
+        const left = x0 * scaleX, top = y0 * scaleY, width = (x1 - x0) * scaleX, height = (y1 - y0) * scaleY;
+        const fontSize = Math.max(height * 0.82, 6);
+        return `<span style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;font-size:${fontSize}px;">${escHtml(w.text)}</span>`;
+    }).join('');
+    layer.style.display = lightboxOcrEnabled ? '' : 'none';
 }
 
 function lightboxWheelHandler(e) {
@@ -5526,11 +5739,17 @@ function twRenderAttachmentControl(wrap, label, key, meta, value) {
     const fieldIdQS = meta?.field_id ? `&field_id=${encodeURIComponent(meta.field_id)}` : '';
     let html = label;
     if (arr.length > 0) {
+        // One gallery per attachment field, stashed on lightboxGalleries so all of this
+        // field's pictures can be paged through with Next/Prev inside the lightbox.
+        const galleryId = `tw-${key.replace(/[^a-zA-Z0-9]/g, '')}-${Math.random().toString(36).slice(2, 8)}`;
+        const gallery = arr.map(f => ({
+            src: `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`,
+            filename: f.name || 'attachment'
+        }));
+        lightboxGalleries[galleryId] = gallery;
         html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
-        arr.forEach(f => {
-            const src = `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`;
-            const fname = (f.name || 'attachment').replace(/'/g, "\\'");
-            html += `<button type="button" class="img-attach-thumb" onclick="openImageLightbox('${src.replace(/'/g, "\\'")}','${fname}')" title="Click to preview"><img src="${src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
+        gallery.forEach((g, idx) => {
+            html += `<button type="button" class="img-attach-thumb" data-gallery-id="${galleryId}" data-gallery-index="${idx}" onclick="openImageLightboxFromThumb(this)" title="Click to preview"><img src="${g.src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
         });
         html += `</div>`;
     } else {
@@ -5823,14 +6042,10 @@ function twCollectFields(form) {
         }
     });
 
-    // If the admin manually switched Request Type tabs (twSelectRequestType) to a
-    // type different from the record's own current one, save that switch back to
-    // Feishu too -- otherwise the newly-filled-in dynamic fields would be attached
-    // to a record still labeled with its old Request Type.
-    const originalReqType = (ltActiveTicket?.fields?.['Request Type'] || '').toString().trim();
-    if (twManualReqType && twManualReqType !== originalReqType) {
-        fields['Request Type'] = twManualReqType;
-    }
+    // NOTE: the Request Type tab strip (twSelectRequestType) is a view-only field-set
+    // preview and never touches the saved payload here. If "Request Type" changed,
+    // it's because the admin edited the actual <select name="Request Type"> in Basic
+    // Information, which the generic select-collection loop above already captured.
 
     return fields;
 }
