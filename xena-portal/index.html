@@ -5462,7 +5462,9 @@ let lightboxFilename = 'attachment';
 let lightboxOcrEnabled = true;
 let lightboxOcrCache = {};    // src -> { words, naturalWidth, naturalHeight }
 let lightboxOcrRunToken = 0;  // bumped on every image switch so a stale OCR result never renders over the wrong image
-let lightboxOcrWorkerPromise = null; // one Tesseract worker, created once and reused for every image opened this session
+let lightboxOcrWorkerPromise = null; // one Tesseract worker (fallback engine), created once and reused
+let lightboxRapidOcrPromise = null;  // one RapidOCR engine (primary), created once and reused
+let lightboxOcrEngine = 'auto';      // 'auto' (try RapidOCR first) | 'rapidocr' | 'tesseract' -- pinned once we know which one actually works, so we don't retry a broken engine on every single image
 let lightboxDragState = null;
 
 // Single-image entry point (kept for backwards compatibility / one-off callers) --
@@ -5674,6 +5676,64 @@ function lightboxToggleOcr() {
     if (btn) btn.classList.toggle('active', lightboxOcrEnabled);
 }
 
+// --- Primary OCR engine: RapidOCR (PP-OCR models via ONNX Runtime Web) -----------
+// A dedicated OCR engine (client-side-ocr, MIT), meaningfully more accurate than
+// Tesseract on real screenshots/photos. Loaded on demand via dynamic import from a
+// public CDN (unpkg) -- not bundled into this app, not served from this app's own
+// origin/Vercel deployment, so it never touches server bandwidth/function limits,
+// same as Tesseract. Falls back to the Tesseract pipeline below automatically if it
+// ever fails to load or errors out, so OCR keeps working either way.
+function lightboxGetRapidOcrEngine() {
+    if (!lightboxRapidOcrPromise) {
+        lightboxRapidOcrPromise = (async () => {
+            const mod = await import('https://unpkg.com/client-side-ocr@latest/dist/index.mjs');
+            const engine = mod.createRapidOCREngine({
+                language: 'en',
+                modelVersion: 'PP-OCRv4',
+                modelType: 'mobile', // smaller/faster model set -- plenty for chat screenshots and ID cards
+                cacheModels: true    // IndexedDB caching -- only downloaded once per device, ever
+            });
+            await engine.initialize();
+            return engine;
+        })();
+    }
+    return lightboxRapidOcrPromise;
+}
+
+// A word-box's quadrilateral (topLeft/topRight/bottomRight/bottomLeft) collapsed to
+// an axis-aligned rect -- good enough for positioning a selectable span; only loses
+// precision on heavily rotated/skewed text.
+function lightboxQuadToRect(box) {
+    const xs = [box.topLeft.x, box.topRight.x, box.bottomRight.x, box.bottomLeft.x];
+    const ys = [box.topLeft.y, box.topRight.y, box.bottomRight.y, box.bottomLeft.y];
+    return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+}
+
+async function lightboxRunRapidOcr(img, myToken) {
+    const engine = await lightboxGetRapidOcrEngine();
+    if (myToken !== lightboxOcrRunToken) return null; // navigated away while the (first-time-only) engine was loading
+    const result = await engine.processImage(img, {
+        enableWordSegmentation: true,
+        enableTextClassification: true // auto-corrects upside-down (180°) screenshots
+    });
+    if (myToken !== lightboxOcrRunToken) return null;
+    if (!result || !Array.isArray(result.lines)) throw new Error('Unexpected RapidOCR result shape');
+
+    // Same "one space after every word, newline at end of every line" approach as the
+    // Tesseract path below -- keeps copy/paste spacing correct either way.
+    const words = [];
+    result.lines.forEach(line => {
+        const lineWords = (Array.isArray(line.words) && line.words.length) ? line.words : [{ text: line.text, box: line.box }];
+        lineWords.forEach((w, idx) => {
+            if (!w || !w.text || !w.text.trim() || !w.box) return;
+            const isLastWord = idx === lineWords.length - 1;
+            words.push({ text: w.text + (isLastWord ? '\n' : ' '), bbox: lightboxQuadToRect(w.box) });
+        });
+    });
+    return { words, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+}
+
+// --- Fallback OCR engine: Tesseract.js -------------------------------------------
 // One Tesseract worker for the whole session instead of Tesseract.recognize(src) --
 // that convenience call spins up and tears down a fresh worker (and re-downloads the
 // language data) on every single image, which is the main reason OCR feels slow/janky.
@@ -5735,6 +5795,34 @@ function lightboxPreprocessForOcr(img) {
     return { canvas, scale };
 }
 
+async function lightboxRunTesseractOcr(img, myToken) {
+    if (typeof Tesseract === 'undefined') return null; // library failed to load -- fail silently, viewing still works fine
+    const worker = await lightboxGetOcrWorker();
+    if (myToken !== lightboxOcrRunToken) return null;
+
+    const { canvas, scale } = lightboxPreprocessForOcr(img);
+    const { data } = await worker.recognize(canvas);
+    if (myToken !== lightboxOcrRunToken) return null;
+
+    const words = [];
+    (data.lines || []).forEach(line => {
+        if (!line.words) return;
+        line.words.forEach((w, idx) => {
+            if (!w.text || !w.text.trim() || !w.bbox) return;
+            const isLastWord = idx === line.words.length - 1;
+            // bbox came back in the upscaled canvas's pixel space -- divide back down
+            // to the original image's pixel space before storing.
+            const b = w.bbox;
+            words.push({
+                text: w.text + (isLastWord ? '\n' : ' '),
+                bbox: { x0: b.x0 / scale, y0: b.y0 / scale, x1: b.x1 / scale, y1: b.y1 / scale }
+            });
+        });
+    });
+    return { words, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+}
+
+// --- Orchestrator: try RapidOCR, fall back to Tesseract ---------------------------
 async function lightboxRunOcr(src) {
     const layer = document.getElementById('imgLightboxTextLayer');
     if (!layer) return;
@@ -5745,56 +5833,52 @@ async function lightboxRunOcr(src) {
         lightboxRenderTextLayer(lightboxOcrCache[src], myToken);
         return;
     }
-    if (typeof Tesseract === 'undefined') return; // library failed to load -- fail silently, viewing still works fine
+
+    const img = document.getElementById('imgLightboxImg');
+    await new Promise(resolve => {
+        if (img.complete && img.naturalWidth) resolve();
+        else img.onload = resolve;
+    });
+    if (myToken !== lightboxOcrRunToken) return; // navigated away while the image itself was still loading
 
     lightboxSetOcrStatus('Reading text…');
-    try {
-        const img = document.getElementById('imgLightboxImg');
-        await new Promise(resolve => {
-            if (img.complete && img.naturalWidth) resolve();
-            else img.onload = resolve;
-        });
-        if (myToken !== lightboxOcrRunToken) return; // navigated away while the image itself was still loading
+    let result = null;
 
-        const worker = await lightboxGetOcrWorker();
-        if (myToken !== lightboxOcrRunToken) return; // navigated away while the (first-time-only) worker was spinning up
+    // Once we know RapidOCR actually works in this browser, keep using it for the
+    // rest of the session. Once we know it doesn't, stop retrying it on every image
+    // and go straight to the Tesseract fallback.
+    if (lightboxOcrEngine !== 'tesseract') {
+        try {
+            result = await lightboxRunRapidOcr(img, myToken);
+            if (result) lightboxOcrEngine = 'rapidocr';
+        } catch (e) {
+            console.warn('RapidOCR unavailable, using Tesseract for the rest of this session:', e);
+            lightboxOcrEngine = 'tesseract';
+        }
+    }
+    if (!result && myToken === lightboxOcrRunToken) {
+        try {
+            result = await lightboxRunTesseractOcr(img, myToken);
+        } catch (e) {
+            // OCR is a nice-to-have on top of viewing the image -- never blocks or errors out loud.
+        }
+    }
 
-        const { canvas, scale } = lightboxPreprocessForOcr(img);
-        const { data } = await worker.recognize(canvas);
-        if (myToken !== lightboxOcrRunToken) return; // stale result -- user already moved to another image
-
-        // Grouping by line (instead of a flat word list) lets us bake a literal space
-        // after every word and a newline at the end of every line straight into each
-        // span's own text content. Each word still renders as its own
-        // absolutely-positioned span (needed so it sits over the right pixels at any
-        // zoom/rotation), but because the DOM order matches reading order and every
-        // span now ends in a real space/newline character, the browser's native copy
-        // no longer squashes "I'd sand kar do" into "I'dsandkardo" -- the separator
-        // travels with the selection instead of being implied by layout.
-        const words = [];
-        (data.lines || []).forEach(line => {
-            if (!line.words) return;
-            line.words.forEach((w, idx) => {
-                if (!w.text || !w.text.trim() || !w.bbox) return;
-                const isLastWord = idx === line.words.length - 1;
-                // bbox came back in the upscaled canvas's pixel space -- divide back
-                // down to the original image's pixel space so it still lines up with
-                // rw/naturalWidth scaling in lightboxRenderTextLayer.
-                const b = w.bbox;
-                words.push({
-                    text: w.text + (isLastWord ? '\n' : ' '),
-                    bbox: { x0: b.x0 / scale, y0: b.y0 / scale, x1: b.x1 / scale, y1: b.y1 / scale }
-                });
-            });
-        });
-        const result = { words, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+    if (myToken !== lightboxOcrRunToken) return; // stale -- user already moved to another image
+    if (result) {
         lightboxOcrCache[src] = result;
         lightboxRenderTextLayer(result, myToken);
-    } catch (e) {
-        // OCR is a nice-to-have on top of viewing the image -- never blocks or errors out loud.
-    } finally {
-        if (myToken === lightboxOcrRunToken) lightboxSetOcrStatus('');
     }
+    lightboxSetOcrStatus('');
+}
+
+// Some OCR engines/versions return word boxes normalized to 0..1 instead of natural
+// pixel coordinates. Detect that case and rescale -- a defensive check since RapidOCR
+// integration here hasn't been exercised against every image size in the wild.
+function lightboxNormalizeBbox(b, naturalWidth, naturalHeight) {
+    const looksNormalized = b.x1 <= 1.5 && b.y1 <= 1.5 && naturalWidth > 3;
+    if (!looksNormalized) return b;
+    return { x0: b.x0 * naturalWidth, y0: b.y0 * naturalHeight, x1: b.x1 * naturalWidth, y1: b.y1 * naturalHeight };
 }
 
 function lightboxRenderTextLayer(result, myToken) {
@@ -5806,13 +5890,14 @@ function lightboxRenderTextLayer(result, myToken) {
     if (!rw || !rh || !result.naturalWidth || !result.naturalHeight) return;
     const scaleX = rw / result.naturalWidth, scaleY = rh / result.naturalHeight;
     layer.innerHTML = result.words.map(w => {
-        const { x0, y0, x1, y1 } = w.bbox;
-        const left = x0 * scaleX, top = y0 * scaleY, width = (x1 - x0) * scaleX, height = (y1 - y0) * scaleY;
+        const b = lightboxNormalizeBbox(w.bbox, result.naturalWidth, result.naturalHeight);
+        const left = b.x0 * scaleX, top = b.y0 * scaleY, width = (b.x1 - b.x0) * scaleX, height = (b.y1 - b.y0) * scaleY;
         const fontSize = Math.max(height * 0.82, 6);
         return `<span style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;font-size:${fontSize}px;">${escHtml(w.text)}</span>`;
     }).join('');
     layer.style.display = lightboxOcrEnabled ? '' : 'none';
 }
+
 
 function lightboxWheelHandler(e) {
     e.preventDefault();
