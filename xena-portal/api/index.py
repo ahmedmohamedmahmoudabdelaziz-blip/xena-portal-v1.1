@@ -127,16 +127,21 @@ def _safe_int(value, default):
 
 _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 
-# SPEED FIX (Live Ticket Queue feels slow to open a ticket / run duplicate check):
-# every http_requests.get/post/put call to Feishu was opening a brand new TCP+TLS
-# connection from scratch, even on a warm serverless instance handling back-to-back
-# requests to the same open.feishu.cn host. requests.Session() pools and reuses
-# connections across calls on the same warm instance (the same pattern already
-# proven out in /api/my-requests's own Session), cutting handshake latency on the
-# hot paths below without changing any request/response behavior -- .get/.post/.put
-# on a Session have the exact same signature and return value as the bare module
-# functions, so this is purely a performance change.
-feishu_session = http_requests.Session()
+# REVERTED (this used to be a shared module-level `feishu_session = http_requests.
+# Session()`, added as a "speed fix" for connection reuse). That turned out to be
+# the actual root cause of an 8-10s delay opening tickets: a module-level Session
+# persists across SEPARATE Vercel invocations on a warm/thawed container, and if the
+# container sat idle for a while, its pooled TCP connection can go silently dead on
+# the remote end while still looking "open" locally -- reusing it then hangs for
+# several seconds before urllib3 gives up and retries with a fresh connection. Every
+# call site that used this global made exactly ONE Feishu request per invocation
+# anyway (get_single_request, update_request, the attachment proxy), so there was no
+# real pooling benefit being lost by removing it -- they now use plain one-off
+# http_requests.get/put calls, which always open a known-fresh connection. Endpoints
+# that genuinely benefit from reuse WITHIN a single request (e.g. /api/my-requests's
+# paginated search loop) already create their OWN local, per-request Session -- that
+# pattern is safe and unaffected, since a local variable can never survive across
+# invocations the way this module-level one did.
 _TOKEN_REDIS_KEY = "xena:tenant_access_token"
 
 def get_tenant_access_token():
@@ -156,7 +161,14 @@ def get_tenant_access_token():
             return _token_cache["token"]
 
     if REDIS_ENABLED:
-        cached = redis_get_json(_TOKEN_REDIS_KEY)
+        # BUG FIX (contributing to the 8-10s ticket-open delay): explicit 2.5s cap
+        # here specifically -- this runs on every cold start (in-process cache is
+        # always empty then) and sits directly in the critical path of every ticket
+        # open. 2.5s is generous relative to Upstash's typical ~20-100ms REST latency
+        # (a 25-100x margin), but fails fast enough that a genuinely stalled Redis
+        # doesn't stall the whole ticket-open -- it just falls through to fetching a
+        # fresh token from Feishu instead, same as if Redis were simply empty.
+        cached = redis_get_json(_TOKEN_REDIS_KEY, timeout=2.5)
         if cached and time.time() < cached.get("expires_at", 0):
             with _token_cache["lock"]:
                 _token_cache["token"] = cached["token"]
@@ -414,7 +426,7 @@ def mask_name(name):
     parts = name.strip().split()
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
-def redis_cmd(*args, timeout=8):
+def redis_cmd(*args, timeout=4):
     if not REDIS_ENABLED: return None
     try:
         resp = http_requests.post(
@@ -427,13 +439,22 @@ def redis_cmd(*args, timeout=8):
         logger.warn("redis_cmd_failed", cmd=args[0] if args else "?", error=str(e))
         return None
 
-def redis_get_json(key):
-    raw = redis_cmd("GET", key)
+def redis_get_json(key, timeout=4):
+    # BUG FIX (contributing to the 8-10s ticket-open delay): this used to inherit
+    # redis_cmd's old default of timeout=8 with no way to override it, so a slow/
+    # stalled Upstash response on a cold start (this is on get_tenant_access_token's
+    # hot path -- runs whenever the in-process token cache is empty, which is every
+    # cold start) could block the whole request for up to 8s before falling back to
+    # a real Feishu auth call. Callers on latency-sensitive paths (see
+    # get_tenant_access_token) now pass a shorter explicit timeout; this function's
+    # own default is also lowered from 8s to a more reasonable 4s for anything that
+    # doesn't override it.
+    raw = redis_cmd("GET", key, timeout=timeout)
     if not raw: return None
     try: return json.loads(raw)
     except Exception: return None
 
-def redis_set_json(key, value, ttl=None):
+def redis_set_json(key, value, ttl=None, timeout=5):
     try:
         payload = json.dumps(value, default=str)
     except Exception as e:
@@ -442,8 +463,8 @@ def redis_set_json(key, value, ttl=None):
     if len(payload) > REDIS_MAX_VALUE_BYTES:
         logger.warn("redis_value_too_large", key=key, size_bytes=len(payload))
         return False
-    if ttl: redis_cmd("SET", key, payload, "EX", int(ttl))
-    else:   redis_cmd("SET", key, payload)
+    if ttl: redis_cmd("SET", key, payload, "EX", int(ttl), timeout=timeout)
+    else:   redis_cmd("SET", key, payload, timeout=timeout)
     return True
 
 _cache: dict = {}
@@ -1883,7 +1904,16 @@ def get_single_request():
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     try:
-        resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        # BUG FIX (8-10s ticket-open delay): this used to reuse the module-level
+        # feishu_session global, which persists across separate Vercel invocations on
+        # a warm/thawed container. If the container had been idle for a while, the
+        # pooled TCP connection could be silently dead on the remote end while still
+        # looking "open" locally -- reusing it then hangs (sometimes for many seconds)
+        # before urllib3 gives up and retries with a fresh connection. Since this
+        # endpoint only ever makes ONE Feishu call, there's no pooling benefit to lose
+        # by not sharing a session here -- a plain one-off request always opens a known-
+        # fresh connection, so this failure mode can't happen at all.
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
         data = resp.json()
         if data.get("code") == 0:
             return jsonify({"success": True, "record": data["data"]["record"]})
@@ -2068,7 +2098,10 @@ def update_request():
 
     logger.info("update_fields_payload", record_id=record_id, fields=fields)
     try:
-        resp = feishu_session.put(url, headers=headers, json={"fields": fields}, timeout=15)
+        # BUG FIX (8-10s delay): see the matching comment in get_single_request() --
+        # same stale-global-session issue, same fix (plain one-off call, no pooling
+        # benefit lost since this endpoint only makes one Feishu call per invocation).
+        resp = http_requests.put(url, headers=headers, json={"fields": fields}, timeout=15)
         data = resp.json()
         logger.info("update_feishu_response", record_id=record_id, response=data)
         if data.get("code") == 0:
@@ -3216,7 +3249,7 @@ def proxy_attachment(file_token):
                         "fieldId": field_id,
                     }
                 })
-            return feishu_session.get(url, headers=headers, params=params, timeout=20, stream=True)
+            return http_requests.get(url, headers=headers, params=params, timeout=20, stream=True)
 
         resp = _attempt(with_extra=True)
         if resp.status_code != 200 and field_id:
