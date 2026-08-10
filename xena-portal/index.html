@@ -5697,7 +5697,23 @@ async function lightboxRunOcr(src) {
         const { data } = await Tesseract.recognize(src, 'eng');
         if (myToken !== lightboxOcrRunToken) return; // stale result -- user already moved to another image
 
-        const words = (data.words || []).filter(w => w.text && w.text.trim() && w.bbox);
+        // FIX: grouping by line (instead of a flat word list) lets us bake a literal
+        // space after every word and a newline at the end of every line straight into
+        // each span's own text content. Each word still renders as its own
+        // absolutely-positioned span (needed so it sits over the right pixels at any
+        // zoom/rotation), but because the DOM order matches reading order and every
+        // span now ends in a real space/newline character, the browser's native
+        // copy no longer squashes "I'd sand kar do" into "I'dsandkardo" -- the
+        // separator travels with the selection instead of being implied by layout.
+        const words = [];
+        (data.lines || []).forEach(line => {
+            if (!line.words) return;
+            line.words.forEach((w, idx) => {
+                if (!w.text || !w.text.trim() || !w.bbox) return;
+                const isLastWord = idx === line.words.length - 1;
+                words.push({ text: w.text + (isLastWord ? '\n' : ' '), bbox: w.bbox });
+            });
+        });
         const result = { words, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
         lightboxOcrCache[src] = result;
         lightboxRenderTextLayer(result, myToken);
