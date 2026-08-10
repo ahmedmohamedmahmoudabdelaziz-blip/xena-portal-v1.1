@@ -2593,7 +2593,7 @@ function playSamuraiIntro() {
     // here, matching what the media-conditional <link rel=preload> already
     // fetched, means this hits the browser's cache instead of a second request.
     const variant = window.innerWidth > 640 ? 'landscape' : 'portrait';
-    const src = `/api/samurai-image?variant=${variant}`;
+    const src = `/api/samurai-image?variant=${variant}&v=2`;
     if (image.getAttribute('src') !== src) image.src = src;
 
     // Reduced motion: skip straight to the homepage with a brief elegant fade
