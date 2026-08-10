@@ -2192,69 +2192,40 @@ def submit_request():
     created_via = "user_token"
 
     try:
-        # Primary Attempt (User Context): Create ONLY the blank row under the agent's
-        # own identity -- no fields at all, so Feishu's own "Created By"/"Respondents"
-        # system columns get stamped with the real submitter if their token is allowed
-        # to create records on this base.
+        # SINGLE-CALL CREATE (User Context): create the row in ONE request, under the
+        # agent's own identity, with every field the user filled in already attached
+        # ("Request Status", "Submitted By", and all of final_fields). This replaces the
+        # old two-step "create blank row -> patch with TAT" flow. Doing it in one call
+        # means Feishu's own "Created By"/"Respondents" system columns get stamped with
+        # the real submitter AND the data lands at the same time -- no more blank
+        # intermediate row, and nothing to roll back if a later step fails, because
+        # there is no later step.
         create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-        resp = http_requests.post(url, headers=create_headers, json={"fields": {}}, timeout=15)
+        resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
         data = resp.json()
-        
-        # Fallback to TAT if UAT was entirely restricted. NOTE: this is expected to
-        # trigger for every agent who genuinely lacks native Bitable record-create
-        # permission on this base (the reason this two-step flow exists in the first
-        # place) -- in that case Feishu's own "Created By" column will always show the
-        # app identity, no matter what token order we try, because that column is a
-        # platform-level automatic field driven by whichever token performed the create
-        # call. The real submitter is still recorded reliably in the "Submitted By"
-        # field below, which is what /api/my-requests and the audit log key off of.
+
+        # Fallback to TAT if the agent's own token can't create records on this base at
+        # all, or is rejected on one of the fields being sent (e.g. a field only the
+        # tenant app identity is allowed to write). NOTE: when this fallback fires,
+        # Feishu's "Created By" column will show the app identity instead of the real
+        # submitter, because that column is a platform-level automatic field driven by
+        # whichever token performed the create call. The real submitter is still
+        # recorded reliably in the "Submitted By" field itself (already inside
+        # final_fields), which is what /api/my-requests and the audit log key off of.
         if data.get("code") != 0 and api_token != tat:
             logger.warn("submit_primary_create_fallback", user=user,
                         feishu_code=data.get("code"), feishu_msg=data.get("msg"))
             create_headers["Authorization"] = f"Bearer {tat}"
-            resp = http_requests.post(url, headers=create_headers, json={"fields": {}}, timeout=15)
+            resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
             data = resp.json()
             created_via = "tenant_token_fallback"
         elif not uat:
             created_via = "tenant_token_no_uat"
 
         if data.get("code") == 0:
-            record_id = data["data"]["record"]["record_id"]
-            
-            # System Patch (TAT Context): fills in ONLY the fields the user actually
-            # populated on the form (final_fields), plus the two operational fields
-            # "Request Status"/"Submitted By" -- never anything else. Everything the
-            # user didn't fill in stays untouched for manual entry on the sheet, exactly
-            # as requested.
-            update_url = f"{url}/{record_id}"
-            update_headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-            update_resp = http_requests.put(update_url, headers=update_headers, json={"fields": final_fields}, timeout=15)
-            update_data = update_resp.json()
-            
-            if update_data.get("code") == 0:
-                success = True
-            else:
-                # BUG FIX (orphaned blank tickets): previously, if this Patch step
-                # failed for any reason, the exception below was raised and an error
-                # was returned to the user -- but the blank row created by the Primary
-                # Attempt just above was NEVER cleaned up. That blank row (Request
-                # Status: Pending, every other field empty, Respondents stamped by
-                # whichever token created it) stayed in the sheet forever, which is
-                # exactly the "record with no info in it" agents and admins were
-                # seeing. Since the create+patch isn't a real atomic transaction on
-                # Feishu's side, we now delete the orphaned blank record ourselves
-                # before surfacing the error, so a failed submission never leaves a
-                # ghost row behind.
-                try:
-                    del_headers = {"Authorization": f"Bearer {tat}"}
-                    http_requests.delete(f"{url}/{record_id}", headers=del_headers, timeout=15)
-                    logger.warn("submit_patch_failed_rolled_back", record_id=record_id,
-                                feishu_msg=update_data.get("msg"))
-                except Exception as del_e:
-                    logger.error("submit_rollback_delete_failed", record_id=record_id, error=str(del_e))
-                raise Exception(f"System Patch failed: {update_data.get('msg')}")
+            success = True
         else:
-            raise Exception(f"Primary Creation failed: {data.get('msg')}")
+            raise Exception(f"Creation failed: {data.get('msg')}")
 
     except Exception as e:
         logger.error("feishu_submit_failed", error=str(e), req_type=req_type)
