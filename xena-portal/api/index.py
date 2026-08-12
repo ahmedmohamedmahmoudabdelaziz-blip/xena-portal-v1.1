@@ -2182,7 +2182,7 @@ def submit_request():
         # see strip_invalid_user_fields() for the full story.
         final_fields = strip_invalid_user_fields(final_fields, field_types, actor=user)
 
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/forms/{FORM_ID}/responses"
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/forms/{FORM_ID}/responses"
     success = False
     created_via = "user_token"
 
@@ -2196,7 +2196,7 @@ def submit_request():
         # intermediate row, and nothing to roll back if a later step fails, because
         # there is no later step.
         create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-        resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
+        resp = http_requests.post(url, headers=create_headers, json={"form_fields": final_fields}, timeout=15)
         data = resp.json()
 
         # Fallback to TAT if the agent's own token can't create records on this base at
@@ -2211,7 +2211,7 @@ def submit_request():
             logger.warn("submit_primary_create_fallback", user=user,
                         feishu_code=data.get("code"), feishu_msg=data.get("msg"))
             create_headers["Authorization"] = f"Bearer {tat}"
-            resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
+            resp = http_requests.post(url, headers=create_headers, json={"form_fields": final_fields}, timeout=15)
             data = resp.json()
             created_via = "tenant_token_fallback"
         elif not uat:
