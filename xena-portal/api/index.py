@@ -22,7 +22,7 @@ REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
 AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")   
-
+FORM_ID = os.environ.get("LARK_FORM_ID", "shrcnKiM5Nd35n4nP0IP2o1Y8Lb")
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
 # BUG FIX (silent identity loss): submit_request() used to write the real submitter's
@@ -2182,7 +2182,7 @@ def submit_request():
         # see strip_invalid_user_fields() for the full story.
         final_fields = strip_invalid_user_fields(final_fields, field_types, actor=user)
 
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/forms/{FORM_ID}/responses"
     success = False
     created_via = "user_token"
 
