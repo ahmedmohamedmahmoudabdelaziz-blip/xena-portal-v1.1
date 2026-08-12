@@ -2155,23 +2155,18 @@ def submit_request():
             final_fields[field_name] = tokens
 
     final_fields["Request Status"] = "Pending"
-    final_fields[SUBMITTED_BY_FIELD_NAME] = user
+    # NOTE: intentionally NOT writing SUBMITTED_BY_FIELD_NAME ("Submitted By") into the
+    # sheet anymore -- per request, that field should not be populated on submit. Real
+    # attribution now relies solely on Feishu's own "Created By"/"Respondents" system
+    # column (stamped by whichever token performs the create call below), plus the
+    # audit log entry at the end of this function, which always records the true
+    # submitter regardless of which token ends up creating the row.
 
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
         dropped = [k for k in final_fields if k not in actual_fields]
         if dropped:
             logger.warn("submit_dropped_unknown_fields", fields=dropped)
-        if SUBMITTED_BY_FIELD_NAME in dropped:
-            # This is the one that matters most: if it's silently dropped, the real
-            # submitter's name is lost for this ticket the moment "Respondents" can't
-            # carry it (see SUBMITTED_BY_FIELD_NAME comment above). Surface it loudly
-            # in the audit log instead of only in server logs, since that's the one
-            # place someone is likely to actually notice a pattern of missing names.
-            audit.log(user, "SUBMITTED_BY_FIELD_MISSING",
-                      f"'{SUBMITTED_BY_FIELD_NAME}' is not a real column on this table -- "
-                      f"real submitter name for this ticket was not saved anywhere.",
-                      severity="Warning")
         final_fields = {k: v for k, v in final_fields.items() if k in actual_fields}
 
     # BUG FIX (NumberFieldConvFail): same coercion as update_request -- protects new
