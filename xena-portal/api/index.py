@@ -1896,26 +1896,28 @@ def get_single_request():
 def search_members():
     """
     Backs the "Done by" / "Mentioned Person" user picker.
-    Uses Feishu's native user search API with User Access Token (UAT) to instantly 
-    search all allowed sub-departments without triggering 40004 or 99991663 errors.
+    Uses Feishu's native user search API with the app's own tenant_access_token
+    (rather than the logged-in user's UAT) so results are governed purely by the
+    app's configured Availability/visible range in the Developer Console -- not by
+    whichever employee happens to be searching. NOTE: this endpoint previously used
+    UAT specifically because tenant-level calls to this API have been known to throw
+    99991663 ("no permission") on some app configs even with the right scope/Availability
+    -- if that resurfaces, check the logged code/msg below first.
     """
     query = sanitize_text(request.args.get('q', '')).strip()
-    uat = request.args.get('uat', '')
-    
+
     # The frontend only calls this when typing, but guard against empty queries
     if not query:
         return jsonify({"success": True, "results": [], "count": 0})
-        
-    if not uat:
-        return jsonify({"success": False, "error": "Missing User Access Token. Please refresh the page."}), 400
 
-    # MUST use user_access_token (UAT) to avoid 99991663 error
+    tat = get_tenant_access_token()
+
     url = "https://open.feishu.cn/open-apis/contact/v3/users/search?user_id_type=open_id"
     headers = {
-        "Authorization": f"Bearer {uat}",
+        "Authorization": f"Bearer {tat}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "query": query,
         "page_size": 50
@@ -1924,6 +1926,17 @@ def search_members():
     try:
         resp = http_requests.post(url, headers=headers, json=payload, timeout=10)
         data = resp.json()
+
+        # TEMP DEBUG: log the raw code/msg/item-count on every call while we confirm
+        # tenant-token search actually returns results in this app's tenant. Safe to
+        # remove once confirmed working.
+        logger.info(
+            "member_search_debug",
+            query=query,
+            code=data.get("code"),
+            msg=data.get("msg"),
+            item_count=len(data.get("data", {}).get("items", []) or []),
+        )
 
         if data.get("code") != 0:
             # A friendlier message specifically for the missing-scope case (99991672) --
