@@ -1669,6 +1669,14 @@ def samurai_image():
     # in index.html) picks based on window.innerWidth before requesting.
     # Deploy BOTH samurai_moon_portrait.png and samurai_moon_landscape.png at
     # the project root, alongside index.html and sam.mp4.
+    #
+    # CACHING: response is Cache-Control: immutable, max-age=7 days (below).
+    # That's safe ONLY because the frontend appends a ?v= version param that gets
+    # bumped whenever the underlying PNG file changes (see SAMURAI_ASSET_VERSION
+    # in index.html) -- the ?v= query param makes it a *new* URL every time, so
+    # the old cached response is never reused. If a future edit here drops the
+    # version param, browsers/Vercel's edge cache will keep serving whatever PNG
+    # they cached first for up to a week, even after a new file is deployed.
     variant = request.args.get('variant', 'portrait')
     filename = 'samurai_moon_landscape.png' if variant == 'landscape' else 'samurai_moon_portrait.png'
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
