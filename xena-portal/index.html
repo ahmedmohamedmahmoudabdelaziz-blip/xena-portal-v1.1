@@ -587,6 +587,7 @@
         }
         .img-lightbox-text-layer span::selection{background:rgba(0,212,255,.45);color:transparent}
         .img-lightbox-hint{color:var(--text-muted,#8a8fa3);font-size:.75rem;margin-top:10px;display:flex;align-items:center;gap:6px}
+        .img-lightbox-extract-panel{background:rgba(18,20,32,.97);border:1px solid rgba(255,255,255,.12);border-radius:10px;max-width:520px;width:90%;margin:10px auto 0;box-shadow:0 8px 24px rgba(0,0,0,.4);}
         .img-attach-thumb{
             display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;
             border:1px solid var(--border,rgba(255,255,255,0.15));cursor:zoom-in;background:none;padding:0;
@@ -633,7 +634,7 @@
         <button type="button" onclick="lightboxRotate(90)" title="Rotate right">↻</button>
         <button type="button" onclick="lightboxReset()" title="Reset pan/zoom">⟲</button>
         <button type="button" id="imgLightboxOcrBtn" class="active" onclick="lightboxToggleOcr()" title="Toggle selectable text (OCR)">🔤</button>
-        <button type="button" id="imgLightboxLarkOcrBtn" onclick="lightboxRunLarkOcr()" title="Extract text (Lark OCR, no selection overlay -- copyable text block)">📋</button>
+        <button type="button" id="imgLightboxExtractBtn" onclick="lightboxExtractText()" title="Extract text (Lark OCR fallback) into a copyable block below the image">📋</button>
         <button type="button" onclick="lightboxDownload()" title="Download">⬇️</button>
         <button type="button" onclick="closeImageLightbox()" title="Close">✕</button>
     </div>
@@ -645,19 +646,15 @@
             <div class="img-lightbox-text-layer" id="imgLightboxTextLayer"></div>
         </div>
     </div>
-    <div id="imgLightboxLarkOcrPanel" style="display:none;position:absolute;left:16px;right:16px;bottom:64px;max-height:30%;overflow-y:auto;background:rgba(20,20,24,.95);border:1px solid var(--border);border-radius:10px;padding:12px 14px;z-index:50;" onclick="event.stopPropagation()">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Extracted text (Lark OCR)</span>
-            <div style="display:flex;gap:8px;">
-                <button type="button" onclick="lightboxCopyLarkOcrText()" style="background:none;border:none;color:var(--accent-cyan);cursor:pointer;font-size:.78rem;">Copy</button>
-                <button type="button" onclick="document.getElementById('imgLightboxLarkOcrPanel').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.78rem;">Close</button>
-            </div>
-        </div>
-        <pre id="imgLightboxLarkOcrText" style="white-space:pre-wrap;font-family:inherit;font-size:.85rem;margin:0;user-select:text;"></pre>
-    </div>
     <div class="img-lightbox-hint">
         <span id="imgLightboxOcrStatus" style="display:none;color:var(--accent-cyan);"></span>
-        <span>🖐️ Drag to pan · Scroll to zoom · 🔤 select text in image · Click outside or press Esc to close</span>
+        <span>🖐️ Drag to pan · Scroll to zoom · 🔤 select text in image · 📋 extract text · Click outside or press Esc to close</span>
+    </div>
+    <!-- Lark OCR fallback: a plain copyable text block, separate from the pixel-aligned
+         RapidOCR/Tesseract selection layer drawn on the image itself. -->
+    <div class="img-lightbox-extract-panel" id="imgLightboxExtractPanel" style="display:none;" onclick="event.stopPropagation()">
+        <div style="font-size:.72rem;color:var(--text-muted);padding:8px 14px 0;">Extracted text (Lark OCR fallback)</div>
+        <div id="imgLightboxExtractBody"></div>
     </div>
 </div>
 
@@ -5521,10 +5518,17 @@ function lightboxLoadCurrent() {
     lightboxApplyTransform();
     lightboxClearTextLayer();
     lightboxSetOcrStatus('');
-    lightboxHideLarkOcrPanel();
+    lightboxHideExtractPanel();
     img.src = item.src;
     lightboxUpdateNav();
     lightboxRunOcr(item.src);
+}
+
+function lightboxHideExtractPanel() {
+    const panel = document.getElementById('imgLightboxExtractPanel');
+    const body = document.getElementById('imgLightboxExtractBody');
+    if (panel) panel.style.display = 'none';
+    if (body) body.innerHTML = '';
 }
 
 function lightboxUpdateNav() {
@@ -5577,6 +5581,96 @@ async function lightboxDownload() {
     }
 }
 
+// --- Lark OCR fallback ("Extract Text" button) ------------------------------------
+// Distinct from lightboxRunOcr() above: that one drives the pixel-aligned selectable
+// text layer drawn on top of the image (RapidOCR, falling back to Tesseract, both
+// running in-browser). Feishu's own OCR API only returns a flat list of recognized
+// text strings with no coordinates, so it can't feed that overlay -- instead this
+// dumps its output into a plain copyable text block below the image, as a fallback
+// for when the on-image selection is fuzzy or misses text entirely.
+async function lightboxExtractText() {
+    const img = document.getElementById('imgLightboxImg');
+    const panel = document.getElementById('imgLightboxExtractPanel');
+    const body = document.getElementById('imgLightboxExtractBody');
+    if (!img || !img.src || !panel || !body) return;
+
+    panel.style.display = 'block';
+    body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">Extracting text…</div>`;
+
+    try {
+        const resp = await fetch(img.src);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        let blob = await resp.blob();
+
+        // Feishu's OCR endpoint has a hard 5MB cap. Re-encode as a smaller JPEG via
+        // canvas instead of failing outright if the original attachment is bigger.
+        if (blob.size > 4.5 * 1024 * 1024) {
+            blob = await lightboxDownscaleForOcr(img);
+        }
+
+        const base64 = await lightboxBlobToBase64(blob);
+        const res = await fetch('/api/ocr/lark', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, image: base64 })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(data.error || 'Text extraction failed')}</div>`;
+            return;
+        }
+        if (!data.text || !data.text.trim()) {
+            body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">No text found in this image.</div>`;
+            return;
+        }
+        body.innerHTML = `
+            <pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.82rem;color:var(--text-primary,#e8eaf0);margin:0;padding:6px 14px 10px;max-height:200px;overflow:auto;">${escHtml(data.text)}</pre>
+            <button type="button" onclick="lightboxCopyExtractedText()" style="margin:0 14px 12px;padding:5px 12px;font-size:.78rem;border-radius:6px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,#00d4ff);cursor:pointer;">📋 Copy text</button>`;
+    } catch (e) {
+        body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">Extraction failed: ${escHtml(e.message)}</div>`;
+    }
+}
+
+function lightboxBlobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+function lightboxDownscaleForOcr(img) {
+    return new Promise((resolve) => {
+        const maxDim = 2400;
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(resolve, 'image/jpeg', 0.85);
+    });
+}
+
+function lightboxCopyExtractedText() {
+    const pre = document.getElementById('imgLightboxExtractText');
+    if (!pre) return;
+    navigator.clipboard?.writeText(pre.textContent).then(() => {
+        ToastManager.show('Text copied to clipboard!', 'success');
+    }).catch(() => {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('copy');
+        sel.removeAllRanges();
+        ToastManager.show('Text copied!', 'success');
+    });
+}
+
 function closeImageLightbox() {
     const overlay = document.getElementById('imgLightboxOverlay');
     const img = document.getElementById('imgLightboxImg');
@@ -5588,7 +5682,7 @@ function closeImageLightbox() {
     lightboxOcrRunToken++; // invalidate any OCR run still in flight for the closed image
     lightboxClearTextLayer();
     lightboxSetOcrStatus('');
-    lightboxHideLarkOcrPanel();
+    lightboxHideExtractPanel();
     lightboxDragEnd();
     document.removeEventListener('keydown', lightboxKeyHandler);
     overlay.removeEventListener('wheel', lightboxWheelHandler);
@@ -6000,7 +6094,7 @@ async function twSearchMembers(pickerId, query) {
 
     _twMemberSearchTimer = setTimeout(async () => {
         try {
-            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}`);
+            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}&uat=${encodeURIComponent(loggedUat)}`);
             const data = await res.json();
             if (!data.success) {
                 menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(data.error || 'Member search unavailable')}</div>`;
