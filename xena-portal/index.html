@@ -633,6 +633,7 @@
         <button type="button" onclick="lightboxRotate(90)" title="Rotate right">↻</button>
         <button type="button" onclick="lightboxReset()" title="Reset pan/zoom">⟲</button>
         <button type="button" id="imgLightboxOcrBtn" class="active" onclick="lightboxToggleOcr()" title="Toggle selectable text (OCR)">🔤</button>
+        <button type="button" id="imgLightboxLarkOcrBtn" onclick="lightboxRunLarkOcr()" title="Extract text (Lark OCR, no selection overlay -- copyable text block)">📋</button>
         <button type="button" onclick="lightboxDownload()" title="Download">⬇️</button>
         <button type="button" onclick="closeImageLightbox()" title="Close">✕</button>
     </div>
@@ -643,6 +644,16 @@
             <img id="imgLightboxImg" src="" alt="Attachment preview" draggable="false">
             <div class="img-lightbox-text-layer" id="imgLightboxTextLayer"></div>
         </div>
+    </div>
+    <div id="imgLightboxLarkOcrPanel" style="display:none;position:absolute;left:16px;right:16px;bottom:64px;max-height:30%;overflow-y:auto;background:rgba(20,20,24,.95);border:1px solid var(--border);border-radius:10px;padding:12px 14px;z-index:50;" onclick="event.stopPropagation()">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Extracted text (Lark OCR)</span>
+            <div style="display:flex;gap:8px;">
+                <button type="button" onclick="lightboxCopyLarkOcrText()" style="background:none;border:none;color:var(--accent-cyan);cursor:pointer;font-size:.78rem;">Copy</button>
+                <button type="button" onclick="document.getElementById('imgLightboxLarkOcrPanel').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.78rem;">Close</button>
+            </div>
+        </div>
+        <pre id="imgLightboxLarkOcrText" style="white-space:pre-wrap;font-family:inherit;font-size:.85rem;margin:0;user-select:text;"></pre>
     </div>
     <div class="img-lightbox-hint">
         <span id="imgLightboxOcrStatus" style="display:none;color:var(--accent-cyan);"></span>
@@ -5510,6 +5521,7 @@ function lightboxLoadCurrent() {
     lightboxApplyTransform();
     lightboxClearTextLayer();
     lightboxSetOcrStatus('');
+    lightboxHideLarkOcrPanel();
     img.src = item.src;
     lightboxUpdateNav();
     lightboxRunOcr(item.src);
@@ -5576,6 +5588,7 @@ function closeImageLightbox() {
     lightboxOcrRunToken++; // invalidate any OCR run still in flight for the closed image
     lightboxClearTextLayer();
     lightboxSetOcrStatus('');
+    lightboxHideLarkOcrPanel();
     lightboxDragEnd();
     document.removeEventListener('keydown', lightboxKeyHandler);
     overlay.removeEventListener('wheel', lightboxWheelHandler);
@@ -5987,7 +6000,7 @@ async function twSearchMembers(pickerId, query) {
 
     _twMemberSearchTimer = setTimeout(async () => {
         try {
-            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}&uat=${encodeURIComponent(loggedUat)}`);
+            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (!data.success) {
                 menu.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(data.error || 'Member search unavailable')}</div>`;
