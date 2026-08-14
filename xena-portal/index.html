@@ -11,8 +11,14 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Yuji+Syuku&family=Shippori+Mincho:wght@700;800&display=swap" rel="stylesheet">
-    <link rel="preload" as="image" media="(min-width: 641px)" href="/api/samurai-image?variant=landscape">
-    <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait">
+    <!-- SAMURAI_ASSET_VERSION: bump this (and the matching literal in playSamuraiIntro()
+         below) any time samurai_moon_portrait.png / samurai_moon_landscape.png are
+         swapped on the server. /api/samurai-image is cached hard (Cache-Control:
+         immutable, max-age=7 days) for performance, so without a version bump on the
+         URL itself, browsers/Vercel's edge cache will keep serving the OLD file for
+         up to a week even after you deploy a new one. -->
+    <link rel="preload" as="image" media="(min-width: 641px)" href="/api/samurai-image?variant=landscape&v=2">
+    <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait&v=2">
     <style>
         :root {
             --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
@@ -2601,7 +2607,11 @@ function playSamuraiIntro() {
     // here, matching what the media-conditional <link rel=preload> already
     // fetched, means this hits the browser's cache instead of a second request.
     const variant = window.innerWidth > 640 ? 'landscape' : 'portrait';
-    const src = `/api/samurai-image?variant=${variant}`;
+    // Keep this '2' in sync with the SAMURAI_ASSET_VERSION used in the <head>
+    // preload links -- bump both together whenever the PNG on the server changes,
+    // or the 7-day immutable cache will keep serving the stale image.
+    const SAMURAI_ASSET_VERSION = '2';
+    const src = `/api/samurai-image?variant=${variant}&v=${SAMURAI_ASSET_VERSION}`;
     if (image.getAttribute('src') !== src) image.src = src;
 
     // Reduced motion: skip straight to the homepage with a brief elegant fade
