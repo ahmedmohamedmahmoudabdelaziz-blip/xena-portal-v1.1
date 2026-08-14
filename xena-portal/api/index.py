@@ -1896,47 +1896,45 @@ def get_single_request():
 def search_members():
     """
     Backs the "Done by" / "Mentioned Person" user picker.
-    Uses Feishu's native user search API with the app's own tenant_access_token
-    (rather than the logged-in user's UAT) so results are governed purely by the
-    app's configured Availability/visible range in the Developer Console -- not by
-    whichever employee happens to be searching. NOTE: this endpoint previously used
-    UAT specifically because tenant-level calls to this API have been known to throw
-    99991663 ("no permission") on some app configs even with the right scope/Availability
-    -- if that resurfaces, check the logged code/msg below first.
+    Uses Feishu's native user search API with User Access Token (UAT) to instantly 
+    search all allowed sub-departments without triggering 40004 or 99991663 errors.
+
+    ENDPOINT FIX: this used to call `contact/v3/users/search`, which needs its own
+    contact-book read scopes (e.g. contact:user.base:readonly / visible-scope
+    permissions) -- NOT the `contact:user:search` scope. That's why, once
+    `contact:user:search` got approved in the Feishu Developer Console, requests
+    here stopped erroring (no more 99991672) but silently started returning zero
+    results instead: the endpoint actually being called was never covered by the
+    scope that was granted. `contact:user:search` gates a different API -- Feishu's
+    "Search users" endpoint at `/open-apis/search/v1/user` (GET, query param
+    `query`, response shape `data.users[]` with name/open_id/user_id/avatar) -- so
+    this now calls that endpoint instead.
     """
     query = sanitize_text(request.args.get('q', '')).strip()
-
+    uat = request.args.get('uat', '')
+    
     # The frontend only calls this when typing, but guard against empty queries
     if not query:
         return jsonify({"success": True, "results": [], "count": 0})
+        
+    if not uat:
+        return jsonify({"success": False, "error": "Missing User Access Token. Please refresh the page."}), 400
 
-    tat = get_tenant_access_token()
-
-    url = "https://open.feishu.cn/open-apis/contact/v3/users/search?user_id_type=open_id"
+    # MUST use user_access_token (UAT) -- Feishu's "Search users" API is
+    # user-identity-only and will reject a tenant_access_token outright.
+    url = "https://open.feishu.cn/open-apis/search/v1/user"
     headers = {
-        "Authorization": f"Bearer {tat}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {uat}",
+        "Content-Type": "application/json; charset=utf-8"
     }
-
-    payload = {
+    params = {
         "query": query,
         "page_size": 50
     }
 
     try:
-        resp = http_requests.post(url, headers=headers, json=payload, timeout=10)
+        resp = http_requests.get(url, headers=headers, params=params, timeout=10)
         data = resp.json()
-
-        # TEMP DEBUG: log the raw code/msg/item-count on every call while we confirm
-        # tenant-token search actually returns results in this app's tenant. Safe to
-        # remove once confirmed working.
-        logger.info(
-            "member_search_debug",
-            query=query,
-            code=data.get("code"),
-            msg=data.get("msg"),
-            item_count=len(data.get("data", {}).get("items", []) or []),
-        )
 
         if data.get("code") != 0:
             # A friendlier message specifically for the missing-scope case (99991672) --
@@ -1956,15 +1954,15 @@ def search_members():
             }), 400
 
         members = []
-        for u in data.get("data", {}).get("items", []):
+        for u in (data.get("data", {}) or {}).get("users", []):
             open_id = u.get("open_id")
             name = u.get("name")
             if not open_id or not name:
                 continue
-            
+
             members.append({
-                "open_id": open_id, 
-                "name": name, 
+                "open_id": open_id,
+                "name": name,
                 "avatar_url": (u.get("avatar") or {}).get("avatar_72", "")
             })
 
@@ -1972,6 +1970,56 @@ def search_members():
 
     except Exception as e:
         logger.error("member_search_failed", error=str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/ocr/lark', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def lark_ocr_extract():
+    """
+    Secondary/fallback OCR for the image lightbox: Feishu/Lark's optical_char_recognition
+    API (https://open.feishu.cn/open-apis/optical_char_recognition/v1/image/basic_recognize).
+
+    NOTE on why this is additive, not a replacement for the existing RapidOCR/Tesseract
+    overlay: this Lark endpoint just returns a flat `text_list` of recognized strings
+    with no bounding boxes/coordinates, so it can't drive the pixel-aligned selectable
+    text layer drawn on top of the image. It powers a separate "Extract Text" button
+    that dumps a plain copyable text block below the image -- useful when the on-image
+    selection is fuzzy/wrong, but not a drop-in swap for it.
+    """
+    data = request.get_json(silent=True) or {}
+    user = sanitize_text(data.get('user', ''))
+    image_b64 = data.get('image', '')
+
+    if not user:
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if not image_b64:
+        return jsonify({"success": False, "error": "Missing image data"}), 400
+
+    # Frontend sends a raw base64 string, but strip a data: URL prefix defensively
+    # in case that ever changes.
+    if image_b64.startswith('data:'):
+        image_b64 = image_b64.split(',', 1)[-1]
+
+    # Feishu's hard limit is 5MB of image bytes; base64 inflates that by ~4/3, so
+    # reject clearly-oversized payloads before spending a request on them.
+    if len(image_b64) > 7_000_000:
+        return jsonify({"success": False, "error": "Image is too large for OCR (5MB limit). Try zooming out or downloading it instead."}), 400
+
+    try:
+        tat = get_tenant_access_token()
+        url = "https://open.feishu.cn/open-apis/optical_char_recognition/v1/image/basic_recognize"
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json; charset=utf-8"}
+        resp = http_requests.post(url, headers=headers, json={"image": image_b64}, timeout=20)
+        result = resp.json()
+
+        if result.get("code") != 0:
+            return jsonify({"success": False, "error": f"{result.get('code')}: {result.get('msg')}"}), 400
+
+        text_list = ((result.get("data") or {}).get("text_list")) or []
+        return jsonify({"success": True, "text_list": text_list, "text": "\n".join(text_list)})
+
+    except Exception as e:
+        logger.error("lark_ocr_failed", error=str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/requests/update', methods=['POST'])
