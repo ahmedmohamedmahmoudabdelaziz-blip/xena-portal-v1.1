@@ -2224,16 +2224,11 @@ def submit_request():
             final_fields[field_name] = tokens
 
     final_fields["Request Status"] = "Pending"
-    # Per request: no longer writing SUBMITTED_BY_FIELD_NAME ("Submitted By") into the
-    # sheet on new submissions. Display and "My Recent Requests" now both key purely off
-    # Feishu's own "Respondents" system column (see my_requests() below) -- which means
-    # whenever an agent's own token lacks permission to create the record and the app
-    # token has to step in instead, Respondents will show the app identity for that
-    # ticket, with nothing else to fall back on. That's the accepted tradeoff of
-    # dropping this field: it goes away the moment the agent's own token is used to
-    # create the row, which is exactly the outcome that a proper Feishu Advanced
-    # Permissions "insert-only" role (discussed separately) is meant to guarantee for
-    # every agent going forward.
+    # Per request: "Submitted By" is intentionally NOT written on Create New Request
+    # anymore -- ignored entirely. Real submitter attribution relies on Feishu's own
+    # "Created By"/"Respondents" system column (stamped by whichever token performs
+    # the create call below), plus the audit log entry at the end of this function,
+    # which always records the true submitter regardless of which token creates the row.
 
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
@@ -2249,44 +2244,39 @@ def submit_request():
         final_fields = coerce_number_fields(final_fields, field_types)
         # BUG FIX: never write to Formula/Lookup/AutoNumber/CreatedTime/etc fields.
         final_fields = strip_readonly_fields(final_fields, field_types)
-        # BUG FIX (UserFieldConvFail on Create New Request): if "Submitted By" (or any
-        # other field reaching here) is actually a Feishu User/Person column rather
-        # than Text, drop it instead of letting it take down the whole submission --
-        # see strip_invalid_user_fields() for the full story.
+        # BUG FIX (UserFieldConvFail on Create New Request): if any field reaching
+        # here is actually a Feishu User/Person column rather than Text, drop it
+        # instead of letting it take down the whole submission -- see
+        # strip_invalid_user_fields() for the full story.
         final_fields = strip_invalid_user_fields(final_fields, field_types, actor=user)
 
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/forms/{FORM_ID}/responses"
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
     created_via = "user_token"
 
     try:
         # SINGLE-CALL CREATE (User Context): create the row in ONE request, under the
         # agent's own identity, with every field the user filled in already attached
-        # ("Request Status", "Submitted By", and all of final_fields). This replaces the
-        # old two-step "create blank row -> patch with TAT" flow. Doing it in one call
-        # means Feishu's own "Created By"/"Respondents" system columns get stamped with
-        # the real submitter AND the data lands at the same time -- no more blank
-        # intermediate row, and nothing to roll back if a later step fails, because
-        # there is no later step.
+        # (final_fields, including "Request Status") -- not a blank row created first
+        # and patched with the real data afterward. Feishu's own "Created
+        # By"/"Respondents" system columns get stamped with the real submitter AND the
+        # data lands at the same time, so there's nothing to roll back if it fails --
+        # a failed call here just never creates a row at all.
         create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-        resp = http_requests.post(url, headers=create_headers, json={"form_fields": final_fields}, timeout=15)
+        resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
         data = resp.json()
 
         # Fallback to TAT if the agent's own token can't create records on this base at
         # all, or is rejected on one of the fields being sent (e.g. a field only the
         # tenant app identity is allowed to write). NOTE: when this fallback fires,
-        # Feishu's "Respondents" column will show the app identity instead of the real
+        # Feishu's "Created By" column will show the app identity instead of the real
         # submitter, because that column is a platform-level automatic field driven by
-        # whichever token performed the create call -- and per current design, nothing
-        # else records the real submitter as a backstop anymore (see the "Submitted By"
-        # removal note above final_fields["Request Status"]). Fixing this fallback from
-        # firing at all is a Feishu Advanced Permissions change (insert-only role for
-        # agents), not something this code can work around.
+        # whichever token performed the create call.
         if data.get("code") != 0 and api_token != tat:
             logger.warn("submit_primary_create_fallback", user=user,
                         feishu_code=data.get("code"), feishu_msg=data.get("msg"))
             create_headers["Authorization"] = f"Bearer {tat}"
-            resp = http_requests.post(url, headers=create_headers, json={"form_fields": final_fields}, timeout=15)
+            resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
             data = resp.json()
             created_via = "tenant_token_fallback"
         elif not uat:
@@ -2713,20 +2703,14 @@ def my_requests():
         # If we have the caller's Feishu open_id (passed from /api/callback via
         # localStorage), prefer a native filter on "Respondents" using it directly --
         # this is the same Person-type field Feishu auto-stamps on every record, and
-        # matching on it (rather than a display-name text match) sidesteps the identity-
-        # attribution bug where records created by agents without native Bitable
-        # permission get stamped with the app's identity instead of theirs.
+        # matching on it (rather than the display-name text match below) sidesteps
+        # the identity-attribution bug where records created by agents without native
+        # Bitable permission get stamped with the app's identity in other text fields.
         # Value is a bare open_id string in an array -- both {"open_id": ...} and
         # {"id": ...} wrapped forms were rejected by Feishu with code 9499 "Invalid
         # parameter value" when actually tested against this base's Respondents
         # field, so despite matching the write-format convention used elsewhere in
         # this file, wrapping is wrong specifically for this filter's value shape.
-        #
-        # NOTE: the SUBMITTED_BY_FIELD_NAME fallback below only fires when open_id is
-        # missing (MOCK_MODE, or a stale/cleared localStorage) -- per request, new
-        # submissions no longer write that field, so this fallback will only still
-        # match tickets submitted before that change. It's left in place rather than
-        # removed outright since it costs nothing and still serves old data.
         identity_condition = (
             {"field_name": "Respondents", "operator": "is", "value": [open_id]}
             if open_id else
@@ -2796,11 +2780,7 @@ def my_requests():
             elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
         acm = (acm_in if region == "in" else acm_pk) or acm_fb
         
-        # Per request: display is now driven purely by Feishu's real "Respondents"
-        # (CreatedUser) field -- no longer falling back to a "Submitted By" text value.
-        # This means a historical ticket created via the app-token fallback (before an
-        # agent had insert permission) will show the app identity here, not the real
-        # submitter -- that's the accepted tradeoff of removing the separate field.
+        submitted_by = extract_field_text(get_field_local(fields, SUBMITTED_BY_FIELD_NAME))
         respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
         
         results.append({
@@ -2808,7 +2788,7 @@ def my_requests():
             "numbering": extract_field_text(get_field_local(fields, "Numbering")),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
             "submitted_on": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
-            "respondents": respondents,
+            "respondents": submitted_by or respondents,
             "user_id": extract_field_text(get_field_local(fields, "User ID")),
             "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
             "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
