@@ -3717,7 +3717,8 @@ async function fetchAgencyData() {
 
     try {
         const currentType=document.getElementById('queryType').value;
-        const res=await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=${currentType}${nocache}`);
+        const res=await fetch(`/api/search?code=${code}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=${currentType}${noc
+ache}`);
         let data;
         try { data = await res.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
         if (!res.ok) throw new Error(data.error);
@@ -6865,6 +6866,14 @@ async function submitReqForm(e) {
         
         if (loggedUat) finalData.append('uat', loggedUat); 
         
+        // Send the logged-in submitter's open_id so the backend can look up their
+        // OAuth refresh_token and silently renew an expired user token at submit
+        // time. That keeps the create running under the agent's own identity, so
+        // Feishu's "Respondents" column shows the agent (not the app). See
+        // submit_request() and _refresh_user_token() in index3.py.
+        const submitterOpenId = localStorage.getItem('xenaOpenId') || '';
+        if (submitterOpenId) finalData.append('open_id', submitterOpenId);
+
         finalData.append('payload', JSON.stringify(payloadFields));
 
         form.querySelectorAll('input[type="file"]').forEach(fInput => {
@@ -6885,7 +6894,18 @@ async function submitReqForm(e) {
         
         if (!res.ok) throw new Error(data.error || 'Submission failed');
 
+        // Token renewal is fully server-side: the backend caches fresh uats in Redis
+        // and prefers them over the browser's copy, so no token ever comes back in
+        // the JSON response and there's nothing token-related to store here.
+
         ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
+
+        // If the create still had to fall back to the tenant/app token (refresh
+        // unavailable), "Respondents" shows the app name for this one ticket.
+        // Surface a warning so the agent knows to re-login to restore attribution.
+        if (data.created_via && String(data.created_via).startsWith('tenant_token')) {
+            ToastManager.show(`Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.`, 'warning', 12000);
+        }
         
         form.reset();
         document.getElementById('formDynamicFields').style.display = 'none';
