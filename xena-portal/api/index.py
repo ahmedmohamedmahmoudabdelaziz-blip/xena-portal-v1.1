@@ -12,6 +12,7 @@ REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.a
 
 UPSTASH_REDIS_REST_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
 UPSTASH_REDIS_REST_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+TICKET_WEBHOOK_SECRET    = os.environ.get("TICKET_WEBHOOK_SECRET", "")
 REDIS_ENABLED = bool(UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN)
 REDIS_MAX_VALUE_BYTES = 900_000
 
@@ -3330,6 +3331,123 @@ def pull_assigned_ticket():
         logger.error("pull_assigned_failed", error=str(e))
 
     return jsonify({"tickets": matches})
+
+# ---------- INSTANT TICKETS (Feishu sheet -> website push via webhook) ----------
+# Flow: Assigned Member gets filled on a ticket in the Base -> a Base workflow
+# fires an HTTP request to /api/webhook/ticket-assigned -> we store it in Redis,
+# bucketed by assigned member -> the portal polls /api/tickets/instant every 30s
+# and toasts/notifies the assignee. Mirrors the exact permission/helper patterns
+# already used by pull_assigned_ticket() above.
+
+def _norm_member(name):
+    # Assigned Member matching is done by normalized display-name text (lowercased,
+    # whitespace-collapsed) on BOTH the write side (webhook) and the read side
+    # (GET/ack), so trailing spaces or double-spaces in Feishu's Person field don't
+    # silently split one person into two buckets.
+    return re.sub(r"\s+", " ", (name or "").strip()).lower()
+
+def _instant_key(member_name):
+    return "instant_tickets:" + _norm_member(member_name)
+
+def _has_instant_access(perms):
+    return perms.get("is_super_admin") or any(
+        ("tickets_instant" in m or "tickets" in m) for m in perms.get("modules", [])
+    )
+
+@app.route('/api/webhook/ticket-assigned', methods=['POST'])
+def ticket_assigned_webhook():
+    # Shared-secret check -- stops randoms from POSTing fake tickets into someone's queue.
+    if TICKET_WEBHOOK_SECRET and request.headers.get("X-Webhook-Secret") != TICKET_WEBHOOK_SECRET:
+        return jsonify({"code": 403, "msg": "bad secret"}), 403
+
+    data = request.get_json(force=True, silent=True) or {}
+
+    # Assigned Member may arrive as a plain string OR as a raw Feishu Person-field
+    # object/array (e.g. {"name": "...", "id": "..."} or a list of those) depending
+    # on how the Base workflow's HTTP request body is built. extract_field_text
+    # already handles every one of those shapes elsewhere in this file, so reuse it
+    # here instead of assuming the payload is a clean string.
+    member = sanitize_text(extract_field_text(data.get("assigned_member", "")), max_length=80)
+    if not member:
+        return jsonify({"code": 400, "msg": "missing assigned_member"}), 400
+
+    record_id = sanitize_text(data.get("record_id", ""))
+    if not record_id:
+        return jsonify({"code": 400, "msg": "missing record_id"}), 400
+
+    ticket = {
+        "record_id":       record_id,
+        "numbering":       sanitize_text(str(data.get("numbering", ""))),
+        "request_type":    sanitize_text(data.get("request_type", "")),
+        "status":          sanitize_text(data.get("status", "")),
+        "agency_code":     sanitize_text(data.get("agency_code", "")),
+        "agency_name":     sanitize_text(data.get("agency_name", "")),
+        "user_id":         sanitize_text(data.get("user_id", "")),
+        "nid_number":      sanitize_text(data.get("nid_number", "")),
+        "region":          sanitize_text(data.get("region", "")),
+        "assigned_member": member,
+        "record_link":     sanitize_text(data.get("record_link", ""), max_length=300),
+        "pushed_at":       int(time.time()),
+    }
+
+    if REDIS_ENABLED:
+        key = _instant_key(member)
+        redis_cmd("LPUSH", key, json.dumps(ticket))
+        redis_cmd("LTRIM", key, 0, 49)              # keep last 50 per person
+        redis_cmd("EXPIRE", key, 7 * 24 * 3600)      # 7 day expiry
+        redis_cmd("LPUSH", "instant_tickets:all", json.dumps(ticket))
+        redis_cmd("LTRIM", "instant_tickets:all", 0, 199)
+        redis_cmd("EXPIRE", "instant_tickets:all", 7 * 24 * 3600)
+
+    logger.info("instant_ticket_pushed", member=mask_name(member), record=record_id)
+    return jsonify({"code": 0, "msg": "success"}), 200
+
+
+@app.route('/api/tickets/instant', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def get_instant_tickets():
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not _has_instant_access(perms):
+        return jsonify({"error": "Access denied"}), 403
+    if not user:
+        return jsonify({"error": "Missing user"}), 400
+
+    tickets = []
+    if REDIS_ENABLED:
+        for raw in (redis_cmd("LRANGE", _instant_key(user), 0, 49) or []):
+            try:
+                tickets.append(json.loads(raw))
+            except Exception:
+                continue  # drop one malformed entry instead of failing the whole request
+    return jsonify({"tickets": tickets})
+
+
+@app.route('/api/tickets/instant/ack', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def ack_instant_ticket():
+    body  = request.get_json(force=True, silent=True) or {}
+    user  = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    rid   = sanitize_text(body.get('record_id', ''))
+    perms = get_user_permissions(email, user)
+    if not _has_instant_access(perms):
+        return jsonify({"error": "Access denied"}), 403
+
+    if REDIS_ENABLED and user and rid:
+        key  = _instant_key(user)
+        keep = []
+        for r in (redis_cmd("LRANGE", key, 0, -1) or []):
+            try:
+                if json.loads(r).get("record_id") != rid:
+                    keep.append(r)
+            except Exception:
+                continue  # malformed entry -- drop it rather than 500ing
+        redis_cmd("DEL", key)
+        for r in reversed(keep):
+            redis_cmd("LPUSH", key, r)
+    return jsonify({"code": 0, "msg": "success"})
 
 @app.route('/api/health', methods=['GET'])
 def health():
