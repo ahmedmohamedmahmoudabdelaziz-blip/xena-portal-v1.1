@@ -1202,6 +1202,7 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_instant"> Instant Tickets</label>
                             </div>
                         </div>
                         <div class="module-card" style="border-color:var(--accent-purple)">
@@ -1800,6 +1801,21 @@
                     </div>
                     <p style="font-size:1.1rem; font-weight:500;">No tickets in your queue yet.</p>
                     <p style="font-size:.85rem;margin-top:6px">New tickets assigned to you will appear here in real time.</p>
+                </div>
+
+                <!-- Instant Tickets (Feishu sheet -> website push via webhook) -->
+                <div class="card" id="itSection" style="margin-top:24px;display:none">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+                        <h3 style="color:var(--accent-amber);margin:0;display:flex;align-items:center;gap:10px">
+                            ⚡ Instant Tickets
+                        </h3>
+                        <span id="itQueueCount" style="font-size:.85rem;color:var(--text-muted)">0 instant</span>
+                    </div>
+                    <div id="itQueueGrid" class="qy-grid"></div>
+                    <div id="itEmpty" style="text-align:center;padding:40px 0;color:var(--text-muted)">
+                        <p style="font-size:.95rem">No instant tickets right now.</p>
+                        <p style="font-size:.8rem;margin-top:4px">Tickets assigned to you in the sheet push here immediately.</p>
+                    </div>
                 </div>
             </div>
             
@@ -3048,7 +3064,7 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(key => {
+     'submit_new_request','submit_my_requests','tickets_live_queue','tickets_instant'].forEach(key => {
         const master = key.split('_')[0];
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
@@ -3125,7 +3141,7 @@ async function addAgent() {
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
+     'submit_new_request','submit_my_requests','tickets_live_queue','tickets_instant'].forEach(m => {
         if(document.getElementById(`mod_${m}`).checked) modules.push(m);
     });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
@@ -5245,6 +5261,75 @@ function ltRenderQueue() {
     `).join('');
 }
 
+// ---------- INSTANT TICKETS (Feishu sheet -> website push via webhook) ----------
+let _instantTimer = null;
+
+function itHasAccess() {
+    return isAdmin || hasExactMod('tickets_instant') || hasExactMod('tickets_live_queue');
+}
+
+async function itPoll() {
+    try {
+        const res = await fetch(`/api/tickets/instant?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = data.tickets || [];
+        itRender(list);
+
+        const seen = new Set(JSON.parse(localStorage.getItem('it_seen') || '[]'));
+        let hasNew = false;
+        list.forEach(t => {
+            if (t.record_id && !seen.has(t.record_id)) {
+                hasNew = true;
+                ToastManager.show(`⚡ Instant ticket #${t.numbering || ''} assigned to you`, 'success', 6000);
+                if (window.Notification && Notification.permission === 'granted') {
+                    new Notification('Xena — Instant Ticket', {
+                        body: `#${t.numbering || ''} ${t.request_type || ''} — ${t.agency_name || t.user_id || ''}`
+                    });
+                }
+                seen.add(t.record_id);
+            }
+        });
+        if (hasNew) localStorage.setItem('it_seen', JSON.stringify([...seen].slice(-200)));
+    } catch (e) { /* silent poll failure -- next tick will retry */ }
+}
+
+function itRender(list) {
+    const grid  = document.getElementById('itQueueGrid');
+    const empty = document.getElementById('itEmpty');
+    const cnt   = document.getElementById('itQueueCount');
+    if (cnt) cnt.textContent = `${list.length} instant`;
+
+    if (!list.length) {
+        if (grid) grid.innerHTML = '';
+        if (empty) empty.style.display = 'block';
+        return;
+    }
+    if (empty) empty.style.display = 'none';
+    if (grid) grid.innerHTML = list.map(t => `
+        <div class="qy-card" style="cursor:pointer" onclick="twOpenWorkspace('${escHtml(t.record_id || '')}')">
+            <div class="qy-card-head">
+                <div>
+                    <div class="qy-card-num" style="color:var(--accent-amber);font-size:.75rem;font-weight:700">${escHtml(t.request_type || 'Request')}</div>
+                    <div class="qy-card-type" style="font-weight:600;margin-top:2px">${escHtml(t.agency_code || t.user_id || '#'+String(t.record_id||'').slice(-6))}</div>
+                </div>
+                <span class="qy-status-pill" style="background:rgba(255,193,7,.12);color:#ffc107">instant</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--text-muted)">👤 ${escHtml(t.assigned_member || '')}</div>
+        </div>
+    `).join('');
+}
+
+function itStartPolling() {
+    if (!itHasAccess()) return;
+    const section = document.getElementById('itSection');
+    if (section) section.style.display = 'block';
+    if (window.Notification && Notification.permission === 'default') Notification.requestPermission();
+    itPoll();
+    clearInterval(_instantTimer);
+    _instantTimer = setInterval(itPoll, 30000);   // every 30s
+}
+
 // ISSUE FIX: "Mentioned Person" and "Done by" were listed only in
 // TICKET_INTERNAL_FIELDS (a filter used for Request Types with no explicit
 // TICKET_DYNAMIC_FIELDS entry), so they never rendered anywhere in the ticket
@@ -6946,6 +7031,7 @@ if (loggedUser&&loggedUat) {
             enforceLocks();
             configureSidebarAndCards();
             renderTabs();
+            itStartPolling();
 
         }).catch(e=>console.error(e));
 
