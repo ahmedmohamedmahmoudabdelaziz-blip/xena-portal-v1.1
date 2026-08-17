@@ -249,9 +249,22 @@ def _refresh_user_token(open_id):
             logger.warn("uat_refresh_rejected", open_id=open_id[-6:],
                         code=resp.get("code"), msg=resp.get("msg"))
             return None
+        # Cache the fresh uat server-side so every later request from this agent uses
+        # it directly -- the new token never has to be sent back to the browser (that
+        # would expose access tokens to XSS in the page).
+        uat_ttl = max(int(data.get("expires_in", 7200)) - 300, 60)
+        redis_cmd("SET", f"xena:uat:{open_id}", new_uat, "EX", uat_ttl)
         if new_rt:
             redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 30 * 24 * 3600)
         return new_uat
+
+def _get_cached_uat(open_id):
+    """Return the freshest server-side user token for this agent, if we hold one.
+    Populated at login and on every silent refresh -- lets the backend use a newer
+    token than the (possibly stale) one the browser still has in localStorage."""
+    if not open_id or not REDIS_ENABLED or MOCK_MODE:
+        return None
+    return redis_cmd("GET", f"xena:uat:{open_id}")
 
 _schema_cache = {"data": {}, "lock": threading.Lock()}
 _SCHEMA_REDIS_TTL = 300
@@ -1805,6 +1818,13 @@ def callback():
         if refresh_token and lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 30 * 24 * 3600)
 
+        # Also cache the freshly minted uat server-side (TTL = its real lifetime minus
+        # a safety buffer). submit_request prefers this over the browser-sent uat, so
+        # an agent's stale localStorage token never causes a wasted failed create.
+        uat_expires_in = (token_resp.get("data") or {}).get("expires_in") or token_resp.get("expires_in") or 7200
+        if lark_open_id and REDIS_ENABLED:
+            redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
+
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
         
@@ -2253,6 +2273,9 @@ def submit_request():
         return jsonify({"error": "Request Type is required."}), 400
 
     tat = get_tenant_access_token()
+    # Prefer the server-side cached uat (minted at login or by an earlier silent
+    # refresh) over the browser-sent one -- the browser's copy may be hours stale.
+    uat = _get_cached_uat(submitter_open_id) or uat
     api_token = uat if uat else tat
 
     final_fields = {}
@@ -2344,7 +2367,6 @@ def submit_request():
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
     created_via = "user_token"
-    new_uat_for_client = None
 
     try:
         # SINGLE-CALL CREATE (User Context): create the row in ONE request, under the
@@ -2379,7 +2401,6 @@ def submit_request():
                     data = resp.json()
                     if data.get("code") == 0:
                         created_via = "user_token_refreshed"
-                        new_uat_for_client = fresh_uat
                     else:
                         logger.warn("submit_refreshed_uat_still_rejected",
                                     user=user, feishu_code=data.get("code"), feishu_msg=data.get("msg"))
@@ -2407,12 +2428,10 @@ def submit_request():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')} | created_via: {created_via}", ip=ip, severity="Info")
 
-    resp_payload = {"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via}
-    # Hand the freshly minted uat back to the client so its session stays alive
-    # without a re-login -- keeps subsequent submits attributed to the agent too.
-    if new_uat_for_client:
-        resp_payload["new_uat"] = new_uat_for_client
-    return jsonify(resp_payload)
+    # created_via lets the frontend warn when the app identity had to be used. The
+    # fresh uat itself is NEVER returned to the browser -- it lives only server-side
+    # in Redis; returning access tokens in JSON would expose them to XSS.
+    return jsonify({"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via})
 
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
