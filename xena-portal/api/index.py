@@ -37,14 +37,6 @@ ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 # (any name is fine) and put that exact name here. Until that column exists, this
 # still degrades gracefully: get_table_schema() drops the key and logs a warning
 # (see submit_request), so nothing crashes, but attribution stays unreliable.
-#
-# UPDATE (attribution strategy change): the "Submitted By" column was removed from
-# the base -- attribution now relies on Feishu's built-in "Respondents" (CreatedUser)
-# system column, stamped by whichever token performs the create call. That column can
-# NEVER be written via API, so the app instead keeps the agent's user token alive via
-# the OAuth refresh_token flow (see _refresh_user_token) so the create almost always
-# runs under the agent's own identity. This constant is retained only so the legacy
-# audit branch in strip_invalid_user_fields() still resolves; nothing writes to it.
 SUBMITTED_BY_FIELD_NAME = "Submitted By"
 
 PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham",
@@ -187,11 +179,9 @@ def get_tenant_access_token():
     return token
 
 _app_token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
-
 def get_app_access_token():
     """App-level access token, used ONLY to renew user access tokens (Feishu's
-    refresh_access_token endpoint requires it in the Authorization header). Distinct
-    from the tenant_access_token used for general Bitable calls. Cached in-memory."""
+    refresh_access_token endpoint requires it in the Authorization header)."""
     if MOCK_MODE:
         return "mock_app_token"
     with _app_token_cache["lock"]:
@@ -208,28 +198,17 @@ def get_app_access_token():
         _app_token_cache["token"] = token
         _app_token_cache["expires_at"] = time.time() + int(resp.get("expire", 7200)) - 300
     return token
-
 _refresh_lock = threading.Lock()
-
 def _refresh_user_token(open_id):
     """Exchange the stored OAuth refresh_token for a fresh user access token (uat).
-
-    Feishu user access tokens live ~2h. Without renewal, a submit hours after login
-    fails the primary create under the agent's identity and falls back to the tenant
-    token -- which stamps the Feishu APP name into the "Respondents" column instead of
-    the agent. Refreshing here keeps attribution on the agent.
-
-    Refresh tokens are stored per open_id at OAuth login (/api/callback). They rotate
-    on every use, so the new refresh_token returned alongside the new uat is written
-    back to Redis (30-day TTL). Returns the new uat, or None if no stored refresh
-    token exists / refresh failed (caller then falls back to the tenant token)."""
+    Keeps 'Respondents' stamped with the agent instead of the app on submits made
+    hours after login. Returns the new uat, or None (caller falls back to tenant)."""
     if not open_id or not REDIS_ENABLED or MOCK_MODE:
         return None
     rt = redis_cmd("GET", f"xena:refresh_token:{open_id}")
     if not rt:
         return None
     with _refresh_lock:
-        # Re-read under lock in case a concurrent submit already rotated it.
         rt = redis_cmd("GET", f"xena:refresh_token:{open_id}") or rt
         app_token = get_app_access_token()
         if not app_token:
@@ -249,19 +228,15 @@ def _refresh_user_token(open_id):
             logger.warn("uat_refresh_rejected", open_id=open_id[-6:],
                         code=resp.get("code"), msg=resp.get("msg"))
             return None
-        # Cache the fresh uat server-side so every later request from this agent uses
-        # it directly -- the new token never has to be sent back to the browser (that
-        # would expose access tokens to XSS in the page).
         uat_ttl = max(int(data.get("expires_in", 7200)) - 300, 60)
         redis_cmd("SET", f"xena:uat:{open_id}", new_uat, "EX", uat_ttl)
         if new_rt:
             redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 30 * 24 * 3600)
         return new_uat
-
 def _get_cached_uat(open_id):
-    """Return the freshest server-side user token for this agent, if we hold one.
-    Populated at login and on every silent refresh -- lets the backend use a newer
-    token than the (possibly stale) one the browser still has in localStorage."""
+    """Freshest server-side user token for this agent, if we hold one (set at login
+    and on every silent refresh). Lets the backend use a newer token than the
+    browser's stale localStorage copy."""
     if not open_id or not REDIS_ENABLED or MOCK_MODE:
         return None
     return redis_cmd("GET", f"xena:uat:{open_id}")
@@ -1809,18 +1784,9 @@ def callback():
         avatar_url = user_data.get("avatar_72") or user_data.get("avatar_url") or ""
         lark_open_id = user_data.get("open_id") or ""
 
-        # Persist the OAuth refresh_token so the backend can silently renew the
-        # agent's user access token (uat) long after the ~2h uat expires. This is
-        # what keeps "Respondents" stamped with the agent instead of the app when
-        # a submit happens hours after login. refresh_token rotates on each use and
-        # is valid ~30 days; stored per open_id with a 30-day TTL.
         refresh_token = (token_resp.get("data") or {}).get("refresh_token") or token_resp.get("refresh_token")
         if refresh_token and lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 30 * 24 * 3600)
-
-        # Also cache the freshly minted uat server-side (TTL = its real lifetime minus
-        # a safety buffer). submit_request prefers this over the browser-sent uat, so
-        # an agent's stale localStorage token never causes a wasted failed create.
         uat_expires_in = (token_resp.get("data") or {}).get("expires_in") or token_resp.get("expires_in") or 7200
         if lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
@@ -2332,17 +2298,11 @@ def submit_request():
             final_fields[field_name] = tokens
 
     final_fields["Request Status"] = "Pending"
-
-    # ATTRIBUTION NOTE: the "Respondents" column (Feishu's system CreatedUser field)
-    # is what now shows who filed the ticket. It can NEVER be written via API -- it is
-    # auto-stamped with whichever identity's token performs the create call below.
-    # So correct attribution depends entirely on the create running under the agent's
-    # own user token: (1) the user's uat is tried first; (2) if it's expired/rejected,
-    # we silently mint a fresh uat from the OAuth refresh_token stored in Redis at
-    # login (see _refresh_user_token) and retry; (3) only if that also fails do we
-    # fall back to the tenant/app token -- which stamps the app name, the exact bug
-    # this is avoiding. submitter_open_id is used solely to look up that agent's
-    # refresh_token; it is never written into any field.
+    # Per request: "Submitted By" is intentionally NOT written on Create New Request
+    # anymore -- ignored entirely. Real submitter attribution relies on Feishu's own
+    # "Created By"/"Respondents" system column (stamped by whichever token performs
+    # the create call below), plus the audit log entry at the end of this function,
+    # which always records the true submitter regardless of which token creates the row.
 
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
@@ -2380,18 +2340,16 @@ def submit_request():
         resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
         data = resp.json()
 
-        # If the primary create (under the agent's own uat) fails AND that uat is not
-        # actually the tenant token, the most likely cause is uat expiry (~2h). Before
-        # giving up and falling back to the tenant/app token (which would stamp the
-        # APP name into "Respondents" -- the exact bug this avoids), try silently renewing
-        # the agent's uat from their OAuth refresh_token (stored in Redis at login). If
-        # the refresh succeeds, retry the create exactly once under the fresh user token;
-        # only that path keeps attribution on the agent.
+        # Fallback to TAT if the agent's own token can't create records on this base at
+        # all, or is rejected on one of the fields being sent (e.g. a field only the
+        # tenant app identity is allowed to write). NOTE: when this fallback fires,
+        # Feishu's "Created By" column will show the app identity instead of the real
+        # submitter, because that column is a platform-level automatic field driven by
+        # whichever token performed the create call.
         if data.get("code") != 0 and api_token != tat:
             logger.warn("submit_primary_create_fallback", user=user,
                         feishu_code=data.get("code"), feishu_msg=data.get("msg"))
-
-            # (1) refresh-token retry -- keep "Respondents" stamped with the agent.
+            # (1) refresh-token retry -- keeps "Respondents" stamped with the agent.
             if submitter_open_id:
                 fresh_uat = _refresh_user_token(submitter_open_id)
                 if fresh_uat:
@@ -2404,10 +2362,7 @@ def submit_request():
                     else:
                         logger.warn("submit_refreshed_uat_still_rejected",
                                     user=user, feishu_code=data.get("code"), feishu_msg=data.get("msg"))
-
             # (2) tenant-token fallback -- last resort so the ticket is never lost.
-            # "Respondents" will show the app identity here; unavoidable when refresh
-            # is unavailable (never logged in, or refresh_token older than ~30 days).
             if data.get("code") != 0:
                 create_headers["Authorization"] = f"Bearer {tat}"
                 resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
@@ -2428,9 +2383,6 @@ def submit_request():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')} | created_via: {created_via}", ip=ip, severity="Info")
 
-    # created_via lets the frontend warn when the app identity had to be used. The
-    # fresh uat itself is NEVER returned to the browser -- it lives only server-side
-    # in Redis; returning access tokens in JSON would expose them to XSS.
     return jsonify({"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via})
 
 @app.route('/api/points/records', methods=['GET'])
@@ -2837,13 +2789,17 @@ def my_requests():
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
-        # Identity filter. "Respondents" is Feishu's Person-typed CreatedUser field
-        # and can ONLY be filtered by open_id -- there is no display-name form. The old
-        # fallback filtered the now-deleted "Submitted By" text column by user name;
-        # that column no longer exists, so it would 1254045. The frontend always sends
-        # open_id after login (see index3.html /api/my-requests call). For the rare
-        # legacy session without one, filter Respondents with a well-formed-but-sentinel
-        # open_id so Feishu cleanly returns zero rows instead of erroring.
+        # If we have the caller's Feishu open_id (passed from /api/callback via
+        # localStorage), prefer a native filter on "Respondents" using it directly --
+        # this is the same Person-type field Feishu auto-stamps on every record, and
+        # matching on it (rather than the display-name text match below) sidesteps
+        # the identity-attribution bug where records created by agents without native
+        # Bitable permission get stamped with the app's identity in other text fields.
+        # Value is a bare open_id string in an array -- both {"open_id": ...} and
+        # {"id": ...} wrapped forms were rejected by Feishu with code 9499 "Invalid
+        # parameter value" when actually tested against this base's Respondents
+        # field, so despite matching the write-format convention used elsewhere in
+        # this file, wrapping is wrong specifically for this filter's value shape.
         identity_condition = (
             {"field_name": "Respondents", "operator": "is", "value": [open_id]}
             if open_id else
@@ -2913,8 +2869,6 @@ def my_requests():
             elif acm_in in IN_ACMS or acm_fb in IN_ACMS: region = "in"
         acm = (acm_in if region == "in" else acm_pk) or acm_fb
         
-        # "Respondents" (CreatedUser) is now the sole attribution column -- the
-        # separate "Submitted By" text column was removed from the base.
         respondents = extract_field_text(get_field_local(fields, "Respondents", "Created By"))
         
         results.append({
