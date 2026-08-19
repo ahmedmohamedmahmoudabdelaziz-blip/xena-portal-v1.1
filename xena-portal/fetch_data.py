@@ -218,7 +218,11 @@ TABLES = [
             "Agency Code", "Agency Name", "Name", "Region", "Agency Region", 
             "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member", 
             "Base Points", "base_points", "Bonus Points", "Total Points", "# Total Points", "Total",
-            "Used Points", "Used", "Point Balance", "Balance"
+            "Used Points", "Used", "Point Balance", "Balance",
+            # YTD Target integration (Executive Dashboard / Advanced Compare Engine) --
+            # "Target whole check" is the formula column holding each agency's full-year
+            # target. Several aliases kept in sync with POINTS_TABLE_FIELDS in index_4.py.
+            "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check"
         ]
     },
     {
