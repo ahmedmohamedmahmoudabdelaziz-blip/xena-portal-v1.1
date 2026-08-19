@@ -1105,6 +1105,11 @@ POINTS_TABLE_FIELDS = [
     "Agency Code", "Agency Name", "Region", "Acm", "Acm Name (PK)", "Acm Name (IN)",
     "Assigned Member", "Base Points", "Bonus Points", "Total Points", "# Total Points",
     "Used Points", "Point Balance",
+    # YTD Target integration (Executive Dashboard) -- "Target whole check" is the
+    # formula column on the Agency Points table (tbl6LYUxGi8tlkJH) that holds each
+    # agency's full-year target. Multiple aliases because Feishu formula columns are
+    # sometimes renamed/duplicated across environments.
+    "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check",
 ]
 
 QUERY_RECORDS_FIELDS = [
@@ -1346,7 +1351,8 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         total_pts = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total')))
         used_pts  = parse_float_safe(extract_field_text(get_field_local(first, 'Used Points', 'Used')))
         balance   = parse_float_safe(extract_field_text(get_field_local(first, 'Point Balance', 'Balance')))
-        
+        ytd_target = parse_float_safe(extract_field_text(get_field_local(first, "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check")))
+
         if balance == 0 and total_pts > 0: balance = total_pts - used_pts
 
         health_score, health_status = 100, "Healthy"
@@ -1363,7 +1369,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "total_points": total_pts, "used_points": used_pts,
             "point_balance": balance, "health_score": health_score,
-            "health_status": health_status,
+            "health_status": health_status, "ytd_target": ytd_target,
             "history": history_points, 
             "allocator_status": allocator_status,
             "accepted_user_ids": sorted(set(accepted_ids_all)),
@@ -2589,6 +2595,7 @@ def points_records():
         total_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
         used_pts   = parse_float_safe(extract_field_text(get_field_local(f, "Used Points")))
         balance    = parse_float_safe(extract_field_text(get_field_local(f, "Point Balance")))
+        ytd_target = parse_float_safe(extract_field_text(get_field_local(f, "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check")))
 
         if balance == 0 and total_pts > 0: balance = total_pts - used_pts
 
@@ -2605,7 +2612,7 @@ def points_records():
             "agency_name": extract_field_text(get_field_local(f, "Agency Name", "Name")),
             "base_points": base_pts, "bonus_points": bonus_pts,
             "total_points": total_pts, "used_points": used_pts,
-            "point_balance": balance, "health_score": health,
+            "point_balance": balance, "health_score": health, "ytd_target": ytd_target,
         })
 
     sort_fields = {
@@ -2624,6 +2631,7 @@ def points_records():
     total_pts_sum = sum(r["total_points"] for r in filtered)
     used_pts_sum  = sum(r["used_points"] for r in filtered)
     balance_sum   = sum(r["point_balance"] for r in filtered)
+    ytd_target_sum = sum(r["ytd_target"] for r in filtered)
 
     is_export = request.args.get('export', 'false').lower() == 'true'
     if is_export:
@@ -2635,7 +2643,7 @@ def points_records():
         return jsonify({
             "records": filtered[:5000], "total": total_count, "page": 1, "page_size": total_count,
             "total_pages": 1,
-            "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
+            "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum, "ytd_target": ytd_target_sum},
             "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
             "served_from_background_cache": served_from_cache,
             "duration_ms": int((time.time() - start) * 1000), "raw_rows_fetched": len(all_items)
@@ -2647,7 +2655,7 @@ def points_records():
     return jsonify({
         "records": page_records, "total": total_count, "page": page, "page_size": page_size,
         "total_pages": max(1, -(-total_count // page_size)),
-        "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum},
+        "totals": {"total_points": total_pts_sum, "used_points": used_pts_sum, "point_balance": balance_sum, "ytd_target": ytd_target_sum},
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
         "served_from_background_cache": served_from_cache,
         "duration_ms": int((time.time() - start) * 1000), "raw_rows_fetched": len(all_items)
@@ -3359,10 +3367,74 @@ def compare():
 
     all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
 
+    # Executive YTD analytics (Target whole check) only make sense when comparing
+    # ACMs -- the Points table is a live snapshot with no per-period history, so a
+    # "Compare Periods" run would show the exact same target/realized numbers in
+    # every period column, which is misleading. We only compute it for ACM mode.
+    points_snapshot = None
+    if mode == "acm":
+        if MOCK_MODE:
+            points_snapshot = MockFeishuDB.generate_agency("All") * 10
+        else:
+            points_snapshot, _pts_complete, _pts_reason, _pts_cache = get_points_table_snapshot()
+
     groups = []
     for label, from_dt, to_dt, acm_filter in groups_spec:
         raw = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
-        groups.append(_shape_compare_group(label, raw))
+        shaped = _shape_compare_group(label, raw)
+        if points_snapshot is not None:
+            exec_metrics = compute_executive_metrics(points_snapshot, acm_filter, region_filter, allowed_acms, allowed_regs)
+            shaped["ytd_metrics"]  = exec_metrics["ytd_metrics"]
+            shaped["diagnostics"]  = exec_metrics["diagnostics"]
+            shaped["is_estimated_trend"] = exec_metrics["is_estimated_trend"]
+
+            # Radar dims: target_fulfillment / point_efficiency / account_health come
+            # straight from the points snapshot; creation_momentum / closing_resilience
+            # come from the requests-table activity for the SAME group so all 5 sit on
+            # one consistent chart.
+            shaped["radar_dimensions"] = {
+                "target_fulfillment": exec_metrics["radar_raw"]["target_fulfillment"],
+                "point_efficiency": exec_metrics["radar_raw"]["point_efficiency"],
+                "account_health": exec_metrics["radar_raw"]["account_health"],
+                "creation_momentum": raw["kpis"]["creations"],   # normalized to 0-100 across groups below
+                "closing_resilience": shaped["closing_efficiency_pct"],
+            }
+
+            # Approximate cumulative pacing trend: distribute the group's current
+            # total realized points across elapsed months, weighted by that month's
+            # share of creation activity (see compute_executive_metrics docstring for
+            # why this is an estimate rather than a true point ledger).
+            monthly_creations = defaultdict(float)
+            for d_str, count in raw["daily_trend_creation"].items():
+                try:
+                    m_key = datetime.strptime(d_str, "%Y-%m-%d").strftime("%Y-%m")
+                except ValueError:
+                    continue
+                monthly_creations[m_key] += count
+            months_sorted = sorted(monthly_creations.keys())
+            total_creation_weight = sum(monthly_creations.values()) or 1
+            realized = exec_metrics["ytd_metrics"]["realized_points"]
+            target   = exec_metrics["ytd_metrics"]["ytd_target"]
+            cum_actual = 0.0
+            trend = []
+            for idx, m_key in enumerate(months_sorted, start=1):
+                cum_actual += (monthly_creations[m_key] / total_creation_weight) * realized
+                target_pace = round((idx / 12) * 100, 1)
+                actual_pace = round((cum_actual / target * 100) if target > 0 else 0, 1)
+                trend.append({"month": datetime.strptime(m_key, "%Y-%m").strftime("%b"), "target_pace": target_pace, "actual_pace": actual_pace})
+            shaped["cumulative_pacing_trend"] = trend
+        else:
+            shaped["ytd_metrics"] = None
+            shaped["ytd_metrics_note"] = "YTD target analytics are only available when comparing ACMs (the Points table has no per-period history)."
+        groups.append(shaped)
+
+    # Normalize creation_momentum to a 0-100 scale relative to the highest creation
+    # count among the compared groups, so the radar chart's 5th axis is on the same
+    # visual scale as the percentage-based axes.
+    if points_snapshot is not None and groups:
+        max_creations = max((g["radar_dimensions"]["creation_momentum"] for g in groups), default=0) or 1
+        for g in groups:
+            g["radar_dimensions"]["creation_momentum"] = round(g["radar_dimensions"]["creation_momentum"] / max_creations * 100, 1)
 
     audit.log(user, "COMPARE_RUN", f"mode:{mode}|groups:{len(groups)}", ip=ip, severity="Info")
     duration_ms = int((time.time() - start) * 1000)
@@ -3383,6 +3455,98 @@ def _shape_compare_group(label, raw):
             "Under Investigation": raw["creation_status"]["Under Investigation"]
         },
         "daily_trend": [{"date": d, "creations": raw["daily_trend_creation"].get(d, 0)} for d in sorted(raw["daily_trend_creation"].keys())]
+    }
+
+def compute_executive_metrics(points_items, acm_filter, region_filter, allowed_acms, allowed_regs):
+    """Aggregates the live Agency Points snapshot (points.json / Feishu tbl6LYUxGi8tlkJH)
+    into the executive YTD analytics used by the Advanced Compare Engine's Tier-1 KPI
+    cards, Tier-2 charts, and Tier-3 diagnostics table.
+
+    IMPORTANT LIMITATION: the Points table is a live current-state snapshot -- it has
+    no per-month history of when points were earned. So `cumulative_pacing_trend` is
+    an approximation: it distributes the group's current total realized points across
+    the months elapsed so far this year, proportionally to how request *creation*
+    activity was distributed (from the Requests table), rather than from real
+    month-by-month point ledger entries. This is clearly labeled as an estimate in the
+    payload (`is_estimated_trend: true`) so the frontend can caption it accordingly.
+    """
+    matched = []
+    for item in points_items:
+        f = item.get("fields", {})
+        agency_code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        agency_name = extract_field_text(get_field_local(f, "Agency Name", "Name")).strip()
+        acm    = extract_field_text(get_field_local(f, "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member")).strip()
+        region = 'PK' if acm.lower() in PK_ACMS else ('IN' if acm.lower() in IN_ACMS else '')
+
+        if "all" not in allowed_acms and acm.lower() not in [a.lower() for a in allowed_acms]: continue
+        if "all" not in allowed_regs and region.lower() not in [r.lower() for r in allowed_regs]: continue
+        if acm_filter != "all" and acm.lower() != acm_filter: continue
+        if region_filter != "all" and region.lower() != region_filter: continue
+
+        total_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
+        used_pts   = parse_float_safe(extract_field_text(get_field_local(f, "Used Points")))
+        balance    = parse_float_safe(extract_field_text(get_field_local(f, "Point Balance")))
+        ytd_target = parse_float_safe(extract_field_text(get_field_local(f, "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check")))
+        if balance == 0 and total_pts > 0: balance = total_pts - used_pts
+
+        health = 95
+        if total_pts > 0:
+            utilization = used_pts / total_pts
+            if utilization > 0.90: health = 40
+            elif utilization > 0.70: health = 70
+        elif total_pts == 0:
+            health = 0
+
+        realization_pct = round((total_pts / ytd_target * 100) if ytd_target > 0 else 0, 1)
+        variance = total_pts - ytd_target
+        if ytd_target <= 0: pacing_status = "No Target"
+        elif realization_pct >= 100: pacing_status = "On Track"
+        elif realization_pct >= 80: pacing_status = "Needs Attention"
+        else: pacing_status = "Lagging"
+
+        matched.append({
+            "agency_code": agency_code, "agency_name": agency_name or agency_code, "acm": acm,
+            "ytd_target": ytd_target, "total_points": total_pts, "used_points": used_pts,
+            "point_balance": balance, "health_score": health,
+            "realization_pct": realization_pct, "pacing_status": pacing_status, "variance": variance,
+        })
+
+    ytd_target_sum  = sum(a["ytd_target"] for a in matched)
+    total_points_sum = sum(a["total_points"] for a in matched)
+    used_points_sum  = sum(a["used_points"] for a in matched)
+    balance_sum       = sum(a["point_balance"] for a in matched)
+    avg_health        = round(sum(a["health_score"] for a in matched) / len(matched), 1) if matched else 0
+
+    now = cairo_now()
+    day_of_year = now.timetuple().tm_yday
+    days_in_year = 366 if (now.year % 4 == 0 and (now.year % 100 != 0 or now.year % 400 == 0)) else 365
+    ytd_expected_pct = round(day_of_year / days_in_year * 100, 2)
+
+    fulfillment_pct = round((total_points_sum / ytd_target_sum * 100) if ytd_target_sum > 0 else 0, 1)
+    pacing_index    = round((fulfillment_pct / ytd_expected_pct * 100) if ytd_expected_pct > 0 else 0, 1)
+    projected_eoy   = round((total_points_sum / day_of_year) * days_in_year, 0) if day_of_year > 0 else 0
+    gap_variance    = round(total_points_sum - ytd_target_sum, 0)
+
+    point_efficiency = round((used_points_sum / total_points_sum * 100) if total_points_sum > 0 else 0, 1)
+
+    # Diagnostics table rows, worst-variance-first so the biggest gaps surface first.
+    diagnostics = sorted(matched, key=lambda a: a["variance"])[:200]
+
+    return {
+        "ytd_metrics": {
+            "ytd_target": ytd_target_sum, "realized_points": total_points_sum,
+            "used_points": used_points_sum, "point_balance": balance_sum,
+            "fulfillment_rate_pct": fulfillment_pct, "pacing_index": pacing_index,
+            "projected_eoy": projected_eoy, "gap_variance": gap_variance,
+            "ytd_expected_pct": ytd_expected_pct, "agency_count": len(matched),
+        },
+        "radar_raw": {
+            "target_fulfillment": min(100, fulfillment_pct),
+            "point_efficiency": min(100, point_efficiency),
+            "account_health": avg_health,
+        },
+        "diagnostics": diagnostics,
+        "is_estimated_trend": True,
     }
 
 @app.route('/api/cache/clear', methods=['POST'])
