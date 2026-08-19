@@ -3071,6 +3071,24 @@ def my_requests():
     # applied afterward in Python using true epoch-ms extracted from each record via
     # _extract_epoch_ms(), compared directly against [from_ms, to_ms_exclusive) --
     # so the boundary math only ever happens in code we control.
+    # SPEED FIX (prolific respondents make this endpoint slow): the identity-only
+    # filter above fetches EVERY record that respondent has ever submitted, then
+    # filters dates in Python -- fine for light users, painfully slow for someone
+    # with hundreds/thousands of historical requests. We still can't trust Feishu's
+    # ExactDate boundary math directly (see the big comment above: it evaluates
+    # against the BASE's configured Beijing/UTC+8 timezone, not the viewer's), so we
+    # don't use it as the final word. Instead we send Feishu a deliberately widened
+    # ("padded") version of the window -- 2 full days earlier and later than what we
+    # actually want -- purely to narrow the candidate set server-side. That padding
+    # comfortably covers the ~5-8h Beijing-vs-viewer offset in either direction with
+    # margin to spare. The exact, correct boundary is still enforced afterward by
+    # _in_local_window() below using true epoch-ms in Python, so accuracy is
+    # unaffected regardless of whether the viewer is in Cairo, Pakistan, or the US --
+    # this padding only ever makes the Feishu-side fetch smaller, never wrong.
+    DATE_FILTER_PAD_MS = 2 * 24 * 60 * 60 * 1000
+    padded_from_ms = from_ms - DATE_FILTER_PAD_MS
+    padded_to_ms_exclusive = to_ms_exclusive + DATE_FILTER_PAD_MS
+
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
         identity_condition = (
@@ -3078,16 +3096,24 @@ def my_requests():
             if open_id else
             {"field_name": "Respondents", "operator": "is", "value": ["ou_no_open_id_legacy_session"]}
         )
+        date_from_condition = {"field_name": "Submitted on Copy", "operator": "isGreater", "value": ["ExactDate", str(padded_from_ms)]}
+        date_to_condition = {"field_name": "Submitted on Copy", "operator": "isLess", "value": ["ExactDate", str(padded_to_ms_exclusive)]}
 
         fast_payload = {
             "page_size": 500,
             "sort": [{"field_name": "Numbering", "desc": True}],
             "filter": {
                "conjunction": "and",
-               "conditions": [identity_condition]
+               "conditions": [identity_condition, date_from_condition, date_to_condition]
             },
          }   
         fast_items, fast_complete, fast_reason = _run_search(fast_payload, _deadline)
+        # If Feishu rejects the combined filter for a real reason (not just the old
+        # 1254018 shape issue -- that's fixed by the string-typed ms value above),
+        # fast_reason carries "<code>: <msg>" through to stop_reason rather than
+        # silently swallowing it. _in_local_window() below still re-validates
+        # everything Feishu does return, so a bad date filter can only ever make
+        # results incomplete/slower to discover, never silently wrong.
         fast_ok = True
     except Exception as e:
         fast_ok = False
