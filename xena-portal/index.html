@@ -1297,6 +1297,17 @@
                 </div>
             </div>
 
+            <div id="monthlyTargetModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)closeMonthlyTargetModal()">
+                <div class="card" style="max-width:640px;width:92%;max-height:80vh;overflow-y:auto">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <h3 id="monthlyTargetModalTitle" style="color:var(--accent-cyan);margin-bottom:0">📅 Monthly Target Breakdown</h3>
+                        <button onclick="closeMonthlyTargetModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1">×</button>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:14px">From the "Target whole check" column — Jan through Dec of this year.</p>
+                    <div id="monthlyTargetModalGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px"></div>
+                </div>
+            </div>
+
             <div id="pg-admin-requests" style="display:none">
                 <div class="card">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -2999,9 +3010,17 @@ async function runAdvancedCompare() {
         window.__lastCompareGroups = data.groups;
         renderCompareSummary(data.groups);
         renderExecKpiRow(data.groups);
+        // BUG FIX ("some charts empty"): chartsWrap MUST become visible BEFORE
+        // Chart.js constructs the canvases inside it. Chart.js reads the canvas's
+        // real on-screen size at construction time -- creating charts while the
+        // wrapper is still display:none bakes in a 0x0 size, which the bar chart
+        // partially survives but the radar/line charts render as fully blank and
+        // never self-correct without an explicit resize. Making the wrapper visible
+        // first, then building the charts, is the actual fix (previously this was
+        // reversed: charts were built, then the wrapper was revealed).
+        chartsWrap.style.display = 'block';
         renderCompareCharts(data.groups);
         renderExecDiagnosticsTable();
-        chartsWrap.style.display = 'block';
     } catch (e) {
         summary.innerHTML = `<div style="color:var(--accent-rose);padding:20px">Comparison failed: ${escHtml(e.message)}</div>`;
     }
@@ -3555,6 +3574,32 @@ function openSaveRoleModal() {
 }
 function closeSaveRoleModal() {
     document.getElementById('saveRoleModalOverlay').style.display = 'none';
+}
+
+function showMonthlyTargetModal(source, idx) {
+    const row = source === 'pt' ? ptAllData[idx] : prAllData[idx];
+    if (!row) return;
+    const monthly = row.monthly_target || [];
+    document.getElementById('monthlyTargetModalTitle').textContent = `📅 ${row.agency_name || row.agency_id || 'Agency'} — Monthly Target`;
+    const grid = document.getElementById('monthlyTargetModalGrid');
+    if (!monthly.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);padding:12px 0">No monthly breakdown available for this agency.</div>';
+    } else {
+        grid.innerHTML = monthly.map(m => {
+            let display, color, bg;
+            if (m.status === 'not_exist') { display = 'Not Exist'; color = 'var(--text-muted)'; bg = 'rgba(255,255,255,.03)'; }
+            else if (m.status === 'na')    { display = 'N/A';       color = 'var(--text-muted)'; bg = 'rgba(255,255,255,.03)'; }
+            else                           { display = Math.round(m.value).toLocaleString(); color = m.value > 0 ? 'var(--accent-green)' : 'var(--accent-amber)'; bg = m.value > 0 ? 'rgba(0,230,118,.08)' : 'rgba(255,171,0,.08)'; }
+            return `<div style="background:${bg};border:1px solid var(--border);border-radius:8px;padding:10px 8px;text-align:center">
+                <div style="font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${m.month}</div>
+                <div style="font-weight:700;color:${color};font-size:.9rem">${display}</div>
+            </div>`;
+        }).join('');
+    }
+    document.getElementById('monthlyTargetModalOverlay').style.display = 'flex';
+}
+function closeMonthlyTargetModal() {
+    document.getElementById('monthlyTargetModalOverlay').style.display = 'none';
 }
 
 async function confirmSaveRole() {
@@ -5093,11 +5138,11 @@ async function prFetch(page) {
         // Points, Point Balance) so header cells always line up with the right data,
         // and Health (not part of that schema) has been removed from this page per
         // request -- it's still shown on the Point Table page.
-        const cols = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance'];
+        const cols = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance','ytd_target'];
         const labels = {
             region:'Region', agency_id:'Agency Code', agency_name:'Agency Name', acm:'Acm',
             base_points:'Base Points', bonus_points:'Bonus Points', total_points:'Total Points',
-            used_points:'Used Points', point_balance:'Point Balance'
+            used_points:'Used Points', point_balance:'Point Balance', ytd_target:'YTD Target'
         };
 
         const thead = document.getElementById('prThead');
@@ -5123,6 +5168,12 @@ async function prFetch(page) {
                     if (c === 'agency_id') {
                         return `<td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(String(v ?? '—'))}</td>`;
                     }
+                    if (c === 'ytd_target') {
+                        return `<td style="padding:9px 12px;text-align:right">
+                            <span style="font-variant-numeric:tabular-nums">${typeof v==='number'?v.toLocaleString():(v||'—')}</span>
+                            <button onclick="showMonthlyTargetModal('pr',${i})" title="View monthly breakdown" style="background:none;border:none;cursor:pointer;color:var(--accent-cyan);font-size:.85rem;margin-left:4px;vertical-align:middle">📅</button>
+                        </td>`;
+                    }
                     if (['total_points','used_points','base_points','bonus_points'].includes(c)) {
                         return `<td style="padding:9px 12px;text-align:right;font-variant-numeric:tabular-nums">${typeof v==='number'?v.toLocaleString():(v||'—')}</td>`;
                     }
@@ -5137,6 +5188,7 @@ async function prFetch(page) {
                     if (c === 'total_points') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>`;
                     if (c === 'used_points')  return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>`;
                     if (c === 'point_balance') return `<td style="padding:9px 12px;font-weight:700;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>`;
+                    if (c === 'ytd_target')     return `<td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--accent-purple)">${(data.totals.ytd_target||0).toLocaleString()}</td>`;
                     if (i === 0) return `<td style="padding:9px 12px;font-weight:700;color:var(--text-muted)">TOTALS</td>`;
                     return '<td></td>';
                 }).join('') + '</tr>';
@@ -5160,7 +5212,7 @@ async function prFetch(page) {
     }
 }
 
-const PR_EXPORT_COLS = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance'];
+const PR_EXPORT_COLS = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance','ytd_target'];
 
 function prExportCsv() {
     const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
@@ -5178,7 +5230,7 @@ const EXPORT_COL_LABELS = {
     agency_id:'Agency Code', agency_name:'Agency Name', region:'Region', acm:'ACM',
     base_points:'Base Points', bonus_points:'Bonus Points',
     total_points:'Total Points', used_points:'Used Points', point_balance:'Point Balance',
-    health_score:'Health'
+    ytd_target:'YTD Target', health_score:'Health'
 };
 
 async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, customCols) {
@@ -5196,7 +5248,7 @@ async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, cust
         const records = data.records || [];
         if(!records.length) { ToastManager.show('No data found to export.', 'warning'); document.getElementById('loadingOverlay').style.display='none'; return; }
         
-        const cols = customCols || ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','health_score'];
+        const cols = customCols || ['agency_id','agency_name','region','acm','total_points','used_points','point_balance','ytd_target','health_score'];
         const labels = cols.map(c => EXPORT_COL_LABELS[c] || c);
         
         if (isExcel && window.XLSX) {
@@ -5287,11 +5339,11 @@ async function ptFetch(page) {
         // Balance), with Health kept as a trailing computed column. Built dynamically
         // (thead + tbody + tfoot from the same `cols` list) so header cells can never
         // drift out of alignment with row cells again.
-        const PT_COLS = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance','health_score'];
+        const PT_COLS = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance','ytd_target','health_score'];
         const PT_LABELS = {
             region:'Region', agency_id:'Agency Code', agency_name:'Agency Name',
             base_points:'Base Points', bonus_points:'Bonus Points', total_points:'Total Points',
-            acm:'Acm', used_points:'Used Points', point_balance:'Point Balance', health_score:'Health'
+            acm:'Acm', used_points:'Used Points', point_balance:'Point Balance', ytd_target:'YTD Target', health_score:'Health'
         };
         const thead = document.getElementById('ptThead');
         const tbody = document.getElementById('ptTbody');
@@ -5308,6 +5360,10 @@ async function ptFetch(page) {
             const cells = PT_COLS.map(c => {
                 if (c === 'health_score') return `<td style="padding:9px 12px;text-align:center;font-weight:700;color:${healthCol}">${r.health_score||0}</td>`;
                 if (c === 'point_balance') return `<td style="padding:9px 12px;text-align:right;font-weight:700;color:${balCol}">${(r.point_balance||0).toLocaleString()}</td>`;
+                if (c === 'ytd_target') return `<td style="padding:9px 12px;text-align:right">
+                    <span style="font-variant-numeric:tabular-nums">${(r.ytd_target||0).toLocaleString()}</span>
+                    <button onclick="showMonthlyTargetModal('pt',${i})" title="View monthly breakdown" style="background:none;border:none;cursor:pointer;color:var(--accent-cyan);font-size:.85rem;margin-left:4px;vertical-align:middle">📅</button>
+                </td>`;
                 if (c === 'total_points' || c === 'used_points' || c === 'base_points' || c === 'bonus_points') return `<td style="padding:9px 12px;text-align:right${c==='used_points'?';color:var(--accent-amber)':''}">${(r[c]||0).toLocaleString()}</td>`;
                 if (c === 'region') return `<td style="padding:9px 12px;text-transform:uppercase;font-size:.8rem;color:var(--text-muted)">${escHtml(r.region||'—')}</td>`;
                 if (c === 'agency_name') return `<td style="padding:9px 12px;font-weight:500">${escHtml(r.agency_name||'—')}</td>`;
@@ -5324,6 +5380,7 @@ async function ptFetch(page) {
                     if (c === 'total_points') return `<td style="padding:9px 12px;text-align:right;color:var(--accent-cyan)">${(data.totals.total_points||0).toLocaleString()}</td>`;
                     if (c === 'used_points')  return `<td style="padding:9px 12px;text-align:right;color:var(--accent-amber)">${(data.totals.used_points||0).toLocaleString()}</td>`;
                     if (c === 'point_balance') return `<td style="padding:9px 12px;text-align:right;color:var(--accent-green)">${(data.totals.point_balance||0).toLocaleString()}</td>`;
+                    if (c === 'ytd_target')    return `<td style="padding:9px 12px;text-align:right;color:var(--accent-purple)">${(data.totals.ytd_target||0).toLocaleString()}</td>`;
                     if (i === 0) return `<td style="padding:9px 12px;color:var(--text-muted)">TOTALS</td>`;
                     return '<td></td>';
                 }).join('') + '</tr>';
