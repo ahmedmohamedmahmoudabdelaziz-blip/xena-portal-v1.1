@@ -5212,7 +5212,7 @@ async function prFetch(page) {
     }
 }
 
-const PR_EXPORT_COLS = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance','ytd_target'];
+const PR_EXPORT_COLS = ['region','agency_id','agency_name','base_points','bonus_points','total_points','acm','used_points','point_balance'];
 
 function prExportCsv() {
     const params = new URLSearchParams({ search: document.getElementById('prSearch')?.value || '', region: document.getElementById('prRegion')?.value || '', acm: document.getElementById('prAcm')?.value || '', user: loggedUser, email: loggedEmail });
@@ -5230,7 +5230,7 @@ const EXPORT_COL_LABELS = {
     agency_id:'Agency Code', agency_name:'Agency Name', region:'Region', acm:'ACM',
     base_points:'Base Points', bonus_points:'Bonus Points',
     total_points:'Total Points', used_points:'Used Points', point_balance:'Point Balance',
-    ytd_target:'YTD Target', health_score:'Health'
+    ytd_target:'YTD Target', monthly_target:'Monthly Target', health_score:'Health'
 };
 
 async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, customCols) {
