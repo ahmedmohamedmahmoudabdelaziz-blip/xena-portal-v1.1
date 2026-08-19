@@ -953,24 +953,46 @@
 
                         <div id="cmpAdvSummary" style="margin-top:20px"></div>
 
+                        <!-- ═══ Executive Dashboard: Inverted Pyramid / Z-Pattern ═══
+                             Tier 1 (top, widest): apex KPI cards -- the numbers a
+                             director glances at first.
+                             Tier 2 (middle): the visual matrix -- target-vs-realized
+                             bars, the 5-axis radar, and the YTD pacing curve.
+                             Tier 3 (bottom, narrowest focus): the granular per-agency
+                             diagnostics table for whoever needs to dig in. -->
                         <div id="cmpAdvChartsWrap" style="display:none;margin-top:24px">
+
+                            <!-- Tier 1: Apex KPI cards -->
+                            <div id="cmpExecKpiRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px"></div>
+                            <div id="cmpExecNoTargetNote" style="display:none;color:var(--text-muted);font-size:.85rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:24px"></div>
+
+                            <!-- Tier 2: Core visual matrix -->
                             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px">
-                                <div class="card" style="padding:16px">
-                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">📊 KPIs by Group</h4>
-                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvBarChart"></canvas></div>
+                                <div class="card" style="padding:16px;grid-column:1/-1">
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🎯 Target vs. Realized Gap</h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvTargetGapChart"></canvas></div>
                                 </div>
                                 <div class="card" style="padding:16px">
-                                    <h4 style="color:var(--accent-purple);margin-bottom:12px;font-size:.9rem">🎯 Performance Radar</h4>
+                                    <h4 style="color:var(--accent-purple);margin-bottom:12px;font-size:.9rem">🕸️ Executive Performance Radar</h4>
                                     <div class="chart-wrapper-pie-large" style="max-width:none"><canvas id="cmpAdvRadarChart"></canvas></div>
                                 </div>
-                                <div class="card" style="padding:16px;grid-column:1/-1">
-                                    <h4 style="color:var(--accent-green);margin-bottom:12px;font-size:.9rem">📈 Daily Trend (Creations, per group)</h4>
-                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvLineChart"></canvas></div>
+                                <div class="card" style="padding:16px">
+                                    <h4 style="color:var(--accent-green);margin-bottom:12px;font-size:.9rem">📈 YTD Cumulative Pacing <span id="cmpEstimateBadge" style="display:none;font-size:.65rem;font-weight:400;color:var(--accent-amber);background:rgba(255,184,0,.12);border:1px solid rgba(255,184,0,.3);border-radius:6px;padding:2px 6px;margin-left:6px">estimated</span></h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvCumulativeChart"></canvas></div>
                                 </div>
                                 <div class="card" style="padding:16px;grid-column:1/-1">
                                     <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🧭 Status Mix by Group</h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvStatusChart"></canvas></div>
                                 </div>
+                            </div>
+
+                            <!-- Tier 3: Granular diagnostics table -->
+                            <div class="card" style="padding:16px;margin-top:24px">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                                    <h4 style="color:var(--text);margin-bottom:0;font-size:.9rem">🔬 Granular Diagnostics</h4>
+                                    <select id="cmpDiagGroupFilter" onchange="renderExecDiagnosticsTable()" style="max-width:220px"></select>
+                                </div>
+                                <div id="cmpDiagTableWrap" style="overflow-x:auto"></div>
                             </div>
                         </div>
                     </div>
@@ -2974,8 +2996,11 @@ async function runAdvancedCompare() {
         let data;
         try { data = await res.json(); } catch(e) { throw new Error('Server timeout: Data too large or loading'); }
         if (!res.ok) throw new Error(data.error || 'Comparison failed.');
+        window.__lastCompareGroups = data.groups;
         renderCompareSummary(data.groups);
+        renderExecKpiRow(data.groups);
         renderCompareCharts(data.groups);
+        renderExecDiagnosticsTable();
         chartsWrap.style.display = 'block';
     } catch (e) {
         summary.innerHTML = `<div style="color:var(--accent-rose);padding:20px">Comparison failed: ${escHtml(e.message)}</div>`;
@@ -2993,54 +3018,140 @@ function renderCompareSummary(groups) {
         </div>`).join('') + `</div>`;
 }
 
-function renderCompareCharts(groups) {
-    const barCtx = document.getElementById('cmpAdvBarChart');
-    if (charts['cmpAdvBarChart']) charts['cmpAdvBarChart'].destroy();
-    charts['cmpAdvBarChart'] = new Chart(barCtx, {
-        type: 'bar',
-        data: {
-            labels: ['Creations','BD Creations','Closings'],
-            datasets: groups.map((g,i)=>({ label:g.label, data:[g.kpis.creations,g.kpis.bds,g.kpis.closings], backgroundColor: COMPARE_GROUP_COLORS[i]+'cc', borderRadius:4 }))
-        },
-        options: { responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{color:'#fff',font:{weight:'bold'}} },
-            scales:{ x:{grid:{display:false}}, y:{grid:{color:'#2a2c3f'}} } }
-    });
+// ═══ Tier 1: Apex Executive KPI cards ═══
+function renderExecKpiRow(groups) {
+    const kpiRow = document.getElementById('cmpExecKpiRow');
+    const note = document.getElementById('cmpExecNoTargetNote');
+    const withYtd = groups.filter(g => g.ytd_metrics);
 
+    if (!withYtd.length) {
+        kpiRow.innerHTML = '';
+        note.style.display = 'block';
+        note.textContent = groups[0]?.ytd_metrics_note || 'YTD target analytics require Compare ACMs mode (the Points table has no per-period history).';
+        return;
+    }
+    note.style.display = 'none';
+
+    const n = num => Math.round(num || 0).toLocaleString();
+    const target   = withYtd.reduce((s,g)=>s+g.ytd_metrics.ytd_target, 0);
+    const realized = withYtd.reduce((s,g)=>s+g.ytd_metrics.realized_points, 0);
+    const used     = withYtd.reduce((s,g)=>s+g.ytd_metrics.used_points, 0);
+    const balance  = withYtd.reduce((s,g)=>s+g.ytd_metrics.point_balance, 0);
+    const projEoy  = withYtd.reduce((s,g)=>s+g.ytd_metrics.projected_eoy, 0);
+    const fulfillment = target > 0 ? Math.round(realized / target * 1000) / 10 : 0;
+    const expectedPct = withYtd[0].ytd_metrics.ytd_expected_pct || 0;
+    const pacing = expectedPct > 0 ? Math.round(fulfillment / expectedPct * 1000) / 10 : 0;
+
+    const badge = pacing >= 100 ? {emoji:'🟢', label:'On Track', color:'var(--accent-green)'}
+                : pacing >= 85  ? {emoji:'🟡', label:'Needs Attention', color:'var(--accent-amber)'}
+                :                 {emoji:'🔴', label:'Lagging Behind Pace', color:'var(--accent-rose)'};
+    const eoyDelta = projEoy - target;
+    const eoyDeltaStr = target > 0 ? `${eoyDelta >= 0 ? '+' : ''}${n(eoyDelta)} vs target` : 'no target set';
+
+    kpiRow.innerHTML = `
+        <div class="card" style="padding:18px">
+            <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🎯 Target Realization</div>
+            <div style="font-size:1.6rem;font-weight:700;color:var(--accent-cyan)">${fulfillment}%</div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin:6px 0 8px">${n(realized)} / ${n(target)} pts</div>
+            <div style="height:6px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.min(100,fulfillment)}%;background:linear-gradient(90deg,#00d4ff,#00e676);border-radius:4px"></div></div>
+        </div>
+        <div class="card" style="padding:18px">
+            <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">⏱️ Target Pacing Index</div>
+            <div style="font-size:1.6rem;font-weight:700;color:${badge.color}">${pacing}%</div>
+            <div style="font-size:.8rem;font-weight:600;color:${badge.color};margin-top:6px">${badge.emoji} ${badge.label}</div>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Expected pace so far this year: ${expectedPct}%</div>
+        </div>
+        <div class="card" style="padding:18px">
+            <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🔥 Burn &amp; Consumption</div>
+            <div style="font-size:1.6rem;font-weight:700;color:var(--accent-amber)">${n(used)}</div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px">used · ${n(balance)} balance remaining</div>
+        </div>
+        <div class="card" style="padding:18px">
+            <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📅 Projected EOY Run-Rate</div>
+            <div style="font-size:1.6rem;font-weight:700;color:var(--accent-purple)">${n(projEoy)}</div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px">${eoyDeltaStr}</div>
+        </div>`;
+}
+
+function renderCompareCharts(groups) {
+    const withYtd = groups.filter(g => g.ytd_metrics);
+    const estimateBadge = document.getElementById('cmpEstimateBadge');
+    if (estimateBadge) estimateBadge.style.display = withYtd.some(g=>g.is_estimated_trend) ? 'inline-block' : 'none';
+
+    // ═══ Tier 2: Target vs. Realized Gap ═══
+    const gapCtx = document.getElementById('cmpAdvTargetGapChart');
+    if (charts['cmpAdvTargetGapChart']) charts['cmpAdvTargetGapChart'].destroy();
+    if (withYtd.length) {
+        charts['cmpAdvTargetGapChart'] = new Chart(gapCtx, {
+            type: 'bar',
+            data: {
+                labels: withYtd.map(g=>g.label),
+                datasets: [
+                    { label:'YTD Target', data: withYtd.map(g=>g.ytd_metrics.ytd_target), backgroundColor:'#00d4ffcc', borderRadius:4 },
+                    { label:'Realized Points', data: withYtd.map(g=>g.ytd_metrics.realized_points), backgroundColor:'#00e676cc', borderRadius:4 },
+                    { label:'Points Used', data: withYtd.map(g=>g.ytd_metrics.used_points), backgroundColor:'#ff4d6dcc', borderRadius:4 },
+                ]
+            },
+            options: { responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{display:false},
+                    tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.raw).toLocaleString()} pts` } } },
+                scales:{ x:{grid:{display:false}}, y:{grid:{color:'#2a2c3f'},ticks:{callback:v=>Number(v).toLocaleString()}} } }
+        });
+    } else {
+        gapCtx.getContext('2d').clearRect(0,0,gapCtx.width,gapCtx.height);
+    }
+
+    // ═══ Tier 2: Executive Performance Radar ═══
     const radarCtx = document.getElementById('cmpAdvRadarChart');
     if (charts['cmpAdvRadarChart']) charts['cmpAdvRadarChart'].destroy();
-    charts['cmpAdvRadarChart'] = new Chart(radarCtx, {
-        type: 'radar',
-        data: {
-            labels: ['Creations','Closings','Closing Efficiency %'],
-            datasets: groups.map((g,i)=>({ label:g.label, data:[g.kpis.creations,g.kpis.closings,g.closing_efficiency_pct],
-                backgroundColor: COMPARE_GROUP_COLORS[i]+'33', borderColor: COMPARE_GROUP_COLORS[i], pointBackgroundColor: COMPARE_GROUP_COLORS[i] }))
-        },
-        options: { responsive:true, maintainAspectRatio:false,
-            scales:{ r:{ angleLines:{color:'rgba(255,255,255,0.1)'}, grid:{color:'rgba(255,255,255,0.1)'}, pointLabels:{color:'#8b8fa3',font:{size:11}}, ticks:{display:false} } },
-            plugins:{ legend:{position:'bottom',labels:{color:'#8b8fa3'}}, datalabels:{display:false} } }
-    });
+    if (withYtd.length) {
+        charts['cmpAdvRadarChart'] = new Chart(radarCtx, {
+            type: 'radar',
+            data: {
+                labels: ['Target Fulfillment %','Point Efficiency','Account Health','Creation Momentum','Closing Resilience'],
+                datasets: withYtd.map((g,i)=>({ label:g.label,
+                    data:[g.radar_dimensions.target_fulfillment, g.radar_dimensions.point_efficiency, g.radar_dimensions.account_health, g.radar_dimensions.creation_momentum, g.radar_dimensions.closing_resilience],
+                    backgroundColor: COMPARE_GROUP_COLORS[i]+'33', borderColor: COMPARE_GROUP_COLORS[i], pointBackgroundColor: COMPARE_GROUP_COLORS[i] }))
+            },
+            options: { responsive:true, maintainAspectRatio:false,
+                scales:{ r:{ min:0, max:100, angleLines:{color:'rgba(255,255,255,0.1)'}, grid:{color:'rgba(255,255,255,0.1)'}, pointLabels:{color:'#8b8fa3',font:{size:10}}, ticks:{display:false} } },
+                plugins:{ legend:{position:'bottom',labels:{color:'#8b8fa3'}}, datalabels:{display:false} } }
+        });
+    } else {
+        radarCtx.getContext('2d').clearRect(0,0,radarCtx.width,radarCtx.height);
+    }
 
-    const lineCtx = document.getElementById('cmpAdvLineChart');
-    if (charts['cmpAdvLineChart']) charts['cmpAdvLineChart'].destroy();
-    const maxLen = Math.max(1, ...groups.map(g=>g.daily_trend.length));
-    const dayLabels = Array.from({length:maxLen}, (_,i)=>`Day ${i+1}`);
-    charts['cmpAdvLineChart'] = new Chart(lineCtx, {
-        type: 'line',
-        data: {
-            labels: dayLabels,
-            datasets: groups.map((g,i)=>({
-                label: g.label,
-                data: g.daily_trend.map(d=>d.creations),
-                borderColor: COMPARE_GROUP_COLORS[i], backgroundColor: COMPARE_GROUP_COLORS[i]+'22',
-                tension: 0.3, fill: false, pointRadius: 2,
-            }))
-        },
-        options: { responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{display:false} },
-            scales:{ x:{grid:{display:false},ticks:{color:'#8b8fa3',maxTicksLimit:12}}, y:{grid:{color:'#2a2c3f'},ticks:{color:'#8b8fa3'}} } }
-    });
+    // ═══ Tier 2: YTD Cumulative Pacing ═══
+    const cumCtx = document.getElementById('cmpAdvCumulativeChart');
+    if (charts['cmpAdvCumulativeChart']) charts['cmpAdvCumulativeChart'].destroy();
+    if (withYtd.length) {
+        const monthLabels = withYtd[0].cumulative_pacing_trend?.map(t=>t.month) || [];
+        const datasets = withYtd.map((g,i)=>({
+            label: `${g.label} — Actual`,
+            data: (g.cumulative_pacing_trend||[]).map(t=>t.actual_pace),
+            borderColor: COMPARE_GROUP_COLORS[i], backgroundColor: COMPARE_GROUP_COLORS[i]+'22',
+            tension: 0.35, fill: true, pointRadius: 2,
+        }));
+        if (withYtd[0].cumulative_pacing_trend?.length) {
+            datasets.push({
+                label: 'Expected Linear Pace',
+                data: withYtd[0].cumulative_pacing_trend.map(t=>t.target_pace),
+                borderColor: '#8b8fa3', borderDash: [6,4], pointRadius: 0, tension: 0, fill: false,
+            });
+        }
+        charts['cmpAdvCumulativeChart'] = new Chart(cumCtx, {
+            type: 'line',
+            data: { labels: monthLabels, datasets },
+            options: { responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{position:'top',labels:{color:'#8b8fa3',font:{size:10}}}, datalabels:{display:false},
+                    tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.raw}%` } } },
+                scales:{ x:{grid:{display:false},ticks:{color:'#8b8fa3'}}, y:{grid:{color:'#2a2c3f'},ticks:{color:'#8b8fa3',callback:v=>v+'%'}} } }
+        });
+    } else {
+        cumCtx.getContext('2d').clearRect(0,0,cumCtx.width,cumCtx.height);
+    }
 
+    // ═══ Status Mix (unchanged) ═══
     const statusCtx = document.getElementById('cmpAdvStatusChart');
     if (charts['cmpAdvStatusChart']) charts['cmpAdvStatusChart'].destroy();
     const statusKeys = ['Done','Rejected','Under Investigation'];
@@ -3055,6 +3166,69 @@ function renderCompareCharts(groups) {
             plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{color:'#fff',font:{weight:'bold',size:10}} },
             scales:{ x:{stacked:true,grid:{color:'#2a2c3f'}}, y:{stacked:true,grid:{display:false}} } }
     });
+}
+
+// ═══ Tier 3: Granular Diagnostics Table ═══
+function renderExecDiagnosticsTable() {
+    const groups = window.__lastCompareGroups || [];
+    const withYtd = groups.filter(g => g.ytd_metrics && g.diagnostics);
+    const wrap = document.getElementById('cmpDiagTableWrap');
+    const sel = document.getElementById('cmpDiagGroupFilter');
+
+    if (!withYtd.length) {
+        sel.style.display = 'none';
+        wrap.innerHTML = '<div class="empty-state" style="padding:20px 0"><p>Diagnostics are only available when comparing ACMs.</p></div>';
+        return;
+    }
+    sel.style.display = '';
+    if (sel.options.length !== withYtd.length + 1) {
+        sel.innerHTML = '<option value="__all__">All compared groups</option>' + withYtd.map(g=>`<option value="${escHtml(g.label)}">${escHtml(g.label)}</option>`).join('');
+    }
+
+    const chosen = sel.value || '__all__';
+    let rows = [];
+    withYtd.forEach(g => {
+        if (chosen !== '__all__' && chosen !== g.label) return;
+        g.diagnostics.forEach(d => rows.push({...d, group: g.label}));
+    });
+    rows.sort((a,b) => a.variance - b.variance);
+    rows = rows.slice(0, 100);
+
+    if (!rows.length) {
+        wrap.innerHTML = '<div class="empty-state" style="padding:20px 0"><p>No agencies matched.</p></div>';
+        return;
+    }
+
+    const pillFor = pct => pct >= 100
+        ? `<span style="background:rgba(0,230,118,.15);color:var(--accent-green);border:1px solid rgba(0,230,118,.4);border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:700;box-shadow:0 0 8px rgba(0,230,118,.25)">${pct}%</span>`
+        : pct >= 80
+        ? `<span style="background:rgba(0,212,255,.12);color:var(--accent-cyan);border:1px solid rgba(0,212,255,.35);border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:700">${pct}%</span>`
+        : `<span style="background:rgba(255,77,109,.12);color:var(--accent-rose);border:1px solid rgba(255,77,109,.35);border-radius:20px;padding:2px 10px;font-size:.78rem;font-weight:700">${pct}%</span>`;
+
+    const actionFor = d => d.pacing_status === 'Lagging' ? '⚠️ Review pipeline'
+        : d.pacing_status === 'Needs Attention' ? '👀 Monitor'
+        : d.pacing_status === 'No Target' ? '➕ Set target'
+        : '✅ On track';
+
+    wrap.innerHTML = `<table class="compare-table" style="width:100%">
+        <thead><tr>
+            <th>Agency</th><th>ACM</th>${chosen==='__all__'?'<th>Group</th>':''}
+            <th>YTD Target</th><th>Total Points</th><th>Balance</th>
+            <th>Realization</th><th>Pacing</th><th>Variance</th><th>Action</th>
+        </tr></thead>
+        <tbody>${rows.map(d => `<tr>
+            <td><strong>${escHtml(d.agency_name||d.agency_code)}</strong></td>
+            <td>${escHtml(d.acm||'—')}</td>
+            ${chosen==='__all__'?`<td style="color:var(--text-muted)">${escHtml(d.group)}</td>`:''}
+            <td>${Math.round(d.ytd_target).toLocaleString()}</td>
+            <td>${Math.round(d.total_points).toLocaleString()}</td>
+            <td>${Math.round(d.point_balance).toLocaleString()}</td>
+            <td>${pillFor(d.realization_pct)}</td>
+            <td style="font-size:.78rem;color:var(--text-muted)">${escHtml(d.pacing_status)}</td>
+            <td style="color:${d.variance>=0?'var(--accent-green)':'var(--accent-rose)'}">${d.variance>=0?'+':''}${Math.round(d.variance).toLocaleString()}</td>
+            <td style="font-size:.78rem">${actionFor(d)}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
 }
 
 async function runAcmCompare(){
