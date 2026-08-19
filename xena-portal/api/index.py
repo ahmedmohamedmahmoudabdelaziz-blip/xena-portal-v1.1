@@ -119,6 +119,30 @@ def cairo_epoch_ms(cairo_dt):
     a real epoch ms value."""
     return int((cairo_dt - CAIRO_OFFSET).timestamp() * 1000)
 
+def local_day_window_ms(prior_days, tz_offset_min=180):
+    """Returns (from_ms, to_ms_exclusive) -- exact UTC epoch-ms boundaries of the
+    VIEWER'S local calendar-day window, correct for any timezone on Earth.
+    tz_offset_min is minutes EAST of UTC (e.g. Cairo=+180, PK=+300, IN=+330)."""
+    tz = timezone(timedelta(minutes=tz_offset_min))
+    now_local = datetime.now(timezone.utc).astimezone(tz)
+    midnight_today = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    from_dt = midnight_today - timedelta(days=prior_days)
+    to_dt = midnight_today + timedelta(days=1)
+    return int(from_dt.timestamp() * 1000), int(to_dt.timestamp() * 1000)
+
+def _extract_epoch_ms(date_val):
+    """Extract the true UTC epoch-ms from a Feishu date/datetime field value, or 0."""
+    if not date_val:
+        return 0
+    if isinstance(date_val, list) and date_val:
+        date_val = date_val[0]
+    if isinstance(date_val, dict):
+        date_val = date_val.get('value', date_val.get('text', ''))
+    try:
+        return int(float(date_val)) if date_val else 0
+    except (TypeError, ValueError):
+        return 0
+
 def _safe_int(value, default):
     try:
         return int(value)
@@ -668,7 +692,12 @@ class AuditLogger:
     def log(self, actor, action, target, details="", ip="", severity="Info"):
         full_target = f"{target} | {details}" if details else target
         entry = {
-            "actor": mask_name(actor) or "Unknown", "action": action, "target": full_target,
+            # NOTE: audit entries are only ever readable by admins (see the
+            # is_super_admin checks on every /api/admin/* route), so we log full,
+            # unmasked identifiers here rather than "F***"/"jo***@..." -- masking
+            # defeated the whole point of an accountability trail for the people
+            # actually authorized to read it.
+            "actor": actor or "Unknown", "action": action, "target": full_target,
             "ip": ip, "severity": severity, "ts": datetime.utcnow().isoformat(),
         }
         logger.info("audit", **entry)
@@ -1792,7 +1821,7 @@ def callback():
             redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
 
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
-        audit.log(lark_name, "LOGIN", mask_email(lark_email), ip=ip)
+        audit.log(lark_name, "LOGIN", lark_email, ip=ip)
         
         return redirect(f"/?user={urllib.parse.quote(lark_name, safe='')}&email={urllib.parse.quote(lark_email, safe='')}&uat={urllib.parse.quote(uat, safe='')}&avatar={urllib.parse.quote(avatar_url, safe='')}&open_id={urllib.parse.quote(lark_open_id, safe='')}")
 
@@ -1838,10 +1867,14 @@ def search():
 
 @app.route('/api/admin/users', methods=['GET','POST','DELETE'])
 def manage_users():
-    admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    # BUG FIX: see the matching comment in audit_logs() -- this must check by email
+    # AND name, exactly like /api/auth/me does, or admins whose Feishu "Person" text
+    # doesn't match their Lark name get an Admin nav group they can't actually use.
+    admin_name  = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    admin_email = sanitize_text(request.headers.get('X-User-Email','')).lower()
     is_authorized = any(a == admin_name for a in ADMIN_USERS)
     if not is_authorized:
-        perms = get_user_permissions("", admin_name)
+        perms = get_user_permissions(admin_email, admin_name)
         if perms.get("is_super_admin"): is_authorized = True
     if not is_authorized:
         audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel", ip=request.headers.get("X-Forwarded-For",""), severity="Critical")
@@ -1863,7 +1896,13 @@ def manage_users():
             users.append({"id":item.get("record_id"),"email":display_email,
                           "modules":extract_field_text(fields.get("Modules","")),
                           "acms_raw":extract_field_text(fields.get("ACMs","")),
-                          "regions_raw":extract_field_text(fields.get("Regions","all"))})
+                          "regions_raw":extract_field_text(fields.get("Regions","all")),
+                          # Role presets are stored as regular rows in this same table,
+                          # keyed by a "__ROLE__::<name>" email sentinel, so named roles
+                          # (CS, ACM, etc.) persist centrally for all admins without
+                          # needing a new Feishu table. The frontend splits these out
+                          # from real agent rows using this flag.
+                          "is_role": display_email.startswith("__ROLE__::")})
         return jsonify(users)
 
     elif request.method == 'POST':
@@ -1910,47 +1949,155 @@ def manage_users():
         audit.log(admin_name, "DELETE_USER", record_id, ip=ip, severity="Warning")
         return jsonify({"success":True})
 
-@app.route('/api/admin/audit-logs', methods=['GET'])
-def audit_logs():
+@app.route('/api/access-request', methods=['POST'])
+@rate_limit(5, 300)
+def request_access():
+    """Logged-in-but-no-permissions users land on the Access Denied screen and can
+    click 'Request Access' from there. We record the request as a Critical audit
+    entry (action=ACCESS_REQUEST) rather than a new Feishu table, so it shows up
+    immediately in the existing Audit Log / Access Requests admin views without any
+    base-schema changes. See /api/admin/access-requests for how these are read back
+    and matched against later ADD_USER/UPDATE_USER/ACCESS_REQUEST_RESOLVED entries
+    to determine which requests are still pending."""
+    data = request.json or {}
+    name = sanitize_text(data.get("name", ""), 100)
+    email = sanitize_text(data.get("email", ""), 150)
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    if not name and not email:
+        return jsonify({"success": False, "error": "Missing name/email."}), 400
+    audit.log(name or email, "ACCESS_REQUEST", email or "(no email)", details=f"Requested by {name}", ip=ip, severity="Critical")
+    return jsonify({"success": True})
+
+@app.route('/api/admin/access-requests', methods=['GET'])
+def list_access_requests():
+    """Returns pending access requests, derived from the audit log: any
+    ACCESS_REQUEST entry that isn't followed by a later ADD_USER / UPDATE_USER /
+    ACCESS_REQUEST_RESOLVED entry for the same requester is still pending."""
     admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    admin_email = sanitize_text(request.headers.get('X-User-Email','')).lower()
     is_authorized = any(a == admin_name for a in ADMIN_USERS)
     if not is_authorized:
-        perms = get_user_permissions("", admin_name)
+        perms = get_user_permissions(admin_email, admin_name)
+        is_authorized = bool(perms.get("is_super_admin"))
+    if not is_authorized:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    logs = audit.get_recent(500)
+    if AUDIT_TABLE_ID and not MOCK_MODE:
+        try:
+            tat = get_tenant_access_token()
+            url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+            headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+            payload = {"page_size": 200, "sort": [{"field_name": "Timestamp", "desc": True}]}
+            res = http_requests.post(url, headers=headers, json=payload, timeout=10).json()
+            if res.get("code") == 0:
+                remote_logs = []
+                for item in res.get("data", {}).get("items", []):
+                    f = item.get("fields", {})
+                    ts_val = f.get("Timestamp")
+                    dt_str = datetime.fromtimestamp(ts_val/1000.0).isoformat() if isinstance(ts_val,(int,float)) else str(ts_val)
+                    remote_logs.append({
+                        "ts": dt_str, "actor": extract_field_text(f.get("Agent","")),
+                        "action": extract_field_text(f.get("Action","")),
+                        "target": extract_field_text(f.get("Target","")),
+                    })
+                logs = remote_logs + logs
+        except Exception:
+            pass
+
+    pending = {}
+    resolved_after = {}
+    for entry in sorted(logs, key=lambda x: x.get("ts","")):
+        action = (entry.get("action") or "").upper()
+        target = (entry.get("target") or "")
+        email_part = target.split("|")[0].strip().lower() if target else ""
+        if action == "ACCESS_REQUEST":
+            pending[email_part or entry.get("actor","")] = entry
+        elif action in ("ADD_USER", "UPDATE_USER", "ACCESS_REQUEST_RESOLVED"):
+            key = email_part or entry.get("actor","").lower()
+            resolved_after[key] = entry.get("ts","")
+
+    result = []
+    for key, entry in pending.items():
+        resolved_ts = resolved_after.get(key)
+        if resolved_ts and resolved_ts >= entry.get("ts",""):
+            continue
+        result.append(entry)
+    result.sort(key=lambda x: x.get("ts",""), reverse=True)
+    return jsonify(result)
+
+@app.route('/api/admin/audit-logs', methods=['GET'])
+def audit_logs():
+    # BUG FIX: this used to authorize by X-User-Name ONLY (get_user_permissions("",
+    # admin_name)). Any admin whose Feishu "Person" field text doesn't exactly match
+    # their Lark display name (but whose Email does match) would see the Admin nav
+    # group in the sidebar -- because /api/auth/me resolves permissions by email OR
+    # name -- yet get a 403 the moment they actually opened Audit Log or Manage
+    # Agents, since this endpoint (and /api/admin/users) only ever checked name.
+    # Now both identifiers are sent and checked, matching /api/auth/me's own logic.
+    admin_name  = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    admin_email = sanitize_text(request.headers.get('X-User-Email','')).lower()
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
+    if not is_authorized:
+        perms = get_user_permissions(admin_email, admin_name)
         if not perms.get("is_super_admin"): return jsonify({"error":"Unauthorized"}), 403
-        
-    if MOCK_MODE: return jsonify(audit.get_recent(50))
-    
-    tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    payload = {
-        "page_size": min(int(request.args.get('limit','100')), 500),
-        "sort": [{"field_name": "Timestamp", "desc": True}],
-    }
-    try:
-        res = http_requests.post(url, headers=headers, json=payload, timeout=10).json()
-        if res.get("code") != 0: raise Exception(res.get("msg", "Feishu API Error"))
-        
-        logs = []
-        for item in res.get("data", {}).get("items", []):
-            f = item.get("fields", {})
-            ts_val = f.get("Timestamp")
-            if isinstance(ts_val, (int, float)): dt_str = datetime.fromtimestamp(ts_val/1000.0).isoformat()
-            else: dt_str = str(ts_val)
-                
-            logs.append({
-                "ts": dt_str,
-                "actor": extract_field_text(f.get("Agent", "")),
-                "action": extract_field_text(f.get("Action", "")),
-                "target": extract_field_text(f.get("Target", "")),
-                "ip": extract_field_text(f.get("IP Address", "")),
-                "severity": extract_field_text(f.get("Severity", "Info"))
-            })
-        logs.sort(key=lambda x: x["ts"], reverse=True)
-        return jsonify(logs)
-    except Exception as e:
-        logger.error("audit_log_fetch_failed", error=str(e))
-        return jsonify(audit.get_recent(min(int(request.args.get('limit','100')), 500)))
+
+    limit    = min(int(request.args.get('limit','200')), 1000)
+    q_actor  = sanitize_text(request.args.get('actor','')).lower()
+    q_action = sanitize_text(request.args.get('action','')).lower()
+    q_search = sanitize_text(request.args.get('search','')).lower()  # free-text over target/action/actor
+    q_sev    = sanitize_text(request.args.get('severity','')).lower()
+    q_from   = sanitize_text(request.args.get('from',''))  # ISO date, inclusive
+    q_to     = sanitize_text(request.args.get('to',''))    # ISO date, inclusive
+
+    if MOCK_MODE:
+        logs = audit.get_recent(limit)
+    else:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        payload = {
+            "page_size": min(limit, 500),
+            "sort": [{"field_name": "Timestamp", "desc": True}],
+        }
+        try:
+            res = http_requests.post(url, headers=headers, json=payload, timeout=10).json()
+            if res.get("code") != 0: raise Exception(res.get("msg", "Feishu API Error"))
+
+            logs = []
+            for item in res.get("data", {}).get("items", []):
+                f = item.get("fields", {})
+                ts_val = f.get("Timestamp")
+                if isinstance(ts_val, (int, float)): dt_str = datetime.fromtimestamp(ts_val/1000.0).isoformat()
+                else: dt_str = str(ts_val)
+
+                logs.append({
+                    "ts": dt_str,
+                    "actor": extract_field_text(f.get("Agent", "")),
+                    "action": extract_field_text(f.get("Action", "")),
+                    "target": extract_field_text(f.get("Target", "")),
+                    "ip": extract_field_text(f.get("IP Address", "")),
+                    "severity": extract_field_text(f.get("Severity", "Info"))
+                })
+            logs.sort(key=lambda x: x["ts"], reverse=True)
+        except Exception as e:
+            logger.error("audit_log_fetch_failed", error=str(e))
+            logs = audit.get_recent(limit)
+
+    def _matches(l):
+        if q_actor  and q_actor  not in (l.get("actor","") or "").lower(): return False
+        if q_action and q_action not in (l.get("action","") or "").lower(): return False
+        if q_sev    and q_sev    != (l.get("severity","") or "").lower(): return False
+        if q_search:
+            hay = " ".join([l.get("actor",""), l.get("action",""), l.get("target",""), l.get("ip","")]).lower()
+            if q_search not in hay: return False
+        ts = (l.get("ts") or "")[:10]  # YYYY-MM-DD
+        if q_from and ts and ts < q_from: return False
+        if q_to   and ts and ts > q_to:   return False
+        return True
+
+    filtered = [l for l in logs if _matches(l)]
+    return jsonify(filtered[:limit])
 
 @app.route('/api/requests/single', methods=['GET'])
 def get_single_request():
@@ -2698,9 +2845,10 @@ def my_requests():
     days_param = sanitize_text(request.args.get('days', '0'))
     prior_days = 0 if days_param == 'today' else max(0, min(_safe_int(days_param, 0), 90))
 
-    _cairo_now = cairo_now()
-    _cairo_midnight_today = _cairo_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    from_dt = _cairo_midnight_today - timedelta(days=prior_days)
+    # Per-user timezone: the browser sends its own UTC offset (minutes east of UTC)
+    # so Cairo / Pakistan / India / USA / Turkey viewers each see THEIR own "today".
+    # Falls back to Cairo (+180) for any stale client that doesn't send it.
+    tz_offset_min = max(-720, min(840, _safe_int(request.args.get('tz_offset', ''), 180)))
     lookback_days = prior_days  # kept in the response payload for the frontend label
 
     # FIX: this is now a fully live, on-demand fetch -- no Redis/background snapshot
@@ -2783,9 +2931,8 @@ def my_requests():
     # exactly at the start of the window. isLess against the *next* midnight gives a
     # clean, inclusive "through end of today" upper bound without needing to guess
     # at "now" down to the millisecond.
-    _cairo_midnight_tomorrow = _cairo_midnight_today + timedelta(days=1)
-    from_ms = cairo_epoch_ms(from_dt) - 1
-    to_ms_exclusive = cairo_epoch_ms(_cairo_midnight_tomorrow)
+    _local_from_ms, to_ms_exclusive = local_day_window_ms(prior_days, tz_offset_min)
+    from_ms = _local_from_ms - 1
 
     fast_items, fast_ok, fast_complete, fast_reason = [], False, True, ""
     try:
@@ -2858,8 +3005,16 @@ def my_requests():
         fields = item.get("fields", {})
         
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
-        dt = parse_feishu_date(raw_date)
-        
+        # Format in the VIEWER'S local timezone (not hardcoded Cairo +3h).
+        _ms = _extract_epoch_ms(raw_date)
+        if _ms:
+            _dt_local = datetime.fromtimestamp(_ms / 1000.0, tz=timezone.utc) + timedelta(minutes=tz_offset_min)
+            dt_str = _dt_local.strftime("%Y-%m-%d %H:%M")
+            _sort_ts = _ms
+        else:
+            dt_str = extract_field_text(raw_date)
+            _sort_ts = 0
+
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
         acm_in = clean(get_field_local(fields, "Acm Name (IN)"))
@@ -2875,7 +3030,7 @@ def my_requests():
             "record_id": item.get("record_id"),
             "numbering": extract_field_text(get_field_local(fields, "Numbering")),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
-            "submitted_on": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
+            "submitted_on": dt_str,
             "respondents": respondents,
             "user_id": extract_field_text(get_field_local(fields, "User ID")),
             "agency_code": extract_field_text(get_field_local(fields, "Agency Code")),
@@ -2888,7 +3043,7 @@ def my_requests():
             "reject_reason": extract_field_text(get_field_local(fields, "Reject Reason", "Rejection Reason")),
             "audition_note": extract_field_text(get_field_local(fields, "Audition note", "Audition Note")),
             "closing_reason": extract_field_text(get_field_local(fields, "Closing Reason", "Closing Agencies Reason")),
-            "_sort_ts": dt.timestamp() if dt else 0,
+            "_sort_ts": _sort_ts,
         })
     
     results.sort(key=lambda r: r["_sort_ts"], reverse=True)
