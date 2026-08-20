@@ -450,6 +450,35 @@
         .health-At\.Risk,.health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
         .health-Critical{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
 
+        /* ── Agency Exchange ────────────────────────────────────────── */
+        .ex-kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;text-align:left}
+        .ex-kpi .ex-kpi-label{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+        .ex-kpi .ex-kpi-val{font-size:1.35rem;font-weight:800}
+        .ex-region-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
+        .ex-region-card h5{margin:0 0 8px;font-size:.85rem;color:var(--accent-cyan);display:flex;align-items:center;gap:6px}
+        .ex-status-pill{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid;white-space:nowrap;display:inline-block}
+        .ex-status-Ahead{background:rgba(0,230,118,.15);color:var(--accent-green);border-color:rgba(0,230,118,.3)}
+        .ex-status-On-Track{background:rgba(0,212,255,.15);color:var(--accent-cyan);border-color:rgba(0,212,255,.3)}
+        .ex-status-Needs-Attention{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
+        .ex-status-Lagging{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
+        .ex-status-No-Target{background:rgba(255,255,255,.08);color:var(--text-muted);border-color:var(--border)}
+        .ex-dormant-tag{color:var(--accent-rose);font-size:.72rem;font-weight:700;margin-left:6px}
+        .ex-board-row{border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+        .ex-board-row:hover{background:var(--surface-hover,rgba(255,255,255,.03))}
+        .ex-star-btn{background:transparent;border:none;cursor:pointer;font-size:1.05rem;color:var(--text-muted);line-height:1;padding:2px 4px}
+        .ex-star-btn.starred{color:var(--accent-amber)}
+        .ex-insight{padding:10px 14px;border-radius:10px;font-size:.83rem;border-left:3px solid;display:flex;gap:8px;align-items:flex-start}
+        .ex-insight-warning{background:rgba(255,184,0,.08);border-color:var(--accent-amber)}
+        .ex-insight-success{background:rgba(0,230,118,.08);border-color:var(--accent-green)}
+        .ex-insight-info{background:rgba(0,212,255,.08);border-color:var(--accent-cyan)}
+        .ex-mover-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:.83rem}
+        .ex-mover-row:last-child{border-bottom:none}
+        .ex-heat-cell{border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;font-size:.72rem;color:#fff;transition:transform .12s;overflow:hidden}
+        .ex-heat-cell:hover{transform:scale(1.06);z-index:2}
+        .ex-heat-cell .ex-heat-code{font-weight:800;font-size:.8rem;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ex-gauge-wrap{display:flex;align-items:center;gap:14px}
+        @media (max-width:900px){ #exMainGrid{grid-template-columns:1fr !important} }
+
         .timeline{position:relative;padding-left:28px}
         .timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border)}
         .timeline-item{position:relative;margin-bottom:16px;}
@@ -729,6 +758,19 @@
                     <div class="nav-item" id="nav-compare"   onclick="openInTab('compare')"><span data-i18n="compareAcm">Compare ACMs / Periods</span></div>
                 </div>
             </div>
+            <div class="nav-group" id="navGrpExchange">
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpExchange','navBodyExchange')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                        <span data-i18n="agencyExchange">Agency Exchange</span>
+                    </span>
+                    <span class="nav-arr" id="navArrExchange">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyExchange">
+                    <div class="nav-item" id="nav-exchange" onclick="openInTab('exchange')"><span data-i18n="exchangeBoard">Target Board</span></div>
+                </div>
+            </div>
+
             <div class="nav-group" id="navGrpPoints">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpPoints','navBodyPoints')">
                     <span>
@@ -996,6 +1038,149 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- ... Agency Exchange ... -->
+            <div id="pg-exchange" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:6px">
+                        <h3 style="margin:0;color:var(--accent-cyan);display:flex;align-items:center;gap:8px">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                            Agency Exchange
+                        </h3>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <span id="exGeneratedAt" style="font-size:.78rem;color:var(--text-muted)"></span>
+                            <button class="btn btn-outline" style="padding:8px 14px;font-size:.82rem" onclick="loadExchangeBoard()">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:.87rem;margin-bottom:4px">Live YTD target realization board — who's pacing well, who needs attention, who's gone quiet. Pure target analytics; not related to Points/Rewards balances.</p>
+                </div>
+
+                <!-- View switcher -->
+                <div class="compare-mode-toggle" style="margin-bottom:18px">
+                    <div class="compare-mode-btn active" id="exViewBtn-board" onclick="setExchangeView('board')">📋 Board</div>
+                    <div class="compare-mode-btn" id="exViewBtn-heatmap" onclick="setExchangeView('heatmap')">🔥 Heatmap</div>
+                    <div class="compare-mode-btn" id="exViewBtn-watchlist" onclick="setExchangeView('watchlist')">⭐ Watchlist</div>
+                </div>
+
+                <!-- KPI strip -->
+                <div id="exKpiStrip" class="kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px"></div>
+
+                <!-- Region rollup -->
+                <div id="exRegionRollup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:18px"></div>
+
+                <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px;align-items:start" id="exMainGrid">
+                    <div>
+                        <!-- Insight feed -->
+                        <div class="card" style="margin-bottom:18px">
+                            <h4 style="margin-bottom:12px;color:var(--accent-cyan);font-size:.95rem;display:flex;align-items:center;gap:8px">💡 What needs your attention</h4>
+                            <div id="exInsightFeed" style="display:flex;flex-direction:column;gap:8px"></div>
+                        </div>
+
+                        <!-- Filters -->
+                        <div class="card" style="margin-bottom:18px;padding:14px 18px">
+                            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                                <div class="control-group" style="min-width:150px;margin:0" id="exScopeWrap">
+                                    <label style="font-size:.75rem">Scope</label>
+                                    <select id="exFilterScope" onchange="loadExchangeBoard()"><option value="mine">My Agencies</option><option value="all">All Agencies</option></select>
+                                </div>
+                                <div class="control-group" style="min-width:130px;margin:0">
+                                    <label style="font-size:.75rem">Region</label>
+                                    <select id="exFilterRegion" onchange="loadExchangeBoard()"><option value="All">All Regions</option><option value="pk">PK</option><option value="in">IN</option></select>
+                                </div>
+                                <div class="control-group" style="min-width:160px;margin:0">
+                                    <label style="font-size:.75rem">Status</label>
+                                    <select id="exFilterStatus" onchange="loadExchangeBoard()">
+                                        <option value="all">All Statuses</option>
+                                        <option value="ahead">Ahead</option>
+                                        <option value="on_track">On Track</option>
+                                        <option value="needs_attention">Needs Attention</option>
+                                        <option value="lagging">Lagging</option>
+                                        <option value="at_risk">At Risk (Needs Attn + Lagging)</option>
+                                        <option value="dormant">Dormant</option>
+                                        <option value="no_target">No Target</option>
+                                    </select>
+                                </div>
+                                <div class="control-group" style="min-width:140px;margin:0">
+                                    <label style="font-size:.75rem">Sort by</label>
+                                    <select id="exFilterSort" onchange="loadExchangeBoard()">
+                                        <option value="variance">Worst Variance First</option>
+                                        <option value="realization">Realization %</option>
+                                        <option value="activity">Least Recently Active</option>
+                                        <option value="balance">Point Balance</option>
+                                        <option value="name">Agency Name</option>
+                                    </select>
+                                </div>
+                                <div class="control-group" style="flex:1;min-width:180px;margin:0">
+                                    <label style="font-size:.75rem">Search</label>
+                                    <input type="text" id="exFilterSearch" placeholder="Agency name, code, or ACM…" oninput="debouncedExchangeSearch()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Board table -->
+                        <div class="card" id="exBoardWrap">
+                            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px">
+                                <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+                                    <thead>
+                                        <tr style="text-align:left;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:.75rem;text-transform:uppercase">
+                                            <th style="padding:10px 8px"></th>
+                                            <th style="padding:10px 8px">Agency</th>
+                                            <th style="padding:10px 8px">ACM / Region</th>
+                                            <th style="padding:10px 8px">Realization</th>
+                                            <th style="padding:10px 8px">Status</th>
+                                            <th style="padding:10px 8px">Variance</th>
+                                            <th style="padding:10px 8px">Health</th>
+                                            <th style="padding:10px 8px">Last Activity</th>
+                                            <th style="padding:10px 8px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="exBoardTbody"></tbody>
+                                </table>
+                            </div>
+                            <div id="exBoardEmpty" style="display:none;text-align:center;padding:40px 0;color:var(--text-muted)">No agencies match these filters.</div>
+                        </div>
+
+                        <!-- Heatmap view -->
+                        <div class="card" id="exHeatmapWrap" style="display:none">
+                            <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:14px">Each cell is one agency, colored by pace vs. target. Click a cell to drill in.</p>
+                            <div id="exHeatmapGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px"></div>
+                        </div>
+
+                        <!-- Watchlist view -->
+                        <div class="card" id="exWatchlistWrap" style="display:none">
+                            <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:14px">Pinned agencies you're tracking closely. Click the star on any row in the Board to add or remove.</p>
+                            <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px">
+                                <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+                                    <thead>
+                                        <tr style="text-align:left;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:.75rem;text-transform:uppercase">
+                                            <th style="padding:10px 8px"></th><th style="padding:10px 8px">Agency</th><th style="padding:10px 8px">ACM / Region</th>
+                                            <th style="padding:10px 8px">Realization</th><th style="padding:10px 8px">Status</th><th style="padding:10px 8px">Last Activity</th><th style="padding:10px 8px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="exWatchlistTbody"></tbody>
+                                </table>
+                            </div>
+                            <div id="exWatchlistEmpty" style="display:none;text-align:center;padding:40px 0;color:var(--text-muted)">No agencies pinned yet — star a row on the Board to add one.</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <!-- Movers panel -->
+                        <div class="card" style="margin-bottom:18px">
+                            <h4 style="margin-bottom:12px;color:var(--accent-cyan);font-size:.9rem">📈 Movers (last 7 days)</h4>
+                            <div id="exMoversPanel"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agency drill-in modal -->
+            <div id="exDrilldownModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeExchangeDrilldown()">
+                <div class="card" style="max-width:760px;width:100%;max-height:88vh;overflow-y:auto;position:relative">
+                    <button onclick="closeExchangeDrilldown()" style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1">×</button>
+                    <div id="exDrilldownBody"><div style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</div></div>
                 </div>
             </div>
 
@@ -2144,6 +2329,8 @@ const translations = {
         agencyAnalysis: "Agency Analysis",
         analyticsReport: "Analytics Report",
         compareAcm: "Compare Module",
+        agencyExchange: "Agency Exchange",
+        exchangeBoard: "Target Board",
         agencyPoints: "Agency Points",
         checkAgencyPoints: "Check Agency Points",
         smartAllocator: "Smart Allocator",
@@ -2170,6 +2357,8 @@ const translations = {
         agencyAnalysis: "机构分析",
         analyticsReport: "分析报告",
         compareAcm: "比较模块",
+        agencyExchange: "代理交易所",
+        exchangeBoard: "目标看板",
         agencyPoints: "机构积分",
         checkAgencyPoints: "查看机构积分",
         smartAllocator: "智能分配器",
@@ -2217,6 +2406,7 @@ const pageTitlesMap = {
     'welcome': 'Welcome',
     'analytics': 'Analytics Report',
     'compare': 'Compare Module',
+    'exchange': 'Agency Exchange',
     'points': 'Check Agency Points',
     'allocator': 'Smart Allocator',
     'target': 'Agency Target',
@@ -2237,6 +2427,7 @@ const zhPageTitlesMap = {
     'welcome': '欢迎',
     'analytics': '分析报告',
     'compare': '比较模块',
+    'exchange': '代理交易所',
     'points': '查看机构积分',
     'allocator': '智能分配器',
     'target': '机构目标',
@@ -2255,7 +2446,7 @@ const zhPageTitlesMap = {
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -2396,6 +2587,10 @@ function executePageLogic(page) {
     } else if(page==='compare'){
         document.getElementById('pg-compare').style.display='block';
         _expandNavGroup('navBodyAnalytics','navArrAnalytics');
+    } else if(page==='exchange'){
+        document.getElementById('pg-exchange').style.display='block';
+        _expandNavGroup('navBodyExchange','navArrExchange');
+        initExchangePageOnce();
     } else if(page==='points-records'){
         document.getElementById('pg-points-records').style.display='block';
         _expandNavGroup('navBodyPoints','navArrPoints');
@@ -3254,6 +3449,342 @@ function renderExecDiagnosticsTable() {
             <td style="font-size:.78rem">${actionFor(d)}</td>
         </tr>`).join('')}</tbody>
     </table>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// AGENCY EXCHANGE — frontend module
+// ════════════════════════════════════════════════════════════════════
+let exBoardData = null;   // last /api/exchange/board response
+let exCurrentView = 'board';
+let exSearchTimer = null;
+let exPageInited = false;
+
+function initExchangePageOnce(){
+    if (exPageInited) { loadExchangeBoard(); return; }
+    exPageInited = true;
+    if (isAdmin) document.getElementById('exFilterScope').value = 'all';
+    loadExchangeBoard();
+}
+
+function debouncedExchangeSearch(){
+    clearTimeout(exSearchTimer);
+    exSearchTimer = setTimeout(loadExchangeBoard, 350);
+}
+
+function setExchangeView(view){
+    exCurrentView = view;
+    ['board','heatmap','watchlist'].forEach(v=>{
+        document.getElementById('exViewBtn-'+v).classList.toggle('active', v===view);
+    });
+    document.getElementById('exBoardWrap').style.display = view==='board' ? '' : 'none';
+    document.getElementById('exHeatmapWrap').style.display = view==='heatmap' ? '' : 'none';
+    document.getElementById('exWatchlistWrap').style.display = view==='watchlist' ? '' : 'none';
+    if (exBoardData){
+        if (view==='heatmap') renderExchangeHeatmap(exBoardData.rows);
+        if (view==='watchlist') renderExchangeWatchlist(exBoardData.rows, exBoardData.watchlist);
+    }
+}
+
+async function loadExchangeBoard(){
+    const wrap = document.getElementById('exBoardTbody');
+    if (wrap) wrap.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Loading board…</td></tr>';
+
+    const scope  = document.getElementById('exFilterScope').value;
+    const region = document.getElementById('exFilterRegion').value;
+    const status = document.getElementById('exFilterStatus').value;
+    const sort   = document.getElementById('exFilterSort').value;
+    const q      = document.getElementById('exFilterSearch').value.trim();
+
+    logFrontendAction("EXCHANGE_BOARD_LOAD", `scope:${scope}|region:${region}|status:${status}`);
+
+    try{
+        const params = new URLSearchParams({
+            user: loggedUser, email: loggedEmail, scope, region, status, sort, q
+        });
+        const r = await fetch(`/api/exchange/board?${params.toString()}`);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to load board');
+        exBoardData = data;
+
+        document.getElementById('exGeneratedAt').textContent = 'Updated ' + new Date(data.generated_at).toLocaleTimeString();
+        if (data.is_super_admin) document.getElementById('exScopeWrap').style.display = '';
+
+        renderExchangeKpiStrip(data.kpi_strip);
+        renderExchangeRegionRollup(data.region_rollup);
+        renderExchangeInsights(data.insights);
+        renderExchangeMovers(data.movers);
+        renderExchangeBoardTable(data.rows, data.watchlist);
+        if (exCurrentView==='heatmap') renderExchangeHeatmap(data.rows);
+        if (exCurrentView==='watchlist') renderExchangeWatchlist(data.rows, data.watchlist);
+    } catch(e){
+        if (wrap) wrap.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--accent-rose)">${escHtml(e.message)}</td></tr>`;
+        ToastManager.show('Exchange board failed to load: ' + e.message, 'error');
+    }
+}
+
+function renderExchangeKpiStrip(k){
+    const el = document.getElementById('exKpiStrip');
+    if (!k) { el.innerHTML=''; return; }
+    const cards = [
+        ['Agencies', k.agency_count, 'var(--accent-cyan)'],
+        ['Avg Realization', k.avg_realization_pct + '%', k.avg_realization_pct>=95?'var(--accent-green)':k.avg_realization_pct>=80?'var(--accent-amber)':'var(--accent-rose)'],
+        ['Ahead', k.count_ahead, 'var(--accent-green)'],
+        ['On Track', k.count_on_track, 'var(--accent-cyan)'],
+        ['At Risk', k.count_at_risk, 'var(--accent-amber)'],
+        ['Dormant', k.count_dormant, 'var(--accent-rose)'],
+        ['Total Balance', Math.round(k.total_balance).toLocaleString(), 'var(--text-primary)'],
+    ];
+    el.innerHTML = cards.map(([label,val,color])=>`
+        <div class="ex-kpi"><div class="ex-kpi-label">${label}</div><div class="ex-kpi-val" style="color:${color}">${val}</div></div>
+    `).join('');
+}
+
+function renderExchangeRegionRollup(rollup){
+    const el = document.getElementById('exRegionRollup');
+    if (!rollup) { el.innerHTML=''; return; }
+    const regions = Object.keys(rollup).filter(r => rollup[r].agency_count > 0);
+    if (!regions.length) { el.innerHTML=''; return; }
+    el.innerHTML = regions.map(reg=>{
+        const r = rollup[reg];
+        const color = r.avg_realization_pct>=95?'var(--accent-green)':r.avg_realization_pct>=80?'var(--accent-amber)':'var(--accent-rose)';
+        return `<div class="ex-region-card">
+            <h5>🌐 Region ${reg} <span style="color:var(--text-muted);font-weight:400">(${r.agency_count} agencies)</span></h5>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div><div style="font-size:1.3rem;font-weight:800;color:${color}">${r.avg_realization_pct}%</div><div style="font-size:.72rem;color:var(--text-muted)">avg realization</div></div>
+                <div style="text-align:right;font-size:.78rem;color:var(--text-muted)">
+                    <div>${r.count_at_risk} at risk</div>
+                    <div>${r.count_dormant} dormant</div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderExchangeInsights(insights){
+    const el = document.getElementById('exInsightFeed');
+    if (!insights || !insights.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem">No insights available.</div>'; return; }
+    const iconFor = sev => sev==='warning' ? '⚠️' : sev==='success' ? '✅' : 'ℹ️';
+    el.innerHTML = insights.map(i => `
+        <div class="ex-insight ex-insight-${escHtml(i.severity)}">
+            <span>${iconFor(i.severity)}</span><span>${escHtml(i.text)}</span>
+        </div>
+    `).join('');
+}
+
+function renderExchangeMovers(movers){
+    const el = document.getElementById('exMoversPanel');
+    if (!movers || !movers.available){
+        el.innerHTML = `<div style="color:var(--text-muted);font-size:.82rem;padding:10px 0">${escHtml(movers?.reason || 'Movers unavailable.')}</div>`;
+        return;
+    }
+    const rowsFor = (list, positive) => list.length ? list.map(m => `
+        <div class="ex-mover-row">
+            <span style="cursor:pointer" onclick="openExchangeDrilldown('${escHtml(m.agency_code)}')">${escHtml(m.agency_name)}</span>
+            <span style="color:${positive?'var(--accent-green)':'var(--accent-rose)'};font-weight:700">${positive?'+':''}${Math.round(m.delta).toLocaleString()} <span style="font-weight:400;font-size:.75rem">(${m.pct_change}%)</span></span>
+        </div>
+    `).join('') : '<div style="color:var(--text-muted);font-size:.78rem;padding:6px 0">None</div>';
+
+    el.innerHTML = `
+        <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:8px">Since ${escHtml(movers.since_date)}</div>
+        <div style="margin-bottom:6px;font-size:.78rem;font-weight:700;color:var(--accent-green)">▲ Gainers</div>
+        ${rowsFor(movers.gainers, true)}
+        <div style="margin:12px 0 6px;font-size:.78rem;font-weight:700;color:var(--accent-rose)">▼ Decliners</div>
+        ${rowsFor(movers.decliners, false)}
+    `;
+}
+
+function _exStatusClass(status){ return 'ex-status-' + String(status).replace(/\s+/g,'-'); }
+
+function renderExchangeBoardTable(rows, watchlist){
+    const tbody = document.getElementById('exBoardTbody');
+    const empty = document.getElementById('exBoardEmpty');
+    if (!rows || !rows.length){
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+    const wl = new Set(watchlist || []);
+    tbody.innerHTML = rows.map(r => `
+        <tr class="ex-board-row" onclick="openExchangeDrilldown('${escHtml(r.agency_code)}')">
+            <td style="padding:8px" onclick="event.stopPropagation()">
+                <button class="ex-star-btn ${wl.has(r.agency_code)?'starred':''}" onclick="toggleExchangeWatchlist('${escHtml(r.agency_code)}')" title="Pin to watchlist">★</button>
+            </td>
+            <td style="padding:8px">
+                <div style="font-weight:700">${escHtml(r.agency_name)}</div>
+                <div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.agency_code)}</div>
+            </td>
+            <td style="padding:8px;font-size:.8rem">
+                <div>${escHtml(r.acm)}</div>
+                <div style="color:var(--text-muted)">${escHtml(r.region)}</div>
+            </td>
+            <td style="padding:8px;font-weight:700">${r.realization_pct}%</td>
+            <td style="padding:8px">
+                <span class="ex-status-pill ${_exStatusClass(r.pacing_status)}">${escHtml(r.pacing_status)}</span>
+                ${r.is_dormant ? '<span class="ex-dormant-tag">● dormant</span>' : ''}
+            </td>
+            <td style="padding:8px;color:${r.variance>=0?'var(--accent-green)':'var(--accent-rose)'}">${r.variance>=0?'+':''}${Math.round(r.variance).toLocaleString()}</td>
+            <td style="padding:8px"><span class="ex-status-pill" style="background:${r.health_score>=85?'rgba(0,230,118,.15)':r.health_score>=60?'rgba(0,212,255,.15)':r.health_score>=40?'rgba(255,184,0,.15)':'rgba(255,77,109,.15)'};color:${r.health_score>=85?'var(--accent-green)':r.health_score>=60?'var(--accent-cyan)':r.health_score>=40?'var(--accent-amber)':'var(--accent-rose)'};border-color:currentColor">${r.health_score}</span></td>
+            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${r.days_since_activity===null?'No activity':r.days_since_activity===0?'Today':r.days_since_activity+'d ago'}</td>
+            <td style="padding:8px;color:var(--text-muted)">›</td>
+        </tr>
+    `).join('');
+}
+
+function renderExchangeWatchlist(rows, watchlist){
+    const tbody = document.getElementById('exWatchlistTbody');
+    const empty = document.getElementById('exWatchlistEmpty');
+    const wl = new Set(watchlist || []);
+    const pinned = (rows || []).filter(r => wl.has(r.agency_code));
+    if (!pinned.length){
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+    tbody.innerHTML = pinned.map(r => `
+        <tr class="ex-board-row" onclick="openExchangeDrilldown('${escHtml(r.agency_code)}')">
+            <td style="padding:8px" onclick="event.stopPropagation()"><button class="ex-star-btn starred" onclick="toggleExchangeWatchlist('${escHtml(r.agency_code)}')">★</button></td>
+            <td style="padding:8px"><div style="font-weight:700">${escHtml(r.agency_name)}</div><div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.agency_code)}</div></td>
+            <td style="padding:8px;font-size:.8rem">${escHtml(r.acm)} · ${escHtml(r.region)}</td>
+            <td style="padding:8px;font-weight:700">${r.realization_pct}%</td>
+            <td style="padding:8px"><span class="ex-status-pill ${_exStatusClass(r.pacing_status)}">${escHtml(r.pacing_status)}</span></td>
+            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${r.days_since_activity===null?'No activity':r.days_since_activity+'d ago'}</td>
+            <td style="padding:8px;color:var(--text-muted)">›</td>
+        </tr>
+    `).join('');
+}
+
+function renderExchangeHeatmap(rows){
+    const el = document.getElementById('exHeatmapGrid');
+    if (!rows || !rows.length){ el.innerHTML = '<div style="color:var(--text-muted)">No agencies to show.</div>'; return; }
+    const colorFor = r => {
+        if (r.pacing_status === 'No Target') return '#4a4a52';
+        if (r.is_dormant) return '#7a3a52';
+        if (r.pacing_status === 'Ahead') return '#00c853';
+        if (r.pacing_status === 'On Track') return '#00acc1';
+        if (r.pacing_status === 'Needs Attention') return '#d99a00';
+        return '#e5395b';
+    };
+    el.innerHTML = rows.map(r => `
+        <div class="ex-heat-cell" style="background:${colorFor(r)}" onclick="openExchangeDrilldown('${escHtml(r.agency_code)}')" title="${escHtml(r.agency_name)} — ${r.realization_pct}%">
+            <span class="ex-heat-code">${escHtml(r.agency_code)}</span>
+            <span>${r.realization_pct}%</span>
+        </div>
+    `).join('');
+}
+
+async function toggleExchangeWatchlist(code){
+    try{
+        const r = await fetch('/api/exchange/watchlist/toggle', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({user: loggedUser, agency_code: code})
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to update watchlist');
+        if (exBoardData) exBoardData.watchlist = data.watchlist;
+        renderExchangeBoardTable(exBoardData.rows, data.watchlist);
+        if (exCurrentView==='watchlist') renderExchangeWatchlist(exBoardData.rows, data.watchlist);
+        ToastManager.show(data.action==='added' ? 'Pinned to watchlist' : 'Removed from watchlist', 'success', 1800);
+    } catch(e){
+        ToastManager.show('Watchlist update failed: ' + e.message, 'error');
+    }
+}
+
+async function openExchangeDrilldown(code){
+    const modal = document.getElementById('exDrilldownModal');
+    const body = document.getElementById('exDrilldownBody');
+    modal.style.display = 'flex';
+    body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</div>';
+    logFrontendAction("EXCHANGE_DRILLDOWN_OPEN", code);
+
+    try{
+        const r = await fetch(`/api/exchange/agency/${encodeURIComponent(code)}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Failed to load agency detail');
+        renderExchangeDrilldown(d);
+    } catch(e){
+        body.innerHTML = `<div style="color:var(--accent-rose);padding:20px">${escHtml(e.message)}</div>`;
+    }
+}
+
+function closeExchangeDrilldown(){
+    document.getElementById('exDrilldownModal').style.display = 'none';
+    if (charts.exTrend) { charts.exTrend.destroy(); delete charts.exTrend; }
+    if (charts.exMix)   { charts.exMix.destroy();   delete charts.exMix; }
+}
+
+function renderExchangeDrilldown(d){
+    const body = document.getElementById('exDrilldownBody');
+    const gaugeColor = d.realization_pct>=100?'var(--accent-green)':d.realization_pct>=80?'var(--accent-amber)':'var(--accent-rose)';
+    const inWatchlist = (exBoardData?.watchlist || []).includes(d.agency_code);
+
+    body.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-right:24px">
+            <div>
+                <h3 style="margin:0;color:var(--accent-cyan)">${escHtml(d.agency_name)}</h3>
+                <div style="color:var(--text-muted);font-size:.85rem">${escHtml(d.agency_code)} · ${escHtml(d.acm)} · ${escHtml(d.region)}</div>
+            </div>
+            <button class="ex-star-btn ${inWatchlist?'starred':''}" style="font-size:1.4rem" onclick="toggleExchangeWatchlist('${escHtml(d.agency_code)}');this.classList.toggle('starred')" title="Pin to watchlist">★</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+            <div class="ex-kpi"><div class="ex-kpi-label">Realization (pace-adjusted)</div><div class="ex-kpi-val" style="color:${gaugeColor}">${d.realization_pct}%</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Health</div><div class="ex-kpi-val">${d.health_status} (${d.health_score})</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">YTD Target</div><div class="ex-kpi-val">${Math.round(d.ytd_target).toLocaleString()}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Total Points</div><div class="ex-kpi-val">${Math.round(d.total_points).toLocaleString()}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Point Balance</div><div class="ex-kpi-val">${Math.round(d.point_balance).toLocaleString()}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Projected Year-End (pace est.)</div><div class="ex-kpi-val">${Math.round(d.projected_eoy_points).toLocaleString()}</div></div>
+        </div>
+
+        <div style="color:var(--text-muted);font-size:.82rem;margin-bottom:16px">
+            Last activity: ${d.last_activity_date ? escHtml(d.last_activity_date) + ' (' + d.days_since_activity + 'd ago)' : 'No recorded activity'}
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px">
+            <div><h5 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">Monthly Activity Trend</h5><canvas id="exTrendChart" height="160"></canvas></div>
+            <div><h5 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">Request Type Mix</h5><canvas id="exMixChart" height="160"></canvas></div>
+        </div>
+
+        <h5 style="font-size:.85rem;color:var(--accent-cyan);margin-bottom:10px">Recent Activity</h5>
+        <div style="max-height:220px;overflow-y:auto">
+            ${d.recent_activity.length ? d.recent_activity.map(a => `
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:.82rem">
+                    <span>${escHtml(a.request_type||'—')}</span>
+                    <span style="color:var(--text-muted)">${escHtml(a.status||'—')}</span>
+                    <span style="color:var(--text-muted)">${escHtml(a.date)}</span>
+                </div>
+            `).join('') : '<div style="color:var(--text-muted);font-size:.82rem;padding:10px 0">No recent activity.</div>'}
+        </div>
+    `;
+
+    requestAnimationFrame(() => {
+        if (charts.exTrend) charts.exTrend.destroy();
+        if (charts.exMix) charts.exMix.destroy();
+
+        const trendCtx = document.getElementById('exTrendChart');
+        if (trendCtx){
+            charts.exTrend = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: d.monthly_activity_trend.map(m => m.month),
+                    datasets: [{ label: 'Requests', data: d.monthly_activity_trend.map(m => m.count),
+                        borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,.12)', fill: true, tension: .3 }]
+                },
+                options: { plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{precision:0} } } }
+            });
+        }
+        const mixCtx = document.getElementById('exMixChart');
+        if (mixCtx){
+            const labels = Object.keys(d.request_type_mix);
+            const vals = Object.values(d.request_type_mix);
+            charts.exMix = new Chart(mixCtx, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data: vals, backgroundColor: ['#00d4ff','#00e676','#ffb800','#ff4d6d','#a78bfa','#4ade80','#f472b6'] }] },
+                options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}}} }
+            });
+        }
+    });
 }
 
 async function runAcmCompare(){
@@ -5264,7 +5795,16 @@ async function executeBulkExport(endpoint, params, fileNamePrefix, isExcel, cust
         const labels = cols.map(c => EXPORT_COL_LABELS[c] || c);
         
         if (isExcel && window.XLSX) {
-            const ws = XLSX.utils.json_to_sheet(records, {header: cols});
+            // json_to_sheet's `header` option only controls the ORDER/labels of the
+            // listed columns -- it does NOT drop other keys present on the record
+            // objects (e.g. health_score/monthly_target/ytd_target sneaking back in).
+            // Explicitly project each record down to just the requested columns first.
+            const filteredRecords = records.map(r => {
+                const o = {};
+                cols.forEach(c => { o[c] = r[c] ?? ''; });
+                return o;
+            });
+            const ws = XLSX.utils.json_to_sheet(filteredRecords, {header: cols});
             XLSX.utils.sheet_add_aoa(ws, [labels], {origin: 'A1'});
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Export");
@@ -5522,6 +6062,10 @@ function configureSidebarAndCards() {
     else {
         if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
         if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
+    }
+
+    if (!hasExactMod('analytics_exchange') && !hasExactMod('analytics') && !isAdmin) {
+        document.getElementById('navGrpExchange').style.display = 'none';
     }
 
     if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
