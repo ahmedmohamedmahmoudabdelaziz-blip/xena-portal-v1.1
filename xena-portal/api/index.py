@@ -41,7 +41,7 @@ SUBMITTED_BY_FIELD_NAME = "Submitted By"
 
 PK_ACMS = {"nabeel","hasseb","haseeb","enzo","farooq","mubeen","cruz","ehtisham",
             "usama","sehar ch","hamza malik","zohaib","eagle","leo","berlin"}
-IN_ACMS  = {"holy","vihan","shivam","ravikant","ansh","rocky","bella"}
+IN_ACMS  = {"holy","vihan","shivam","rudra","ravikant","ansh","rocky","bella"}
 
 CACHE_TTL_REALTIME   = 300    
 CACHE_TTL_HISTORICAL = 3600   
