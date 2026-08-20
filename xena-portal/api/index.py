@@ -91,6 +91,22 @@ EXCLUDED_UPDATE_FIELDS = {
     "Assigned Time", "Completion Time", "Last Retry Time", "Ready to Archive", "Reward"
 }
 
+# ════════════════════════════════════════════════════════════════════
+# AGENCY EXCHANGE (target realization board) — config
+# ════════════════════════════════════════════════════════════════════
+# An agency with no Requests-table activity in this many days is flagged "Dormant"
+# on the board, independent of its pacing status (an agency can be on-pace but
+# still dormant if it front-loaded activity earlier in the month).
+EXCHANGE_DORMANT_DAYS = 14
+# How many days of daily point-total snapshots we keep in Redis for the "Movers"
+# (gainers/decliners) panel. Snapshots are tiny (agency_code -> total_points), one
+# per day, so this is cheap even at a few hundred agencies.
+EXCHANGE_HISTORY_MAX_DAYS = 35
+REDIS_KEY_EXCHANGE_HISTORY_PREFIX = "xena:exchange:hist:"
+REDIS_KEY_EXCHANGE_HISTORY_INDEX  = "xena:exchange:hist:index"
+REDIS_KEY_EXCHANGE_LAST_SNAPSHOT  = "xena:exchange:last_snapshot_date"
+REDIS_KEY_WATCHLIST_PREFIX        = "xena:exchange:watchlist:"
+
 MONTHLY_ALLOCATOR_LIMITS = {
     "trend card": 10, "traffic card": 50, "30 mic 15 days": 999, "30 mic 30 days": 999,
     "normal short id ( 2 levels above ) 15 days": 999, "normal short id ( 2 levels above ) 30 days": 999,
@@ -2805,6 +2821,17 @@ def sync_refresh():
         futures = [executor.submit(_background_sync_requests_table), executor.submit(_background_sync_points_table)]
         for f in futures: f.result()
 
+    # Piggyback the Agency Exchange's daily points snapshot on the existing cron
+    # cadence, so Movers history accrues reliably even if nobody opens the board
+    # that day. Cheap no-op if today's snapshot was already taken.
+    try:
+        with _bg_points_lock:
+            pts_items_for_snapshot = list(_bg_points_sync["items"])
+        if pts_items_for_snapshot:
+            append_exchange_daily_snapshot(pts_items_for_snapshot)
+    except Exception as e:
+        logger.warn("exchange_snapshot_from_cron_failed", error=str(e))
+
     with _bg_sync_lock:
         req_count, req_updated, req_complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
     with _bg_points_lock:
@@ -3684,6 +3711,471 @@ def compute_executive_metrics(points_items, acm_filter, region_filter, allowed_a
         "diagnostics": diagnostics,
         "is_estimated_trend": True,
     }
+
+# ════════════════════════════════════════════════════════════════════
+# AGENCY EXCHANGE — "stock exchange" board for ACMs: which agencies are pacing
+# well against their fixed YTD target, which are lagging, which have gone quiet.
+# Deliberately has NOTHING to do with the Points/Rewards system (Point Balance,
+# Used Points, allocator, privileges) beyond displaying it for context — this is
+# pure target-realization analytics, built entirely on data already fetched by
+# the existing Points/Requests snapshot machinery. No new Feishu calls.
+# ════════════════════════════════════════════════════════════════════
+
+def build_agency_activity_map(requests_items):
+    """Groups the Requests table snapshot by Agency Code to answer: when did this
+    agency last have any activity, and how much recent volume have they had. Feeds
+    the Exchange board's dormancy detection and request-volume signals. Runs off
+    the same full snapshot already kept warm by the background sync -- no extra
+    Feishu calls."""
+    activity = {}
+    now_date = cairo_now().date()
+    for item in requests_items:
+        f = item.get("fields", {})
+        code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        if not code:
+            continue
+        d = parse_feishu_date(get_field_local(f, "Submitted on Copy", "Submitted on", "Created Time"))
+        if not d:
+            continue
+        entry = activity.setdefault(code, {"last_date": None, "count_30d": 0, "count_90d": 0, "total_count": 0})
+        entry["total_count"] += 1
+        days_ago = (now_date - d.date()).days
+        if 0 <= days_ago <= 30: entry["count_30d"] += 1
+        if 0 <= days_ago <= 90: entry["count_90d"] += 1
+        if entry["last_date"] is None or d.date() > entry["last_date"]:
+            entry["last_date"] = d.date()
+    return activity
+
+def compute_exchange_board_rows(points_items, activity_map, acm_filter, region_filter, allowed_acms, allowed_regs):
+    """One row per agency: target realization, pace status, health, and activity
+    recency. `realization_pct` is already pace-correct at month granularity --
+    parse_monthly_target_field() sums the target only through the current elapsed
+    month, so 100% here genuinely means "on pace today", not "on pace by Dec 31"."""
+    now_date = cairo_now().date()
+    elapsed_months = cairo_now().month
+    rows = []
+    for item in points_items:
+        f = item.get("fields", {})
+        agency_code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        if not agency_code:
+            continue
+        agency_name = extract_field_text(get_field_local(f, "Agency Name", "Name")).strip()
+        acm = extract_field_text(get_field_local(f, "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member")).strip()
+        region = 'PK' if acm.lower() in PK_ACMS else ('IN' if acm.lower() in IN_ACMS else clean(get_field_local(f, "Region")).upper())
+
+        if "all" not in allowed_acms and acm.lower() not in [a.lower() for a in allowed_acms]: continue
+        if "all" not in allowed_regs and region.lower() not in [r.lower() for r in allowed_regs]: continue
+        if acm_filter != "all" and acm.lower() != acm_filter: continue
+        if region_filter != "all" and region.lower() != region_filter: continue
+
+        total_pts = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
+        used_pts  = parse_float_safe(extract_field_text(get_field_local(f, "Used Points")))
+        balance   = parse_float_safe(extract_field_text(get_field_local(f, "Point Balance")))
+        if balance == 0 and total_pts > 0: balance = total_pts - used_pts
+        _monthly, ytd_target = parse_monthly_target_field(get_field_local(f, "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check"))
+
+        health_score = 95
+        if total_pts > 0:
+            utilization = used_pts / total_pts
+            if utilization > 0.90: health_score = 40
+            elif utilization > 0.70: health_score = 70
+        elif total_pts == 0:
+            health_score = 0
+
+        realization_pct = round((total_pts / ytd_target * 100) if ytd_target > 0 else 0, 1)
+        variance = round(total_pts - ytd_target, 0)
+
+        act = activity_map.get(agency_code, {})
+        last_date = act.get("last_date")
+        days_since_activity = (now_date - last_date).days if last_date else None
+        is_dormant = (last_date is None) or (days_since_activity >= EXCHANGE_DORMANT_DAYS)
+
+        if ytd_target <= 0:            pacing_status = "No Target"
+        elif realization_pct >= 110:   pacing_status = "Ahead"
+        elif realization_pct >= 95:    pacing_status = "On Track"
+        elif realization_pct >= 80:    pacing_status = "Needs Attention"
+        else:                          pacing_status = "Lagging"
+
+        # Simple pace-based projection: NOT a claim about the actual full-year
+        # target (future months may not have a target value yet) -- purely "at the
+        # rate this agency is accumulating points, where do they land by Dec 31".
+        projected_eoy_points = round((total_pts / elapsed_months) * 12, 0) if elapsed_months > 0 else total_pts
+
+        rows.append({
+            "agency_code": agency_code, "agency_name": agency_name or agency_code,
+            "acm": acm.title(), "region": region.upper(),
+            "total_points": total_pts, "used_points": used_pts, "point_balance": balance,
+            "ytd_target": ytd_target, "realization_pct": realization_pct, "variance": variance,
+            "pacing_status": pacing_status, "health_score": health_score,
+            "is_dormant": is_dormant, "days_since_activity": days_since_activity,
+            "last_activity_date": last_date.strftime("%Y-%m-%d") if last_date else None,
+            "request_count_30d": act.get("count_30d", 0), "request_count_90d": act.get("count_90d", 0),
+            "projected_eoy_points": projected_eoy_points,
+        })
+    return rows
+
+def _exchange_row_matches_status(row, status):
+    status = (status or "").lower()
+    if status in ("", "all"):        return True
+    if status == "dormant":          return row["is_dormant"]
+    if status == "at_risk":          return row["pacing_status"] in ("Needs Attention", "Lagging")
+    if status == "ahead":            return row["pacing_status"] == "Ahead"
+    if status == "on_track":         return row["pacing_status"] == "On Track"
+    if status == "lagging":          return row["pacing_status"] == "Lagging"
+    if status == "needs_attention":  return row["pacing_status"] == "Needs Attention"
+    if status == "no_target":        return row["pacing_status"] == "No Target"
+    return True
+
+def build_exchange_kpi_strip(rows):
+    n = len(rows)
+    with_target = [r for r in rows if r["ytd_target"] > 0]
+    avg_realization = round(sum(r["realization_pct"] for r in with_target) / len(with_target), 1) if with_target else 0
+    return {
+        "agency_count": n,
+        "avg_realization_pct": avg_realization,
+        "total_target": round(sum(r["ytd_target"] for r in rows), 0),
+        "total_points": round(sum(r["total_points"] for r in rows), 0),
+        "total_balance": round(sum(r["point_balance"] for r in rows), 0),
+        "count_ahead":         sum(1 for r in rows if r["pacing_status"] == "Ahead"),
+        "count_on_track":      sum(1 for r in rows if r["pacing_status"] == "On Track"),
+        "count_needs_attention": sum(1 for r in rows if r["pacing_status"] == "Needs Attention"),
+        "count_lagging":       sum(1 for r in rows if r["pacing_status"] == "Lagging"),
+        "count_no_target":     sum(1 for r in rows if r["pacing_status"] == "No Target"),
+        "count_at_risk":       sum(1 for r in rows if r["pacing_status"] in ("Needs Attention", "Lagging")),
+        "count_dormant":       sum(1 for r in rows if r["is_dormant"]),
+    }
+
+def build_exchange_region_rollup(rows):
+    out = {}
+    for reg in ("PK", "IN"):
+        sub = [r for r in rows if r["region"] == reg]
+        wt = [r for r in sub if r["ytd_target"] > 0]
+        out[reg] = {
+            "agency_count": len(sub),
+            "avg_realization_pct": round(sum(r["realization_pct"] for r in wt) / len(wt), 1) if wt else 0,
+            "count_at_risk": sum(1 for r in sub if r["pacing_status"] in ("Needs Attention", "Lagging")),
+            "count_dormant": sum(1 for r in sub if r["is_dormant"]),
+            "total_points": round(sum(r["total_points"] for r in sub), 0),
+            "total_target": round(sum(r["ytd_target"] for r in sub), 0),
+        }
+    return out
+
+def generate_exchange_insights(rows, region_rollup):
+    """Plain-English rules engine over numbers already on the board -- no ML, no
+    invented signals. Each rule reads straight off realization_pct / variance /
+    is_dormant, which are computed the same way the board table shows them."""
+    insights = []
+    with_target = [r for r in rows if r["ytd_target"] > 0]
+
+    dormant = sorted([r for r in rows if r["is_dormant"]], key=lambda r: -(r["days_since_activity"] or 9999))
+    if dormant:
+        names = ", ".join(r["agency_name"] for r in dormant[:3])
+        extra = f" and {len(dormant)-3} more" if len(dormant) > 3 else ""
+        insights.append({"type": "dormant", "severity": "warning",
+            "text": f"{len(dormant)} agenc{'y' if len(dormant)==1 else 'ies'} had no activity in {EXCHANGE_DORMANT_DAYS}+ days: {names}{extra}."})
+
+    lagging = sorted([r for r in with_target if r["pacing_status"] in ("Lagging", "Needs Attention")], key=lambda r: r["variance"])
+    if lagging:
+        top = lagging[0]
+        gap_pct = round(100 - top["realization_pct"], 1)
+        insights.append({"type": "lagging", "severity": "warning",
+            "text": f"{top['agency_name']} is {gap_pct}% behind pace-adjusted target — the largest gap on the board."})
+        if len(lagging) > 1:
+            names = ", ".join(r["agency_name"] for r in lagging[1:3])
+            insights.append({"type": "lagging_more", "severity": "warning",
+                "text": f"Also trailing pace: {names}."})
+
+    ahead = [r for r in with_target if r["realization_pct"] >= 100]
+    if ahead:
+        best = max(ahead, key=lambda r: r["realization_pct"])
+        insights.append({"type": "ahead", "severity": "success",
+            "text": f"{best['agency_name']} is at {best['realization_pct']}% of pace-adjusted target — leading the board."})
+
+    pk, ind = region_rollup.get("PK", {}), region_rollup.get("IN", {})
+    if pk.get("agency_count") and ind.get("agency_count"):
+        pk_avg, in_avg = pk["avg_realization_pct"], ind["avg_realization_pct"]
+        if abs(pk_avg - in_avg) >= 5:
+            leader, laggard, lead_val, lag_val = ("PK", "IN", pk_avg, in_avg) if pk_avg > in_avg else ("IN", "PK", in_avg, pk_avg)
+            insights.append({"type": "region", "severity": "info",
+                "text": f"Region {leader} is pacing ahead of {laggard} this period ({lead_val}% vs {lag_val}% avg realization)."})
+
+    if not insights:
+        insights.append({"type": "stable", "severity": "info", "text": "No major flags right now — the board looks stable."})
+    return insights
+
+def append_exchange_daily_snapshot(points_items):
+    """Appends one compact {agency_code: total_points} row to Redis, once per
+    calendar day (Cairo time), so the Movers panel has real history to diff
+    against instead of guessing. No-ops if Redis isn't configured or if today's
+    snapshot was already taken (checked via a single cheap GET)."""
+    if not REDIS_ENABLED:
+        return
+    today_str = cairo_now().strftime("%Y-%m-%d")
+    last = redis_cmd("GET", REDIS_KEY_EXCHANGE_LAST_SNAPSHOT)
+    if last == today_str:
+        return
+    snap = {}
+    for item in points_items:
+        f = item.get("fields", {})
+        code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        if not code: continue
+        snap[code] = parse_float_safe(extract_field_text(get_field_local(f, "Total Points", "# Total Points")))
+    if not snap:
+        return
+    if redis_set_json(f"{REDIS_KEY_EXCHANGE_HISTORY_PREFIX}{today_str}", snap, ttl=EXCHANGE_HISTORY_MAX_DAYS * 86400):
+        idx = redis_get_json(REDIS_KEY_EXCHANGE_HISTORY_INDEX) or []
+        idx = sorted(set(idx + [today_str]))[-EXCHANGE_HISTORY_MAX_DAYS:]
+        redis_set_json(REDIS_KEY_EXCHANGE_HISTORY_INDEX, idx, ttl=EXCHANGE_HISTORY_MAX_DAYS * 86400)
+        redis_cmd("SET", REDIS_KEY_EXCHANGE_LAST_SNAPSHOT, today_str)
+
+def compute_exchange_movers(rows, lookback_days=7):
+    """Diffs today's board against the oldest snapshot within lookback_days to
+    find real gainers/decliners. Honestly reports when there isn't enough history
+    yet instead of fabricating trend data."""
+    if not REDIS_ENABLED:
+        return {"available": False, "reason": "History tracking requires Redis, which isn't configured on this deployment."}
+    idx = redis_get_json(REDIS_KEY_EXCHANGE_HISTORY_INDEX) or []
+    if len(idx) < 2:
+        return {"available": False, "reason": "Building history — check back in a day or two for movers."}
+
+    cutoff_str = (cairo_now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    candidates = [d for d in idx if d >= cutoff_str]
+    old_date = min(candidates) if candidates else min(idx)
+    if old_date == max(idx):
+        return {"available": False, "reason": "Building history — check back in a day or two for movers."}
+
+    old_snap = redis_get_json(f"{REDIS_KEY_EXCHANGE_HISTORY_PREFIX}{old_date}") or {}
+    movers = []
+    for row in rows:
+        old_val = old_snap.get(row["agency_code"])
+        if old_val is None:
+            continue
+        delta = row["total_points"] - old_val
+        pct = round((delta / old_val * 100), 1) if old_val > 0 else (100.0 if delta > 0 else 0.0)
+        if delta == 0:
+            continue
+        movers.append({"agency_code": row["agency_code"], "agency_name": row["agency_name"],
+                        "acm": row["acm"], "delta": round(delta, 0), "pct_change": pct,
+                        "total_points": row["total_points"]})
+
+    gainers   = sorted([m for m in movers if m["delta"] > 0], key=lambda m: -m["delta"])[:5]
+    decliners = sorted([m for m in movers if m["delta"] < 0], key=lambda m: m["delta"])[:5]
+    return {"available": True, "since_date": old_date, "gainers": gainers, "decliners": decliners}
+
+def _watchlist_key(user):
+    return f"{REDIS_KEY_WATCHLIST_PREFIX}{sanitize_text(user).strip().lower()}"
+
+_watchlist_memory_fallback = {}
+
+def get_exchange_watchlist(user):
+    if not user: return []
+    key = _watchlist_key(user)
+    if REDIS_ENABLED:
+        return redis_get_json(key) or []
+    return _watchlist_memory_fallback.get(key, [])
+
+def set_exchange_watchlist(user, codes):
+    key = _watchlist_key(user)
+    codes = list(dict.fromkeys([sanitize_agency_code(c) for c in codes if c]))[:150]
+    if REDIS_ENABLED:
+        redis_set_json(key, codes)
+    else:
+        _watchlist_memory_fallback[key] = codes
+    return codes
+
+@app.route('/api/exchange/board', methods=['GET', 'POST'])
+@rate_limit(*RATE_LIMIT_ANALYTICS)
+def exchange_board():
+    start = time.time()
+    body = request.json if request.method == 'POST' else request.args
+
+    user   = sanitize_text(body.get('user', ''))
+    email  = sanitize_text(body.get('email', ''))
+    scope  = sanitize_text(body.get('scope', 'mine')).strip().lower()   # 'mine' | 'all'
+    region = sanitize_text(body.get('region', 'All')).strip()
+    status = sanitize_text(body.get('status', 'all')).strip().lower()
+    search_q = sanitize_text(body.get('q', '')).strip().lower()
+    sort_by  = sanitize_text(body.get('sort', 'variance')).strip().lower()
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+
+    allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
+    allowed_regs = perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"])
+    region_filter = region.lower() if region.lower() != "all" else "all"
+
+    acm_filter = "all"
+    if scope != "all" and not perms.get("is_super_admin"):
+        acm_filter = user.strip().lower()
+
+    if MOCK_MODE:
+        points_items = []
+        for i in range(30):
+            rec = MockFeishuDB.generate_agency(str(40100 + i))[0]
+            rec["fields"]["Target whole check"] = " | ".join(str(random.randint(200, 2000)) for _ in range(cairo_now().month)) + " | N/A" * (12 - cairo_now().month)
+            points_items.append(rec)
+        requests_items = MockFeishuDB.generate_requests(300)
+    else:
+        points_items, _pts_complete, _pts_reason, _pts_cache = get_points_table_snapshot()
+        requests_items, _keys, _req_complete, _req_reason, _req_cache = get_requests_table_snapshot()
+
+    activity_map = build_agency_activity_map(requests_items)
+    rows = compute_exchange_board_rows(points_items, activity_map, acm_filter, region_filter, allowed_acms, allowed_regs)
+
+    if status != "all":
+        rows = [r for r in rows if _exchange_row_matches_status(r, status)]
+    if search_q:
+        rows = [r for r in rows if search_q in r["agency_name"].lower() or search_q in r["agency_code"].lower() or search_q in r["acm"].lower()]
+
+    sort_map = {
+        "variance":    lambda r: r["variance"],
+        "realization": lambda r: -r["realization_pct"],
+        "activity":    lambda r: -(r["days_since_activity"] if r["days_since_activity"] is not None else 9999) * -1,
+        "balance":     lambda r: -r["point_balance"],
+        "name":        lambda r: r["agency_name"].lower(),
+    }
+    rows.sort(key=sort_map.get(sort_by, sort_map["variance"]))
+
+    kpi_strip = build_exchange_kpi_strip(rows)
+    region_rollup = build_exchange_region_rollup(rows)
+    insights = generate_exchange_insights(rows, region_rollup)
+
+    if not MOCK_MODE:
+        try: append_exchange_daily_snapshot(points_items)
+        except Exception as e: logger.warn("exchange_snapshot_failed", error=str(e))
+    movers = compute_exchange_movers(rows)
+    watchlist = get_exchange_watchlist(user)
+
+    audit.log(user, "EXCHANGE_BOARD_VIEW", f"scope:{scope}|rows:{len(rows)}", ip=ip, severity="Info")
+    duration_ms = int((time.time() - start) * 1000)
+    return jsonify({
+        "rows": rows, "kpi_strip": kpi_strip, "region_rollup": region_rollup,
+        "insights": insights, "movers": movers, "watchlist": watchlist,
+        "scope": scope, "is_super_admin": perms.get("is_super_admin", False),
+        "generated_at": cairo_now().isoformat(), "duration_ms": duration_ms,
+    })
+
+@app.route('/api/exchange/agency/<code>', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def exchange_agency_detail(code):
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+
+    allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
+    allowed_regs = perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"])
+    code = sanitize_agency_code(code)
+
+    if MOCK_MODE:
+        points_items = MockFeishuDB.generate_agency(code)
+        requests_items = MockFeishuDB.generate_requests(80)
+    else:
+        points_items, _c, _r, _cache = get_points_table_snapshot()
+        requests_items, _k, _c2, _r2, _fc = get_requests_table_snapshot()
+
+    match = None
+    for item in points_items:
+        f = item.get("fields", {})
+        if extract_field_text(get_field_local(f, "Agency Code")).strip() == str(code).strip():
+            match = f
+            break
+    if not match:
+        return jsonify({"error": f"Agency {code} not found in the current snapshot."}), 404
+
+    acm = extract_field_text(get_field_local(match, "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member")).strip()
+    region = 'PK' if acm.lower() in PK_ACMS else ('IN' if acm.lower() in IN_ACMS else clean(get_field_local(match, "Region")).upper())
+
+    if allowed_acms and "all" not in allowed_acms and acm.lower() not in [a.lower() for a in allowed_acms]:
+        return jsonify({"error": "Access denied for this ACM."}), 403
+    if allowed_regs and "all" not in allowed_regs and region.lower() not in [r.lower() for r in allowed_regs]:
+        return jsonify({"error": "Access denied for this region."}), 403
+
+    total_pts = parse_float_safe(extract_field_text(get_field_local(match, "Total Points", "# Total Points")))
+    used_pts  = parse_float_safe(extract_field_text(get_field_local(match, "Used Points")))
+    balance   = parse_float_safe(extract_field_text(get_field_local(match, "Point Balance")))
+    if balance == 0 and total_pts > 0: balance = total_pts - used_pts
+    monthly_target, ytd_target = parse_monthly_target_field(get_field_local(match, "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check"))
+    realization_pct = round((total_pts / ytd_target * 100) if ytd_target > 0 else 0, 1)
+
+    monthly_counts, type_mix, dated = defaultdict(int), defaultdict(int), []
+    for item in requests_items:
+        f = item.get("fields", {})
+        r_code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        if r_code != str(code).strip():
+            continue
+        d = parse_feishu_date(get_field_local(f, "Submitted on Copy", "Submitted on", "Created Time"))
+        if not d:
+            continue
+        monthly_counts[d.strftime("%Y-%m")] += 1
+        rtype = extract_field_text(get_field_local(f, "Request Type", "Type")).strip().title()
+        if rtype: type_mix[rtype] += 1
+        dated.append((d, f))
+    dated.sort(key=lambda x: x[0], reverse=True)
+
+    recent_activity = [{
+        "date": d.strftime("%Y-%m-%d"),
+        "request_type": extract_field_text(get_field_local(f, "Request Type", "Type")),
+        "status": extract_field_text(get_field_local(f, "Status", "Request Status")),
+    } for d, f in dated[:15]]
+
+    last_activity_date = dated[0][0].strftime("%Y-%m-%d") if dated else None
+    days_since_activity = (cairo_now().date() - dated[0][0].date()).days if dated else None
+
+    elapsed_months = cairo_now().month
+    projected_eoy_points = round((total_pts / elapsed_months) * 12, 0) if elapsed_months > 0 else total_pts
+
+    health_score, health_status = 95, "Healthy"
+    if total_pts > 0:
+        util = used_pts / total_pts
+        if util > 0.90: health_score, health_status = 40, "Critical"
+        elif util > 0.70: health_score, health_status = 70, "At Risk"
+    elif total_pts == 0:
+        health_score, health_status = 0, "Inactive"
+
+    audit.log(user, "EXCHANGE_AGENCY_VIEW", code, ip=request.headers.get("X-Forwarded-For", ""), severity="Info")
+    return jsonify({
+        "agency_code": code,
+        "agency_name": extract_field_text(get_field_local(match, "Agency Name", "Name")) or code,
+        "acm": acm.title(), "region": region.upper(),
+        "total_points": total_pts, "used_points": used_pts, "point_balance": balance,
+        "ytd_target": ytd_target, "monthly_target": monthly_target,
+        "realization_pct": realization_pct, "health_score": health_score, "health_status": health_status,
+        "projected_eoy_points": projected_eoy_points,
+        "last_activity_date": last_activity_date, "days_since_activity": days_since_activity,
+        "monthly_activity_trend": [{"month": k, "count": v} for k, v in sorted(monthly_counts.items())],
+        "request_type_mix": dict(sorted(type_mix.items(), key=lambda x: -x[1])),
+        "recent_activity": recent_activity,
+    })
+
+@app.route('/api/exchange/watchlist', methods=['GET'])
+def get_exchange_watchlist_route():
+    user = sanitize_text(request.args.get('user', ''))
+    if not user:
+        return jsonify({"error": "Missing user"}), 400
+    return jsonify({"watchlist": get_exchange_watchlist(user)})
+
+@app.route('/api/exchange/watchlist/toggle', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def toggle_exchange_watchlist_route():
+    body = request.json or {}
+    user = sanitize_text(body.get('user', ''))
+    code = sanitize_agency_code(body.get('agency_code', ''))
+    if not user or not code:
+        return jsonify({"error": "Missing user or agency_code"}), 400
+    current = get_exchange_watchlist(user)
+    if code in current:
+        current.remove(code)
+        action = "removed"
+    else:
+        current.append(code)
+        action = "added"
+    current = set_exchange_watchlist(user, current)
+    audit.log(user, "EXCHANGE_WATCHLIST_TOGGLE", f"{action}:{code}", ip=request.headers.get("X-Forwarded-For", ""), severity="Info")
+    return jsonify({"watchlist": current, "action": action})
 
 @app.route('/api/cache/clear', methods=['POST'])
 def clear_cache():
