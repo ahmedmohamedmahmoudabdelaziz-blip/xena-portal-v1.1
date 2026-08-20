@@ -462,7 +462,6 @@
         .ex-status-Needs-Attention{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
         .ex-status-Lagging{background:rgba(255,77,109,.15);color:var(--accent-rose);border-color:rgba(255,77,109,.3)}
         .ex-status-No-Target{background:rgba(255,255,255,.08);color:var(--text-muted);border-color:var(--border)}
-        .ex-dormant-tag{color:var(--accent-rose);font-size:.72rem;font-weight:700;margin-left:6px}
         .ex-board-row{border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
         .ex-board-row:hover{background:var(--surface-hover,rgba(255,255,255,.03))}
         .ex-star-btn{background:transparent;border:none;cursor:pointer;font-size:1.05rem;color:var(--text-muted);line-height:1;padding:2px 4px}
@@ -1098,7 +1097,6 @@
                                         <option value="needs_attention">Needs Attention</option>
                                         <option value="lagging">Lagging</option>
                                         <option value="at_risk">At Risk (Needs Attn + Lagging)</option>
-                                        <option value="dormant">Dormant</option>
                                         <option value="no_target">No Target</option>
                                     </select>
                                 </div>
@@ -1107,7 +1105,6 @@
                                     <select id="exFilterSort" onchange="loadExchangeBoard()">
                                         <option value="variance">Worst Variance First</option>
                                         <option value="realization">Realization %</option>
-                                        <option value="activity">Least Recently Active</option>
                                         <option value="balance">Point Balance</option>
                                         <option value="name">Agency Name</option>
                                     </select>
@@ -1132,7 +1129,7 @@
                                             <th style="padding:10px 8px">Status</th>
                                             <th style="padding:10px 8px">Variance</th>
                                             <th style="padding:10px 8px">Health</th>
-                                            <th style="padding:10px 8px">Last Activity</th>
+                                            <th style="padding:10px 8px">Projected EOY</th>
                                             <th style="padding:10px 8px"></th>
                                         </tr>
                                     </thead>
@@ -1156,7 +1153,7 @@
                                     <thead>
                                         <tr style="text-align:left;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:.75rem;text-transform:uppercase">
                                             <th style="padding:10px 8px"></th><th style="padding:10px 8px">Agency</th><th style="padding:10px 8px">ACM / Region</th>
-                                            <th style="padding:10px 8px">Realization</th><th style="padding:10px 8px">Status</th><th style="padding:10px 8px">Last Activity</th><th style="padding:10px 8px"></th>
+                                            <th style="padding:10px 8px">Realization</th><th style="padding:10px 8px">Status</th><th style="padding:10px 8px">Projected EOY</th><th style="padding:10px 8px"></th>
                                         </tr>
                                     </thead>
                                     <tbody id="exWatchlistTbody"></tbody>
@@ -3531,7 +3528,7 @@ function renderExchangeKpiStrip(k){
         ['Ahead', k.count_ahead, 'var(--accent-green)'],
         ['On Track', k.count_on_track, 'var(--accent-cyan)'],
         ['At Risk', k.count_at_risk, 'var(--accent-amber)'],
-        ['Dormant', k.count_dormant, 'var(--accent-rose)'],
+        ['No Target', k.count_no_target, 'var(--text-muted)'],
         ['Total Balance', Math.round(k.total_balance).toLocaleString(), 'var(--text-primary)'],
     ];
     el.innerHTML = cards.map(([label,val,color])=>`
@@ -3553,7 +3550,7 @@ function renderExchangeRegionRollup(rollup){
                 <div><div style="font-size:1.3rem;font-weight:800;color:${color}">${r.avg_realization_pct}%</div><div style="font-size:.72rem;color:var(--text-muted)">avg realization</div></div>
                 <div style="text-align:right;font-size:.78rem;color:var(--text-muted)">
                     <div>${r.count_at_risk} at risk</div>
-                    <div>${r.count_dormant} dormant</div>
+                    <div>${Math.round(r.total_points).toLocaleString()} / ${Math.round(r.total_target).toLocaleString()} pts</div>
                 </div>
             </div>
         </div>`;
@@ -3621,11 +3618,10 @@ function renderExchangeBoardTable(rows, watchlist){
             <td style="padding:8px;font-weight:700">${r.realization_pct}%</td>
             <td style="padding:8px">
                 <span class="ex-status-pill ${_exStatusClass(r.pacing_status)}">${escHtml(r.pacing_status)}</span>
-                ${r.is_dormant ? '<span class="ex-dormant-tag">● dormant</span>' : ''}
             </td>
             <td style="padding:8px;color:${r.variance>=0?'var(--accent-green)':'var(--accent-rose)'}">${r.variance>=0?'+':''}${Math.round(r.variance).toLocaleString()}</td>
             <td style="padding:8px"><span class="ex-status-pill" style="background:${r.health_score>=85?'rgba(0,230,118,.15)':r.health_score>=60?'rgba(0,212,255,.15)':r.health_score>=40?'rgba(255,184,0,.15)':'rgba(255,77,109,.15)'};color:${r.health_score>=85?'var(--accent-green)':r.health_score>=60?'var(--accent-cyan)':r.health_score>=40?'var(--accent-amber)':'var(--accent-rose)'};border-color:currentColor">${r.health_score}</span></td>
-            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${r.days_since_activity===null?'No activity':r.days_since_activity===0?'Today':r.days_since_activity+'d ago'}</td>
+            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${Math.round(r.projected_eoy_points).toLocaleString()}</td>
             <td style="padding:8px;color:var(--text-muted)">›</td>
         </tr>
     `).join('');
@@ -3649,7 +3645,7 @@ function renderExchangeWatchlist(rows, watchlist){
             <td style="padding:8px;font-size:.8rem">${escHtml(r.acm)} · ${escHtml(r.region)}</td>
             <td style="padding:8px;font-weight:700">${r.realization_pct}%</td>
             <td style="padding:8px"><span class="ex-status-pill ${_exStatusClass(r.pacing_status)}">${escHtml(r.pacing_status)}</span></td>
-            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${r.days_since_activity===null?'No activity':r.days_since_activity+'d ago'}</td>
+            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${Math.round(r.projected_eoy_points).toLocaleString()}</td>
             <td style="padding:8px;color:var(--text-muted)">›</td>
         </tr>
     `).join('');
@@ -3660,7 +3656,6 @@ function renderExchangeHeatmap(rows){
     if (!rows || !rows.length){ el.innerHTML = '<div style="color:var(--text-muted)">No agencies to show.</div>'; return; }
     const colorFor = r => {
         if (r.pacing_status === 'No Target') return '#4a4a52';
-        if (r.is_dormant) return '#7a3a52';
         if (r.pacing_status === 'Ahead') return '#00c853';
         if (r.pacing_status === 'On Track') return '#00acc1';
         if (r.pacing_status === 'Needs Attention') return '#d99a00';
@@ -3710,8 +3705,7 @@ async function openExchangeDrilldown(code){
 
 function closeExchangeDrilldown(){
     document.getElementById('exDrilldownModal').style.display = 'none';
-    if (charts.exTrend) { charts.exTrend.destroy(); delete charts.exTrend; }
-    if (charts.exMix)   { charts.exMix.destroy();   delete charts.exMix; }
+    if (charts.exTarget) { charts.exTarget.destroy(); delete charts.exTarget; }
 }
 
 function renderExchangeDrilldown(d){
@@ -3737,51 +3731,33 @@ function renderExchangeDrilldown(d){
             <div class="ex-kpi"><div class="ex-kpi-label">Projected Year-End (pace est.)</div><div class="ex-kpi-val">${Math.round(d.projected_eoy_points).toLocaleString()}</div></div>
         </div>
 
+        ${d.current_month_target !== null && d.current_month_target !== undefined ? `
         <div style="color:var(--text-muted);font-size:.82rem;margin-bottom:16px">
-            Last activity: ${d.last_activity_date ? escHtml(d.last_activity_date) + ' (' + d.days_since_activity + 'd ago)' : 'No recorded activity'}
-        </div>
+            This month's target: ${Math.round(d.current_month_target).toLocaleString()} xcoins
+        </div>` : ''}
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px">
-            <div><h5 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">Monthly Activity Trend</h5><canvas id="exTrendChart" height="160"></canvas></div>
-            <div><h5 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">Request Type Mix</h5><canvas id="exMixChart" height="160"></canvas></div>
-        </div>
-
-        <h5 style="font-size:.85rem;color:var(--accent-cyan);margin-bottom:10px">Recent Activity</h5>
-        <div style="max-height:220px;overflow-y:auto">
-            ${d.recent_activity.length ? d.recent_activity.map(a => `
-                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:.82rem">
-                    <span>${escHtml(a.request_type||'—')}</span>
-                    <span style="color:var(--text-muted)">${escHtml(a.status||'—')}</span>
-                    <span style="color:var(--text-muted)">${escHtml(a.date)}</span>
-                </div>
-            `).join('') : '<div style="color:var(--text-muted);font-size:.82rem;padding:10px 0">No recent activity.</div>'}
-        </div>
+        <h5 style="font-size:.85rem;color:var(--accent-cyan);margin-bottom:10px">Monthly Target Breakdown</h5>
+        <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">Bars are this agency's target for each month (100k xcoins per base point). The dashed line is where cumulative Total Points sits right now, so you can see visually how many months of target it already covers.</p>
+        <div style="margin-bottom:20px"><canvas id="exTargetChart" height="140"></canvas></div>
     `;
 
     requestAnimationFrame(() => {
-        if (charts.exTrend) charts.exTrend.destroy();
-        if (charts.exMix) charts.exMix.destroy();
+        if (charts.exTarget) { charts.exTarget.destroy(); delete charts.exTarget; }
 
-        const trendCtx = document.getElementById('exTrendChart');
-        if (trendCtx){
-            charts.exTrend = new Chart(trendCtx, {
-                type: 'line',
+        const targetCtx = document.getElementById('exTargetChart');
+        if (targetCtx){
+            const labels = d.monthly_target.map(m => m.month);
+            const values = d.monthly_target.map(m => m.status === 'value' ? m.value : null);
+            charts.exTarget = new Chart(targetCtx, {
                 data: {
-                    labels: d.monthly_activity_trend.map(m => m.month),
-                    datasets: [{ label: 'Requests', data: d.monthly_activity_trend.map(m => m.count),
-                        borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,.12)', fill: true, tension: .3 }]
+                    labels,
+                    datasets: [
+                        { type: 'bar', label: 'Monthly Target', data: values, backgroundColor: '#00d4ff88', borderRadius: 4 },
+                        { type: 'line', label: 'Total Points (cumulative)', data: labels.map(() => d.total_points),
+                            borderColor: '#ff4d6d', borderDash: [6,4], pointRadius: 0, borderWidth: 2 }
+                    ]
                 },
-                options: { plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{precision:0} } } }
-            });
-        }
-        const mixCtx = document.getElementById('exMixChart');
-        if (mixCtx){
-            const labels = Object.keys(d.request_type_mix);
-            const vals = Object.values(d.request_type_mix);
-            charts.exMix = new Chart(mixCtx, {
-                type: 'doughnut',
-                data: { labels, datasets: [{ data: vals, backgroundColor: ['#00d4ff','#00e676','#ffb800','#ff4d6d','#a78bfa','#4ade80','#f472b6'] }] },
-                options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}}} }
+                options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}}}, scales:{ y:{ beginAtZero:true } } }
             });
         }
     });
