@@ -1007,6 +1007,18 @@
                             <div id="cmpExecKpiRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px"></div>
                             <div id="cmpExecNoTargetNote" style="display:none;color:var(--text-muted);font-size:.85rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:24px"></div>
 
+                            <!-- Top Performers spotlight + Movers highlight -->
+                            <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:24px">
+                                <div class="card" style="padding:16px">
+                                    <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🏆 Top Performers</h4>
+                                    <div id="cmpLeaderboard" style="display:flex;flex-direction:column;gap:8px"></div>
+                                </div>
+                                <div class="card" style="padding:16px">
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🔥 Movers</h4>
+                                    <div id="cmpMovers" style="display:flex;flex-direction:column;gap:8px"></div>
+                                </div>
+                            </div>
+
                             <!-- Tier 2: Core visual matrix -->
                             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px">
                                 <div class="card" style="padding:16px;grid-column:1/-1">
@@ -1025,6 +1037,29 @@
                                     <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🧭 Status Mix by Group</h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvStatusChart"></canvas></div>
                                 </div>
+                                <div class="card" style="padding:16px;grid-column:1/-1">
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">📊 Creations / BDs / Closings — Group by Group</h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvActivityChart"></canvas></div>
+                                </div>
+                            </div>
+
+                            <!-- Side-by-side Diff + Consistency Score -->
+                            <div class="card" style="padding:16px;margin-top:24px">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                                    <h4 style="color:var(--text);margin-bottom:0;font-size:.9rem">⚖️ Side-by-Side Diff</h4>
+                                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                        <select id="cmpDiffBaseline" onchange="renderCompareDiff()" style="max-width:180px"></select>
+                                        <span style="color:var(--text-muted);font-size:.8rem">vs</span>
+                                        <select id="cmpDiffCompare" onchange="renderCompareDiff()" style="max-width:180px"></select>
+                                    </div>
+                                </div>
+                                <div id="cmpDiffTableWrap" style="overflow-x:auto"></div>
+                            </div>
+
+                            <div class="card" style="padding:16px;margin-top:24px">
+                                <h4 style="color:var(--text);margin-bottom:4px;font-size:.9rem">📐 Consistency Score</h4>
+                                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:12px">How stable each metric is across the compared groups — a high score flags a group set that spiked once then collapsed rather than performing steadily.</p>
+                                <div id="cmpConsistency" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
                             </div>
 
                             <!-- Tier 3: Granular diagnostics table -->
@@ -1098,6 +1133,7 @@
                                         <option value="lagging">Lagging</option>
                                         <option value="at_risk">At Risk (Needs Attn + Lagging)</option>
                                         <option value="no_target">No Target</option>
+                                        <option value="downgrade_risk">Downgrade Risk ⚠️</option>
                                     </select>
                                 </div>
                                 <div class="control-group" style="min-width:140px;margin:0">
@@ -1125,9 +1161,10 @@
                                             <th style="padding:10px 8px"></th>
                                             <th style="padding:10px 8px">Agency</th>
                                             <th style="padding:10px 8px">ACM / Region</th>
-                                            <th style="padding:10px 8px">Realization</th>
+                                            <th style="padding:10px 8px">Achievement</th>
                                             <th style="padding:10px 8px">Status</th>
                                             <th style="padding:10px 8px">Variance</th>
+                                            <th style="padding:10px 8px">7d Trend</th>
                                             <th style="padding:10px 8px">Health</th>
                                             <th style="padding:10px 8px">Projected EOY</th>
                                             <th style="padding:10px 8px"></th>
@@ -1164,6 +1201,13 @@
                     </div>
 
                     <div>
+                        <!-- Needs a Push panel -->
+                        <div class="card" style="margin-bottom:18px">
+                            <h4 style="margin-bottom:4px;color:var(--accent-amber);font-size:.9rem">🎯 Needs a Push</h4>
+                            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:10px">Worst pace gap first, with the daily rate needed to still land on target by year end.</p>
+                            <div id="exNeedsPushPanel"></div>
+                        </div>
+
                         <!-- Movers panel -->
                         <div class="card" style="margin-bottom:18px">
                             <h4 style="margin-bottom:12px;color:var(--accent-cyan);font-size:.9rem">📈 Movers (last 7 days)</h4>
@@ -3383,9 +3427,192 @@ function renderCompareCharts(groups) {
             plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{color:'#fff',font:{weight:'bold',size:10}} },
             scales:{ x:{stacked:true,grid:{color:'#2a2c3f'}}, y:{stacked:true,grid:{display:false}} } }
     });
+
+    // ═══ Grouped activity: Creations / BDs / Closings side by side per group ═══
+    const activityCtx = document.getElementById('cmpAdvActivityChart');
+    if (charts['cmpAdvActivityChart']) charts['cmpAdvActivityChart'].destroy();
+    charts['cmpAdvActivityChart'] = new Chart(activityCtx, {
+        type: 'bar',
+        data: {
+            labels: groups.map(g=>g.label),
+            datasets: [
+                { label:'Creations', data: groups.map(g=>g.kpis.creations), backgroundColor:'#00d4ffcc', borderRadius:4 },
+                { label:'BD Creations', data: groups.map(g=>g.kpis.bds), backgroundColor:'#a78bfacc', borderRadius:4 },
+                { label:'Closings', data: groups.map(g=>g.kpis.closings), backgroundColor:'#00e676cc', borderRadius:4 },
+            ]
+        },
+        options: { responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{position:'top',labels:{color:'#8b8fa3'}}, datalabels:{display:false} },
+            scales:{ x:{grid:{display:false}}, y:{grid:{color:'#2a2c3f'},ticks:{precision:0}} } }
+    });
+
+    renderCompareLeaderboard(groups);
+    renderCompareMovers(groups);
+    renderCompareConsistency(groups);
+    populateCompareDiffSelectors(groups);
+    renderCompareDiff();
 }
 
-// ═══ Tier 3: Granular Diagnostics Table ═══
+// ═══ Compare enhancements: diff, growth %, consistency, leaderboard, movers ═══
+// All computed client-side from the same `groups` payload /api/compare already
+// returns -- no extra API calls, so switching the Baseline/Compare dropdowns is
+// instant and costs nothing extra on the backend.
+const CMP_METRIC_DEFS = [
+    { path: 'kpis.creations', label: 'Creations', higherBetter: true },
+    { path: 'kpis.bds', label: 'BD Creations', higherBetter: true },
+    { path: 'kpis.closings', label: 'Closings', higherBetter: true },
+    { path: 'closing_efficiency_pct', label: 'Closing Efficiency %', higherBetter: true, isPct: true },
+];
+const CMP_YTD_METRIC_DEFS = [
+    { path: 'ytd_metrics.realized_points', label: 'Realized Points', higherBetter: true },
+    { path: 'ytd_metrics.fulfillment_rate_pct', label: 'Fulfillment %', higherBetter: true, isPct: true },
+    { path: 'ytd_metrics.pacing_index', label: 'Pacing Index', higherBetter: true, isPct: true },
+];
+
+function _cmpGetMetric(group, path){
+    return path.split('.').reduce((v,k) => (v==null ? null : v[k]), group);
+}
+
+function _cmpMetricDefs(groups){
+    const withYtd = groups.every(g => g.ytd_metrics);
+    return withYtd ? CMP_METRIC_DEFS.concat(CMP_YTD_METRIC_DEFS) : CMP_METRIC_DEFS;
+}
+
+function _cmpFmt(val, isPct){
+    if (val === null || val === undefined) return '—';
+    return isPct ? `${Math.round(val*10)/10}%` : Math.round(val).toLocaleString();
+}
+
+function renderCompareLeaderboard(groups){
+    const el = document.getElementById('cmpLeaderboard');
+    if (!el || !groups.length) return;
+    const withYtd = groups.every(g => g.ytd_metrics);
+    const path = withYtd ? 'ytd_metrics.fulfillment_rate_pct' : 'kpis.creations';
+    const label = withYtd ? 'Fulfillment %' : 'Creations';
+    const isPct = withYtd;
+    const ranked = [...groups].sort((a,b) => (_cmpGetMetric(b,path)||0) - (_cmpGetMetric(a,path)||0));
+    const medals = ['🥇','🥈','🥉'];
+    el.innerHTML = ranked.slice(0,3).map((g,i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px">
+            <span>${medals[i]} <strong>${escHtml(g.label)}</strong></span>
+            <span style="color:var(--accent-cyan);font-weight:700">${_cmpFmt(_cmpGetMetric(g,path), isPct)}</span>
+        </div>
+    `).join('') + `<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px">Ranked by ${label}</div>`;
+}
+
+function renderCompareMovers(groups){
+    const el = document.getElementById('cmpMovers');
+    if (!el) return;
+    if (groups.length < 2){ el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem">Need at least 2 groups.</div>'; return; }
+    const defs = _cmpMetricDefs(groups);
+    const from = groups[0], to = groups[groups.length-1];
+    let best = null, worst = null;
+    defs.forEach(d => {
+        const a = _cmpGetMetric(from, d.path), b = _cmpGetMetric(to, d.path);
+        if (a===null || b===null || !d.higherBetter) return;
+        const growth = a !== 0 ? ((b-a)/Math.abs(a))*100 : (b>0?100:0);
+        const entry = { ...d, growth: Math.round(growth*10)/10, a, b };
+        if (!best || entry.growth > best.growth) best = entry;
+        if (!worst || entry.growth < worst.growth) worst = entry;
+    });
+    const rowsHtml = [];
+    if (best && best.growth > 0){
+        rowsHtml.push(`<div style="padding:8px 10px;background:rgba(0,230,118,.08);border-left:3px solid var(--accent-green);border-radius:6px">
+            <div style="font-weight:700;color:var(--accent-green)">📈 Biggest Improver</div>
+            <div style="font-size:.8rem">${escHtml(best.label)}: ${escHtml(from.label)} → ${escHtml(to.label)} <span style="color:var(--accent-green);font-weight:700">+${best.growth}%</span></div>
+        </div>`);
+    }
+    if (worst && worst.growth < 0){
+        rowsHtml.push(`<div style="padding:8px 10px;background:rgba(255,77,109,.08);border-left:3px solid var(--accent-rose);border-radius:6px">
+            <div style="font-weight:700;color:var(--accent-rose)">📉 Biggest Decliner</div>
+            <div style="font-size:.8rem">${escHtml(worst.label)}: ${escHtml(from.label)} → ${escHtml(to.label)} <span style="color:var(--accent-rose);font-weight:700">${worst.growth}%</span></div>
+        </div>`);
+    }
+    el.innerHTML = rowsHtml.length ? rowsHtml.join('') : '<div style="color:var(--text-muted);font-size:.82rem">No significant movement between groups.</div>';
+}
+
+function renderCompareConsistency(groups){
+    const el = document.getElementById('cmpConsistency');
+    if (!el) return;
+    if (groups.length < 2){ el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem">Need at least 2 groups to measure consistency.</div>'; return; }
+    const defs = _cmpMetricDefs(groups);
+    const cards = defs.map(d => {
+        const values = groups.map(g => _cmpGetMetric(g, d.path)).filter(v => v !== null && v !== undefined);
+        if (values.length < 2) return null;
+        const mean = values.reduce((s,v)=>s+v,0) / values.length;
+        const variance = values.reduce((s,v)=>s+Math.pow(v-mean,2),0) / values.length;
+        const stdDev = Math.sqrt(variance);
+        const cv = mean !== 0 ? Math.round((stdDev/Math.abs(mean))*1000)/10 : 0;
+        const isVolatile = cv >= 35;
+        return `<div class="ex-kpi" style="border-left:3px solid ${isVolatile?'var(--accent-rose)':'var(--accent-green)'}">
+            <div class="ex-kpi-label">${escHtml(d.label)}</div>
+            <div class="ex-kpi-val" style="font-size:1.1rem;color:${isVolatile?'var(--accent-rose)':'var(--accent-green)'}">${cv}% CV</div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${isVolatile ? '⚠️ Volatile — spikes then drops' : '✓ Stable across groups'}</div>
+        </div>`;
+    }).filter(Boolean);
+    el.innerHTML = cards.length ? cards.join('') : '<div style="color:var(--text-muted);font-size:.82rem">Not enough data.</div>';
+}
+
+function populateCompareDiffSelectors(groups){
+    const baseSel = document.getElementById('cmpDiffBaseline');
+    const cmpSel = document.getElementById('cmpDiffCompare');
+    if (!baseSel || !cmpSel) return;
+    const opts = groups.map((g,i) => `<option value="${i}">${escHtml(g.label)}</option>`).join('');
+    baseSel.innerHTML = opts;
+    cmpSel.innerHTML = opts;
+    baseSel.value = 0;
+    cmpSel.value = groups.length > 1 ? groups.length - 1 : 0;
+}
+
+function renderCompareDiff(){
+    const groups = window.__lastCompareGroups || [];
+    const wrap = document.getElementById('cmpDiffTableWrap');
+    if (!wrap || groups.length < 2) { if(wrap) wrap.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem">Run a comparison with at least 2 groups.</div>'; return; }
+    const baseIdx = Number(document.getElementById('cmpDiffBaseline')?.value || 0);
+    const cmpIdx = Number(document.getElementById('cmpDiffCompare')?.value || 1);
+    const a = groups[baseIdx], b = groups[cmpIdx];
+    if (!a || !b) return;
+    const defs = _cmpMetricDefs(groups);
+    const rows = defs.map(d => {
+        const aVal = _cmpGetMetric(a, d.path), bVal = _cmpGetMetric(b, d.path);
+        if (aVal === null || bVal === null) return null;
+        const delta = bVal - aVal;
+        const growth = aVal !== 0 ? (delta/Math.abs(aVal))*100 : (bVal>0?100:0);
+        const improved = d.higherBetter ? delta > 0 : delta < 0;
+        const flat = Math.abs(growth) < 0.05;
+        return { ...d, aVal, bVal, delta, growth: Math.round(growth*10)/10, improved, flat };
+    }).filter(Boolean);
+
+    wrap.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+            <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:.75rem;text-transform:uppercase">
+                    <th style="padding:8px">Metric</th>
+                    <th style="padding:8px">${escHtml(a.label)}</th>
+                    <th style="padding:8px">${escHtml(b.label)}</th>
+                    <th style="padding:8px">Δ</th>
+                    <th style="padding:8px">Growth %</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(r => `
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:8px">${escHtml(r.label)}</td>
+                        <td style="padding:8px">${_cmpFmt(r.aVal, r.isPct)}</td>
+                        <td style="padding:8px">${_cmpFmt(r.bVal, r.isPct)}</td>
+                        <td style="padding:8px;color:${r.delta>=0?'var(--accent-green)':'var(--accent-rose)'}">${r.delta>=0?'+':''}${_cmpFmt(r.delta, r.isPct)}</td>
+                        <td style="padding:8px">
+                            <span style="color:${r.flat?'var(--text-muted)':r.improved?'var(--accent-green)':'var(--accent-rose)'};font-weight:700">
+                                ${r.flat ? '—' : (r.improved ? '📈 ' : '📉 ') + (r.growth>=0?'+':'') + r.growth + '%'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>`;
+}
+
+
 function renderExecDiagnosticsTable() {
     const groups = window.__lastCompareGroups || [];
     const withYtd = groups.filter(g => g.ytd_metrics && g.diagnostics);
@@ -3451,6 +3678,34 @@ function renderExecDiagnosticsTable() {
 // ════════════════════════════════════════════════════════════════════
 // AGENCY EXCHANGE — frontend module
 // ════════════════════════════════════════════════════════════════════
+const POINT_TO_XCOIN = 100000;
+
+function formatXcoins(points){
+    const n = Number(points) || 0;
+    const xcoins = n * POINT_TO_XCOIN;
+    const sign = xcoins < 0 ? '-' : '';
+    const abs = Math.abs(xcoins);
+    if (abs >= 1_000_000) return sign + (abs / 1_000_000).toFixed(1) + "M XC";
+    if (abs >= 1_000) return sign + (abs / 1_000).toFixed(0) + "K XC";
+    return sign + abs.toLocaleString() + " XC";
+}
+
+function sparklineSvg(values, color){
+    if (!values || values.length < 2) return '<span style="color:var(--text-muted);font-size:.7rem">—</span>';
+    const w = 70, h = 24, pad = 2;
+    const min = Math.min(...values), max = Math.max(...values);
+    const range = (max - min) || 1;
+    const pts = values.map((v,i) => {
+        const x = pad + (i / (values.length - 1)) * (w - pad*2);
+        const y = h - pad - ((v - min) / range) * (h - pad*2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    const rising = values[values.length-1] >= values[0];
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <polyline points="${pts}" fill="none" stroke="${color || (rising ? 'var(--accent-green)' : 'var(--accent-rose)')}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+}
+
 let exBoardData = null;   // last /api/exchange/board response
 let exCurrentView = 'board';
 let exSearchTimer = null;
@@ -3506,10 +3761,15 @@ async function loadExchangeBoard(){
         document.getElementById('exGeneratedAt').textContent = 'Updated ' + new Date(data.generated_at).toLocaleTimeString();
         if (data.is_super_admin) document.getElementById('exScopeWrap').style.display = '';
 
+        if (data.stop_reason && String(data.stop_reason).startsWith('stale')) {
+            ToastManager.show('Target Board data is from an older snapshot: ' + data.stop_reason, 'warning', 8000);
+        }
+
         renderExchangeKpiStrip(data.kpi_strip);
         renderExchangeRegionRollup(data.region_rollup);
         renderExchangeInsights(data.insights);
         renderExchangeMovers(data.movers);
+        renderExchangeNeedsPush(data.needs_push);
         renderExchangeBoardTable(data.rows, data.watchlist);
         if (exCurrentView==='heatmap') renderExchangeHeatmap(data.rows);
         if (exCurrentView==='watchlist') renderExchangeWatchlist(data.rows, data.watchlist);
@@ -3528,12 +3788,13 @@ function renderExchangeKpiStrip(k){
         ['Ahead', k.count_ahead, 'var(--accent-green)'],
         ['On Track', k.count_on_track, 'var(--accent-cyan)'],
         ['At Risk', k.count_at_risk, 'var(--accent-amber)'],
+        ['Downgrade Risk ⚠️', k.count_will_miss_target, 'var(--accent-rose)'],
         ['No Target', k.count_no_target, 'var(--text-muted)'],
-        ['Total Balance', Math.round(k.total_balance).toLocaleString(), 'var(--text-primary)'],
+        ['Total Balance', formatXcoins(k.total_balance), 'var(--text-primary)'],
     ];
     el.innerHTML = cards.map(([label,val,color])=>`
         <div class="ex-kpi"><div class="ex-kpi-label">${label}</div><div class="ex-kpi-val" style="color:${color}">${val}</div></div>
-    `).join('');
+    `).join('') + `<div style="grid-column:1/-1;font-size:.7rem;color:var(--text-muted);margin-top:-4px">1 point = 100K XCoins</div>`;
 }
 
 function renderExchangeRegionRollup(rollup){
@@ -3550,7 +3811,7 @@ function renderExchangeRegionRollup(rollup){
                 <div><div style="font-size:1.3rem;font-weight:800;color:${color}">${r.avg_realization_pct}%</div><div style="font-size:.72rem;color:var(--text-muted)">avg realization</div></div>
                 <div style="text-align:right;font-size:.78rem;color:var(--text-muted)">
                     <div>${r.count_at_risk} at risk</div>
-                    <div>${Math.round(r.total_points).toLocaleString()} / ${Math.round(r.total_target).toLocaleString()} pts</div>
+                    <div>${formatXcoins(r.total_points)} / ${formatXcoins(r.total_target)}</div>
                 </div>
             </div>
         </div>`;
@@ -3577,7 +3838,7 @@ function renderExchangeMovers(movers){
     const rowsFor = (list, positive) => list.length ? list.map(m => `
         <div class="ex-mover-row">
             <span style="cursor:pointer" onclick="openExchangeDrilldown('${escHtml(m.agency_code)}')">${escHtml(m.agency_name)}</span>
-            <span style="color:${positive?'var(--accent-green)':'var(--accent-rose)'};font-weight:700">${positive?'+':''}${Math.round(m.delta).toLocaleString()} <span style="font-weight:400;font-size:.75rem">(${m.pct_change}%)</span></span>
+            <span style="color:${positive?'var(--accent-green)':'var(--accent-rose)'};font-weight:700">${positive?'+':''}${formatXcoins(m.delta)} <span style="font-weight:400;font-size:.75rem">(${m.pct_change}%)</span></span>
         </div>
     `).join('') : '<div style="color:var(--text-muted);font-size:.78rem;padding:6px 0">None</div>';
 
@@ -3588,6 +3849,26 @@ function renderExchangeMovers(movers){
         <div style="margin:12px 0 6px;font-size:.78rem;font-weight:700;color:var(--accent-rose)">▼ Decliners</div>
         ${rowsFor(movers.decliners, false)}
     `;
+}
+
+function renderExchangeNeedsPush(list){
+    const el = document.getElementById('exNeedsPushPanel');
+    if (!el) return;
+    if (!list || !list.length){
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:.82rem;padding:10px 0">No agencies currently behind pace. 🎉</div>';
+        return;
+    }
+    el.innerHTML = list.map(a => `
+        <div class="ex-mover-row" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:4px" onclick="openExchangeDrilldown('${escHtml(a.agency_code)}')">
+            <div style="display:flex;justify-content:space-between">
+                <span style="font-weight:700">${escHtml(a.agency_name)} ${a.will_miss_target ? '<span style="color:var(--accent-rose)" title="Projected to miss implied full-year target">⚠️</span>' : ''}</span>
+                <span style="color:var(--accent-rose);font-weight:700">${a.realization_pct}%</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted)">
+                Behind by ${formatXcoins(a.gap_now)} · needs ${formatXcoins(a.required_daily_rate)}/day to catch up by year end
+            </div>
+        </div>
+    `).join('');
 }
 
 function _exStatusClass(status){ return 'ex-status-' + String(status).replace(/\s+/g,'-'); }
@@ -3615,13 +3896,20 @@ function renderExchangeBoardTable(rows, watchlist){
                 <div>${escHtml(r.acm)}</div>
                 <div style="color:var(--text-muted)">${escHtml(r.region)}</div>
             </td>
-            <td style="padding:8px;font-weight:700">${r.realization_pct}%</td>
+            <td style="padding:8px;min-width:110px">
+                <div style="font-weight:700;margin-bottom:3px">${r.realization_pct}%</div>
+                <div style="background:var(--border);border-radius:4px;height:5px;overflow:hidden">
+                    <div style="height:100%;width:${Math.min(100, r.realization_pct)}%;background:${r.realization_pct>=100?'var(--accent-green)':r.realization_pct>=80?'var(--accent-amber)':'var(--accent-rose)'}"></div>
+                </div>
+            </td>
             <td style="padding:8px">
                 <span class="ex-status-pill ${_exStatusClass(r.pacing_status)}">${escHtml(r.pacing_status)}</span>
+                ${r.will_miss_target ? '<span style="color:var(--accent-rose);margin-left:4px" title="Projected to miss implied full-year target">⚠️</span>' : ''}
             </td>
-            <td style="padding:8px;color:${r.variance>=0?'var(--accent-green)':'var(--accent-rose)'}">${r.variance>=0?'+':''}${Math.round(r.variance).toLocaleString()}</td>
+            <td style="padding:8px;color:${r.variance>=0?'var(--accent-green)':'var(--accent-rose)'}">${r.variance>=0?'+':''}${formatXcoins(r.variance)}</td>
+            <td style="padding:8px">${sparklineSvg(r.trend_7d)}</td>
             <td style="padding:8px"><span class="ex-status-pill" style="background:${r.health_score>=85?'rgba(0,230,118,.15)':r.health_score>=60?'rgba(0,212,255,.15)':r.health_score>=40?'rgba(255,184,0,.15)':'rgba(255,77,109,.15)'};color:${r.health_score>=85?'var(--accent-green)':r.health_score>=60?'var(--accent-cyan)':r.health_score>=40?'var(--accent-amber)':'var(--accent-rose)'};border-color:currentColor">${r.health_score}</span></td>
-            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${Math.round(r.projected_eoy_points).toLocaleString()}</td>
+            <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${formatXcoins(r.projected_eoy_points)}</td>
             <td style="padding:8px;color:var(--text-muted)">›</td>
         </tr>
     `).join('');
@@ -3716,28 +4004,42 @@ function renderExchangeDrilldown(d){
     body.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-right:24px">
             <div>
-                <h3 style="margin:0;color:var(--accent-cyan)">${escHtml(d.agency_name)}</h3>
+                <h3 style="margin:0;color:var(--accent-cyan)">${escHtml(d.agency_name)} ${d.will_miss_target ? '<span style="color:var(--accent-rose);font-size:1rem" title="Projected to miss implied full-year target">⚠️ Downgrade Risk</span>' : ''}</h3>
                 <div style="color:var(--text-muted);font-size:.85rem">${escHtml(d.agency_code)} · ${escHtml(d.acm)} · ${escHtml(d.region)}</div>
             </div>
             <button class="ex-star-btn ${inWatchlist?'starred':''}" style="font-size:1.4rem" onclick="toggleExchangeWatchlist('${escHtml(d.agency_code)}');this.classList.toggle('starred')" title="Pin to watchlist">★</button>
         </div>
 
+        <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted);margin-bottom:4px">
+                <span>Achievement</span><span style="color:${gaugeColor};font-weight:700">${d.realization_pct}%</span>
+            </div>
+            <div style="background:var(--border);border-radius:6px;height:10px;overflow:hidden">
+                <div style="height:100%;width:${Math.min(100, d.realization_pct)}%;background:${gaugeColor}"></div>
+            </div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-            <div class="ex-kpi"><div class="ex-kpi-label">Realization (pace-adjusted)</div><div class="ex-kpi-val" style="color:${gaugeColor}">${d.realization_pct}%</div></div>
             <div class="ex-kpi"><div class="ex-kpi-label">Health</div><div class="ex-kpi-val">${d.health_status} (${d.health_score})</div></div>
-            <div class="ex-kpi"><div class="ex-kpi-label">YTD Target</div><div class="ex-kpi-val">${Math.round(d.ytd_target).toLocaleString()}</div></div>
-            <div class="ex-kpi"><div class="ex-kpi-label">Total Points</div><div class="ex-kpi-val">${Math.round(d.total_points).toLocaleString()}</div></div>
-            <div class="ex-kpi"><div class="ex-kpi-label">Point Balance</div><div class="ex-kpi-val">${Math.round(d.point_balance).toLocaleString()}</div></div>
-            <div class="ex-kpi"><div class="ex-kpi-label">Projected Year-End (pace est.)</div><div class="ex-kpi-val">${Math.round(d.projected_eoy_points).toLocaleString()}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">YTD Target</div><div class="ex-kpi-val">${formatXcoins(d.ytd_target)}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Total (actual)</div><div class="ex-kpi-val">${formatXcoins(d.total_points)}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Point Balance</div><div class="ex-kpi-val">${formatXcoins(d.point_balance)}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Projected Year-End (pace est.)</div><div class="ex-kpi-val">${formatXcoins(d.projected_eoy_points)}</div></div>
+            <div class="ex-kpi"><div class="ex-kpi-label">Implied Full-Year Target</div><div class="ex-kpi-val">${d.implied_full_year_target ? formatXcoins(d.implied_full_year_target) : '—'}</div></div>
         </div>
 
         ${d.current_month_target !== null && d.current_month_target !== undefined ? `
         <div style="color:var(--text-muted);font-size:.82rem;margin-bottom:16px">
-            This month's target: ${Math.round(d.current_month_target).toLocaleString()} xcoins
+            This month's target: ${formatXcoins(d.current_month_target)}
+        </div>` : ''}
+
+        ${d.will_miss_target ? `
+        <div class="ex-insight ex-insight-warning" style="margin-bottom:16px">
+            <span>⚠️</span><span>At the current rate, this agency needs ${formatXcoins(d.required_daily_rate)}/day to still hit its implied full-year target by Dec 31.</span>
         </div>` : ''}
 
         <h5 style="font-size:.85rem;color:var(--accent-cyan);margin-bottom:10px">Monthly Target Breakdown</h5>
-        <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">Bars are this agency's target for each month (100k xcoins per base point). The dashed line is where cumulative Total Points sits right now, so you can see visually how many months of target it already covers.</p>
+        <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">Bars are this agency's target for each month, in XCoins. The dashed line is where cumulative actual points sit right now, so you can see visually how many months of target it already covers.</p>
         <div style="margin-bottom:20px"><canvas id="exTargetChart" height="140"></canvas></div>
     `;
 
@@ -3747,17 +4049,24 @@ function renderExchangeDrilldown(d){
         const targetCtx = document.getElementById('exTargetChart');
         if (targetCtx){
             const labels = d.monthly_target.map(m => m.month);
-            const values = d.monthly_target.map(m => m.status === 'value' ? m.value : null);
+            const values = d.monthly_target.map(m => m.status === 'value' ? m.value * POINT_TO_XCOIN : null);
+            const totalXc = d.total_points * POINT_TO_XCOIN;
             charts.exTarget = new Chart(targetCtx, {
                 data: {
                     labels,
                     datasets: [
                         { type: 'bar', label: 'Monthly Target', data: values, backgroundColor: '#00d4ff88', borderRadius: 4 },
-                        { type: 'line', label: 'Total Points (cumulative)', data: labels.map(() => d.total_points),
+                        { type: 'line', label: 'Actual (cumulative)', data: labels.map(() => totalXc),
                             borderColor: '#ff4d6d', borderDash: [6,4], pointRadius: 0, borderWidth: 2 }
                     ]
                 },
-                options: { plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}}}, scales:{ y:{ beginAtZero:true } } }
+                options: {
+                    plugins:{
+                        legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}},
+                        tooltip:{ callbacks:{ label: (ctx) => `${ctx.dataset.label}: ${formatXcoins(ctx.parsed.y / POINT_TO_XCOIN)}` } }
+                    },
+                    scales:{ y:{ beginAtZero:true, ticks:{ callback: (v) => formatXcoins(v / POINT_TO_XCOIN) } } }
+                }
             });
         }
     });
