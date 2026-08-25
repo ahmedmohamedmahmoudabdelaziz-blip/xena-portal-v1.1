@@ -1798,6 +1798,21 @@ def ensure_points_sync_started():
             threading.Thread(target=_background_sync_points_loop, daemon=True).start()
             _bg_points_thread_started = True
 
+def get_points_snapshot_from_public_file():
+    """Target Board (Agency Exchange) data source: ONLY the public build snapshot
+    (public/data/points.json), exactly like Search Records' preferred source.
+    Never touches Feishu, never touches the background sync / Redis chain that
+    get_points_table_snapshot() falls through to -- if the file is missing or
+    stale we say so honestly instead of silently fetching live."""
+    data = load_local_json("points.json")
+    if not data:
+        return None, False, "public/data/points.json not found on this deployment"
+    age = local_json_age_seconds("points.json")
+    note = ""
+    if age is not None and age > LOCAL_SNAPSHOT_MAX_AGE_SECONDS:
+        note = f"stale_snapshot ({int(age/3600)}h old)"
+    return data, True, note
+
 def get_points_table_snapshot():
     local_data = load_local_json("points.json")
     local_age = local_json_age_seconds("points.json")
@@ -3709,32 +3724,28 @@ def compute_executive_metrics(points_items, acm_filter, region_filter, allowed_a
     }
 
 # ════════════════════════════════════════════════════════════════════
-# AGENCY EXCHANGE — "stock exchange" board for ACMs: which agencies are pacing
-# well against their fixed YTD target, which are lagging, which have gone quiet.
-# Deliberately has NOTHING to do with the Points/Rewards system (Point Balance,
-# Used Points, allocator, privileges) beyond displaying it for context — this is
-# pure target-realization analytics, built entirely on data already fetched by
-# the existing Points/Requests snapshot machinery. No new Feishu calls.
-# ════════════════════════════════════════════════════════════════════
-
-# ════════════════════════════════════════════════════════════════════
-# AGENCY EXCHANGE — "stock exchange" board for ACMs: which agencies are pacing
-# well against their fixed YTD target, which are lagging. Built ENTIRELY from
-# the Points table snapshot -- the exact same cache-first get_points_table_snapshot()
-# that Analytics Report / Compare / Search Records already use, refreshed by the
-# same background cron. No Requests-table reads, no per-agency live Feishu calls,
-# no extra load on top of what those three pages already cost. Deliberately has
-# nothing to do with the Points/Rewards system (Point Balance, Used Points,
-# allocator) beyond displaying it for context -- this is pure target-realization
-# analytics.
+# AGENCY EXCHANGE ("Target Board") — stock-exchange-style board for ACMs: which
+# agencies are pacing well against their fixed YTD target, which are lagging.
+# Reads ONLY from the public build snapshot (get_points_snapshot_from_public_file,
+# defined just above get_points_table_snapshot) -- the same file Search Records
+# prefers -- so opening this page never triggers a live Feishu call. No
+# Requests-table reads either way. Deliberately has nothing to do with the
+# Points/Rewards system (Point Balance, Used Points, allocator) beyond
+# displaying it for context -- this is pure target-realization analytics.
 # ════════════════════════════════════════════════════════════════════
 
 def compute_exchange_board_rows(points_items, acm_filter, region_filter, allowed_acms, allowed_regs):
-    """One row per agency: target realization, pace status, health. `realization_pct`
-    is already pace-correct at month granularity -- parse_monthly_target_field()
-    sums the target only through the current elapsed month, so 100% here genuinely
-    means "on pace today", not "on pace by Dec 31"."""
-    elapsed_months = cairo_now().month
+    """One row per agency: target realization, pace status, health, and a
+    "will they miss their implied full-year target at this rate" flag.
+    `realization_pct` is already pace-correct at month granularity --
+    parse_monthly_target_field() sums the target only through the current elapsed
+    month, so 100% here genuinely means "on pace today", not "on pace by Dec 31".
+    All monetary-looking fields here are in raw POINTS -- multiply by 100,000 to
+    get XCoins. Conversion happens at display time in the frontend, not here."""
+    now = cairo_now()
+    elapsed_months = now.month
+    year_end = now.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=0)
+    days_left_in_year = max(1, (year_end.date() - now.date()).days)
     rows = []
     for item in points_items:
         f = item.get("fields", {})
@@ -3783,6 +3794,17 @@ def compute_exchange_board_rows(points_items, acm_filter, region_filter, allowed
         current_month_target = monthly[elapsed_months - 1]["value"] if elapsed_months <= 12 else None
         months_with_target = sum(1 for m in monthly if m["status"] == "value")
 
+        # "Downgrade risk" -- honest linear projection, same idea as compute_executive_metrics
+        # elsewhere in this file: extend this agency's average monthly target rate out
+        # to a full 12 months and see if their current pace would land short of it.
+        # Only computed when we actually have >=1 elapsed month with a real target value;
+        # otherwise there's nothing to project against.
+        elapsed_value_months = sum(1 for m in monthly[:elapsed_months] if m["status"] == "value")
+        implied_full_year_target = round((ytd_target / elapsed_value_months) * 12, 0) if elapsed_value_months > 0 else 0
+        will_miss_target = bool(implied_full_year_target > 0 and projected_eoy_points < implied_full_year_target)
+        gap_to_full_year = max(0.0, implied_full_year_target - total_pts) if implied_full_year_target > 0 else 0.0
+        required_daily_rate = round(gap_to_full_year / days_left_in_year, 2) if gap_to_full_year > 0 else 0.0
+
         rows.append({
             "agency_code": agency_code, "agency_name": agency_name or agency_code,
             "acm": acm.title(), "region": region.upper(),
@@ -3791,6 +3813,8 @@ def compute_exchange_board_rows(points_items, acm_filter, region_filter, allowed
             "pacing_status": pacing_status, "health_score": health_score,
             "projected_eoy_points": projected_eoy_points,
             "current_month_target": current_month_target, "months_with_target": months_with_target,
+            "implied_full_year_target": implied_full_year_target, "will_miss_target": will_miss_target,
+            "gap_to_full_year": round(gap_to_full_year, 0), "required_daily_rate": required_daily_rate,
         })
     return rows
 
@@ -3803,6 +3827,7 @@ def _exchange_row_matches_status(row, status):
     if status == "lagging":          return row["pacing_status"] == "Lagging"
     if status == "needs_attention":  return row["pacing_status"] == "Needs Attention"
     if status == "no_target":        return row["pacing_status"] == "No Target"
+    if status == "downgrade_risk":   return row["will_miss_target"]
     return True
 
 def build_exchange_kpi_strip(rows):
@@ -3821,6 +3846,7 @@ def build_exchange_kpi_strip(rows):
         "count_lagging":       sum(1 for r in rows if r["pacing_status"] == "Lagging"),
         "count_no_target":     sum(1 for r in rows if r["pacing_status"] == "No Target"),
         "count_at_risk":       sum(1 for r in rows if r["pacing_status"] in ("Needs Attention", "Lagging")),
+        "count_will_miss_target": sum(1 for r in rows if r["will_miss_target"]),
     }
 
 def build_exchange_region_rollup(rows):
@@ -3836,6 +3862,42 @@ def build_exchange_region_rollup(rows):
             "total_target": round(sum(r["ytd_target"] for r in sub), 0),
         }
     return out
+
+def build_exchange_needs_push(rows, limit=8):
+    """Worst-first list of agencies below pace, with the raw gap to their
+    pace-adjusted target and the daily rate (in points -- frontend converts to
+    XCoins) they'd need to sustain to still land on their implied full-year
+    target by Dec 31. Pure arithmetic over fields already on each row."""
+    candidates = [r for r in rows if r["pacing_status"] in ("Lagging", "Needs Attention") and r["ytd_target"] > 0]
+    candidates.sort(key=lambda r: r["variance"])
+    out = []
+    for r in candidates[:limit]:
+        out.append({
+            "agency_code": r["agency_code"], "agency_name": r["agency_name"],
+            "acm": r["acm"], "region": r["region"], "realization_pct": r["realization_pct"],
+            "gap_now": abs(round(r["variance"], 0)), "required_daily_rate": r["required_daily_rate"],
+            "will_miss_target": r["will_miss_target"],
+        })
+    return out
+
+def build_exchange_sparklines(rows, max_days=7):
+    """Cheap 'weekly trend' per agency for the board's mini sparklines. Reuses the
+    same Redis daily-snapshot history the Movers panel already maintains -- reads
+    at most `max_days` extra keys total (not per agency), and returns {} entirely
+    if Redis isn't configured or there isn't history yet. No Feishu, no
+    Requests-table, nothing beyond a handful of small Redis GETs."""
+    if not REDIS_ENABLED:
+        return {}
+    idx = redis_get_json(REDIS_KEY_EXCHANGE_HISTORY_INDEX) or []
+    if len(idx) < 2:
+        return {}
+    recent_dates = idx[-max_days:]
+    series = {}
+    for d in recent_dates:
+        snap = redis_get_json(f"{REDIS_KEY_EXCHANGE_HISTORY_PREFIX}{d}") or {}
+        for code, val in snap.items():
+            series.setdefault(code, []).append(val)
+    return series
 
 def generate_exchange_insights(rows, region_rollup, movers):
     """Plain-English rules engine over numbers already on the board -- no ML, no
@@ -3866,6 +3928,13 @@ def generate_exchange_insights(rows, region_rollup, movers):
     if no_target:
         insights.append({"type": "no_target", "severity": "info",
             "text": f"{len(no_target)} agenc{'y has' if len(no_target)==1 else 'ies have'} no target set yet, so they're excluded from realization averages."})
+
+    at_risk_downgrade = [r for r in with_target if r["will_miss_target"]]
+    if at_risk_downgrade:
+        names = ", ".join(r["agency_name"] for r in at_risk_downgrade[:3])
+        extra = f" and {len(at_risk_downgrade)-3} more" if len(at_risk_downgrade) > 3 else ""
+        insights.append({"type": "downgrade_risk", "severity": "warning",
+            "text": f"{len(at_risk_downgrade)} agenc{'y is' if len(at_risk_downgrade)==1 else 'ies are'} projected to miss their implied full-year target at the current rate: {names}{extra}."})
 
     if movers and movers.get("available"):
         if movers.get("decliners"):
@@ -4002,11 +4071,16 @@ def exchange_board():
             rec = MockFeishuDB.generate_agency(str(40100 + i))[0]
             rec["fields"]["Target whole check"] = " | ".join(str(random.randint(200, 2000)) for _ in range(cairo_now().month)) + " | N/A" * (12 - cairo_now().month)
             points_items.append(rec)
+        data_source, stop_reason = "mock", ""
     else:
-        # Same cache-first snapshot Analytics Report / Compare / Search Records
-        # already use -- warm from the background cron, so this costs nothing
-        # extra on top of what those pages already cost. No Requests-table read.
-        points_items, _pts_complete, _pts_reason, _pts_cache = get_points_table_snapshot()
+        # Target Board reads ONLY from the public build file (same source Search
+        # Records prefers) -- no live Feishu calls from this page, ever. If the
+        # cron that regenerates it has stalled, we say so instead of silently
+        # falling back to a live fetch.
+        points_items, _complete, stop_reason = get_points_snapshot_from_public_file()
+        if points_items is None:
+            return jsonify({"error": stop_reason}), 503
+        data_source = "public_file"
 
     rows = compute_exchange_board_rows(points_items, acm_filter, region_filter, allowed_acms, allowed_regs)
 
@@ -4025,11 +4099,15 @@ def exchange_board():
 
     kpi_strip = build_exchange_kpi_strip(rows)
     region_rollup = build_exchange_region_rollup(rows)
+    needs_push = build_exchange_needs_push(rows)
 
     if not MOCK_MODE:
         try: append_exchange_daily_snapshot(points_items)
         except Exception as e: logger.warn("exchange_snapshot_failed", error=str(e))
     movers = compute_exchange_movers(rows)
+    sparklines = build_exchange_sparklines(rows)
+    for r in rows:
+        r["trend_7d"] = sparklines.get(r["agency_code"], [])
     insights = generate_exchange_insights(rows, region_rollup, movers)
     watchlist = get_exchange_watchlist(user)
 
@@ -4037,9 +4115,10 @@ def exchange_board():
     duration_ms = int((time.time() - start) * 1000)
     return jsonify({
         "rows": rows, "kpi_strip": kpi_strip, "region_rollup": region_rollup,
-        "insights": insights, "movers": movers, "watchlist": watchlist,
+        "insights": insights, "movers": movers, "watchlist": watchlist, "needs_push": needs_push,
         "scope": scope, "is_super_admin": perms.get("is_super_admin", False),
         "generated_at": cairo_now().isoformat(), "duration_ms": duration_ms,
+        "data_source": data_source, "stop_reason": stop_reason,
     })
 
 @app.route('/api/exchange/agency/<code>', methods=['GET'])
@@ -4058,8 +4137,10 @@ def exchange_agency_detail(code):
     if MOCK_MODE:
         points_items = MockFeishuDB.generate_agency(code)
     else:
-        # Points-table snapshot only -- same cache-first source as the board.
-        points_items, _c, _r, _cache = get_points_table_snapshot()
+        # Same file-only source as the board -- no live Feishu calls.
+        points_items, _c, _r = get_points_snapshot_from_public_file()
+        if points_items is None:
+            return jsonify({"error": _r}), 503
 
     match = None
     for item in points_items:
