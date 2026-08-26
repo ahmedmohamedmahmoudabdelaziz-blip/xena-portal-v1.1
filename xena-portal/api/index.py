@@ -1293,6 +1293,42 @@ def fetch_points_sharded(field_names=POINTS_TABLE_FIELDS):
     logger.info("points_fetch", ms=int((time.time() - t0) * 1000), rows=len(items), complete=complete, reason=reason or "")
     return items, complete, reason
 
+def compute_target_pace_analytics(total_pts, ytd_target, monthly_target):
+    """Shared target-realization math -- same formulas the Agency Exchange board
+    uses (realization %, pace-based year-end projection, implied full-year target,
+    downgrade-risk flag, required daily catch-up rate). Used here so the single-
+    agency lookup ("Check Agency Points") can show the same analytics without a
+    second network call -- it's computed from fields already fetched for this page."""
+    now = cairo_now()
+    elapsed_months = now.month
+    year_end = now.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=0)
+    days_left_in_year = max(1, (year_end.date() - now.date()).days)
+
+    realization_pct = round((total_pts / ytd_target * 100) if ytd_target > 0 else 0, 1)
+    variance = round(total_pts - ytd_target, 0)
+
+    if ytd_target <= 0:            pacing_status = "No Target"
+    elif realization_pct >= 110:   pacing_status = "Ahead"
+    elif realization_pct >= 95:    pacing_status = "On Track"
+    elif realization_pct >= 80:    pacing_status = "Needs Attention"
+    else:                          pacing_status = "Lagging"
+
+    projected_eoy_points = round((total_pts / elapsed_months) * 12, 0) if elapsed_months > 0 else total_pts
+    current_month_target = monthly_target[elapsed_months - 1]["value"] if elapsed_months <= 12 else None
+
+    elapsed_value_months = sum(1 for m in monthly_target[:elapsed_months] if m["status"] == "value")
+    implied_full_year_target = round((ytd_target / elapsed_value_months) * 12, 0) if elapsed_value_months > 0 else 0
+    will_miss_target = bool(implied_full_year_target > 0 and projected_eoy_points < implied_full_year_target)
+    gap_to_full_year = max(0.0, implied_full_year_target - total_pts) if implied_full_year_target > 0 else 0.0
+    required_daily_rate = round(gap_to_full_year / days_left_in_year, 2) if gap_to_full_year > 0 else 0.0
+
+    return {
+        "realization_pct": realization_pct, "variance": variance, "pacing_status": pacing_status,
+        "projected_eoy_points": projected_eoy_points, "current_month_target": current_month_target,
+        "implied_full_year_target": implied_full_year_target, "will_miss_target": will_miss_target,
+        "gap_to_full_year": round(gap_to_full_year, 0), "required_daily_rate": required_daily_rate,
+    }
+
 def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs=None):
     if MOCK_MODE:
         all_records = MockFeishuDB.generate_agency(code)
@@ -1463,6 +1499,22 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         else: 
             health_score, health_status = 0, "Inactive"
 
+        pace = compute_target_pace_analytics(total_pts, ytd_target, monthly_target)
+
+        # This-month activity, bucketed like a simple kanban board (Pending / Completed
+        # / Rejected) for the Agency dashboard -- built entirely from `history_points`,
+        # which was already fetched above for the allocator; no extra Feishu calls.
+        activity_board = {"pending": [], "completed": [], "rejected": []}
+        for h in history_points:
+            s = (h.get("status") or "").lower()
+            entry = {"date": h.get("date"), "request_type": h.get("request_type"), "privilege": h.get("privilege")}
+            if any(rej in s for rej in ("reject", "fail", "decline")):
+                activity_board["rejected"].append(entry)
+            elif any(ok in s for ok in ("done", "complet", "approv", "confirm")):
+                activity_board["completed"].append(entry)
+            else:
+                activity_board["pending"].append(entry)
+
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
             "region": region_raw.upper(), "acm": acm_raw.title(),
@@ -1472,7 +1524,9 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "history": history_points, 
             "allocator_status": allocator_status,
             "accepted_user_ids": sorted(set(accepted_ids_all)),
-            "requests": [r.get("fields", {}) for r in all_records]
+            "requests": [r.get("fields", {}) for r in all_records],
+            "target_analytics": pace,
+            "activity_board": activity_board,
         }
     else:  
         raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
