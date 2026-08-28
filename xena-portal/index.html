@@ -2821,7 +2821,7 @@ function executePageLogic(page) {
         initExchangePageOnce();
     } else if(page==='agency-target-table'){
         document.getElementById('pg-agency-target-table').style.display='block';
-        _expandNavGroup('navBodyExchange','navArrExchange');
+        _expandNavGroup('navBodyTarget','navArrTarget');
         initAgencyTargetTableOnce();
     } else if(page==='points-records'){
         document.getElementById('pg-points-records').style.display='block';
@@ -8641,41 +8641,59 @@ async function attFetch(page) {
             return;
         }
 
-        if (countEl) countEl.textContent = `${data.total_count} agenc${data.total_count===1?'y':'ies'} with claims this month`;
+        if (countEl) countEl.textContent = `${data.total_count} agencies found`;
 
+        const privTypes = data.privilege_types || ["Dynamic Avatar", "30 Mic", "20 Mic", "New User Welcome Room", "Game Room"];
+
+        // 1. Build the dynamic two-tier table header
+        const thead = document.getElementById('attThead');
+        let headerRow1 = `<tr style="background:var(--surface-hover)">
+            <th rowspan="2" style="padding:12px;text-align:left;border-bottom:2px solid var(--border)">Agency</th>
+            <th rowspan="2" style="padding:12px;text-align:left;border-bottom:2px solid var(--border)">ACM / Region</th>`;
+        let headerRow2 = `<tr style="background:var(--surface-hover)">`;
+
+        privTypes.forEach(pt => {
+            headerRow1 += `<th colspan="3" style="padding:8px 12px;text-align:center;border-bottom:1px solid var(--border);border-left:1px solid var(--border);color:var(--accent-cyan)">${escHtml(pt)}</th>`;
+            headerRow2 += `
+                <th style="padding:6px;font-size:.7rem;text-align:center;border-bottom:2px solid var(--border);border-left:1px solid var(--border)">Claimed</th>
+                <th style="padding:6px;font-size:.7rem;text-align:center;border-bottom:2px solid var(--border)">Used</th>
+                <th style="padding:6px;font-size:.7rem;text-align:center;border-bottom:2px solid var(--border)">Remain</th>`;
+        });
+        headerRow1 += `</tr>`;
+        headerRow2 += `</tr>`;
+        thead.innerHTML = headerRow1 + headerRow2;
+
+        // 2. Build the flat row data
         const tbody = document.getElementById('attTbody');
         tbody.innerHTML = rows.map((r, i) => {
-            const rowId = `attRow${i}`;
             const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
-            const privSummary = r.privileges.map(p => p.privilege).join(', ');
-            const detailRows = r.privileges.map(p => `
-                <tr style="border-bottom:1px solid var(--border)">
-                    <td style="padding:8px 12px 8px 40px;color:var(--text-muted);font-size:.8rem">${escHtml(p.privilege)}</td>
-                    <td style="padding:8px 12px;font-size:.8rem">Earned: <b>${p.total_earned}</b></td>
-                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-green)">Claimed: <b>${p.claimed}</b></td>
-                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-cyan)">Remaining: <b>${p.remaining}</b></td>
-                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-amber)">Pending: <b>${p.pending}</b></td>
-                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-rose)">Rejected: <b>${p.rejected}</b></td>
-                </tr>`).join('');
+            let cells = `
+                <td style="padding:12px;border-bottom:1px solid var(--border)">
+                    <strong style="color:var(--text)">${escHtml(r.agency_name)}</strong>
+                    <div style="font-size:.72rem;color:var(--accent-cyan)">${escHtml(r.agency_code)}</div>
+                </td>
+                <td style="padding:12px;font-size:.85rem;border-bottom:1px solid var(--border)">
+                    ${escHtml(r.acm)}<div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.region)}</div>
+                </td>`;
 
-            return `<tr style="${rowStyle};border-bottom:1px solid var(--border);cursor:pointer" onclick="attToggleRow('${rowId}')">
-                    <td style="padding:12px;color:var(--text-muted)"><span id="${rowId}-arrow">▸</span></td>
-                    <td style="padding:12px"><strong style="color:var(--accent-cyan)">${escHtml(r.agency_name)}</strong><div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.agency_code)} · ${escHtml(privSummary)}</div></td>
-                    <td style="padding:12px;font-size:.85rem">${escHtml(r.acm)}<div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.region)}</div></td>
-                    <td style="padding:12px;font-size:.8rem;color:var(--text-muted)">${r.privileges.length} type${r.privileges.length===1?'':'s'}</td>
-                    <td style="padding:12px;font-weight:700;color:var(--accent-green)">${r.total_claimed}</td>
-                    <td style="padding:12px;font-weight:700;color:var(--accent-amber)">${r.total_pending}</td>
-                    <td style="padding:12px;font-weight:700;color:var(--accent-rose)">${r.total_rejected}</td>
-                </tr>
-                <tr id="${rowId}-detail" style="display:none;background:rgba(0,212,255,.03)">
-                    <td colspan="7" style="padding:0">
-                        <table style="width:100%;border-collapse:collapse">${detailRows}</table>
-                    </td>
-                </tr>`;
+            privTypes.forEach(pt => {
+                const pData = r.privileges.find(p => p.privilege === pt) || { claimed: 0, used: 0, remaining: 0, pending: 0, rejected: 0 };
+                
+                // Hide pending/rejected behind a tooltip if they exist, so it doesn't break the layout
+                let usedDisplay = pData.used;
+                if (pData.pending > 0 || pData.rejected > 0) {
+                    usedDisplay += ` <span class="info-tip" data-tip="Pending: ${pData.pending} | Rejected: ${pData.rejected}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>`;
+                }
+
+                cells += `
+                    <td style="padding:12px;text-align:center;font-weight:600;color:var(--text);border-left:1px solid var(--border);border-bottom:1px solid var(--border)">${pData.claimed}</td>
+                    <td style="padding:12px;text-align:center;color:var(--accent-amber);border-bottom:1px solid var(--border)">${usedDisplay}</td>
+                    <td style="padding:12px;text-align:center;font-weight:700;color:var(--accent-green);border-bottom:1px solid var(--border)">${pData.remaining}</td>`;
+            });
+            return `<tr style="${rowStyle};transition:background .15s" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='${i%2===0?'':'rgba(255,255,255,.025)'}'">${cells}</tr>`;
         }).join('');
 
         tableEl.style.display = '';
-
         if (data.total_pages > 1) {
             document.getElementById('attPageNum').textContent = data.page;
             document.getElementById('attTotalPages').textContent = data.total_pages;
@@ -9114,17 +9132,117 @@ if (loggedUser&&loggedUat) {
     populateAcmFilterSelect();
 
     if (hashRegion) {
-        const sel=document.getElementById('anaRegion');
-        if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
-        updateAcmDropdown();
-        if (hashAcm) {
-            const acmSel=document.getElementById('anaAcm');
-            if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
+            const sel=document.getElementById('anaRegion');
+            if (sel) {for(let o of sel.options){if(o.value.toLowerCase()===hashRegion.toLowerCase()){sel.value=o.value;break;}}}
+            updateAcmDropdown();
+            if (hashAcm) {
+                const acmSel=document.getElementById('anaAcm');
+                if (acmSel) {for(let o of acmSel.options){if(o.value.toLowerCase()===hashAcm.toLowerCase()){acmSel.value=o.value;break;}}}
+            }
+            openInTab('analytics');
+        } else {
+            openInTab('welcome'); 
         }
-        openInTab('analytics');
-    } else {
-        openInTab('welcome'); 
     }
+
+// ═══ Agency Target Table Exports ═══
+async function fetchAttExportData() {
+    const params = new URLSearchParams({
+        user: loggedUser || '', email: loggedEmail || '',
+        q: document.getElementById('attSearch')?.value || '',
+        region: document.getElementById('attRegion')?.value || '',
+        export: 'true'
+    });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+    
+    ToastManager.show('Preparing export...', 'info');
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    
+    try {
+        const resp = await fetch('/api/agency-target-table?' + params.toString());
+        const data = await resp.json();
+        document.getElementById('loadingOverlay').style.display = 'none';
+        if (!resp.ok) throw new Error(data.error);
+        return data;
+    } catch (e) {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        ToastManager.show('Export failed: ' + e.message, 'error');
+        return null;
+    }
+}
+
+async function attExportCsv() {
+    logFrontendAction("EXPORT_CSV", "Agency Target Table");
+    const data = await fetchAttExportData();
+    if (!data || !data.rows || !data.rows.length) return;
+    
+    const privTypes = data.privilege_types || [];
+    let header = ['Agency Code', 'Agency Name', 'ACM', 'Region'];
+    privTypes.forEach(pt => {
+        header.push(`${pt} (Claimed)`);
+        header.push(`${pt} (Used)`);
+        header.push(`${pt} (Remain)`);
+    });
+    
+    const csvRows = [header.map(h => JSON.stringify(h)).join(',')];
+    data.rows.forEach(r => {
+        let row = [r.agency_code, r.agency_name, r.acm, r.region];
+        privTypes.forEach(pt => {
+            const pData = r.privileges.find(p => p.privilege === pt) || { claimed:0, used:0, remaining:0 };
+            row.push(pData.claimed, pData.used, pData.remaining);
+        });
+        csvRows.push(row.map(val => JSON.stringify(val ?? '')).join(','));
+    });
+    
+    const blob = new Blob([csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `agency_target_table.csv`; a.click();
+    ToastManager.show('CSV exported successfully!', 'success');
+}
+
+async function attExportExcel() {
+    if (!window.XLSX) { ToastManager.show('Excel library not loaded.', 'warning'); return; }
+    logFrontendAction("EXPORT_EXCEL", "Agency Target Table");
+    const data = await fetchAttExportData();
+    if (!data || !data.rows || !data.rows.length) return;
+    
+    const privTypes = data.privilege_types || [];
+    const aoa = [];
+    
+    // Header Row 1 (Merged cells for Groups)
+    let h1 = ['Agency Code', 'Agency Name', 'ACM', 'Region'];
+    privTypes.forEach(pt => { h1.push(pt, '', ''); });
+    aoa.push(h1);
+    
+    // Header Row 2 (Sub-columns)
+    let h2 = ['', '', '', ''];
+    privTypes.forEach(() => { h2.push('Claimed', 'Used', 'Remain'); });
+    aoa.push(h2);
+    
+    // Data Rows
+    data.rows.forEach(r => {
+        let row = [r.agency_code, r.agency_name, r.acm, r.region];
+        privTypes.forEach(pt => {
+            const pData = r.privileges.find(p => p.privilege === pt) || { claimed:0, used:0, remaining:0 };
+            row.push(pData.claimed, pData.used, pData.remaining);
+        });
+        aoa.push(row);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    
+    // Grouped column styling
+    ws['!merges'] = [];
+    let colIdx = 4;
+    privTypes.forEach(() => {
+        ws['!merges'].push({ s: {r:0, c:colIdx}, e: {r:0, c:colIdx+2} });
+        colIdx += 3;
+    });
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Target Table");
+    XLSX.writeFile(wb, `agency_target_table.xlsx`);
+    ToastManager.show('Excel exported successfully!', 'success');
 }
 </script>
 </body>
