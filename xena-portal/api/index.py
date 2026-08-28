@@ -2719,19 +2719,21 @@ def submit_request():
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records"
     success = False
     created_via = "user_token"
-    # Feishu error codes that specifically mean "this token is dead" -- NOT a
-    # field/scope/permission rejection. Only these trigger a forced re-login;
-    # see the comment below for why that distinction matters.
+    # Feishu error codes that specifically mean "this token is dead" (expired/
+    # invalid) -- these are the ONLY case that forces a re-login. Anything else
+    # (a field this token isn't scoped to write, a transient rejection, etc.)
+    # falls back to the tenant token exactly like before, so a ticket is never
+    # blocked for a reason that logging in again wouldn't actually fix.
     TOKEN_AUTH_ERROR_CODES = (99991663, 99991668)
 
     try:
         # SINGLE-CALL CREATE (User Context): create the row in ONE request, under the
-        # agent's own identity, with every field the user filled in already attached
-        # (final_fields, including "Request Status") -- not a blank row created first
-        # and patched with the real data afterward. Feishu's own "Created
-        # By"/"Respondents" system columns get stamped with the real submitter AND the
-        # data lands at the same time, so there's nothing to roll back if it fails --
-        # a failed call here just never creates a row at all.
+        # agent's own identity first and foremost, with every field the user filled
+        # in already attached (final_fields, including "Request Status") -- not a
+        # blank row created first and patched with the real data afterward. Feishu's
+        # own "Created By"/"Respondents" system columns get stamped with the real
+        # submitter AND the data lands at the same time, so there's nothing to roll
+        # back if it fails -- a failed call here just never creates a row at all.
         create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
         resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
         data = resp.json()
@@ -2742,9 +2744,7 @@ def submit_request():
 
             if data.get("code") in TOKEN_AUTH_ERROR_CODES:
                 # The token itself is dead (expired/invalid) -- retry once with a
-                # freshly-refreshed uat, but NEVER fall back to the tenant token.
-                # A ticket filed under the app identity instead of the real agent
-                # is worse than one that needs a retry after logging back in.
+                # freshly-refreshed uat first...
                 fresh_uat = _refresh_user_token(submitter_open_id) if submitter_open_id else None
                 if fresh_uat:
                     logger.info("submit_retry_with_refreshed_uat", user=user)
@@ -2757,14 +2757,26 @@ def submit_request():
                         logger.warn("submit_refreshed_uat_still_rejected",
                                     user=user, feishu_code=data.get("code"), feishu_msg=data.get("msg"))
 
+                # ...and if the refresh itself was impossible or still rejected,
+                # this really is an expired session -- force a fresh login instead
+                # of quietly filing the ticket under the app identity.
                 if data.get("code") != 0:
                     audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type} | feishu_code: {data.get('code')}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
                     return jsonify({"error": "Your session has expired. Please log out and log in again, then resubmit this request.", "code": "SESSION_EXPIRED"}), 401
-            # else: NOT a dead-token error -- e.g. a field this agent's account isn't
-            # scoped to write, a validation rejection, etc. Forcing a re-login here
-            # wouldn't fix anything (the same rejection would just happen again) and
-            # would trap the agent in a login loop, so this falls through to the
-            # normal error response below with Feishu's real reason surfaced as-is.
+            else:
+                # NOT a dead-token error -- e.g. a field only the tenant identity is
+                # allowed to write, or some other rejection logging in again won't
+                # fix. Fall back to the tenant token as a last resort so the ticket
+                # is never lost -- same behavior as before this change, just no
+                # longer triggered by simple expiry (that's handled above instead).
+                # NOTE: when this fallback fires, Feishu's "Created By" column will
+                # show the app identity instead of the real submitter, because
+                # that column is a platform-level automatic field driven by
+                # whichever token performed the create call.
+                create_headers["Authorization"] = f"Bearer {tat}"
+                resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
+                data = resp.json()
+                created_via = "tenant_token_fallback"
 
         if data.get("code") == 0:
             success = True
