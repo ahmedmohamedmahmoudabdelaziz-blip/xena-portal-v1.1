@@ -4275,13 +4275,35 @@ def privilege_total_earned_quota(privilege_name, base_points):
         return 1 if bp >= 20 else 0
     return 0
 
+# Canonical privilege buckets the table always reports on, in display order --
+# matches the tiers privilege_total_earned_quota() knows how to price. Any raw
+# privilege string from the Requests table gets classified into one of these
+# (or dropped, if it doesn't match anything the ledger prices).
+PRIVILEGE_TYPE_ORDER = ["Dynamic Avatar", "30 Mic", "20 Mic", "New User Welcome Room", "Game Room"]
+
+def classify_privilege_type(privilege_name):
+    """Maps a raw privilege string from the Requests table (e.g. '30 MIC 15 days
+    ( 150 - 175 for others )') onto one of PRIVILEGE_TYPE_ORDER, reusing the same
+    substring rules privilege_total_earned_quota() prices by, so a claim always
+    lands under the same bucket it was quoted a quota against."""
+    p = (privilege_name or "").lower()
+    if "dynamic avatar" in p: return "Dynamic Avatar"
+    if "20 mic" in p: return "20 Mic"
+    if "30 mic" in p: return "30 Mic"
+    if "new user welcome room" in p or "welcome room" in p: return "New User Welcome Room"
+    if "game room" in p: return "Game Room"
+    return None
+
 def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, region_filter, allowed_acms, allowed_regs):
-    """Per-agency, per-privilege ledger for the CURRENT calendar month: Total
-    Earned quota (from Base Points tiers), Claimed / Pending / Rejected (tallied
-    from the Requests snapshot), and Remaining = Total Earned - Claimed. Built
-    entirely from the two bulk snapshots the rest of the portal already keeps
-    warm (Points table + Requests table via get_requests_table_snapshot(), the
-    same cache-first source Compare/Analytics already read) -- no live
+    """Per-agency, per-privilege ledger for the CURRENT calendar month: Claimed
+    quota (from Base Points tiers), Used / Pending / Rejected (tallied from the
+    Requests snapshot), and Remaining = Claimed - Used. Returns one row for
+    EVERY agency in the Points snapshot -- not just agencies with a claim this
+    month -- each carrying all five canonical privilege buckets (zeroed out if
+    unused), so the table reads as a full roster rather than an activity feed.
+    Built entirely from the two bulk snapshots the rest of the portal already
+    keeps warm (Points table + Requests table via get_requests_table_snapshot(),
+    the same cache-first source Compare/Analytics already read) -- no live
     per-agency Feishu calls, same cost model as those existing pages."""
     now = cairo_now()
     cur_month, cur_year = now.month, now.year
@@ -4304,7 +4326,7 @@ def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, re
             "acm": acm.title(), "region": region.upper(),
         }
 
-    ledger = defaultdict(lambda: {"claimed": 0, "pending": 0, "rejected": 0})
+    ledger = defaultdict(lambda: {"used": 0, "pending": 0, "rejected": 0})
     for item in requests_items:
         f = item.get("fields", {})
         req_type = extract_field_text(get_field_local(f, "Request Type")).strip().lower()
@@ -4316,8 +4338,9 @@ def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, re
         d = parse_feishu_date(get_field_local(f, "Submitted on Copy", "Submitted on", "Created Time"))
         if not d or d.month != cur_month or d.year != cur_year:
             continue
-        privilege = extract_field_text(get_field_local(f, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
-        if not privilege:
+        raw_privilege = extract_field_text(get_field_local(f, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+        priv_type = classify_privilege_type(raw_privilege)
+        if not priv_type:
             continue
         status = extract_field_text(get_field_local(f, "Status")).strip().lower()
         raw_counter = extract_field_text(get_field_local(f, "Counter", "Qty", "Quantities Input")).strip()
@@ -4326,34 +4349,32 @@ def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, re
             m = re.search(r'\d+', raw_counter)
             if m: qty = int(m.group())
 
-        key = (code, privilege)
+        key = (code, priv_type)
         if any(ok in status for ok in ("done", "complet", "approv", "confirm")):
-            ledger[key]["claimed"] += qty
+            ledger[key]["used"] += qty
         elif any(rej in status for rej in ("reject", "fail", "decline")):
             ledger[key]["rejected"] += qty
         else:
             ledger[key]["pending"] += qty
 
-    rows_by_agency = defaultdict(list)
-    for (code, privilege), counts in ledger.items():
-        base_pts = base_points_map.get(code, 0)
-        total_earned = privilege_total_earned_quota(privilege, base_pts)
-        remaining = max(0, total_earned - counts["claimed"])
-        rows_by_agency[code].append({
-            "privilege": privilege, "total_earned": total_earned,
-            "claimed": counts["claimed"], "remaining": remaining,
-            "pending": counts["pending"], "rejected": counts["rejected"],
-        })
-
     rows = []
-    for code, privileges in rows_by_agency.items():
-        meta = agency_meta.get(code, {"agency_name": code, "acm": "", "region": ""})
-        privileges.sort(key=lambda p: p["privilege"])
+    for code, meta in agency_meta.items():
+        base_pts = base_points_map.get(code, 0)
+        privileges = []
+        for priv_type in PRIVILEGE_TYPE_ORDER:
+            counts = ledger.get((code, priv_type), {"used": 0, "pending": 0, "rejected": 0})
+            claimed = privilege_total_earned_quota(priv_type, base_pts)
+            used = counts["used"]
+            privileges.append({
+                "privilege": priv_type, "claimed": claimed,
+                "used": used, "remaining": max(0, claimed - used),
+                "pending": counts["pending"], "rejected": counts["rejected"],
+            })
         rows.append({
             "agency_code": code, "agency_name": meta["agency_name"],
             "acm": meta["acm"], "region": meta["region"],
             "privileges": privileges,
-            "total_claimed": sum(p["claimed"] for p in privileges),
+            "total_used": sum(p["used"] for p in privileges),
             "total_pending": sum(p["pending"] for p in privileges),
             "total_rejected": sum(p["rejected"] for p in privileges),
         })
@@ -4407,6 +4428,19 @@ def agency_target_table():
     rows.sort(key=lambda r: r["agency_name"].lower())
 
     total_count = len(rows)
+
+    is_export = request.args.get('export', 'false').lower() == 'true'
+    if is_export:
+        if not perms.get("is_super_admin") and not any("export" in m for m in perms.get("modules", [])):
+            audit.log(user, "UNAUTHORIZED_EXPORT", "Agency Target Table", ip=ip, severity="Critical")
+            return jsonify({"error": "Export access denied."}), 403
+        audit.log(user, "EXPORT_DATA", f"Agency Target Table ({total_count} rows)", ip=ip, severity="Info")
+        return jsonify({
+            "rows": rows[:5000], "total_count": total_count, "page": 1, "page_size": total_count,
+            "total_pages": 1, "privilege_types": PRIVILEGE_TYPE_ORDER,
+            "generated_at": cairo_now().isoformat(),
+        })
+
     start = (page - 1) * page_size
     page_rows = rows[start:start + page_size]
 
@@ -4414,6 +4448,7 @@ def agency_target_table():
     return jsonify({
         "rows": page_rows, "total_count": total_count, "page": page, "page_size": page_size,
         "total_pages": max(1, (total_count + page_size - 1) // page_size),
+        "privilege_types": PRIVILEGE_TYPE_ORDER,
         "generated_at": cairo_now().isoformat(),
     })
 
