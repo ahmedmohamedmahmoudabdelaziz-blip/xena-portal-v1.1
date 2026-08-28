@@ -3357,21 +3357,55 @@ const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
 // --- SESSION TIMEOUT ENFORCER (4 HOURS) ---
 // Matches the backend's refresh-token TTL (also 4 hours) so a session can't
-// silently keep working past what the token layer actually allows.
+// silently keep working past what the token layer actually allows. This is a
+// belt on top of the backend's own enforcement (submit_request() now refuses
+// -- rather than silently falling back -- once the agent's server-side uat is
+// really gone, see SESSION_EXPIRED below); this client-side timer exists so
+// search/browsing gets cut off at the same 4-hour mark too, not just submits,
+// and so the agent is dropped back to the login screen instead of finding out
+// only when the next click quietly fails.
+const SESSION_LIMIT_MS = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+
+// Forces an immediate, hard logout -- clears local session state and reloads
+// to the login screen. Used both by the 4-hour timer below and by the Submit
+// Request handler when the server itself reports {code:'SESSION_EXPIRED'}
+// (submit_request() now refuses to file a ticket under the app identity and
+// returns this instead), so a stale session is caught the moment the SERVER
+// notices it too, not only on our own clock -- covers a tab that was
+// backgrounded past the timer, a phone that suspended the JS interval, or a
+// laptop that slept mid-session.
+function forceSessionExpiredLogout(message) {
+    localStorage.clear();
+    loggedUser = null;
+    loggedUat = null;
+    ToastManager.show(message || 'Your session has expired. Please log in again.', 'warning', 8000);
+    setTimeout(() => window.location.reload(), 1200);
+}
+
 function checkSessionExpiry() {
+    const hasSession = !!(localStorage.getItem('xenaUser') && localStorage.getItem('xenaUat'));
+    if (!hasSession) return;
     const loginTs = parseInt(localStorage.getItem('xenaLoginTimestamp') || '0', 10);
-    const SESSION_LIMIT_MS = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
-    if (loginTs > 0 && (Date.now() - loginTs > SESSION_LIMIT_MS)) {
-        localStorage.clear();
-        loggedUser = null;
-        loggedUat = null;
-        window.location.reload();
+    // A logged-in session with NO timestamp on record (e.g. one that started
+    // before this timer existed, or somehow lost the field) is treated as
+    // expired too, not skipped -- otherwise a session like that would never
+    // time out at all. This is the fix for a phone/tab left logged in for
+    // weeks and still working: on the very next load or focus, it now gets
+    // flushed out exactly like a session that's actually past 4 hours.
+    if (loginTs <= 0 || (Date.now() - loginTs > SESSION_LIMIT_MS)) {
+        forceSessionExpiredLogout('Your session has expired. Please log in again.');
     }
 }
 // If not actively logging in right now, verify the session is still valid
 if (!urlParams.get('user')) checkSessionExpiry();
-// Keep checking every 1 minute while the tab is open
+// Keep checking every 1 minute while the tab is open...
 setInterval(checkSessionExpiry, 60000);
+// ...and immediately whenever the tab regains focus/visibility, since mobile
+// browsers pause setInterval while backgrounded -- without this, returning to
+// a tab that crossed the 4-hour mark while asleep could let one more action
+// through before the next scheduled check.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkSessionExpiry(); });
+window.addEventListener('focus', checkSessionExpiry);
 // ------------------------------------------
 
 // Samurai cinematic intro -- a still image (samurai silhouetted against a blood
@@ -9301,11 +9335,30 @@ async function submitReqForm(e) {
 
         let data;
         try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response.'); }
-        
+
+        // The backend now refuses -- rather than silently filing the ticket under
+        // the app's own identity -- once the agent's session is really gone
+        // server-side, and reports it with this code. Force a real, hard
+        // re-login instead of just warning after the fact; nothing was created,
+        // so the agent's typed fields are left in the form to resubmit right
+        // after logging back in (the form is intentionally NOT reset below).
+        if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
+            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
+            btn.innerHTML = origTxt;
+            btn.disabled = false;
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+        }
+
         if (!res.ok) throw new Error(data.error || 'Submission failed');
 
         ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
-        
+
+        // Restored: if the backend had to fall back to the tenant/app token for
+        // this one (not an expiry -- those are caught above -- but some other
+        // rejection of the agent's own token), the ticket still went through,
+        // same as before this whole change. Just let them know it was filed
+        // under the app identity so "Created By" won't show their name.
         if (data.created_via && String(data.created_via).startsWith('tenant_token')) {
             ToastManager.show(`Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.`, 'warning', 12000);
         }
