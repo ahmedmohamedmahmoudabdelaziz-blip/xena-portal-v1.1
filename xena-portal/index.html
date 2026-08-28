@@ -4531,7 +4531,7 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(key => {
@@ -4744,7 +4744,7 @@ async function confirmSaveRole() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
@@ -4795,7 +4795,7 @@ async function addAgent() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
@@ -6755,22 +6755,19 @@ function configureSidebarAndCards() {
         if (!hasExactMod('target_timeline') && !hasExactMod('target')) document.getElementById('nav-target-timeline').style.display = 'none';
     }
 
-    if (!hasMod('points')) document.getElementById('navGrpPoints').style.display = 'none';
-    else {
-        if (!hasExactMod('points_check') && !hasExactMod('points')) document.getElementById('nav-points').style.display = 'none';
-        if (!hasExactMod('points_allocator') && !hasExactMod('points')) document.getElementById('nav-allocator').style.display = 'none';
-        if (!hasExactMod('points_records') && !hasExactMod('points')) document.getElementById('nav-points-records').style.display = 'none';
-        if (!hasExactMod('points_table') && !hasExactMod('points')) document.getElementById('nav-points-table').style.display = 'none';
-    }
-
     if (!hasMod('analytics')) document.getElementById('navGrpAnalytics').style.display = 'none';
     else {
         if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
         if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
     }
 
-    if (!hasMod('analytics') && !isAdmin) {
+    if (!hasMod('analytics') && !hasMod('exchange') && !isAdmin) {
         document.getElementById('navGrpExchange').style.display = 'none';
+    } else {
+        if (!hasExactMod('exchange') && !hasExactMod('analytics') && !isAdmin) {
+            const el = document.getElementById('nav-exchange');
+            if (el) el.style.display = 'none';
+        }
     }
 
     // Sub-feature gating (Exchange). Additive-only per hasSubFeature() -- never
