@@ -267,7 +267,7 @@ def _refresh_user_token(open_id):
         uat_ttl = max(int(data.get("expires_in", 7200)) - 300, 60)
         redis_cmd("SET", f"xena:uat:{open_id}", new_uat, "EX", uat_ttl)
         if new_rt:
-            redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 30 * 24 * 3600)
+            redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 4 * 3600)
         return new_uat
 def _get_cached_uat(open_id):
     """Freshest server-side user token for this agent, if we hold one (set at login
@@ -788,7 +788,7 @@ class AuditLogger:
         self._queue = []
         self._lock  = threading.Lock()
 
-    def log(self, actor, action, target, details="", ip="", severity="Info"):
+    def log(self, actor, action, target, details="", ip="", severity="Info", blocking=False):
         full_target = f"{target} | {details}" if details else target
         entry = {
             # NOTE: audit entries are only ever readable by admins (see the
@@ -801,8 +801,20 @@ class AuditLogger:
         }
         logger.info("audit", **entry)
         if AUDIT_TABLE_ID and not MOCK_MODE:
-            t = threading.Thread(target=self._write_feishu, args=(entry,), daemon=True)
-            t.start()
+            if blocking:
+                # Used for critical, low-volume, time-sensitive events (e.g. an
+                # access request) where the caller needs the Feishu write to have
+                # actually landed before returning -- otherwise an admin's very
+                # next poll of /api/admin/access-requests can miss it entirely.
+                # This app runs on serverless (Vercel): self._queue below is
+                # per-process memory and is NOT shared across invocations, so a
+                # fire-and-forget background write plus an in-memory fallback can
+                # silently race for minutes until a poll happens to land on an
+                # instance where the async write already finished.
+                self._write_feishu(entry)
+            else:
+                t = threading.Thread(target=self._write_feishu, args=(entry,), daemon=True)
+                t.start()
         with self._lock:
             self._queue.append(entry)
             if len(self._queue) > 500: self._queue = self._queue[-500:]
@@ -2025,7 +2037,7 @@ def callback():
 
         refresh_token = (token_resp.get("data") or {}).get("refresh_token") or token_resp.get("refresh_token")
         if refresh_token and lark_open_id and REDIS_ENABLED:
-            redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 30 * 24 * 3600)
+            redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 4 * 3600)
         uat_expires_in = (token_resp.get("data") or {}).get("expires_in") or token_resp.get("expires_in") or 7200
         if lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
@@ -2118,14 +2130,22 @@ def manage_users():
     elif request.method == 'POST':
         data = request.json or {}
         email_to_check = sanitize_text(data.get("email",""))
+        if not email_to_check:
+            # Defense-in-depth: a blank identity should never be persisted as an
+            # agent/role row (it renders as an unlabeled "ghost" entry in Manage
+            # Agents that can't be edited by identity, only removed). Reject it
+            # outright instead of silently creating one.
+            return jsonify({"success": False, "error": "Email/identity is required and cannot be empty."}), 400
         acms_formatted = (f"target={data.get('acms',{}).get('target','all')};"
                           f"points={data.get('acms',{}).get('points','all')};"
                           f"analytics={data.get('acms',{}).get('analytics','all')};"
-                          f"query={data.get('acms',{}).get('query','all')}")
+                          f"query={data.get('acms',{}).get('query','all')};"
+                          f"exchange={data.get('acms',{}).get('exchange','all')}")
         regs_formatted = (f"target={data.get('regions',{}).get('target','all')};"
                           f"points={data.get('regions',{}).get('points','all')};"
                           f"analytics={data.get('regions',{}).get('analytics','all')};"
-                          f"query={data.get('regions',{}).get('query','all')}")
+                          f"query={data.get('regions',{}).get('query','all')};"
+                          f"exchange={data.get('regions',{}).get('exchange','all')}")
                           
         payload_fields = {"Email":email_to_check,"Modules":data.get("modules",""),
                           "ACMs":acms_formatted,"Regions":regs_formatted}
@@ -2178,7 +2198,7 @@ def request_access():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     if not name and not email:
         return jsonify({"success": False, "error": "Missing name/email."}), 400
-    audit.log(name or email, "ACCESS_REQUEST", email or "(no email)", details=f"Requested by {name}", ip=ip, severity="Critical")
+    audit.log(name or email, "ACCESS_REQUEST", email or "(no email)", details=f"Requested by {name}", ip=ip, severity="Critical", blocking=True)
     return jsonify({"success": True})
 
 @app.route('/api/admin/access-requests', methods=['GET'])
