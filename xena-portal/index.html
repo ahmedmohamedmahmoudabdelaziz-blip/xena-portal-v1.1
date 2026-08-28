@@ -811,7 +811,6 @@
                 </div>
                 <div class="nav-group-body" id="navBodyExchange">
                     <div class="nav-item" id="nav-exchange" onclick="openInTab('exchange')"><span data-i18n="exchangeBoard">Target Board</span></div>
-                    <div class="nav-item" id="nav-agency-target-table" onclick="openInTab('agency-target-table')"><span data-i18n="agencyTargetTable">Agency Target Table</span></div>
                 </div>
             </div>
 
@@ -841,6 +840,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodyTarget">
                     <div class="nav-item" id="nav-target" onclick="openInTab('target')"><span data-i18n="checkAgencyTarget">Check Agency Target</span></div>
+                    <div class="nav-item" id="nav-agency-target-table" onclick="openInTab('agency-target-table')"><span data-i18n="agencyTargetTable">Agency Target Table</span></div>
                     <div class="nav-item" id="nav-target-timeline" onclick="openInTab('target-timeline')"><span data-i18n="targetTimeline">Target Timeline</span></div>
                 </div>
             </div>
@@ -1280,9 +1280,9 @@
                 <div class="card" style="margin-bottom:20px">
                     <h3 style="color:var(--accent-cyan);margin-bottom:8px; display:flex; align-items:center; gap:8px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                        Agency Target Table <span class="info-tip" data-tip="Per-agency, per-privilege target claim ledger for the current month: how much each agency has earned, claimed, has remaining, or has pending/rejected. Built from the same cached snapshots as Search Records — no live per-agency calls."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+                        Agency Target Table <span class="info-tip" data-tip="Every agency's per-privilege target ledger for the current month: Claimed (this month's quota), Used, Remaining, Pending and Rejected. Built from the same cached snapshots as Search Records — no live per-agency calls."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
                     </h3>
-                    <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:20px">This month's privilege claim ledger for every agency — Total Earned, Claimed, Remaining, Pending, Rejected per privilege type.</p>
+                    <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:20px">This month's target ledger for every agency — Claimed, Used and Remaining per privilege type.</p>
                     <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
                         <div class="control-group">
                             <label>Quick Search</label>
@@ -1309,6 +1309,8 @@
                             <span id="attLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                            <button id="attExportCsvBtn" class="export-gated-btn" onclick="attExportCsv()" style="display:none;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 Export CSV</button>
+                            <button id="attExportXlsBtn" class="export-gated-btn" onclick="attExportExcel()" style="display:none;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Export Excel</button>
                             <select id="attPageSize" onchange="attFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
                                 <option value="25">25 / page</option>
                                 <option value="50" selected>50 / page</option>
@@ -1320,31 +1322,21 @@
 
                     <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px">
                         <table id="attTable" style="width:100%;border-collapse:collapse;font-size:.87rem;display:none">
-                            <thead>
-                                <tr style="background:var(--surface-hover)">
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)"></th>
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Agency</th>
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">ACM / Region</th>
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Privileges</th>
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Claimed</th>
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Pending</th>
-                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Rejected</th>
-                                </tr>
-                            </thead>
+                            <thead id="attThead"></thead>
                             <tbody id="attTbody"></tbody>
                         </table>
                         <div id="attEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
                             <div style="font-size:2rem;margin-bottom:12px">
                                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-hover)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                             </div>
-                            <p>No privilege claims found for this month matching your criteria.</p>
+                            <p>No agencies found matching your criteria.</p>
                         </div>
                     </div>
 
                     <div id="attPagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;display:none">
                         <div style="font-size:.85rem;color:var(--text-muted)">
                             Page <span id="attPageNum">1</span> of <span id="attTotalPages">1</span>
-                            &nbsp;·&nbsp; <span id="attTotalCount">0</span> agencies with claims this month
+                            &nbsp;·&nbsp; <span id="attTotalCount">0</span> agencies
                         </div>
                         <div style="display:flex;gap:6px">
                             <button onclick="attFetch(attCurrentPage-1)" id="attPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
@@ -1597,6 +1589,7 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_check"> Check Agency Target</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_agency_target_table"> Agency Target Table</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_timeline"> Target Timeline</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
@@ -1642,7 +1635,6 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_movers"> Movers panel</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_heatmap"> Heatmap view</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_watchlist"> Watchlist view</label>
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_agency_target_table"> Agency Target Table (new)</label>
                             </div>
                         </div>
                         <div class="module-card" style="border-color:rgba(185,103,255,.25)">
