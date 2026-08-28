@@ -4776,7 +4776,8 @@ async function confirmSaveRole() {
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
-        if(document.getElementById(`mod_${m}`).checked) modules.push(m);
+        const cb = document.getElementById(`mod_${m}`);
+        if(cb && cb.checked) modules.push(m);
     });
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
     // Roles never carry "admin" themselves -- admin is a person-level grant, not a
@@ -4829,7 +4830,8 @@ async function addAgent() {
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
-        if(document.getElementById(`mod_${m}`).checked) modules.push(m);
+        const cb = document.getElementById(`mod_${m}`);
+        if(cb && cb.checked) modules.push(m);
     });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
