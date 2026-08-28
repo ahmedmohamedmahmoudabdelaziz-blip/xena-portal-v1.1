@@ -1530,6 +1530,12 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         }
     else:  
         raw_base_pts = parse_float_safe(extract_field_text(get_field_local(first, "Base Points", "base_points")))
+        # Same target-realization fields as the Points branch, added here so the
+        # "🎯 Agency Target Lookup" view can show the Monthly Target Breakdown too
+        # (this was previously only under Points -- moved/shared per request).
+        total_pts_for_target = parse_float_safe(extract_field_text(get_field_local(first, '# Total Points', 'Total Points', 'Total')))
+        monthly_target, ytd_target = parse_monthly_target_field(get_field_local(first, "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check"))
+        pace = compute_target_pace_analytics(total_pts_for_target, ytd_target, monthly_target)
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
             "region": region_raw.upper(), "acm": acm_raw.title(),
@@ -1537,7 +1543,9 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             "privileges_claimed": dict(privileges_claimed),  
             "history": history_target, 
             "accepted_user_ids": sorted(set(accepted_ids_all)),
-            "requests": [r.get("fields", {}) for r in all_records]
+            "requests": [r.get("fields", {}) for r in all_records],
+            "total_points": total_pts_for_target, "ytd_target": ytd_target, "monthly_target": monthly_target,
+            "target_analytics": pace,
         }
 
 def _build_field_map_safe(item: dict) -> dict:
@@ -4241,6 +4249,172 @@ def exchange_agency_detail(code):
         "ytd_target": ytd_target, "monthly_target": monthly_target, "current_month_target": current_month_target,
         "realization_pct": realization_pct, "health_score": health_score, "health_status": health_status,
         "projected_eoy_points": projected_eoy_points,
+    })
+
+def privilege_total_earned_quota(privilege_name, base_points):
+    """Reimplements the Feishu formula field's tier logic in Python, so the
+    Agency Target Table can compute it over the already-cached bulk snapshot
+    instead of depending on a specific pre-computed Feishu formula field name
+    (which this codebase can't verify exists under a known field name) or,
+    worse, a live per-agency lookup. Tiers per privilege type, based on the
+    agency's Base Points."""
+    p = (privilege_name or "").lower()
+    bp = base_points or 0
+    if "dynamic avatar" in p:
+        return int(bp // 100)
+    if "20 mic" in p:
+        return 1 if bp >= 150 else 0
+    if "30 mic" in p:
+        if bp >= 1000: return 4
+        if bp >= 500: return 2
+        if bp >= 300: return 1
+        return 0
+    if "new user welcome room" in p:
+        return 1 if bp >= 20 else 0
+    if "game room" in p:
+        return 1 if bp >= 20 else 0
+    return 0
+
+def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, region_filter, allowed_acms, allowed_regs):
+    """Per-agency, per-privilege ledger for the CURRENT calendar month: Total
+    Earned quota (from Base Points tiers), Claimed / Pending / Rejected (tallied
+    from the Requests snapshot), and Remaining = Total Earned - Claimed. Built
+    entirely from the two bulk snapshots the rest of the portal already keeps
+    warm (Points table + Requests table via get_requests_table_snapshot(), the
+    same cache-first source Compare/Analytics already read) -- no live
+    per-agency Feishu calls, same cost model as those existing pages."""
+    now = cairo_now()
+    cur_month, cur_year = now.month, now.year
+
+    base_points_map, agency_meta = {}, {}
+    for item in points_items:
+        f = item.get("fields", {})
+        code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        if not code:
+            continue
+        acm = extract_field_text(get_field_local(f, "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member")).strip()
+        region = 'PK' if acm.lower() in PK_ACMS else ('IN' if acm.lower() in IN_ACMS else clean(get_field_local(f, "Region")).upper())
+        if "all" not in allowed_acms and acm.lower() not in [a.lower() for a in allowed_acms]: continue
+        if "all" not in allowed_regs and region.lower() not in [r.lower() for r in allowed_regs]: continue
+        if acm_filter != "all" and acm.lower() != acm_filter: continue
+        if region_filter != "all" and region.lower() != region_filter: continue
+        base_points_map[code] = parse_float_safe(extract_field_text(get_field_local(f, "Base Points")))
+        agency_meta[code] = {
+            "agency_name": extract_field_text(get_field_local(f, "Agency Name", "Name")) or code,
+            "acm": acm.title(), "region": region.upper(),
+        }
+
+    ledger = defaultdict(lambda: {"claimed": 0, "pending": 0, "rejected": 0})
+    for item in requests_items:
+        f = item.get("fields", {})
+        req_type = extract_field_text(get_field_local(f, "Request Type")).strip().lower()
+        if "target" not in req_type:
+            continue
+        code = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        if code not in base_points_map:
+            continue
+        d = parse_feishu_date(get_field_local(f, "Submitted on Copy", "Submitted on", "Created Time"))
+        if not d or d.month != cur_month or d.year != cur_year:
+            continue
+        privilege = extract_field_text(get_field_local(f, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip()
+        if not privilege:
+            continue
+        status = extract_field_text(get_field_local(f, "Status")).strip().lower()
+        raw_counter = extract_field_text(get_field_local(f, "Counter", "Qty", "Quantities Input")).strip()
+        qty = 1
+        if raw_counter:
+            m = re.search(r'\d+', raw_counter)
+            if m: qty = int(m.group())
+
+        key = (code, privilege)
+        if any(ok in status for ok in ("done", "complet", "approv", "confirm")):
+            ledger[key]["claimed"] += qty
+        elif any(rej in status for rej in ("reject", "fail", "decline")):
+            ledger[key]["rejected"] += qty
+        else:
+            ledger[key]["pending"] += qty
+
+    rows_by_agency = defaultdict(list)
+    for (code, privilege), counts in ledger.items():
+        base_pts = base_points_map.get(code, 0)
+        total_earned = privilege_total_earned_quota(privilege, base_pts)
+        remaining = max(0, total_earned - counts["claimed"])
+        rows_by_agency[code].append({
+            "privilege": privilege, "total_earned": total_earned,
+            "claimed": counts["claimed"], "remaining": remaining,
+            "pending": counts["pending"], "rejected": counts["rejected"],
+        })
+
+    rows = []
+    for code, privileges in rows_by_agency.items():
+        meta = agency_meta.get(code, {"agency_name": code, "acm": "", "region": ""})
+        privileges.sort(key=lambda p: p["privilege"])
+        rows.append({
+            "agency_code": code, "agency_name": meta["agency_name"],
+            "acm": meta["acm"], "region": meta["region"],
+            "privileges": privileges,
+            "total_claimed": sum(p["claimed"] for p in privileges),
+            "total_pending": sum(p["pending"] for p in privileges),
+            "total_rejected": sum(p["rejected"] for p in privileges),
+        })
+    return rows
+
+@app.route('/api/agency-target-table', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_target_table():
+    """Search-Records-style table: per-agency, per-privilege target claim ledger
+    (Total Earned / Claimed / Remaining / Pending / Rejected) for the current
+    month. Built entirely from the two bulk snapshots already kept warm by the
+    background cron (Points table + Requests table) -- the exact same
+    cache-first sources Search Records and Compare already read. No live
+    per-agency Feishu calls."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+    if not perms.get("is_super_admin") and not any(("analytics" in m or "points" in m) for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+
+    allowed_acms = perms.get("permissions", {}).get("acms", {}).get("points", perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"]))
+    allowed_regs = perms.get("permissions", {}).get("regions", {}).get("points", perms.get("permissions", {}).get("regions", {}).get("analytics", ["all"]))
+    region_filter = sanitize_text(request.args.get('region', 'all')).strip().lower() or "all"
+    search_q = sanitize_text(request.args.get('q', '')).strip().lower()
+
+    try:
+        page = max(1, int(request.args.get('page', '1')))
+        page_size = min(200, max(1, int(request.args.get('page_size', '50'))))
+    except (ValueError, TypeError):
+        page, page_size = 1, 50
+
+    acm_filter = "all"
+    if sanitize_text(request.args.get('scope', 'all')).lower() != "all" and not perms.get("is_super_admin"):
+        acm_filter = user.strip().lower()
+
+    if MOCK_MODE:
+        points_items = []
+        for i in range(30):
+            rec = MockFeishuDB.generate_agency(str(40200 + i))[0]
+            points_items.append(rec)
+        requests_items = MockFeishuDB.generate_requests(120) if hasattr(MockFeishuDB, "generate_requests") else []
+    else:
+        points_items, _pts_complete, _pts_reason, _pts_cache = get_points_table_snapshot()
+        requests_items, _keys, _req_complete, _req_reason, _req_cache = get_requests_table_snapshot()
+
+    rows = compute_agency_privilege_ledger(points_items, requests_items, acm_filter, region_filter, allowed_acms, allowed_regs)
+    if search_q:
+        rows = [r for r in rows if search_q in r["agency_name"].lower() or search_q in r["agency_code"].lower() or search_q in r["acm"].lower()]
+    rows.sort(key=lambda r: r["agency_name"].lower())
+
+    total_count = len(rows)
+    start = (page - 1) * page_size
+    page_rows = rows[start:start + page_size]
+
+    audit.log(user, "AGENCY_TARGET_TABLE_VIEW", f"rows:{total_count}|page:{page}", ip=ip, severity="Info")
+    return jsonify({
+        "rows": page_rows, "total_count": total_count, "page": page, "page_size": page_size,
+        "total_pages": max(1, (total_count + page_size - 1) // page_size),
+        "generated_at": cairo_now().isoformat(),
     })
 
 @app.route('/api/exchange/watchlist', methods=['GET'])
