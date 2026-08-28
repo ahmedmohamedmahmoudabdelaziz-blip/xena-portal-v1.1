@@ -4119,7 +4119,7 @@ def exchange_board():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules", [])):
+    if not perms.get("is_super_admin") and not any("analytics" in m or "exchange" in m for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
@@ -4192,7 +4192,7 @@ def exchange_agency_detail(code):
     user  = sanitize_text(request.args.get('user', ''))
     email = sanitize_text(request.args.get('email', ''))
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules", [])):
+    if not perms.get("is_super_admin") and not any("analytics" in m or "exchange" in m for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
