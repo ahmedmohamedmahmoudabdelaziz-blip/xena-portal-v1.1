@@ -482,6 +482,30 @@
         .dz-thumb-add{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--border-hover);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--text-muted);cursor:pointer;flex-shrink:0;transition:.15s}
         .dz-thumb-add:hover{border-color:var(--accent-cyan);color:var(--accent-cyan)}
 
+        /* ── Searchable Select (site-wide enhancer) ──────────────────────
+           Wraps every native <select> with a type-to-filter dropdown while
+           keeping the real <select> in the DOM (hidden) so all existing
+           value/onchange/id-based JS keeps working unchanged. ── */
+        .ss-wrapper{position:relative;display:inline-block;width:100%}
+        .ss-native-hidden{position:absolute !important;opacity:0 !important;pointer-events:none !important;height:1px !important;width:1px !important;overflow:hidden !important}
+        .ss-display{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface,var(--bg));color:var(--text);font-size:.87rem;cursor:pointer;transition:.15s;user-select:none}
+        .ss-display:hover{border-color:var(--accent-cyan)}
+        .ss-wrapper.ss-open .ss-display{border-color:var(--accent-cyan);box-shadow:0 0 0 2px rgba(0,212,255,.12)}
+        .ss-display-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+        .ss-display-text.ss-placeholder{color:var(--text-muted)}
+        .ss-arrow{color:var(--text-muted);font-size:.7rem;transition:transform .15s;flex-shrink:0}
+        .ss-wrapper.ss-open .ss-arrow{transform:rotate(180deg);color:var(--accent-cyan)}
+        .ss-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;background:#0d0e17;border:1px solid var(--border-hover);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);overflow:hidden;min-width:180px}
+        .ss-search{width:100%;box-sizing:border-box;padding:10px 12px;border:none;border-bottom:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);font-size:.85rem;outline:none}
+        .ss-search::placeholder{color:var(--text-muted)}
+        .ss-options{max-height:220px;overflow-y:auto;padding:4px}
+        .ss-options::-webkit-scrollbar{width:6px}
+        .ss-options::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:6px}
+        .ss-option{padding:9px 12px;border-radius:6px;font-size:.85rem;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ss-option:hover,.ss-option.ss-active{background:rgba(0,212,255,.12);color:var(--accent-cyan)}
+        .ss-option.ss-selected{font-weight:700}
+        .ss-no-match{padding:12px;text-align:center;color:var(--text-muted);font-size:.82rem}
+
         /* ── Tiny info tooltip icon (small "?" circle beside chart/metric titles) ── */
         .info-tip{display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);cursor:help;position:relative;vertical-align:middle;margin-left:3px;top:-1px}
         .info-tip:hover{color:var(--accent-cyan)}
@@ -3133,6 +3157,164 @@ function buildDropzoneHtml(id, fieldName, required) {
         <div class="dz-thumbs" id="${id}_thumbs"></div>`;
 }
 
+// ═══ Searchable Select — site-wide enhancer ═══
+// Wraps every native <select> (existing on load, and any created dynamically
+// afterward anywhere in the app) with a type-to-filter dropdown. The real
+// <select> stays in the DOM (visually hidden, value/id/name/onchange all
+// untouched), so every existing call site that reads a select's .value or
+// listens for its 'change' event keeps working with zero changes elsewhere.
+//
+// One gap that would otherwise bite: lots of existing code sets a select's
+// value programmatically (`document.getElementById('x').value = 'pk'`), which
+// fires neither a 'change' event nor a DOM mutation -- so the custom display
+// text would silently go stale. Patched below so ANY assignment to .value or
+// .selectedIndex on ANY <select>, anywhere in the app, present or future,
+// keeps the custom display in sync automatically.
+(function () {
+    const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    const idxDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
+    if (!valueDesc || !idxDesc) return; // safety: bail if the browser doesn't expose these as configurable accessors
+
+    function resync(select) {
+        if (!select.dataset || !select.dataset.ssEnhanced) return;
+        const wrapper = select.closest('.ss-wrapper');
+        const dt = wrapper && wrapper.querySelector('.ss-display > .ss-display-text');
+        if (dt) ssSyncDisplay(select, dt);
+    }
+
+    Object.defineProperty(HTMLSelectElement.prototype, 'value', {
+        configurable: true,
+        get() { return valueDesc.get.call(this); },
+        set(v) { valueDesc.set.call(this, v); resync(this); },
+    });
+    Object.defineProperty(HTMLSelectElement.prototype, 'selectedIndex', {
+        configurable: true,
+        get() { return idxDesc.get.call(this); },
+        set(v) { idxDesc.set.call(this, v); resync(this); },
+    });
+})();
+
+function ssSyncDisplay(select, displayText) {
+    const opt = select.options[select.selectedIndex];
+    const txt = opt ? opt.textContent : '';
+    displayText.textContent = txt || (select.options.length ? 'Select…' : 'No options');
+    displayText.classList.toggle('ss-placeholder', !opt || !opt.value);
+}
+
+function ssRenderOptions(select, optList, filterText, onPick) {
+    optList.innerHTML = '';
+    const f = (filterText || '').toLowerCase();
+    let any = false;
+    Array.from(select.options).forEach((opt, idx) => {
+        if (f && !opt.textContent.toLowerCase().includes(f)) return;
+        any = true;
+        const row = document.createElement('div');
+        row.className = 'ss-option' + (idx === select.selectedIndex ? ' ss-selected' : '');
+        row.textContent = opt.textContent;
+        row.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (select.selectedIndex !== idx) {
+                select.selectedIndex = idx;
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            onPick();
+        });
+        optList.appendChild(row);
+    });
+    if (!any) {
+        const none = document.createElement('div');
+        none.className = 'ss-no-match';
+        none.textContent = 'No matches';
+        optList.appendChild(none);
+    }
+}
+
+function enhanceSelect(select) {
+    if (!select || select.dataset.ssEnhanced || select.multiple || select.disabled) return;
+    // Skip selects explicitly opted out (e.g. extremely simple 2-3-option
+    // toggles where a searchable panel would be overkill) via data-no-search.
+    if (select.hasAttribute('data-no-search')) return;
+    select.dataset.ssEnhanced = '1';
+    select.classList.add('ss-native-hidden');
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ss-wrapper';
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.appendChild(select);
+
+    const display = document.createElement('div');
+    display.className = 'ss-display';
+    display.tabIndex = 0;
+    const displayText = document.createElement('span');
+    displayText.className = 'ss-display-text';
+    const arrow = document.createElement('span');
+    arrow.className = 'ss-arrow';
+    arrow.textContent = '▾';
+    display.appendChild(displayText);
+    display.appendChild(arrow);
+    wrapper.appendChild(display);
+
+    const panel = document.createElement('div');
+    panel.className = 'ss-panel';
+    panel.style.display = 'none';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'ss-search';
+    searchInput.placeholder = 'Type to search, or scroll…';
+    const optList = document.createElement('div');
+    optList.className = 'ss-options';
+    panel.appendChild(searchInput);
+    panel.appendChild(optList);
+    wrapper.appendChild(panel);
+
+    const closePanel = () => { panel.style.display = 'none'; wrapper.classList.remove('ss-open'); };
+    const openPanel = () => {
+        if (select.disabled) return;
+        ssRenderOptions(select, optList, '', () => { ssSyncDisplay(select, displayText); closePanel(); });
+        searchInput.value = '';
+        panel.style.display = 'block';
+        wrapper.classList.add('ss-open');
+        setTimeout(() => searchInput.focus(), 10);
+    };
+
+    display.addEventListener('click', () => {
+        if (panel.style.display === 'none') openPanel(); else closePanel();
+    });
+    searchInput.addEventListener('input', () => {
+        ssRenderOptions(select, optList, searchInput.value, () => { ssSyncDisplay(select, displayText); closePanel(); });
+    });
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePanel(); display.focus(); } });
+    document.addEventListener('click', (e) => { if (!wrapper.contains(e.target)) closePanel(); });
+
+    // If some later code repopulates this select's <option>s (very common in
+    // this app -- filters get re-filled after a fetch), keep the display text
+    // and open panel's option list in sync automatically.
+    const mo = new MutationObserver(() => {
+        ssSyncDisplay(select, displayText);
+        if (panel.style.display !== 'none') ssRenderOptions(select, optList, searchInput.value, () => { ssSyncDisplay(select, displayText); closePanel(); });
+    });
+    mo.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+    select.addEventListener('change', () => ssSyncDisplay(select, displayText));
+
+    ssSyncDisplay(select, displayText);
+}
+
+function enhanceAllSelects(root) {
+    (root || document).querySelectorAll('select').forEach(enhanceSelect);
+}
+
+document.addEventListener('DOMContentLoaded', () => enhanceAllSelects());
+const _ssGlobalObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+        m.addedNodes.forEach(node => {
+            if (node.nodeType !== 1) return;
+            if (node.tagName === 'SELECT') enhanceSelect(node);
+            else if (node.querySelectorAll) enhanceAllSelects(node);
+        });
+    }
+});
+_ssGlobalObserver.observe(document.documentElement, { childList: true, subtree: true });
+
 function escapeJSArgs(str) {
     if (!str) return '';
     return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -3172,6 +3354,25 @@ if (urlParams.get('user') && urlParams.get('uat')) {
 
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
+
+// --- SESSION TIMEOUT ENFORCER (4 HOURS) ---
+// Matches the backend's refresh-token TTL (also 4 hours) so a session can't
+// silently keep working past what the token layer actually allows.
+function checkSessionExpiry() {
+    const loginTs = parseInt(localStorage.getItem('xenaLoginTimestamp') || '0', 10);
+    const SESSION_LIMIT_MS = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+    if (loginTs > 0 && (Date.now() - loginTs > SESSION_LIMIT_MS)) {
+        localStorage.clear();
+        loggedUser = null;
+        loggedUat = null;
+        window.location.reload();
+    }
+}
+// If not actively logging in right now, verify the session is still valid
+if (!urlParams.get('user')) checkSessionExpiry();
+// Keep checking every 1 minute while the tab is open
+setInterval(checkSessionExpiry, 60000);
+// ------------------------------------------
 
 // Samurai cinematic intro -- a still image (samurai silhouetted against a blood
 // moon), shown static (no zoom/pan), driven by CSS "stage" classes on
@@ -4652,9 +4853,12 @@ async function fetchAdminUsers() {
         }
         users.forEach(u=>{
             let dispEmail=u.email||u.person;
+            const isOrphan = !dispEmail || !dispEmail.trim();
             let badge=u.modules.includes('admin')?'<span style="background:var(--accent-amber);color:#000;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px">ADMIN</span>':'';
+            if (isOrphan) badge += '<span style="background:var(--accent-rose);color:#fff;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px" title="This row has no email/identity attached — it cannot be edited by identity. Safe to remove.">⚠ NO IDENTITY</span>';
             const row=document.createElement('div'); row.className='user-row';
-            
+            if (isOrphan) row.style.borderColor = 'var(--accent-rose)';
+
             const safeEmail = escapeJSArgs(dispEmail);
             const safeModules = escapeJSArgs(u.modules);
             const safeAcms = escapeJSArgs(u.acms_raw);
@@ -4663,11 +4867,11 @@ async function fetchAdminUsers() {
 
             row.innerHTML=`
                  <div class="user-info">
-                    <span class="user-email">${escHtml(dispEmail)}${badge}</span>
+                    <span class="user-email">${isOrphan ? '<em style="color:var(--text-muted)">(no identity set)</em>' : escHtml(dispEmail)}${badge}</span>
                     <div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${escHtml(u.modules||'none')}</span></div>
                 </div>
                 <div class="action-btns">
-                    <button class="edit-btn" onclick="editAgent('${safeEmail}','${safeModules}','${safeAcms}','${safeRegs}')">Edit</button>
+                    <button class="edit-btn" onclick="editAgent('${safeEmail}','${safeModules}','${safeAcms}','${safeRegs}')" ${isOrphan?'disabled title="Cannot edit a row with no identity — remove it instead"':''}>Edit</button>
                     <button class="edit-btn" onclick="copyAccessFromAgent('${safeId}')" style="background:rgba(0,212,255,.1);color:var(--accent-cyan)">Copy</button>
                     <button class="del-btn" onclick="deleteAgent('${safeId}')">Remove</button>
                 </div>
@@ -6817,7 +7021,35 @@ function configureSidebarAndCards() {
     }
 
     // Sub-feature gating (Exchange). Additive-only per hasSubFeature() -- never
-// ... existing code ...
+    // hides anything from someone who already had broader analytics access.
+    const exNeedsPushCard = document.getElementById('exNeedsPushPanel')?.closest('.card');
+    if (exNeedsPushCard && !hasSubFeature('exchange_needs_push')) exNeedsPushCard.style.display = 'none';
+    const exMoversCard = document.getElementById('exMoversPanel')?.closest('.card');
+    if (exMoversCard && !hasSubFeature('exchange_movers')) exMoversCard.style.display = 'none';
+    const exHeatmapBtn = document.getElementById('exViewBtn-heatmap');
+    if (exHeatmapBtn && !hasSubFeature('exchange_heatmap')) exHeatmapBtn.style.display = 'none';
+    const exWatchlistBtn = document.getElementById('exViewBtn-watchlist');
+    if (exWatchlistBtn && !hasSubFeature('exchange_watchlist')) exWatchlistBtn.style.display = 'none';
+
+    // Sub-feature gating (Compare).
+    const cmpRadarCard = document.getElementById('cmpAdvRadarChart')?.closest('.card');
+    if (cmpRadarCard && !hasSubFeature('compare_radar')) cmpRadarCard.style.display = 'none';
+    const cmpDiffCard = document.getElementById('cmpDiffTableWrap')?.closest('.card');
+    if (cmpDiffCard && !hasSubFeature('compare_diff')) cmpDiffCard.style.display = 'none';
+    const cmpAreaCard = document.getElementById('cmpAdvTargetAreaChart')?.closest('.card');
+    if (cmpAreaCard && !hasSubFeature('compare_area_chart')) cmpAreaCard.style.display = 'none';
+    const cmpLeaderboardCard = document.getElementById('cmpLeaderboard')?.closest('.card');
+    if (cmpLeaderboardCard && !hasSubFeature('compare_leaderboard')) cmpLeaderboardCard.style.display = 'none';
+    const cmpConsistencyCard = document.getElementById('cmpConsistency')?.closest('.card');
+    if (cmpConsistencyCard && !hasSubFeature('compare_consistency')) cmpConsistencyCard.style.display = 'none';
+
+    // Agency Target Table nav item -- uses the 'target_table' key (falls back to
+    // the bare 'target' module too, matching applyConfigToForm's convention).
+    const targetTableNav = document.getElementById('nav-agency-target-table');
+    if (targetTableNav && !hasExactMod('target_table') && !hasMod('target') && !hasFullAnalytics) {
+        targetTableNav.style.display = 'none';
+    }
+
     if (hasExactMod('tickets_live_queue') || hasExactMod('tickets') || isAdmin) {
         document.getElementById('navGrpTickets').style.display = 'block';
     }
@@ -6849,7 +7081,7 @@ function configureSidebarAndCards() {
         };
         
         checkAccessReqs(); // Check immediately on load
-        setInterval(checkAccessReqs, 30000); // Check again every 30 seconds
+        setInterval(checkAccessReqs, 15000); // Check again every 15 seconds
     }
 
     const icons = {
@@ -7435,7 +7667,7 @@ async function twOpenWorkspace(recordId) {
             const rrMeta = FIELD_SCHEMA['Reject Reason'];
             const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
             rrWrap.innerHTML = `<div class="msel-wrap">${(rrMeta?.options || []).map(o => `
-                <label class="msel-toggle ${rrChecked.has(o) ? 'active' : ''}" onclick="this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+                <label class="msel-toggle ${rrChecked.has(o) ? 'active' : ''}" onclick="event.preventDefault(); this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
                     <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="display:none">
                     <span class="msel-dot" style="border-color:var(--accent-rose)">✓</span>
                     <span class="msel-text">${escHtml(o)}</span>
@@ -8220,7 +8452,7 @@ function createTwControl(key, value) {
     if (meta?.ui_type === 'MultiSelect' && meta.options) {
         const checkedSet = new Set(feishuValueToList(value));
         const chks = meta.options.map(o => `
-            <label class="msel-toggle ${checkedSet.has(o) ? 'active' : ''}" onclick="this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+            <label class="msel-toggle ${checkedSet.has(o) ? 'active' : ''}" onclick="event.preventDefault(); this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
                 <input type="checkbox" name="${escHtml(key)}" value="${escHtml(o)}" data-multi="true" ${checkedSet.has(o) ? 'checked' : ''} style="display:none">
                 <span class="msel-dot">✓</span>
                 <span class="msel-text">${escHtml(o)}</span>
@@ -8903,7 +9135,7 @@ function buildFieldControl(fName, def, req) {
         wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} class="form-highlight-input">${opts}</select>`;
     } else if (def.type === 'multiselect') {
         let chks = def.options.map(o => `
-            <label class="msel-toggle" onclick="this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+            <label class="msel-toggle" onclick="event.preventDefault(); this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
                 <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="display:none">
                 <span class="msel-dot">✓</span>
                 <span class="msel-text">${escHtml(o)}</span>
