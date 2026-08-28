@@ -2149,13 +2149,16 @@ def manage_users():
         if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Unknown error")}), 500
             
         audit.log(admin_name, "UPDATE_USER" if existing_record_id else "ADD_USER", email_to_check, ip=ip, severity="Info")
-        cache_invalidate(cache_make_key("perms", email_to_check.lower(), ""))
+        cache_invalidate() # FIX: Clear the entire permission cache immediately on updates
         return jsonify({"success":True,"record_id":res.get("data",{}).get("record",{}).get("record_id")})
 
     elif request.method == 'DELETE':
         record_id = sanitize_text(request.args.get('id',''))
         res = http_requests.delete(f"{base_url}/{record_id}", headers=headers, timeout=15).json()
         if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Delete failed")}), 500
+        
+        cache_invalidate() # FIX: Clear the permission cache immediately when deleting an agent
+        
         audit.log(admin_name, "DELETE_USER", record_id, ip=ip, severity="Warning")
         return jsonify({"success":True})
 
