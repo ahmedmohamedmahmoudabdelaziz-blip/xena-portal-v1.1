@@ -445,6 +445,50 @@
         .priv-check{font-size:.85rem;color:var(--accent-cyan);opacity:0;width:14px;text-align:center}
         .priv-toggle.active .priv-check{opacity:1}
 
+        /* ── Elegant MultiSelect toggle list (Create Request + Live Ticket Queue) ──
+           Replaces raw <input type=checkbox> lists that rendered as a cramped,
+           double-scrollbar box. Same visual language as .priv-toggle above. */
+        .msel-wrap{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;overflow-x:hidden;padding:6px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.15)}
+        .msel-wrap::-webkit-scrollbar{width:6px;height:6px}
+        .msel-wrap::-webkit-scrollbar-track{background:transparent}
+        .msel-wrap::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:6px}
+        .msel-toggle{background:var(--bg);border:1px solid var(--border);padding:10px 12px;border-radius:8px;font-size:.85rem;cursor:pointer;transition:.15s;color:var(--text-muted);display:flex;align-items:center;gap:10px;user-select:none;width:100%;box-sizing:border-box}
+        .msel-toggle:hover{border-color:var(--accent-cyan);color:var(--text)}
+        .msel-toggle.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--text);font-weight:600}
+        .msel-toggle span.msel-text{flex:1;pointer-events:none;white-space:normal;line-height:1.3}
+        .msel-toggle .msel-dot{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border-hover);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;color:transparent;transition:.15s;pointer-events:none}
+        .msel-toggle.active .msel-dot{background:var(--accent-cyan);border-color:var(--accent-cyan);color:#04202a}
+
+        /* ── Elegant file input (fixes the misaligned "Choose Files / No file
+           chosen" default browser control on Evidence Screen etc.) ── */
+        .elegant-file-input{width:100%;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px dashed var(--accent-cyan);border-radius:10px;background:rgba(0,212,255,.03);color:var(--text-muted);font-size:.8rem;cursor:pointer;transition:.2s}
+        .elegant-file-input:hover{border-color:var(--accent-cyan);background:rgba(0,212,255,.07)}
+        .elegant-file-input::file-selector-button{background:var(--accent-cyan);color:#04202a;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:.78rem;cursor:pointer;margin-right:4px;transition:.15s}
+        .elegant-file-input::file-selector-button:hover{background:#33dfff}
+
+        /* ── Elegant dropzone (drag/drop + paste + thumbnail gallery), replacing the
+           plain file input per the reference screenshot ── */
+        .elegant-dropzone{border:1.5px dashed var(--accent-cyan);border-radius:12px;background:rgba(0,212,255,.03);padding:22px 16px;text-align:center;cursor:pointer;transition:.2s;outline:none}
+        .elegant-dropzone:hover,.elegant-dropzone.dragover{background:rgba(0,212,255,.08);border-color:#33dfff}
+        .elegant-dropzone .dz-hint{color:var(--text-muted);font-size:.85rem;margin-bottom:6px}
+        .elegant-dropzone .dz-upload-link{color:var(--accent-cyan);font-size:.82rem;font-weight:600}
+        .dz-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+        .dz-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg);flex-shrink:0}
+        .dz-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+        .dz-thumb-file{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:1.2rem;color:var(--text-muted)}
+        .dz-thumb-file span{font-size:.52rem;margin-top:2px;word-break:break-all;padding:0 3px;text-align:center;line-height:1.2}
+        .dz-thumb-remove{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.75);color:#fff;border:none;font-size:.7rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+        .dz-thumb-remove:hover{background:var(--accent-rose)}
+        .dz-thumb-add{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--border-hover);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--text-muted);cursor:pointer;flex-shrink:0;transition:.15s}
+        .dz-thumb-add:hover{border-color:var(--accent-cyan);color:var(--accent-cyan)}
+
+        /* ── Tiny info tooltip icon (small "?" circle beside chart/metric titles) ── */
+        .info-tip{display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);cursor:help;position:relative;vertical-align:middle;margin-left:3px;top:-1px}
+        .info-tip:hover{color:var(--accent-cyan)}
+        .info-tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);background:#0d0e17;color:var(--text);border:1px solid var(--border-hover);padding:9px 11px;border-radius:8px;font-size:.72rem;font-weight:400;line-height:1.45;white-space:normal;width:230px;text-align:left;opacity:0;visibility:hidden;transition:opacity .15s,visibility .15s;z-index:80;box-shadow:0 10px 28px rgba(0,0,0,.45);pointer-events:none}
+        .info-tip::before{content:'';position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#0d0e17;opacity:0;visibility:hidden;transition:opacity .15s,visibility .15s}
+        .info-tip:hover::after,.info-tip:hover::before{opacity:1;visibility:visible}
+
         .health-badge{position:absolute;top:16px;left:16px;padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid}
         .health-Healthy{background:rgba(0,230,118,.15);color:var(--accent-green);border-color:rgba(0,230,118,.3)}
         .health-At\.Risk,.health-At-Risk{background:rgba(255,184,0,.15);color:var(--accent-amber);border-color:rgba(255,184,0,.3)}
@@ -767,6 +811,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodyExchange">
                     <div class="nav-item" id="nav-exchange" onclick="openInTab('exchange')"><span data-i18n="exchangeBoard">Target Board</span></div>
+                    <div class="nav-item" id="nav-agency-target-table" onclick="openInTab('agency-target-table')"><span data-i18n="agencyTargetTable">Agency Target Table</span></div>
                 </div>
             </div>
 
@@ -1010,11 +1055,11 @@
                             <!-- Top Performers spotlight + Movers highlight -->
                             <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:24px">
                                 <div class="card" style="padding:16px">
-                                    <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🏆 Top Performers</h4>
+                                    <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🏆 Top Performers <span class="info-tip" data-tip="Top 3 compared groups ranked by Fulfillment % (or Creations if target data isn't available for this comparison)."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div id="cmpLeaderboard" style="display:flex;flex-direction:column;gap:8px"></div>
                                 </div>
                                 <div class="card" style="padding:16px">
-                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🔥 Movers</h4>
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🔥 Movers <span class="info-tip" data-tip="Compares your first and last selected group and flags whichever metric grew the most (improver) and shrank the most (decliner) between them."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div id="cmpMovers" style="display:flex;flex-direction:column;gap:8px"></div>
                                 </div>
                             </div>
@@ -1022,42 +1067,47 @@
                             <!-- Tier 2: Core visual matrix -->
                             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px">
                                 <div class="card" style="padding:16px;grid-column:1/-1">
-                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🎯 Target vs. Realized Gap</h4>
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🎯 Target vs. Realized Gap <span class="info-tip" data-tip="Three bars per group: YTD Target (pace-adjusted), Realized Points (actual earned), and Points Used (redeemed). Compare bar heights to see who's ahead or behind."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvTargetGapChart"></canvas></div>
                                 </div>
                                 <div class="card" style="padding:16px">
-                                    <h4 style="color:var(--accent-purple);margin-bottom:12px;font-size:.9rem">🕸️ Executive Performance Radar</h4>
+                                    <h4 style="color:var(--accent-purple);margin-bottom:6px;font-size:.9rem">🕸️ Executive Performance Radar <span class="info-tip" data-tip="Each axis is a 0-100 score. Further from center = better on that dimension. A group whose shape leans heavily to one side is strong there but weak elsewhere — a balanced, large pentagon is the best overall shape."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
+                                    <p style="color:var(--text-muted);font-size:.72rem;margin-bottom:10px">5 axes, each scored 0–100: <b>Target Fulfillment</b> (YTD realization), <b>Point Efficiency</b> (earned vs. used), <b>Account Health</b>, <b>Creation Momentum</b> (recent creation pace), <b>Closing Resilience</b> (closing rate stability). Hover any point for the exact number.</p>
                                     <div class="chart-wrapper-pie-large" style="max-width:none"><canvas id="cmpAdvRadarChart"></canvas></div>
                                 </div>
                                 <div class="card" style="padding:16px">
-                                    <h4 style="color:var(--accent-green);margin-bottom:12px;font-size:.9rem">📈 YTD Cumulative Pacing <span id="cmpEstimateBadge" style="display:none;font-size:.65rem;font-weight:400;color:var(--accent-amber);background:rgba(255,184,0,.12);border:1px solid rgba(255,184,0,.3);border-radius:6px;padding:2px 6px;margin-left:6px">estimated</span></h4>
+                                    <h4 style="color:var(--accent-green);margin-bottom:12px;font-size:.9rem">📈 YTD Cumulative Pacing <span class="info-tip" data-tip="Solid lines are each group's actual cumulative points month by month. The dashed gray line is the expected linear pace. Above the dashed line = ahead of pace."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span><span id="cmpEstimateBadge" style="display:none;font-size:.65rem;font-weight:400;color:var(--accent-amber);background:rgba(255,184,0,.12);border:1px solid rgba(255,184,0,.3);border-radius:6px;padding:2px 6px;margin-left:6px">estimated</span></h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvCumulativeChart"></canvas></div>
                                 </div>
                                 <div class="card" style="padding:16px;grid-column:1/-1">
-                                    <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🧭 Status Mix by Group</h4>
+                                    <h4 style="color:var(--accent-rose);margin-bottom:12px;font-size:.9rem">🌄 Target Coverage — Area View <span class="info-tip" data-tip="Filled area = pace-adjusted target accumulated over the year for each group. The line on top = actual realized points. Where the line dips below the fill, that group is behind target."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
+                                    <div class="chart-wrapper-bar"><canvas id="cmpAdvTargetAreaChart"></canvas></div>
+                                </div>
+                                <div class="card" style="padding:16px;grid-column:1/-1">
+                                    <h4 style="color:var(--accent-amber);margin-bottom:12px;font-size:.9rem">🧭 Status Mix by Group <span class="info-tip" data-tip="Each bar is one group's requests broken down by final status (Done / Rejected / Under Investigation), stacked so you can compare volume and outcome quality side by side."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvStatusChart"></canvas></div>
                                 </div>
                                 <div class="card" style="padding:16px;grid-column:1/-1">
-                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">📊 Creations / BDs / Closings — Group by Group</h4>
+                                    <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">📊 Creations / BDs / Closings — Group by Group <span class="info-tip" data-tip="Raw activity counts per group for the compared period — how many agency creations, BD creations, and closings each group logged."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvActivityChart"></canvas></div>
                                 </div>
                             </div>
 
                             <!-- Side-by-side Diff + Consistency Score -->
                             <div class="card" style="padding:16px;margin-top:24px">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-                                    <h4 style="color:var(--text);margin-bottom:0;font-size:.9rem">⚖️ Side-by-Side Diff</h4>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+                                    <h4 style="color:var(--text);margin-bottom:0;font-size:.9rem">⚖️ Side-by-Side Diff <span class="info-tip" data-tip="Shows every compared group side by side. Growth % is each group vs. the Baseline you pick below."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                        <span style="color:var(--text-muted);font-size:.8rem">Growth vs:</span>
                                         <select id="cmpDiffBaseline" onchange="renderCompareDiff()" style="max-width:180px"></select>
-                                        <span style="color:var(--text-muted);font-size:.8rem">vs</span>
-                                        <select id="cmpDiffCompare" onchange="renderCompareDiff()" style="max-width:180px"></select>
                                     </div>
                                 </div>
+                                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">Every compared group shown side by side, with growth % measured against the baseline selected above.</p>
                                 <div id="cmpDiffTableWrap" style="overflow-x:auto"></div>
                             </div>
 
                             <div class="card" style="padding:16px;margin-top:24px">
-                                <h4 style="color:var(--text);margin-bottom:4px;font-size:.9rem">📐 Consistency Score</h4>
+                                <h4 style="color:var(--text);margin-bottom:4px;font-size:.9rem">📐 Consistency Score <span class="info-tip" data-tip="Coefficient of Variation (std deviation ÷ mean) across the compared groups for each metric. Under 35% = stable performance. 35%+ = volatile — one group spiked while others didn't, or vice versa."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:12px">How stable each metric is across the compared groups — a high score flags a group set that spiked once then collapsed rather than performing steadily.</p>
                                 <div id="cmpConsistency" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
                             </div>
@@ -1161,12 +1211,12 @@
                                             <th style="padding:10px 8px"></th>
                                             <th style="padding:10px 8px">Agency</th>
                                             <th style="padding:10px 8px">ACM / Region</th>
-                                            <th style="padding:10px 8px">Achievement</th>
+                                            <th style="padding:10px 8px">Achievement <span class="info-tip" data-tip="Realized points ÷ pace-adjusted target so far this year. 100% means exactly on pace today — the target already only counts elapsed months."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></th>
                                             <th style="padding:10px 8px">Status</th>
-                                            <th style="padding:10px 8px">Variance</th>
+                                            <th style="padding:10px 8px">Variance <span class="info-tip" data-tip="Total Points minus pace-adjusted target, in XCoins. Positive (green) = ahead of pace, negative (red) = behind."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></th>
                                             <th style="padding:10px 8px">7d Trend</th>
-                                            <th style="padding:10px 8px">Health</th>
-                                            <th style="padding:10px 8px">Projected EOY</th>
+                                            <th style="padding:10px 8px">Health <span class="info-tip" data-tip="Not target-related — this is Used Points ÷ Total Points (rewards balance utilization). Under 70% used = healthy, over 90% = critical."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></th>
+                                            <th style="padding:10px 8px">Projected EOY <span class="info-tip" data-tip="Simple linear projection: current average monthly pace × 12. Shows where this agency lands by Dec 31 if nothing changes — not a guarantee."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></th>
                                             <th style="padding:10px 8px"></th>
                                         </tr>
                                     </thead>
@@ -1222,6 +1272,85 @@
                 <div class="card" style="max-width:760px;width:100%;max-height:88vh;overflow-y:auto;position:relative">
                     <button onclick="closeExchangeDrilldown()" style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1">×</button>
                     <div id="exDrilldownBody"><div style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</div></div>
+                </div>
+            </div>
+
+            <!-- ... Agency Target Table (Search-Records-style, target realization) ... -->
+            <div id="pg-agency-target-table" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        Agency Target Table <span class="info-tip" data-tip="Per-agency, per-privilege target claim ledger for the current month: how much each agency has earned, claimed, has remaining, or has pending/rejected. Built from the same cached snapshots as Search Records — no live per-agency calls."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+                    </h3>
+                    <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:20px">This month's privilege claim ledger for every agency — Total Earned, Claimed, Remaining, Pending, Rejected per privilege type.</p>
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+                        <div class="control-group">
+                            <label>Quick Search</label>
+                            <input type="text" id="attSearch" placeholder="Agency Code, name, or ACM…" oninput="attDebounce()">
+                        </div>
+                        <div class="control-group">
+                            <label>Region</label>
+                            <select id="attRegion" onchange="attFetch(1)">
+                                <option value="">All Regions</option>
+                                <option value="pk">PK</option>
+                                <option value="in">IN</option>
+                            </select>
+                        </div>
+                        <div class="control-group" style="display:flex;align-items:flex-end">
+                            <button class="btn btn-primary" onclick="attFetch(1)" style="width:100%">🔎 Search</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <span id="attResultCount" style="font-size:.9rem;color:var(--text-muted)">Loading…</span>
+                            <span id="attLoadingSpinner" style="display:none;color:var(--accent-cyan)">⏳ Loading…</span>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                            <select id="attPageSize" onchange="attFetch(1)" style="padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem">
+                                <option value="25">25 / page</option>
+                                <option value="50" selected>50 / page</option>
+                                <option value="100">100 / page</option>
+                                <option value="200">200 / page</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px">
+                        <table id="attTable" style="width:100%;border-collapse:collapse;font-size:.87rem;display:none">
+                            <thead>
+                                <tr style="background:var(--surface-hover)">
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)"></th>
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Agency</th>
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">ACM / Region</th>
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Privileges</th>
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Claimed</th>
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Pending</th>
+                                    <th style="padding:12px;text-align:left;color:var(--text-muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid var(--border)">Rejected</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attTbody"></tbody>
+                        </table>
+                        <div id="attEmpty" style="display:none;text-align:center;padding:48px 0;color:var(--text-muted)">
+                            <div style="font-size:2rem;margin-bottom:12px">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-hover)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            </div>
+                            <p>No privilege claims found for this month matching your criteria.</p>
+                        </div>
+                    </div>
+
+                    <div id="attPagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;display:none">
+                        <div style="font-size:.85rem;color:var(--text-muted)">
+                            Page <span id="attPageNum">1</span> of <span id="attTotalPages">1</span>
+                            &nbsp;·&nbsp; <span id="attTotalCount">0</span> agencies with claims this month
+                        </div>
+                        <div style="display:flex;gap:6px">
+                            <button onclick="attFetch(attCurrentPage-1)" id="attPrevBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">‹ Prev</button>
+                            <button onclick="attFetch(attCurrentPage+1)" id="attNextBtn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">Next ›</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1501,6 +1630,32 @@
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="analyticsAcmSelect"></div></div>
                                 <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
+                            </div>
+                        </div>
+                        <div class="module-card" style="border-color:rgba(0,212,255,.25)">
+                            <div class="module-header">
+                                <h4>🏛 Agency Exchange — Sub-Features</h4>
+                            </div>
+                            <p style="font-size:.75rem;color:var(--text-muted);margin:-4px 0 10px">Fine-grained toggles for the Target Board. Leave unchecked to keep default access (anyone with broader Analytics access still sees everything) — check these to grant just these specific pieces to someone without full Analytics/Compare access.</p>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_needs_push"> Needs a Push panel</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_movers"> Movers panel</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_heatmap"> Heatmap view</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_watchlist"> Watchlist view</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_agency_target_table"> Agency Target Table (new)</label>
+                            </div>
+                        </div>
+                        <div class="module-card" style="border-color:rgba(185,103,255,.25)">
+                            <div class="module-header">
+                                <h4>⚖️ Compare — Sub-Features</h4>
+                            </div>
+                            <p style="font-size:.75rem;color:var(--text-muted);margin:-4px 0 10px">Same idea for the Compare page's advanced charts.</p>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_compare_radar"> Executive Performance Radar</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_compare_diff"> Side-by-Side Diff</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_compare_area_chart"> Target Coverage Area Chart</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_compare_leaderboard"> Top Performers Leaderboard</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_compare_consistency"> Consistency Score</label>
                             </div>
                         </div>
                         <div class="module-card">
@@ -2040,7 +2195,7 @@
                 <div class="card" style="margin-bottom:24px">
                     <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                        Agency List <span style="font-size:0.8rem;color:var(--text-muted);font-weight:400;margin-left:8px;">(Last 40 Days)</span>
+                        Agency List
                     </h3>
                     <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px; align-items:end;">
                         <div class="control-group">
@@ -2109,7 +2264,7 @@
                             <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
                                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                             </div>
-                            <p style="font-size:1.1rem; font-weight:500;">No agencies found in the last 40 days.</p>
+                            <p style="font-size:1.1rem; font-weight:500;">No agencies found.</p>
                             <p style="font-size:0.9rem; margin-top:8px;">Try adjusting your filters above.</p>
                         </div>
                     </div>
@@ -2410,6 +2565,7 @@ const translations = {
         compareAcm: "Compare Module",
         agencyExchange: "Agency Exchange",
         exchangeBoard: "Target Board",
+        agencyTargetTable: "Agency Target Table",
         agencyPoints: "Agency Points",
         checkAgencyPoints: "Check Agency Points",
         smartAllocator: "Smart Allocator",
@@ -2438,6 +2594,7 @@ const translations = {
         compareAcm: "比较模块",
         agencyExchange: "代理交易所",
         exchangeBoard: "目标看板",
+        agencyTargetTable: "机构目标表",
         agencyPoints: "机构积分",
         checkAgencyPoints: "查看机构积分",
         smartAllocator: "智能分配器",
@@ -2525,7 +2682,7 @@ const zhPageTitlesMap = {
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -2670,6 +2827,10 @@ function executePageLogic(page) {
         document.getElementById('pg-exchange').style.display='block';
         _expandNavGroup('navBodyExchange','navArrExchange');
         initExchangePageOnce();
+    } else if(page==='agency-target-table'){
+        document.getElementById('pg-agency-target-table').style.display='block';
+        _expandNavGroup('navBodyExchange','navArrExchange');
+        initAgencyTargetTableOnce();
     } else if(page==='points-records'){
         document.getElementById('pg-points-records').style.display='block';
         _expandNavGroup('navBodyPoints','navArrPoints');
@@ -2873,6 +3034,87 @@ const allAcms=[...pkAcms,...inAcms].sort();
 const allRegs=["pk","in","all"];
 
 function escHtml(s){const d=document.createElement('div');d.appendChild(document.createTextNode(String(s||'')));return d.innerHTML;}
+
+// ═══ Elegant dropzone: drag/drop + paste + thumbnail gallery for file inputs ═══
+// A hidden native <input type="file"> keeps the real FileList in sync (via
+// DataTransfer) so all existing form-submission code that reads file inputs by
+// name works completely unchanged -- this is purely a nicer front-end for it.
+window._dzFiles = window._dzFiles || {};
+
+function dzFileStore(id) {
+    window._dzFiles[id] = window._dzFiles[id] || [];
+    return window._dzFiles[id];
+}
+
+function dzSyncInput(id) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    const dt = new DataTransfer();
+    dzFileStore(id).forEach(f => dt.items.add(f));
+    input.files = dt.files;
+}
+
+function dzAddFiles(id, files) {
+    const store = dzFileStore(id);
+    Array.from(files || []).forEach(f => { if (f) store.push(f); });
+    dzSyncInput(id);
+    dzRenderThumbs(id);
+}
+
+function dzRemoveFile(id, idx) {
+    dzFileStore(id).splice(idx, 1);
+    dzSyncInput(id);
+    dzRenderThumbs(id);
+}
+
+function dzOnNativeChange(id) {
+    // User used the native picker (click-to-upload) -- pull those files into our store too.
+    const input = document.getElementById(id);
+    if (input && input.files) dzAddFiles(id, Array.from(input.files).filter(f => !dzFileStore(id).includes(f)));
+}
+
+function dzHandleDrop(e, id) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('dragover');
+    dzAddFiles(id, e.dataTransfer?.files);
+}
+
+function dzHandlePaste(e, id) {
+    const items = Array.from(e.clipboardData?.items || []);
+    const files = items.filter(it => it.kind === 'file').map(it => it.getAsFile()).filter(Boolean);
+    if (files.length) { e.preventDefault(); dzAddFiles(id, files); }
+}
+
+function dzRenderThumbs(id) {
+    const wrap = document.getElementById(id + '_thumbs');
+    if (!wrap) return;
+    const store = dzFileStore(id);
+    const thumbs = store.map((f, i) => {
+        const isImg = f.type && f.type.startsWith('image/');
+        const url = isImg ? URL.createObjectURL(f) : null;
+        return `<div class="dz-thumb" title="${escHtml(f.name)}">
+            ${isImg ? `<img src="${url}">` : `<div class="dz-thumb-file">📄<span>${escHtml(f.name.length > 12 ? f.name.slice(0,10)+'…' : f.name)}</span></div>`}
+            <button type="button" class="dz-thumb-remove" onclick="event.stopPropagation();dzRemoveFile('${id}',${i})">×</button>
+        </div>`;
+    }).join('');
+    wrap.innerHTML = thumbs + `<div class="dz-thumb-add" onclick="document.getElementById('${id}').click()" title="Add more files">+</div>`;
+}
+
+function buildDropzoneHtml(id, fieldName, required) {
+    return `
+        <div class="elegant-dropzone" tabindex="0"
+             onclick="document.getElementById('${id}').click()"
+             ondragover="event.preventDefault();this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="dzHandleDrop(event,'${id}')"
+             onpaste="dzHandlePaste(event,'${id}')">
+            <div class="dz-hint">📎 Paste or drag files here</div>
+            <div class="dz-upload-link">+ Upload local files</div>
+        </div>
+        <input type="file" id="${id}" name="${escHtml(fieldName)}" ${required ? 'required' : ''} multiple style="display:none" onchange="dzOnNativeChange('${id}')">
+        <div class="dz-thumbs" id="${id}_thumbs"></div>`;
+}
+
 function escapeJSArgs(str) {
     if (!str) return '';
     return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -3450,6 +3692,38 @@ function renderCompareCharts(groups) {
         cumCtx.getContext('2d').clearRect(0,0,cumCtx.width,cumCtx.height);
     }
 
+    // ═══ Target Coverage — Area view (per-group target-as-area + actual-as-line) ═══
+    const areaCtx = document.getElementById('cmpAdvTargetAreaChart');
+    if (charts['cmpAdvTargetAreaChart']) charts['cmpAdvTargetAreaChart'].destroy();
+    if (withYtd.length && withYtd.every(g => g.cumulative_pacing_trend?.length)) {
+        const monthLabels = withYtd[0].cumulative_pacing_trend.map(t=>t.month);
+        const areaDatasets = [];
+        withYtd.forEach((g,i) => {
+            areaDatasets.push({
+                label: `${g.label} — Target (area)`,
+                data: g.cumulative_pacing_trend.map(t=>t.target_pace),
+                borderColor: COMPARE_GROUP_COLORS[i]+'55', backgroundColor: COMPARE_GROUP_COLORS[i]+'26',
+                fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1, borderDash: [3,3],
+            });
+            areaDatasets.push({
+                label: `${g.label} — Actual`,
+                data: g.cumulative_pacing_trend.map(t=>t.actual_pace),
+                borderColor: COMPARE_GROUP_COLORS[i], backgroundColor: 'transparent',
+                fill: false, tension: 0.3, pointRadius: 2, borderWidth: 2.5,
+            });
+        });
+        charts['cmpAdvTargetAreaChart'] = new Chart(areaCtx, {
+            type: 'line',
+            data: { labels: monthLabels, datasets: areaDatasets },
+            options: { responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{position:'top',labels:{color:'#8b8fa3',font:{size:9},boxWidth:10}}, datalabels:{display:false},
+                    tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: ${ctx.raw}%` } } },
+                scales:{ x:{grid:{display:false},ticks:{color:'#8b8fa3'}}, y:{grid:{color:'#2a2c3f'},ticks:{color:'#8b8fa3',callback:v=>v+'%'}} } }
+        });
+    } else {
+        areaCtx.getContext('2d').clearRect(0,0,areaCtx.width,areaCtx.height);
+    }
+
     // ═══ Status Mix (unchanged) ═══
     const statusCtx = document.getElementById('cmpAdvStatusChart');
     if (charts['cmpAdvStatusChart']) charts['cmpAdvStatusChart'].destroy();
@@ -3593,13 +3867,9 @@ function renderCompareConsistency(groups){
 
 function populateCompareDiffSelectors(groups){
     const baseSel = document.getElementById('cmpDiffBaseline');
-    const cmpSel = document.getElementById('cmpDiffCompare');
-    if (!baseSel || !cmpSel) return;
-    const opts = groups.map((g,i) => `<option value="${i}">${escHtml(g.label)}</option>`).join('');
-    baseSel.innerHTML = opts;
-    cmpSel.innerHTML = opts;
+    if (!baseSel) return;
+    baseSel.innerHTML = groups.map((g,i) => `<option value="${i}">${escHtml(g.label)}</option>`).join('');
     baseSel.value = 0;
-    cmpSel.value = groups.length > 1 ? groups.length - 1 : 0;
 }
 
 function renderCompareDiff(){
@@ -3607,18 +3877,24 @@ function renderCompareDiff(){
     const wrap = document.getElementById('cmpDiffTableWrap');
     if (!wrap || groups.length < 2) { if(wrap) wrap.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem">Run a comparison with at least 2 groups.</div>'; return; }
     const baseIdx = Number(document.getElementById('cmpDiffBaseline')?.value || 0);
-    const cmpIdx = Number(document.getElementById('cmpDiffCompare')?.value || 1);
-    const a = groups[baseIdx], b = groups[cmpIdx];
-    if (!a || !b) return;
+    const baseline = groups[baseIdx];
+    if (!baseline) return;
     const defs = _cmpMetricDefs(groups);
+
     const rows = defs.map(d => {
-        const aVal = _cmpGetMetric(a, d.path), bVal = _cmpGetMetric(b, d.path);
-        if (aVal === null || bVal === null) return null;
-        const delta = bVal - aVal;
-        const growth = aVal !== 0 ? (delta/Math.abs(aVal))*100 : (bVal>0?100:0);
-        const improved = d.higherBetter ? delta > 0 : delta < 0;
-        const flat = Math.abs(growth) < 0.05;
-        return { ...d, aVal, bVal, delta, growth: Math.round(growth*10)/10, improved, flat };
+        const baseVal = _cmpGetMetric(baseline, d.path);
+        const cells = groups.map((g, i) => {
+            const val = _cmpGetMetric(g, d.path);
+            if (val === null || val === undefined) return { val: null };
+            if (i === baseIdx || baseVal === null || baseVal === undefined) return { val, isBaseline: i === baseIdx };
+            const delta = val - baseVal;
+            const growth = baseVal !== 0 ? (delta/Math.abs(baseVal))*100 : (val>0?100:0);
+            const improved = d.higherBetter ? delta > 0 : delta < 0;
+            const flat = Math.abs(growth) < 0.05;
+            return { val, delta, growth: Math.round(growth*10)/10, improved, flat };
+        });
+        if (cells.every(c => c.val === null)) return null;
+        return { ...d, cells };
     }).filter(Boolean);
 
     wrap.innerHTML = `
@@ -3626,24 +3902,22 @@ function renderCompareDiff(){
             <thead>
                 <tr style="text-align:left;border-bottom:2px solid var(--border);color:var(--text-muted);font-size:.75rem;text-transform:uppercase">
                     <th style="padding:8px">Metric</th>
-                    <th style="padding:8px">${escHtml(a.label)}</th>
-                    <th style="padding:8px">${escHtml(b.label)}</th>
-                    <th style="padding:8px">Δ</th>
-                    <th style="padding:8px">Growth %</th>
+                    ${groups.map((g,i) => `<th style="padding:8px">${escHtml(g.label)}${i===baseIdx?' <span style="color:var(--accent-cyan);font-size:.68rem">(baseline)</span>':''}</th>`).join('')}
                 </tr>
             </thead>
             <tbody>
                 ${rows.map(r => `
                     <tr style="border-bottom:1px solid var(--border)">
                         <td style="padding:8px">${escHtml(r.label)}</td>
-                        <td style="padding:8px">${_cmpFmt(r.aVal, r.isPct)}</td>
-                        <td style="padding:8px">${_cmpFmt(r.bVal, r.isPct)}</td>
-                        <td style="padding:8px;color:${r.delta>=0?'var(--accent-green)':'var(--accent-rose)'}">${r.delta>=0?'+':''}${_cmpFmt(r.delta, r.isPct)}</td>
-                        <td style="padding:8px">
-                            <span style="color:${r.flat?'var(--text-muted)':r.improved?'var(--accent-green)':'var(--accent-rose)'};font-weight:700">
-                                ${r.flat ? '—' : (r.improved ? '📈 ' : '📉 ') + (r.growth>=0?'+':'') + r.growth + '%'}
-                            </span>
-                        </td>
+                        ${r.cells.map(c => {
+                            if (c.val === null) return `<td style="padding:8px;color:var(--text-muted)">—</td>`;
+                            if (c.isBaseline) return `<td style="padding:8px;font-weight:700">${_cmpFmt(c.val, r.isPct)}</td>`;
+                            const color = c.flat ? 'var(--text-muted)' : c.improved ? 'var(--accent-green)' : 'var(--accent-rose)';
+                            return `<td style="padding:8px">
+                                <div>${_cmpFmt(c.val, r.isPct)}</div>
+                                <div style="color:${color};font-weight:700;font-size:.78rem">${c.flat ? '—' : (c.improved ? '📈 ' : '📉 ') + (c.growth>=0?'+':'') + c.growth + '%'}</div>
+                            </td>`;
+                        }).join('')}
                     </tr>
                 `).join('')}
             </tbody>
@@ -3726,6 +4000,12 @@ function formatXcoins(points){
     if (abs >= 1_000_000) return sign + (abs / 1_000_000).toFixed(1) + "M XC";
     if (abs >= 1_000) return sign + (abs / 1_000).toFixed(0) + "K XC";
     return sign + abs.toLocaleString() + " XC";
+}
+
+// Small "?" info icon with a hover tooltip -- used next to metric labels/chart
+// titles so a manager glancing at the board doesn't need this explained verbally.
+function infoTip(text){
+    return `<span class="info-tip" data-tip="${escHtml(text)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>`;
 }
 
 function sparklineSvg(values, color){
@@ -4259,6 +4539,8 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
+     'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(key => {
         const master = key.split('_')[0];
@@ -4470,6 +4752,8 @@ async function confirmSaveRole() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
+     'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
         if(document.getElementById(`mod_${m}`).checked) modules.push(m);
@@ -4519,6 +4803,8 @@ async function addAgent() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
+     'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
         if(document.getElementById(`mod_${m}`).checked) modules.push(m);
@@ -5245,6 +5531,7 @@ async function fetchAgencyData() {
             document.getElementById('displayTargetCoins').style.color='var(--text)';
             
             showTargetViewElements();
+            if (data.target_analytics) renderAgencyAnalytics(data);
         } else if (currentType==='points') {
             const bal=data.point_balance||0;
             document.getElementById('displayTargetTitle').innerText='Current Available Points';
@@ -6460,6 +6747,13 @@ function enforceLocks() {
 }
 
 function hasMod(m) { return isAdmin || userModules.some(um => um.includes(m)); }
+
+// Sub-feature gating: an admin can grant a narrow module key (e.g. 'exchange_needs_push')
+// to give someone just that one panel. Anyone with the broader existing Analytics
+// access (analytics_report/analytics_compare/etc, matched via hasMod substring same
+// as the backend) keeps seeing every sub-feature exactly as before -- this is
+// additive-only and never removes access an existing agent already has.
+function hasSubFeature(key) { return hasExactMod(key) || hasMod('analytics') || isAdmin; }
 function hasExactMod(m) { return isAdmin || userModules.includes(m); }
 
 function configureSidebarAndCards() {
@@ -6483,9 +6777,36 @@ function configureSidebarAndCards() {
         if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
     }
 
-    if (!hasExactMod('analytics_exchange') && !hasExactMod('analytics') && !isAdmin) {
+    if (!hasMod('analytics') && !isAdmin) {
         document.getElementById('navGrpExchange').style.display = 'none';
     }
+
+    // Sub-feature gating (Exchange). Additive-only per hasSubFeature() -- never
+    // hides anything from someone who already had broader analytics access.
+    const exNeedsPushCard = document.getElementById('exNeedsPushPanel')?.closest('.card');
+    if (exNeedsPushCard && !hasSubFeature('exchange_needs_push')) exNeedsPushCard.style.display = 'none';
+    const exMoversCard = document.getElementById('exMoversPanel')?.closest('.card');
+    if (exMoversCard && !hasSubFeature('exchange_movers')) exMoversCard.style.display = 'none';
+    const exHeatmapBtn = document.getElementById('exViewBtn-heatmap');
+    if (exHeatmapBtn && !hasSubFeature('exchange_heatmap')) exHeatmapBtn.style.display = 'none';
+    const exWatchlistBtn = document.getElementById('exViewBtn-watchlist');
+    if (exWatchlistBtn && !hasSubFeature('exchange_watchlist')) exWatchlistBtn.style.display = 'none';
+
+    // Sub-feature gating (Compare).
+    const cmpRadarCard = document.getElementById('cmpAdvRadarChart')?.closest('.card');
+    if (cmpRadarCard && !hasSubFeature('compare_radar')) cmpRadarCard.style.display = 'none';
+    const cmpDiffCard = document.getElementById('cmpDiffTableWrap')?.closest('.card');
+    if (cmpDiffCard && !hasSubFeature('compare_diff')) cmpDiffCard.style.display = 'none';
+    const cmpAreaCard = document.getElementById('cmpAdvTargetAreaChart')?.closest('.card');
+    if (cmpAreaCard && !hasSubFeature('compare_area_chart')) cmpAreaCard.style.display = 'none';
+    const cmpLeaderboardCard = document.getElementById('cmpLeaderboard')?.closest('.card');
+    if (cmpLeaderboardCard && !hasSubFeature('compare_leaderboard')) cmpLeaderboardCard.style.display = 'none';
+    const cmpConsistencyCard = document.getElementById('cmpConsistency')?.closest('.card');
+    if (cmpConsistencyCard && !hasSubFeature('compare_consistency')) cmpConsistencyCard.style.display = 'none';
+
+    // New Agency Target Table page/nav item.
+    const targetTableNav = document.getElementById('nav-agency-target-table');
+    if (targetTableNav && !hasSubFeature('agency_target_table')) targetTableNav.style.display = 'none';
 
     if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
     else {
@@ -7097,11 +7418,12 @@ async function twOpenWorkspace(recordId) {
         if (rrWrap) {
             const rrMeta = FIELD_SCHEMA['Reject Reason'];
             const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
-            rrWrap.innerHTML = (rrMeta?.options || []).map(o => `
-                <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
-                    <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent-rose);">
-                    ${escHtml(o)}
-                </label>`).join('');
+            rrWrap.innerHTML = `<div class="msel-wrap">${(rrMeta?.options || []).map(o => `
+                <label class="msel-toggle ${rrChecked.has(o) ? 'active' : ''}" onclick="this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+                    <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="display:none">
+                    <span class="msel-dot" style="border-color:var(--accent-rose)">✓</span>
+                    <span class="msel-text">${escHtml(o)}</span>
+                </label>`).join('')}</div>`;
         }
 
         // ISSUE 5 FIX: "Create Way" restored as a dropdown in the Duplicate Check card.
@@ -7711,7 +8033,8 @@ function twRenderAttachmentControl(wrap, label, key, meta, value) {
     } else {
         html += `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:6px;">No attachment yet -- add one below.</div>`;
     }
-    html += `<input type="file" name="${escHtml(key)}" multiple class="form-highlight-input" style="font-size:0.75rem;padding:8px;background:rgba(255,255,255,0.02) !important;">`;
+    const dzId = `dz_${escapeJSArgs(key)}_${Math.random().toString(36).slice(2,8)}`;
+    html += buildDropzoneHtml(dzId, key, false);
     wrap.innerHTML = html;
     // Stash the existing (valid) tokens on the wrap element so twSaveWorkspace/
     // twRunVerify can resend them alongside any newly uploaded files -- the backend
@@ -7881,11 +8204,12 @@ function createTwControl(key, value) {
     if (meta?.ui_type === 'MultiSelect' && meta.options) {
         const checkedSet = new Set(feishuValueToList(value));
         const chks = meta.options.map(o => `
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
-                <input type="checkbox" name="${escHtml(key)}" value="${escHtml(o)}" data-multi="true" ${checkedSet.has(o) ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent-cyan);">
-                ${escHtml(o)}
+            <label class="msel-toggle ${checkedSet.has(o) ? 'active' : ''}" onclick="this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+                <input type="checkbox" name="${escHtml(key)}" value="${escHtml(o)}" data-multi="true" ${checkedSet.has(o) ? 'checked' : ''} style="display:none">
+                <span class="msel-dot">✓</span>
+                <span class="msel-text">${escHtml(o)}</span>
             </label>`).join('');
-        wrap.innerHTML = label + `<div class="sub-opts" style="flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;">${chks}</div>`;
+        wrap.innerHTML = label + `<div class="msel-wrap">${chks}</div>`;
         return wrap;
     }
     if (meta?.ui_type === 'Checkbox') {
@@ -8174,6 +8498,7 @@ function alIsRejected(status) {
 
 function alSetView(view) {
     alCurrentView = view;
+    alCurrentPage = 1;
     const accBtn = document.getElementById('alToggleAccepted');
     const rejBtn = document.getElementById('alToggleRejected');
     if (view === 'accepted') {
@@ -8183,6 +8508,14 @@ function alSetView(view) {
         rejBtn.style.background = 'var(--accent-rose)'; rejBtn.style.color = '#2a0000';
         accBtn.style.background = 'transparent'; accBtn.style.color = 'var(--text-muted)';
     }
+    alRenderTable();
+}
+
+let alCurrentPage = 1;
+const AL_PAGE_SIZE = 50;
+
+function alGoToPage(p){
+    alCurrentPage = p;
     alRenderTable();
 }
 
@@ -8198,16 +8531,25 @@ function alRenderTable() {
     document.getElementById('alCountRejected').textContent = `(${rejected.length})`;
 
     const results = alCurrentView === 'accepted' ? accepted : rejected;
-    countEl.textContent = `${results.length} agenc${results.length===1?'y':'ies'} — ${alCurrentView} (last 40 days)`;
+    const totalPages = Math.max(1, Math.ceil(results.length / AL_PAGE_SIZE));
+    if (alCurrentPage > totalPages) alCurrentPage = totalPages;
+    if (alCurrentPage < 1) alCurrentPage = 1;
 
     if (!results.length) {
         tableEl.style.display = 'none';
         emptyEl.style.display = 'block';
+        countEl.textContent = `0 agencies — ${alCurrentView}`;
+        const pagerEl = document.getElementById('alPager');
+        if (pagerEl) pagerEl.innerHTML = '';
         return;
     }
     emptyEl.style.display = 'none';
 
-    tbody.innerHTML = results.map((r, i) => {
+    const startIdx = (alCurrentPage - 1) * AL_PAGE_SIZE;
+    const pageResults = results.slice(startIdx, startIdx + AL_PAGE_SIZE);
+    countEl.textContent = `${results.length} agenc${results.length===1?'y':'ies'} — ${alCurrentView} — page ${alCurrentPage} of ${totalPages}`;
+
+    tbody.innerHTML = pageResults.map((r, i) => {
         const typeClass = (r.agency_type||'').toLowerCase().includes('walk') ? 'al-type-walkin' :
                           (r.agency_type||'').toLowerCase().includes('acm') ? 'al-type-acm' :
                           (r.agency_type||'').toLowerCase().includes('bd') ? 'al-type-bd' : 'al-type-default';
@@ -8226,9 +8568,152 @@ function alRenderTable() {
         </tr>`;
     }).join('');
     tableEl.style.display = '';
+    alRenderPager(totalPages);
+}
+
+function alRenderPager(totalPages){
+    let pagerEl = document.getElementById('alPager');
+    if (!pagerEl) {
+        pagerEl = document.createElement('div');
+        pagerEl.id = 'alPager';
+        pagerEl.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:6px;padding:16px 24px;flex-wrap:wrap';
+        document.getElementById('alTable').closest('.al-table-wrap').after(pagerEl);
+    }
+    if (totalPages <= 1) { pagerEl.innerHTML = ''; return; }
+
+    const btn = (label, page, disabled, active) => `
+        <button onclick="alGoToPage(${page})" ${disabled?'disabled':''} style="min-width:34px;padding:6px 10px;border-radius:8px;border:1px solid ${active?'var(--accent-cyan)':'var(--border)'};background:${active?'rgba(0,212,255,.12)':'var(--bg)'};color:${active?'var(--accent-cyan)':disabled?'var(--text-muted)':'var(--text)'};font-size:.8rem;font-weight:${active?'700':'500'};cursor:${disabled?'not-allowed':'pointer'};opacity:${disabled?'.5':'1'}">${label}</button>`;
+
+    let pages = [];
+    const cur = alCurrentPage;
+    const windowSize = 2;
+    for (let p = 1; p <= totalPages; p++) {
+        if (p === 1 || p === totalPages || (p >= cur - windowSize && p <= cur + windowSize)) pages.push(p);
+        else if (pages[pages.length-1] !== '…') pages.push('…');
+    }
+
+    pagerEl.innerHTML = btn('‹ Prev', cur - 1, cur === 1, false) +
+        pages.map(p => p === '…' ? `<span style="color:var(--text-muted);padding:0 4px">…</span>` : btn(p, p, false, p === cur)).join('') +
+        btn('Next ›', cur + 1, cur === totalPages, false);
+}
+
+// ═══ Agency Target Table — mirrors Search Records (prFetch) exactly: server-side
+// pagination, same filter bar layout, same loading/empty states. Data source is
+// the bulk privilege ledger endpoint (Points + Requests snapshots already kept
+// warm by the cron) -- no live per-agency calls. ═══
+let attCurrentPage = 1;
+let attDebounceTimer = null;
+
+function attDebounce(){
+    clearTimeout(attDebounceTimer);
+    attDebounceTimer = setTimeout(() => attFetch(1), 400);
+}
+
+async function attFetch(page) {
+    page = Math.max(1, page || 1);
+    attCurrentPage = page;
+
+    const pageSize = parseInt(document.getElementById('attPageSize')?.value || '50');
+    const params = new URLSearchParams({
+        page, page_size: pageSize,
+        user: loggedUser || '', email: loggedEmail || '',
+        q: document.getElementById('attSearch')?.value || '',
+        region: document.getElementById('attRegion')?.value || '',
+    });
+    for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
+
+    const spinner   = document.getElementById('attLoadingSpinner');
+    const countEl   = document.getElementById('attResultCount');
+    const tableEl   = document.getElementById('attTable');
+    const emptyEl   = document.getElementById('attEmpty');
+    const pagination= document.getElementById('attPagination');
+
+    if (spinner)  spinner.style.display = 'inline';
+    if (tableEl)  tableEl.style.display = 'none';
+    if (emptyEl)  emptyEl.style.display = 'none';
+    if (pagination) pagination.style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/agency-target-table?' + params.toString());
+        let data;
+        try { data = await resp.json(); }
+        catch(e) { throw new Error('Server timeout: Data too large or loading'); }
+
+        if (!resp.ok) throw new Error(data.error || ('API error ' + resp.status));
+        if (spinner) spinner.style.display = 'none';
+
+        const rows = data.rows || [];
+        if (!rows.length) {
+            if (emptyEl) emptyEl.style.display = 'block';
+            if (countEl) countEl.textContent = '0 agencies with claims this month';
+            return;
+        }
+
+        if (countEl) countEl.textContent = `${data.total_count} agenc${data.total_count===1?'y':'ies'} with claims this month`;
+
+        const tbody = document.getElementById('attTbody');
+        tbody.innerHTML = rows.map((r, i) => {
+            const rowId = `attRow${i}`;
+            const rowStyle = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.025)';
+            const privSummary = r.privileges.map(p => p.privilege).join(', ');
+            const detailRows = r.privileges.map(p => `
+                <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 12px 8px 40px;color:var(--text-muted);font-size:.8rem">${escHtml(p.privilege)}</td>
+                    <td style="padding:8px 12px;font-size:.8rem">Earned: <b>${p.total_earned}</b></td>
+                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-green)">Claimed: <b>${p.claimed}</b></td>
+                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-cyan)">Remaining: <b>${p.remaining}</b></td>
+                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-amber)">Pending: <b>${p.pending}</b></td>
+                    <td style="padding:8px 12px;font-size:.8rem;color:var(--accent-rose)">Rejected: <b>${p.rejected}</b></td>
+                </tr>`).join('');
+
+            return `<tr style="${rowStyle};border-bottom:1px solid var(--border);cursor:pointer" onclick="attToggleRow('${rowId}')">
+                    <td style="padding:12px;color:var(--text-muted)"><span id="${rowId}-arrow">▸</span></td>
+                    <td style="padding:12px"><strong style="color:var(--accent-cyan)">${escHtml(r.agency_name)}</strong><div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.agency_code)} · ${escHtml(privSummary)}</div></td>
+                    <td style="padding:12px;font-size:.85rem">${escHtml(r.acm)}<div style="font-size:.72rem;color:var(--text-muted)">${escHtml(r.region)}</div></td>
+                    <td style="padding:12px;font-size:.8rem;color:var(--text-muted)">${r.privileges.length} type${r.privileges.length===1?'':'s'}</td>
+                    <td style="padding:12px;font-weight:700;color:var(--accent-green)">${r.total_claimed}</td>
+                    <td style="padding:12px;font-weight:700;color:var(--accent-amber)">${r.total_pending}</td>
+                    <td style="padding:12px;font-weight:700;color:var(--accent-rose)">${r.total_rejected}</td>
+                </tr>
+                <tr id="${rowId}-detail" style="display:none;background:rgba(0,212,255,.03)">
+                    <td colspan="7" style="padding:0">
+                        <table style="width:100%;border-collapse:collapse">${detailRows}</table>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        tableEl.style.display = '';
+
+        if (data.total_pages > 1) {
+            document.getElementById('attPageNum').textContent = data.page;
+            document.getElementById('attTotalPages').textContent = data.total_pages;
+            document.getElementById('attTotalCount').textContent = data.total_count;
+            document.getElementById('attPrevBtn').disabled = data.page <= 1;
+            document.getElementById('attNextBtn').disabled = data.page >= data.total_pages;
+            pagination.style.display = 'flex';
+        }
+    } catch(e) {
+        if (spinner) spinner.style.display = 'none';
+        if (emptyEl) { emptyEl.style.display = 'block'; emptyEl.querySelector('p').textContent = e.message; }
+        ToastManager.show('Agency Target Table failed to load: ' + e.message, 'error');
+    }
+}
+
+function attToggleRow(rowId){
+    const detail = document.getElementById(`${rowId}-detail`);
+    const arrow = document.getElementById(`${rowId}-arrow`);
+    if (!detail) return;
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'table-row';
+    if (arrow) arrow.textContent = isOpen ? '▸' : '▾';
+}
+
+function initAgencyTargetTableOnce(){
+    attFetch(1);
 }
 
 async function alFetch() {
+    alCurrentPage = 1;
     const spinner = document.getElementById('alLoadingSpinner');
     const countEl = document.getElementById('alResultCount');
     const tableEl = document.getElementById('alTable');
@@ -8383,15 +8868,14 @@ function buildFieldControl(fName, def, req) {
         wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} class="form-highlight-input">${opts}</select>`;
     } else if (def.type === 'multiselect') {
         let chks = def.options.map(o => `
-            <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; font-weight:600; cursor:pointer; color:var(--text); padding:6px 0; text-transform:none;">
-                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="width:18px;height:18px;accent-color:var(--accent-cyan);cursor:pointer;">
-                ${escHtml(o)}
+            <label class="msel-toggle" onclick="this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+                <input type="checkbox" name="${escHtml(fName)}" value="${escHtml(o)}" style="display:none">
+                <span class="msel-dot">✓</span>
+                <span class="msel-text">${escHtml(o)}</span>
             </label>`).join('');
-        wrap.innerHTML += `<div class="sub-opts" style="flex-direction:column; gap:6px; max-height:280px; overflow-y:auto; border:1px solid var(--accent-cyan); background:rgba(0,212,255,0.03);">${chks}</div>`;
+        wrap.innerHTML += `<div class="msel-wrap">${chks}</div>`;
     } else if (def.type === 'file') {
-        wrap.innerHTML += `
-            <input type="file" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} multiple
-                style="background:rgba(255,255,255,0.02); border:1px dashed var(--accent-purple); padding:20px 14px; cursor:pointer;" class="form-highlight-input">`;
+        wrap.innerHTML += buildDropzoneHtml(idSafe, fName, req);
     }
     return wrap;
 }
