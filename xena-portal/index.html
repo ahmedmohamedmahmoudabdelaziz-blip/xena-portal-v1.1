@@ -1627,10 +1627,11 @@
                         </div>
                         <div class="module-card" style="border-color:rgba(0,212,255,.25)">
                             <div class="module-header">
-                                <h4>🏛 Agency Exchange — Sub-Features</h4>
+                                <h4>🏛 Agency Exchange Module</h4>
                             </div>
-                            <p style="font-size:.75rem;color:var(--text-muted);margin:-4px 0 10px">Fine-grained toggles for the Target Board. Leave unchecked to keep default access (anyone with broader Analytics access still sees everything) — check these to grant just these specific pieces to someone without full Analytics/Compare access.</p>
+                            <p style="font-size:.75rem;color:var(--text-muted);margin:-4px 0 10px">Grant access to the Target Board. The sub-toggles below add specific panels. (Users with full Analytics access see everything automatically).</p>
                             <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange"> Target Board (Main)</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_needs_push"> Needs a Push panel</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_movers"> Movers panel</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_exchange_heatmap"> Heatmap view</label>
@@ -6815,14 +6816,25 @@ function configureSidebarAndCards() {
 
     if (isAdmin) {
         document.getElementById('navGrpAdmin').style.display = 'block';
-        // Quietly check for pending access requests so the sidebar badge is populated
-        // without the admin needing to open the tab first.
-        fetch('/api/admin/access-requests', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
-            .then(r=>r.ok?r.json():[])
-            .then(reqs=>{
-                const badge = document.getElementById('pendingRequestsBadge');
-                if (badge && Array.isArray(reqs) && reqs.length) { badge.style.display='inline-block'; badge.textContent = reqs.length; }
-            }).catch(()=>{});
+        // Check for pending access requests every 30 seconds to update the red dot immediately
+        const checkAccessReqs = () => {
+            fetch('/api/admin/access-requests', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
+                .then(r=>r.ok?r.json():[])
+                .then(reqs=>{
+                    const badge = document.getElementById('pendingRequestsBadge');
+                    if (badge && Array.isArray(reqs)) {
+                        if (reqs.length > 0) {
+                            badge.style.display = 'inline-block';
+                            badge.textContent = reqs.length;
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                }).catch(()=>{});
+        };
+        
+        checkAccessReqs(); // Check immediately on load
+        setInterval(checkAccessReqs, 30000); // Check again every 30 seconds
     }
 
     const icons = {
