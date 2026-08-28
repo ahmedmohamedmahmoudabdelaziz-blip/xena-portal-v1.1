@@ -6791,6 +6791,15 @@ function configureSidebarAndCards() {
         if (!hasExactMod('target_timeline') && !hasExactMod('target')) document.getElementById('nav-target-timeline').style.display = 'none';
     }
 
+    // RESTORED: Agency Points security locks
+    if (!hasMod('points')) document.getElementById('navGrpPoints').style.display = 'none';
+    else {
+        if (!hasExactMod('points_check') && !hasExactMod('points')) document.getElementById('nav-points').style.display = 'none';
+        if (!hasExactMod('points_allocator') && !hasExactMod('points')) document.getElementById('nav-allocator').style.display = 'none';
+        if (!hasExactMod('points_records') && !hasExactMod('points')) document.getElementById('nav-points-records').style.display = 'none';
+        if (!hasExactMod('points_table') && !hasExactMod('points')) document.getElementById('nav-points-table').style.display = 'none';
+    }
+
     if (!hasMod('analytics')) document.getElementById('navGrpAnalytics').style.display = 'none';
     else {
         if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
