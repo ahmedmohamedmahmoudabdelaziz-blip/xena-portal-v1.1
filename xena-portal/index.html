@@ -6806,51 +6806,14 @@ function configureSidebarAndCards() {
     }
 
     // Sub-feature gating (Exchange). Additive-only per hasSubFeature() -- never
-    // hides anything from someone who already had broader analytics access.
-    const exNeedsPushCard = document.getElementById('exNeedsPushPanel')?.closest('.card');
-    if (exNeedsPushCard && !hasSubFeature('exchange_needs_push')) exNeedsPushCard.style.display = 'none';
-    const exMoversCard = document.getElementById('exMoversPanel')?.closest('.card');
-    if (exMoversCard && !hasSubFeature('exchange_movers')) exMoversCard.style.display = 'none';
-    const exHeatmapBtn = document.getElementById('exViewBtn-heatmap');
-    if (exHeatmapBtn && !hasSubFeature('exchange_heatmap')) exHeatmapBtn.style.display = 'none';
-    const exWatchlistBtn = document.getElementById('exViewBtn-watchlist');
-    if (exWatchlistBtn && !hasSubFeature('exchange_watchlist')) exWatchlistBtn.style.display = 'none';
-
-    // Sub-feature gating (Compare).
-    const cmpRadarCard = document.getElementById('cmpAdvRadarChart')?.closest('.card');
-    if (cmpRadarCard && !hasSubFeature('compare_radar')) cmpRadarCard.style.display = 'none';
-    const cmpDiffCard = document.getElementById('cmpDiffTableWrap')?.closest('.card');
-    if (cmpDiffCard && !hasSubFeature('compare_diff')) cmpDiffCard.style.display = 'none';
-    const cmpAreaCard = document.getElementById('cmpAdvTargetAreaChart')?.closest('.card');
-    if (cmpAreaCard && !hasSubFeature('compare_area_chart')) cmpAreaCard.style.display = 'none';
-    const cmpLeaderboardCard = document.getElementById('cmpLeaderboard')?.closest('.card');
-    if (cmpLeaderboardCard && !hasSubFeature('compare_leaderboard')) cmpLeaderboardCard.style.display = 'none';
-    const cmpConsistencyCard = document.getElementById('cmpConsistency')?.closest('.card');
-    if (cmpConsistencyCard && !hasSubFeature('compare_consistency')) cmpConsistencyCard.style.display = 'none';
-
-    // New Agency Target Table page/nav item.
-    const targetTableNav = document.getElementById('nav-agency-target-table');
-    if (targetTableNav && !hasSubFeature('target_table')) targetTableNav.style.display = 'none';
-
-    if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
-    else {
-        if (!hasExactMod('query_requests') && !hasExactMod('query')) document.getElementById('nav-query').style.display = 'none';
-        if (!hasExactMod('query_agency_list') && !hasExactMod('query')) { const el=document.getElementById('nav-agency-list'); if (el) el.style.display = 'none'; }
-    }
-
-    if (!hasMod('submit')) document.getElementById('navGrpSubmit').style.display = 'none';
-    else {
-        if (!hasExactMod('submit_new_request') && !hasExactMod('submit')) document.getElementById('nav-new-request').style.display = 'none';
-        if (!hasExactMod('submit_my_requests') && !hasExactMod('submit')) { const el=document.getElementById('nav-my-requests'); if (el) el.style.display = 'none'; }
-    }
-
+// ... existing code ...
     if (hasExactMod('tickets_live_queue') || hasExactMod('tickets') || isAdmin) {
         document.getElementById('navGrpTickets').style.display = 'block';
     }
 
     if (isAdmin) {
         document.getElementById('navGrpAdmin').style.display = 'block';
-        let lastAccessReqCount = 0;
+        let lastAccessReqCount = -1; // -1 means it hasn't checked yet
         // Check for pending access requests every 30 seconds to update the red dot immediately
         const checkAccessReqs = () => {
             fetch('/api/admin/access-requests', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
@@ -6859,7 +6822,11 @@ function configureSidebarAndCards() {
                     const badge = document.getElementById('pendingRequestsBadge');
                     if (badge && Array.isArray(reqs)) {
                         if (reqs.length > 0) {
-                            if (reqs.length > lastAccessReqCount) playNotifySound();
+                            // Only play sound if it's NOT the first load, and count went up.
+                            // Browsers block audio on first load unless user clicked something!
+                            if (lastAccessReqCount !== -1 && reqs.length > lastAccessReqCount) {
+                                playNotifySound();
+                            }
                             badge.style.display = 'inline-block';
                             badge.textContent = reqs.length;
                         } else {
