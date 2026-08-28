@@ -2531,10 +2531,9 @@ let loggedUat=localStorage.getItem('xenaUat');
 let pendingRequests=new Map();  
 let activeFilters={};           
 let sparkCharts={};             
-let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQueryAcm,pQueryReg;
+let pTargetAcm,pTargetReg,pPointsAcm,pPointsReg,pAnalyticsAcm,pAnalyticsReg,pQueryAcm,pQueryReg,pExchangeAcm,pExchangeReg;
 
 const urlParams=new URLSearchParams(window.location.search);
-
 function renderUserIds(ids) {
     if (!ids || !ids.length) return '';
     return `<div class="tl-users">
@@ -2864,16 +2863,20 @@ function executePageLogic(page) {
 function filterSidebar() {
     const term = document.getElementById('sidebarSearch').value.toLowerCase();
     
-    if (!term) {
-        document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'block');
-        return;
-    }
+    // Reset all to block, then re-apply strict permissions BEFORE filtering
+    document.querySelectorAll('.nav-item').forEach(el => el.style.display = 'block');
+    document.querySelectorAll('.nav-group').forEach(el => el.style.display = 'block');
+    configureSidebarAndCards();
+    
+    if (!term) return;
 
     document.querySelectorAll('.nav-group').forEach(group => {
+        if (group.style.display === 'none') return; // Skip locked groups
         let hasVisibleChild = false;
         const items = group.querySelectorAll('.nav-item');
         
         items.forEach(item => {
+            if (item.style.display === 'none') return; // Skip locked items
             const text = item.textContent.toLowerCase();
             if (text.includes(term)) {
                 item.style.display = 'block';
@@ -2888,8 +2891,26 @@ function filterSidebar() {
         if (hasVisibleChild) {
             body.classList.add('open');
             if(arr) arr.classList.add('open');
+        } else {
+            group.style.display = 'none';
         }
     });
+}
+
+function playNotifySound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.15);
+        osc.stop(ctx.currentTime + 0.15);
+    } catch(e){}
 }
 
 const ToastManager = {
@@ -4532,7 +4553,7 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(key => {
@@ -4555,6 +4576,8 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     pAnalyticsReg.setValues(parseGranular(regRaw,'analytics'));
     pQueryAcm.setValues(parseGranular(acmsRaw,'query'));
     pQueryReg.setValues(parseGranular(regRaw,'query'));
+    pExchangeAcm.setValues(parseGranular(acmsRaw,'exchange'));
+    pExchangeReg.setValues(parseGranular(regRaw,'exchange'));
 }
 
 function editAgent(email,modulesStr,acmsRaw,regRaw) {
@@ -4745,7 +4768,7 @@ async function confirmSaveRole() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
@@ -4760,11 +4783,13 @@ async function confirmSaveRole() {
         modules: modules.join(', '),
         acms: {
             target:pTargetAcm.getValues().join(','), points:pPointsAcm.getValues().join(','),
-            analytics:pAnalyticsAcm.getValues().join(','), query:pQueryAcm.getValues().join(',')
+            analytics:pAnalyticsAcm.getValues().join(','), query:pQueryAcm.getValues().join(','),
+            exchange:pExchangeAcm.getValues().join(',')
         },
         regions: {
             target:pTargetReg.getValues().join(','), points:pPointsReg.getValues().join(','),
-            analytics:pAnalyticsReg.getValues().join(','), query:pQueryReg.getValues().join(',')
+            analytics:pAnalyticsReg.getValues().join(','), query:pQueryReg.getValues().join(','),
+            exchange:pExchangeReg.getValues().join(',')
         }
     };
 
@@ -4796,7 +4821,7 @@ async function addAgent() {
     ['target_check','target_timeline',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare',
-     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','agency_target_table',
+     'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
@@ -4811,13 +4836,15 @@ async function addAgent() {
         target:pTargetAcm.getValues().join(','),
         points:pPointsAcm.getValues().join(','),
         analytics:pAnalyticsAcm.getValues().join(','),
-        query:pQueryAcm.getValues().join(',')
+        query:pQueryAcm.getValues().join(','),
+        exchange:pExchangeAcm.getValues().join(',')
     };
     const commonRegions={
         target:pTargetReg.getValues().join(','),
         points:pPointsReg.getValues().join(','),
         analytics:pAnalyticsReg.getValues().join(','),
-        query:pQueryReg.getValues().join(',')
+        query:pQueryReg.getValues().join(','),
+        exchange:pExchangeReg.getValues().join(',')
     };
 
     let successCount = 0, failures = [];
@@ -5040,6 +5067,8 @@ function initPills() {
     pAnalyticsReg=new PillSelect('analyticsRegSelect',allRegs);
     pQueryAcm=new PillSelect('queryAcmSelect',allAcms);
     pQueryReg=new PillSelect('queryRegSelect',allRegs);
+    pExchangeAcm=new PillSelect('exchangeAcmSelect',allAcms);
+    pExchangeReg=new PillSelect('exchangeRegSelect',allRegs);
 }
 
 function crossFilter(dimension, value) {
@@ -6762,10 +6791,11 @@ function configureSidebarAndCards() {
         if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
     }
 
-    if (!hasMod('analytics') && !hasMod('exchange') && !isAdmin) {
+    const hasFullAnalytics = hasExactMod('analytics') || isAdmin;
+    if (!hasMod('exchange') && !hasFullAnalytics) {
         document.getElementById('navGrpExchange').style.display = 'none';
     } else {
-        if (!hasExactMod('exchange') && !hasExactMod('analytics') && !isAdmin) {
+        if (!hasExactMod('exchange') && !hasFullAnalytics) {
             const el = document.getElementById('nav-exchange');
             if (el) el.style.display = 'none';
         }
@@ -6796,7 +6826,7 @@ function configureSidebarAndCards() {
 
     // New Agency Target Table page/nav item.
     const targetTableNav = document.getElementById('nav-agency-target-table');
-    if (targetTableNav && !hasSubFeature('agency_target_table')) targetTableNav.style.display = 'none';
+    if (targetTableNav && !hasSubFeature('target_table')) targetTableNav.style.display = 'none';
 
     if (!hasMod('query')) document.getElementById('navGrpQuery').style.display = 'none';
     else {
@@ -6816,6 +6846,7 @@ function configureSidebarAndCards() {
 
     if (isAdmin) {
         document.getElementById('navGrpAdmin').style.display = 'block';
+        let lastAccessReqCount = 0;
         // Check for pending access requests every 30 seconds to update the red dot immediately
         const checkAccessReqs = () => {
             fetch('/api/admin/access-requests', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
@@ -6824,11 +6855,13 @@ function configureSidebarAndCards() {
                     const badge = document.getElementById('pendingRequestsBadge');
                     if (badge && Array.isArray(reqs)) {
                         if (reqs.length > 0) {
+                            if (reqs.length > lastAccessReqCount) playNotifySound();
                             badge.style.display = 'inline-block';
                             badge.textContent = reqs.length;
                         } else {
                             badge.style.display = 'none';
                         }
+                        lastAccessReqCount = reqs.length;
                     }
                 }).catch(()=>{});
         };
@@ -8431,6 +8464,7 @@ function ltHandleIncoming(payload) {
     if (ltQueue.some(t => (t.record_id||t.id) === id)) return;
     ltQueue.unshift(payload);
     ltRenderQueue();
+    playNotifySound();
     ToastManager.show(`New ticket: ${payload.request_type || 'Request'}`, 'info');
 }
 
