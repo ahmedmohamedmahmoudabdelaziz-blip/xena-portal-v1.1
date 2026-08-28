@@ -4376,6 +4376,7 @@ def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, re
         rows.append({
             "agency_code": code, "agency_name": meta["agency_name"],
             "acm": meta["acm"], "region": meta["region"],
+            "base_points": base_pts,
             "privileges": privileges,
             "total_used": sum(p["used"] for p in privileges),
             "total_pending": sum(p["pending"] for p in privileges),
@@ -4428,7 +4429,8 @@ def agency_target_table():
     rows = compute_agency_privilege_ledger(points_items, requests_items, acm_filter, region_filter, allowed_acms, allowed_regs)
     if search_q:
         rows = [r for r in rows if search_q in r["agency_name"].lower() or search_q in r["agency_code"].lower() or search_q in r["acm"].lower()]
-    rows.sort(key=lambda r: r["agency_name"].lower())
+    
+    rows.sort(key=lambda r: (-r.get("base_points", 0), r["agency_name"].lower()))
 
     total_count = len(rows)
 
