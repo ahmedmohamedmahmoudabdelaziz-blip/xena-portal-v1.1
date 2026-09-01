@@ -17,6 +17,16 @@ REDIS_MAX_VALUE_BYTES = 900_000
 
 MOCK_MODE = not bool(APP_ID and APP_SECRET)
 
+# APP_VERSION changes automatically on every new deploy: Vercel sets
+# VERCEL_GIT_COMMIT_SHA (falls back to VERCEL_DEPLOYMENT_ID, then to this
+# process's own start time for local/dev runs where neither is set -- so at
+# minimum a server restart still counts as "the code changed"). The frontend
+# polls /api/app-version and forces a re-login the moment this value no longer
+# matches what a session logged in under, so nobody keeps running against a
+# deploy the server has already moved past.
+APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL_DEPLOYMENT_ID")
+               or f"local-{int(time.time())}")
+
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
@@ -2050,6 +2060,14 @@ def callback():
     except Exception as exc:
         return redirect("/?auth_error=" + urllib.parse.quote(f"Login error: {str(exc)[:120]}", safe=''))
 
+@app.route('/api/app-version', methods=['GET'])
+def app_version():
+    """No auth required -- just a version fingerprint so the frontend can
+    detect a new deploy shipping mid-session and force a fresh login rather
+    than keep running stale code (or, worse, against server logic that's
+    already changed)."""
+    return jsonify({"version": APP_VERSION})
+
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
     username = sanitize_text(request.args.get('user',''))
@@ -2201,19 +2219,22 @@ def request_access():
     audit.log(name or email, "ACCESS_REQUEST", email or "(no email)", details=f"Requested by {name}", ip=ip, severity="Critical", blocking=True)
     return jsonify({"success": True})
 
-@app.route('/api/admin/access-requests', methods=['GET'])
-def list_access_requests():
-    """Returns pending access requests, derived from the audit log: any
-    ACCESS_REQUEST entry that isn't followed by a later ADD_USER / UPDATE_USER /
-    ACCESS_REQUEST_RESOLVED entry for the same requester is still pending."""
-    admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
-    admin_email = sanitize_text(request.headers.get('X-User-Email','')).lower()
-    is_authorized = any(a == admin_name for a in ADMIN_USERS)
-    if not is_authorized:
-        perms = get_user_permissions(admin_email, admin_name)
-        is_authorized = bool(perms.get("is_super_admin"))
-    if not is_authorized:
-        return jsonify({"error": "Unauthorized"}), 403
+def _get_recent_audit_logs_cached():
+    """Shared by every admin-alert endpoint below. The expensive part of this --
+    a live Feishu fetch of up to 200 audit records, plus parsing them -- used to
+    run TWICE per poll cycle (once for access-requests, once for sheet-perm
+    alerts), independently, from every open admin tab, every 15 seconds. On a
+    Vercel Hobby plan that adds up fast: each poll is 2 function invocations
+    doing real work, which at 15s intervals is ~345k invocations/month from a
+    single tab left open, against a 1M/month budget shared with the whole app.
+    This cuts that back down: one fetch, cached in Redis for CACHE_TTL seconds,
+    shared across BOTH alert types AND across every admin tab polling around
+    the same time, not just one process's local memory."""
+    CACHE_TTL = 20
+    if REDIS_ENABLED:
+        cached = redis_get_json("xena:admin_alerts_logs_cache")
+        if cached is not None:
+            return cached
 
     logs = audit.get_recent(500)
     if AUDIT_TABLE_ID and not MOCK_MODE:
@@ -2238,6 +2259,14 @@ def list_access_requests():
         except Exception:
             pass
 
+    if REDIS_ENABLED:
+        try:
+            redis_set_json("xena:admin_alerts_logs_cache", logs, ttl=CACHE_TTL)
+        except Exception:
+            pass
+    return logs
+
+def _derive_access_requests(logs):
     pending = {}
     resolved_after = {}
     for entry in sorted(logs, key=lambda x: x.get("ts","")):
@@ -2249,7 +2278,6 @@ def list_access_requests():
         elif action in ("ADD_USER", "UPDATE_USER", "ACCESS_REQUEST_RESOLVED"):
             key = email_part or entry.get("actor","").lower()
             resolved_after[key] = entry.get("ts","")
-
     result = []
     for key, entry in pending.items():
         resolved_ts = resolved_after.get(key)
@@ -2257,7 +2285,96 @@ def list_access_requests():
             continue
         result.append(entry)
     result.sort(key=lambda x: x.get("ts",""), reverse=True)
-    return jsonify(result)
+    return result
+
+def _derive_sheet_permission_alerts(logs):
+    pending = {}
+    resolved_after = {}
+    for entry in sorted(logs, key=lambda x: x.get("ts","")):
+        action = (entry.get("action") or "").upper()
+        actor_key = (entry.get("actor") or "").lower()
+        target = (entry.get("target") or "")
+        if action == "SHEET_PERMISSION_MISSING":
+            pending[actor_key] = entry
+        elif action == "SHEET_PERMISSION_RESOLVED":
+            resolved_after[actor_key] = entry.get("ts","")
+        elif action == "SUBMIT_NEW_REQUEST" and ("created_via: user_token" in target):
+            resolved_after[actor_key] = entry.get("ts","")
+    result = []
+    for key, entry in pending.items():
+        resolved_ts = resolved_after.get(key)
+        if resolved_ts and resolved_ts >= entry.get("ts",""):
+            continue
+        result.append(entry)
+    result.sort(key=lambda x: x.get("ts",""), reverse=True)
+    return result
+
+def _require_admin():
+    admin_name = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    admin_email = sanitize_text(request.headers.get('X-User-Email','')).lower()
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
+    if not is_authorized:
+        perms = get_user_permissions(admin_email, admin_name)
+        is_authorized = bool(perms.get("is_super_admin"))
+    return is_authorized, admin_name, admin_email
+
+@app.route('/api/admin/alerts-summary', methods=['GET'])
+def admin_alerts_summary():
+    """ONE call for both alert types, used by the recurring 15s poll and the
+    admin-requests tab -- this is the one to hit repeatedly, not the two
+    endpoints below (kept for compatibility/direct linking, but each of those
+    still shares the same cached log fetch via _get_recent_audit_logs_cached)."""
+    is_authorized, _, _ = _require_admin()
+    if not is_authorized:
+        return jsonify({"error": "Unauthorized"}), 403
+    logs = _get_recent_audit_logs_cached()
+    return jsonify({
+        "access_requests": _derive_access_requests(logs),
+        "sheet_permission_alerts": _derive_sheet_permission_alerts(logs),
+    })
+
+@app.route('/api/admin/access-requests', methods=['GET'])
+def list_access_requests():
+    """Returns pending access requests, derived from the audit log: any
+    ACCESS_REQUEST entry that isn't followed by a later ADD_USER / UPDATE_USER /
+    ACCESS_REQUEST_RESOLVED entry for the same requester is still pending."""
+    is_authorized, _, _ = _require_admin()
+    if not is_authorized:
+        return jsonify({"error": "Unauthorized"}), 403
+    return jsonify(_derive_access_requests(_get_recent_audit_logs_cached()))
+
+@app.route('/api/admin/sheet-permission-alerts', methods=['GET'])
+def list_sheet_permission_alerts():
+    """Same idea as /api/admin/access-requests, same derivation approach (read
+    the audit log, no new table): flags agents whose ticket had to be filed
+    under the app identity because their own Lark account isn't a collaborator
+    with edit rights on the Bitable. A SHEET_PERMISSION_MISSING entry counts as
+    resolved once a LATER entry exists for the same agent that's either an
+    admin's manual SHEET_PERMISSION_RESOLVED, or that agent's own successful
+    SUBMIT_NEW_REQUEST under their real token (created_via: user_token /
+    user_token_refreshed) -- i.e. it self-heals the moment their permissions
+    actually get fixed and they submit again, no admin action required."""
+    is_authorized, _, _ = _require_admin()
+    if not is_authorized:
+        return jsonify({"error": "Unauthorized"}), 403
+    return jsonify(_derive_sheet_permission_alerts(_get_recent_audit_logs_cached()))
+
+@app.route('/api/admin/sheet-permission-alerts/resolve', methods=['POST'])
+def resolve_sheet_permission_alert():
+    """Lets an admin manually dismiss an alert (e.g. after fixing the agent's
+    Bitable collaborator access outside of a resubmission) instead of waiting
+    for it to self-heal on their next submit."""
+    is_authorized, admin_name, admin_email = _require_admin()
+    if not is_authorized:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.json or {}
+    target_user = sanitize_text(data.get("user", ""), 100)
+    if not target_user:
+        return jsonify({"success": False, "error": "Missing user."}), 400
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    audit.log(target_user, "SHEET_PERMISSION_RESOLVED", f"Dismissed by {admin_name or admin_email}", ip=ip, severity="Info")
+    return jsonify({"success": True})
 
 @app.route('/api/admin/audit-logs', methods=['GET'])
 def audit_logs():
@@ -2619,18 +2736,22 @@ def submit_request():
         return jsonify({"error": "Request Type is required."}), 400
 
     tat = get_tenant_access_token()
-    # Prefer the server-side cached uat (minted at login or by an earlier silent
-    # refresh) over the browser-sent one -- the browser's copy may be hours stale.
-    uat = _get_cached_uat(submitter_open_id) or uat
     # SESSION ENFORCEMENT: tickets must be filed under the real agent's identity,
-    # never quietly under the app's. If we don't already hold a live uat, try one
-    # last silent refresh; if that also comes back empty the agent's 4-hour
-    # session really is over server-side, so refuse the submission outright
-    # (never falling back to the tenant token) and tell the frontend to force a
-    # fresh login. Nothing is created and nothing is lost -- the agent's typed
-    # form data stays in the browser for them to resubmit right after logging in.
-    if not uat and submitter_open_id:
-        uat = _refresh_user_token(submitter_open_id)
+    # never quietly under the app's. Where the server CAN verify a token's real
+    # state (Redis enabled, real open_id on file), trust ONLY that -- not the uat
+    # the browser sent in the form. The server cache is stored with an EX
+    # matching Feishu's own expires_in (see _refresh_user_token), so an empty
+    # cache result IS the authoritative "this token is dead" signal; the
+    # browser's copy can't be trusted for that, it's just old localStorage that
+    # doesn't know its own token died -- exactly how a stale request used to
+    # slip through to Feishu and get caught only by guessing at its ever-
+    # changing rejection codes (99991663/99991668/99991677 and counting).
+    # Where server-side verification isn't possible at all (mock mode, Redis
+    # disabled, or a legacy session with no open_id on file), there's nothing to
+    # check against, so this falls back to trusting the browser-sent uat as-is,
+    # same as the original design.
+    if REDIS_ENABLED and not MOCK_MODE and submitter_open_id:
+        uat = _get_cached_uat(submitter_open_id) or _refresh_user_token(submitter_open_id)
     if not uat:
         audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
         return jsonify({"error": "Your session has expired. Please log out and log in again, then resubmit this request.", "code": "SESSION_EXPIRED"}), 401
@@ -2724,7 +2845,18 @@ def submit_request():
     # (a field this token isn't scoped to write, a transient rejection, etc.)
     # falls back to the tenant token exactly like before, so a ticket is never
     # blocked for a reason that logging in again wouldn't actually fix.
-    TOKEN_AUTH_ERROR_CODES = (99991663, 99991668)
+    # 99991663 = invalid tenant_access_token, 99991668 = invalid user_access_token,
+    # 99991677 = user_access_token expired (confirmed from production logs --
+    # this one was missing before and is the code actually being hit).
+    TOKEN_AUTH_ERROR_CODES = (99991663, 99991668, 99991677)
+    def _is_token_dead(d):
+        if d.get("code") in TOKEN_AUTH_ERROR_CODES:
+            return True
+        # Fallback for any Feishu auth-error code not in the list above --
+        # match on the message text so an unseen variant doesn't slip through
+        # as a silent tenant-token fallback the way 99991677 just did.
+        msg = str(d.get("msg", "")).lower()
+        return ("token" in msg) and ("expir" in msg or "invalid" in msg)
 
     try:
         # SINGLE-CALL CREATE (User Context): create the row in ONE request, under the
@@ -2742,7 +2874,7 @@ def submit_request():
             logger.warn("submit_primary_create_rejected", user=user,
                         feishu_code=data.get("code"), feishu_msg=data.get("msg"))
 
-            if data.get("code") in TOKEN_AUTH_ERROR_CODES:
+            if _is_token_dead(data):
                 # The token itself is dead (expired/invalid) -- retry once with a
                 # freshly-refreshed uat first...
                 fresh_uat = _refresh_user_token(submitter_open_id) if submitter_open_id else None
@@ -2764,19 +2896,46 @@ def submit_request():
                     audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type} | feishu_code: {data.get('code')}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
                     return jsonify({"error": "Your session has expired. Please log out and log in again, then resubmit this request.", "code": "SESSION_EXPIRED"}), 401
             else:
-                # NOT a dead-token error -- e.g. a field only the tenant identity is
-                # allowed to write, or some other rejection logging in again won't
-                # fix. Fall back to the tenant token as a last resort so the ticket
-                # is never lost -- same behavior as before this change, just no
-                # longer triggered by simple expiry (that's handled above instead).
-                # NOTE: when this fallback fires, Feishu's "Created By" column will
-                # show the app identity instead of the real submitter, because
-                # that column is a platform-level automatic field driven by
-                # whichever token performed the create call.
+                # NOT a dead-token error -- e.g. this agent's Lark account isn't a
+                # collaborator with edit rights on the Bitable itself, or some other
+                # rejection logging in again won't fix. Fall back to the tenant
+                # token as a last resort so the ticket is never lost -- same
+                # behavior as before this change, just no longer triggered by
+                # simple expiry (that's handled above instead).
+                # NOTE: Feishu's own "Created By" column will still show the app
+                # identity, not the real submitter -- that's a platform-level
+                # automatic field driven by whichever token performed the create
+                # call, and nothing we send can override it. So instead, add a
+                # short attribution line onto the END of the agent's own "Applier
+                # Note" text -- never replacing or removing what they wrote, just
+                # appended below it -- naming the real submitter (their Lark name,
+                # the one WE already know from their website login, not from
+                # Feishu's token) so a reviewer opening the record still sees who
+                # actually filed it. Also try SUBMITTED_BY_FIELD_NAME as a bonus,
+                # in case that dedicated column ever gets added to the table --
+                # it silently no-ops today if it doesn't exist yet.
+                rejection_code, rejection_msg = data.get("code"), data.get("msg")
+                fallback_fields = dict(final_fields)
+                attribution_line = f"🔒 Submitted via website by {user} (no sheet edit access)"
+                existing_note = str(fallback_fields.get("Applier Note") or "").strip()
+                fallback_fields["Applier Note"] = f"{existing_note}\n\n{attribution_line}" if existing_note else attribution_line
+                if actual_fields and SUBMITTED_BY_FIELD_NAME in actual_fields:
+                    fallback_fields[SUBMITTED_BY_FIELD_NAME] = user
                 create_headers["Authorization"] = f"Bearer {tat}"
-                resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
+                resp = http_requests.post(url, headers=create_headers, json={"fields": fallback_fields}, timeout=15)
                 data = resp.json()
                 created_via = "tenant_token_fallback"
+                # Flag this for admins the same way an Access Request shows up --
+                # a derived, no-extra-table read of the audit log (see
+                # /api/admin/sheet-permission-alerts) rather than inventing new
+                # storage. Auto-resolves the moment this agent successfully
+                # submits again under their own token (see that endpoint), or an
+                # admin can dismiss it manually once they've fixed the Bitable
+                # collaborator permissions.
+                audit.log(user, "SHEET_PERMISSION_MISSING",
+                          f"Type: {req_type} | feishu_code: {rejection_code} | feishu_msg: {rejection_msg}",
+                          ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Critical")
+
 
         if data.get("code") == 0:
             success = True
