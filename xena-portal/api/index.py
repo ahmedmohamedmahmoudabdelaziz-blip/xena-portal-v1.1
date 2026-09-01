@@ -3571,6 +3571,67 @@ def live_queue():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+@app.route('/api/new-request/agency-info', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def new_request_agency_info():
+    """Lightweight, on-demand lookup for the Create New Request form: given an
+    agency code (and optionally a target privilege), returns the agency's
+    current point balance and -- for a given privilege -- this month's
+    Claimed/Used/Remaining, computed with the exact same logic as the Agency
+    Target Table so the numbers a submitter sees here always match what shows
+    up there. Built from the same warm, cache-first snapshots the rest of the
+    portal already reads (no live per-agency Feishu call), and is only ever
+    called when a submitter is actively typing in the form, not on a timer."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("submit" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+
+    code = sanitize_agency_code(request.args.get('agency_code', ''))
+    privilege = sanitize_text(request.args.get('privilege', ''), 60).strip()
+    if not code:
+        return jsonify({"error": "agency_code is required."}), 400
+
+    if MOCK_MODE:
+        points_items = MockFeishuDB.generate_agency(code)
+        requests_items = MockFeishuDB.generate_requests(60) if hasattr(MockFeishuDB, "generate_requests") else []
+    else:
+        points_items, _pc, _pr, _pcache = get_points_table_snapshot()
+        requests_items, _rk, _rc, _rr, _rcache = get_requests_table_snapshot() if privilege else ([], None, None, None, None)
+
+    match = None
+    for item in points_items:
+        f = item.get("fields", {})
+        if extract_field_text(get_field_local(f, "Agency Code")).strip() == str(code).strip():
+            match = f
+            break
+    if not match:
+        return jsonify({"found": False})
+
+    total_pts = parse_float_safe(extract_field_text(get_field_local(match, "Total Points", "# Total Points")))
+    used_pts = parse_float_safe(extract_field_text(get_field_local(match, "Used Points")))
+    balance = parse_float_safe(extract_field_text(get_field_local(match, "Point Balance")))
+    if balance == 0 and total_pts > 0:
+        balance = total_pts - used_pts
+
+    result = {
+        "found": True, "agency_code": code,
+        "agency_name": extract_field_text(get_field_local(match, "Agency Name", "Name")) or code,
+        "point_balance": balance,
+    }
+
+    if privilege:
+        priv_type = classify_privilege_type(privilege)
+        if priv_type:
+            ledger_rows = compute_agency_privilege_ledger(points_items, requests_items, "all", "all", ["all"], ["all"])
+            agency_row = next((r for r in ledger_rows if r["agency_code"] == code), None)
+            priv_row = next((p for p in (agency_row["privileges"] if agency_row else []) if p["privilege"] == priv_type), None)
+            if priv_row:
+                result["target"] = priv_row
+
+    return jsonify(result)
+
 @app.route('/api/agency-list', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_list():
