@@ -458,6 +458,23 @@
         .msel-toggle span.msel-text{flex:1;pointer-events:none;white-space:normal;line-height:1.3}
         .msel-toggle .msel-dot{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border-hover);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;color:transparent;transition:.15s;pointer-events:none}
         .msel-toggle.active .msel-dot{background:var(--accent-cyan);border-color:var(--accent-cyan);color:#04202a}
+        .multiid-wrap{border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.15);padding:10px}
+        .multiid-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+        .multiid-chips:empty{display:none}
+        .multiid-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,.1);border:1px solid var(--accent-cyan);color:var(--text);padding:4px 6px 4px 10px;border-radius:16px;font-size:.82rem;font-weight:600}
+        .multiid-chip button{background:none;border:none;color:var(--accent-cyan);cursor:pointer;font-size:1rem;line-height:1;padding:2px 4px;border-radius:50%}
+        .multiid-chip button:hover{background:rgba(0,212,255,.2);color:#fff}
+        .multiid-input-row{display:flex;gap:8px}
+        .multiid-input-row input{flex:1}
+        .multiid-hint{font-size:.72rem;color:var(--text-muted);margin-top:6px}
+        .rap-card{animation:rapFadeIn .25s ease-out;border:1px solid var(--border);border-radius:14px;background:rgba(0,212,255,.04);padding:18px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+        @keyframes rapFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+        .rap-agency{font-weight:700;color:var(--text);font-size:.95rem}
+        .rap-code{color:var(--text-muted);font-size:.78rem;font-weight:600}
+        .rap-stat{display:flex;flex-direction:column;align-items:center;min-width:74px}
+        .rap-stat-val{font-size:1.35rem;font-weight:800;line-height:1.1}
+        .rap-stat-label{font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+        .rap-divider{width:1px;align-self:stretch;background:var(--border)}
 
         /* ── Elegant file input (fixes the misaligned "Choose Files / No file
            chosen" default browser control on Evidence Screen etc.) ── */
@@ -9192,7 +9209,7 @@ const REQ_BRANCHES = {
     "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
     "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
     "Remove BD ": ["Region", "User ID", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen 2"],
-    "Agency Target Privilege": ["Region", "User ID", "Agency Code", "Target", "Privilege", "Applier Note", "Evidence Screen 2"],
+    "Agency Target Privilege": ["Region", "User ID (Multi)", "Agency Code", "Target", "Privilege", "Applier Note", "Evidence Screen 2"],
     "Agency Point Request": ["Region", "User ID", "Agency Code", "Agency Point Privilege", "Applier Note", "Evidence Screen 2"],
     "Change agency name ": ["Region", "User ID", "Agency Code", "New agency name", "Applier Note", "Evidence Screen"],
     "Change Agency Manger ID (with same owner)": ["Region", "User ID", "Agency Code", "Current agency manger name (same in NID )", "New agency owner ID", "Applier Note", "Evidence Screen 2"],
@@ -9216,6 +9233,12 @@ const REQ_SUBCONDITIONS = {
 const REQ_FIELD_DEFS = {
     "Region": { type: "select", options: ["PK", "IN"], req: true },
     "User ID": { type: "text", req: true },
+    // Agency Target Privilege only -- lets a submitter attach several User IDs
+    // to one ticket (e.g. applying the same privilege for a few hosts under one
+    // agency) instead of filing a separate ticket per ID. Renders as a chip/tag
+    // input, but still posts as a single comma-joined "User ID" text value --
+    // same Feishu field, same shape, nothing downstream needs to change.
+    "User ID (Multi)": { type: "multitext", req: true, postAs: "User ID" },
     "Agency Code": { type: "text", req: true },
     "Agency Name": { type: "text", req: true },
     "Applier real name": { type: "text", req: true },
@@ -9292,11 +9315,69 @@ function buildFieldControl(fName, def, req) {
                 <span class="msel-text">${escHtml(o)}</span>
             </label>`).join('');
         wrap.innerHTML += `<div class="msel-wrap">${chks}</div>`;
+    } else if (def.type === 'multitext') {
+        const postName = def.postAs || fName;
+        const displayLabel = fName.replace(/\s*\(Multi\)\s*$/i, '');
+        wrap.querySelector('label').innerHTML = `${escHtml(displayLabel)} ${reqMark}`;
+        wrap.innerHTML += `
+            <div class="multiid-wrap">
+                <div class="multiid-chips" id="${idSafe}_chips"></div>
+                <div class="multiid-input-row">
+                    <input type="text" id="${idSafe}_input" placeholder="Type a User ID, then press Enter or Add" class="form-highlight-input">
+                    <button type="button" class="btn-sm btn-outline" onclick="multiIdAdd('${idSafe}','${escHtml(postName)}')">+ Add</button>
+                </div>
+                <div class="multiid-hint">Add as many User IDs as this ticket covers -- each one lands on the same ticket.</div>
+                <input type="text" name="${escHtml(postName)}" id="${idSafe}_hidden" style="display:none" ${req ? 'data-required="1"' : ''}>
+            </div>`;
     } else if (def.type === 'file') {
         wrap.innerHTML += buildDropzoneHtml(idSafe, fName, req);
     }
     return wrap;
 }
+
+function multiIdSync(idSafe) {
+    const chipsWrap = document.getElementById(`${idSafe}_chips`);
+    const hidden = document.getElementById(`${idSafe}_hidden`);
+    if (!chipsWrap || !hidden) return;
+    const ids = Array.from(chipsWrap.querySelectorAll('[data-uid]')).map(c => c.dataset.uid);
+    hidden.value = ids.join(', ');
+}
+
+function multiIdAdd(idSafe, fieldName) {
+    const input = document.getElementById(`${idSafe}_input`);
+    const chipsWrap = document.getElementById(`${idSafe}_chips`);
+    if (!input || !chipsWrap) return;
+    const val = (input.value || '').trim().replace(/,+$/, '');
+    if (!val) return;
+    const existing = Array.from(chipsWrap.querySelectorAll('[data-uid]')).map(c => c.dataset.uid.toLowerCase());
+    if (existing.includes(val.toLowerCase())) {
+        input.value = '';
+        return;
+    }
+    const chip = document.createElement('span');
+    chip.className = 'multiid-chip';
+    chip.dataset.uid = val;
+    chip.innerHTML = `${escHtml(val)} <button type="button" aria-label="Remove ${escHtml(val)}">&times;</button>`;
+    chip.querySelector('button').addEventListener('click', () => { chip.remove(); multiIdSync(idSafe); });
+    chipsWrap.appendChild(chip);
+    input.value = '';
+    multiIdSync(idSafe);
+    input.focus();
+}
+
+// Enter or comma adds the current chip, without submitting the whole form.
+document.addEventListener('keydown', (e) => {
+    if (!e.target.id || !e.target.id.endsWith('_input')) return;
+    if (!e.target.closest('.multiid-wrap')) return;
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const idSafe = e.target.id.replace(/_input$/, '');
+        const fieldWrap = e.target.closest('[data-field]');
+        const fName = fieldWrap ? fieldWrap.dataset.field : '';
+        const def = REQ_FIELD_DEFS[fName];
+        multiIdAdd(idSafe, (def && def.postAs) || fName);
+    }
+});
 
 function refreshAcmAutoSlot() {
     const slot = document.getElementById('acmAutoSlot');
@@ -9356,7 +9437,27 @@ function renderReqFormFields() {
         if (fName === 'Closing Reason') {
             el.querySelector('select').addEventListener('change', refreshClosingReasonSubfields);
         }
+        // Live agency preview: only wired up for the two branch types where it's
+        // actually useful (points balance / target quota) -- see
+        // reqAgencyPreviewUpdate() below.
+        if (fName === 'Agency Code' && (branch === 'Agency Point Request' || branch === 'Agency Target Privilege')) {
+            let debounceT = null;
+            el.querySelector('input').addEventListener('input', (ev) => {
+                clearTimeout(debounceT);
+                debounceT = setTimeout(() => reqAgencyPreviewUpdate(branch), 500);
+            });
+        }
+        if (fName === 'Privilege' && branch === 'Agency Target Privilege') {
+            el.querySelector('select').addEventListener('change', () => reqAgencyPreviewUpdate(branch));
+        }
     });
+
+    if (branch === 'Agency Point Request' || branch === 'Agency Target Privilege') {
+        const preview = document.createElement('div');
+        preview.id = 'reqAgencyPreview';
+        preview.style.gridColumn = '1 / -1';
+        container.appendChild(preview);
+    }
 
     const subs = REQ_SUBCONDITIONS[branch];
     if (subs) {
@@ -9388,6 +9489,88 @@ function renderReqFormFields() {
     submitArea.style.display = 'block';
 }
 
+let _rapFetchToken = 0;
+async function reqAgencyPreviewUpdate(branch) {
+    const box = document.getElementById('reqAgencyPreview');
+    if (!box) return;
+    const codeInput = document.getElementById('reqfld_Agency_Code');
+    const code = codeInput ? codeInput.value.trim() : '';
+    if (code.length < 3) { box.innerHTML = ''; return; }
+
+    const privSel = document.getElementById('reqfld_Privilege');
+    const privilege = (branch === 'Agency Target Privilege' && privSel) ? privSel.value : '';
+
+    const myToken = ++_rapFetchToken; // guards against an earlier slow request overwriting a later one
+    box.innerHTML = `<div class="rap-card" style="opacity:.6"><span style="color:var(--text-muted);font-size:.85rem">Looking up ${escHtml(code)}…</span></div>`;
+
+    try {
+        const qs = new URLSearchParams({ user: loggedUser, email: loggedEmail, agency_code: code });
+        if (privilege) qs.set('privilege', privilege);
+        const res = await fetch(`/api/new-request/agency-info?${qs}`);
+        const data = await res.json();
+        if (myToken !== _rapFetchToken) return; // a newer keystroke already superseded this
+        if (!res.ok) { box.innerHTML = ''; return; }
+
+        if (!data.found) {
+            box.innerHTML = `<div class="rap-card" style="border-color:var(--accent-amber);background:rgba(255,184,0,.05)">
+                <span style="color:var(--accent-amber);font-size:.85rem">⚠️ Agency "${escHtml(code)}" isn't in the current snapshot yet -- double-check the code.</span>
+            </div>`;
+            return;
+        }
+
+        if (branch === 'Agency Point Request') {
+            box.innerHTML = `<div class="rap-card">
+                <div style="flex:1;min-width:140px">
+                    <div class="rap-agency">${escHtml(data.agency_name)}</div>
+                    <div class="rap-code">${escHtml(data.agency_code)}</div>
+                </div>
+                <div class="rap-divider"></div>
+                <div class="rap-stat">
+                    <div class="rap-stat-val" style="color:var(--accent-cyan)">${Math.round(data.point_balance).toLocaleString()}</div>
+                    <div class="rap-stat-label">Points Remaining</div>
+                </div>
+            </div>`;
+            return;
+        }
+
+        // Agency Target Privilege
+        if (!privilege) {
+            box.innerHTML = `<div class="rap-card">
+                <div style="flex:1;min-width:140px">
+                    <div class="rap-agency">${escHtml(data.agency_name)}</div>
+                    <div class="rap-code">${escHtml(data.agency_code)}</div>
+                </div>
+                <span style="color:var(--text-muted);font-size:.82rem">Pick a Privilege above to see this month's remaining quota →</span>
+            </div>`;
+            return;
+        }
+        if (!data.target) {
+            box.innerHTML = `<div class="rap-card" style="border-color:var(--accent-amber);background:rgba(255,184,0,.05)">
+                <span style="color:var(--accent-amber);font-size:.85rem">⚠️ "${escHtml(privilege)}" isn't a tracked target privilege type for this agency.</span>
+            </div>`;
+            return;
+        }
+        const t = data.target;
+        const remColor = t.remaining <= 0 ? 'var(--accent-rose)' : (t.remaining <= t.claimed * 0.25 ? 'var(--accent-amber)' : 'var(--accent-green)');
+        const pendingNote = (t.pending > 0 || t.rejected > 0)
+            ? `<div style="width:100%;font-size:.72rem;color:var(--text-muted);margin-top:4px">${t.pending ? `${t.pending} pending` : ''}${t.pending && t.rejected ? ' · ' : ''}${t.rejected ? `${t.rejected} rejected` : ''} this month</div>`
+            : '';
+        box.innerHTML = `<div class="rap-card">
+            <div style="flex:1;min-width:140px">
+                <div class="rap-agency">${escHtml(data.agency_name)}</div>
+                <div class="rap-code">${escHtml(data.agency_code)} · ${escHtml(privilege)}</div>
+            </div>
+            <div class="rap-divider"></div>
+            <div class="rap-stat"><div class="rap-stat-val" style="color:var(--text)">${t.claimed}</div><div class="rap-stat-label">Claimed</div></div>
+            <div class="rap-stat"><div class="rap-stat-val" style="color:var(--text)">${t.used}</div><div class="rap-stat-label">Used</div></div>
+            <div class="rap-stat"><div class="rap-stat-val" style="color:${remColor}">${t.remaining}</div><div class="rap-stat-label">Remaining</div></div>
+            ${pendingNote}
+        </div>`;
+    } catch (e) {
+        if (myToken === _rapFetchToken) box.innerHTML = '';
+    }
+}
+
 async function submitReqForm(e) {
     e.preventDefault();
     const form = e.target;
@@ -9405,6 +9588,21 @@ async function submitReqForm(e) {
             }
         }
     });
+    // Same idea for the User ID chip input -- at least one ID chip must be
+    // added, since the underlying hidden text field only "looks" filled once
+    // multiIdSync() has run at least once.
+    const multiTextFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f] && REQ_FIELD_DEFS[f].type === 'multitext');
+    multiTextFields.forEach(mf => {
+        const def = REQ_FIELD_DEFS[mf];
+        if (!def.req) return;
+        const idSafe = 'reqfld_' + mf.replace(/[^a-zA-Z0-9]/g, '_');
+        const hidden = document.getElementById(`${idSafe}_hidden`);
+        if (!hidden || !hidden.value.trim()) {
+            multiValid = false;
+            const displayLabel = mf.replace(/\s*\(Multi\)\s*$/i, '');
+            ToastManager.show(`Please add at least one ${displayLabel}.`, 'warning');
+        }
+    });
     if (!multiValid) return;
 
     const btn = document.getElementById('btnSubmitReq');
@@ -9418,6 +9616,7 @@ async function submitReqForm(e) {
 
         form.querySelectorAll('input[type="text"], select').forEach(el => {
             if (el.id === 'formRequestType') return;
+            if (!el.name) return; // the chip-add text input itself has no name -- only its synced hidden twin does
             if (el.value) payloadFields[el.name] = el.value;
         });
 
