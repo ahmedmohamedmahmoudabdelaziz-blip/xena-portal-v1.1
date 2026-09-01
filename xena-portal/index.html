@@ -923,7 +923,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodyAdmin">
                     <div class="nav-item" id="nav-admin-agents" onclick="openInTab('admin-agents')"><span data-i18n="manageAgents">Manage Agents</span></div>
-                    <div class="nav-item" id="nav-admin-requests" onclick="openInTab('admin-requests')"><span>Access Requests <span id="pendingRequestsBadge" style="display:none;background:var(--accent-rose);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:4px"></span></span></div>
+                    <div class="nav-item" id="nav-admin-requests" onclick="openInTab('admin-requests')"><span>Access Requests <span id="pendingRequestsBadge" style="display:none;background:var(--accent-rose);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:4px"></span><span id="sheetPermAlertBadge" style="display:none;background:var(--accent-amber);color:#000;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:4px"></span></span></div>
                     <div class="nav-item" id="nav-admin-audit"  onclick="openInTab('admin-audit')"><span data-i18n="auditLog">Audit Log</span></div>
                 </div>
             </div>
@@ -1755,6 +1755,14 @@
             </div>
 
             <div id="pg-admin-requests" style="display:none">
+                <div class="card" style="margin-bottom:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                        <h3 style="color:var(--accent-amber)">⚠️ Sheet Permission Issues</h3>
+                        <button class="btn-sm btn-outline" onclick="loadSheetPermAlerts()">🔄 Refresh</button>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">These agents have portal access, but their Lark account isn't a collaborator with edit rights on the Requests Bitable itself — so their ticket had to be filed under the app identity instead of theirs (their own note still shows it, with an attribution line added). Add them as an editor on the Bitable to fix it; this clears itself automatically the next time they submit successfully.</p>
+                    <div id="sheetPermAlertsList"><div class="empty-state" style="padding:40px 0"><p>Loading…</p></div></div>
+                </div>
                 <div class="card">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
                         <h3 style="color:var(--accent-cyan)">🔓 Access Requests</h3>
@@ -2835,7 +2843,7 @@ function executePageLogic(page) {
     } else if(page==='admin-requests'){
         document.getElementById('pg-admin-requests').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
-        loadAccessRequests();
+        loadAdminAlerts();
     } else if(page==='admin-audit'){
         document.getElementById('pg-admin-audit').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
@@ -3349,27 +3357,43 @@ if (urlParams.get('user') && urlParams.get('uat')) {
     if(openId) localStorage.setItem('xenaOpenId', openId);
     
     localStorage.setItem('xenaLoginTimestamp', Date.now().toString());
+    localStorage.setItem('xenaLastActivity', Date.now().toString());
     window.history.replaceState({},'',window.location.href.split('?')[0].split('#')[0]);   
+    // Baseline the app version immediately on a fresh login rather than
+    // waiting for the first periodic check, so a deploy that happens later in
+    // this session is compared against what was actually running at login.
+    setTimeout(() => { if (typeof checkAppVersion === 'function') checkAppVersion(); }, 0);
 }
 
 const hashParams=new URLSearchParams(window.location.hash.replace('#analyze?',''));
 const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 
-// --- SESSION TIMEOUT ENFORCER (4 HOURS) ---
-// Matches the backend's refresh-token TTL (also 4 hours) so a session can't
-// silently keep working past what the token layer actually allows. This is a
-// belt on top of the backend's own enforcement (submit_request() now refuses
-// -- rather than silently falling back -- once the agent's server-side uat is
-// really gone, see SESSION_EXPIRED below); this client-side timer exists so
-// search/browsing gets cut off at the same 4-hour mark too, not just submits,
-// and so the agent is dropped back to the login screen instead of finding out
-// only when the next click quietly fails.
-const SESSION_LIMIT_MS = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+// --- SESSION SECURITY ENFORCER ---
+// Three independent triggers, any one of which forces a hard logout back to
+// the login screen -- no case where the page just sits open indefinitely
+// without a fresh login:
+//   1. ABSOLUTE limit -- 4 hours since login, active or not. Matches the
+//      backend's refresh_token TTL, so the client can't outlast what the
+//      token layer actually allows.
+//   2. IDLE limit -- 2 hours with no user interaction at all, even within an
+//      otherwise-valid 4-hour session. Resets on any click/keypress/touch/
+//      scroll/fetch.
+//   3. VERSION mismatch -- if the deployed backend reports a different
+//      APP_VERSION than the one this page was loaded with, a new deploy has
+//      shipped since this session started; force a reload+login so the agent
+//      is always running current code rather than a stale bundle.
+// This is a belt on top of the backend's own enforcement (submit_request()
+// checks the server-side token cache itself and refuses -- never falls back
+// silently -- once that's really gone, independent of anything the client
+// reports), so search/browsing gets cut off at the same points too, not just
+// submits.
+const SESSION_LIMIT_MS = 4 * 60 * 60 * 1000; // 4 hours
+const IDLE_LIMIT_MS = 2 * 60 * 60 * 1000;    // 2 hours
 
 // Forces an immediate, hard logout -- clears local session state and reloads
-// to the login screen. Used both by the 4-hour timer below and by the Submit
-// Request handler when the server itself reports {code:'SESSION_EXPIRED'}
-// (submit_request() now refuses to file a ticket under the app identity and
+// to the login screen. Used by the timers below and by the Submit Request
+// handler when the server itself reports {code:'SESSION_EXPIRED'}
+// (submit_request() refuses to file a ticket under the app identity and
 // returns this instead), so a stale session is caught the moment the SERVER
 // notices it too, not only on our own clock -- covers a tab that was
 // backgrounded past the timer, a phone that suspended the JS interval, or a
@@ -3389,23 +3413,64 @@ function checkSessionExpiry() {
     // A logged-in session with NO timestamp on record (e.g. one that started
     // before this timer existed, or somehow lost the field) is treated as
     // expired too, not skipped -- otherwise a session like that would never
-    // time out at all. This is the fix for a phone/tab left logged in for
-    // weeks and still working: on the very next load or focus, it now gets
-    // flushed out exactly like a session that's actually past 4 hours.
+    // time out at all.
     if (loginTs <= 0 || (Date.now() - loginTs > SESSION_LIMIT_MS)) {
-        forceSessionExpiredLogout('Your session has expired. Please log in again.');
+        forceSessionExpiredLogout('Your session has expired after 4 hours. Please log in again.');
+        return;
+    }
+    const idleTs = parseInt(localStorage.getItem('xenaLastActivity') || '0', 10);
+    // Same treatment for a missing idle timestamp -- don't give it the benefit
+    // of the doubt, force the check to fail closed rather than open.
+    if (idleTs <= 0 || (Date.now() - idleTs > IDLE_LIMIT_MS)) {
+        forceSessionExpiredLogout('You were inactive for 2 hours, so you were logged out for security. Please log in again.');
     }
 }
+
+// --- Idle-activity tracking ---
+// Any real interaction resets the 2-hour idle clock. Throttled to at most one
+// localStorage write per 20s so this doesn't fire on every single mousemove.
+let _lastActivityWrite = 0;
+function markActivity() {
+    const now = Date.now();
+    if (now - _lastActivityWrite < 20000) return;
+    _lastActivityWrite = now;
+    if (localStorage.getItem('xenaUser')) localStorage.setItem('xenaLastActivity', now.toString());
+}
+['mousemove','keydown','click','touchstart','scroll'].forEach(evt =>
+    window.addEventListener(evt, markActivity, { passive: true, capture: true }));
+
+// --- Deploy/version enforcement ---
+// APP_VERSION is injected server-side (see the /api/app-version endpoint and
+// the inline <script> near the top of <body>) and changes automatically on
+// every new deploy. If the version this session logged in under no longer
+// matches what the server is currently running, a new deploy has shipped
+// mid-session -- force a fresh login so the agent is never left running code
+// the server has moved on from.
+async function checkAppVersion() {
+    if (!localStorage.getItem('xenaUser')) return;
+    try {
+        const res = await fetch('/api/app-version');
+        const data = await res.json();
+        const storedVersion = localStorage.getItem('xenaAppVersion');
+        if (storedVersion && data.version && storedVersion !== data.version) {
+            forceSessionExpiredLogout('This app was just updated. Please log in again to load the latest version.');
+            return;
+        }
+        if (data.version) localStorage.setItem('xenaAppVersion', data.version);
+    } catch (e) { /* offline or unreachable -- don't force a logout over a network blip */ }
+}
+
 // If not actively logging in right now, verify the session is still valid
-if (!urlParams.get('user')) checkSessionExpiry();
+if (!urlParams.get('user')) { checkSessionExpiry(); checkAppVersion(); }
 // Keep checking every 1 minute while the tab is open...
 setInterval(checkSessionExpiry, 60000);
+setInterval(checkAppVersion, 5 * 60000);
 // ...and immediately whenever the tab regains focus/visibility, since mobile
 // browsers pause setInterval while backgrounded -- without this, returning to
-// a tab that crossed the 4-hour mark while asleep could let one more action
-// through before the next scheduled check.
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkSessionExpiry(); });
-window.addEventListener('focus', checkSessionExpiry);
+// a tab that crossed a limit while asleep could let one more action through
+// before the next scheduled check.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { markActivity(); checkSessionExpiry(); checkAppVersion(); } });
+window.addEventListener('focus', () => { markActivity(); checkSessionExpiry(); checkAppVersion(); });
 // ------------------------------------------
 
 // Samurai cinematic intro -- a still image (samurai silhouetted against a blood
@@ -5168,41 +5233,84 @@ function populateAuditActionFilter(logs) {
     auditActionsPopulated = true;
 }
 
-async function loadAccessRequests() {
-    const el = document.getElementById('accessRequestsList');
-    if (!el) return;
-    el.innerHTML = '<div style="color:var(--text-muted);padding:20px">Loading...</div>';
+async function loadAdminAlerts() {
+    // ONE fetch for both panels on this page (instead of each hitting its own
+    // endpoint separately) -- see /api/admin/alerts-summary and the comment on
+    // updateAdminAlertBadges() above for why that matters on a Hobby budget.
+    const elReqs = document.getElementById('accessRequestsList');
+    const elAlerts = document.getElementById('sheetPermAlertsList');
+    if (elReqs) elReqs.innerHTML = '<div style="color:var(--text-muted);padding:20px">Loading...</div>';
+    if (elAlerts) elAlerts.innerHTML = '<div style="color:var(--text-muted);padding:20px">Loading...</div>';
+    let data;
     try {
-        const res = await fetch('/api/admin/access-requests', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}});
-        let reqs;
-        try { reqs = await res.json(); } catch(e) { throw new Error('Server timeout'); }
-        if (!res.ok) throw new Error(reqs.error || 'Failed to load requests.');
+        const res = await fetch('/api/admin/alerts-summary', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}});
+        try { data = await res.json(); } catch(e) { throw new Error('Server timeout'); }
+        if (!res.ok) throw new Error(data.error || 'Failed to load.');
+    } catch(e) {
+        if (elReqs) elReqs.innerHTML = '<div style="color:var(--accent-rose)">Failed to load: '+escHtml(e.message)+'</div>';
+        if (elAlerts) elAlerts.innerHTML = '<div style="color:var(--accent-rose)">Failed to load: '+escHtml(e.message)+'</div>';
+        return;
+    }
 
-        const badge = document.getElementById('pendingRequestsBadge');
-        if (badge) {
-            if (reqs.length) { badge.style.display='inline-block'; badge.textContent = reqs.length; }
-            else { badge.style.display='none'; }
-        }
+    if (typeof window.updateAdminAlertBadges === 'function') window.updateAdminAlertBadges(data);
 
-        if (!reqs.length) {
-            el.innerHTML = '<div class="empty-state" style="padding:30px 0"><p>No pending access requests.</p></div>';
-            return;
-        }
-        el.innerHTML = reqs.map(r => {
-            const email = (r.target || '').split('|')[0].trim();
-            const safeActor = escapeJSArgs(r.actor || '');
-            const safeEmail = escapeJSArgs(email);
-            return `<div class="user-row">
-                <div class="user-info">
-                    <span class="user-email">${escHtml(r.actor||'Unknown')}</span>
-                    <div class="user-details"><span style="color:var(--text);font-weight:600">Email:</span> <span>${escHtml(email||'—')}</span> &nbsp;·&nbsp; <span style="color:var(--text-muted)">${escHtml((r.ts||'').substring(0,19).replace('T',' '))}</span></div>
-                </div>
-                <div class="action-btns">
-                    <button class="edit-btn" onclick="grantAccessTo('${safeActor}','${safeEmail}')">Grant Access</button>
-                </div>
-            </div>`;
-        }).join('');
-    } catch(e) { el.innerHTML = '<div style="color:var(--accent-rose)">Failed to load access requests: '+escHtml(e.message)+'</div>'; }
+    const reqs = data.access_requests || [];
+    if (elReqs) {
+        elReqs.innerHTML = !reqs.length
+            ? '<div class="empty-state" style="padding:30px 0"><p>No pending access requests.</p></div>'
+            : reqs.map(r => {
+                const email = (r.target || '').split('|')[0].trim();
+                const safeActor = escapeJSArgs(r.actor || '');
+                const safeEmail = escapeJSArgs(email);
+                return `<div class="user-row">
+                    <div class="user-info">
+                        <span class="user-email">${escHtml(r.actor||'Unknown')}</span>
+                        <div class="user-details"><span style="color:var(--text);font-weight:600">Email:</span> <span>${escHtml(email||'—')}</span> &nbsp;·&nbsp; <span style="color:var(--text-muted)">${escHtml((r.ts||'').substring(0,19).replace('T',' '))}</span></div>
+                    </div>
+                    <div class="action-btns">
+                        <button class="edit-btn" onclick="grantAccessTo('${safeActor}','${safeEmail}')">Grant Access</button>
+                    </div>
+                </div>`;
+            }).join('');
+    }
+
+    const alerts = data.sheet_permission_alerts || [];
+    if (elAlerts) {
+        elAlerts.innerHTML = !alerts.length
+            ? '<div class="empty-state" style="padding:30px 0"><p>No sheet permission issues right now.</p></div>'
+            : alerts.map(a => {
+                const safeActor = escapeJSArgs(a.actor || '');
+                const reqType = (a.target || '').split('|')[0].replace('Type:','').trim();
+                return `<div class="user-row">
+                    <div class="user-info">
+                        <span class="user-email">${escHtml(a.actor||'Unknown')}</span>
+                        <div class="user-details"><span style="color:var(--text);font-weight:600">Blocked on:</span> <span>${escHtml(reqType||'—')}</span> &nbsp;·&nbsp; <span style="color:var(--text-muted)">${escHtml((a.ts||'').substring(0,19).replace('T',' '))}</span></div>
+                    </div>
+                    <div class="action-btns">
+                        <button class="edit-btn" onclick="resolveSheetPermAlert('${safeActor}')">Mark Resolved</button>
+                    </div>
+                </div>`;
+            }).join('');
+    }
+}
+// Old names kept as aliases -- a couple of onclick="loadAccessRequests()" /
+// onclick="loadSheetPermAlerts()" refresh buttons still call these directly;
+// both now just trigger the one combined load above.
+function loadAccessRequests() { return loadAdminAlerts(); }
+function loadSheetPermAlerts() { return loadAdminAlerts(); }
+
+async function resolveSheetPermAlert(userName) {
+    try {
+        const res = await fetch('/api/admin/sheet-permission-alerts/resolve', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+            body: JSON.stringify({ user: userName })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Failed to dismiss.');
+        ToastManager.show('Marked resolved.', 'success');
+        loadSheetPermAlerts();
+    } catch(e) { ToastManager.show('Failed: '+e.message, 'error'); }
 }
 
 function grantAccessTo(name, email) {
@@ -7091,31 +7199,40 @@ function configureSidebarAndCards() {
     if (isAdmin) {
         document.getElementById('navGrpAdmin').style.display = 'block';
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
-        // Check for pending access requests every 30 seconds to update the red dot immediately
-        const checkAccessReqs = () => {
-            fetch('/api/admin/access-requests', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
-                .then(r=>r.ok?r.json():[])
-                .then(reqs=>{
-                    const badge = document.getElementById('pendingRequestsBadge');
-                    if (badge && Array.isArray(reqs)) {
-                        if (reqs.length > 0) {
-                            // Only play sound if it's NOT the first load, and count went up.
-                            // Browsers block audio on first load unless user clicked something!
-                            if (lastAccessReqCount !== -1 && reqs.length > lastAccessReqCount) {
-                                playNotifySound();
-                            }
-                            badge.style.display = 'inline-block';
-                            badge.textContent = reqs.length;
-                        } else {
-                            badge.style.display = 'none';
-                        }
-                        lastAccessReqCount = reqs.length;
-                    }
-                }).catch(()=>{});
+        let lastSheetPermCount = -1;
+        // NOT on a timer anymore -- a 15s interval was ~345k invocations/month
+        // from one open tab alone on a Vercel Hobby budget of 1M/month, for
+        // something that isn't actually time-critical. This now checks ONCE
+        // per admin session (here, at login) to populate the badges, and again
+        // whenever the admin actually opens the Access Requests page (see
+        // loadAccessRequests()/loadSheetPermAlerts(), which update these same
+        // badges too) -- so it costs a small, bounded number of calls per
+        // session instead of a constant background drip regardless of whether
+        // anyone's even looking. True instant-the-moment-it-happens alerts
+        // would need real push notifications (a service worker + Web Push),
+        // which is a bigger, separate feature -- ask if you want that built.
+        window.updateAdminAlertBadges = (data, { silent } = {}) => {
+            const reqs = data.access_requests || [];
+            const alerts = data.sheet_permission_alerts || [];
+            const badge1 = document.getElementById('pendingRequestsBadge');
+            if (badge1) {
+                if (!silent && lastAccessReqCount !== -1 && reqs.length > lastAccessReqCount) playNotifySound();
+                badge1.style.display = reqs.length ? 'inline-block' : 'none';
+                badge1.textContent = reqs.length;
+                lastAccessReqCount = reqs.length;
+            }
+            const badge2 = document.getElementById('sheetPermAlertBadge');
+            if (badge2) {
+                if (!silent && lastSheetPermCount !== -1 && alerts.length > lastSheetPermCount) playNotifySound();
+                badge2.style.display = alerts.length ? 'inline-block' : 'none';
+                badge2.textContent = alerts.length;
+                lastSheetPermCount = alerts.length;
+            }
         };
-        
-        checkAccessReqs(); // Check immediately on load
-        setInterval(checkAccessReqs, 15000); // Check again every 15 seconds
+        fetch('/api/admin/alerts-summary', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
+            .then(r=>r.ok?r.json():null)
+            .then(data=>{ if (data) window.updateAdminAlertBadges(data, { silent: true }); }) // silent: don't chime for whatever was already pending before this session opened
+            .catch(()=>{});
     }
 
     const icons = {
