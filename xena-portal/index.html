@@ -418,14 +418,6 @@
         .del-btn:hover{background:var(--accent-rose);color:#000}
 
         .pill-select-container{position:relative;width:100%}
-        .pill-input-box{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;min-height:42px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;align-items:center}
-        .pill{background:rgba(0,212,255,.15);color:var(--accent-cyan);padding:4px 10px;border-radius:20px;font-size:.8rem;display:flex;align-items:center;gap:6px;border:1px solid rgba(0,212,255,.3)}
-        .pill.all-pill{background:rgba(0,230,118,.15);color:var(--accent-green);border-color:rgba(0,230,118,.3)}
-        .pill-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;margin-top:6px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:var(--shadow);display:none;flex-direction:column;padding:8px}
-        .pill-dropdown.show{display:flex}
-        .pill-option{padding:8px 12px;cursor:pointer;font-size:.9rem;border-radius:6px;transition:.2s;color:var(--text)}
-        .pill-option:hover{background:var(--border)}
-        .pill-option.selected{background:var(--accent-cyan);color:#000;font-weight:700}
 
         /* ── Multi-select dropdown (checkbox list, no pills/chips) ── */
         .msdd-box{width:100%;padding:12px 14px;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none}
@@ -4807,7 +4799,7 @@ function updateAcmDropdown() {
     // silently resetting to "All" every time the region filter changes.
     const prevSelected = pAnaAcm ? pAnaAcm.getValues() : ['all'];
 
-    pAnaAcm = new AcmMultiSelect('anaAcmSelect', list);
+    pAnaAcm = new MultiSelectDropdown('anaAcmSelect', list, {allLabel:'All ACMs', unitLabel:'ACMs'});
 
     const hasAllPerm = isAdmin || (userPermissions?.permissions?.acms?.analytics || ['all']).includes('all');
     if (!(list.length === 1 && !hasAllPerm)) {
@@ -5387,71 +5379,17 @@ async function loadAuditLog() {
     } catch(e) { el.innerHTML='<div style="color:var(--accent-rose)">Failed to load audit log: '+escHtml(e.message)+'</div>'; }
 }
 
-class PillSelect {
-    constructor(containerId, options) {
-        this.container=document.getElementById(containerId);
-        this.options=options;
-        this.selected=['all'];
-        this.render();
-    }
-    render() {
-        this.container.innerHTML='';
-        const box=document.createElement('div');
-        box.className='pill-input-box';
-        const drop=document.createElement('div');
-        drop.className='pill-dropdown';
-        const allOpt=document.createElement('div');
-        allOpt.className='pill-option'+(this.selected.includes('all')?' selected':'');
-        allOpt.textContent='ALL'; allOpt.onclick=()=>{ this.selected=['all']; this.renderPills(box); drop.classList.remove('show'); };
-        drop.appendChild(allOpt);
-        this.options.forEach(opt=>{
-            const div=document.createElement('div');
-            div.className='pill-option'+(this.selected.includes(opt.toLowerCase())?' selected':'');
-            div.textContent=opt;
-            div.onclick=()=>{ const v=opt.toLowerCase(); const i=this.selected.indexOf(v);
-                if (i>-1) this.selected.splice(i,1); else { this.selected=this.selected.filter(x=>x!=='all'); this.selected.push(v); }
-                if (!this.selected.length) this.selected=['all'];
-                div.className='pill-option'+(this.selected.includes(v)?' selected':'');
-                allOpt.className='pill-option'+(this.selected.includes('all')?' selected':'');
-                this.renderPills(box);
-            };
-            drop.appendChild(div);
-        });
-        box.onclick=e=>{ if (e.target===box||e.target.classList.contains('pill-input-box')) { drop.classList.toggle('show'); } };
-        document.addEventListener('click',e=>{ if (!this.container.contains(e.target)) drop.classList.remove('show'); });
-        this.container.appendChild(box); this.container.appendChild(drop);
-        this.box=box; this.renderPills(box);
-    }
-    renderPills(box) {
-        box.querySelectorAll('.pill').forEach(p=>p.remove());
-        const vals=this.selected.length===0||this.selected.includes('all')?['all']:this.selected;
-        vals.forEach(v=>{
-            const pill=document.createElement('span');
-            pill.className='pill'+(v==='all'?' all-pill':'');
-            pill.textContent=v==='all'?'ALL':v;
-            if (v!=='all') {
-                const x=document.createElement('span');
-                x.textContent='×'; x.style.cursor='pointer'; x.style.marginLeft='2px';
-                x.onclick=e=>{ e.stopPropagation(); const i=this.selected.indexOf(v); if (i>-1) this.selected.splice(i,1); if (!this.selected.length) this.selected=['all']; this.renderPills(box); };
-                pill.appendChild(x);
-            }
-            box.insertBefore(pill,box.firstChild);
-        });
-    }
-    getValues() { return this.selected; }
-    setValues(vals) {
-        this.selected=vals.map(v=>v.toLowerCase()); this.render();
-    }
-}
-
-// Plain checkbox-list dropdown multi-select (no pills/chips) -- used for the
-// Analytics Report's "Assigned ACM" filter. Closed state shows a text summary
-// ("All ACMs" / one name / "N ACMs selected"); the checkbox list opens below,
-// same visual language as the other filter dropdowns on that page.
-class AcmMultiSelect {
-    constructor(containerId, options) {
+// Plain checkbox-list dropdown multi-select (no pills/chips) -- used for every
+// multi-select field across the app: Manage Agents' ACM/Region access grants,
+// and the Analytics Report's "Assigned ACM" filter. Closed state shows a text
+// summary ("All ACMs" / one name / "N ACMs selected"); the checkbox list opens
+// below, same visual language as the other dropdown filters on the page.
+class MultiSelectDropdown {
+    constructor(containerId, options, opts = {}) {
         this.container = document.getElementById(containerId);
         this.options = options;
+        this.allLabel = opts.allLabel || 'All';
+        this.unitLabel = opts.unitLabel || 'items';
         this.selected = ['all'];
         this.render();
     }
@@ -5464,7 +5402,7 @@ class AcmMultiSelect {
         const menu = document.createElement('div');
         menu.className = 'msdd-menu';
 
-        const buildRow = (label, value, cb) => {
+        const buildRow = (label, cb) => {
             const row = document.createElement('div');
             row.className = 'msdd-item';
             const chk = document.createElement('input');
@@ -5478,7 +5416,7 @@ class AcmMultiSelect {
             return chk;
         };
 
-        this.allCb = buildRow('All ACMs', 'all', () => {
+        this.allCb = buildRow(this.allLabel, () => {
             this.selected = ['all'];
             this.syncChecks(); this.updateBoxText();
         });
@@ -5490,7 +5428,7 @@ class AcmMultiSelect {
         this.itemCbs = {};
         this.options.forEach(opt => {
             const v = opt.toLowerCase();
-            this.itemCbs[v] = buildRow(opt, v, (chk) => {
+            this.itemCbs[v] = buildRow(opt, (chk) => {
                 const nowChecked = !this.selected.includes(v);
                 if (nowChecked) {
                     this.selected = this.selected.filter(x => x !== 'all');
@@ -5519,11 +5457,11 @@ class AcmMultiSelect {
     }
     updateBoxText() {
         let text;
-        if (this.selected.includes('all')) text = 'All ACMs';
+        if (this.selected.includes('all')) text = this.allLabel;
         else if (this.selected.length === 1) {
             const match = this.options.find(o => o.toLowerCase() === this.selected[0]);
             text = match || this.selected[0];
-        } else text = `${this.selected.length} ACMs selected`;
+        } else text = `${this.selected.length} ${this.unitLabel} selected`;
         this.box.textContent = text;
     }
     getValues() { return this.selected; }
@@ -5531,20 +5469,21 @@ class AcmMultiSelect {
         this.selected = vals.map(v => v.toLowerCase());
         if (!this.selected.length) this.selected = ['all'];
         this.render();
+
     }
 }
 
 function initPills() {
-    pTargetAcm=new PillSelect('targetAcmSelect',allAcms);
-    pTargetReg=new PillSelect('targetRegSelect',allRegs);
-    pPointsAcm=new PillSelect('pointsAcmSelect',allAcms);
-    pPointsReg=new PillSelect('pointsRegSelect',allRegs);
-    pAnalyticsAcm=new PillSelect('analyticsAcmSelect',allAcms);
-    pAnalyticsReg=new PillSelect('analyticsRegSelect',allRegs);
-    pQueryAcm=new PillSelect('queryAcmSelect',allAcms);
-    pQueryReg=new PillSelect('queryRegSelect',allRegs);
-    pExchangeAcm=new PillSelect('exchangeAcmSelect',allAcms);
-    pExchangeReg=new PillSelect('exchangeRegSelect',allRegs);
+    pTargetAcm=new MultiSelectDropdown('targetAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
+    pTargetReg=new MultiSelectDropdown('targetRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
+    pPointsAcm=new MultiSelectDropdown('pointsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
+    pPointsReg=new MultiSelectDropdown('pointsRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
+    pAnalyticsAcm=new MultiSelectDropdown('analyticsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
+    pAnalyticsReg=new MultiSelectDropdown('analyticsRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
+    pQueryAcm=new MultiSelectDropdown('queryAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
+    pQueryReg=new MultiSelectDropdown('queryRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
+    pExchangeAcm=new MultiSelectDropdown('exchangeAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
+    pExchangeReg=new MultiSelectDropdown('exchangeRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
 }
 
 function crossFilter(dimension, value) {
@@ -9444,7 +9383,7 @@ function buildFieldControl(fName, def, req) {
                     <input type="text" id="${idSafe}_input" placeholder="Type a User ID, then press Enter or Add" class="form-highlight-input">
                     <button type="button" class="btn-sm btn-outline" onclick="multiIdAdd('${idSafe}','${escHtml(postName)}')">+ Add</button>
                 </div>
-                <div class="multiid-hint">Add as many User IDs as this ticket covers -- each one lands on the same ticket.</div>
+                <div class="multiid-hint">Add as many User IDs as this ticket covers -- each one lands on the same ticket. You can also paste a whole list (one per line, or comma/space-separated) to add them all at once.</div>
                 <input type="text" name="${escHtml(postName)}" id="${idSafe}_hidden" style="display:none" ${req ? 'data-required="1"' : ''}>
             </div>`;
     } else if (def.type === 'file') {
@@ -9461,27 +9400,54 @@ function multiIdSync(idSafe) {
     hidden.value = ids.join(', ');
 }
 
-function multiIdAdd(idSafe, fieldName) {
-    const input = document.getElementById(`${idSafe}_input`);
-    const chipsWrap = document.getElementById(`${idSafe}_chips`);
-    if (!input || !chipsWrap) return;
-    const val = (input.value || '').trim().replace(/,+$/, '');
-    if (!val) return;
+function multiIdCreateChip(idSafe, chipsWrap, rawVal) {
+    const val = (rawVal || '').trim().replace(/,+$/, '');
+    if (!val) return false;
     const existing = Array.from(chipsWrap.querySelectorAll('[data-uid]')).map(c => c.dataset.uid.toLowerCase());
-    if (existing.includes(val.toLowerCase())) {
-        input.value = '';
-        return;
-    }
+    if (existing.includes(val.toLowerCase())) return false;
     const chip = document.createElement('span');
     chip.className = 'multiid-chip';
     chip.dataset.uid = val;
     chip.innerHTML = `${escHtml(val)} <button type="button" aria-label="Remove ${escHtml(val)}">&times;</button>`;
     chip.querySelector('button').addEventListener('click', () => { chip.remove(); multiIdSync(idSafe); });
     chipsWrap.appendChild(chip);
+    return true;
+}
+
+function multiIdAdd(idSafe, fieldName) {
+    const input = document.getElementById(`${idSafe}_input`);
+    const chipsWrap = document.getElementById(`${idSafe}_chips`);
+    if (!input || !chipsWrap) return;
+    multiIdCreateChip(idSafe, chipsWrap, input.value);
     input.value = '';
     multiIdSync(idSafe);
     input.focus();
 }
+
+// Bulk paste: pasting a block of several IDs (one per line, like a column
+// copied straight out of a sheet, or comma/space-separated) splits into
+// individual chips in one go instead of landing as one long string. A plain
+// single-ID paste still behaves exactly like normal typing.
+document.addEventListener('paste', (e) => {
+    const target = e.target;
+    if (!target || !target.id || !target.id.endsWith('_input') || !target.closest('.multiid-wrap')) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!text) return;
+    const tokens = text.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
+    if (tokens.length <= 1) return; // single value -- let the default paste happen
+    e.preventDefault();
+    const idSafe = target.id.replace(/_input$/, '');
+    const chipsWrap = document.getElementById(`${idSafe}_chips`);
+    if (!chipsWrap) return;
+    let added = 0;
+    tokens.forEach(tok => { if (multiIdCreateChip(idSafe, chipsWrap, tok)) added++; });
+    target.value = '';
+    multiIdSync(idSafe);
+    if (added && typeof ToastManager !== 'undefined') {
+        ToastManager.show(`Added ${added} User ID${added > 1 ? 's' : ''} from paste`, 'success', 2500);
+    }
+});
+
 
 // Enter or comma adds the current chip, without submitting the whole form.
 document.addEventListener('keydown', (e) => {
