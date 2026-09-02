@@ -1623,7 +1623,15 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
             stats["daily_trend_creation"][ds], stats["daily_trend_bd"][ds], stats["daily_trend_closing"][ds] = 0, 0, 0
             cur += timedelta(days=1)
 
-    acm_filter_c     = acm_filter.strip().lower() if acm_filter else "all"
+    # acm_filter may be a single string (legacy callers, e.g. /api/compare which
+    # always filters to exactly one ACM per group) or an iterable of ACM names
+    # (the Analytics Report's multi-select ACM filter). Normalize to a set so
+    # both call shapes work unchanged.
+    if isinstance(acm_filter, str):
+        acm_filter_set = {acm_filter.strip().lower()} if acm_filter and acm_filter.strip().lower() != "all" else {"all"}
+    else:
+        acm_filter_set = set(a.strip().lower() for a in (acm_filter or []) if a and a.strip())
+        if not acm_filter_set: acm_filter_set = {"all"}
     region_filter_c  = region_filter.strip().lower() if region_filter else "all"
     type_filter_c    = type_filter.strip().lower() if type_filter else "all"
     allowed_acms_set = set([a.lower() for a in allowed_acms]) if allowed_acms else {"all"}
@@ -1651,7 +1659,7 @@ def run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_fil
         if not acm: acm = fm["acm_fb"]
 
         if "all" not in allowed_acms_set and acm.lower().strip() not in allowed_acms_set: continue
-        if acm_filter_c != "all" and acm_filter_c != acm: continue
+        if "all" not in acm_filter_set and acm.lower().strip() not in acm_filter_set: continue
 
         req_type, status, agency_type, closing_reason, other_app = fm["req_type"], fm["status"], fm["a_type"], fm["cl_rsn"], fm["o_app"]
 
@@ -3760,7 +3768,12 @@ def analytics():
         return jsonify({"error":"Access denied"}), 403
 
     region_filter = region.lower() if region.lower() != "all" else "all"
-    acm_filter    = acm.lower() if acm.lower() not in ("all","all acms") else "all"
+    # acm may now be a comma-separated list from the multi-select ACM filter
+    # (e.g. "sara,ahmed"), plain "All", or a single name -- all three shapes
+    # are handled the same way here, and run_analytics() does the actual
+    # membership check against the resulting set.
+    acm_parts = [a.strip().lower() for a in acm.split(",") if a.strip()]
+    acm_filter = "all" if (not acm_parts or "all" in acm_parts or "all acms" in acm_parts) else set(acm_parts)
     type_filter   = atype.lower() if atype.lower() not in ("all","all types") else "all"
 
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("analytics",["all"])
