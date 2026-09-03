@@ -8,7 +8,7 @@ import requests as http_requests
 
 APP_ID       = os.environ.get("LARK_APP_ID")
 APP_SECRET   = os.environ.get("LARK_APP_SECRET")
-REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://xena-portal-v1-1.vercel.app/api/callback")
+REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://samurai-portal.vercel.app/api/callback")
 
 UPSTASH_REDIS_REST_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
 UPSTASH_REDIS_REST_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
