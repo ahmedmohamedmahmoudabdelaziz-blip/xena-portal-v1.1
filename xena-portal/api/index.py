@@ -972,7 +972,11 @@ def extract_field_list(field_data):
             return [str(field_data['id']).strip()]
         return [str(field_data).strip()]
     if isinstance(field_data, str):
-        return [s.strip() for s in field_data.split(',') if s.strip()]
+        # Accept both comma-separated (legacy tickets) and newline-separated
+        # (Agency Target Privilege's multi User ID field submits one ID per
+        # line now, matching how it displays in Feishu) so old and new
+        # tickets parse the same way.
+        return [s.strip() for s in re.split(r'[,\n\r]+', field_data) if s.strip()]
     if isinstance(field_data, list):
         res = []
         for item in field_data:
