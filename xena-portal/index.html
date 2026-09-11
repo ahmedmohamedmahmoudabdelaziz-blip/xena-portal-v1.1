@@ -725,18 +725,19 @@
 <svg style="display:none;">
     <defs>
         <!-- Brand mark: an ascending, asymmetric "A" — sharp apex, powerful tapered
-             legs, cut by a bright diagonal accent stroke for energy. Drawn as a
-             free-floating glyph (no bounding box) so it reads as a real mark, not
-             a generic boxed app icon, on both the dark login screen and the
-             light-theme welcome hero. -->
+             legs, cut by a bright diagonal accent stroke for energy. Two independent
+             closed paths (not one self-intersecting outline) so the fill is always
+             solid, and colors are hardcoded rather than var(--...) since some
+             embedded webviews don't resolve CSS custom properties inside <stop>. -->
         <linearGradient id="logoGradient" x1="5%" y1="0%" x2="95%" y2="100%">
-            <stop offset="0%" stop-color="var(--accent-cyan)"/>
+            <stop offset="0%" stop-color="#22e8ff"/>
             <stop offset="55%" stop-color="#6a8cff"/>
-            <stop offset="100%" stop-color="var(--accent-purple)"/>
+            <stop offset="100%" stop-color="#c860ff"/>
         </linearGradient>
         <g id="icon-logo">
-            <path d="M49,6 C40,26 24,54 8,93 L23,93 C34,64 43,38 49,18 C55,38 65,64 76,93 L91,93 C79,58 63,26 53,6 C52,4 50,4 49,6 Z" fill="url(#logoGradient)"/>
-            <path d="M34,61 L66,56" stroke="#f5f7ff" stroke-width="5.5" stroke-linecap="round"/>
+            <path d="M50,7 Q28,46 10,92 L27,92 Q42,50 50,7 Z" fill="url(#logoGradient)"/>
+            <path d="M50,7 Q58,32 68,58 Q80,76 91,92 L73,92 Q60,66 50,7 Z" fill="url(#logoGradient)"/>
+            <path d="M37,63 L64,58" stroke="#f5f7ff" stroke-width="6" stroke-linecap="round"/>
         </g>
         
         <g id="icon-analytics"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
