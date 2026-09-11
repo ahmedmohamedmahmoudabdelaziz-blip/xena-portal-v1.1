@@ -43,9 +43,10 @@
         body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;overflow-x:hidden;transition:background .3s,color .3s}
 
         #loginOverlay{position:fixed;inset:0;background:radial-gradient(circle at 50% 0%,#1a1c2e 0%,var(--bg) 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000}
-        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:48px 40px;width:100%;max-width:400px;text-align:center;box-shadow:var(--shadow)}
-        .login-card h1{font-size:1.8rem;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px; display:flex; align-items:center; justify-content:center; gap:12px;}
-        .login-card p{color:var(--text-muted);margin-bottom:32px}
+        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:44px 40px;width:100%;max-width:440px;text-align:center;box-shadow:var(--shadow)}
+        .login-card .brand-mark{margin:0 auto 20px;filter:drop-shadow(0 6px 20px rgba(0,212,255,.25))}
+        .login-card h1{font-size:1.45rem;font-weight:700;letter-spacing:-.01em;white-space:nowrap;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+        .login-card p{color:var(--text-muted);font-size:.92rem;margin-bottom:32px}
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
         
@@ -723,15 +724,19 @@
 
 <svg style="display:none;">
     <defs>
-        <!-- Custom Wax Seal Logo from image -->
+        <!-- Brand mark: an ascending, asymmetric "A" — sharp apex, powerful tapered
+             legs, cut by a bright diagonal accent stroke for energy. Drawn as a
+             free-floating glyph (no bounding box) so it reads as a real mark, not
+             a generic boxed app icon, on both the dark login screen and the
+             light-theme welcome hero. -->
+        <linearGradient id="logoGradient" x1="5%" y1="0%" x2="95%" y2="100%">
+            <stop offset="0%" stop-color="var(--accent-cyan)"/>
+            <stop offset="55%" stop-color="#6a8cff"/>
+            <stop offset="100%" stop-color="var(--accent-purple)"/>
+        </linearGradient>
         <g id="icon-logo">
-            <!-- Minimalist four-pointed "sparkle" mark: outline only (no fill), sharp
-                 outer points with a gently rounded/curved concave waist between each
-                 point, in bright neon cyan. Replaces the old maroon "S" badge mark
-                 that was still leaking into the login card and sidebar header. -->
-            <path d="M 50 6 Q 59 41, 94 50 Q 59 59, 50 94 Q 41 59, 6 50 Q 41 41, 50 6 Z"
-                  fill="none" stroke="var(--accent-cyan)" stroke-width="5"
-                  stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M49,6 C40,26 24,54 8,93 L23,93 C34,64 43,38 49,18 C55,38 65,64 76,93 L91,93 C79,58 63,26 53,6 C52,4 50,4 49,6 Z" fill="url(#logoGradient)"/>
+            <path d="M34,61 L66,56" stroke="#f5f7ff" stroke-width="5.5" stroke-linecap="round"/>
         </g>
         
         <g id="icon-analytics"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
@@ -788,10 +793,8 @@
 
 <div id="loginOverlay">
     <div class="login-card">
-        <h1>
-            <svg width="40" height="40" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
-            Audition Dashboard
-        </h1>
+        <svg class="brand-mark" width="56" height="56" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
+        <h1>Audition Dashboard</h1>
         <p>Secure Analytics Dashboard</p>
         <button class="btn btn-primary" onclick="window.location.href='/api/login'">Login with Feishu</button>
         <p id="loginErrMsg" style="display:none;color:#ff6b8a;font-size:.82rem;margin-top:14px;max-width:320px;text-align:center;line-height:1.5"></p>
@@ -824,7 +827,7 @@
 <div class="app-shell" id="mainApp">
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
-            <svg width="32" height="32" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
+            <svg width="26" height="26" viewBox="0 0 100 100" style="flex-shrink:0"><use href="#icon-logo"></use></svg>
             <span class="sidebar-brand">Audition Dashboard</span>
         </div>
         
