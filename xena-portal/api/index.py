@@ -1,4 +1,4 @@
-import os, time, re, json, hashlib, logging, urllib.parse, threading, random, uuid
+import os, time, re, json, hashlib, hmac, logging, urllib.parse, threading, random, uuid
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from functools import wraps
@@ -13,6 +13,12 @@ REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://samurai-portal.vercel.app
 UPSTASH_REDIS_REST_URL   = os.environ.get("UPSTASH_REDIS_REST_URL", "")
 UPSTASH_REDIS_REST_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
 REDIS_ENABLED = bool(UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN)
+
+# Bearer-token auth for the external cron-job.org caller that drives
+# /api/sync/refresh every 30 minutes -- separate from the admin-user session
+# check already on that route, since an unattended cron job has no Feishu user
+# session to present. See is_cron_authorized().
+CRON_SECRET = os.environ.get("CRON_SECRET", "")
 REDIS_MAX_VALUE_BYTES = 900_000
 
 MOCK_MODE = not bool(APP_ID and APP_SECRET)
@@ -592,6 +598,19 @@ def rate_check(ip, max_requests, window_seconds):
         if len(_rate_store[ip]) >= max_requests: return False
         _rate_store[ip].append(now)
         return True
+
+def is_cron_authorized(req):
+    """True if the request carries a valid `Authorization: Bearer <CRON_SECRET>`
+    header -- the auth path for the external cron-job.org caller hitting
+    /api/sync/refresh. Fails closed if CRON_SECRET isn't set (never treat a
+    missing secret as "no auth required")."""
+    if not CRON_SECRET:
+        return False
+    auth_header = req.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return False
+    token = auth_header[len("Bearer "):]
+    return hmac.compare_digest(token, CRON_SECRET)
 
 def rate_limit(max_req, window):
     def decorator(fn):
@@ -3105,39 +3124,66 @@ def client_audit_log_action():
 @app.route('/api/sync/refresh', methods=['POST'])
 @rate_limit(*RATE_LIMIT_ANALYTICS)
 def sync_refresh():
+    # Two ways in: the external cron-job.org caller presents a bearer token
+    # (no Feishu session to check), everything else (a manual "sync now" from
+    # an admin tool, curl testing, etc.) still goes through the normal
+    # admin-user permission check exactly as before. Either is sufficient.
     user  = sanitize_text(request.args.get('user', request.headers.get('X-User-Name','')))
     email = sanitize_text(request.args.get('email',''))
-    perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not perms.get("modules"): return jsonify({"error":"Access denied"}), 403
+    via_cron = is_cron_authorized(request)
+    if not via_cron:
+        perms = get_user_permissions(email, user)
+        if not perms.get("is_super_admin") and not perms.get("modules"):
+            return jsonify({"error": "Access denied"}), 403
+
+    # ?table=requests / ?table=points refreshes just that one table (so
+    # cron-job.org can hit each on its own lightweight schedule); omitting it
+    # (or ?table=all) keeps the original behavior of refreshing both in one
+    # call, e.g. for a manual admin-triggered sync.
+    table = sanitize_text(request.args.get('table', 'all')).strip().lower()
+    if table not in ('all', 'requests', 'points'):
+        return jsonify({"error": "Invalid table. Use 'requests', 'points', or omit for both."}), 400
 
     cache_invalidate()
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(_background_sync_requests_table), executor.submit(_background_sync_points_table)]
+    jobs = []
+    if table in ('all', 'requests'): jobs.append(_background_sync_requests_table)
+    if table in ('all', 'points'):   jobs.append(_background_sync_points_table)
+    with ThreadPoolExecutor(max_workers=max(len(jobs), 1)) as executor:
+        futures = [executor.submit(job) for job in jobs]
         for f in futures: f.result()
 
     # Piggyback the Agency Exchange's daily points snapshot on the existing cron
     # cadence, so Movers history accrues reliably even if nobody opens the board
-    # that day. Cheap no-op if today's snapshot was already taken.
-    try:
+    # that day. Cheap no-op if today's snapshot was already taken. Only runs
+    # when this call actually touched the points table (or refreshed both).
+    if table in ('all', 'points'):
+        try:
+            with _bg_points_lock:
+                pts_items_for_snapshot = list(_bg_points_sync["items"])
+            if pts_items_for_snapshot:
+                append_exchange_daily_snapshot(pts_items_for_snapshot)
+        except Exception as e:
+            logger.warn("exchange_snapshot_from_cron_failed", error=str(e))
+
+    resp = {"success": True, "redis_enabled": REDIS_ENABLED, "table": table}
+    if table in ('all', 'requests'):
+        with _bg_sync_lock:
+            resp["requests_table"] = {
+                "record_count": len(_bg_sync["requests_items"]),
+                "last_refreshed_at": _bg_sync["updated_at"],
+                "fetch_complete": _bg_sync["fetch_complete"],
+            }
+    if table in ('all', 'points'):
         with _bg_points_lock:
-            pts_items_for_snapshot = list(_bg_points_sync["items"])
-        if pts_items_for_snapshot:
-            append_exchange_daily_snapshot(pts_items_for_snapshot)
-    except Exception as e:
-        logger.warn("exchange_snapshot_from_cron_failed", error=str(e))
+            resp["points_table"] = {
+                "record_count": len(_bg_points_sync["items"]),
+                "last_refreshed_at": _bg_points_sync["updated_at"],
+                "fetch_complete": _bg_points_sync["fetch_complete"],
+            }
 
-    with _bg_sync_lock:
-        req_count, req_updated, req_complete = len(_bg_sync["requests_items"]), _bg_sync["updated_at"], _bg_sync["fetch_complete"]
-    with _bg_points_lock:
-        pts_count, pts_updated, pts_complete = len(_bg_points_sync["items"]), _bg_points_sync["updated_at"], _bg_points_sync["fetch_complete"]
-
-    audit.log(user, "MANUAL_SYNC_REFRESH", "grand_table+points_table", ip=request.headers.get("X-Forwarded-For",""), severity="Info")
-    return jsonify({
-        "success": True,
-        "requests_table": {"record_count": req_count, "updated_at": req_updated, "fetch_complete": req_complete},
-        "points_table":   {"record_count": pts_count, "updated_at": pts_updated, "fetch_complete": pts_complete},
-        "redis_enabled": REDIS_ENABLED,
-    })
+    audit_actor = "cron-job.org" if via_cron else (user or "unknown")
+    audit.log(audit_actor, "MANUAL_SYNC_REFRESH", table, ip=request.headers.get("X-Forwarded-For",""), severity="Info")
+    return jsonify(resp)
 
 @app.route('/api/points/search', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
