@@ -722,21 +722,19 @@
 
 <body>
 
-<svg style="display:none;">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none;">
     <defs>
         <!-- Brand mark: an ascending, asymmetric "A" — sharp apex, powerful tapered
              legs, cut by a bright diagonal accent stroke for energy. Two independent
-             closed paths (not one self-intersecting outline) so the fill is always
-             solid, and colors are hardcoded rather than var(--...) since some
-             embedded webviews don't resolve CSS custom properties inside <stop>. -->
-        <linearGradient id="logoGradient" x1="5%" y1="0%" x2="95%" y2="100%">
-            <stop offset="0%" stop-color="#22e8ff"/>
-            <stop offset="55%" stop-color="#6a8cff"/>
-            <stop offset="100%" stop-color="#c860ff"/>
-        </linearGradient>
+             closed paths (not one self-intersecting outline), plain solid fills
+             (no <linearGradient>/url() paint-server reference at all) -- that
+             gradient-through-<use> reference was the actual bug: it was silently
+             failing to resolve in the target webview, leaving only the plain-color
+             crossbar stroke visible. Flat colors use the exact same mechanism
+             already proven working for that crossbar. -->
         <g id="icon-logo">
-            <path d="M50,7 Q28,46 10,92 L27,92 Q42,50 50,7 Z" fill="url(#logoGradient)"/>
-            <path d="M50,7 Q58,32 68,58 Q80,76 91,92 L73,92 Q60,66 50,7 Z" fill="url(#logoGradient)"/>
+            <path d="M50,7 Q28,46 10,92 L27,92 Q42,50 50,7 Z" fill="#00d4ff"/>
+            <path d="M50,7 Q58,32 68,58 Q80,76 91,92 L73,92 Q60,66 50,7 Z" fill="#b967ff"/>
             <path d="M37,63 L64,58" stroke="#f5f7ff" stroke-width="6" stroke-linecap="round"/>
         </g>
         
@@ -794,7 +792,7 @@
 
 <div id="loginOverlay">
     <div class="login-card">
-        <svg class="brand-mark" width="56" height="56" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
+        <svg class="brand-mark" width="56" height="56" viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
         <h1>Audition Dashboard</h1>
         <p>Secure Analytics Dashboard</p>
         <button class="btn btn-primary" onclick="window.location.href='/api/login'">Login with Feishu</button>
@@ -828,7 +826,7 @@
 <div class="app-shell" id="mainApp">
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
-            <svg width="26" height="26" viewBox="0 0 100 100" style="flex-shrink:0"><use href="#icon-logo"></use></svg>
+            <svg width="26" height="26" viewBox="0 0 100 100" style="flex-shrink:0" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
             <span class="sidebar-brand">Audition Dashboard</span>
         </div>
         
@@ -1001,7 +999,7 @@
                 </div>
                 <div style="text-align:center;padding:32px 24px 24px" id="welcomeHero">
                     <div style="margin-bottom:16px; display:flex; justify-content:center;">
-                        <svg width="70" height="70" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
+                        <svg width="70" height="70" viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
                     </div>
                     <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px" data-i18n="portalWelcome">Audition Dashboard</h2>
                     <p style="color:var(--text-muted);margin-bottom:32px" data-i18n="portalSub">Agency Privilege &amp; Operational Analytics</p>
