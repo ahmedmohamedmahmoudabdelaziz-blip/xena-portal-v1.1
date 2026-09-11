@@ -1769,7 +1769,7 @@ _bg_thread_lock = threading.Lock()
 
 REDIS_KEY_REQUESTS_SNAPSHOT = "xena:snapshot:requests_table"
 
-BACKGROUND_SYNC_FETCH_BUDGET_SECONDS = 50
+BACKGROUND_SYNC_FETCH_BUDGET_SECONDS = 22
 
 def _background_sync_requests_table():
     with _bg_sync_lock:
@@ -1882,12 +1882,21 @@ _bg_points_lock = threading.Lock()
 _bg_points_thread_started = False
 _bg_points_thread_lock = threading.Lock()
 
+# Same class of bug the comment above documents for the requests table: called with
+# no max_seconds, this walked the *entire* points table on every cron cycle with no
+# early-stop (the from_dt-based heuristic in fetch_feishu_records never applies here
+# since points syncs don't pass from_dt). That's why "Points Table" always times out
+# on cron-job.org -- it was never bounded in the first place, not just under-bounded.
+# Set below cron-job.org's 30s job timeout (not the old 50s used for requests) so a
+# single call reliably finishes inside that window with margin for network/JSON overhead.
+BACKGROUND_SYNC_POINTS_FETCH_BUDGET_SECONDS = 22
+
 def _background_sync_points_table():
     with _bg_points_lock:
         if _bg_points_sync["syncing"]: return
         _bg_points_sync["syncing"] = True
     try:
-        items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
+        items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID, max_seconds=BACKGROUND_SYNC_POINTS_FETCH_BUDGET_SECONDS)
         now = time.time()
         with _bg_points_lock:
             _bg_points_sync["items"]          = items
