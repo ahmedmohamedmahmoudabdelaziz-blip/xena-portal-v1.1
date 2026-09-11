@@ -600,13 +600,16 @@ def rate_check(ip, max_requests, window_seconds):
         return True
 
 def is_cron_authorized(req):
-    """True if the request carries a valid `Authorization: Bearer <CRON_SECRET>`
+    """True if the request carries a valid `X-Cron-Authorization: Bearer <CRON_SECRET>`
     header -- the auth path for the external cron-job.org caller hitting
-    /api/sync/refresh. Fails closed if CRON_SECRET isn't set (never treat a
-    missing secret as "no auth required")."""
+    /api/sync/refresh. Uses a custom header rather than the standard
+    `Authorization` header, since that header is reserved for platform/proxy-
+    level auth on some hosts and can be stripped, rewritten, or consumed
+    before it ever reaches this code. Fails closed if CRON_SECRET isn't set
+    (never treat a missing secret as "no auth required")."""
     if not CRON_SECRET:
         return False
-    auth_header = req.headers.get("Authorization", "")
+    auth_header = req.headers.get("X-Cron-Authorization", "")
     if not auth_header.startswith("Bearer "):
         return False
     token = auth_header[len("Bearer "):]
