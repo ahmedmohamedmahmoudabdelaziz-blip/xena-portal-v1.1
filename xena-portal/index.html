@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audition Dashboard</title>
+    <title>Xena Data Portal</title>
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><circle cx='50' cy='50' r='38' fill='%23841b2d' stroke='%23841b2d' stroke-width='16' stroke-dasharray='0 14.92' stroke-linecap='round'/><circle cx='50' cy='50' r='29' fill='%232a2c30'/><text x='47' y='66' font-family='Times New Roman, serif' font-size='52' font-weight='bold' fill='%23841b2d' text-anchor='middle' font-style='italic'>S</text><path d='M 32 60 L 46 72 L 85 25 L 80 20 L 46 60 L 36 52 Z' fill='%23841b2d' stroke='%232a2c30' stroke-width='2' stroke-linejoin='round'/></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -43,15 +43,9 @@
         body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;overflow-x:hidden;transition:background .3s,color .3s}
 
         #loginOverlay{position:fixed;inset:0;background:radial-gradient(circle at 50% 0%,#1a1c2e 0%,var(--bg) 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000}
-        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:44px 40px;width:100%;max-width:440px;text-align:center;box-shadow:var(--shadow);animation:loginCardIn .6s cubic-bezier(.16,1,.3,1)}
-        .login-card .brand-mark-wrap{position:relative;width:76px;height:76px;margin:0 auto 22px;display:flex;align-items:center;justify-content:center}
-        .login-card .brand-mark-wrap::before{content:'';position:absolute;inset:-16px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.38) 0%,rgba(185,103,255,.28) 55%,transparent 75%);filter:blur(16px);animation:brandGlow 3.4s ease-in-out infinite}
-        .login-card .brand-mark{position:relative;filter:drop-shadow(0 10px 26px rgba(0,212,255,.35)) drop-shadow(0 3px 12px rgba(185,103,255,.3));animation:brandFloat 4.8s ease-in-out infinite}
-        .login-card h1{font-size:1.45rem;font-weight:700;letter-spacing:-.01em;white-space:nowrap;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
-        .login-card p{color:var(--text-muted);font-size:.92rem;margin-bottom:32px}
-        @keyframes loginCardIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-        @keyframes brandGlow{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.1)}}
-        @keyframes brandFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:48px 40px;width:100%;max-width:400px;text-align:center;box-shadow:var(--shadow)}
+        .login-card h1{font-size:1.8rem;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px; display:flex; align-items:center; justify-content:center; gap:12px;}
+        .login-card p{color:var(--text-muted);margin-bottom:32px}
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
         
@@ -727,20 +721,17 @@
 
 <body>
 
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none;">
+<svg style="display:none;">
     <defs>
-        <!-- Brand mark: an ascending, asymmetric "A" — sharp apex, powerful tapered
-             legs, cut by a bright diagonal accent stroke for energy. Two independent
-             closed paths (not one self-intersecting outline), plain solid fills
-             (no <linearGradient>/url() paint-server reference at all) -- that
-             gradient-through-<use> reference was the actual bug: it was silently
-             failing to resolve in the target webview, leaving only the plain-color
-             crossbar stroke visible. Flat colors use the exact same mechanism
-             already proven working for that crossbar. -->
+        <!-- Custom Wax Seal Logo from image -->
         <g id="icon-logo">
-            <path d="M50,7 Q28,46 10,92 L27,92 Q42,50 50,7 Z" fill="#00d4ff"/>
-            <path d="M50,7 Q58,32 68,58 Q80,76 91,92 L73,92 Q60,66 50,7 Z" fill="#b967ff"/>
-            <path d="M37,63 L64,58" stroke="#f5f7ff" stroke-width="6" stroke-linecap="round"/>
+            <!-- Minimalist four-pointed "sparkle" mark: outline only (no fill), sharp
+                 outer points with a gently rounded/curved concave waist between each
+                 point, in bright neon cyan. Replaces the old maroon "S" badge mark
+                 that was still leaking into the login card and sidebar header. -->
+            <path d="M 50 6 Q 59 41, 94 50 Q 59 59, 50 94 Q 41 59, 6 50 Q 41 41, 50 6 Z"
+                  fill="none" stroke="var(--accent-cyan)" stroke-width="5"
+                  stroke-linejoin="round" stroke-linecap="round"/>
         </g>
         
         <g id="icon-analytics"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
@@ -797,10 +788,10 @@
 
 <div id="loginOverlay">
     <div class="login-card">
-        <div class="brand-mark-wrap">
-            <svg class="brand-mark" width="56" height="56" viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
-        </div>
-        <h1>Audition Dashboard</h1>
+        <h1>
+            <svg width="40" height="40" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
+            Xena Portal
+        </h1>
         <p>Secure Analytics Dashboard</p>
         <button class="btn btn-primary" onclick="window.location.href='/api/login'">Login with Feishu</button>
         <p id="loginErrMsg" style="display:none;color:#ff6b8a;font-size:.82rem;margin-top:14px;max-width:320px;text-align:center;line-height:1.5"></p>
@@ -833,8 +824,8 @@
 <div class="app-shell" id="mainApp">
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
-            <svg width="26" height="26" viewBox="0 0 100 100" style="flex-shrink:0" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
-            <span class="sidebar-brand">Audition Dashboard</span>
+            <svg width="32" height="32" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
+            <span class="sidebar-brand">Xena Portal</span>
         </div>
         
         <div class="sidebar-search-area">
@@ -1006,9 +997,9 @@
                 </div>
                 <div style="text-align:center;padding:32px 24px 24px" id="welcomeHero">
                     <div style="margin-bottom:16px; display:flex; justify-content:center;">
-                        <svg width="70" height="70" viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
+                        <svg width="70" height="70" viewBox="0 0 100 100"><use href="#icon-logo"></use></svg>
                     </div>
-                    <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px" data-i18n="portalWelcome">Audition Dashboard</h2>
+                    <h2 style="font-size:1.7rem;font-weight:700;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px" data-i18n="portalWelcome">Xena Live Data Portal</h2>
                     <p style="color:var(--text-muted);margin-bottom:32px" data-i18n="portalSub">Agency Privilege &amp; Operational Analytics</p>
                 </div>
                 <div class="welcome-cards" id="welcomeCards"></div>
@@ -2643,7 +2634,7 @@ const translations = {
         auditLog: "Audit Log",
         logout: "Logout",
         searchMenu: "Search menu...",
-        portalWelcome: "Audition Dashboard",
+        portalWelcome: "Xena Live Data Portal",
         portalSub: "Agency Privilege & Operational Analytics",
         crunching: "Crunching Feishu data..."
     },
@@ -2672,7 +2663,7 @@ const translations = {
         auditLog: "审计日志",
         logout: "退出登录",
         searchMenu: "搜索菜单...",
-        portalWelcome: "试镜仪表盘",
+        portalWelcome: "Xena 实时数据门户",
         portalSub: "机构特权与运营分析",
         crunching: "处理飞书数据..."
     }
