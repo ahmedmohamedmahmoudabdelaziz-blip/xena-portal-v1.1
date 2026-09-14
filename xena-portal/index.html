@@ -495,7 +495,8 @@
         .dz-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
         .dz-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg);flex-shrink:0}
         .dz-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-        .dz-thumb-file{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:1.2rem;color:var(--text-muted)}
+        .dz-thumb-open{display:block;width:100%;height:100%;padding:0;margin:0;border:none;background:none;cursor:zoom-in}
+        .dz-thumb-file{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%;padding:0;margin:0;border:none;background:none;cursor:pointer;color:inherit;font:inherit;font-size:1.2rem;color:var(--text-muted)}
         .dz-thumb-file span{font-size:.52rem;margin-top:2px;word-break:break-all;padding:0 3px;text-align:center;line-height:1.2}
         .dz-thumb-remove{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.75);color:#fff;border:none;font-size:.7rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
         .dz-thumb-remove:hover{background:var(--accent-rose)}
@@ -3156,15 +3157,44 @@ function dzHandlePaste(e, id) {
     if (files.length) { e.preventDefault(); dzAddFiles(id, files); }
 }
 
+function dzOpenFile(btn) {
+    const url = btn.dataset.fileUrl;
+    if (url) window.open(url, '_blank');
+}
+
 function dzRenderThumbs(id) {
     const wrap = document.getElementById(id + '_thumbs');
     if (!wrap) return;
     const store = dzFileStore(id);
+
+    // Build a lightbox gallery of just this dropzone's *image* files (same
+    // viewer used in the Live Ticket Queue: zoom, rotate, pan, Next/Prev, OCR)
+    // so clicking a thumbnail actually opens a preview instead of doing nothing.
+    const galleryId = `dz-${id}`;
+    const galleryIndexByStoreIdx = [];
+    const gallery = [];
+    store.forEach((f, i) => {
+        if (f.type && f.type.startsWith('image/')) {
+            galleryIndexByStoreIdx[i] = gallery.length;
+            gallery.push({ src: URL.createObjectURL(f), filename: f.name });
+        }
+    });
+    lightboxGalleries[galleryId] = gallery;
+
     const thumbs = store.map((f, i) => {
         const isImg = f.type && f.type.startsWith('image/');
-        const url = isImg ? URL.createObjectURL(f) : null;
-        return `<div class="dz-thumb" title="${escHtml(f.name)}">
-            ${isImg ? `<img src="${url}">` : `<div class="dz-thumb-file">📄<span>${escHtml(f.name.length > 12 ? f.name.slice(0,10)+'…' : f.name)}</span></div>`}
+        if (isImg) {
+            const gIdx = galleryIndexByStoreIdx[i];
+            return `<div class="dz-thumb" title="Click to preview">
+                <button type="button" class="dz-thumb-open" data-gallery-id="${galleryId}" data-gallery-index="${gIdx}" onclick="event.stopPropagation();openImageLightboxFromThumb(this)">
+                    <img src="${gallery[gIdx].src}">
+                </button>
+                <button type="button" class="dz-thumb-remove" onclick="event.stopPropagation();dzRemoveFile('${id}',${i})">×</button>
+            </div>`;
+        }
+        const fileUrl = URL.createObjectURL(f);
+        return `<div class="dz-thumb" title="Click to open">
+            <button type="button" class="dz-thumb-file" data-file-url="${fileUrl}" onclick="event.stopPropagation();dzOpenFile(this)">📄<span>${escHtml(f.name.length > 12 ? f.name.slice(0,10)+'…' : f.name)}</span></button>
             <button type="button" class="dz-thumb-remove" onclick="event.stopPropagation();dzRemoveFile('${id}',${i})">×</button>
         </div>`;
     }).join('');
@@ -5473,17 +5503,91 @@ class MultiSelectDropdown {
     }
 }
 
+// Always-visible checkbox list -- same exact component style as "Reject
+// Reason" and "Agency Point Privilege" (.msel-wrap / .msel-toggle): every
+// option is shown and toggled directly, no click-to-expand, no pills/chips.
+// Used for every ACM/Region access grant in Manage Agents so the whole app
+// shares one consistent multi-select look.
+class ChecklistMultiSelect {
+    constructor(containerId, options, opts = {}) {
+        this.container = document.getElementById(containerId);
+        this.options = options;
+        this.allLabel = opts.allLabel || 'All';
+        this.selected = ['all'];
+        this.render();
+    }
+    render() {
+        this.container.innerHTML = '';
+        const wrap = document.createElement('div');
+        wrap.className = 'msel-wrap';
+
+        const buildToggle = (label, isAll, val) => {
+            const lbl = document.createElement('label');
+            lbl.className = 'msel-toggle';
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.style.display = 'none';
+            const dot = document.createElement('span');
+            dot.className = 'msel-dot';
+            dot.textContent = '✓';
+            const span = document.createElement('span');
+            span.className = 'msel-text';
+            span.textContent = label;
+            lbl.appendChild(chk); lbl.appendChild(dot); lbl.appendChild(span);
+            lbl.onclick = (e) => {
+                e.preventDefault();
+                if (isAll) {
+                    this.selected = ['all'];
+                } else {
+                    const nowChecked = !this.selected.includes(val);
+                    if (nowChecked) { this.selected = this.selected.filter(x => x !== 'all'); this.selected.push(val); }
+                    else { this.selected = this.selected.filter(x => x !== val); }
+                    if (!this.selected.length) this.selected = ['all'];
+                }
+                this.sync();
+            };
+            wrap.appendChild(lbl);
+            return { lbl, chk };
+        };
+
+        this.allRow = buildToggle(this.allLabel, true, 'all');
+        this.itemRows = {};
+        this.options.forEach(opt => {
+            const v = opt.toLowerCase();
+            this.itemRows[v] = buildToggle(opt, false, v);
+        });
+
+        this.container.appendChild(wrap);
+        this.sync();
+    }
+    sync() {
+        const setActive = (row, active) => {
+            row.lbl.classList.toggle('active', active);
+            row.chk.checked = active;
+        };
+        setActive(this.allRow, this.selected.includes('all'));
+        Object.entries(this.itemRows).forEach(([v, row]) => setActive(row, this.selected.includes(v)));
+    }
+    getValues() { return this.selected; }
+    setValues(vals) {
+        this.selected = vals.map(v => v.toLowerCase());
+        if (!this.selected.length) this.selected = ['all'];
+        this.sync();
+    }
+}
+
 function initPills() {
-    pTargetAcm=new MultiSelectDropdown('targetAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pTargetReg=new MultiSelectDropdown('targetRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
-    pPointsAcm=new MultiSelectDropdown('pointsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pPointsReg=new MultiSelectDropdown('pointsRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
-    pAnalyticsAcm=new MultiSelectDropdown('analyticsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pAnalyticsReg=new MultiSelectDropdown('analyticsRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
-    pQueryAcm=new MultiSelectDropdown('queryAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pQueryReg=new MultiSelectDropdown('queryRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
-    pExchangeAcm=new MultiSelectDropdown('exchangeAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pExchangeReg=new MultiSelectDropdown('exchangeRegSelect',allRegs,{allLabel:'All Regions',unitLabel:'Regions'});
+    pTargetAcm=new ChecklistMultiSelect('targetAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pTargetReg=new ChecklistMultiSelect('targetRegSelect',allRegs,{allLabel:'All Regions'});
+    pPointsAcm=new ChecklistMultiSelect('pointsAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pPointsReg=new ChecklistMultiSelect('pointsRegSelect',allRegs,{allLabel:'All Regions'});
+    pAnalyticsAcm=new ChecklistMultiSelect('analyticsAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pAnalyticsReg=new ChecklistMultiSelect('analyticsRegSelect',allRegs,{allLabel:'All Regions'});
+
+    pQueryAcm=new ChecklistMultiSelect('queryAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pQueryReg=new ChecklistMultiSelect('queryRegSelect',allRegs,{allLabel:'All Regions'});
+    pExchangeAcm=new ChecklistMultiSelect('exchangeAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pExchangeReg=new ChecklistMultiSelect('exchangeRegSelect',allRegs,{allLabel:'All Regions'});
 }
 
 function crossFilter(dimension, value) {
@@ -9397,7 +9501,9 @@ function multiIdSync(idSafe) {
     const hidden = document.getElementById(`${idSafe}_hidden`);
     if (!chipsWrap || !hidden) return;
     const ids = Array.from(chipsWrap.querySelectorAll('[data-uid]')).map(c => c.dataset.uid);
-    hidden.value = ids.join(', ');
+    // One ID per line in the sheet cell (not "id1, id2, id3" side-by-side) --
+    // matches how Ahmed wants it to land in Feishu.
+    hidden.value = ids.join('\n');
 }
 
 function multiIdCreateChip(idSafe, chipsWrap, rawVal) {
