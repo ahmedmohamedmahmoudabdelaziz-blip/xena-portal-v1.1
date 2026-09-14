@@ -43,10 +43,15 @@
         body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;overflow-x:hidden;transition:background .3s,color .3s}
 
         #loginOverlay{position:fixed;inset:0;background:radial-gradient(circle at 50% 0%,#1a1c2e 0%,var(--bg) 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000}
-        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:44px 40px;width:100%;max-width:440px;text-align:center;box-shadow:var(--shadow)}
-        .login-card .brand-mark{margin:0 auto 20px;filter:drop-shadow(0 6px 20px rgba(0,212,255,.25))}
+        .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:44px 40px;width:100%;max-width:440px;text-align:center;box-shadow:var(--shadow);animation:loginCardIn .6s cubic-bezier(.16,1,.3,1)}
+        .login-card .brand-mark-wrap{position:relative;width:76px;height:76px;margin:0 auto 22px;display:flex;align-items:center;justify-content:center}
+        .login-card .brand-mark-wrap::before{content:'';position:absolute;inset:-16px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.38) 0%,rgba(185,103,255,.28) 55%,transparent 75%);filter:blur(16px);animation:brandGlow 3.4s ease-in-out infinite}
+        .login-card .brand-mark{position:relative;filter:drop-shadow(0 10px 26px rgba(0,212,255,.35)) drop-shadow(0 3px 12px rgba(185,103,255,.3));animation:brandFloat 4.8s ease-in-out infinite}
         .login-card h1{font-size:1.45rem;font-weight:700;letter-spacing:-.01em;white-space:nowrap;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
         .login-card p{color:var(--text-muted);font-size:.92rem;margin-bottom:32px}
+        @keyframes loginCardIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes brandGlow{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.1)}}
+        @keyframes brandFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 
         .app-shell{display:none;flex-direction:row;min-height:100vh}
         
@@ -792,7 +797,9 @@
 
 <div id="loginOverlay">
     <div class="login-card">
-        <svg class="brand-mark" width="56" height="56" viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
+        <div class="brand-mark-wrap">
+            <svg class="brand-mark" width="56" height="56" viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#icon-logo" xlink:href="#icon-logo"></use></svg>
+        </div>
         <h1>Audition Dashboard</h1>
         <p>Secure Analytics Dashboard</p>
         <button class="btn btn-primary" onclick="window.location.href='/api/login'">Login with Feishu</button>
