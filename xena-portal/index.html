@@ -450,6 +450,8 @@
         .msdd-box:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
         .msdd-box::after{content:'▾';color:var(--text-muted);flex-shrink:0;font-size:.8rem}
         .msdd-menu{position:absolute;top:100%;left:0;right:0;margin-top:6px;background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:var(--shadow);display:none;padding:6px}
+        .msdd-search{width:100%;padding:8px 10px;margin-bottom:6px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:.85rem;font-family:inherit;position:sticky;top:0}
+        .msdd-search:focus{outline:none;border-color:var(--accent-cyan)}
         .msdd-menu.show{display:block}
         .msdd-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:.9rem;color:var(--text)}
         .msdd-item:hover{background:var(--border)}
@@ -477,6 +479,8 @@
         /* ── Elegant MultiSelect toggle list (Create Request + Live Ticket Queue) ──
            Replaces raw <input type=checkbox> lists that rendered as a cramped,
            double-scrollbar box. Same visual language as .priv-toggle above. */
+        .msel-search{width:100%;padding:9px 12px;margin-bottom:6px;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;font-family:inherit}
+        .msel-search:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
         .msel-wrap{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;overflow-x:hidden;padding:6px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.15)}
         .msel-wrap::-webkit-scrollbar{width:6px;height:6px}
         .msel-wrap::-webkit-scrollbar-track{background:transparent}
@@ -5472,6 +5476,19 @@ class MultiSelectDropdown {
         const menu = document.createElement('div');
         menu.className = 'msdd-menu';
 
+        // Long lists (20+ ACMs) made scrolling the only way to find a name --
+        // a search box at the top of the popover fixes that. Skipped for
+        // short lists where there's nothing worth filtering.
+        let search = null;
+        if (this.options.length > 5) {
+            search = document.createElement('input');
+            search.type = 'text';
+            search.className = 'msdd-search';
+            search.placeholder = `Search ${this.allLabel.replace(/^All /, '')}...`;
+            search.onclick = (e) => e.stopPropagation();
+            menu.appendChild(search);
+        }
+
         const buildRow = (label, cb) => {
             const row = document.createElement('div');
             row.className = 'msdd-item';
@@ -5483,22 +5500,23 @@ class MultiSelectDropdown {
             row.appendChild(chk); row.appendChild(span);
             row.onclick = (e) => { e.stopPropagation(); cb(chk); };
             menu.appendChild(row);
-            return chk;
+            return { chk, row, label };
         };
 
         this.allCb = buildRow(this.allLabel, () => {
             this.selected = ['all'];
             this.syncChecks(); this.updateBoxText();
-        });
+        }).chk;
 
         const divider = document.createElement('div');
         divider.className = 'msdd-divider';
         menu.appendChild(divider);
 
         this.itemCbs = {};
+        this.itemRows = {};
         this.options.forEach(opt => {
             const v = opt.toLowerCase();
-            this.itemCbs[v] = buildRow(opt, (chk) => {
+            const built = buildRow(opt, (chk) => {
                 const nowChecked = !this.selected.includes(v);
                 if (nowChecked) {
                     this.selected = this.selected.filter(x => x !== 'all');
@@ -5509,9 +5527,24 @@ class MultiSelectDropdown {
                 if (!this.selected.length) this.selected = ['all'];
                 this.syncChecks(); this.updateBoxText();
             });
+            this.itemCbs[v] = built.chk;
+            this.itemRows[v] = built;
         });
 
-        box.onclick = () => { menu.classList.toggle('show'); };
+        if (search) {
+            search.oninput = () => {
+                const q = search.value.trim().toLowerCase();
+                Object.values(this.itemRows).forEach(row => {
+                    row.row.style.display = row.label.toLowerCase().includes(q) ? '' : 'none';
+                });
+            };
+        }
+
+        box.onclick = () => {
+            const opening = !menu.classList.contains('show');
+            menu.classList.toggle('show');
+            if (opening && search) { search.value = ''; search.oninput(); setTimeout(() => search.focus(), 0); }
+        };
         document.addEventListener('click', (e) => {
             if (!this.container.contains(e.target)) menu.classList.remove('show');
         });
@@ -5558,6 +5591,21 @@ class ChecklistMultiSelect {
     }
     render() {
         this.container.innerHTML = '';
+
+        // Long ACM lists (20+) made "scroll to find the one you want" the only
+        // way to locate someone -- a live search filter on top of the same
+        // checkbox box fixes that without changing how selection itself works.
+        // Skip it for short lists (e.g. Regions: just PK/IN) where it's pure
+        // clutter with nothing to filter.
+        let search = null;
+        if (this.options.length > 5) {
+            search = document.createElement('input');
+            search.type = 'text';
+            search.className = 'msel-search';
+            search.placeholder = `Search ${this.allLabel.replace(/^All /, '')}...`;
+            this.container.appendChild(search);
+        }
+
         const wrap = document.createElement('div');
         wrap.className = 'msel-wrap';
 
@@ -5587,7 +5635,7 @@ class ChecklistMultiSelect {
                 this.sync();
             };
             wrap.appendChild(lbl);
-            return { lbl, chk };
+            return { lbl, chk, label };
         };
 
         this.allRow = buildToggle(this.allLabel, true, 'all');
@@ -5596,6 +5644,15 @@ class ChecklistMultiSelect {
             const v = opt.toLowerCase();
             this.itemRows[v] = buildToggle(opt, false, v);
         });
+
+        if (search) {
+            search.oninput = () => {
+                const q = search.value.trim().toLowerCase();
+                Object.values(this.itemRows).forEach(row => {
+                    row.lbl.style.display = row.label.toLowerCase().includes(q) ? '' : 'none';
+                });
+            };
+        }
 
         this.container.appendChild(wrap);
         this.sync();
@@ -5617,16 +5674,16 @@ class ChecklistMultiSelect {
 }
 
 function initPills() {
-    pTargetAcm=new ChecklistMultiSelect('targetAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pTargetAcm=new MultiSelectDropdown('targetAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
     pTargetReg=new ChecklistMultiSelect('targetRegSelect',allRegs,{allLabel:'All Regions'});
-    pPointsAcm=new ChecklistMultiSelect('pointsAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pPointsAcm=new MultiSelectDropdown('pointsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
     pPointsReg=new ChecklistMultiSelect('pointsRegSelect',allRegs,{allLabel:'All Regions'});
-    pAnalyticsAcm=new ChecklistMultiSelect('analyticsAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pAnalyticsAcm=new MultiSelectDropdown('analyticsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
     pAnalyticsReg=new ChecklistMultiSelect('analyticsRegSelect',allRegs,{allLabel:'All Regions'});
 
-    pQueryAcm=new ChecklistMultiSelect('queryAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pQueryAcm=new MultiSelectDropdown('queryAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
     pQueryReg=new ChecklistMultiSelect('queryRegSelect',allRegs,{allLabel:'All Regions'});
-    pExchangeAcm=new ChecklistMultiSelect('exchangeAcmSelect',allAcms,{allLabel:'All ACMs'});
+    pExchangeAcm=new MultiSelectDropdown('exchangeAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
     pExchangeReg=new ChecklistMultiSelect('exchangeRegSelect',allRegs,{allLabel:'All Regions'});
 }
 
@@ -6123,7 +6180,11 @@ async function fetchAgencyData() {
             document.getElementById('displayTargetCoins').style.color='var(--text)';
             
             showTargetViewElements();
-            if (data.target_analytics) renderAgencyAnalytics(data);
+            // Target Analytics belongs to the plain Check Agency Target view and
+            // Check Agency Points -- deliberately excluded from the Target
+            // Timeline variant of this same page (window.currentTargetView is
+            // set by showTargetViewElements() just above).
+            if (data.target_analytics && window.currentTargetView !== 'target-timeline') renderAgencyAnalytics(data);
         } else if (currentType==='points') {
             const bal=data.point_balance||0;
             document.getElementById('displayTargetTitle').innerText='Current Available Points';
