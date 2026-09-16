@@ -1680,6 +1680,7 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_check"> Check Agency Target</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_table"> Agency Target Table</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_timeline"> Target Timeline</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_analytics"> 📈 Target Analytics (shown on both Check Agency Target &amp; Check Agency Points)</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
@@ -4954,7 +4955,7 @@ function parseGranular(str,module) {
 function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     const m = (modulesStr || '').toLowerCase();
 
-    ['target_check','target_timeline',
+    ['target_check','target_timeline','target_analytics',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare','analytics_exec_insights',
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
@@ -5172,7 +5173,7 @@ async function confirmSaveRole() {
     if (!name) { ToastManager.show('Enter a role name.', 'warning'); return; }
 
     let modules=[];
-    ['target_check','target_timeline',
+    ['target_check','target_timeline','target_analytics',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare','analytics_exec_insights',
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
@@ -5226,7 +5227,7 @@ async function addAgent() {
     }
     
     let modules=[];
-    ['target_check','target_timeline',
+    ['target_check','target_timeline','target_analytics',
      'points_check','points_allocator','points_records','points_table',
      'analytics_report','analytics_compare','analytics_exec_insights',
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
@@ -6217,7 +6218,10 @@ async function fetchAgencyData() {
 function renderAgencyAnalytics(data){
     const t = data.target_analytics;
     const area = document.getElementById('agencyAnalyticsArea');
-    if (!t || !data.ytd_target || data.ytd_target <= 0){
+    // Independently grantable permission (mod_target_analytics in Manage
+    // Agents) -- checked here, once, so every call site is covered rather
+    // than relying on each caller to remember it.
+    if (!t || !data.ytd_target || data.ytd_target <= 0 || !hasTargetAnalyticsAccess()){
         area.style.display = 'none';
         return;
     }
@@ -7408,6 +7412,14 @@ function hasMod(m) { return isAdmin || userModules.some(um => um.includes(m)); }
 // additive-only and never removes access an existing agent already has.
 function hasSubFeature(key) { return hasExactMod(key) || hasMod('analytics') || isAdmin; }
 function hasExactMod(m) { return isAdmin || userModules.includes(m); }
+// Target Analytics is its own grantable permission (mod_target_analytics in
+// Manage Agents), independent of hasSubFeature()'s fallback above -- that one
+// falls back to broad "analytics" (the Analytics Report module), which has
+// nothing to do with this card. This falls back to broad access on either
+// Target or Points instead, since that's literally where this card appears;
+// anyone with the narrow "target_analytics" key or full "target"/"points"
+// access sees it without needing to be granted it twice.
+function hasTargetAnalyticsAccess() { return hasExactMod('target_analytics') || hasMod('target') || hasMod('points') || isAdmin; }
 
 function configureSidebarAndCards() {
     if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
