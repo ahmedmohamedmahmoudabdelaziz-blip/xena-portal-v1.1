@@ -1680,7 +1680,7 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_check"> Check Agency Target</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_table"> Agency Target Table</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_timeline"> Target Timeline</label>
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_analytics"> 📈 Target Analytics (shown on both Check Agency Target &amp; Check Agency Points)</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_target_analytics"> 📈 Target Analytics (Check Agency Target only)</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="targetAcmSelect"></div></div>
@@ -6181,10 +6181,10 @@ async function fetchAgencyData() {
             document.getElementById('displayTargetCoins').style.color='var(--text)';
             
             showTargetViewElements();
-            // Target Analytics belongs to the plain Check Agency Target view and
-            // Check Agency Points -- deliberately excluded from the Target
-            // Timeline variant of this same page (window.currentTargetView is
-            // set by showTargetViewElements() just above).
+            // Target Analytics belongs to the plain Check Agency Target view
+            // only (not Check Agency Points, not the Target Timeline variant
+            // of this same page -- window.currentTargetView is set by
+            // showTargetViewElements() just above).
             if (data.target_analytics && window.currentTargetView !== 'target-timeline') renderAgencyAnalytics(data);
         } else if (currentType==='points') {
             const bal=data.point_balance||0;
@@ -6196,7 +6196,8 @@ async function fetchAgencyData() {
             const allocEl=document.getElementById('allocatorBalance');
             if(allocEl) allocEl.value=bal;
 
-            if (data.target_analytics) renderAgencyAnalytics(data);
+            // Target Analytics deliberately does NOT appear on Check Agency
+            // Points -- Target-only now, per explicit request.
             if (data.activity_board) renderAgencyActivityBoard(data.activity_board);
         }
         document.getElementById('resultsContainer').style.display='block';
@@ -7415,11 +7416,10 @@ function hasExactMod(m) { return isAdmin || userModules.includes(m); }
 // Target Analytics is its own grantable permission (mod_target_analytics in
 // Manage Agents), independent of hasSubFeature()'s fallback above -- that one
 // falls back to broad "analytics" (the Analytics Report module), which has
-// nothing to do with this card. This falls back to broad access on either
-// Target or Points instead, since that's literally where this card appears;
-// anyone with the narrow "target_analytics" key or full "target"/"points"
-// access sees it without needing to be granted it twice.
-function hasTargetAnalyticsAccess() { return hasExactMod('target_analytics') || hasMod('target') || hasMod('points') || isAdmin; }
+// nothing to do with this card. Target Analytics only ever appears on Check
+// Agency Target (never Check Agency Points, by design), so the fallback here
+// is scoped to broad Target access only.
+function hasTargetAnalyticsAccess() { return hasExactMod('target_analytics') || hasMod('target') || isAdmin; }
 
 function configureSidebarAndCards() {
     if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
