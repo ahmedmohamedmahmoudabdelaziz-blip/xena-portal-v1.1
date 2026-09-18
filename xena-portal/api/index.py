@@ -3740,6 +3740,7 @@ def agency_list():
     f_acm = sanitize_text(request.args.get('acm','')).lower()
     f_agency_type = sanitize_text(request.args.get('agency_type','')).lower()
     f_bd_code = sanitize_text(request.args.get('bd_code','')).lower()
+    f_parent_agency = sanitize_text(request.args.get('parent_agency','')).lower()
     f_from_str = sanitize_text(request.args.get('from',''))
     f_to_str = sanitize_text(request.args.get('to',''))
     f_from_dt = parse_feishu_date(f_from_str) if f_from_str else None
@@ -3804,6 +3805,9 @@ def agency_list():
         agency_name = extract_field_text(get_field_local(fields, "Agency Name"))
         bd_code = extract_field_text(get_field_local(fields, "Bd Code", "BD Code"))
         agency_type = extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency"))
+        # Same field priority as the column itself -- see the comment on the
+        # results dict below for why "Parent Sub Agency" comes first.
+        parent_agency = extract_field_text(get_field_local(fields, "Parent Sub Agency", "Parent-Sub Agency", "Parent/Sub Agency", "Parent Agency", "Parent-Agency ID"))
         
         if f_region and f_region not in region: continue
         if f_agency_code and f_agency_code not in agency_code.lower(): continue
@@ -3811,6 +3815,7 @@ def agency_list():
         if f_acm and f_acm not in acm.lower(): continue
         if f_agency_type and f_agency_type not in agency_type.lower(): continue
         if f_bd_code and f_bd_code not in bd_code.lower(): continue
+        if f_parent_agency and f_parent_agency not in parent_agency.lower(): continue
         if f_from_dt and dt and dt < f_from_dt: continue
         if f_to_dt and dt and dt > f_to_dt.replace(hour=23, minute=59, second=59): continue
         
@@ -3827,11 +3832,11 @@ def agency_list():
             "create_time": create_time_str,
             "agency_type": agency_type,
             "bd_code": bd_code,
-            # "Parent Agency" column now shows the "Parent Sub Agency" field
-            # per request, not the old "Parent Agency"/"Parent-Agency ID"
-            # fields -- those are kept as trailing fallbacks only in case
-            # "Parent Sub Agency" isn't the exact field name in every record.
-            "parent_agency": extract_field_text(get_field_local(fields, "Parent Sub Agency", "Parent-Sub Agency", "Parent/Sub Agency", "Parent Agency", "Parent-Agency ID")),
+            # "Parent Agency" column shows the "Parent Sub Agency" field per
+            # request, not the old "Parent Agency"/"Parent-Agency ID" fields --
+            # those are kept as trailing fallbacks only in case "Parent Sub
+            # Agency" isn't the exact field name in every record.
+            "parent_agency": parent_agency,
             "acm_name": acm.title() if acm else "",
             "status": extract_field_text(get_field_local(fields, "Status", "Request Status")),
             "_sort_ts": _ms / 1000.0 if _ms else 0,
