@@ -2343,6 +2343,10 @@
                             <input type="text" id="alBdCode" placeholder="Search Bd Code..." oninput="alDebounce()" style="background:var(--surface-hover);">
                         </div>
                         <div class="control-group">
+                            <label>Parent Agency</label>
+                            <input type="text" id="alParentAgency" placeholder="Search Parent Agency..." oninput="alDebounce()" style="background:var(--surface-hover);">
+                        </div>
+                        <div class="control-group">
                             <label>Date Filter</label>
                             <select id="alDatePreset" onchange="alUpdateCustomDateVisibility()" style="background:var(--surface-hover);">
                                 <option value="all" selected>All Time</option>
@@ -2373,7 +2377,9 @@
                 <div class="card" style="padding:0; overflow:hidden;">
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border); background:rgba(0,0,0,0.1); flex-wrap:wrap; gap:12px;">
                         <span id="alResultCount" style="font-size:1rem;color:var(--text); font-weight:600;">Loading agency list...</span>
-                        <div style="display:flex;align-items:center;gap:8px">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                            <button id="alExportCsvBtn" class="export-gated-btn" onclick="alExportCsv()" style="display:none;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--accent-green);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📄 Export CSV</button>
+                            <button id="alExportXlsBtn" class="export-gated-btn" onclick="alExportExcel()" style="display:none;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">📊 Export Excel</button>
                             <div style="display:flex;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px">
                                 <button id="alToggleAccepted" onclick="alSetView('accepted')" style="border:none;background:var(--accent-green);color:#001a0a;padding:7px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">✅ Accepted <span id="alCountAccepted"></span></button>
                                 <button id="alToggleRejected" onclick="alSetView('rejected')" style="border:none;background:transparent;color:var(--text-muted);padding:7px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">❌ Rejected <span id="alCountRejected"></span></button>
@@ -9486,6 +9492,69 @@ function initAgencyTargetTableOnce(){
     attFetch(1);
 }
 
+// ═══ Agency List Exports ═══
+// Purely client-side: alAllResults already holds every row that matched the current
+// filters (the server returns the full filtered set and only the table is paginated),
+// so exporting needs no extra request -- zero added Vercel function usage. Exports the
+// tab currently selected (Accepted / Rejected), across ALL pages, not just the 50 on screen.
+const AL_EXPORT_COLS = [
+    ['Region', 'region'], ['Agency ID', 'agency_code'], ['Agency Name', 'agency_name'],
+    ['Manager ID (Name)', 'agency_manager'], ['Create Time', 'create_time'],
+    ['Agency Type', 'agency_type'], ['Bd Code', 'bd_code'], ['Parent Agency', 'parent_agency'],
+    ['ACM Name', 'acm_name'], ['Status', 'status']
+];
+
+function alGetExportRows() {
+    const rows = alAllResults.filter(r => alCurrentView === 'rejected' ? alIsRejected(r.status) : !alIsRejected(r.status));
+    if (!rows.length) {
+        ToastManager.show(`Nothing to export in the ${alCurrentView} list.`, 'warning');
+        return null;
+    }
+    return rows;
+}
+
+function alExportFileName(ext) {
+    return `agency_list_${alCurrentView}_${fmtDate(new Date())}.${ext}`;
+}
+
+function alCsvCell(v) {
+    let t = String(v ?? '');
+    // Stop spreadsheet apps from running a cell that starts with a formula character.
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+    return '"' + t.replace(/"/g, '""') + '"';
+}
+
+function alExportCsv() {
+    const rows = alGetExportRows();
+    if (!rows) return;
+    logFrontendAction("EXPORT_CSV", "Agency List");
+    const lines = [AL_EXPORT_COLS.map(c => alCsvCell(c[0])).join(',')];
+    rows.forEach(r => lines.push(AL_EXPORT_COLS.map(c => alCsvCell(r[c[1]])).join(',')));
+    // BOM so Excel reads names in Arabic/Urdu/Chinese etc. as UTF-8.
+    const blob = new Blob(['\uFEFF' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = alExportFileName('csv');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    ToastManager.show(`CSV exported (${rows.length} agencies).`, 'success');
+}
+
+function alExportExcel() {
+    if (!window.XLSX) { ToastManager.show('Excel library not loaded.', 'warning'); return; }
+    const rows = alGetExportRows();
+    if (!rows) return;
+    logFrontendAction("EXPORT_EXCEL", "Agency List");
+    const aoa = [AL_EXPORT_COLS.map(c => c[0])];
+    rows.forEach(r => aoa.push(AL_EXPORT_COLS.map(c => r[c[1]] ?? '')));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [8, 12, 30, 26, 18, 18, 14, 16, 18, 14].map(w => ({wch: w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, alCurrentView === 'rejected' ? 'Rejected' : 'Accepted');
+    XLSX.writeFile(wb, alExportFileName('xlsx'));
+    ToastManager.show(`Excel exported (${rows.length} agencies).`, 'success');
+}
+
 async function alFetch() {
     alCurrentPage = 1;
     const spinner = document.getElementById('alLoadingSpinner');
@@ -9506,6 +9575,7 @@ async function alFetch() {
         acm: document.getElementById('alAcm')?.value || '',
         agency_type: document.getElementById('alAgencyType')?.value || '',
         bd_code: document.getElementById('alBdCode')?.value || '',
+        parent_agency: document.getElementById('alParentAgency')?.value || '',
         from: document.getElementById('alFrom')?.value || '',
         to: document.getElementById('alTo')?.value || '',
         tz_offset: -new Date().getTimezoneOffset(),
