@@ -944,6 +944,18 @@
                 </div>
                 <div class="nav-group-body" id="navBodyQuery">
                     <div class="nav-item" id="nav-query" onclick="openInTab('query')"><span data-i18n="queryRequests">Query Requests</span></div>
+                </div>
+            </div>
+
+            <div class="nav-group" id="navGrpAcmMgmt">
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpAcmMgmt','navBodyAcmMgmt')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-admin"></use></svg>
+                        <span data-i18n="acmManagement">ACM Management</span>
+                    </span>
+                    <span class="nav-arr" id="navArrAcmMgmt">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyAcmMgmt">
                     <div class="nav-item" id="nav-agency-list" onclick="openInTab('agency-list')"><span data-i18n="agencyList">Agency List</span></div>
                 </div>
             </div>
@@ -2317,6 +2329,39 @@
                             </select>
                         </div>
                         <div class="control-group">
+                            <label>Agency Type</label>
+                            <select id="alAgencyType" onchange="alFetch()" style="background:var(--surface-hover);">
+                                <option value="">All Types</option>
+                                <option value="bd hunting">BD Hunting</option>
+                                <option value="acm hunting">ACM Hunting</option>
+                                <option value="walkin sub-agency">Walkin Sub-Agency</option>
+                                <option value="walkin">Walkin</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Bd Code</label>
+                            <input type="text" id="alBdCode" placeholder="Search Bd Code..." oninput="alDebounce()" style="background:var(--surface-hover);">
+                        </div>
+                        <div class="control-group">
+                            <label>Date Filter</label>
+                            <select id="alDatePreset" onchange="alUpdateCustomDateVisibility()" style="background:var(--surface-hover);">
+                                <option value="all" selected>All Time</option>
+                                <option value="this_month">Current Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_week">Current Week</option>
+                                <option value="last_week">Last Week</option>
+                                <option value="specific">Specific Date</option>
+                            </select>
+                        </div>
+                        <div class="control-group" id="alCustomFromDiv" style="display:none">
+                            <label>From Date</label>
+                            <input type="date" id="alFrom" onchange="alFetch()">
+                        </div>
+                        <div class="control-group" id="alCustomToDiv" style="display:none">
+                            <label>To Date</label>
+                            <input type="date" id="alTo" onchange="alFetch()">
+                        </div>
+                        <div class="control-group">
                             <button class="btn btn-primary" onclick="alFetch()" style="height:44px;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                                 Search
@@ -2345,12 +2390,10 @@
                                     <th>Agency ID</th>
                                     <th>Agency Name</th>
                                     <th>Manager ID (Name)</th>
-                                    <th>Country</th>
                                     <th>Create Time</th>
-                                    <th style="text-align:center;">Members</th>
                                     <th>Agency Type</th>
+                                    <th>Bd Code</th>
                                     <th>Parent Agency</th>
-                                    <th>Sub Agency</th>
                                     <th>ACM Name</th>
                                 </tr>
                             </thead>
@@ -2671,6 +2714,7 @@ const translations = {
         targetTimeline: "Target Timeline",
         universalQuery: "Universal Query",
         queryRequests: "Query Requests",
+        acmManagement: "ACM Management",
         submitRequest: "Submit Request",
         newRequest: "New Request",
         createNewRequest: "Create New Request",
@@ -2700,6 +2744,7 @@ const translations = {
         targetTimeline: "目标时间表",
         universalQuery: "通用查询",
         queryRequests: "查询请求",
+        acmManagement: "ACM 管理",
         submitRequest: "提交请求",
         newRequest: "新请求",
         createNewRequest: "创建新请求",
@@ -9180,6 +9225,28 @@ function alDebounce() {
     alDebounceTimer = setTimeout(() => alFetch(), 400);
 }
 
+function alUpdateCustomDateVisibility() {
+    const isSpec = document.getElementById('alDatePreset').value === 'specific';
+    document.getElementById('alCustomFromDiv').style.display = isSpec ? 'block' : 'none';
+    document.getElementById('alCustomToDiv').style.display = isSpec ? 'block' : 'none';
+    if (!isSpec) alSetDatePresets();
+    alFetch();
+}
+function alSetDatePresets() {
+    const preset = document.getElementById('alDatePreset').value;
+    if (preset === 'specific') return;
+    const fi = document.getElementById('alFrom'), ti = document.getElementById('alTo');
+    if (preset === 'all') { fi.value = ''; ti.value = ''; return; }
+    const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+    let from, to;
+    if (preset === 'this_month') { from = new Date(y, m, 1); to = new Date(y, m, now.getDate()); }
+    else if (preset === 'last_month') { from = new Date(y, m - 1, 1); to = new Date(y, m, 0); }
+    else if (preset === 'this_week') { const d = now.getDay(), diff = now.getDate() - d + (d === 0 ? -6 : 1); from = new Date(y, m, diff); to = new Date(y, m, diff + 6); }
+    else if (preset === 'last_week') { const d = now.getDay(), diff = now.getDate() - d + (d === 0 ? -6 : 1) - 7; from = new Date(y, m, diff); to = new Date(y, m, diff + 6); }
+    if (from) fi.value = fmtDate(from);
+    if (to)   ti.value = fmtDate(to);
+}
+
 let alAllResults = [];
 let alCurrentView = 'accepted';
 
@@ -9249,12 +9316,10 @@ function alRenderTable() {
             <td><strong style="color:var(--accent-cyan)">${escHtml(r.agency_code||'—')}</strong></td>
             <td style="font-weight:600; color:var(--text);">${escHtml(r.agency_name||'—')}</td>
             <td style="font-family:monospace; font-size:0.85rem;">${escHtml(r.agency_manager||'—')}</td>
-            <td style="font-size:0.8rem; letter-spacing:0.5px; opacity:0.7;">${escHtml(r.country||'—')}</td>
             <td style="color:var(--text-muted);">${escHtml(r.create_time||'—')}</td>
-            <td style="text-align:center; font-weight:800; color:var(--text);">${escHtml(r.agency_members||'0')}</td>
             <td><span class="al-type-pill ${typeClass}">${escHtml(r.agency_type||'—')}</span></td>
+            <td style="font-family:monospace; font-size:0.85rem;">${escHtml(r.bd_code||'—')}</td>
             <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.parent_agency||'—')}</td>
-            <td style="font-family:monospace; font-size:0.8rem; opacity:0.6;">${escHtml(r.sub_agency||'—')}</td>
             <td style="font-weight:600; color:var(--accent-purple);">${escHtml(r.acm_name||'—')}</td>
         </tr>`;
     }).join('');
@@ -9439,6 +9504,11 @@ async function alFetch() {
         agency_code: document.getElementById('alAgencyCode')?.value || '',
         agency_name: document.getElementById('alAgencyName')?.value || '',
         acm: document.getElementById('alAcm')?.value || '',
+        agency_type: document.getElementById('alAgencyType')?.value || '',
+        bd_code: document.getElementById('alBdCode')?.value || '',
+        from: document.getElementById('alFrom')?.value || '',
+        to: document.getElementById('alTo')?.value || '',
+        tz_offset: -new Date().getTimezoneOffset(),
     });
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
     
