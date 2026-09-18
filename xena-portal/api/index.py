@@ -3738,6 +3738,15 @@ def agency_list():
     f_agency_code = sanitize_text(request.args.get('agency_code','')).lower()
     f_agency_name = sanitize_text(request.args.get('agency_name','')).lower()
     f_acm = sanitize_text(request.args.get('acm','')).lower()
+    f_agency_type = sanitize_text(request.args.get('agency_type','')).lower()
+    f_bd_code = sanitize_text(request.args.get('bd_code','')).lower()
+    f_from_str = sanitize_text(request.args.get('from',''))
+    f_to_str = sanitize_text(request.args.get('to',''))
+    f_from_dt = parse_feishu_date(f_from_str) if f_from_str else None
+    f_to_dt = parse_feishu_date(f_to_str) if f_to_str else None
+    # Same viewer-local-timezone handling as /api/my-requests, so "Create Time"
+    # shows in the person's own timezone rather than a hardcoded one.
+    tz_offset_min = max(-720, min(840, _safe_int(request.args.get('tz_offset', ''), 180)))
     
     if MOCK_MODE:
         all_items = MockFeishuDB.generate_requests(300)
@@ -3755,8 +3764,23 @@ def agency_list():
         if not any(t in req_type for t in target_types):
             continue
         
+        # BUG FIX (every row showed "00:00" regardless of actual submit time): the
+        # field priority here was never the problem -- "Submitted on Copy" already
+        # carries a real timestamp, same as it does for My Recent Requests, which
+        # displays real hours from this exact field. The bug was the FUNCTION:
+        # parse_feishu_date() deliberately zeroes out the time (it's meant for
+        # day-level bucketing elsewhere in this file), so using it here for display
+        # was always going to show midnight no matter which field fed it. Switched
+        # to the same _extract_epoch_ms() + viewer-timezone conversion that
+        # /api/my-requests already uses successfully, instead of reinventing it.
         raw_date = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
-        dt = parse_feishu_date(raw_date)
+        dt = parse_feishu_date(raw_date)  # kept for the day-level date-range filter below
+        _ms = _extract_epoch_ms(raw_date)
+        if _ms:
+            _dt_local = datetime.fromtimestamp(_ms / 1000.0, tz=timezone.utc) + timedelta(minutes=tz_offset_min)
+            create_time_str = _dt_local.strftime("%Y-%m-%d %H:%M")
+        else:
+            create_time_str = extract_field_text(raw_date)
         
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
@@ -3773,12 +3797,22 @@ def agency_list():
             continue
         
         agency_code = extract_field_text(get_field_local(fields, "Agency Code"))
-        agency_name = extract_field_text(get_field_local(fields, "Agency Name", "Name"))
+        # Was falling back to a generic "Name" field, which in this table
+        # duplicates the ACM's own name -- every row showed the ACM name
+        # twice (once as "Agency Name", once as "ACM Name"). Only ever read
+        # the actual "Agency Name" column now.
+        agency_name = extract_field_text(get_field_local(fields, "Agency Name"))
+        bd_code = extract_field_text(get_field_local(fields, "Bd Code", "BD Code"))
+        agency_type = extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency"))
         
         if f_region and f_region not in region: continue
         if f_agency_code and f_agency_code not in agency_code.lower(): continue
         if f_agency_name and f_agency_name not in agency_name.lower(): continue
         if f_acm and f_acm not in acm.lower(): continue
+        if f_agency_type and f_agency_type not in agency_type.lower(): continue
+        if f_bd_code and f_bd_code not in bd_code.lower(): continue
+        if f_from_dt and dt and dt < f_from_dt: continue
+        if f_to_dt and dt and dt > f_to_dt.replace(hour=23, minute=59, second=59): continue
         
         manager_raw = extract_field_text(get_field_local(fields, "User ID", "Agency Manager ID", "Manager ID"))
         manager_name = extract_field_text(get_field_local(fields, "Applier real name", "Manager Name", "Agency Manager Name"))
@@ -3790,15 +3824,17 @@ def agency_list():
             "agency_code": agency_code,
             "agency_name": agency_name,
             "agency_manager": manager_display,
-            "country": extract_field_text(get_field_local(fields, "Country")) or (region.upper() if region else ""),
-            "create_time": dt.strftime("%Y-%m-%d %H:%M") if dt else extract_field_text(raw_date),
-            "agency_members": extract_field_text(get_field_local(fields, "Agency Members", "Members", "Member Count")) or "0",
-            "agency_type": extract_field_text(get_field_local(fields, "Agency Type", "Type of Agency")),
-            "parent_agency": extract_field_text(get_field_local(fields, "Parent Agency", "Parent-Agency ID")),
-            "sub_agency": extract_field_text(get_field_local(fields, "Sub Agency", "Sub-Agency")),
+            "create_time": create_time_str,
+            "agency_type": agency_type,
+            "bd_code": bd_code,
+            # "Parent Agency" column now shows the "Parent Sub Agency" field
+            # per request, not the old "Parent Agency"/"Parent-Agency ID"
+            # fields -- those are kept as trailing fallbacks only in case
+            # "Parent Sub Agency" isn't the exact field name in every record.
+            "parent_agency": extract_field_text(get_field_local(fields, "Parent Sub Agency", "Parent-Sub Agency", "Parent/Sub Agency", "Parent Agency", "Parent-Agency ID")),
             "acm_name": acm.title() if acm else "",
             "status": extract_field_text(get_field_local(fields, "Status", "Request Status")),
-            "_sort_ts": dt.timestamp() if dt else 0,
+            "_sort_ts": _ms / 1000.0 if _ms else 0,
         })
     
     results.sort(key=lambda r: r["_sort_ts"], reverse=True)
