@@ -200,6 +200,12 @@ TABLES = [
             "Region", "Agency Region", 
             "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
             "Agency Type", "Type of Agency", 
+            # Agency List page's "Agency Name" column reads this exact field
+            # (see agency_list() in index_4.py) -- it was missing from this
+            # projection whitelist, so the nightly build silently stripped it
+            # out of every record before index_4.py ever saw it, and the
+            # column always rendered "—" no matter what was in Feishu.
+            "Agency Name",
             "Closing Reason", "Closing Agencies Reason",
             "Otherapp Name", "Other App Name", "Other Apps", 
             "Reject Reason", "Rejection Reason",
