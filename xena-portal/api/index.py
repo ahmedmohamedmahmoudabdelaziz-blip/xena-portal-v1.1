@@ -2127,6 +2127,35 @@ def app_version():
     already changed)."""
     return jsonify({"version": APP_VERSION})
 
+@app.route('/api/auth/check-session', methods=['GET'])
+def check_session():
+    """Cheap, side-effect-free session probe. Reuses the exact same
+    server-side check submit_request() already does right before filing a
+    ticket (_get_cached_uat / _refresh_user_token against the agent's real
+    open_id) -- but callable up front, so the frontend can catch an already-
+    dead session the moment a form tab is opened instead of only after the
+    agent has filled the whole thing in and clicked Submit. No Feishu write
+    of any kind happens here, just a token cache read (and, if that's cold,
+    a refresh-token exchange) -- safe to call on every tab open."""
+    user = sanitize_text(request.args.get('user', ''))
+    open_id = sanitize_text(request.args.get('open_id', ''))
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    # Same guard as submit_request(): only actually verifiable when Redis is
+    # enabled, we're not in mock mode, and this session has an open_id on
+    # file. Anything else (legacy session, Redis off, mock mode) has nothing
+    # server-side to check against, so there's no false "expired" here --
+    # the client's own 4h/2h timers remain the only signal for those cases.
+    if REDIS_ENABLED and not MOCK_MODE and open_id:
+        uat = _get_cached_uat(open_id) or _refresh_user_token(open_id)
+        if not uat:
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+            audit.log(user, "SESSION_EXPIRED_ON_OPEN", "Detected opening New Request", ip=ip, severity="Warning")
+            return jsonify({"error": "Your session has expired. Please log in again.", "code": "SESSION_EXPIRED"}), 401
+
+    return jsonify({"valid": True})
+
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
     username = sanitize_text(request.args.get('user',''))
