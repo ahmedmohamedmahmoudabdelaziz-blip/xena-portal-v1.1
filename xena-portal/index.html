@@ -195,6 +195,10 @@
         .form-card { max-width: 800px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
         .form-highlight-input { border-color: var(--accent-cyan) !important; background: rgba(0,212,255,0.03) !important; font-weight: 600; box-shadow: 0 4px 15px rgba(0,212,255,0.05); }
         .form-highlight-input:focus { background: rgba(0,212,255,0.06) !important; }
+        /* Marks a field that auditParseText() just populated from pasted
+           ticket text, so the agent can see at a glance what was auto-filled
+           (and, by omission, which fields still need a manual look). */
+        .reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
         
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -971,6 +975,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodySubmit">
                     <div class="nav-item" id="nav-new-request" onclick="openInTab('new-request')"><span data-i18n="newRequest">New Request</span></div>
+                    <div class="nav-item" id="nav-audit" onclick="openInTab('audit')"><span data-i18n="auditQuickCreate">Audit</span></div>
                     <div class="nav-item" id="nav-my-requests" onclick="openInTab('my-requests')"><span data-i18n="myRecentRequests">My Recent Requests</span></div>
                 </div>
             </div>
@@ -2357,13 +2362,13 @@
                                 <option value="specific">Specific Date</option>
                             </select>
                         </div>
-                        <div class="control-group" id="alCustomFromDiv" style="display:none">
-                            <label>From Date</label>
-                            <input type="date" id="alFrom" onchange="alFetch()">
-                        </div>
-                        <div class="control-group" id="alCustomToDiv" style="display:none">
-                            <label>To Date</label>
-                            <input type="date" id="alTo" onchange="alFetch()">
+                        <div class="control-group" id="alCustomDateWrap" style="display:none; grid-column:span 2;">
+                            <label>Custom Range</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="date" id="alListFrom" onchange="alFetch()" style="background:var(--surface-hover);">
+                                <span style="color:var(--text-muted);font-size:.85rem;flex-shrink:0;">to</span>
+                                <input type="date" id="alListTo" onchange="alFetch()" style="background:var(--surface-hover);">
+                            </div>
                         </div>
                         <div class="control-group">
                             <button class="btn btn-primary" onclick="alFetch()" style="height:44px;">
@@ -2669,6 +2674,37 @@
                 </div>
             </div>
 
+            <div id="pg-audit" style="display:none">
+                <div class="form-card">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; justify-content:center; gap:10px; font-size:1.5rem; border-bottom:1px solid rgba(0,212,255,0.1); padding-bottom:20px;">
+                        <div style="background:rgba(0,212,255,0.1); padding:8px; border-radius:10px;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                        </div>
+                        <span data-i18n="auditQuickCreate">Audit</span>
+                    </h3>
+
+                    <div class="control-group" style="margin-bottom:24px;">
+                        <label style="font-size:0.85rem;">📋 Paste Ticket Text</label>
+                        <textarea id="audRawText" rows="6" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)" class="form-highlight-input" style="font-family:inherit;resize:vertical;width:100%;box-sizing:border-box;"></textarea>
+                        <button type="button" class="btn btn-outline" style="margin-top:10px;" onclick="auditParseText()">✨ Parse &amp; Auto-Fill Fields</button>
+                    </div>
+
+                    <form id="auditRequestForm" onsubmit="submitAuditForm(event)">
+                        <div id="auditDynamicFields" class="control-grid" style="padding-top:24px; border-top:1px dashed var(--border); gap:24px;">
+                            <!-- built once by renderAuditFields() -->
+                        </div>
+
+                        <div style="margin-top:40px; padding-top:24px; border-top:1px solid var(--border);">
+                            <button type="submit" class="btn btn-primary" id="btnSubmitAudit" style="padding:16px; font-size:1.1rem; width:100%; max-width:400px; margin:0 auto;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                Secure Submit to Feishu
+                            </button>
+                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Filed as Request Type "Agency Creation" (Create Way: Audit). Files and inputs will be validated before submission.</p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
         </div> 
     </div> 
 </div>
@@ -2723,6 +2759,7 @@ const translations = {
         acmManagement: "ACM Management",
         submitRequest: "Submit Request",
         newRequest: "New Request",
+        auditQuickCreate: "Audit",
         createNewRequest: "Create New Request",
         accessManagement: "Access Management",
         manageAgents: "Manage Agents",
@@ -2753,6 +2790,7 @@ const translations = {
         acmManagement: "ACM 管理",
         submitRequest: "提交请求",
         newRequest: "新请求",
+        auditQuickCreate: "审核提交",
         createNewRequest: "创建新请求",
         accessManagement: "权限管理",
         manageAgents: "管理代理",
@@ -2801,6 +2839,7 @@ const pageTitlesMap = {
     'query': 'Universal Query',
     'agency-list': 'Agency List',
     'new-request': 'New Request',
+    'audit': 'Audit',
     'my-requests': 'My Recent Requests',
     'live-tickets': 'Live Ticket Queue'
 };
@@ -2822,13 +2861,14 @@ const zhPageTitlesMap = {
     'query': '通用查询',
     'agency-list': '机构列表',
     'new-request': '新请求',
+    'audit': '审核提交',
     'my-requests': '我的最近请求',
     'live-tickets': '实时工单队列'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -2995,6 +3035,12 @@ function executePageLogic(page) {
         document.getElementById('pg-new-request').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
         if(document.getElementById('formRequestType').options.length === 1) initReqFormOptions();
+        checkNewRequestSessionOnOpen();
+    } else if(page==='audit'){
+        document.getElementById('pg-audit').style.display='block';
+        _expandNavGroup('navBodySubmit','navArrSubmit');
+        renderAuditFields();
+        checkNewRequestSessionOnOpen();
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -3551,6 +3597,34 @@ function forceSessionExpiredLogout(message) {
     loggedUat = null;
     ToastManager.show(message || 'Your session has expired. Please log in again.', 'warning', 8000);
     setTimeout(() => window.location.reload(), 1200);
+}
+
+// Catches an already-dead session the moment "New Request" is opened, instead
+// of only after the agent fills in the whole form (fields, photo uploads, the
+// agency lookup) and clicks Submit -- which is where this used to first
+// surface, via the 401 SESSION_EXPIRED handling in submitReqForm(). This is a
+// real server round-trip (see /api/auth/check-session), not just the client-
+// side 4h/2h clock above, since the token can die server-side well before
+// either of those local timers would ever notice.
+let _nrSessionCheckToken = 0;
+async function checkNewRequestSessionOnOpen() {
+    if (!loggedUser) return;
+    const myToken = ++_nrSessionCheckToken;
+    try {
+        const openId = localStorage.getItem('xenaOpenId') || '';
+        const qs = new URLSearchParams({ user: loggedUser, open_id: openId });
+        const res = await fetch(`/api/auth/check-session?${qs}`);
+        // A newer tab-open (or a switch away and back) already superseded this
+        // check -- don't act on a stale answer.
+        if (myToken !== _nrSessionCheckToken) return;
+        if (res.status === 401) {
+            let data = {};
+            try { data = await res.json(); } catch (e) {}
+            if (data.code === 'SESSION_EXPIRED') {
+                forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again.');
+            }
+        }
+    } catch (e) { /* offline or unreachable -- don't force a logout over a network blip */ }
 }
 
 function checkSessionExpiry() {
@@ -9233,15 +9307,19 @@ function alDebounce() {
 
 function alUpdateCustomDateVisibility() {
     const isSpec = document.getElementById('alDatePreset').value === 'specific';
-    document.getElementById('alCustomFromDiv').style.display = isSpec ? 'block' : 'none';
-    document.getElementById('alCustomToDiv').style.display = isSpec ? 'block' : 'none';
+    document.getElementById('alCustomDateWrap').style.display = isSpec ? 'block' : 'none';
     if (!isSpec) alSetDatePresets();
     alFetch();
 }
 function alSetDatePresets() {
     const preset = document.getElementById('alDatePreset').value;
     if (preset === 'specific') return;
-    const fi = document.getElementById('alFrom'), ti = document.getElementById('alTo');
+    // IDs alListFrom/alListTo (not alFrom/alTo -- those belong to the Audit
+    // Log page's own date filter elsewhere on this page; reusing that id here
+    // used to make getElementById silently grab the Audit Log's hidden inputs
+    // instead of these, so picking a Specific Date range never actually
+    // changed what got searched).
+    const fi = document.getElementById('alListFrom'), ti = document.getElementById('alListTo');
     if (preset === 'all') { fi.value = ''; ti.value = ''; return; }
     const now = new Date(), y = now.getFullYear(), m = now.getMonth();
     let from, to;
@@ -9576,8 +9654,8 @@ async function alFetch() {
         agency_type: document.getElementById('alAgencyType')?.value || '',
         bd_code: document.getElementById('alBdCode')?.value || '',
         parent_agency: document.getElementById('alParentAgency')?.value || '',
-        from: document.getElementById('alFrom')?.value || '',
-        to: document.getElementById('alTo')?.value || '',
+        from: document.getElementById('alListFrom')?.value || '',
+        to: document.getElementById('alListTo')?.value || '',
         tz_offset: -new Date().getTimezoneOffset(),
     });
     for (const [k,v] of [...params.entries()]) { if (!v) params.delete(k); }
@@ -9707,9 +9785,10 @@ function acmFieldForRegion(region) {
     return null;
 }
 
-function buildFieldControl(fName, def, req) {
+function buildFieldControl(fName, def, req, idPrefix) {
+    idPrefix = idPrefix || 'reqfld_';
     const reqMark = req ? '<span style="color:var(--accent-rose)">*</span>' : '';
-    const idSafe = 'reqfld_' + fName.replace(/[^a-zA-Z0-9]/g, '_');
+    const idSafe = idPrefix + fName.replace(/[^a-zA-Z0-9]/g, '_');
     const wrap = document.createElement('div');
     wrap.className = 'control-group';
     wrap.dataset.field = fName;
@@ -9822,15 +9901,18 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-function refreshAcmAutoSlot() {
-    const slot = document.getElementById('acmAutoSlot');
+function refreshAcmAutoSlot(regionSelId, slotId, idPrefix) {
+    regionSelId = regionSelId || 'reqfld_Region';
+    slotId = slotId || 'acmAutoSlot';
+    idPrefix = idPrefix || 'reqfld_';
+    const slot = document.getElementById(slotId);
     if (!slot) return;
-    const regionSel = document.getElementById('reqfld_Region');
+    const regionSel = document.getElementById(regionSelId);
     const region = regionSel ? regionSel.value : '';
     slot.innerHTML = '';
     const resolved = acmFieldForRegion(region);
     if (resolved) {
-        slot.appendChild(buildFieldControl(resolved.name, resolved.def, true));
+        slot.appendChild(buildFieldControl(resolved.name, resolved.def, true, idPrefix));
     } else {
         const hint = document.createElement('div');
         hint.className = 'control-group';
@@ -9875,7 +9957,7 @@ function renderReqFormFields() {
         container.appendChild(el);
 
         if (fName === 'Region') {
-            el.querySelector('select').addEventListener('change', refreshAcmAutoSlot);
+            el.querySelector('select').addEventListener('change', () => refreshAcmAutoSlot());
         }
         if (fName === 'Closing Reason') {
             el.querySelector('select').addEventListener('change', refreshClosingReasonSubfields);
@@ -10126,6 +10208,247 @@ async function submitReqForm(e) {
         document.getElementById('formDynamicFields').style.display = 'none';
         document.getElementById('formSubmitArea').style.display = 'none';
         
+    } catch (e) {
+        ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
+    }
+
+    btn.innerHTML = origTxt;
+    btn.disabled = false;
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════════════
+// AUDIT TAB — paste ticket text, auto-fill, submit as a real Agency
+// Creation request. Always Request Type = "Agency Creation",
+// Create Way = "Audit (with all info)" -- same combination the Feishu
+// "Audit" Base Automation writes when its raw_text trigger fires, so
+// tickets filed from here land identically to ones that automation creates.
+// Field ids use the "audfld_" prefix (via buildFieldControl's idPrefix
+// param) so this page's own copies of Region/Agency Type/ACM/etc. never
+// collide with the New Request page's "reqfld_" ones -- both pages sit in
+// the DOM at the same time, just hidden/shown.
+const AUDIT_BRANCH = 'Agency Creation';
+
+function renderAuditFields() {
+    const container = document.getElementById('auditDynamicFields');
+    if (!container || container.dataset.built) return; // build once, like initReqFormOptions()
+    container.dataset.built = '1';
+
+    const fields = REQ_BRANCHES[AUDIT_BRANCH] || [];
+    fields.forEach(fName => {
+        if (fName === ACM_AUTO) {
+            const slot = document.createElement('div');
+            slot.id = 'auditAcmSlot';
+            slot.className = 'control-group';
+            container.appendChild(slot);
+            return;
+        }
+        const def = REQ_FIELD_DEFS[fName];
+        if (!def) return;
+        const el = buildFieldControl(fName, def, def.req, 'audfld_');
+        container.appendChild(el);
+        if (fName === 'Region') {
+            el.querySelector('select').addEventListener('change', () => refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_'));
+        }
+    });
+
+    refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_');
+}
+
+// Every extractor is a direct port of the corresponding step in the Feishu
+// "Audit" Base Automation (trigger: raw_text changes on Grand Table), kept
+// field-for-field identical so a pasted ticket parses the same way here as
+// it does over there.
+function rtExtract(text, label) {
+    const m = (text || '').match(new RegExp(label + '[：:](.*)'));
+    return m ? m[1].trim() : '';
+}
+function rtExtractRegion(text) { return rtExtract(text, 'Region').toUpperCase(); }
+function rtExtractApplierId(text) { return rtExtract(text, 'Applier ID'); }
+function rtExtractRealName(text) { return rtExtract(text, 'Applier Real Name'); }
+function rtExtractAgencyName(text) { return rtExtract(text, 'Agency Name'); }
+function rtExtractWhatsapp(text) { return rtExtract(text, 'Whatsapp'); }
+function rtExtractBdId(text) {
+    const m = (text || '').match(/BD ID:\s*(\d+)/);
+    return m ? m[1].trim() : '';
+}
+function rtExtractNid(text) {
+    // Accepts "NID Number", "NID", or "Passport ID" -- then strips spaces,
+    // hyphens, underscores, dots and commas, same as the automation's step.
+    const m = (text || '').match(/(?:Passport ID|NID|NID Number)[：:](.*)/i);
+    return m ? m[1].trim().replace(/[\s\-_.,]/g, '') : '';
+}
+function rtExtractOtherappId(text) { return rtExtract(text, 'ID On App'); }
+
+// Mirrors the automation's final "Agency type" step: strips the "(...)"
+// suffix, special-casing the "[sub-agency]" tag.
+function rtExtractAgencyType(text) {
+    const lineMatch = (text || '').match(/Agency Type[：:](.*)/i);
+    if (!lineMatch) return '';
+    const line = lineMatch[1];
+    if (line.toLowerCase().includes('[sub-agency]')) return 'Walkin sub-agency';
+    const typeMatch = line.match(/(.*?)(?:\(|（|$)/);
+    return typeMatch ? typeMatch[1].trim() : line.trim();
+}
+
+// Mirrors the automation's "Acm name" step: a bare "Walkin" resolves by
+// region (PK -> Eagle, IN -> Holy), otherwise reads the [sub-agency] tag or
+// a normal "ACM: Name" line.
+function rtExtractAcm(text) {
+    text = text || '';
+    const region = rtExtractRegion(text);
+    const lineMatch = text.match(/Agency Type[：:](.*)/i);
+    if (!lineMatch) return '';
+    const line = lineMatch[1].trim();
+    if (line.toLowerCase() === 'walkin') {
+        if (region === 'PK') return 'Eagle';
+        if (region === 'IN') return 'Holy';
+        return '';
+    }
+    const subAgencyMatch = line.match(/\[sub-agency\]\s*([^)]+)/i);
+    if (subAgencyMatch) return subAgencyMatch[1].trim();
+    const normalMatch = line.match(/ACM[：:]\s*([^\/)]+)/i);
+    if (normalMatch) return normalMatch[1].trim();
+    return '';
+}
+
+// Sets a rendered field's value from extracted text. Selects (Region, Agency
+// Type, ACM) are matched case-insensitively against their real option list,
+// since the pasted ticket's casing won't always match the sheet's option
+// text exactly -- returns false (leaving the field untouched) when nothing
+// lines up, so the caller can flag it for a manual look instead of silently
+// leaving a wrong or blank value.
+function rtSetFieldValue(id, val) {
+    if (!val) return false;
+    const el = document.getElementById(id);
+    if (!el) return false;
+    if (el.tagName === 'SELECT') {
+        const opt = Array.from(el.options).find(o => o.value.toLowerCase() === val.toLowerCase());
+        if (!opt) return false;
+        el.value = opt.value;
+    } else {
+        el.value = val;
+    }
+    el.classList.add('reqfld-autofilled');
+    return true;
+}
+
+function auditParseText() {
+    renderAuditFields(); // safety net -- fields should already exist by the time this is clickable
+    const ta = document.getElementById('audRawText');
+    const text = ta ? ta.value : '';
+    if (!text.trim()) {
+        ToastManager.show('Paste the ticket text first.', 'warning');
+        return;
+    }
+
+    const region = rtExtractRegion(text);
+    const targets = [
+        ['audfld_Region', region],
+        ['audfld_User_ID', rtExtractApplierId(text)],
+        ['audfld_Agency_Name', rtExtractAgencyName(text)],
+        ['audfld_Applier_real_name', rtExtractRealName(text)],
+        ['audfld_Agency_Type', rtExtractAgencyType(text)],
+        ['audfld_Bd_Code', rtExtractBdId(text)],
+        ['audfld_Whatsapp_Number', rtExtractWhatsapp(text)],
+        ['audfld_NID_Number', rtExtractNid(text)],
+        ['audfld_Otherapp_ID', rtExtractOtherappId(text)],
+    ];
+
+    let filled = 0, missed = [];
+    targets.forEach(([id, val]) => {
+        if (rtSetFieldValue(id, val)) filled++;
+        else missed.push(id.replace('audfld_', '').replace(/_/g, ' '));
+    });
+
+    // The ACM select only exists once the Region slot has rebuilt for that
+    // region, so rebuild it now that Region is set, then fill ACM into it.
+    refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_');
+    const acmField = acmFieldForRegion(region);
+    if (acmField) {
+        const acmId = 'audfld_' + acmField.name.replace(/[^a-zA-Z0-9]/g, '_');
+        if (rtSetFieldValue(acmId, rtExtractAcm(text))) filled++;
+        else missed.push('ACM');
+    } else {
+        missed.push('ACM (Region not recognized)');
+    }
+
+    // "Create Way: Audit (with all info)" implies the full original text is
+    // kept on the ticket, not just the pieces pulled out of it -- so drop the
+    // raw paste into Applier Note too, unless the agent already typed
+    // something there themselves.
+    const noteEl = document.getElementById('audfld_Applier_Note');
+    if (noteEl && !noteEl.value.trim()) {
+        noteEl.value = text.trim();
+        noteEl.classList.add('reqfld-autofilled');
+    }
+
+    // Otherapp Name and the NID/Otherapp screenshot can't be pulled out of
+    // plain text -- always flag them so the agent knows to handle those two
+    // by hand, even on an otherwise clean parse.
+    missed.push('Otherapp Name', 'NID & Otherapp Screen (upload)');
+
+    ToastManager.show(`Auto-filled ${filled} field(s). Please fill in manually: ${missed.join(', ')}.`, 'warning', 9000);
+}
+
+async function submitAuditForm(e) {
+    e.preventDefault();
+    const form = e.target;
+
+    const btn = document.getElementById('btnSubmitAudit');
+    const origTxt = btn.innerHTML;
+    btn.innerHTML = '⏳ Submitting to Feishu...';
+    btn.disabled = true;
+    document.getElementById('loadingOverlay').style.display = 'flex';
+
+    try {
+        const payloadFields = { "Request Type": AUDIT_BRANCH, "Create Way": "Audit (with all info)" };
+
+        form.querySelectorAll('input[type="text"], select').forEach(el => {
+            if (!el.name) return;
+            if (el.value) payloadFields[el.name] = el.value;
+        });
+
+        const finalData = new FormData();
+        finalData.append('user', loggedUser);
+        finalData.append('email', loggedEmail);
+        if (loggedUat) finalData.append('uat', loggedUat);
+        const submitterOpenId = localStorage.getItem('xenaOpenId') || '';
+        if (submitterOpenId) finalData.append('open_id', submitterOpenId);
+        finalData.append('payload', JSON.stringify(payloadFields));
+
+        form.querySelectorAll('input[type="file"]').forEach(fInput => {
+            if (fInput.files.length > 0) {
+                Array.from(fInput.files).forEach(file => finalData.append(fInput.name, file));
+            }
+        });
+
+        const res = await fetch('/api/requests/submit', { method: 'POST', body: finalData });
+
+        let data;
+        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response.'); }
+
+        if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
+            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
+            btn.innerHTML = origTxt;
+            btn.disabled = false;
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+        }
+
+        if (!res.ok) throw new Error(data.error || 'Submission failed');
+
+        ToastManager.show('Request successfully submitted to Feishu!', 'success');
+
+        if (data.created_via && String(data.created_via).startsWith('tenant_token')) {
+            ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
+        }
+
+        form.reset();
+        document.getElementById('audRawText').value = '';
+        form.querySelectorAll('.reqfld-autofilled').forEach(el => el.classList.remove('reqfld-autofilled'));
+        refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_');
+
     } catch (e) {
         ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
     }
