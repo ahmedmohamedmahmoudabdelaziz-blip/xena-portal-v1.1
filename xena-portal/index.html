@@ -200,16 +200,23 @@
            (and, by omission, which fields still need a manual look). */
         .reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
 
-        /* ═══ Audit tab: collapsible cards, reminders panel, bigger evidence
-           thumbnails, and the duplicate-check "reveal" ═══ */
-        details.audit-card { border-radius: var(--radius); }
-        details.audit-card summary { list-style: none; cursor: pointer; user-select: none; }
-        details.audit-card summary::-webkit-details-marker { display: none; }
-        .audit-card-chevron { transition: transform .2s ease; color: var(--text-muted); margin-left: auto; }
-        details.audit-card[open] .audit-card-chevron { transform: rotate(180deg); }
+        /* ═══ Audit tab: tabbed steps (no long vertical stack), reminders
+           panel, bigger evidence thumbnails, and the duplicate-check
+           "reveal" ═══ */
+        .audit-tabbar { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        .audit-tab { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border: none; background: transparent; color: var(--text-muted); font-weight: 700; font-size: .82rem; cursor: pointer; border-bottom: 3px solid transparent; border-radius: 10px 10px 0 0; transition: all .15s; }
+        .audit-tab:hover { background: rgba(255,255,255,.03); color: var(--text); }
+        .audit-tab.active { color: var(--text); background: rgba(255,255,255,.03); }
+        .audit-tab-badge { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 800; color: #000; flex-shrink: 0; }
+        .audit-tab[data-tab="identity"].active { border-bottom-color: var(--accent-cyan); }
+        .audit-tab[data-tab="app"].active { border-bottom-color: var(--accent-purple); }
+        .audit-tab[data-tab="action"].active { border-bottom-color: var(--accent-rose); }
+        .audit-tab[data-tab="notes"].active { border-bottom-color: var(--accent-green); }
+        .audit-panel { display: none; animation: auditFadeIn .2s ease; }
+        .audit-panel.active { display: block; }
+        .audit-tab-next { margin-top: 24px; display: flex; justify-content: flex-end; }
         .audit-card-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-hover); flex-shrink: 0; transition: background .2s ease, box-shadow .2s ease; }
         .audit-card-dot.filled { background: var(--accent-green); box-shadow: 0 0 8px rgba(0,230,118,.6); }
-        .audit-card-body { padding-top: 16px; animation: auditFadeIn .2s ease; }
         @keyframes auditFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
         .audit-reminders { border: 1px solid rgba(255,184,0,.35); background: rgba(255,184,0,.06); border-radius: var(--radius); padding: 16px 18px; margin-top: 24px; }
@@ -2717,65 +2724,52 @@
                     </div>
 
                     <form id="auditRequestForm" onsubmit="submitAuditForm(event)">
-                        <details class="audit-card card" open style="margin-bottom:16px; background:rgba(0,212,255,.03);">
-                            <summary style="display:flex; align-items:center; gap:8px;">
-                                <span style="background:var(--accent-cyan); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold; flex-shrink:0;">1</span>
-                                <h4 style="color:var(--accent-cyan); margin:0;">Agency &amp; Identity</h4>
-                                <span class="audit-card-dot" id="auditDotIdentity"></span>
-                                <svg class="audit-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                            </summary>
-                            <div class="audit-card-body">
-                                <div id="auditFieldsIdentity" class="control-grid"><!-- built by renderAuditFields() --></div>
+                        <div class="audit-tabbar">
+                            <button type="button" class="audit-tab active" data-tab="identity" onclick="auditSwitchTab('identity')">
+                                <span class="audit-tab-badge" style="background:var(--accent-cyan);">1</span> Identity <span class="audit-card-dot" id="auditDotIdentity"></span>
+                            </button>
+                            <button type="button" class="audit-tab" data-tab="app" onclick="auditSwitchTab('app')">
+                                <span class="audit-tab-badge" style="background:var(--accent-purple);">2</span> App &amp; Sourcing <span class="audit-card-dot" id="auditDotApp"></span>
+                            </button>
+                            <button type="button" class="audit-tab" data-tab="action" onclick="auditSwitchTab('action')">
+                                <span class="audit-tab-badge" style="background:var(--accent-rose);">3</span> 🎯 Action <span class="audit-card-dot" id="auditDotAction"></span>
+                            </button>
+                            <button type="button" class="audit-tab" data-tab="notes" onclick="auditSwitchTab('notes')">
+                                <span class="audit-tab-badge" style="background:var(--accent-green);">4</span> Notes <span class="audit-card-dot" id="auditDotNotes"></span>
+                            </button>
+                        </div>
 
-                                <div style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
-                                    <button type="button" id="btnAuditCheckDup" class="btn btn-outline" style="border-color:var(--accent-amber); color:var(--accent-amber);" onclick="auditCheckDuplicates()">
-                                        🔍 Check Duplicate
-                                    </button>
-                                    <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Searches every request ever submitted, matching whichever of User ID / Otherapp ID / NID Number you've filled in above.</div>
-                                    <div id="auditDupSummary" style="margin-top:14px; font-size:.9rem;"></div>
-                                    <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;">
-                                        <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
-                                    </div>
-                                    <div id="auditDupResults" class="qy-grid" style="margin-top:14px;"></div>
+                        <div class="audit-panel active" data-panel="identity">
+                            <div id="auditFieldsIdentity" class="control-grid"><!-- built by renderAuditFields() --></div>
+
+                            <div style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
+                                <button type="button" id="btnAuditCheckDup" class="btn btn-outline" style="border-color:var(--accent-amber); color:var(--accent-amber);" onclick="auditCheckDuplicates()">
+                                    🔍 Check Duplicate
+                                </button>
+                                <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Searches every request ever submitted, matching whichever of User ID / Otherapp ID / NID Number you've filled in above.</div>
+                                <div id="auditDupSummary" style="margin-top:14px; font-size:.9rem;"></div>
+                                <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;">
+                                    <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
                                 </div>
+                                <div id="auditDupResults" class="qy-grid" style="margin-top:14px;"></div>
                             </div>
-                        </details>
 
-                        <details class="audit-card card" open style="margin-bottom:16px; background:rgba(185,103,255,.03);">
-                            <summary style="display:flex; align-items:center; gap:8px;">
-                                <span style="background:var(--accent-purple); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold; flex-shrink:0;">2</span>
-                                <h4 style="color:var(--accent-purple); margin:0;">App &amp; Sourcing Info</h4>
-                                <span class="audit-card-dot" id="auditDotApp"></span>
-                                <svg class="audit-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                            </summary>
-                            <div class="audit-card-body">
-                                <div id="auditFieldsApp" class="control-grid"><!-- built by renderAuditFields() --></div>
-                            </div>
-                        </details>
+                            <div class="audit-tab-next"><button type="button" class="btn btn-outline" onclick="auditSwitchTab('app')">Next: App &amp; Sourcing Info →</button></div>
+                        </div>
 
-                        <details class="audit-card card" open style="margin-bottom:16px; background:rgba(255,77,109,.03);">
-                            <summary style="display:flex; align-items:center; gap:8px;">
-                                <span style="background:var(--accent-rose); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold; flex-shrink:0;">3</span>
-                                <h4 style="color:var(--accent-rose); margin:0;">🎯 Audition Action</h4>
-                                <span class="audit-card-dot" id="auditDotAction"></span>
-                                <svg class="audit-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                            </summary>
-                            <div class="audit-card-body">
-                                <div id="auditFieldsAction" class="control-grid"><!-- built by renderAuditFields() --></div>
-                            </div>
-                        </details>
+                        <div class="audit-panel" data-panel="app">
+                            <div id="auditFieldsApp" class="control-grid"><!-- built by renderAuditFields() --></div>
+                            <div class="audit-tab-next"><button type="button" class="btn btn-outline" onclick="auditSwitchTab('action')">Next: 🎯 Audition Action →</button></div>
+                        </div>
 
-                        <details class="audit-card card" open style="margin-bottom:16px; background:rgba(0,230,118,.03);">
-                            <summary style="display:flex; align-items:center; gap:8px;">
-                                <span style="background:var(--accent-green); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold; flex-shrink:0;">4</span>
-                                <h4 style="color:var(--accent-green); margin:0;">Notes &amp; Evidence</h4>
-                                <span class="audit-card-dot" id="auditDotNotes"></span>
-                                <svg class="audit-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                            </summary>
-                            <div class="audit-card-body">
-                                <div id="auditFieldsNotes" class="control-grid"><!-- built by renderAuditFields() --></div>
-                            </div>
-                        </details>
+                        <div class="audit-panel" data-panel="action">
+                            <div id="auditFieldsAction" class="control-grid"><!-- built by renderAuditFields() --></div>
+                            <div class="audit-tab-next"><button type="button" class="btn btn-outline" onclick="auditSwitchTab('notes')">Next: Notes &amp; Evidence →</button></div>
+                        </div>
+
+                        <div class="audit-panel" data-panel="notes">
+                            <div id="auditFieldsNotes" class="control-grid"><!-- built by renderAuditFields() --></div>
+                        </div>
 
                         <div id="auditReminders" class="audit-reminders" style="display:none;"></div>
 
@@ -2784,7 +2778,7 @@
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                 Secure Submit to Feishu
                             </button>
-                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Filed as Request Type "Agency Creation" (Create Way: Audit). Nothing here is hard-required -- the reminders above just flag what usually belongs on this kind of ticket.</p>
+                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Filed as Request Type "Agency Creation" (Create Way: Audit). Nothing here is hard-required -- the reminders above just flag what usually belongs on this kind of ticket. Submit works from any tab.</p>
                         </div>
                     </form>
                 </div>
@@ -10381,6 +10375,16 @@ const AUDIT_FIELDS = Object.keys(AUDIT_FIELD_GROUPS);
 // that card has a value, so the agent can see progress without opening
 // every section.
 const AUDIT_CARD_DOTS = { auditFieldsIdentity: 'auditDotIdentity', auditFieldsApp: 'auditDotApp', auditFieldsAction: 'auditDotAction', auditFieldsNotes: 'auditDotNotes' };
+
+// Switches which of the 4 steps is visible -- only one panel's fields are ever
+// on screen at once, so the page height stays constant instead of growing
+// into one long scroll of four stacked cards. Values in every other panel
+// are untouched while hidden (just display:none, not removed), and Submit
+// sits below the tab strip so it's reachable from any step without hunting.
+function auditSwitchTab(tab) {
+    document.querySelectorAll('.audit-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.audit-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === tab));
+}
 
 function renderAuditFields() {
     const container = document.getElementById('auditFieldsIdentity');
