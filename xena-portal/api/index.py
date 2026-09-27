@@ -87,7 +87,7 @@ EXCLUDED_SUBMIT_FIELDS = {
     "Point Balance", "time of the requests", "Created By", "Webhook Lookup",
     "Mention this Group", "BD Nickname1", "BD Nickname2", "Respondents", "Lock Owner",
     "Assigned Member", "Assigned Time", "Completion Time",
-    "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Status", "Request Status"
+    "Last Retry Time", "Ready to Archive", "Reward", "Approval", "Request Status"
 }
 
 # Update fields allows auditors to edit Status, Approval, Reject Reason, etc.
@@ -101,6 +101,11 @@ EXCLUDED_SUBMIT_FIELDS = {
 # /api/members/search) that sends proper `[{"id": open_id}]` objects instead of
 # plain text, so Feishu accepts the write -- they're deliberately no longer
 # excluded here.
+#
+# "Status" is ALSO deliberately no longer excluded: the Audit tab's "Audition
+# Action" card lets the agent set Status/Mentioned Group/Done by/Audition note
+# at creation time (this ticket type is filed already-resolved), and only that
+# form ever renders a "Status" field to submit in the first place.
 EXCLUDED_UPDATE_FIELDS = {
     "Numbering", "Submitted on", "Submitted on Copy", "Match ID", "Record ID Text",
     "Cleaned User ID", "Bot Color", "Bot Title", "Bot Message", "Ticket Details",
