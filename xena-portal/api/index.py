@@ -74,6 +74,10 @@ QUERY_FIELD_ALIASES = {
     "otherapp_id": ["Otherapp ID", "Otherapp Name", "Other App ID"],
     "nid_number":  ["NID Number", "NID"],
     "bd_code":     ["Bd Code", "BD Code"],
+    # Added for the Audit tab's "Check Duplicate" button (auditCheckDuplicates()
+    # in the frontend) -- it fans out one /api/query call per filled identity
+    # field, Agency Code included, so this needs its own alias entry here.
+    "agency_code": ["Agency Code"],
 }
 
 EXCLUDED_SUBMIT_FIELDS = {
