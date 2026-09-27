@@ -199,6 +199,18 @@
            ticket text, so the agent can see at a glance what was auto-filled
            (and, by omission, which fields still need a manual look). */
         .reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
+        /* Audit tab's "Audition Action" card: Type of Action renders as three
+           color-coded buttons instead of a plain dropdown -- the underlying
+           <select> stays in the DOM (hidden) so nothing downstream needs to
+           know the difference. */
+        .audit-action-btn{flex:1;min-width:130px;padding:13px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-weight:700;font-size:.85rem;cursor:pointer;transition:all .15s;color:var(--text-muted);}
+        .audit-action-btn:hover{border-color:var(--border-hover);transform:translateY(-1px);}
+        .audit-action-btn[data-val="Approved"]{border-color:var(--accent-green);color:var(--accent-green);}
+        .audit-action-btn[data-val="Not Approved"]{border-color:var(--accent-rose);color:var(--accent-rose);}
+        .audit-action-btn[data-val="Check with the Acm "]{border-color:var(--accent-amber);color:var(--accent-amber);}
+        .audit-action-btn.active[data-val="Approved"]{background:var(--accent-green);color:#000;box-shadow:0 4px 15px rgba(0,230,118,.25);}
+        .audit-action-btn.active[data-val="Not Approved"]{background:var(--accent-rose);color:#000;box-shadow:0 4px 15px rgba(255,77,109,.25);}
+        .audit-action-btn.active[data-val="Check with the Acm "]{background:var(--accent-amber);color:#000;box-shadow:0 4px 15px rgba(255,184,0,.25);}
         
         .skeleton{background:linear-gradient(90deg,var(--surface-hover) 25%,var(--border) 50%,var(--surface-hover) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:4px;color:transparent!important;border-color:transparent!important;pointer-events:none}
         @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -2690,8 +2702,45 @@
                     </div>
 
                     <form id="auditRequestForm" onsubmit="submitAuditForm(event)">
-                        <div id="auditDynamicFields" class="control-grid" style="padding-top:24px; border-top:1px dashed var(--border); gap:24px;">
-                            <!-- built once by renderAuditFields() -->
+                        <div class="card" style="margin-bottom:24px; background:rgba(0,212,255,.03);">
+                            <h4 style="color:var(--accent-cyan);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                <span style="background:var(--accent-cyan); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">1</span>
+                                Agency &amp; Identity
+                            </h4>
+                            <div id="auditFieldsIdentity" class="control-grid"><!-- built by renderAuditFields() --></div>
+
+                            <div style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
+                                <button type="button" id="btnAuditCheckDup" class="btn btn-outline" style="border-color:var(--accent-amber); color:var(--accent-amber);" onclick="auditCheckDuplicates()">
+                                    🔍 Check Duplicate
+                                </button>
+                                <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Searches every request ever submitted, across whichever of User ID / NID Number / Otherapp ID / Bd Code / Agency Code you've filled in above.</div>
+                                <div id="auditDupSummary" style="margin-top:14px; font-size:.9rem;"></div>
+                                <div id="auditDupResults" class="qy-grid" style="margin-top:14px;"></div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:24px; background:rgba(185,103,255,.03);">
+                            <h4 style="color:var(--accent-purple);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                <span style="background:var(--accent-purple); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">2</span>
+                                App &amp; Sourcing Info
+                            </h4>
+                            <div id="auditFieldsApp" class="control-grid"><!-- built by renderAuditFields() --></div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:24px; background:rgba(255,77,109,.03);">
+                            <h4 style="color:var(--accent-rose);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                <span style="background:var(--accent-rose); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">3</span>
+                                🎯 Audition Action
+                            </h4>
+                            <div id="auditFieldsAction" class="control-grid"><!-- built by renderAuditFields() --></div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:24px; background:rgba(0,230,118,.03);">
+                            <h4 style="color:var(--accent-green);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                <span style="background:var(--accent-green); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">4</span>
+                                Notes &amp; Evidence
+                            </h4>
+                            <div id="auditFieldsNotes" class="control-grid"><!-- built by renderAuditFields() --></div>
                         </div>
 
                         <div style="margin-top:40px; padding-top:24px; border-top:1px solid var(--border);">
@@ -9745,6 +9794,15 @@ const REQ_FIELD_DEFS = {
     "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Rudra","Ravikant","Ansh","Rocky","Bella","nabeel"], req: true },
     "Applier Note": { type: "text", req: false },
     "NID & Otherapp Screen": { type: "file", req: true },
+    // Added for the Audit tab (see AUDIT_FIELDS / auditUpdateDynamicRequirements):
+    // required only for a "Walkin sub-agency" Agency Type, hidden otherwise --
+    // matches the live Feishu field's own (misspelled in the sheet) name.
+    "Parenet sub agency": { type: "text", req: false },
+    // "Audit action" the reviewer takes on this ticket -- optional at creation time.
+    "Type of Action": { type: "select", options: ["Approved", "Not Approved", "Check with the Acm "], req: false },
+    // Feishu User-type field -- real member-search picker, see buildFieldControl's
+    // 'user' branch. Optional; who (if anyone) should be looped in on this ticket.
+    "Mentioned Person": { type: "user", req: false },
     "Closing Reason": { type: "select", options: ["User Request","Duplicated Hosting","Acm Request","Opened by mistake"], req: true },
     "Old ID": { type: "text", req: true },
     "Reporter ID": { type: "text", req: true },
@@ -9787,7 +9845,11 @@ function acmFieldForRegion(region) {
 
 function buildFieldControl(fName, def, req, idPrefix) {
     idPrefix = idPrefix || 'reqfld_';
-    const reqMark = req ? '<span style="color:var(--accent-rose)">*</span>' : '';
+    // "req-marker" class lets auditSetRequired() find and add/remove this
+    // marker later when a field's required-ness changes dynamically (Audit
+    // tab only) -- purely a class-name addition, no visual/behavioral change
+    // for any existing caller.
+    const reqMark = req ? '<span class="req-marker" style="color:var(--accent-rose)">*</span>' : '';
     const idSafe = idPrefix + fName.replace(/[^a-zA-Z0-9]/g, '_');
     const wrap = document.createElement('div');
     wrap.className = 'control-group';
@@ -9824,6 +9886,13 @@ function buildFieldControl(fName, def, req, idPrefix) {
             </div>`;
     } else if (def.type === 'file') {
         wrap.innerHTML += buildDropzoneHtml(idSafe, fName, req);
+    } else if (def.type === 'user') {
+        // Real, searchable member picker (backed by /api/members/search) --
+        // same control the Ticket Workspace uses for "Done by"/"Mentioned
+        // Person" (see twRenderMemberPicker). Sends a proper [{"id": open_id}]
+        // object at submit time instead of plain text, which is what a
+        // Feishu User-type field actually needs.
+        twRenderMemberPicker(wrap, `<label style="font-size:0.8rem;">${escHtml(fName)} ${reqMark}</label>`, fName, []);
     }
     return wrap;
 }
@@ -10229,31 +10298,155 @@ async function submitReqForm(e) {
 // the DOM at the same time, just hidden/shown.
 const AUDIT_BRANCH = 'Agency Creation';
 
+// A dedicated copy of the Agency Creation field list -- NOT the shared
+// REQ_BRANCHES['Agency Creation'] array -- so everything specific to the
+// Audit tab (Agency Code, Parent Agency Code, Type of Action, Mentioned
+// Person, and the dynamic required-ness below) stays isolated here and never
+// changes what New Request's own Agency Creation form shows or requires.
+// Each field also maps to which of the tab's four cards it renders into --
+// "Agency & Identity" (with the duplicate-check button), "App & Sourcing
+// Info", "Audition Action" (Type of Action + Mentioned Person, styled as its
+// own elegant section), and "Notes & Evidence".
+const AUDIT_FIELD_GROUPS = {
+    'Region':               'auditFieldsIdentity',
+    'User ID':              'auditFieldsIdentity',
+    'Agency Code':          'auditFieldsIdentity',
+    'Agency Name':          'auditFieldsIdentity',
+    'Applier real name':    'auditFieldsIdentity',
+    'Otherapp Name':        'auditFieldsApp',
+    'Otherapp ID':          'auditFieldsApp',
+    'Country':              'auditFieldsApp',
+    'Whatsapp Number':      'auditFieldsApp',
+    'NID Number':           'auditFieldsApp',
+    'Agency Type':          'auditFieldsApp',
+    'Bd Code':              'auditFieldsApp',
+    'Parenet sub agency':   'auditFieldsApp',
+    [ACM_AUTO]:             'auditFieldsApp',
+    'Type of Action':       'auditFieldsAction',
+    'Mentioned Person':     'auditFieldsAction',
+    'Applier Note':         'auditFieldsNotes',
+    'NID & Otherapp Screen':'auditFieldsNotes',
+};
+const AUDIT_FIELDS = Object.keys(AUDIT_FIELD_GROUPS);
+
 function renderAuditFields() {
-    const container = document.getElementById('auditDynamicFields');
+    const container = document.getElementById('auditFieldsIdentity');
     if (!container || container.dataset.built) return; // build once, like initReqFormOptions()
     container.dataset.built = '1';
 
-    const fields = REQ_BRANCHES[AUDIT_BRANCH] || [];
-    fields.forEach(fName => {
+    AUDIT_FIELDS.forEach(fName => {
+        const target = document.getElementById(AUDIT_FIELD_GROUPS[fName]);
+        if (!target) return;
         if (fName === ACM_AUTO) {
             const slot = document.createElement('div');
             slot.id = 'auditAcmSlot';
             slot.className = 'control-group';
-            container.appendChild(slot);
+            target.appendChild(slot);
             return;
         }
         const def = REQ_FIELD_DEFS[fName];
         if (!def) return;
         const el = buildFieldControl(fName, def, def.req, 'audfld_');
-        container.appendChild(el);
+        if (fName === 'Parenet sub agency') {
+            // Only meaningful (and only shown) for a "Walkin sub-agency" --
+            // see auditUpdateDynamicRequirements(). Relabel it plainly too;
+            // the sheet's own field name is a typo carried over from Feishu.
+            el.id = 'auditParentAgencyWrap';
+            el.style.display = 'none';
+            const lbl = el.querySelector('label');
+            if (lbl) lbl.innerHTML = lbl.innerHTML.replace('Parenet sub agency', 'Parent Agency Code');
+        }
+        target.appendChild(el);
         if (fName === 'Region') {
-            el.querySelector('select').addEventListener('change', () => refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_'));
+            el.querySelector('select').addEventListener('change', () => {
+                refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_');
+                auditUpdateDynamicRequirements();
+            });
+        }
+        if (fName === 'Agency Type') {
+            el.querySelector('select').addEventListener('change', auditUpdateDynamicRequirements);
+        }
+        if (fName === 'Type of Action') {
+            auditRenderActionSegmented(el);
         }
     });
 
     refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_');
+    auditUpdateDynamicRequirements();
 }
+
+// Turns the plain "Type of Action" <select> into three color-coded buttons
+// (creative/quick to tap) while leaving the real <select> in the DOM, just
+// visually hidden -- submitAuditForm() and everything else still just reads
+// its .value, with zero awareness this is happening.
+function auditRenderActionSegmented(wrap) {
+    const select = wrap.querySelector('select');
+    if (!select) return;
+    select.style.display = 'none';
+
+    const seg = document.createElement('div');
+    seg.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';
+    seg.innerHTML = Array.from(select.options)
+        .filter(o => o.value)
+        .map(o => `<button type="button" class="audit-action-btn" data-val="${escHtml(o.value)}">${escHtml(o.textContent.trim())}</button>`)
+        .join('');
+    wrap.appendChild(seg);
+
+    seg.querySelectorAll('.audit-action-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            select.value = btn.dataset.val;
+            seg.querySelectorAll('.audit-action-btn').forEach(b => b.classList.toggle('active', b === btn));
+        });
+    });
+}
+
+
+// Toggles one Audit field's required-ness in place (native `required`
+// attribute + the visible "*" marker), without touching whatever value the
+// agent already typed in -- unlike rebuilding the control from scratch.
+function auditSetRequired(id, isRequired) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.required = isRequired;
+    const label = el.closest('.control-group')?.querySelector('label');
+    if (!label) return;
+    const marker = label.querySelector('.req-marker');
+    if (isRequired && !marker) {
+        label.insertAdjacentHTML('beforeend', '<span class="req-marker" style="color:var(--accent-rose)">*</span>');
+    } else if (!isRequired && marker) {
+        marker.remove();
+    }
+}
+
+// Agency Type drives which fields actually make sense on a Walkin / Walkin
+// sub-agency ticket: no BD hunter and no ACM chased this one down, so ACM and
+// Bd Code shouldn't be forced; Otherapp Name is a nice-to-have, not a must;
+// and a sub-agency additionally needs its parent's agency code, which no
+// other Agency Type uses at all.
+function auditUpdateDynamicRequirements() {
+    const type = document.getElementById('audfld_Agency_Type')?.value || '';
+    const isWalkinFamily = (type === 'Walkin' || type === 'Walkin sub-agency');
+    const isSubAgency = (type === 'Walkin sub-agency');
+
+    auditSetRequired('audfld_Bd_Code', !isWalkinFamily);
+    auditSetRequired('audfld_Otherapp_Name', !isWalkinFamily);
+
+    // ACM lives in auditAcmSlot, which refreshAcmAutoSlot() rebuilds (always
+    // defaulting to required) whenever Region changes -- re-apply the current
+    // Agency-Type-driven requirement on top of that every time.
+    const region = document.getElementById('audfld_Region')?.value || '';
+    const acmField = acmFieldForRegion(region);
+    if (acmField) {
+        auditSetRequired('audfld_' + acmField.name.replace(/[^a-zA-Z0-9]/g, '_'), !isWalkinFamily);
+    }
+
+    const parentWrap = document.getElementById('auditParentAgencyWrap');
+    if (parentWrap) {
+        parentWrap.style.display = isSubAgency ? '' : 'none';
+        auditSetRequired('audfld_Parenet_sub_agency', isSubAgency);
+    }
+}
+
 
 // Every extractor is a direct port of the corresponding step in the Feishu
 // "Audit" Base Automation (trigger: raw_text changes on Grand Table), kept
@@ -10383,10 +10576,15 @@ function auditParseText() {
         noteEl.classList.add('reqfld-autofilled');
     }
 
-    // Otherapp Name and the NID/Otherapp screenshot can't be pulled out of
-    // plain text -- always flag them so the agent knows to handle those two
-    // by hand, even on an otherwise clean parse.
-    missed.push('Otherapp Name', 'NID & Otherapp Screen (upload)');
+    // Otherapp Name, Agency Code, and the NID/Otherapp screenshot can't be
+    // pulled out of plain text -- always flag them so the agent knows to
+    // handle those by hand, even on an otherwise clean parse.
+    missed.push('Agency Code', 'Otherapp Name', 'NID & Otherapp Screen (upload)');
+
+    // Agency Type (and Region) were just set programmatically above, which
+    // doesn't fire a 'change' event -- re-apply the Walkin/Walkin sub-agency
+    // required-ness rules now that we know the real Agency Type.
+    auditUpdateDynamicRequirements();
 
     ToastManager.show(`Auto-filled ${filled} field(s). Please fill in manually: ${missed.join(', ')}.`, 'warning', 9000);
 }
@@ -10407,6 +10605,16 @@ async function submitAuditForm(e) {
         form.querySelectorAll('input[type="text"], select').forEach(el => {
             if (!el.name) return;
             if (el.value) payloadFields[el.name] = el.value;
+        });
+
+        // Mentioned Person (Feishu User-type field) doesn't live in a plain
+        // input/select -- twRenderMemberPicker stores the real
+        // [{"id": open_id}] payload on the picker's own wrapper instead.
+        form.querySelectorAll('[data-user-field]').forEach(wrap => {
+            const key = wrap.dataset.userField;
+            const sel = wrap.dataset.userSelected;
+            if (!key || !sel) return;
+            try { payloadFields[key] = JSON.parse(sel); } catch (err) { /* nothing picked */ }
         });
 
         const finalData = new FormData();
@@ -10447,7 +10655,20 @@ async function submitAuditForm(e) {
         form.reset();
         document.getElementById('audRawText').value = '';
         form.querySelectorAll('.reqfld-autofilled').forEach(el => el.classList.remove('reqfld-autofilled'));
+        // form.reset() doesn't know about the Type of Action segmented
+        // buttons -- they're not native form controls, so clear their
+        // "active" highlight by hand too.
+        form.querySelectorAll('.audit-action-btn.active').forEach(b => b.classList.remove('active'));
+        // form.reset() only touches native input/select elements -- the member
+        // picker's chip and dataset.userSelected need clearing by hand.
+        const mpWrap = form.querySelector('[data-user-field="Mentioned Person"]');
+        if (mpWrap) twRenderMemberPicker(mpWrap, '<label style="font-size:0.8rem;">Mentioned Person</label>', 'Mentioned Person', []);
+        const dupResults = document.getElementById('auditDupResults');
+        const dupSummary = document.getElementById('auditDupSummary');
+        if (dupResults) dupResults.innerHTML = '';
+        if (dupSummary) dupSummary.innerHTML = '';
         refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_');
+        auditUpdateDynamicRequirements();
 
     } catch (e) {
         ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
@@ -10456,6 +10677,98 @@ async function submitAuditForm(e) {
     btn.innerHTML = origTxt;
     btn.disabled = false;
     document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// "Check Duplicate" -- reuses the exact same /api/query endpoint and .qy-card
+// markup the Query Requests page uses, so results look and behave identically.
+// Fires one search per identity field the agent has actually filled in
+// (User ID, NID, Otherapp ID, Bd Code, Agency Code), merges the results by
+// ticket number, and tags each card with which field(s) matched.
+async function auditCheckDuplicates() {
+    const fieldsToCheck = [
+        ['user_id', 'audfld_User_ID', 'User ID'],
+        ['nid_number', 'audfld_NID_Number', 'NID Number'],
+        ['otherapp_id', 'audfld_Otherapp_ID', 'Otherapp ID'],
+        ['bd_code', 'audfld_Bd_Code', 'Bd Code'],
+        ['agency_code', 'audfld_Agency_Code', 'Agency Code'],
+    ].map(([field, id, label]) => [field, (document.getElementById(id)?.value || '').trim(), label])
+     .filter(([, value]) => value);
+
+    const summaryEl = document.getElementById('auditDupSummary');
+    const resultsEl = document.getElementById('auditDupResults');
+    const btn = document.getElementById('btnAuditCheckDup');
+
+    if (!fieldsToCheck.length) {
+        ToastManager.show('Fill in at least one of User ID, NID Number, Otherapp ID, BD Code, or Agency Code first.', 'warning');
+        return;
+    }
+
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (summaryEl) summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
+    if (btn) btn.disabled = true;
+
+    try {
+        const responses = await Promise.all(fieldsToCheck.map(([field, value]) =>
+            fetch(`/api/query?${new URLSearchParams({ field, value, user: loggedUser || '', email: loggedEmail || '' })}`)
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .catch(err => ({ ok: false, data: { error: err.message } }))
+        ));
+
+        const byKey = new Map(); // ticket key -> { record, matchedOn: Set<label> }
+        let firstError = null;
+        responses.forEach(({ ok, data }, i) => {
+            const label = fieldsToCheck[i][2];
+            if (!ok || data.error) { firstError = firstError || data.error || 'Search failed'; return; }
+            (data.results || []).forEach(r => {
+                const key = r.numbering || `${r.user_id}|${r.agency_code}|${r.otherapp_id}|${r.bd_code}`;
+                if (!byKey.has(key)) byKey.set(key, { record: r, matchedOn: new Set() });
+                byKey.get(key).matchedOn.add(label);
+            });
+        });
+
+        const matches = Array.from(byKey.values());
+
+        if (!matches.length) {
+            if (summaryEl) summaryEl.innerHTML = `<span style="color:var(--accent-green);font-weight:600;">✅ No matching requests found${firstError ? ' (one of the searches had an issue -- see below)' : ''}.</span>`;
+            if (firstError) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
+            if (btn) btn.disabled = false;
+            return;
+        }
+
+        if (summaryEl) summaryEl.innerHTML = `<span style="color:var(--accent-amber);font-weight:600;">⚠️ ${matches.length} existing request${matches.length === 1 ? '' : 's'} found matching what you entered -- review before submitting.</span>`;
+
+        if (resultsEl) resultsEl.innerHTML = matches.map(({ record: r, matchedOn }) => `
+            <div class="qy-card">
+                <div class="qy-card-head">
+                    <div>
+                        <div class="qy-card-num">#${escHtml(r.numbering || '—')}</div>
+                        <div class="qy-card-type">${escHtml(r.request_type || 'Request')}</div>
+                    </div>
+                    <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status || '—')}</span>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <span style="font-size:.72rem;font-weight:700;color:var(--accent-amber);background:rgba(255,171,0,.1);border:1px solid rgba(255,171,0,.3);padding:3px 8px;border-radius:12px;">Matched on: ${escHtml(Array.from(matchedOn).join(', '))}</span>
+                </div>
+                ${qyRow('Submitted on', r.submitted_on)}
+                ${qyRow('Respondents', r.respondents)}
+                ${qyRow('User ID', r.user_id)}
+                ${qyRow('Agency Code', r.agency_code)}
+                ${qyRow('Agency Type', r.agency_type)}
+                ${qyRow('Otherapp ID', r.otherapp_id)}
+                ${qyRow('ACM / Region', [r.acm, r.region].filter(Boolean).join(' · '))}
+                ${qyRow('Bd Code', r.bd_code)}
+                ${qyRow('Duplicated Check', r.duplicated_check)}
+                ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
+                ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
+            </div>
+        `).join('');
+
+    } catch (e) {
+        if (summaryEl) summaryEl.innerHTML = '';
+        ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
+    }
+
+    if (btn) btn.disabled = false;
 }
 
 if (loggedUser&&loggedUat) {
