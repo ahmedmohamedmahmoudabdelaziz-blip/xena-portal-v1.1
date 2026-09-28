@@ -222,8 +222,15 @@
         .audit-pick-btn.active[data-val="Done "] { background: var(--accent-green); color: #000; }
         .audit-pick-btn.active[data-val="Rejected"] { background: var(--accent-rose); color: #000; }
         .audit-pick-btn.active[data-val="Under Investigation"] { background: var(--accent-amber); color: #000; }
-        .audit-pick-btn[data-person] { border-color: var(--accent-purple); color: var(--accent-purple); }
-        .audit-pick-btn.active[data-person] { background: var(--accent-purple); color: #000; }
+        /* "Done by" quick-picks: one signature color per person -- Ahmed blue,
+           Noora pink, Mano yellow -- so the agent can spot their own name at
+           a glance (and everyone else's). */
+        .audit-pick-btn[data-person="Ahmed Samurai"] { border-color: rgba(77,163,255,.65); color: #6fb2ff; }
+        .audit-pick-btn.active[data-person="Ahmed Samurai"] { background: rgba(77,163,255,.92); border-color: #4da3ff; color: #fff; box-shadow: 0 0 14px rgba(77,163,255,.4); }
+        .audit-pick-btn[data-person="Noora"] { border-color: rgba(255,122,200,.65); color: #ff8fd0; }
+        .audit-pick-btn.active[data-person="Noora"] { background: rgba(255,122,200,.92); border-color: #ff7ac8; color: #2a0018; box-shadow: 0 0 14px rgba(255,122,200,.4); }
+        .audit-pick-btn[data-person="Mano"] { border-color: rgba(255,213,74,.65); color: #ffd54a; }
+        .audit-pick-btn.active[data-person="Mano"] { background: rgba(255,213,74,.95); border-color: #ffd54a; color: #2a2200; box-shadow: 0 0 14px rgba(255,213,74,.4); }
         .audit-pick-btn:disabled { opacity: .5; cursor: wait; }
 
         .audit-reminders { border: 1px solid rgba(255,184,0,.35); background: rgba(255,184,0,.06); border-radius: var(--radius); padding: 16px 18px; margin-top: 24px; }
@@ -245,7 +252,7 @@
            important ever scrolls out of view. */
         #pg-audit { height: 100%; min-height: 520px; }
         .aws { display: flex; flex-direction: column; height: 100%; gap: 14px; }
-        .aws-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr 350px; gap: 14px; }
+        .aws-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr 430px; gap: 14px; }
         .aws-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; min-height: 0; overflow: hidden; box-shadow: var(--shadow); }
         .aws-left { border-top: 3px solid var(--accent-cyan); }
         .aws-mid { border-top: 3px solid var(--accent-purple); }
@@ -276,14 +283,42 @@
         .aws-rem-ok { color: var(--accent-green); font-weight: 600; font-size: .84rem; display: flex; align-items: center; gap: 6px; }
         .aws-submit { width: auto; padding: 12px 36px; font-size: 1.02rem; flex-direction: column; gap: 1px; line-height: 1.25; }
         .aws-submit-hint { font-size: .66rem; opacity: .65; font-weight: 500; letter-spacing: .3px; }
-        .aws-dup-drawer { display: none; position: fixed; left: 264px; right: 24px; bottom: 100px; max-height: 56vh; background: var(--surface); border: 1px solid var(--accent-amber); border-radius: var(--radius); box-shadow: 0 -14px 55px rgba(0,0,0,.55); z-index: 300; flex-direction: column; overflow: hidden; }
+        .aws-dup-drawer { display: none; position: fixed; left: 264px; right: 24px; bottom: 100px; max-height: 62vh; background: var(--surface); border: 1px solid var(--accent-amber); border-radius: var(--radius); box-shadow: 0 -14px 55px rgba(0,0,0,.55); z-index: 300; flex-direction: column; overflow: hidden; }
         .aws-dup-drawer.open { display: flex; animation: awsDrawerIn .25s ease; }
         @keyframes awsDrawerIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
         .aws-dup-drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--accent-amber); flex-shrink: 0; }
         .aws-dup-close { background: none; border: none; color: var(--text-muted); font-size: 1.35rem; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; }
         .aws-dup-close:hover { color: var(--accent-rose); background: rgba(255,77,109,.1); }
-        .aws-dup-results { padding: 16px; overflow-y: auto; }
-        @media (max-width: 1280px) { .aws-grid { grid-template-columns: 290px 1fr 320px; } }
+        /* flex:1 + min-height:0 is what makes this area scroll INSIDE the
+           fixed-height drawer instead of overflowing it -- without it the
+           bottom of each match card (Reject Reason / Audition Note) was
+           silently clipped away. */
+        .aws-dup-results { flex: 1; min-height: 0; padding: 16px; overflow-y: auto; }
+        /* Radar verdict -- mirrors the Grand Table "Duplicated Check" formula
+           style: 🟢 when clean, one 🔴 line per matched field when not. The
+           whole verdict is clickable and opens the match cards. */
+        .aws-dup-verdict { cursor: pointer; border-radius: 8px; padding: 3px 8px; margin: -3px -8px; transition: background .15s; }
+        .aws-dup-verdict:hover { background: rgba(255,77,109,.08); }
+        .aws-dup-clean { color: var(--accent-green); font-weight: 700; font-size: .86rem; }
+        .aws-dup-hit { color: var(--accent-rose); font-weight: 600; font-size: .8rem; line-height: 1.6; }
+        .aws-dup-hit b { font-weight: 800; }
+        .aws-dup-cta { color: var(--text-muted); font-size: .68rem; margin-top: 3px; }
+        /* Reject Reason quick-picker (Audit): selected chips + filter box + a
+           wrapping toggle cloud -- replaces the 21-row scrolling checklist so
+           the whole Decision block stays on one screen. */
+        .rr-picker { margin-top: 6px; }
+        .rr-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .rr-selected:empty { display: none; }
+        .rr-sel-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,77,109,.14); border: 1px solid rgba(255,77,109,.45); color: #ff9db4; font-size: .74rem; font-weight: 600; padding: 4px 6px 4px 10px; border-radius: 20px; }
+        .rr-sel-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: .95rem; line-height: 1; padding: 0 2px; opacity: .75; }
+        .rr-sel-chip button:hover { opacity: 1; color: #fff; }
+        .rr-filter { width: 100%; box-sizing: border-box; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); font-size: .8rem; font-family: inherit; outline: none; margin-bottom: 8px; transition: border-color .15s; }
+        .rr-filter:focus { border-color: var(--accent-rose); }
+        .rr-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+        .rr-chip { padding: 5px 11px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: .73rem; font-weight: 600; cursor: pointer; transition: all .12s; font-family: inherit; }
+        .rr-chip:hover { border-color: var(--accent-rose); color: var(--text); }
+        .rr-chip.active { background: rgba(255,77,109,.16); border-color: var(--accent-rose); color: #ff9db4; }
+        @media (max-width: 1280px) { .aws-grid { grid-template-columns: 290px 1fr 380px; } }
         @media (max-width: 1024px) {
             #pg-audit { height: auto; }
             .aws-grid { grid-template-columns: 1fr; overflow-y: auto; }
@@ -2846,7 +2881,7 @@
                             <button type="button" id="btnAuditCheckDup" class="aws-radar-btn" onclick="auditCheckDuplicates()" title="Check for duplicates now">📡</button>
                             <div style="min-width:0">
                                 <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
-                                <div id="auditDupSummary" class="aws-radar-summary">Scans automatically as you fill IDs in.</div>
+                                <div id="auditDupSummary" class="aws-radar-summary">Click 📡 to run the duplicate scan.</div>
                                 <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
                                     <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
                                 </div>
@@ -10599,6 +10634,9 @@ function renderAuditFields() {
         if (fName === 'Done by') {
             auditRenderDoneByPicker(el);
         }
+        if (fName === 'Reject Reason') {
+            auditRenderRejectReasonPicker(el);
+        }
     });
 
     refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
@@ -10610,10 +10648,8 @@ function renderAuditFields() {
     if (form) {
         form.addEventListener('input', auditUpdateReminders);
         form.addEventListener('change', auditUpdateReminders);
-        // Duplicate Radar scans on its own: once edits settle for ~1.2s it
-        // re-checks whichever of User ID / Otherapp ID / NID is filled in.
-        form.addEventListener('input', auditScheduleDupCheck);
-        form.addEventListener('change', auditScheduleDupCheck);
+        // Duplicate Radar is manual-only: it runs when the agent clicks the
+        // 📡 button, never on its own while they type.
         // Ctrl/Cmd+Enter anywhere inside the workstation files the ticket.
         form.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -10712,6 +10748,77 @@ function auditRenderDoneByPicker(wrap) {
             btn.textContent = origText;
         });
     });
+}
+
+// "Reject Reason" quick-picker: the raw field is a 21-option checkbox list,
+// which means endless up-and-down scrolling inside the Decision panel. This
+// swaps it (visually) for selected-chips on top, a filter box, and a
+// wrapping toggle cloud. The original checkboxes stay in the DOM (hidden)
+// and stay perfectly in sync, so submitAuditForm()'s collection logic and
+// the post-submit reset keep working exactly as before.
+function auditRenderRejectReasonPicker(wrap) {
+    const msel = wrap.querySelector('.msel-wrap');
+    if (!msel) return;
+    const boxes = Array.from(msel.querySelectorAll('input[type="checkbox"]'));
+    msel.style.display = 'none';
+
+    const picker = document.createElement('div');
+    picker.className = 'rr-picker';
+    picker.innerHTML = `
+        <div class="rr-selected"></div>
+        <input type="text" class="rr-filter" placeholder="🔍 Filter reasons…">
+        <div class="rr-cloud"></div>`;
+    wrap.appendChild(picker);
+
+    const selWrap = picker.querySelector('.rr-selected');
+    const cloud = picker.querySelector('.rr-cloud');
+    const filter = picker.querySelector('.rr-filter');
+
+    const sync = () => {
+        // The selected-chips row mirrors whichever checkboxes are on.
+        selWrap.innerHTML = boxes.filter(b => b.checked).map(b =>
+            `<span class="rr-sel-chip">${escHtml(b.value.trim())}<button type="button" data-val="${escHtml(b.value)}" aria-label="Remove ${escHtml(b.value)}">×</button></span>`).join('');
+        cloud.querySelectorAll('.rr-chip').forEach(c => {
+            const box = boxes.find(b => b.value === c.dataset.val);
+            c.classList.toggle('active', !!(box && box.checked));
+        });
+    };
+
+    cloud.innerHTML = boxes.map(b => `<button type="button" class="rr-chip" data-val="${escHtml(b.value)}">${escHtml(b.value.trim())}</button>`).join('');
+    cloud.querySelectorAll('.rr-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const box = boxes.find(b => b.value === chip.dataset.val);
+            if (box) { box.checked = !box.checked; sync(); }
+        });
+    });
+    // Tapping × on a selected chip unchecks its checkbox too.
+    selWrap.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-val]');
+        if (!btn) return;
+        const box = boxes.find(b => b.value === btn.dataset.val);
+        if (box) { box.checked = false; sync(); }
+    });
+    filter.addEventListener('input', () => {
+        const q = filter.value.trim().toLowerCase();
+        cloud.querySelectorAll('.rr-chip').forEach(c => {
+            c.style.display = !q || c.dataset.val.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+    // A plain Enter inside the filter must never file the ticket.
+    filter.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault();
+    });
+
+    // After a successful filing the form resets -- re-sync from the (now
+    // cleared) checkboxes so no stale chips survive into the next ticket,
+    // and un-hide anything the filter box had filtered away.
+    const form = wrap.closest('form');
+    if (form) form.addEventListener('reset', () => setTimeout(() => {
+        cloud.querySelectorAll('.rr-chip').forEach(c => c.style.display = '');
+        sync();
+    }, 0));
+
+    sync();
 }
 
 
@@ -11027,7 +11134,7 @@ async function submitAuditForm(e) {
         const dupSummary = document.getElementById('auditDupSummary');
         const dupReveal = document.getElementById('auditDupReveal');
         if (dupResults) dupResults.innerHTML = '';
-        if (dupSummary) dupSummary.innerHTML = 'Scans automatically as you fill IDs in.';
+        if (dupSummary) dupSummary.innerHTML = 'Click 📡 to run the duplicate scan.';
         if (dupReveal) dupReveal.style.display = 'none';
         auditDupMatches = [];
         auditCloseDupDrawer();
@@ -11050,8 +11157,9 @@ async function submitAuditForm(e) {
 // ticket number, and tags each card with which field(s) matched.
 let auditDupMatches = []; // populated by auditCheckDuplicates(), rendered on demand by auditRevealDuplicates()
 
-async function auditCheckDuplicates(opts) {
-    const isAuto = !!(opts && opts.auto); // auto scans stay silent -- no toasts, no warnings
+// Manual-only by design (Ahmed's call): runs when the 📡 button is clicked,
+// never on its own while the agent types.
+async function auditCheckDuplicates() {
     // Kept to just these three for now, per Ahmed's call -- more fields can
     // be added to this list later if needed.
     const fieldsToCheck = [
@@ -11067,15 +11175,6 @@ async function auditCheckDuplicates(opts) {
     const btn = document.getElementById('btnAuditCheckDup');
 
     if (!fieldsToCheck.length) {
-        if (isAuto) {
-            // Nothing to scan (or the agent just cleared the IDs) -- quietly
-            // reset the radar instead of nagging.
-            auditDupMatches = [];
-            if (summaryEl) summaryEl.innerHTML = 'Scans automatically as you fill IDs in.';
-            if (revealWrap) revealWrap.style.display = 'none';
-            auditCloseDupDrawer();
-            return;
-        }
         ToastManager.show('Fill in at least one of User ID, Otherapp ID, or NID Number first.', 'warning');
         return;
     }
@@ -11109,17 +11208,28 @@ async function auditCheckDuplicates(opts) {
         auditDupMatches = Array.from(byKey.values());
 
         if (!auditDupMatches.length) {
-            if (summaryEl) summaryEl.innerHTML = `<span style="color:var(--accent-green);font-weight:600;">✅ No matching requests found${firstError ? ' (one of the searches had an issue -- see below)' : ''}.</span>`;
-            if (firstError && !isAuto) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
+            if (summaryEl) summaryEl.innerHTML = `<span class="aws-dup-clean">🟢 No duplicate</span>${firstError ? ' <span style="font-size:.68rem;color:var(--text-muted)">(one search had an issue)</span>' : ''}`;
+            if (firstError) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
             if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
             return;
         }
 
-        // "Magic" reveal: lead with just the count, so the agent isn't
-        // instantly buried in cards -- the actual matches only render once
-        // they choose to look, via auditRevealDuplicates().
+        // Verdict styled after the Grand Table's own "Duplicated Check"
+        // formula: one 🔴 line per matched field, listing the tickets that
+        // share it. The whole verdict is clickable and opens the match cards.
         const n = auditDupMatches.length;
-        if (summaryEl) summaryEl.innerHTML = `<span style="color:var(--accent-amber);font-weight:600;">⚠️ ${n} existing request${n === 1 ? '' : 's'} found matching what you entered.</span>`;
+        const byField = new Map(); // field label -> [ticket numbers]
+        auditDupMatches.forEach(({ record, matchedOn }) => {
+            matchedOn.forEach(label => {
+                if (!byField.has(label)) byField.set(label, []);
+                byField.get(label).push('#' + (record.numbering || '—'));
+            });
+        });
+        const hitLines = ['User ID', 'Otherapp ID', 'NID Number']
+            .filter(f => byField.has(f))
+            .map(f => `<div class="aws-dup-hit">🔴 <b>${escHtml(f)}</b> in Grand Table Ticket: ${byField.get(f).map(escHtml).join(', ')}</div>`)
+            .join('');
+        if (summaryEl) summaryEl.innerHTML = `<div class="aws-dup-verdict" onclick="auditRevealDuplicates()" title="Show the matching requests">${hitLines}<div class="aws-dup-cta">👆 Click to review the ${n} matching request${n === 1 ? '' : 's'} before filing</div></div>`;
         if (revealWrap) {
             revealWrap.style.display = 'block';
             const revealBtn = document.getElementById('btnAuditDupReveal');
@@ -11128,18 +11238,10 @@ async function auditCheckDuplicates(opts) {
 
     } catch (e) {
         if (summaryEl) summaryEl.innerHTML = '';
-        if (!isAuto) ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
+        ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
     }
 
     if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
-}
-
-// Debounced auto-scan for the Duplicate Radar: fired from the form's
-// input/change listeners, waits until the agent pauses typing.
-let auditDupAutoTimer = null;
-function auditScheduleDupCheck() {
-    clearTimeout(auditDupAutoTimer);
-    auditDupAutoTimer = setTimeout(() => auditCheckDuplicates({ auto: true }), 1200);
 }
 
 function auditCloseDupDrawer() {
