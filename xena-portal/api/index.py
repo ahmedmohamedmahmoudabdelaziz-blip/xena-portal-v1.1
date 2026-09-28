@@ -1118,17 +1118,17 @@ def get_user_permissions(email, name):
     
     if any(admin == name_clean for admin in ADMIN_USERS):
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "submit_audit", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"],
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
 
-    if not email_clean and not name_clean: 
+    if not email_clean and not name_clean:
         return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
 
     if MOCK_MODE:
         return {
-            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"], 
+            "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "submit_audit", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"],
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
                             "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
         }
@@ -2832,6 +2832,21 @@ def submit_request():
     if not req_type:
         return jsonify({"error": "Request Type is required."}), 400
 
+    # AUDIT WORKSTATION FILINGS: the Audit tab always sends Create Way starting
+    # with "Audit" ("Audit (with all info)") -- that's the only place in the app
+    # that sets it (Create New Request never sends Create Way at all), so this
+    # flag identifies a workstation filing precisely.
+    create_way = str(user_fields.get("Create Way") or "").strip().lower()
+    is_audit_filing = create_way.startswith("audit")
+    if is_audit_filing:
+        # Access Management grant: the Audit tab is behind its own module key
+        # ("submit_audit", granted via the "Audit Workstation" toggle in Manage
+        # Agents). Master "submit" / admins keep access automatically, same
+        # convention as every other module check in this file.
+        perms = get_user_permissions(email, user)
+        if not perms.get("is_super_admin") and not any(m in ("submit", "submit_audit", "admin") for m in perms.get("modules", [])):
+            return jsonify({"error": "Access denied: you don't have Audit Workstation permission. Ask an admin to grant it in Access Management."}), 403
+
     tat = get_tenant_access_token()
     # SESSION ENFORCEMENT: tickets must be filed under the real agent's identity,
     # never quietly under the app's. Where the server CAN verify a token's real
@@ -2907,7 +2922,22 @@ def submit_request():
         if tokens:
             final_fields[field_name] = tokens
 
-    final_fields["Request Status"] = "Pending"
+    # AUDIT WORKSTATION FILINGS land already-decided: the auditor made the call
+    # (Done / Rejected / Under Investigation) while filing, so the ticket should
+    # never enter the live queue as Pending. It is written Closed from the start,
+    # and Assigned Member is set to the very person who filed it (their Feishu
+    # open_id, which the frontend always sends) -- so "who handled this audit"
+    # and "who submitted it" are the same person by construction. User-type
+    # fields need [{"id": open_id}] and that shape passes
+    # strip_invalid_user_fields() below untouched; if the session has no open_id
+    # on file (legacy/mock), the assignment is simply skipped rather than
+    # blocking the filing.
+    if is_audit_filing:
+        final_fields["Request Status"] = "Closed"
+        if submitter_open_id:
+            final_fields["Assigned Member"] = [{"id": submitter_open_id}]
+    else:
+        final_fields["Request Status"] = "Pending"
     # Per request: "Submitted By" is intentionally NOT written on Create New Request
     # anymore -- ignored entirely. Real submitter attribution relies on Feishu's own
     # "Created By"/"Respondents" system column (stamped by whichever token performs
