@@ -200,24 +200,31 @@
            (and, by omission, which fields still need a manual look). */
         .reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
 
-        /* ═══ Audit tab: tabbed steps (no long vertical stack), reminders
-           panel, bigger evidence thumbnails, and the duplicate-check
-           "reveal" ═══ */
-        .audit-tabbar { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-        .audit-tab { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border: none; background: transparent; color: var(--text-muted); font-weight: 700; font-size: .82rem; cursor: pointer; border-bottom: 3px solid transparent; border-radius: 10px 10px 0 0; transition: all .15s; }
-        .audit-tab:hover { background: rgba(255,255,255,.03); color: var(--text); }
-        .audit-tab.active { color: var(--text); background: rgba(255,255,255,.03); }
-        .audit-tab-badge { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 800; color: #000; flex-shrink: 0; }
-        .audit-tab[data-tab="identity"].active { border-bottom-color: var(--accent-cyan); }
-        .audit-tab[data-tab="app"].active { border-bottom-color: var(--accent-purple); }
-        .audit-tab[data-tab="action"].active { border-bottom-color: var(--accent-rose); }
-        .audit-tab[data-tab="notes"].active { border-bottom-color: var(--accent-green); }
-        .audit-panel { display: none; animation: auditFadeIn .2s ease; }
-        .audit-panel.active { display: block; }
-        .audit-tab-next { margin-top: 24px; display: flex; justify-content: flex-end; }
+        /* ═══ Audit tab: Main Info full-width up top, Check Duplicate + 🎯
+           Audition Action side by side below, reminders panel, bigger
+           evidence thumbnails, and the duplicate-check "reveal" ═══ */
+        .audit-sections-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+        @media (max-width: 900px) { .audit-sections-row { grid-template-columns: 1fr; } }
         .audit-card-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-hover); flex-shrink: 0; transition: background .2s ease, box-shadow .2s ease; }
         .audit-card-dot.filled { background: var(--accent-green); box-shadow: 0 0 8px rgba(0,230,118,.6); }
         @keyframes auditFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Status / Done by: one-tap color-coded buttons instead of a select
+           or an open-ended member search -- the real <select>/picker state
+           stays in the DOM (hidden or backing dataset), so submitAuditForm()
+           and the reminders logic don't need to know these are buttons. */
+        .audit-pick-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+        .audit-pick-btn { flex: 1; min-width: 110px; padding: 12px; border-radius: 10px; border: 1.5px solid var(--border); background: transparent; font-weight: 700; font-size: .82rem; cursor: pointer; transition: all .15s; color: var(--text-muted); }
+        .audit-pick-btn:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+        .audit-pick-btn[data-val="Done "] { border-color: var(--accent-green); color: var(--accent-green); }
+        .audit-pick-btn[data-val="Rejected"] { border-color: var(--accent-rose); color: var(--accent-rose); }
+        .audit-pick-btn[data-val="Under Investigation"] { border-color: var(--accent-amber); color: var(--accent-amber); }
+        .audit-pick-btn.active[data-val="Done "] { background: var(--accent-green); color: #000; }
+        .audit-pick-btn.active[data-val="Rejected"] { background: var(--accent-rose); color: #000; }
+        .audit-pick-btn.active[data-val="Under Investigation"] { background: var(--accent-amber); color: #000; }
+        .audit-pick-btn[data-person] { border-color: var(--accent-purple); color: var(--accent-purple); }
+        .audit-pick-btn.active[data-person] { background: var(--accent-purple); color: #000; }
+        .audit-pick-btn:disabled { opacity: .5; cursor: wait; }
 
         .audit-reminders { border: 1px solid rgba(255,184,0,.35); background: rgba(255,184,0,.06); border-radius: var(--radius); padding: 16px 18px; margin-top: 24px; }
         .audit-reminders-title { color: var(--accent-amber); font-weight: 700; font-size: .85rem; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -2724,29 +2731,20 @@
                     </div>
 
                     <form id="auditRequestForm" onsubmit="submitAuditForm(event)">
-                        <div class="audit-tabbar">
-                            <button type="button" class="audit-tab active" data-tab="identity" onclick="auditSwitchTab('identity')">
-                                <span class="audit-tab-badge" style="background:var(--accent-cyan);">1</span> Identity <span class="audit-card-dot" id="auditDotIdentity"></span>
-                            </button>
-                            <button type="button" class="audit-tab" data-tab="app" onclick="auditSwitchTab('app')">
-                                <span class="audit-tab-badge" style="background:var(--accent-purple);">2</span> App &amp; Sourcing <span class="audit-card-dot" id="auditDotApp"></span>
-                            </button>
-                            <button type="button" class="audit-tab" data-tab="action" onclick="auditSwitchTab('action')">
-                                <span class="audit-tab-badge" style="background:var(--accent-rose);">3</span> 🎯 Action <span class="audit-card-dot" id="auditDotAction"></span>
-                            </button>
-                            <button type="button" class="audit-tab" data-tab="notes" onclick="auditSwitchTab('notes')">
-                                <span class="audit-tab-badge" style="background:var(--accent-green);">4</span> Notes <span class="audit-card-dot" id="auditDotNotes"></span>
-                            </button>
+                        <div class="card" style="margin-bottom:16px; background:rgba(0,212,255,.03);">
+                            <h4 style="color:var(--accent-cyan); margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                <span class="audit-card-dot" id="auditDotMain"></span> Main Info
+                            </h4>
+                            <div id="auditFieldsMain" class="control-grid"><!-- built by renderAuditFields() --></div>
                         </div>
 
-                        <div class="audit-panel active" data-panel="identity">
-                            <div id="auditFieldsIdentity" class="control-grid"><!-- built by renderAuditFields() --></div>
-
-                            <div style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
+                        <div class="audit-sections-row" style="margin-bottom:16px;">
+                            <div class="card" style="background:rgba(255,184,0,.03);">
+                                <h4 style="color:var(--accent-amber); margin-bottom:16px;">🔍 Check Duplicate</h4>
                                 <button type="button" id="btnAuditCheckDup" class="btn btn-outline" style="border-color:var(--accent-amber); color:var(--accent-amber);" onclick="auditCheckDuplicates()">
                                     🔍 Check Duplicate
                                 </button>
-                                <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Searches every request ever submitted, matching whichever of User ID / Otherapp ID / NID Number you've filled in above.</div>
+                                <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Matches whichever of User ID / Otherapp ID / NID Number you've filled in above, against every request ever submitted.</div>
                                 <div id="auditDupSummary" style="margin-top:14px; font-size:.9rem;"></div>
                                 <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;">
                                     <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
@@ -2754,21 +2752,12 @@
                                 <div id="auditDupResults" class="qy-grid" style="margin-top:14px;"></div>
                             </div>
 
-                            <div class="audit-tab-next"><button type="button" class="btn btn-outline" onclick="auditSwitchTab('app')">Next: App &amp; Sourcing Info →</button></div>
-                        </div>
-
-                        <div class="audit-panel" data-panel="app">
-                            <div id="auditFieldsApp" class="control-grid"><!-- built by renderAuditFields() --></div>
-                            <div class="audit-tab-next"><button type="button" class="btn btn-outline" onclick="auditSwitchTab('action')">Next: 🎯 Audition Action →</button></div>
-                        </div>
-
-                        <div class="audit-panel" data-panel="action">
-                            <div id="auditFieldsAction" class="control-grid"><!-- built by renderAuditFields() --></div>
-                            <div class="audit-tab-next"><button type="button" class="btn btn-outline" onclick="auditSwitchTab('notes')">Next: Notes &amp; Evidence →</button></div>
-                        </div>
-
-                        <div class="audit-panel" data-panel="notes">
-                            <div id="auditFieldsNotes" class="control-grid"><!-- built by renderAuditFields() --></div>
+                            <div class="card" style="background:rgba(255,77,109,.03);">
+                                <h4 style="color:var(--accent-rose); margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                    🎯 Audition Action <span class="audit-card-dot" id="auditDotAction"></span>
+                                </h4>
+                                <div id="auditFieldsAction" class="control-grid"><!-- built by renderAuditFields() --></div>
+                            </div>
                         </div>
 
                         <div id="auditReminders" class="audit-reminders" style="display:none;"></div>
@@ -2778,7 +2767,7 @@
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                 Secure Submit to Feishu
                             </button>
-                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Filed as Request Type "Agency Creation" (Create Way: Audit). Nothing here is hard-required -- the reminders above just flag what usually belongs on this kind of ticket. Submit works from any tab.</p>
+                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Filed as Request Type "Agency Creation" (Create Way: Audit). Nothing here is hard-required -- the reminders above just flag what usually belongs on this kind of ticket. Mentioned Group is set ~3s after the ticket is created, once everything else has settled.</p>
                         </div>
                     </form>
                 </div>
@@ -9840,6 +9829,9 @@ const REQ_FIELD_DEFS = {
     "Mentioned Group": { type: "select", options: ["South Asia Audition Group","PK-Mubeen Group","SA Agency CS & Audition group","VIP CS SA & Audition","South Asia - CS&Audition group","PK-Usama-Audition group","PK-Zohaib-Audition group","PK-Farooq-Audition group","PK-Hasseb-Audition group","PK-Enzo-Audition group","PK-Cruz-Audition group","PK-Ehtisham-Audition group","IN-Holy&Ritu-Audition group","IN-Vihan-Audition group","IN-Rudra-Audition group","IN-Ansh-Audition group","IN-Ravikant-Audition group","PK-Sehar-Audition group","usless","PK-Hamza-Audition group","PK-Nabeel-Audition group"], req: false },
     "Done by": { type: "user", req: false },
     "Audition note": { type: "textarea", req: false },
+    // MultiSelect in Feishu (checkbox list here, same .msel-toggle look Ticket
+    // Workspace uses) -- options match the sheet's own list exactly.
+    "Reject Reason": { type: "multiselect", options: ["Duplicate Device Authentication detected (System)","Duplicate Device Authentication detected (Sheet)","Duplicate NID (First time)","Duplicate NID (Multiple time)","Mico user ","Old agency manger (Duplicated Hosting)","Fake NID","Fake otherapp","Out of the ragion","duplicate other app info","Underage","Host account or BD","Old account","Applied as walkin","Applied with diffrenet information","Duplicated, already opened","Missing Information","Wrong Xena ID","wealth level >= 40","Applied under another acm or bd","Duplicated agency name"], req: false },
     "Closing Reason": { type: "select", options: ["User Request","Duplicated Hosting","Acm Request","Opened by mistake"], req: true },
     "Old ID": { type: "text", req: true },
     "Reporter ID": { type: "text", req: true },
@@ -10340,54 +10332,58 @@ const AUDIT_BRANCH = 'Agency Creation';
 // A dedicated copy of the Agency Creation field list -- NOT the shared
 // REQ_BRANCHES['Agency Creation'] array -- so everything specific to the
 // Audit tab (Agency Code, Parent Agency Code, Status, Mentioned Group, Done
-// by, Mentioned Person, Audition note, and the reminders logic below) stays
-// isolated here and never changes what New Request's own Agency Creation
-// form shows or requires. Nothing in this tab is hard-required (see
-// auditComputeReminders()); every field is built with req=false regardless
-// of what REQ_FIELD_DEFS itself says, and every field is always shown -- no
-// hide/show toggling. Each field also maps to which of the tab's four cards
-// it renders into.
+// by, Mentioned Person, Audition note, Reject Reason, and the reminders
+// logic below) stays isolated here and never changes what New Request's own
+// Agency Creation form shows or requires. Nothing in this tab is hard-
+// required (see auditComputeReminders()); every field is built with
+// req=false regardless of what REQ_FIELD_DEFS itself says, and every field
+// is always shown -- no hide/show toggling. Only two groups now: "Main
+// Info" (everything about the agency/applier/app/evidence) and "Audition
+// Action" (the review outcome -- Status/Mentioned Person/Done by/Mentioned
+// Group/Audition note/Reject Reason, ending with Agency Code + Parent
+// Agency Code).
 const AUDIT_FIELD_GROUPS = {
-    'Region':               'auditFieldsIdentity',
-    'User ID':              'auditFieldsIdentity',
-    'Agency Code':          'auditFieldsIdentity',
-    'Agency Name':          'auditFieldsIdentity',
-    'Applier real name':    'auditFieldsIdentity',
-    'Otherapp Name':        'auditFieldsApp',
-    'Otherapp ID':          'auditFieldsApp',
-    'Country':              'auditFieldsApp',
-    'Whatsapp Number':      'auditFieldsApp',
-    'NID Number':           'auditFieldsApp',
-    'Agency Type':          'auditFieldsApp',
-    'Bd Code':              'auditFieldsApp',
-    'Parenet sub agency':   'auditFieldsApp',
-    [ACM_AUTO]:             'auditFieldsApp',
-    'Mentioned Person':     'auditFieldsAction',
+    'Region':               'auditFieldsMain',
+    'User ID':              'auditFieldsMain',
+    'Agency Name':          'auditFieldsMain',
+    'Applier real name':    'auditFieldsMain',
+    'Otherapp Name':        'auditFieldsMain',
+    'Otherapp ID':          'auditFieldsMain',
+    'Country':              'auditFieldsMain',
+    'Whatsapp Number':      'auditFieldsMain',
+    'NID Number':           'auditFieldsMain',
+    'Agency Type':          'auditFieldsMain',
+    'Bd Code':              'auditFieldsMain',
+    [ACM_AUTO]:             'auditFieldsMain',
+    'Applier Note':         'auditFieldsMain',
+    'NID & Otherapp Screen':'auditFieldsMain',
     'Status':               'auditFieldsAction',
-    'Mentioned Group':      'auditFieldsAction',
+    'Mentioned Person':     'auditFieldsAction',
     'Done by':              'auditFieldsAction',
+    'Mentioned Group':      'auditFieldsAction',
     'Audition note':        'auditFieldsAction',
-    'Applier Note':         'auditFieldsNotes',
-    'NID & Otherapp Screen':'auditFieldsNotes',
+    'Reject Reason':        'auditFieldsAction',
+    'Agency Code':          'auditFieldsAction',
+    'Parenet sub agency':   'auditFieldsAction',
 };
 const AUDIT_FIELDS = Object.keys(AUDIT_FIELD_GROUPS);
-// One card-completion dot per card -- lit up green the moment any field in
-// that card has a value, so the agent can see progress without opening
-// every section.
-const AUDIT_CARD_DOTS = { auditFieldsIdentity: 'auditDotIdentity', auditFieldsApp: 'auditDotApp', auditFieldsAction: 'auditDotAction', auditFieldsNotes: 'auditDotNotes' };
+// One completion dot per section -- lit up green the moment any field inside
+// has a value, so the agent can see progress at a glance.
+const AUDIT_CARD_DOTS = { auditFieldsMain: 'auditDotMain', auditFieldsAction: 'auditDotAction' };
 
-// Switches which of the 4 steps is visible -- only one panel's fields are ever
-// on screen at once, so the page height stays constant instead of growing
-// into one long scroll of four stacked cards. Values in every other panel
-// are untouched while hidden (just display:none, not removed), and Submit
-// sits below the tab strip so it's reachable from any step without hunting.
-function auditSwitchTab(tab) {
-    document.querySelectorAll('.audit-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-    document.querySelectorAll('.audit-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === tab));
-}
+// The 3 fixed people "Done by" quick-picks resolve to, by email -- looked up
+// once via /api/members/search (by name, since that's what Feishu's search
+// API actually matches against) and cached here so repeat clicks don't
+// re-search. { name: {open_id, name} | null }
+const AUDIT_DONE_BY_PEOPLE = [
+    { name: 'Ahmed Samurai', email: 'saleh@micous.com' },
+    { name: 'Noora', email: 'noora@micous.com' },
+    { name: 'Mano', email: 'abdelrahmanhassan@micous.com' },
+];
+let auditDoneByCache = {};
 
 function renderAuditFields() {
-    const container = document.getElementById('auditFieldsIdentity');
+    const container = document.getElementById('auditFieldsMain');
     if (!container || container.dataset.built) return; // build once, like initReqFormOptions()
     container.dataset.built = '1';
 
@@ -10408,21 +10404,32 @@ function renderAuditFields() {
         const el = buildFieldControl(fName, def, false, 'audfld_');
         if (fName === 'Parenet sub agency') {
             // The sheet's own field name is a typo carried over from Feishu --
-            // relabel it plainly. Always shown now (see auditComputeReminders()
-            // for the Walkin-sub-agency reminder instead of hiding it).
+            // relabel it plainly.
             const lbl = el.querySelector('label');
             if (lbl) lbl.innerHTML = lbl.innerHTML.replace('Parenet sub agency', 'Parent Agency Code');
+        }
+        if (fName === 'Audition note' || fName === 'Reject Reason') {
+            // Long/tall controls (textarea, scrollable checkbox list) look
+            // cramped squeezed into one grid column -- give them the full
+            // card width instead.
+            el.style.gridColumn = '1 / -1';
         }
         target.appendChild(el);
         if (fName === 'Region') {
             el.querySelector('select').addEventListener('change', () => refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false));
         }
+        if (fName === 'Status') {
+            auditRenderPickButtons(el, 'audfld_Status');
+        }
+        if (fName === 'Done by') {
+            auditRenderDoneByPicker(el);
+        }
     });
 
     refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
 
-    // One delegated listener covers every field in every card, present or
-    // future -- keeps the reminders panel and the card dots live as the
+    // One delegated listener covers every field in every section, present or
+    // future -- keeps the reminders panel and the section dots live as the
     // agent types, without wiring a handler onto each control individually.
     const form = document.getElementById('auditRequestForm');
     if (form) {
@@ -10432,10 +10439,93 @@ function renderAuditFields() {
     auditUpdateReminders();
 }
 
+// Turns the "Status" <select> (Done / Rejected / Under Investigation) into
+// three color-coded buttons, one tap instead of opening a dropdown -- the
+// real <select> stays in the DOM, just visually hidden, so submitAuditForm()
+// reads its .value exactly as if nothing changed.
+function auditRenderPickButtons(wrap, selectId) {
+    const select = document.getElementById(selectId) || wrap.querySelector('select');
+    if (!select) return;
+    select.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = 'audit-pick-row';
+    row.innerHTML = Array.from(select.options)
+        .filter(o => o.value)
+        .map(o => `<button type="button" class="audit-pick-btn" data-val="${escHtml(o.value)}">${escHtml(o.textContent.trim())}</button>`)
+        .join('');
+    wrap.appendChild(row);
+    row.querySelectorAll('.audit-pick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            select.value = btn.dataset.val;
+            row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
+            auditUpdateReminders();
+        });
+    });
+}
 
-// Lights up a card's little dot the moment any field inside it has a value
-// -- a quick glance tells the agent which cards still need attention without
-// opening every <details>.
+// "Done by" quick-pick: the same one-tap idea as Status, but for 3 specific
+// people instead of a fixed list of words. Feishu's User-type field needs a
+// real open_id, not just a name/email string, so the first tap on each
+// button resolves it via /api/members/search (by name) and caches the
+// result; the button then behaves exactly like twPickMember() would --
+// storing [{"id": open_id}] on this control-group's dataset.
+function auditRenderDoneByPicker(wrap) {
+    // buildFieldControl() built the generic open-ended member-search picker
+    // for this field first -- replace it wholesale with just a label + the
+    // quick-pick buttons below.
+    wrap.innerHTML = '<label style="font-size:0.8rem;">Done by</label>';
+    wrap.dataset.userField = 'Done by';
+    wrap.dataset.userSelected = '';
+    const row = document.createElement('div');
+    row.className = 'audit-pick-row';
+    row.innerHTML = AUDIT_DONE_BY_PEOPLE.map(p => `<button type="button" class="audit-pick-btn" data-person="${escHtml(p.name)}">${escHtml(p.name)}</button>`).join('');
+    wrap.appendChild(row);
+
+    row.querySelectorAll('.audit-pick-btn').forEach((btn, idx) => {
+        btn.addEventListener('click', async () => {
+            const person = AUDIT_DONE_BY_PEOPLE[idx];
+            row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
+
+            if (auditDoneByCache[person.name]) {
+                wrap.dataset.userSelected = JSON.stringify([{ id: auditDoneByCache[person.name].open_id }]);
+                return;
+            }
+            btn.disabled = true;
+            const origText = btn.textContent;
+            btn.textContent = '⏳ ' + person.name;
+            try {
+                const res = await fetch(`/api/members/search?q=${encodeURIComponent(person.name)}&uat=${encodeURIComponent(loggedUat)}`);
+                const data = await res.json();
+                const results = data.success ? (data.results || []) : [];
+                const want = person.name.toLowerCase();
+                // Exact display-name match first, then a name that starts with it
+                // ("Noora" -> "Noora Ahmed") -- never just "whatever came back
+                // first", since tagging the wrong person as Done by is worse than
+                // asking the agent to pick manually.
+                const match = results.find(m => (m.name || '').trim().toLowerCase() === want)
+                    || results.find(m => (m.name || '').trim().toLowerCase().startsWith(want))
+                    || null;
+                if (match) {
+                    auditDoneByCache[person.name] = match;
+                    wrap.dataset.userSelected = JSON.stringify([{ id: match.open_id }]);
+                } else {
+                    ToastManager.show(`Couldn't find "${person.name}" in Feishu -- pick manually if this keeps happening.`, 'warning', 6000);
+                    btn.classList.remove('active');
+                }
+            } catch (e) {
+                ToastManager.show('Member lookup failed: ' + e.message, 'error', 6000);
+                btn.classList.remove('active');
+            }
+            btn.disabled = false;
+            btn.textContent = origText;
+        });
+    });
+}
+
+
+// Lights up a section's little dot the moment any field inside it has a
+// value -- a quick glance tells the agent which section still needs
+// attention.
 function auditUpdateCardDots() {
     Object.entries(AUDIT_CARD_DOTS).forEach(([containerId, dotId]) => {
         const container = document.getElementById(containerId);
@@ -10643,14 +10733,26 @@ async function submitAuditForm(e) {
     try {
         const payloadFields = { "Request Type": AUDIT_BRANCH, "Create Way": "Audit (with all info)" };
 
+        // "Mentioned Group" is deliberately NOT part of the initial create call
+        // -- it's held back here and set as a separate follow-up update ~3s
+        // after the ticket exists (see the setTimeout below), so whatever
+        // fires off the @mention lands once the rest of the ticket's data has
+        // settled instead of racing it.
+        let mentionedGroup = '';
         form.querySelectorAll('input[type="text"], select, textarea').forEach(el => {
             if (!el.name) return;
+            if (el.name === 'Mentioned Group') { mentionedGroup = el.value; return; }
             if (el.value) payloadFields[el.name] = el.value;
         });
 
-        // Mentioned Person (Feishu User-type field) doesn't live in a plain
-        // input/select -- twRenderMemberPicker stores the real
-        // [{"id": open_id}] payload on the picker's own wrapper instead.
+        // MultiSelect checkbox lists (Reject Reason) -- same collection New
+        // Request uses: every checked box sharing this field's name.
+        const rejectChecked = Array.from(form.querySelectorAll('input[type="checkbox"][name="Reject Reason"]:checked')).map(c => c.value);
+        if (rejectChecked.length) payloadFields['Reject Reason'] = rejectChecked;
+
+        // Mentioned Person / Done by (Feishu User-type fields) don't live in a
+        // plain input/select -- the member picker / quick-pick buttons store
+        // the real [{"id": open_id}] payload on their own wrapper instead.
         form.querySelectorAll('[data-user-field]').forEach(wrap => {
             const key = wrap.dataset.userField;
             const sel = wrap.dataset.userSelected;
@@ -10693,15 +10795,43 @@ async function submitAuditForm(e) {
             ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
         }
 
+        // Set Mentioned Group ~3s after the ticket exists, via the same
+        // /api/requests/update endpoint Ticket Workspace saves through.
+        if (mentionedGroup) {
+            const newRecordId = data.record_id;
+            if (!newRecordId) {
+                ToastManager.show('Ticket created, but its record id wasn\'t returned -- set Mentioned Group manually in Ticket Workspace.', 'warning', 10000);
+            } else {
+                setTimeout(async () => {
+                    try {
+                        const fd = new FormData();
+                        fd.append('user', loggedUser);
+                        fd.append('record_id', newRecordId);
+                        fd.append('fields', JSON.stringify({ 'Mentioned Group': mentionedGroup }));
+                        const upRes = await fetch('/api/requests/update', { method: 'POST', body: fd });
+                        const upData = await upRes.json();
+                        if (!upData.success) throw new Error(upData.error || 'update failed');
+                        ToastManager.show('Mentioned Group set.', 'success', 3000);
+                    } catch (err) {
+                        ToastManager.show(`Ticket was created, but Mentioned Group couldn't be set (${err.message}) -- set it manually in Ticket Workspace.`, 'warning', 10000);
+                    }
+                }, 3000);
+            }
+        }
+
         form.reset();
         document.getElementById('audRawText').value = '';
         form.querySelectorAll('.reqfld-autofilled').forEach(el => el.classList.remove('reqfld-autofilled'));
-        // form.reset() only touches native input/select elements -- the member
-        // pickers' chips and dataset.userSelected need clearing by hand.
+        // form.reset() only touches native input/select/checkbox elements --
+        // the custom visual state on top of them needs clearing by hand:
+        // the member picker's chip/dataset, the Status + Done by quick-pick
+        // buttons' "active" highlight, and the Reject Reason toggles.
         const mpWrap = form.querySelector('[data-user-field="Mentioned Person"]');
         if (mpWrap) twRenderMemberPicker(mpWrap, '<label style="font-size:0.8rem;">Mentioned Person</label>', 'Mentioned Person', []);
         const dbWrap = form.querySelector('[data-user-field="Done by"]');
-        if (dbWrap) twRenderMemberPicker(dbWrap, '<label style="font-size:0.8rem;">Done by</label>', 'Done by', []);
+        if (dbWrap) dbWrap.dataset.userSelected = '';
+        form.querySelectorAll('.audit-pick-btn.active').forEach(b => b.classList.remove('active'));
+        form.querySelectorAll('.msel-toggle.active').forEach(l => l.classList.remove('active'));
         const dupResults = document.getElementById('auditDupResults');
         const dupSummary = document.getElementById('auditDupSummary');
         const dupReveal = document.getElementById('auditDupReveal');
