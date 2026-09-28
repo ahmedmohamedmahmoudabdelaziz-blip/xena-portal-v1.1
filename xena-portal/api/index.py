@@ -3046,7 +3046,13 @@ def submit_request():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
     audit.log(user, "SUBMIT_NEW_REQUEST", f"Type: {req_type} | Code: {final_fields.get('Agency Code', 'N/A')} | created_via: {created_via}", ip=ip, severity="Info")
 
-    return jsonify({"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via})
+    # record_id is returned so the frontend can do a deliberate delayed
+    # follow-up PATCH via /api/requests/update -- see the Audit tab's
+    # submitAuditForm(), which deliberately submits everything except
+    # "Mentioned Group" up front, then sets that one field ~3s later so the
+    # @mention notification fires once the ticket's other data has settled.
+    new_record_id = (data.get("data") or {}).get("record", {}).get("record_id")
+    return jsonify({"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via, "record_id": new_record_id})
 
 @app.route('/api/points/records', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
