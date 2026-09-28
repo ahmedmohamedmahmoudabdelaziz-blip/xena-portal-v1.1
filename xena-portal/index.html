@@ -237,6 +237,81 @@
         .audit-dup-reveal { margin-top: 10px; }
         @keyframes auditCardIn { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .qy-grid .qy-card { animation: auditCardIn .25s ease backwards; }
+
+        /* ═══ Audit Workstation (one-screen layout) ═══
+           Left = ticket text (always visible), middle = agency data, right =
+           the decision, bottom bar = duplicate radar + live reminders +
+           Submit. The grid fills exactly the visible page area so nothing
+           important ever scrolls out of view. */
+        #pg-audit { height: 100%; min-height: 520px; }
+        .aws { display: flex; flex-direction: column; height: 100%; gap: 14px; }
+        .aws-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr 350px; gap: 14px; }
+        .aws-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; min-height: 0; overflow: hidden; box-shadow: var(--shadow); }
+        .aws-left { border-top: 3px solid var(--accent-cyan); }
+        .aws-mid { border-top: 3px solid var(--accent-purple); }
+        .aws-right { border-top: 3px solid var(--accent-rose); }
+        .aws-panel-head { display: flex; justify-content: space-between; align-items: center; padding: 13px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: rgba(255,255,255,.015); }
+        .aws-panel-title { font-weight: 700; font-size: .95rem; display: flex; align-items: center; gap: 8px; }
+        .aws-parse-btn { background: rgba(0,212,255,.1); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,.3); border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: .8rem; cursor: pointer; transition: all .2s; white-space: nowrap; }
+        .aws-parse-btn:hover { background: rgba(0,212,255,.2); transform: translateY(-1px); }
+        .aws-rawtext { flex: 1; min-height: 0; resize: none; border: none; background: rgba(0,0,0,.22); color: var(--text); padding: 16px 18px; font-family: inherit; font-size: .9rem; line-height: 1.75; outline: none; transition: background .2s; }
+        .aws-rawtext:focus { background: rgba(0,212,255,.035); }
+        .aws-rawtext::placeholder { color: var(--text-muted); opacity: .75; }
+        .aws-left-foot { padding: 10px 18px; font-size: .74rem; color: var(--text-muted); border-top: 1px dashed var(--border); flex-shrink: 0; }
+        .aws-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
+        .aws-fields { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-bottom: 0; }
+        .aws-fields-1col { grid-template-columns: 1fr; }
+        .aws-bottom { flex-shrink: 0; display: grid; grid-template-columns: minmax(300px,1.15fr) minmax(200px,1fr) auto; gap: 16px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; box-shadow: var(--shadow); }
+        .aws-radar { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .aws-radar-btn { position: relative; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--accent-amber); background: rgba(255,184,0,.08); font-size: 1.15rem; cursor: pointer; flex-shrink: 0; transition: all .2s; display: flex; align-items: center; justify-content: center; }
+        .aws-radar-btn:hover { background: rgba(255,184,0,.18); transform: scale(1.06); }
+        .aws-radar-btn.scanning { animation: awsRadarPulse 1.1s ease-in-out infinite; }
+        @keyframes awsRadarPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,184,0,.45); } 50% { box-shadow: 0 0 0 11px rgba(255,184,0,0); } }
+        .aws-radar-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--accent-amber); white-space: nowrap; }
+        .aws-radar-hint { color: var(--text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 6px; font-size: .7rem; }
+        .aws-radar-summary { font-size: .82rem; color: var(--text-muted); margin-top: 2px; }
+        .aws-reminders { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; align-content: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); padding: 4px 16px; min-width: 0; max-height: 92px; overflow-y: auto; }
+        .aws-rem-title { color: var(--accent-amber); font-weight: 700; font-size: .78rem; white-space: nowrap; }
+        .aws-rem-chip { background: rgba(255,184,0,.08); border: 1px solid rgba(255,184,0,.3); color: var(--text); font-size: .74rem; padding: 4px 10px; border-radius: 20px; }
+        .aws-rem-ok { color: var(--accent-green); font-weight: 600; font-size: .84rem; display: flex; align-items: center; gap: 6px; }
+        .aws-submit { width: auto; padding: 12px 36px; font-size: 1.02rem; flex-direction: column; gap: 1px; line-height: 1.25; }
+        .aws-submit-hint { font-size: .66rem; opacity: .65; font-weight: 500; letter-spacing: .3px; }
+        .aws-dup-drawer { display: none; position: fixed; left: 264px; right: 24px; bottom: 100px; max-height: 56vh; background: var(--surface); border: 1px solid var(--accent-amber); border-radius: var(--radius); box-shadow: 0 -14px 55px rgba(0,0,0,.55); z-index: 300; flex-direction: column; overflow: hidden; }
+        .aws-dup-drawer.open { display: flex; animation: awsDrawerIn .25s ease; }
+        @keyframes awsDrawerIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        .aws-dup-drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--accent-amber); flex-shrink: 0; }
+        .aws-dup-close { background: none; border: none; color: var(--text-muted); font-size: 1.35rem; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+        .aws-dup-close:hover { color: var(--accent-rose); background: rgba(255,77,109,.1); }
+        .aws-dup-results { padding: 16px; overflow-y: auto; }
+        @media (max-width: 1280px) { .aws-grid { grid-template-columns: 290px 1fr 320px; } }
+        @media (max-width: 1024px) {
+            #pg-audit { height: auto; }
+            .aws-grid { grid-template-columns: 1fr; overflow-y: auto; }
+            .aws-panel { min-height: 280px; }
+            .aws-left { min-height: 320px; }
+            .aws-bottom { grid-template-columns: 1fr; }
+            .aws-reminders { border: none; padding: 4px 0; max-height: none; }
+            .aws-submit { width: 100%; }
+            .aws-dup-drawer { left: 24px; bottom: 24px; }
+        }
+
+        /* ═══ Access Management (Manage Agents) polish ═══
+           Module cards become a responsive grid of collapsible panels, each
+           with a live "granted n/total" badge; the Save button rides a sticky
+           bar at the bottom so it's never a long scroll away. */
+        .admin-modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 14px; align-items: start; }
+        #pg-admin-agents .module-card .module-header { cursor: pointer; user-select: none; margin-bottom: 0; border-bottom: 1px solid transparent; padding-bottom: 0; transition: padding .2s, margin .2s, border-color .2s; }
+        #pg-admin-agents .module-card:not(.collapsed) .module-header { margin-bottom: 12px; border-bottom-color: var(--border); padding-bottom: 12px; }
+        #pg-admin-agents .module-card.collapsed > *:not(.module-header) { display: none; }
+        .mod-head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .mod-count { font-size: .68rem; font-weight: 700; padding: 2px 9px; border-radius: 12px; background: rgba(255,255,255,.06); color: var(--text-muted); border: 1px solid var(--border); transition: all .2s; }
+        .mod-count.on { background: rgba(0,230,118,.12); color: var(--accent-green); border-color: rgba(0,230,118,.35); }
+        .mod-collapse-arr { color: var(--text-muted); font-size: .72rem; transition: transform .25s; }
+        #pg-admin-agents .module-card:not(.collapsed) .mod-collapse-arr { transform: rotate(90deg); }
+        .admin-save-bar { position: sticky; bottom: 12px; z-index: 50; margin-top: 8px; }
+        .admin-save-bar .btn { box-shadow: 0 10px 32px rgba(0,212,255,.28); }
+        .admin-agent-search { width: 100%; max-width: 360px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,.2); color: var(--text); font-size: .88rem; margin-bottom: 12px; outline: none; transition: border-color .2s; font-family: inherit; }
+        .admin-agent-search:focus { border-color: var(--accent-cyan); }
         .qy-grid .qy-card:nth-child(2) { animation-delay: .04s; }
         .qy-grid .qy-card:nth-child(3) { animation-delay: .08s; }
         .qy-grid .qy-card:nth-child(4) { animation-delay: .12s; }
@@ -1730,6 +1805,8 @@
                             </div>
                             <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
                         </div>
+                        <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
+                        <div class="admin-modules-grid">
                         <div class="module-card">
                             <div class="module-header">
                                 <h4>🎯 Target Module</h4>
@@ -1810,7 +1887,7 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_agency_list" checked> Agency List</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_agency_list" checked> ACM Management — Agency List</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
@@ -1823,6 +1900,7 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_new_request" checked> New Request</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_audit" checked> ⚡ Audit Workstation</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_my_requests" checked> My Recent Requests</label>
                             </div>
                         </div>
@@ -1842,7 +1920,10 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_export_data" checked> Allow Data Export (CSV / Excel)</label>
                             </div>
                         </div>
-                        <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;margin-top:8px;font-size:1.05rem">+ Save Agent Configuration</button>
+                        </div>
+                        <div class="admin-save-bar">
+                            <button class="btn btn-primary" id="adminBtnSubmit" onclick="addAgent()" style="padding:14px;font-size:1.05rem;width:100%">+ Save Agent Configuration</button>
+                        </div>
                     </div>
 
                     <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">🏷️ Saved Roles</h3>
@@ -2716,61 +2797,73 @@
             </div>
 
             <div id="pg-audit" style="display:none">
-                <div class="form-card">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; justify-content:center; gap:10px; font-size:1.5rem; border-bottom:1px solid rgba(0,212,255,0.1); padding-bottom:20px;">
-                        <div style="background:rgba(0,212,255,0.1); padding:8px; border-radius:10px;">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-                        </div>
-                        <span data-i18n="auditQuickCreate">Audit</span>
-                    </h3>
+                <!-- Audit Workstation: one screen, three panels + bottom bar.
+                     Left = the raw ticket text (stays visible while you work),
+                     middle = the agency data, right = the decision,
+                     bottom = duplicate radar + live reminders + Submit. -->
+                <form id="auditRequestForm" class="aws" onsubmit="submitAuditForm(event)">
+                    <div class="aws-grid">
+                        <section class="aws-panel aws-left">
+                            <div class="aws-panel-head">
+                                <span class="aws-panel-title">📋 Ticket Text</span>
+                                <button type="button" class="aws-parse-btn" onclick="auditParseText()">✨ Parse &amp; Fill</button>
+                            </div>
+                            <textarea id="audRawText" class="aws-rawtext" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)"></textarea>
+                            <div class="aws-left-foot">Auto-parses the moment you paste · the ticket stays in view while you work</div>
+                        </section>
 
-                    <div class="control-group" style="margin-bottom:24px;">
-                        <label style="font-size:0.85rem;">📋 Paste Ticket Text</label>
-                        <textarea id="audRawText" rows="6" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)" class="form-highlight-input" style="font-family:inherit;resize:vertical;width:100%;box-sizing:border-box;"></textarea>
-                        <button type="button" class="btn btn-outline" style="margin-top:10px;" onclick="auditParseText()">✨ Parse &amp; Auto-Fill Fields</button>
+                        <section class="aws-panel aws-mid">
+                            <div class="aws-panel-head">
+                                <span class="aws-panel-title"><span class="audit-card-dot" id="auditDotMain"></span> 🗂️ Agency Data</span>
+                                <span style="font-size:.72rem;color:var(--text-muted)">auto-filled from the text — review &amp; complete</span>
+                            </div>
+                            <div class="aws-scroll">
+                                <div id="auditFieldsMain" class="control-grid aws-fields"><!-- built by renderAuditFields() --></div>
+                            </div>
+                        </section>
+
+                        <section class="aws-panel aws-right">
+                            <div class="aws-panel-head">
+                                <span class="aws-panel-title"><span class="audit-card-dot" id="auditDotAction"></span> 🎯 The Decision</span>
+                                <span style="font-size:.72rem;color:var(--text-muted)">one tap per field</span>
+                            </div>
+                            <div class="aws-scroll">
+                                <div id="auditFieldsAction" class="control-grid aws-fields aws-fields-1col"><!-- built by renderAuditFields() --></div>
+                            </div>
+                        </section>
                     </div>
 
-                    <form id="auditRequestForm" onsubmit="submitAuditForm(event)">
-                        <div class="card" style="margin-bottom:16px; background:rgba(0,212,255,.03);">
-                            <h4 style="color:var(--accent-cyan); margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                                <span class="audit-card-dot" id="auditDotMain"></span> Main Info
-                            </h4>
-                            <div id="auditFieldsMain" class="control-grid"><!-- built by renderAuditFields() --></div>
+                    <div id="auditDupDrawer" class="aws-dup-drawer">
+                        <div class="aws-dup-drawer-head">
+                            <span>⚠️ Possible duplicates — check these before filing</span>
+                            <button type="button" class="aws-dup-close" onclick="auditCloseDupDrawer()" title="Close">×</button>
                         </div>
+                        <div id="auditDupResults" class="qy-grid aws-dup-results"></div>
+                    </div>
 
-                        <div class="audit-sections-row" style="margin-bottom:16px;">
-                            <div class="card" style="background:rgba(255,184,0,.03);">
-                                <h4 style="color:var(--accent-amber); margin-bottom:16px;">🔍 Check Duplicate</h4>
-                                <button type="button" id="btnAuditCheckDup" class="btn btn-outline" style="border-color:var(--accent-amber); color:var(--accent-amber);" onclick="auditCheckDuplicates()">
-                                    🔍 Check Duplicate
-                                </button>
-                                <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Matches whichever of User ID / Otherapp ID / NID Number you've filled in above, against every request ever submitted.</div>
-                                <div id="auditDupSummary" style="margin-top:14px; font-size:.9rem;"></div>
-                                <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;">
+                    <div class="aws-bottom">
+                        <div class="aws-radar">
+                            <button type="button" id="btnAuditCheckDup" class="aws-radar-btn" onclick="auditCheckDuplicates()" title="Check for duplicates now">📡</button>
+                            <div style="min-width:0">
+                                <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
+                                <div id="auditDupSummary" class="aws-radar-summary">Scans automatically as you fill IDs in.</div>
+                                <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
                                     <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
                                 </div>
-                                <div id="auditDupResults" class="qy-grid" style="margin-top:14px;"></div>
-                            </div>
-
-                            <div class="card" style="background:rgba(255,77,109,.03);">
-                                <h4 style="color:var(--accent-rose); margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                                    🎯 Audition Action <span class="audit-card-dot" id="auditDotAction"></span>
-                                </h4>
-                                <div id="auditFieldsAction" class="control-grid"><!-- built by renderAuditFields() --></div>
                             </div>
                         </div>
-
-                        <div id="auditReminders" class="audit-reminders" style="display:none;"></div>
-
-                        <div style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
-                            <button type="submit" class="btn btn-primary" id="btnSubmitAudit" style="padding:16px; font-size:1.1rem; width:100%; max-width:400px; margin:0 auto;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                                Secure Submit to Feishu
+                        <div id="auditReminders" class="aws-reminders"></div>
+                        <div>
+                            <button type="submit" class="btn btn-primary aws-submit" id="btnSubmitAudit">
+                                <span style="display:flex;align-items:center;gap:8px">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    Secure Submit to Feishu
+                                </span>
+                                <span class="aws-submit-hint">Ctrl + Enter</span>
                             </button>
-                            <p style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:16px;">Filed as Request Type "Agency Creation" (Create Way: Audit). Nothing here is hard-required -- the reminders above just flag what usually belongs on this kind of ticket. Mentioned Group is set ~3s after the ticket is created, once everything else has settled.</p>
                         </div>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
 
         </div> 
@@ -3066,6 +3159,7 @@ function executePageLogic(page) {
         document.getElementById('pg-admin-agents').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
         fetchAdminUsers();
+        initAdminModulesUI();
     } else if(page==='admin-requests'){
         document.getElementById('pg-admin-requests').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
@@ -5154,7 +5248,7 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(key => {
+     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue'].forEach(key => {
         const master = key.split('_')[0];
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
@@ -5176,6 +5270,7 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     pQueryReg.setValues(parseGranular(regRaw,'query'));
     pExchangeAcm.setValues(parseGranular(acmsRaw,'exchange'));
     pExchangeReg.setValues(parseGranular(regRaw,'exchange'));
+    adminRefreshModuleCounts();
 }
 
 function editAgent(email,modulesStr,acmsRaw,regRaw) {
@@ -5325,6 +5420,7 @@ function resetAgentForm() {
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
+    adminRefreshModuleCounts();
 }
 
 function openSaveRoleModal() {
@@ -5372,7 +5468,7 @@ async function confirmSaveRole() {
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
+     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue'].forEach(m => {
         const cb = document.getElementById(`mod_${m}`);
         if(cb && cb.checked) modules.push(m);
     });
@@ -5406,6 +5502,58 @@ async function confirmSaveRole() {
     } catch(e) { ToastManager.show('Error: '+e.message,'error'); }
 }
 
+// Manage Agents polish: every module card becomes collapsible (click its
+// header) and carries a live "granted n/total" badge. Runs once per session;
+// the badges re-sync through a single delegated change listener, plus an
+// explicit refresh wherever checkboxes get set programmatically.
+let adminModulesUIInit = false;
+function initAdminModulesUI() {
+    if (adminModulesUIInit) return;
+    const page = document.getElementById('pg-admin-agents');
+    if (!page) return;
+    adminModulesUIInit = true;
+    page.querySelectorAll('.module-card').forEach(card => {
+        const header = card.querySelector('.module-header');
+        if (!header) return;
+        const right = document.createElement('span');
+        right.className = 'mod-head-right';
+        right.innerHTML = '<span class="mod-count">0/0</span><span class="mod-collapse-arr">▶</span>';
+        header.appendChild(right);
+        header.addEventListener('click', e => {
+            if (e.target.closest('input,select,textarea,button,a,label')) return;
+            card.classList.toggle('collapsed');
+        });
+    });
+    page.addEventListener('change', e => {
+        if (e.target.matches('.module-card input[type="checkbox"]')) adminRefreshModuleCounts();
+    });
+    adminRefreshModuleCounts();
+}
+
+function adminRefreshModuleCounts() {
+    document.querySelectorAll('#pg-admin-agents .module-card').forEach(card => {
+        const badge = card.querySelector('.mod-count');
+        const cbs = card.querySelectorAll('.sub-opts input[type="checkbox"]');
+        if (!badge) return;
+        if (!cbs.length) { badge.style.display = 'none'; return; }
+        const on = Array.from(cbs).filter(c => c.checked).length;
+        badge.textContent = `${on}/${cbs.length}`;
+        badge.classList.toggle('on', on > 0);
+    });
+}
+
+// The module filter above the grid: narrows cards by any text they contain
+// ("query", "audit", "points"…), re-expanding matches so the toggle being
+// looked for is actually visible.
+function filterAdminModuleCards(term) {
+    term = (term || '').trim().toLowerCase();
+    document.querySelectorAll('#pg-admin-agents .module-card').forEach(card => {
+        const match = !term || card.textContent.toLowerCase().includes(term);
+        card.style.display = match ? '' : 'none';
+        if (match && term) card.classList.remove('collapsed');
+    });
+}
+
 async function addAgent() {
     const rawIdentities=document.getElementById('newAgentEmail').value.trim();
     if (!rawIdentities) { ToastManager.show('Please enter at least one Agent Identity.','warning'); return; }
@@ -5426,7 +5574,7 @@ async function addAgent() {
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_my_requests','tickets_live_queue'].forEach(m => {
+     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue'].forEach(m => {
         const cb = document.getElementById(`mod_${m}`);
         if(cb && cb.checked) modules.push(m);
     });
@@ -7615,6 +7763,31 @@ function hasExactMod(m) { return isAdmin || userModules.includes(m); }
 function hasTargetAnalyticsAccess() { return hasExactMod('target_analytics') || hasMod('target') || isAdmin; }
 
 function configureSidebarAndCards() {
+    // Submit Request + Universal Query groups: each nav item follows its own
+    // granular key from Manage Agents (submit_audit = the "⚡ Audit Workstation"
+    // toggle, query_agency_list = "ACM Management — Agency List"). The bare
+    // master keys ('submit' / 'query') and admin keep everything visible.
+    const hasSubmitMaster = isAdmin || userModules.includes('submit');
+    const hasQueryMaster = isAdmin || userModules.includes('query');
+
+    const navNewReq = document.getElementById('nav-new-request');
+    const navAudit = document.getElementById('nav-audit');
+    const navMyReq = document.getElementById('nav-my-requests');
+    if (navNewReq) navNewReq.style.display = (hasSubmitMaster || hasExactMod('submit_new_request')) ? '' : 'none';
+    if (navAudit) navAudit.style.display = (hasSubmitMaster || hasExactMod('submit_audit')) ? '' : 'none';
+    if (navMyReq) navMyReq.style.display = (hasSubmitMaster || hasExactMod('submit_my_requests')) ? '' : 'none';
+    const grpSubmit = document.getElementById('navGrpSubmit');
+    if (grpSubmit) grpSubmit.style.display = [navNewReq, navAudit, navMyReq].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    const navQuery = document.getElementById('nav-query');
+    const navAgencyList = document.getElementById('nav-agency-list');
+    if (navQuery) navQuery.style.display = (hasQueryMaster || hasExactMod('query_requests')) ? '' : 'none';
+    if (navAgencyList) navAgencyList.style.display = (hasQueryMaster || hasExactMod('query_agency_list')) ? '' : 'none';
+    const grpQuery = document.getElementById('navGrpQuery');
+    if (grpQuery) grpQuery.style.display = (navQuery && navQuery.style.display !== 'none') ? '' : 'none';
+    const grpAcm = document.getElementById('navGrpAcmMgmt');
+    if (grpAcm) grpAcm.style.display = (navAgencyList && navAgencyList.style.display !== 'none') ? '' : 'none';
+
     if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
     else {
         if (!hasExactMod('target_check') && !hasExactMod('target')) document.getElementById('nav-target').style.display = 'none';
@@ -7727,7 +7900,8 @@ function configureSidebarAndCards() {
         target: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
         query: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
         form: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
-        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`
+        admin: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+        audit: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>`
     };
 
     const wc = document.getElementById('welcomeCards');
@@ -7739,8 +7913,9 @@ function configureSidebarAndCards() {
     if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
     if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
     
-    wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
-    
+    if (hasSubmitMaster || hasExactMod('submit_new_request')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
+    if (hasSubmitMaster || hasExactMod('submit_audit')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('audit')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.audit}</div><div class="welcome-card-title" data-i18n="auditQuickCreate">Audit Workstation</div><div class="welcome-card-desc">One-screen audit — ticket text, agency data &amp; the decision</div></div>`;
+
     if (isAdmin) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('admin-agents')"><div class="welcome-card-icon" style="color:var(--text-muted)">${icons.admin}</div><div class="welcome-card-title" data-i18n="accessManagement">Access Management</div><div class="welcome-card-desc">Manage agent permissions &amp; modules</div></div>`;
 
     if (currentLang !== 'en') changeLanguage(currentLang);
@@ -10435,7 +10610,24 @@ function renderAuditFields() {
     if (form) {
         form.addEventListener('input', auditUpdateReminders);
         form.addEventListener('change', auditUpdateReminders);
+        // Duplicate Radar scans on its own: once edits settle for ~1.2s it
+        // re-checks whichever of User ID / Otherapp ID / NID is filled in.
+        form.addEventListener('input', auditScheduleDupCheck);
+        form.addEventListener('change', auditScheduleDupCheck);
+        // Ctrl/Cmd+Enter anywhere inside the workstation files the ticket.
+        form.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                form.requestSubmit();
+            }
+        });
     }
+
+    // Paste the ticket text and it parses itself a beat later -- no extra
+    // click on "Parse & Fill" needed (the button stays for manual re-runs).
+    const rawTa = document.getElementById('audRawText');
+    if (rawTa) rawTa.addEventListener('paste', () => setTimeout(auditParseText, 120));
+
     auditUpdateReminders();
 }
 
@@ -10578,15 +10770,14 @@ function auditUpdateReminders() {
     const panel = document.getElementById('auditReminders');
     if (!panel) return;
     const reminders = auditComputeReminders();
+    // The workstation's bottom bar keeps this panel always visible: an all-clear
+    // state when nothing is flagged, amber chips the moment something is.
     if (!reminders.length) {
-        panel.style.display = 'none';
+        panel.innerHTML = '<span class="aws-rem-ok">✅ Looks complete — good to file</span>';
         return;
     }
-    panel.style.display = 'block';
-    panel.innerHTML = `
-        <div class="audit-reminders-title">💡 Worth double-checking</div>
-        <ul>${reminders.map(r => `<li>${escHtml(r)}</li>`).join('')}</ul>
-    `;
+    panel.innerHTML = '<span class="aws-rem-title">💡 Double-check:</span>'
+        + reminders.map(r => `<span class="aws-rem-chip">${escHtml(r)}</span>`).join('');
 }
 
 
@@ -10836,9 +11027,10 @@ async function submitAuditForm(e) {
         const dupSummary = document.getElementById('auditDupSummary');
         const dupReveal = document.getElementById('auditDupReveal');
         if (dupResults) dupResults.innerHTML = '';
-        if (dupSummary) dupSummary.innerHTML = '';
+        if (dupSummary) dupSummary.innerHTML = 'Scans automatically as you fill IDs in.';
         if (dupReveal) dupReveal.style.display = 'none';
         auditDupMatches = [];
+        auditCloseDupDrawer();
         refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
         auditUpdateReminders();
 
@@ -10858,7 +11050,8 @@ async function submitAuditForm(e) {
 // ticket number, and tags each card with which field(s) matched.
 let auditDupMatches = []; // populated by auditCheckDuplicates(), rendered on demand by auditRevealDuplicates()
 
-async function auditCheckDuplicates() {
+async function auditCheckDuplicates(opts) {
+    const isAuto = !!(opts && opts.auto); // auto scans stay silent -- no toasts, no warnings
     // Kept to just these three for now, per Ahmed's call -- more fields can
     // be added to this list later if needed.
     const fieldsToCheck = [
@@ -10874,15 +11067,25 @@ async function auditCheckDuplicates() {
     const btn = document.getElementById('btnAuditCheckDup');
 
     if (!fieldsToCheck.length) {
+        if (isAuto) {
+            // Nothing to scan (or the agent just cleared the IDs) -- quietly
+            // reset the radar instead of nagging.
+            auditDupMatches = [];
+            if (summaryEl) summaryEl.innerHTML = 'Scans automatically as you fill IDs in.';
+            if (revealWrap) revealWrap.style.display = 'none';
+            auditCloseDupDrawer();
+            return;
+        }
         ToastManager.show('Fill in at least one of User ID, Otherapp ID, or NID Number first.', 'warning');
         return;
     }
 
     if (resultsEl) resultsEl.innerHTML = '';
     if (revealWrap) revealWrap.style.display = 'none';
+    auditCloseDupDrawer();
     auditDupMatches = [];
     if (summaryEl) summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
-    if (btn) btn.disabled = true;
+    if (btn) { btn.disabled = true; btn.classList.add('scanning'); }
 
     try {
         const responses = await Promise.all(fieldsToCheck.map(([field, value]) =>
@@ -10907,8 +11110,8 @@ async function auditCheckDuplicates() {
 
         if (!auditDupMatches.length) {
             if (summaryEl) summaryEl.innerHTML = `<span style="color:var(--accent-green);font-weight:600;">✅ No matching requests found${firstError ? ' (one of the searches had an issue -- see below)' : ''}.</span>`;
-            if (firstError) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
-            if (btn) btn.disabled = false;
+            if (firstError && !isAuto) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
+            if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
             return;
         }
 
@@ -10925,10 +11128,22 @@ async function auditCheckDuplicates() {
 
     } catch (e) {
         if (summaryEl) summaryEl.innerHTML = '';
-        ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
+        if (!isAuto) ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
     }
 
-    if (btn) btn.disabled = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
+}
+
+// Debounced auto-scan for the Duplicate Radar: fired from the form's
+// input/change listeners, waits until the agent pauses typing.
+let auditDupAutoTimer = null;
+function auditScheduleDupCheck() {
+    clearTimeout(auditDupAutoTimer);
+    auditDupAutoTimer = setTimeout(() => auditCheckDuplicates({ auto: true }), 1200);
+}
+
+function auditCloseDupDrawer() {
+    document.getElementById('auditDupDrawer')?.classList.remove('open');
 }
 
 // Renders whatever auditCheckDuplicates() found, the moment the agent
@@ -10965,7 +11180,9 @@ function auditRevealDuplicates() {
         </div>
     `).join('');
 
-    if (revealWrap) revealWrap.style.display = 'none';
+    // Open the drawer rather than hiding the reveal button, so the agent can
+    // close the matches and bring them back without re-running the scan.
+    document.getElementById('auditDupDrawer')?.classList.add('open');
 }
 
 if (loggedUser&&loggedUat) {
