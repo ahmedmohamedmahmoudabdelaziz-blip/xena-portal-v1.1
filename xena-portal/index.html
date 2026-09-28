@@ -339,6 +339,18 @@
         .control-group.aws-flag textarea { border-color: var(--accent-rose) !important; background: rgba(255,77,109,.07) !important; box-shadow: 0 0 10px rgba(255,77,109,.2); }
         .control-group.aws-flag .elegant-dropzone { border-color: var(--accent-rose) !important; background: rgba(255,77,109,.05); box-shadow: 0 0 10px rgba(255,77,109,.18); }
         .control-group.aws-flag .ss-display { border-color: var(--accent-rose) !important; background: rgba(255,77,109,.07) !important; box-shadow: 0 0 10px rgba(255,77,109,.2); }
+        /* The green "fixed it" paint must reach the visible box too, not just
+           the hidden native control: searchable selects paint their
+           .ss-display, dropzones paint the .elegant-dropzone shell. */
+        .ss-wrapper:has(> select.reqfld-autofilled) > .ss-display { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
+        .elegant-dropzone.reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.05) !important; }
+        /* Reject Reason's own section, sitting in the middle panel's spare
+           space so the Decision panel fits whole with no scrolling. */
+        .aws-rr-section { margin-top: 20px; padding-top: 14px; border-top: 1px dashed var(--border); }
+        .aws-rr-head { font-size: .85rem; font-weight: 700; color: var(--accent-rose); margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .aws-rr-head .aws-rr-hint { font-size: .68rem; color: var(--text-muted); font-weight: 400; }
+        #auditFieldsReject > .control-group > label { display: none; }
+        .aws-rr-section .rr-cloud { max-height: 120px; overflow-y: auto; padding-right: 4px; }
         /* 🧹 Clear All -- quiet outline companion under the submit button. */
         .aws-clear-btn { width: 100%; padding: 7px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-weight: 600; font-size: .78rem; cursor: pointer; transition: all .18s; font-family: inherit; }
         .aws-clear-btn:hover { border-color: var(--accent-rose); color: var(--accent-rose); background: rgba(255,77,109,.07); }
@@ -2878,6 +2890,13 @@
                             </div>
                             <div class="aws-scroll">
                                 <div id="auditFieldsMain" class="control-grid aws-fields"><!-- built by renderAuditFields() --></div>
+                                <!-- Reject Reason lives in its own section here, using this
+                                     panel's spare space -- so the Decision panel shows every
+                                     field at once, no up-and-down scrolling. -->
+                                <div class="aws-rr-section">
+                                    <div class="aws-rr-head">🚫 Reject Reason <span class="aws-rr-hint">tap every reason that applies — only for a Rejected decision</span></div>
+                                    <div id="auditFieldsReject" class="control-grid aws-fields aws-fields-1col"></div>
+                                </div>
                             </div>
                         </section>
 
@@ -2918,7 +2937,7 @@
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                     Secure Submit to Feishu
                                 </span>
-                                <span class="aws-submit-hint">Ctrl + Enter · fields stay after filing</span>
+                                <span class="aws-submit-hint">Ctrl + Enter · clears for the next ticket</span>
                             </button>
                             <button type="button" class="aws-clear-btn" id="btnAuditClear" onclick="auditClearWorkstation()" title="Wipe every field, the pasted text and the radar">🧹 Clear All</button>
                         </div>
@@ -10572,11 +10591,12 @@ const AUDIT_BRANCH = 'Agency Creation';
 // Agency Creation form shows or requires. Nothing in this tab is hard-
 // required (see auditComputeReminders()); every field is built with
 // req=false regardless of what REQ_FIELD_DEFS itself says, and every field
-// is always shown -- no hide/show toggling. Only two groups now: "Main
-// Info" (everything about the agency/applier/app/evidence) and "Audition
-// Action" (the review outcome -- Status/Mentioned Person/Done by/Mentioned
-// Group/Audition note/Reject Reason, ending with Agency Code + Parent
-// Agency Code).
+// is always shown -- no hide/show toggling. Three groups now: "Main
+// Info" (everything about the agency/applier/app/evidence), "Reject
+// Reason" (its own section under the agency data, filling the middle
+// panel's spare space), and "Audition Action" (the review outcome --
+// Status/Mentioned Person/Done by/Mentioned Group/Audition note, ending
+// with Agency Code + Parent Agency Code -- all visible without scrolling).
 const AUDIT_FIELD_GROUPS = {
     'Region':               'auditFieldsMain',
     'User ID':              'auditFieldsMain',
@@ -10597,7 +10617,7 @@ const AUDIT_FIELD_GROUPS = {
     'Done by':              'auditFieldsAction',
     'Mentioned Group':      'auditFieldsAction',
     'Audition note':        'auditFieldsAction',
-    'Reject Reason':        'auditFieldsAction',
+    'Reject Reason':        'auditFieldsReject',
     'Agency Code':          'auditFieldsAction',
     'Parenet sub agency':   'auditFieldsAction',
 };
@@ -10673,8 +10693,8 @@ function renderAuditFields() {
     if (form) {
         form.addEventListener('input', auditUpdateReminders);
         form.addEventListener('change', auditUpdateReminders);
-        // Duplicate Radar is manual-only: it runs when the agent clicks the
-        // 📡 button, never on its own while they type.
+        // Duplicate Radar: auto-scans when the watched ID fields change (the
+        // listeners wired below) and manually via the 📡 button.
         // Ctrl/Cmd+Enter anywhere inside the workstation files the ticket.
         form.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -10706,7 +10726,13 @@ function renderAuditFields() {
 function auditRenderPickButtons(wrap, selectId) {
     const select = document.getElementById(selectId) || wrap.querySelector('select');
     if (!select) return;
+    // The pick buttons fully replace the dropdown, so keep the searchable-
+    // select enhancer away from it (data-no-search) -- otherwise a redundant
+    // second Status box appears above the buttons and goes stale on reset.
+    select.setAttribute('data-no-search', '');
     select.style.display = 'none';
+    const ssWrap = select.closest('.ss-wrapper');
+    if (ssWrap) ssWrap.style.display = 'none';
     const row = document.createElement('div');
     row.className = 'audit-pick-row';
     row.innerHTML = Array.from(select.options)
@@ -10906,6 +10932,10 @@ function auditComputeReminders() {
     return reminders;
 }
 
+// The element ids currently painted red -- remembered between rounds so a
+// field the agent just fixed can be repainted green (like an auto-fill).
+let auditFlaggedIds = new Set();
+
 function auditUpdateReminders() {
     auditUpdateCardDots();
     const panel = document.getElementById('auditReminders');
@@ -10916,11 +10946,29 @@ function auditUpdateReminders() {
     // "auto-filled" paint), clearing last round's paint first.
     const form = document.getElementById('auditRequestForm');
     if (form) form.querySelectorAll('.control-group.aws-flag').forEach(g => g.classList.remove('aws-flag'));
+    const newFlagged = new Set();
     reminders.forEach(r => (r.ids || []).forEach(id => {
         const el = document.getElementById(id);
         const grp = el ? el.closest('.control-group') : null;
-        if (grp) grp.classList.add('aws-flag');
+        if (grp) { grp.classList.add('aws-flag'); newFlagged.add(id); }
     }));
+
+    // Red turns green the moment the blamed field actually holds a value --
+    // the agent answered the reminder, so mark it done like an auto-fill.
+    auditFlaggedIds.forEach(id => {
+        if (newFlagged.has(id)) return;
+        const el = document.getElementById(id);
+        if (!el) return;
+        let hasVal = !!(el.value || '').trim();
+        if (!hasVal && typeof dzFileStore === 'function') {
+            try { hasVal = (dzFileStore(id) || []).length > 0; } catch (err) { /* not a dropzone field */ }
+        }
+        if (!hasVal) return;
+        el.classList.add('reqfld-autofilled');
+        const dzBox = el.closest('.elegant-dropzone');
+        if (dzBox) dzBox.classList.add('reqfld-autofilled');
+    });
+    auditFlaggedIds = newFlagged;
 
     // The workstation's bottom bar keeps this panel always visible: an all-clear
     // state when nothing is flagged, amber chips the moment something is.
@@ -11164,17 +11212,12 @@ async function submitAuditForm(e) {
             }
         }
 
-        // Ahmed's call: keep every field exactly as filed after submit (he
-        // reviews what just went in), so nothing is auto-cleared anymore --
-        // the 🧹 Clear All button wipes the workstation when he's ready for
-        // the next ticket. The radar is snoozed with the just-filed values so
-        // it doesn't instantly re-flag the ticket he just created.
-        auditLastScanKey = auditIdScanKey();
-        const dupSummary = document.getElementById('auditDupSummary');
-        if (dupSummary) dupSummary.innerHTML = '<span class="aws-dup-clean">✅ Filed — fields kept. Hit 🧹 Clear All when you\'re ready for the next ticket.</span>';
-        const filedBtn = document.getElementById('btnAuditCheckDup');
-        if (filedBtn) filedBtn.classList.remove('alert');
-        auditCloseDupDrawer();
+        // Ahmed's call: a successful filing wipes the workstation right away
+        // so it's instantly ready for the next ticket -- same full cleanup
+        // as the 🧹 Clear All button, just silent (the success toast above
+        // already told the story). Mentioned Group's follow-up update was
+        // captured before this, so it still lands on the ticket.
+        auditClearWorkstation(true);
 
     } catch (e) {
         ToastManager.show(`Failed: ${e.message}`, 'error', 10000);
@@ -11186,12 +11229,21 @@ async function submitAuditForm(e) {
 }
 
 // 🧹 Clear All -- wipes the whole workstation (raw text, every field, all
-// quick-pick visual state, the radar) so a wrong paste or a finished ticket
-// never leaks into the next one. Manual-only since submit no longer clears.
-function auditClearWorkstation() {
+// quick-pick visual state, the radar) so a wrong paste never leaks into the
+// next ticket. Runs silently (no toast) when a successful submit calls it.
+function auditClearWorkstation(silent) {
     const form = document.getElementById('auditRequestForm');
     if (!form) return;
     form.reset();
+    // form.reset() silently restores the native select values -- the
+    // searchable dropdown boxes built on top of them (Mentioned Group,
+    // Region, Agency Type, Otherapp Name, ACM…) don't notice and keep
+    // showing the old pick, so re-sync each one from its reset option.
+    form.querySelectorAll('select').forEach(sel => {
+        if (!sel.dataset || !sel.dataset.ssEnhanced) return;
+        const dt = sel.closest('.ss-wrapper')?.querySelector('.ss-display > .ss-display-text');
+        if (dt) ssSyncDisplay(sel, dt);
+    });
     document.getElementById('audRawText').value = '';
     form.querySelectorAll('.reqfld-autofilled').forEach(el => el.classList.remove('reqfld-autofilled'));
     form.querySelectorAll('.control-group.aws-flag').forEach(g => g.classList.remove('aws-flag'));
@@ -11218,7 +11270,7 @@ function auditClearWorkstation() {
     auditCloseDupDrawer();
     refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
     auditUpdateReminders();
-    ToastManager.show('Workstation cleared — ready for the next ticket.', 'success', 2500);
+    if (!silent) ToastManager.show('Workstation cleared — ready for the next ticket.', 'success', 2500);
 }
 
 // "Check Duplicate" -- reuses the exact same /api/query endpoint and .qy-card
@@ -11338,11 +11390,10 @@ async function auditCheckDuplicates(opts) {
             const revealBtn = document.getElementById('btnAuditDupReveal');
             if (revealBtn) revealBtn.textContent = `👀 View ${n} match${n === 1 ? '' : 'es'}`;
         }
-        // Unmissable by design: the radar button pulses red AND the match
-        // cards open on their own -- a duplicate found in the background must
-        // never wait on the agent noticing a quiet line of text.
+        // Unmissable but never intrusive: the radar button pulses red and
+        // the verdict glows -- the drawer itself only opens when the agent
+        // asks for it (clicking the verdict, 👀 View matches, or 📡 again).
         if (btn) btn.classList.add('alert');
-        auditRevealDuplicates();
 
     } catch (e) {
         if (summaryEl) summaryEl.innerHTML = '';
@@ -11364,6 +11415,20 @@ function auditScheduleDupCheck() {
 function auditCloseDupDrawer() {
     document.getElementById('auditDupDrawer')?.classList.remove('open');
 }
+
+// Clicking any empty spot on the page closes the drawer, same as tapping ×.
+// The radar strip (📡, the glowing verdict, 👀 View matches) is exempt --
+// those clicks are what open or refresh it. Escape closes it too.
+document.addEventListener('click', (e) => {
+    const drawer = document.getElementById('auditDupDrawer');
+    if (!drawer || !drawer.classList.contains('open')) return;
+    if (drawer.contains(e.target)) return;
+    if (e.target.closest && e.target.closest('.aws-radar')) return;
+    drawer.classList.remove('open');
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') auditCloseDupDrawer();
+});
 
 // Renders whatever auditCheckDuplicates() found, the moment the agent
 // actually asks to see it -- same .qy-card markup Query Requests uses, with
