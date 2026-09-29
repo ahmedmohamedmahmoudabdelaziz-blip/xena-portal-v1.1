@@ -347,6 +347,25 @@
         .rr-chip { padding: 5px 11px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: .73rem; font-weight: 600; cursor: pointer; transition: all .12s; font-family: inherit; }
         .rr-chip:hover { border-color: var(--accent-rose); color: var(--text); }
         .rr-chip.active { background: rgba(255,77,109,.16); border-color: var(--accent-rose); color: #ff9db4; }
+        /* Agency Point Privilege picker (New Request > Agency Point Request):
+           a card grid where the privilege name leads and its point cost is a
+           gold badge, instead of one long cramped checkbox list. */
+        .pp-picker { margin-top: 6px; }
+        .pp-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .pp-selected:empty { display: none; }
+        .pp-sel-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,184,0,.14); border: 1px solid rgba(255,184,0,.5); color: var(--accent-amber); font-size: .76rem; font-weight: 700; padding: 4px 6px 4px 10px; border-radius: 20px; }
+        .pp-sel-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: .95rem; line-height: 1; padding: 0 2px; opacity: .75; }
+        .pp-sel-chip button:hover { opacity: 1; color: #fff; }
+        .pp-filter { width: 100%; box-sizing: border-box; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); font-size: .8rem; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color .15s; }
+        .pp-filter:focus { border-color: var(--accent-amber); }
+        .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
+        .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .12s; }
+        .pp-card:hover { border-color: var(--accent-amber); background: rgba(255,184,0,.05); }
+        .pp-card.active { border-color: var(--accent-amber); background: rgba(255,184,0,.10); box-shadow: 0 0 10px rgba(255,184,0,.15); }
+        .pp-card-name { font-size: .82rem; font-weight: 700; color: var(--text); line-height: 1.25; padding-right: 14px; }
+        .pp-card-badge { font-size: .67rem; font-weight: 600; color: var(--accent-amber); background: rgba(255,184,0,.12); border: 1px solid rgba(255,184,0,.35); border-radius: 12px; padding: 2px 8px; }
+        .pp-card-check { position: absolute; top: 8px; right: 10px; font-size: .82rem; font-weight: 700; color: var(--accent-amber); opacity: 0; transition: opacity .12s; }
+        .pp-card.active .pp-card-check { opacity: 1; }
         /* Fields a 💡 Double-check reminder blames get painted red, the same
            way auto-filled fields get painted green (.reqfld-autofilled). */
         .control-group.aws-flag > label { color: #ff8fa3; }
@@ -8042,7 +8061,7 @@ const LT_CHANNEL_NAME = "tickets-channel";
 const LT_EVENT_NAME = "new-ticket";
 
 const LT_FIELD_MAP = {
-    "Agency Creation": [["region","Region"],["user_id","User ID"],["agency_name","Agency Name"],["applier_real_name","Applier Real Name"],["otherapp_name","Otherapp Name"],["otherapp_id","Otherapp ID"],["country","Country"],["whatsapp_number","Whatsapp Number"],["nid_number","NID Number"],["agency_type","Agency Type"],["bd_code","Bd Code"],["acm","ACM"]],
+    "Agency Creation": [["region","Region"],["user_id","User ID"],["agency_type","Agency Type"],["agency_name","Agency Name"],["applier_real_name","Applier Real Name"],["otherapp_name","Otherapp Name"],["otherapp_id","Otherapp ID"],["country","Country"],["whatsapp_number","Whatsapp Number"],["nid_number","NID Number"],["bd_code","Bd Code"],["acm","ACM"]],
     "Agency applied already by ACM or BD link ( follow-up )": [["region","Region"],["user_id","User ID"],["acm","ACM"]],
     "Closing Agency": [["region","Region"],["user_id","User ID"],["agency_code","Agency Code"],["acm","ACM"],["closing_reason","Closing Reason"],["new_id","New ID"],["old_id","Old ID"],["reporter_id","Reporter ID"]],
     "BD Creation": [["region","Region"],["user_id","User ID"],["applier_real_name","Applier Real Name"],["bd_nickname","BD Nickname"],["email_address","Email Address"],["bd_hunted_agency_code","BD Hunted Agency Code"],["country","Country"],["whatsapp_number","Whatsapp Number"],["nid_number","NID Number"],["acm","ACM"]],
@@ -8535,7 +8554,13 @@ async function twOpenWorkspace(recordId) {
         // is currently empty on this record -- see LT_BASIC_KEYS_ORDERED above.
         const sec1 = document.getElementById('tw-sec-1');
         sec1.innerHTML = '';
+        // Only the ACM field for this ticket's Region renders (Ahmed's rule:
+        // a PK ticket never shows the IN list and vice versa). Tickets with
+        // no/unknown Region keep both so the ACM can still be set.
+        const twRegion = feishuValueToString(ticket.fields['Region']).trim();
         LT_BASIC_KEYS_ORDERED.forEach(key => {
+            if (twRegion === 'PK' && key === 'Acm Name (IN)') return;
+            if (twRegion === 'IN' && key === 'Acm Name (PK)') return;
             sec1.appendChild(createTwControl(key, ticket.fields[key]));
         });
 
@@ -9400,7 +9425,16 @@ function createTwControl(key, value) {
     // ISSUE 4/5/6 CONTROL MAPPING: render strictly by the schema's ui_type.
     if (meta?.ui_type === 'SingleSelect' && meta.options) {
         const cur = feishuValueToString(value);
-        const opts = meta.options.map(o => `<option value="${escHtml(o)}" ${o === cur ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+        // The two ACM dropdowns use Ahmed's current region rosters (same lists
+        // the New Request / Audit forms enforce) instead of every option the
+        // sheet has ever collected. A ticket whose saved ACM is off-roster
+        // keeps that value as an extra option so nothing displays blank.
+        let optPairs = meta.options.map(o => ({ v: o, l: o }));
+        if (key === 'Acm Name (PK)' || key === 'Acm Name (IN)') {
+            optPairs = REQ_FIELD_DEFS[key].options.map(o => (o && typeof o === 'object') ? { v: o.v, l: o.l || o.v } : { v: o, l: o });
+        }
+        if (cur && !optPairs.some(p => p.v.toLowerCase() === cur.toLowerCase())) optPairs.push({ v: cur, l: cur });
+        const opts = optPairs.map(p => `<option value="${escHtml(p.v)}" ${p.v === cur ? 'selected' : ''}>${escHtml(p.l)}</option>`).join('');
         wrap.innerHTML = label + `<select name="${escHtml(key)}" class="form-highlight-input"><option value="">-- Select --</option>${opts}</select>`;
         return wrap;
     }
@@ -10084,7 +10118,10 @@ function populateAlAcmSelect() {
 const ACM_AUTO = "__ACM_AUTO__";
 
 const REQ_BRANCHES = {
-    "Agency Creation": ["Region", "User ID", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Agency Type", "Bd Code", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    // Agency Type sits right after User ID (Ahmed 2026-09-30): the agent
+    // picks it up front and the rest of the form reacts -- see
+    // reqApplyAgencyTypeRules() (Acm hunting / Walkin hide the BD Code).
+    "Agency Creation": ["Region", "User ID", "Agency Type", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Bd Code", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
     "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", ACM_AUTO, "Applier Note", "Evidence Screen 2"],
     "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
     "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
@@ -10132,10 +10169,10 @@ const REQ_FIELD_DEFS = {
     // Ahmed's current rosters (2026-09-29): only these ACMs appear, per
     // region. Values stay the sheet's exact spellings; labels show the full
     // names he knows them by. Names parsed from old ticket text that aren't
-    // on the roster (Enzo, Leo, Rocky, ...) are still appended at parse time
+    // on the roster (Leo, Rocky, ...) are still appended at parse time
     // so historical tickets keep their ACM displayed (see auditParseText).
     "Acm Name (PK)": { type: "select", options: [
-        {v:"Zohaib", l:"Zohaib Ahmed"}, {v:"Haseeb", l:"Haseeb Malik"}, "Farooq",
+        {v:"Zohaib", l:"Zohaib Ahmed"}, {v:"Haseeb", l:"Haseeb Malik"}, "Enzo", "Farooq",
         "Mubeen", "Ehtisham", "Cruz", {v:"Sehar Ch", l:"Sehar Choudhry"},
         "Hamza Malik", "Usama", {v:"nabeel", l:"Nabeel"}, "Eagle",
     ], req: true },
@@ -10168,7 +10205,11 @@ const REQ_FIELD_DEFS = {
     "Evidence Screen 2": { type: "file", req: false },
     "BD Nickname": { type: "text", req: true },
     "Email Adress": { type: "text", req: true },
-    "BD Hunted Agency Code": { type: "text", req: true },
+    // BD Creation (Ahmed 2026-09-30): one ticket can carry several hunted
+    // agency codes -- same chip input as "User ID (Multi)", posts
+    // newline-joined into the same Feishu text field, so nothing downstream
+    // changes.
+    "BD Hunted Agency Code": { type: "multitext", req: true, postAs: "BD Hunted Agency Code" },
     "Target": { type: "text", req: false },
     "Privilege": { type: "select", options: ["30 Mics","Dynamic Avatar","Game room","New User Welcome Room","20 Mics "], req: true },
     "Agency Point Privilege": { type: "multiselect", options: ["Trend card ( 40 - 50 for others )","Traffic card ( 30 - 40 for others )","30 MIC 15 days ( 150 - 175 for others ) ","30 MIC 30 days ( 300 - 350 for others) ","Welcome Package 3 ( 80 )","Welcome Package 2 ( 30 )","Room Pin-Up ( 100 - 150 for others )","Customized Short ID 30 days ( 1200 - 1800 for others )","News banner ( 100 Points ) (No more than 5 days at one time)","Live banner ( 150 Points ) (No more than 5 days at one time)","Splash ( 1500 - 2000 for others )","Golden Lion Package ( 50 )","White Lion Package ( 50 )","Pink Lion Package ( 50 )","Green Warrior Package ( 50 )","Lion King Package ( 50 )","Pink Love Package ( 50 )"], req: true },
@@ -10244,11 +10285,11 @@ function buildFieldControl(fName, def, req, idPrefix) {
             <div class="multiid-wrap">
                 <div class="multiid-chips" id="${idSafe}_chips"></div>
                 <div class="multiid-input-row">
-                    <input type="text" id="${idSafe}_input" placeholder="Type a User ID, then press Enter or Add" class="form-highlight-input">
+                    <input type="text" id="${idSafe}_input" placeholder="Type a ${escHtml(displayLabel)}, then press Enter or Add" class="form-highlight-input">
                     <button type="button" class="btn-sm btn-outline" onclick="multiIdAdd('${idSafe}','${escHtml(postName)}')">+ Add</button>
                 </div>
-                <div class="multiid-hint">Add as many User IDs as this ticket covers -- each one lands on the same ticket. You can also paste a whole list (one per line, or comma/space-separated) to add them all at once.</div>
-                <input type="text" name="${escHtml(postName)}" id="${idSafe}_hidden" style="display:none" ${req ? 'data-required="1"' : ''}>
+                <div class="multiid-hint">Add as many ${escHtml(displayLabel)}s as this ticket covers -- each one lands on the same ticket. You can also paste a whole list (one per line, or comma/space-separated) to add them all at once.</div>
+                <textarea name="${escHtml(postName)}" id="${idSafe}_hidden" style="display:none" ${req ? 'data-required="1"' : ''}></textarea>
             </div>`;
     } else if (def.type === 'file') {
         wrap.innerHTML += buildDropzoneHtml(idSafe, fName, req);
@@ -10269,7 +10310,10 @@ function multiIdSync(idSafe) {
     if (!chipsWrap || !hidden) return;
     const ids = Array.from(chipsWrap.querySelectorAll('[data-uid]')).map(c => c.dataset.uid);
     // One ID per line in the sheet cell (not "id1, id2, id3" side-by-side) --
-    // matches how Ahmed wants it to land in Feishu.
+    // matches how Ahmed wants it to land in Feishu. The hidden carrier is a
+    // <textarea>, NOT an <input type="text">: the HTML spec strips line
+    // breaks out of text-input values, which used to silently fuse the IDs
+    // into one long string ("id1id2") before this was a textarea.
     hidden.value = ids.join('\n');
 }
 
@@ -10317,7 +10361,9 @@ document.addEventListener('paste', (e) => {
     target.value = '';
     multiIdSync(idSafe);
     if (added && typeof ToastManager !== 'undefined') {
-        ToastManager.show(`Added ${added} User ID${added > 1 ? 's' : ''} from paste`, 'success', 2500);
+        const fieldWrap = target.closest('[data-field]');
+        const label = fieldWrap ? fieldWrap.dataset.field.replace(/\s*\(Multi\)\s*$/i, '') : 'ID';
+        ToastManager.show(`Added ${added} ${label}${added > 1 ? 's' : ''} from paste`, 'success', 2500);
     }
 });
 
@@ -10366,6 +10412,28 @@ function refreshClosingReasonSubfields() {
     wrap.querySelectorAll('input').forEach(inp => { inp.required = show; });
 }
 
+// Agency Creation only (Ahmed 2026-09-30): the fields that follow depend on
+// the Agency Type picked up front. Acm hunting and Walkin involve no BD, so
+// the BD Code field hides (and stops being required -- a hidden required
+// input would block the submit with a browser "not focusable" error). Any
+// typed BD Code is cleared on hide so a stale value can't ride along in the
+// payload. Otherapp ID is never mandatory, and stays that way for Walkin.
+function reqApplyAgencyTypeRules() {
+    const typeSel = document.getElementById('reqfld_Agency_Type');
+    const container = document.getElementById('formDynamicFields');
+    if (!typeSel || !container) return;
+    const t = (typeSel.value || '').trim().toLowerCase();
+    const bdWrap = container.querySelector('[data-field="Bd Code"]');
+    if (!bdWrap) return;
+    const bdInput = bdWrap.querySelector('input, select');
+    const hideBd = t === 'acm hunting' || t === 'walkin';
+    bdWrap.style.display = hideBd ? 'none' : '';
+    if (bdInput) {
+        bdInput.required = !hideBd;
+        if (hideBd) bdInput.value = '';
+    }
+}
+
 function renderReqFormFields() {
     const branch = document.getElementById('formRequestType').value;
     const container = document.getElementById('formDynamicFields');
@@ -10397,6 +10465,12 @@ function renderReqFormFields() {
         }
         if (fName === 'Closing Reason') {
             el.querySelector('select').addEventListener('change', refreshClosingReasonSubfields);
+        }
+        if (fName === 'Agency Type' && branch === 'Agency Creation') {
+            el.querySelector('select').addEventListener('change', reqApplyAgencyTypeRules);
+        }
+        if (fName === 'Agency Point Privilege') {
+            reqRenderPointPrivilegePicker(el);
         }
         // Live agency preview: only wired up for the two branch types where it's
         // actually useful (points balance / target quota) -- see
@@ -10445,9 +10519,98 @@ function renderReqFormFields() {
     }
 
     if (document.getElementById('acmAutoSlot')) refreshAcmAutoSlot();
+    if (branch === 'Agency Creation') reqApplyAgencyTypeRules();
 
     container.style.display = 'grid';
     submitArea.style.display = 'block';
+}
+
+// "Agency Point Privilege" (Agency Point Request, Ahmed 2026-09-30): the raw
+// field is a 17-option checkbox list whose labels bury the privilege name
+// inside point-cost parentheses. This swaps it visually for a card grid --
+// each card leads with the privilege name and wears its point cost as a
+// gold badge -- plus a filter box and a selected-chips row on top. The
+// original checkboxes stay in the DOM (hidden) and perfectly in sync, so
+// submitReqForm()'s multiselect validation and payload collection keep
+// working exactly as before.
+function reqRenderPointPrivilegePicker(wrap) {
+    const msel = wrap.querySelector('.msel-wrap');
+    if (!msel) return;
+    const boxes = Array.from(msel.querySelectorAll('input[type="checkbox"]'));
+    msel.style.display = 'none';
+    wrap.style.gridColumn = '1 / -1'; // the card grid deserves the full row
+
+    // Split "30 MIC 15 days ( 150 - 175 for others ) " into the lead name +
+    // its parenthesized notes (point cost, usage caps) shown as badges.
+    const parse = (raw) => {
+        const notes = [];
+        const name = raw.replace(/\(([^)]*)\)/g, (_, n) => { notes.push(n.trim()); return ''; }).trim();
+        return { name: name || raw.trim(), notes };
+    };
+
+    const picker = document.createElement('div');
+    picker.className = 'pp-picker';
+    picker.innerHTML = `
+        <div class="pp-selected"></div>
+        <input type="text" class="pp-filter" placeholder="🔍 Filter privileges…">
+        <div class="pp-grid"></div>`;
+    wrap.appendChild(picker);
+
+    const selWrap = picker.querySelector('.pp-selected');
+    const grid = picker.querySelector('.pp-grid');
+    const filter = picker.querySelector('.pp-filter');
+
+    const sync = () => {
+        selWrap.innerHTML = boxes.filter(b => b.checked).map(b =>
+            `<span class="pp-sel-chip">${escHtml(parse(b.value).name)}<button type="button" data-val="${escHtml(b.value)}" aria-label="Remove ${escHtml(parse(b.value).name)}">×</button></span>`).join('');
+        grid.querySelectorAll('.pp-card').forEach(c => {
+            const box = boxes.find(b => b.value === c.dataset.val);
+            c.classList.toggle('active', !!(box && box.checked));
+        });
+    };
+
+    grid.innerHTML = boxes.map(b => {
+        const p = parse(b.value);
+        return `<button type="button" class="pp-card" data-val="${escHtml(b.value)}">
+            <span class="pp-card-name">${escHtml(p.name)}</span>
+            ${p.notes.map(n => `<span class="pp-card-badge">${escHtml(n)}</span>`).join('')}
+            <span class="pp-card-check">✓</span>
+        </button>`;
+    }).join('');
+    grid.querySelectorAll('.pp-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const box = boxes.find(b => b.value === card.dataset.val);
+            if (box) { box.checked = !box.checked; sync(); }
+        });
+    });
+    // Tapping × on a selected chip unchecks its checkbox too.
+    selWrap.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-val]');
+        if (!btn) return;
+        const box = boxes.find(b => b.value === btn.dataset.val);
+        if (box) { box.checked = false; sync(); }
+    });
+    filter.addEventListener('input', () => {
+        const q = filter.value.trim().toLowerCase();
+        grid.querySelectorAll('.pp-card').forEach(c => {
+            c.style.display = !q || c.dataset.val.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+    // A plain Enter inside the filter must never file the ticket.
+    filter.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault();
+    });
+
+    // After a successful filing the form resets -- re-sync from the (now
+    // cleared) checkboxes so no stale chips survive into the next ticket.
+    const form = wrap.closest('form');
+    if (form) form.addEventListener('reset', () => setTimeout(() => {
+        filter.value = '';
+        grid.querySelectorAll('.pp-card').forEach(c => c.style.display = '');
+        sync();
+    }, 0));
+
+    sync();
 }
 
 let _rapFetchToken = 0;
@@ -10575,7 +10738,11 @@ async function submitReqForm(e) {
     try {
         const payloadFields = { "Request Type": branch };
 
-        form.querySelectorAll('input[type="text"], select').forEach(el => {
+        // textarea included for the multitext chip fields' hidden carrier
+        // (a textarea, so the one-ID-per-line value survives -- see
+        // multiIdSync). No REQ_BRANCHES field is a visible textarea, so this
+        // picks up nothing else.
+        form.querySelectorAll('input[type="text"], select, textarea').forEach(el => {
             if (el.id === 'formRequestType') return;
             if (!el.name) return; // the chip-add text input itself has no name -- only its synced hidden twin does
             if (el.value) payloadFields[el.name] = el.value;
@@ -10746,6 +10913,7 @@ const AUDIT_MENTION_ROSTER = [
     { name: 'Usama',          email: 'usama@micous.com' },
     { name: 'Nabeel',         email: 'nabeeliqbal@micous.com' },
     { name: 'Eagle (Adnan)',  email: 'muhammadnan@micous.com' },
+    { name: 'Enzo',           email: 'enzo@micous.com' },
 ];
 
 const auditMentionCache = {}; // email -> { open_id, name } resolved through this app's member search
@@ -10778,10 +10946,11 @@ async function auditResolveMentionMember(person) {
 // option text to pick in "Mentioned Group". Keyed by the exact sheet values
 // ("Haseeb" is the sheet's spelling; the group option is the sheet's own
 // "PK-Hasseb-Audition group" typo, matched exactly on purpose). Eagle has no
-// group of his own -> group stays empty. Enzo/Leo/Berlin/Rocky/Bella aren't
-// on the roster -> nothing is auto-mentioned for them.
+// group of his own -> group stays empty. Leo/Berlin/Rocky/Bella aren't on
+// the roster -> nothing is auto-mentioned for them.
 const AUDIT_ACM_ROSTER = {
     'nabeel':       { person: 'Nabeel',         group: 'PK-Nabeel-Audition group' },
+    'enzo':         { person: 'Enzo',           group: 'PK-Enzo-Audition group' },
     'haseeb':       { person: 'Haseeb Malik',   group: 'PK-Hasseb-Audition group' },
     'farooq':       { person: 'Farooq',         group: 'PK-Farooq-Audition group' },
     'mubeen':       { person: 'Mubeen',         group: 'PK-Mubeen Group' },
@@ -11487,6 +11656,36 @@ function auditParseText(opts) {
 async function submitAuditForm(e) {
     e.preventDefault();
     const form = e.target;
+
+    // Ahmed's hard gate (2026-09-30): an audit ticket may NOT be filed until
+    // the review is actually complete. Status and Done by are always
+    // mandatory; a "Done" verdict needs the Agency Code; a "Rejected" verdict
+    // needs at least one Reject Reason ticked and a non-empty Audition note.
+    // Missing pieces are listed in one toast and the submit simply stops.
+    const missing = [];
+    const statusVal = (document.getElementById('audfld_Status')?.value || '').trim();
+    let doneBySet = false;
+    try {
+        doneBySet = !!JSON.parse(form.querySelector('[data-user-field="Done by"]')?.dataset.userSelected || '[]').length;
+    } catch (err) { doneBySet = false; }
+    if (!statusVal) missing.push('Status');
+    if (!doneBySet) missing.push('Done by');
+    if (statusVal === 'Done' && !(document.getElementById('audfld_Agency_Code')?.value || '').trim()) {
+        missing.push('Agency Code (required when Status is Done)');
+    }
+    if (statusVal === 'Rejected') {
+        if (!form.querySelector('input[type="checkbox"][name="Reject Reason"]:checked')) {
+            missing.push('Reject Reason (pick at least one)');
+        }
+        if (!(document.getElementById('audfld_Audition_note')?.value || '').trim()) {
+            missing.push('Audition note (required when Status is Rejected)');
+        }
+    }
+    if (missing.length) {
+        ToastManager.show(`Can't submit yet — please fill: ${missing.join(' · ')}`, 'error', 8000);
+        auditUpdateReminders();
+        return;
+    }
 
     const btn = document.getElementById('btnSubmitAudit');
     const origTxt = btn.innerHTML;
