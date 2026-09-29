@@ -279,7 +279,7 @@
         @keyframes awsRadarPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,184,0,.45); } 50% { box-shadow: 0 0 0 11px rgba(255,184,0,0); } }
         .aws-radar-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--accent-amber); white-space: nowrap; }
         .aws-radar-hint { color: var(--text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 6px; font-size: .7rem; }
-        .aws-radar-summary { font-size: .82rem; color: var(--text-muted); margin-top: 2px; }
+        .aws-radar-summary { font-size: .82rem; color: var(--text-muted); margin-top: 2px; max-height: 118px; overflow-y: auto; }
         .aws-reminders { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; align-content: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); padding: 4px 16px; min-width: 0; max-height: 92px; overflow-y: auto; }
         .aws-rem-title { color: var(--accent-amber); font-weight: 700; font-size: .78rem; white-space: nowrap; }
         .aws-rem-chip { background: rgba(255,184,0,.08); border: 1px solid rgba(255,184,0,.3); color: var(--text); font-size: .74rem; padding: 4px 10px; border-radius: 20px; }
@@ -304,6 +304,20 @@
         .aws-dup-results .qy-card-head { margin-bottom: 10px; padding-bottom: 8px; }
         .aws-dup-results .qy-row { padding: 4px 0; font-size: .8rem; }
         .aws-dup-results .qy-note-block { margin-top: 8px; padding: 8px 12px; }
+        /* Compact row mode (many matches): one line per ticket, tap to open
+           its full card underneath -- replaces the unreadable micro-card
+           grid when a dupe wave returns a dozen+ hits. */
+        .aws-dup-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: border-color .15s, background .15s; }
+        .aws-dup-row:hover { border-color: var(--accent-amber); background: rgba(255,184,0,.05); }
+        .aws-dup-row.open { border-color: var(--accent-amber); border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: 0; }
+        .aws-dup-row-num { font-weight: 700; color: var(--accent-cyan); white-space: nowrap; }
+        .aws-dup-row-agency { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .82rem; }
+        .aws-dup-row-matched { font-size: .68rem; color: var(--accent-amber); white-space: nowrap; }
+        .aws-dup-row-caret { color: var(--text-muted); font-size: .75rem; transition: transform .15s; }
+        .aws-dup-row.open .aws-dup-row-caret { transform: rotate(90deg); }
+        .aws-dup-detail { display: none; border: 1px solid var(--accent-amber); border-top: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; margin: -6px 0 10px; padding: 0; }
+        .aws-dup-detail.open { display: block; }
+        .aws-dup-detail .qy-card { border: none; box-shadow: none; }
         /* Radar verdict -- mirrors the Grand Table "Duplicated Check" formula
            style: 🟢 when clean, one 🔴 line per matched field when not. The
            whole verdict is clickable and opens the match cards. */
@@ -9315,7 +9329,13 @@ function twPickMember(pickerId, idx) {
             <span style="flex:1;font-size:.85rem;">${escHtml(m.name)}</span>
             <button type="button" onclick="twClearUserPicker('${pickerId}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0 4px;" title="Clear">✕</button>`;
     }
-    if (inputEl) { inputEl.value = ''; inputEl.style.display = 'none'; }
+    if (inputEl) {
+        inputEl.value = '';
+        // Mentioned Person keeps its search box visible after a pick, so you
+        // can still look up someone outside the roster; every other picker
+        // collapses to the chip.
+        inputEl.style.display = (wrap && wrap.dataset.userField === 'Mentioned Person') ? 'block' : 'none';
+    }
     if (menu) { menu.style.display = 'none'; menu.innerHTML = ''; }
 }
 
@@ -10109,8 +10129,17 @@ const REQ_FIELD_DEFS = {
     "NID Number": { type: "text", req: true },
     "Agency Type": { type: "select", options: ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"], req: true },
     "Bd Code": { type: "text", req: true },
-    "Acm Name (PK)": { type: "select", options: ["nabeel","Haseeb","Enzo","Farooq","Mubeen","Cruz","Ehtisham","Usama","Sehar Ch","Hamza Malik","Zohaib","Eagle","Leo","Berlin"], req: true },
-    "Acm Name (IN)": { type: "select", options: ["Holy","Vihan","Rudra","Ravikant","Ansh","Rocky","Bella","nabeel"], req: true },
+    // Ahmed's current rosters (2026-09-29): only these ACMs appear, per
+    // region. Values stay the sheet's exact spellings; labels show the full
+    // names he knows them by. Names parsed from old ticket text that aren't
+    // on the roster (Enzo, Leo, Rocky, ...) are still appended at parse time
+    // so historical tickets keep their ACM displayed (see auditParseText).
+    "Acm Name (PK)": { type: "select", options: [
+        {v:"Zohaib", l:"Zohaib Ahmed"}, {v:"Haseeb", l:"Haseeb Malik"}, "Farooq",
+        "Mubeen", "Ehtisham", "Cruz", {v:"Sehar Ch", l:"Sehar Choudhry"},
+        "Hamza Malik", "Usama", {v:"nabeel", l:"Nabeel"}, "Eagle",
+    ], req: true },
+    "Acm Name (IN)": { type: "select", options: ["Ritu Pant","Holy","Ravikant","Vihan","Ansh","Rudra"], req: true },
     "Applier Note": { type: "text", req: false },
     "NID & Otherapp Screen": { type: "file", req: true },
     // Added for the Audit tab (see AUDIT_FIELD_GROUPS / renderAuditFields).
@@ -10190,7 +10219,14 @@ function buildFieldControl(fName, def, req, idPrefix) {
         wrap.innerHTML += `<textarea id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} rows="3" placeholder="Enter ${escHtml(fName)}" class="form-highlight-input" style="font-family:inherit;resize:vertical;"></textarea>`;
     } else if (def.type === 'select') {
         let opts = `<option value="">-- Select --</option>`;
-        def.options.forEach(o => opts += `<option value="${escHtml(o)}">${escHtml(o)}</option>`);
+        // Options are plain strings, or {v, l} when the label should read
+        // friendlier than the exact sheet value it posts (e.g. the dropdown
+        // shows "Zohaib Ahmed" but the sheet still receives "Zohaib").
+        def.options.forEach(o => {
+            const v = (o && typeof o === 'object') ? o.v : o;
+            const l = (o && typeof o === 'object') ? (o.l || o.v) : o;
+            opts += `<option value="${escHtml(v)}">${escHtml(l)}</option>`;
+        });
         wrap.innerHTML += `<select id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} class="form-highlight-input">${opts}</select>`;
     } else if (def.type === 'multiselect') {
         let chks = def.options.map(o => `
@@ -10685,28 +10721,58 @@ const AUDIT_DONE_BY_PEOPLE = [
 let auditDoneByCache = {};
 
 // ═══ Mention intelligence ═══
-// The roster Ahmed gave (17 teammates, name + email), each pre-resolved to the
-// Feishu open_id that a User-type field actually needs -- so tapping a chip
-// sets the person instantly, no member search round-trip.
+// The roster Ahmed gave (17 teammates, name + email). open_ids are NOT
+// hardcoded here anymore: an open_id is scoped to whichever Feishu app
+// issued it, and ids resolved outside this app get rejected by the Grand
+// Table write with 1254066 UserFieldConvFail -- which is exactly what
+// happened on the first roster-chip submission. Instead each person is
+// resolved once through THIS app's own /api/members/search (the same
+// endpoint the Done-by quick picks use, which submits cleanly) and cached.
 const AUDIT_MENTION_ROSTER = [
-    { name: 'Ritu Pant',     email: 'ritupant@micous.com',      open_id: 'ou_a68a88f4c75818e4eaa3d10e0553d780' },
-    { name: 'Holy',          email: 'holy@micous.com',           open_id: 'ou_3e2df45d94e775326a9eccaab44989f7' },
-    { name: 'Ravikant',      email: 'ravikant@micous.com',       open_id: 'ou_3691fef09117269e73294016f2d32d19' },
-    { name: 'Vihan',         email: 'vihan@micous.com',          open_id: 'ou_c97c1b9a458fa05e9d8c6aa4ec359638' },
-    { name: 'Ansh',          email: 'ansh@micous.com',           open_id: 'ou_527ef4f899edad810a103ec56d2b5391' },
-    { name: 'Rudra',         email: 'rudra@micous.com',          open_id: 'ou_18280f81339dbaae8a602146d51fd4ae' },
-    { name: 'Zohaib Ahmed',  email: 'zohaibahmed@micous.com',    open_id: 'ou_1b32390ed7b6425b76b27eecf6fa7db1' },
-    { name: 'Haseeb Malik',  email: 'haseebmalik@micous.com',   open_id: 'ou_6def4c693d866bda79c87829b11a0e0a' },
-    { name: 'Farooq',        email: 'farooq@micous.com',         open_id: 'ou_e30b176291a8da7d0a5186bcf925ba58' },
-    { name: 'Mubeen',        email: 'mubeen@micous.com',         open_id: 'ou_a39c59bc4e35183556b21d4f4dc554ad' },
-    { name: 'Ehtisham',      email: 'ehtisham@micous.com',       open_id: 'ou_e6dd0c0ce03037cb2277ce611d77d957' },
-    { name: 'Cruz',          email: 'cruz@micous.com',           open_id: 'ou_6108127446c0991ac49432d38bbd5913' },
-    { name: 'Sehar Choudhry',email: 'seharch@micous.com',        open_id: 'ou_40ba8cb7c8e971d314a3fb9c27e8e0ff' },
-    { name: 'Hamza Malik',   email: 'hamzamalik@micous.com',     open_id: 'ou_16ebfa35775209c271c659aa5a1624ad' },
-    { name: 'Usama',         email: 'usama@micous.com',          open_id: 'ou_2b22539964ec3170aaa39918ff0049c3' },
-    { name: 'Nabeel',        email: 'nabeeliqbal@micous.com',   open_id: 'ou_4e7799a017c88558e0aa9b8fbaf843c9' },
-    { name: 'Eagle (Adnan)', email: 'muhammadnan@micous.com',    open_id: 'ou_dcb055f8af481f42958af4b07a8995dc' },
+    { name: 'Ritu Pant',      email: 'ritupant@micous.com' },
+    { name: 'Holy',           email: 'holy@micous.com' },
+    { name: 'Ravikant',       email: 'ravikant@micous.com' },
+    { name: 'Vihan',          email: 'vihan@micous.com' },
+    { name: 'Ansh',           email: 'ansh@micous.com' },
+    { name: 'Rudra',          email: 'rudra@micous.com' },
+    { name: 'Zohaib Ahmed',   email: 'zohaibahmed@micous.com' },
+    { name: 'Haseeb Malik',   email: 'haseebmalik@micous.com' },
+    { name: 'Farooq',         email: 'farooq@micous.com' },
+    { name: 'Mubeen',         email: 'mubeen@micous.com' },
+    { name: 'Ehtisham',       email: 'ehtisham@micous.com' },
+    { name: 'Cruz',           email: 'cruz@micous.com' },
+    { name: 'Sehar Choudhry', email: 'seharch@micous.com' },
+    { name: 'Hamza Malik',    email: 'hamzamalik@micous.com' },
+    { name: 'Usama',          email: 'usama@micous.com' },
+    { name: 'Nabeel',         email: 'nabeeliqbal@micous.com' },
+    { name: 'Eagle (Adnan)',  email: 'muhammadnan@micous.com' },
 ];
+
+const auditMentionCache = {}; // email -> { open_id, name } resolved through this app's member search
+async function auditResolveMentionMember(person) {
+    if (auditMentionCache[person.email]) return auditMentionCache[person.email];
+    // Email first (unique -- its first hit is almost certainly them); fall
+    // back to the display name, but then only accept a real name match,
+    // never "whatever came back first" (tagging the wrong teammate is worse
+    // than leaving the field empty for a manual pick).
+    for (const q of [person.email, person.name]) {
+        const isEmailQuery = q.includes('@');
+        try {
+            const res = await fetch(`/api/members/search?q=${encodeURIComponent(q)}&uat=${encodeURIComponent(loggedUat)}`);
+            const data = await res.json();
+            const results = data.success ? (data.results || []) : [];
+            const match =
+                results.find(m => (m.name || '').trim().toLowerCase() === person.name.toLowerCase())
+                || results.find(m => m.name && person.name.toLowerCase().startsWith(m.name.trim().toLowerCase()))
+                || (isEmailQuery && results.length === 1 ? results[0] : null);
+            if (match && match.open_id) {
+                auditMentionCache[person.email] = match;
+                return match;
+            }
+        } catch (err) { /* try the next query */ }
+    }
+    return null;
+}
 
 // ACM option value (lowercased) -> the person to mention + the group whose
 // option text to pick in "Mentioned Group". Keyed by the exact sheet values
@@ -10727,6 +10793,7 @@ const AUDIT_ACM_ROSTER = {
     'zohaib':       { person: 'Zohaib Ahmed',   group: 'PK-Zohaib-Audition group' },
     'eagle':        { person: 'Eagle (Adnan)',  group: '' },
     'holy':         { person: 'Holy',          group: 'IN-Holy&Ritu-Audition group' },
+    'ritu pant':    { person: 'Ritu Pant',     group: 'IN-Holy&Ritu-Audition group' },
     'vihan':        { person: 'Vihan',          group: 'IN-Vihan-Audition group' },
     'rudra':        { person: 'Rudra',          group: 'IN-Rudra-Audition group' },
     'ravikant':     { person: 'Ravikant',      group: 'IN-Ravikant-Audition group' },
@@ -10743,22 +10810,24 @@ function auditMentionWrap() {
 }
 
 // Renders the 17 roster chips between "Mentioned Person" label and the member
-// search box (same look as the Done-by quick picks). Tapping a chip stores the
-// real open_id and shows the picker's own person chip; tapping the active chip
-// again clears it. The search box stays fully functional for anyone else.
+// search box (same look as the Done-by quick picks). Tapping a chip resolves
+// the teammate's open_id through this app's own member search (app-scoped ids
+// are the ONLY ones Feishu accepts at submit) and shows the picker's person
+// chip; tapping the active chip again clears it. The search box stays fully
+// functional for anyone else.
 function auditRenderMentionRoster(wrap) {
     if (!wrap || wrap.querySelector('.audit-mention-row')) return;
     const row = document.createElement('div');
     row.className = 'audit-pick-row audit-mention-row';
     row.innerHTML = AUDIT_MENTION_ROSTER.map(p =>
-        `<button type="button" class="audit-pick-btn audit-mention-chip" data-oid="${p.open_id}" title="${escHtml(p.email)}">${escHtml(p.name)}</button>`).join('');
+        `<button type="button" class="audit-pick-btn audit-mention-chip" data-email="${escHtml(p.email)}">${escHtml(p.name)}</button>`).join('');
     const label = wrap.querySelector('label');
     if (label && label.nextSibling) wrap.insertBefore(row, label.nextSibling);
     else wrap.appendChild(row);
 
     row.querySelectorAll('.audit-mention-chip').forEach(btn => {
         btn.addEventListener('click', () => {
-            const person = AUDIT_MENTION_ROSTER.find(p => p.open_id === btn.dataset.oid);
+            const person = AUDIT_MENTION_ROSTER.find(p => p.email === btn.dataset.email);
             if (!person) return;
             if (btn.classList.contains('active')) {
                 // Tapping the already-active chip clears the pick again.
@@ -10769,7 +10838,7 @@ function auditRenderMentionRoster(wrap) {
                 return;
             }
             auditDeducedPerson = ''; // a hand tap now owns the field
-            auditSetMentionedPerson(person, true);
+            auditSetMentionedPerson(person, true, true);
         });
     });
 
@@ -10784,29 +10853,53 @@ function auditRenderMentionRoster(wrap) {
 }
 
 // Sets Mentioned Person through the normal member-picker machinery (chip UI +
-// [{"id": open_id}] payload), without needing a search round-trip.
-function auditSetMentionedPerson(person, markChip) {
+// [{"id": open_id}] payload). The open_id is resolved at runtime through THIS
+// app's /api/members/search — never a hardcoded id, because open_ids are
+// scoped to the Feishu app that issued them (the 1254066 UserFieldConvFail
+// on submit was exactly that: ids minted by a different app). Resolution is
+// cached per email; on failure the field stays empty for a manual search.
+async function auditSetMentionedPerson(person, markChip, force) {
     const wrap = auditMentionWrap();
     if (!wrap || !person) return;
     const input = wrap.querySelector('input[id^="twup-"][id$="-input"]');
     if (!input) return;
     const pickerId = input.id.slice(0, -6); // strip the trailing "-input"
-    window.__twMemberResults[pickerId] = [{ open_id: person.open_id, name: person.name }];
+    const match = await auditResolveMentionMember(person);
+    if (!match) {
+        // Couldn't verify this teammate in the app's user directory — don't
+        // tag a guess. If WE had filled it, the picker simply stays empty.
+        if (markChip) {
+            wrap.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
+        }
+        return;
+    }
+    // A hand pick may have landed while the lookup was in flight — don't
+    // stomp a different value the agent chose in the meantime. Deliberate
+    // roster-chip taps (force) always win, even over an earlier auto-fill.
+    if (!force) {
+        let cur = '';
+        try { cur = ((JSON.parse(wrap.dataset.userSelected || '[]')[0]) || {}).id || ''; } catch (err) { /* empty */ }
+        if (cur && cur !== auditDeducedPerson && cur !== match.open_id) return;
+    }
+    window.__twMemberResults[pickerId] = [{ open_id: match.open_id, name: person.name }];
     twPickMember(pickerId, 0);
     if (markChip) {
-        wrap.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.toggle('active', c.dataset.oid === person.open_id));
+        wrap.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.toggle('active', c.dataset.email === person.email));
     }
+    return match;
 }
 
 // The "intelligence" itself: reads the current Region + ACM + Agency Type and
 // fills Mentioned Person / Mentioned Group with the right teammate and group.
-// Walk-ins are deliberately left empty (Ahmed's rule), and a hand-picked value
-// is never overwritten -- only an empty field or one we filled ourselves.
-function auditDeduceMentions() {
+// Only a PLAIN "Walkin" is left empty (Ahmed's rule) — a "Walkin sub-agency"
+// ticket still belongs to an ACM, so person + group are deducted for it.
+// A hand-picked value is never overwritten -- only an empty field or one we
+// filled ourselves.
+async function auditDeduceMentions() {
     const type = (document.getElementById('audfld_Agency_Type')?.value || '').trim();
     if (!type) return;
-    if (/walkin/i.test(type)) {
-        // Walk-in (plain or sub-agency): Ahmed's rule — nothing is mentioned.
+    if (/^\s*walkin\s*$/i.test(type)) {
+        // Plain walk-in only (sub-agency walk-ins keep their ACM mentions):
         // Only values WE filled ourselves are cleared; a hand-picked mention
         // is the agent's call and stays untouched.
         const wrap = auditMentionWrap();
@@ -10845,8 +10938,9 @@ function auditDeduceMentions() {
             let cur = '';
             try { cur = ((JSON.parse(wrap.dataset.userSelected || '[]')[0]) || {}).id || ''; } catch (err) { /* empty */ }
             if (!cur || cur === auditDeducedPerson) {
-                auditSetMentionedPerson(AUDIT_MENTION_ROSTER.find(p => p.name === hit.person), true);
-                auditDeducedPerson = AUDIT_MENTION_ROSTER.find(p => p.name === hit.person)?.open_id || '';
+                const person = AUDIT_MENTION_ROSTER.find(p => p.name === hit.person);
+                const match = person ? await auditSetMentionedPerson(person, true) : null;
+                if (match) auditDeducedPerson = match.open_id;
             }
         }
     }
@@ -10961,6 +11055,18 @@ function renderAuditFields() {
     // click on "Parse & Fill" needed (the button stays for manual re-runs).
     const rawTa = document.getElementById('audRawText');
     if (rawTa) rawTa.addEventListener('paste', () => setTimeout(auditParseText, 120));
+    // Editing the pasted text by hand re-parses it too (quietly -- no toast
+    // on every keystroke-pause), so the fields always track what's in the
+    // text box instead of keeping the values from the first parse.
+    if (rawTa) {
+        let rawRetimer = null;
+        rawTa.addEventListener('input', () => {
+            clearTimeout(rawRetimer);
+            rawRetimer = setTimeout(() => {
+                if (rawTa.value.trim()) auditParseText({ quiet: true });
+            }, 900);
+        });
+    }
 
     // The radar watches the three identity fields directly: filling or
     // editing any of them schedules a scan (debounced inside the scheduler).
@@ -11293,7 +11399,11 @@ function rtSetFieldValue(id, val) {
     const el = document.getElementById(id);
     if (!el) return false;
     if (el.tagName === 'SELECT') {
-        const opt = Array.from(el.options).find(o => o.value.toLowerCase() === val.toLowerCase());
+        // Match on the posted value first, then on the visible label (an
+        // option may show "Zohaib Ahmed" while posting "Zohaib" -- ticket
+        // text usually carries the full name).
+        const opt = Array.from(el.options).find(o => o.value.toLowerCase() === val.toLowerCase())
+                 || Array.from(el.options).find(o => (o.textContent || '').trim().toLowerCase() === val.toLowerCase());
         if (!opt) return false;
         el.value = opt.value;
     } else {
@@ -11303,12 +11413,13 @@ function rtSetFieldValue(id, val) {
     return true;
 }
 
-function auditParseText() {
+function auditParseText(opts) {
+    const quiet = !!(opts && opts.quiet); // quiet = re-parse after a text edit: fill, but no toast
     renderAuditFields(); // safety net -- fields should already exist by the time this is clickable
     const ta = document.getElementById('audRawText');
     const text = ta ? ta.value : '';
     if (!text.trim()) {
-        ToastManager.show('Paste the ticket text first.', 'warning');
+        if (!quiet) ToastManager.show('Paste the ticket text first.', 'warning');
         return;
     }
 
@@ -11337,7 +11448,18 @@ function auditParseText() {
     const acmField = acmFieldForRegion(region);
     if (acmField) {
         const acmId = 'audfld_' + acmField.name.replace(/[^a-zA-Z0-9]/g, '_');
-        if (rtSetFieldValue(acmId, rtExtractAcm(text))) filled++;
+        const acmVal = rtExtractAcm(text);
+        if (acmVal && !rtSetFieldValue(acmId, acmVal)) {
+            // A name that's no longer on the current roster (Enzo, Rocky,
+            // a brand-new ACM...) won't match any option -- append it so the
+            // ticket still keeps its real ACM instead of falling to blank.
+            const acmSel = document.getElementById(acmId);
+            if (acmSel) {
+                acmSel.add(new Option(acmVal, acmVal));
+                rtSetFieldValue(acmId, acmVal);
+            }
+        }
+        if (acmVal) filled++;
         else missed.push('ACM');
     } else {
         missed.push('ACM (Region not recognized)');
@@ -11357,7 +11479,9 @@ function auditParseText() {
     auditDeduceMentions();
     auditScheduleDupCheck();
 
-    ToastManager.show(`Auto-filled ${filled} field(s). Please look over: ${missed.join(', ')}.`, 'warning', 9000);
+    if (!quiet) {
+        ToastManager.show(`Auto-filled ${filled} field(s). Please look over: ${missed.join(', ')}.`, 'warning', 9000);
+    }
 }
 
 async function submitAuditForm(e) {
@@ -11634,7 +11758,14 @@ async function auditCheckDuplicates(opts) {
         });
         const hitLines = ['User ID', 'Otherapp ID', 'NID Number']
             .filter(f => byField.has(f))
-            .map(f => `<div class="aws-dup-hit">🔴 <b>${escHtml(f)}</b> in Grand Table Ticket: ${byField.get(f).map(escHtml).join(', ')}</div>`)
+            .map(f => {
+                // Cap the ticket list -- a big dupe wave used to paint a wall
+                // of numbers that pushed the rest of the form off-screen.
+                const nums = byField.get(f);
+                const shown = nums.slice(0, 6).map(escHtml).join(', ');
+                const more = nums.length > 6 ? ` … (+${nums.length - 6} more)` : '';
+                return `<div class="aws-dup-hit">🔴 <b>${escHtml(f)}</b> in Grand Table Ticket: ${shown}${more}</div>`;
+            })
             .join('');
         if (summaryEl) summaryEl.innerHTML = `<div class="aws-dup-verdict" onclick="auditRevealDuplicates()" title="Show the matching requests">${hitLines}<div class="aws-dup-cta">👆 Click to review the ${n} matching request${n === 1 ? '' : 's'} before filing</div></div>`;
         if (revealWrap) {
@@ -11683,14 +11814,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Renders whatever auditCheckDuplicates() found, the moment the agent
-// actually asks to see it -- same .qy-card markup Query Requests uses, with
-// a staggered fade-in (see .qy-grid .qy-card in the CSS) for a bit of polish.
-function auditRevealDuplicates() {
-    const resultsEl = document.getElementById('auditDupResults');
-    const revealWrap = document.getElementById('auditDupReveal');
-    if (!resultsEl) return;
-
-    resultsEl.innerHTML = auditDupMatches.map(({ record: r, matchedOn }) => `
+// actually asks to see it. A handful of matches gets the full .qy-card grid
+// (same markup Query Requests uses, with a staggered fade-in); a big dupe
+// wave gets compact one-line rows instead -- tap a row to unfold that
+// ticket's full card right under it, tap again to fold it back.
+function auditDupCardHtml(r, matchedOn) {
+    return `
         <div class="qy-card">
             <div class="qy-card-head">
                 <div>
@@ -11714,7 +11843,34 @@ function auditRevealDuplicates() {
             ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
             ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
         </div>
-    `).join('');
+    `;
+}
+
+function auditToggleDupRow(row) {
+    const detail = row.nextElementSibling;
+    const isOpen = row.classList.toggle('open');
+    if (detail && detail.classList.contains('aws-dup-detail')) detail.classList.toggle('open', isOpen);
+}
+
+function auditRevealDuplicates() {
+    const resultsEl = document.getElementById('auditDupResults');
+    if (!resultsEl) return;
+
+    const compact = auditDupMatches.length > 8;
+    if (!compact) {
+        resultsEl.innerHTML = auditDupMatches.map(({ record: r, matchedOn }) => auditDupCardHtml(r, matchedOn)).join('');
+    } else {
+        resultsEl.innerHTML = auditDupMatches.map(({ record: r, matchedOn }) => `
+            <div class="aws-dup-row" onclick="auditToggleDupRow(this)">
+                <span class="aws-dup-row-caret">▶</span>
+                <span class="aws-dup-row-num">#${escHtml(r.numbering || '—')}</span>
+                <span class="qy-status-pill ${qyStatusClass(r.status)}">${escHtml(r.status || '—')}</span>
+                <span class="aws-dup-row-agency">${escHtml(r.agency_name || r.agency_code || '—')}</span>
+                <span class="aws-dup-row-matched">${escHtml(Array.from(matchedOn).join(', '))}</span>
+            </div>
+            <div class="aws-dup-detail">${auditDupCardHtml(r, matchedOn)}</div>
+        `).join('');
+    }
 
     // Open the drawer rather than hiding the reveal button, so the agent can
     // close the matches and bring them back without re-running the scan.
