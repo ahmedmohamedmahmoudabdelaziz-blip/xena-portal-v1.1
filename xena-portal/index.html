@@ -246,10 +246,10 @@
         .qy-grid .qy-card { animation: auditCardIn .25s ease backwards; }
 
         /* ═══ Audit Workstation (one-screen layout) ═══
-           Left = ticket text (always visible), middle = agency data, right =
-           the decision, bottom bar = duplicate radar + live reminders +
-           Submit. The grid fills exactly the visible page area so nothing
-           important ever scrolls out of view. */
+           Left = ticket text (always visible), middle = duplicate radar pinned
+           on top + agency data, right = the decision, bottom bar = reject
+           reasons + Submit. The grid fills exactly the visible page area so
+           nothing important ever scrolls out of view. */
         #pg-audit { height: 100%; min-height: 520px; }
         .aws { display: flex; flex-direction: column; height: 100%; gap: 14px; }
         .aws-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr 430px; gap: 14px; }
@@ -268,8 +268,11 @@
         .aws-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
         .aws-fields { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-bottom: 0; }
         .aws-fields-1col { grid-template-columns: 1fr; }
-        .aws-bottom { flex-shrink: 0; display: grid; grid-template-columns: minmax(300px,1.15fr) minmax(200px,1fr) auto; gap: 16px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; box-shadow: var(--shadow); }
+        .aws-bottom { flex-shrink: 0; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; box-shadow: var(--shadow); }
         .aws-radar { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        /* Radar pinned at the top of the middle panel (its own always-visible
+           strip above the scrolling agency fields). */
+        .aws-radar-mid { padding: 12px 18px; border-bottom: 1px dashed var(--border); background: rgba(255,184,0,.04); flex-shrink: 0; }
         .aws-radar-btn { position: relative; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--accent-amber); background: rgba(255,184,0,.08); font-size: 1.15rem; cursor: pointer; flex-shrink: 0; transition: all .2s; display: flex; align-items: center; justify-content: center; }
         .aws-radar-btn:hover { background: rgba(255,184,0,.18); transform: scale(1.06); }
         .aws-radar-btn.scanning { animation: awsRadarPulse 1.1s ease-in-out infinite; }
@@ -344,13 +347,19 @@
            .ss-display, dropzones paint the .elegant-dropzone shell. */
         .ss-wrapper:has(> select.reqfld-autofilled) > .ss-display { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
         .elegant-dropzone.reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.05) !important; }
-        /* Reject Reason's own section, sitting in the middle panel's spare
-           space so the Decision panel fits whole with no scrolling. */
-        .aws-rr-section { margin-top: 20px; padding-top: 14px; border-top: 1px dashed var(--border); }
-        .aws-rr-head { font-size: .85rem; font-weight: 700; color: var(--accent-rose); margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        /* Reject Reason's own section, living in the bottom bar (the radar's
+           old spot) so the Decision panel fits whole with no scrolling. */
+        .aws-rr-section { min-width: 0; }
+        .aws-rr-head { font-size: .85rem; font-weight: 700; color: var(--accent-rose); margin-bottom: 6px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .aws-rr-head .aws-rr-hint { font-size: .68rem; color: var(--text-muted); font-weight: 400; }
         #auditFieldsReject > .control-group > label { display: none; }
-        .aws-rr-section .rr-cloud { max-height: 120px; overflow-y: auto; padding-right: 4px; }
+        .aws-rr-section .rr-picker { margin-top: 2px; }
+        .aws-rr-section .rr-filter { margin-bottom: 6px; padding: 5px 12px; }
+        .aws-rr-section .rr-cloud { max-height: 92px; overflow-y: auto; padding-right: 4px; }
+        /* Mentioned Person roster chips sit between the label and the member
+           search box -- one tap picks a teammate, the box stays for anyone else. */
+        .audit-mention-row { margin: 2px 0 8px; }
+        .audit-mention-chip { font-size: .72rem; padding: 4px 10px; }
         /* 🧹 Clear All -- quiet outline companion under the submit button. */
         .aws-clear-btn { width: 100%; padding: 7px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-weight: 600; font-size: .78rem; cursor: pointer; transition: all .18s; font-family: inherit; }
         .aws-clear-btn:hover { border-color: var(--accent-rose); color: var(--accent-rose); background: rgba(255,77,109,.07); }
@@ -2870,8 +2879,8 @@
             <div id="pg-audit" style="display:none">
                 <!-- Audit Workstation: one screen, three panels + bottom bar.
                      Left = the raw ticket text (stays visible while you work),
-                     middle = the agency data, right = the decision,
-                     bottom = duplicate radar + live reminders + Submit. -->
+                     middle = duplicate radar pinned on top + the agency data,
+                     right = the decision, bottom = reject reasons + Submit. -->
                 <form id="auditRequestForm" class="aws" onsubmit="submitAuditForm(event)">
                     <div class="aws-grid">
                         <section class="aws-panel aws-left">
@@ -2888,15 +2897,20 @@
                                 <span class="aws-panel-title"><span class="audit-card-dot" id="auditDotMain"></span> 🗂️ Agency Data</span>
                                 <span style="font-size:.72rem;color:var(--text-muted)">auto-filled from the text — review &amp; complete</span>
                             </div>
+                            <!-- Duplicate Radar: pinned at the TOP of the middle panel,
+                                 always in view while the agency fields scroll below it. -->
+                            <div class="aws-radar aws-radar-mid">
+                                <button type="button" id="btnAuditCheckDup" class="aws-radar-btn" onclick="auditCheckDuplicates()" title="Check for duplicates now">📡</button>
+                                <div style="min-width:0">
+                                    <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
+                                    <div id="auditDupSummary" class="aws-radar-summary">Scans on its own when you fill or edit an ID — or click 📡 anytime.</div>
+                                    <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
+                                        <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="aws-scroll">
                                 <div id="auditFieldsMain" class="control-grid aws-fields"><!-- built by renderAuditFields() --></div>
-                                <!-- Reject Reason lives in its own section here, using this
-                                     panel's spare space -- so the Decision panel shows every
-                                     field at once, no up-and-down scrolling. -->
-                                <div class="aws-rr-section">
-                                    <div class="aws-rr-head">🚫 Reject Reason <span class="aws-rr-hint">tap every reason that applies — only for a Rejected decision</span></div>
-                                    <div id="auditFieldsReject" class="control-grid aws-fields aws-fields-1col"></div>
-                                </div>
                             </div>
                         </section>
 
@@ -2920,24 +2934,20 @@
                     </div>
 
                     <div class="aws-bottom">
-                        <div class="aws-radar">
-                            <button type="button" id="btnAuditCheckDup" class="aws-radar-btn" onclick="auditCheckDuplicates()" title="Check for duplicates now">📡</button>
-                            <div style="min-width:0">
-                                <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
-                                <div id="auditDupSummary" class="aws-radar-summary">Scans on its own when you fill or edit an ID — or click 📡 anytime.</div>
-                                <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
-                                    <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
-                                </div>
-                            </div>
+                        <!-- Reject Reason took over the radar's old bottom-bar spot --
+                             the whole reason cloud is one glance away, and the Decision
+                             panel above never needs scrolling. -->
+                        <div class="aws-rr-section">
+                            <div class="aws-rr-head">🚫 Reject Reason <span class="aws-rr-hint">tap every reason that applies — only for a Rejected decision</span></div>
+                            <div id="auditFieldsReject" class="control-grid aws-fields aws-fields-1col"></div>
                         </div>
-                        <div id="auditReminders" class="aws-reminders"></div>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <button type="submit" class="btn btn-primary aws-submit" id="btnSubmitAudit">
                                 <span style="display:flex;align-items:center;gap:8px">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                     Secure Submit to Feishu
                                 </span>
-                                <span class="aws-submit-hint">Ctrl + Enter · clears for the next ticket</span>
+                                <span class="aws-submit-hint">Ctrl / Shift + Enter · clears for the next ticket</span>
                             </button>
                             <button type="button" class="aws-clear-btn" id="btnAuditClear" onclick="auditClearWorkstation()" title="Wipe every field, the pasted text and the radar">🧹 Clear All</button>
                         </div>
@@ -3725,7 +3735,18 @@ function enhanceSelect(select) {
     searchInput.addEventListener('input', () => {
         ssRenderOptions(select, optList, searchInput.value, () => { ssSyncDisplay(select, displayText); closePanel(); });
     });
-    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePanel(); display.focus(); } });
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { closePanel(); display.focus(); return; }
+        // Enter inside the search box picks the FIRST visible option (same as the
+        // sheet's own dropdowns) -- it must never reach the surrounding form,
+        // where the browser would read it as "submit the whole request".
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            const first = optList.querySelector('.ss-option');
+            if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        }
+    });
     document.addEventListener('click', (e) => { if (!wrapper.contains(e.target)) closePanel(); });
 
     // If some later code repopulates this select's <option>s (very common in
@@ -8625,6 +8646,7 @@ function openImageLightboxGallery(gallery, index) {
     lightboxIndex = ((index % gallery.length) + gallery.length) % gallery.length;
     overlay.classList.add('active');
     lightboxInitDrag();
+    lightboxInitFitZoom();
     lightboxLoadCurrent();
     document.addEventListener('keydown', lightboxKeyHandler);
     overlay.addEventListener('wheel', lightboxWheelHandler, { passive: false });
@@ -8864,6 +8886,30 @@ function lightboxInitDrag() {
     if (!canvas || canvas.dataset.dragInit) return;
     canvas.dataset.dragInit = '1';
     canvas.addEventListener('mousedown', lightboxDragStart);
+}
+
+// --- Fit-to-stage on open ---------------------------------------------------------
+// Small photos (ID cards, chat screenshots) used to open at their tiny natural
+// pixel size -- a postage stamp in the middle of a dark screen. The moment a new
+// image finishes loading we zoom it UP to fill the stage (never down: big images
+// are already fitted by the CSS max-width/max-height). Runs only right after a
+// src swap -- lightboxLoadCurrent() resets zoom to 1 before every load and any
+// manual zoom happens after this fires, so the user's own zoom is never overridden.
+function lightboxInitFitZoom() {
+    const img = document.getElementById('imgLightboxImg');
+    if (!img || img.dataset.fitInit) return;
+    img.dataset.fitInit = '1';
+    img.addEventListener('load', () => {
+        const stage = document.getElementById('imgLightboxStage');
+        if (!stage || !img.naturalWidth || !lightboxGallery.length) return;
+        const rect = img.getBoundingClientRect(); // transform is scale(1) at this point
+        if (!rect.width || !rect.height) return;
+        const fit = Math.min((stage.clientWidth * 0.94) / rect.width, (stage.clientHeight * 0.94) / rect.height);
+        lightboxZoomLevel = Math.min(Math.max(fit, 1), 6);
+        lightboxPanX = 0;
+        lightboxPanY = 0;
+        lightboxApplyTransform();
+    });
 }
 
 function lightboxDragStart(e) {
@@ -10593,33 +10639,34 @@ const AUDIT_BRANCH = 'Agency Creation';
 // req=false regardless of what REQ_FIELD_DEFS itself says, and every field
 // is always shown -- no hide/show toggling. Three groups now: "Main
 // Info" (everything about the agency/applier/app/evidence), "Reject
-// Reason" (its own section under the agency data, filling the middle
-// panel's spare space), and "Audition Action" (the review outcome --
-// Status/Mentioned Person/Done by/Mentioned Group/Audition note, ending
-// with Agency Code + Parent Agency Code -- all visible without scrolling).
+// Reason" (its own section in the bottom bar, the radar's old spot), and
+// "Audition Action" (the review outcome -- Status/Mentioned Person/Done by/
+// Mentioned Group/Audition note -- all visible without scrolling).
+// Agency Data's own order follows Ahmed's sheet form, ending with Agency
+// Code + Parent Agency Code as he asked.
 const AUDIT_FIELD_GROUPS = {
     'Region':               'auditFieldsMain',
-    'User ID':              'auditFieldsMain',
-    'Agency Name':          'auditFieldsMain',
-    'Applier real name':    'auditFieldsMain',
-    'Otherapp Name':        'auditFieldsMain',
-    'Otherapp ID':          'auditFieldsMain',
-    'Country':              'auditFieldsMain',
-    'Whatsapp Number':      'auditFieldsMain',
-    'NID Number':           'auditFieldsMain',
     'Agency Type':          'auditFieldsMain',
     'Bd Code':              'auditFieldsMain',
     [ACM_AUTO]:             'auditFieldsMain',
+    'Agency Name':          'auditFieldsMain',
+    'User ID':              'auditFieldsMain',
+    'Applier real name':    'auditFieldsMain',
+    'Country':              'auditFieldsMain',
+    'Whatsapp Number':      'auditFieldsMain',
+    'NID Number':           'auditFieldsMain',
+    'Otherapp Name':        'auditFieldsMain',
+    'Otherapp ID':          'auditFieldsMain',
     'Applier Note':         'auditFieldsMain',
     'NID & Otherapp Screen':'auditFieldsMain',
+    'Agency Code':          'auditFieldsMain',
+    'Parenet sub agency':   'auditFieldsMain',
     'Status':               'auditFieldsAction',
     'Mentioned Person':     'auditFieldsAction',
     'Done by':              'auditFieldsAction',
     'Mentioned Group':      'auditFieldsAction',
     'Audition note':        'auditFieldsAction',
     'Reject Reason':        'auditFieldsReject',
-    'Agency Code':          'auditFieldsAction',
-    'Parenet sub agency':   'auditFieldsAction',
 };
 const AUDIT_FIELDS = Object.keys(AUDIT_FIELD_GROUPS);
 // One completion dot per section -- lit up green the moment any field inside
@@ -10636,6 +10683,190 @@ const AUDIT_DONE_BY_PEOPLE = [
     { name: 'Mano', email: 'abdelrahmanhassan@micous.com' },
 ];
 let auditDoneByCache = {};
+
+// ═══ Mention intelligence ═══
+// The roster Ahmed gave (17 teammates, name + email), each pre-resolved to the
+// Feishu open_id that a User-type field actually needs -- so tapping a chip
+// sets the person instantly, no member search round-trip.
+const AUDIT_MENTION_ROSTER = [
+    { name: 'Ritu Pant',     email: 'ritupant@micous.com',      open_id: 'ou_a68a88f4c75818e4eaa3d10e0553d780' },
+    { name: 'Holy',          email: 'holy@micous.com',           open_id: 'ou_3e2df45d94e775326a9eccaab44989f7' },
+    { name: 'Ravikant',      email: 'ravikant@micous.com',       open_id: 'ou_3691fef09117269e73294016f2d32d19' },
+    { name: 'Vihan',         email: 'vihan@micous.com',          open_id: 'ou_c97c1b9a458fa05e9d8c6aa4ec359638' },
+    { name: 'Ansh',          email: 'ansh@micous.com',           open_id: 'ou_527ef4f899edad810a103ec56d2b5391' },
+    { name: 'Rudra',         email: 'rudra@micous.com',          open_id: 'ou_18280f81339dbaae8a602146d51fd4ae' },
+    { name: 'Zohaib Ahmed',  email: 'zohaibahmed@micous.com',    open_id: 'ou_1b32390ed7b6425b76b27eecf6fa7db1' },
+    { name: 'Haseeb Malik',  email: 'haseebmalik@micous.com',   open_id: 'ou_6def4c693d866bda79c87829b11a0e0a' },
+    { name: 'Farooq',        email: 'farooq@micous.com',         open_id: 'ou_e30b176291a8da7d0a5186bcf925ba58' },
+    { name: 'Mubeen',        email: 'mubeen@micous.com',         open_id: 'ou_a39c59bc4e35183556b21d4f4dc554ad' },
+    { name: 'Ehtisham',      email: 'ehtisham@micous.com',       open_id: 'ou_e6dd0c0ce03037cb2277ce611d77d957' },
+    { name: 'Cruz',          email: 'cruz@micous.com',           open_id: 'ou_6108127446c0991ac49432d38bbd5913' },
+    { name: 'Sehar Choudhry',email: 'seharch@micous.com',        open_id: 'ou_40ba8cb7c8e971d314a3fb9c27e8e0ff' },
+    { name: 'Hamza Malik',   email: 'hamzamalik@micous.com',     open_id: 'ou_16ebfa35775209c271c659aa5a1624ad' },
+    { name: 'Usama',         email: 'usama@micous.com',          open_id: 'ou_2b22539964ec3170aaa39918ff0049c3' },
+    { name: 'Nabeel',        email: 'nabeeliqbal@micous.com',   open_id: 'ou_4e7799a017c88558e0aa9b8fbaf843c9' },
+    { name: 'Eagle (Adnan)', email: 'muhammadnan@micous.com',    open_id: 'ou_dcb055f8af481f42958af4b07a8995dc' },
+];
+
+// ACM option value (lowercased) -> the person to mention + the group whose
+// option text to pick in "Mentioned Group". Keyed by the exact sheet values
+// ("Haseeb" is the sheet's spelling; the group option is the sheet's own
+// "PK-Hasseb-Audition group" typo, matched exactly on purpose). Eagle has no
+// group of his own -> group stays empty. Enzo/Leo/Berlin/Rocky/Bella aren't
+// on the roster -> nothing is auto-mentioned for them.
+const AUDIT_ACM_ROSTER = {
+    'nabeel':       { person: 'Nabeel',         group: 'PK-Nabeel-Audition group' },
+    'haseeb':       { person: 'Haseeb Malik',   group: 'PK-Hasseb-Audition group' },
+    'farooq':       { person: 'Farooq',         group: 'PK-Farooq-Audition group' },
+    'mubeen':       { person: 'Mubeen',         group: 'PK-Mubeen Group' },
+    'cruz':         { person: 'Cruz',           group: 'PK-Cruz-Audition group' },
+    'ehtisham':     { person: 'Ehtisham',       group: 'PK-Ehtisham-Audition group' },
+    'usama':        { person: 'Usama',           group: 'PK-Usama-Audition group' },
+    'sehar ch':     { person: 'Sehar Choudhry', group: 'PK-Sehar-Audition group' },
+    'hamza malik':  { person: 'Hamza Malik',    group: 'PK-Hamza-Audition group' },
+    'zohaib':       { person: 'Zohaib Ahmed',   group: 'PK-Zohaib-Audition group' },
+    'eagle':        { person: 'Eagle (Adnan)',  group: '' },
+    'holy':         { person: 'Holy',          group: 'IN-Holy&Ritu-Audition group' },
+    'vihan':        { person: 'Vihan',          group: 'IN-Vihan-Audition group' },
+    'rudra':        { person: 'Rudra',          group: 'IN-Rudra-Audition group' },
+    'ravikant':     { person: 'Ravikant',      group: 'IN-Ravikant-Audition group' },
+    'ansh':         { person: 'Ansh',           group: 'IN-Ansh-Audition group' },
+};
+
+// The last values WE auto-filled -- lets a later deduction refresh its own
+// earlier guess while never stomping a choice the agent made by hand.
+let auditDeducedPerson = '';
+let auditDeducedGroup = '';
+
+function auditMentionWrap() {
+    return document.querySelector('#auditRequestForm [data-user-field="Mentioned Person"]');
+}
+
+// Renders the 17 roster chips between "Mentioned Person" label and the member
+// search box (same look as the Done-by quick picks). Tapping a chip stores the
+// real open_id and shows the picker's own person chip; tapping the active chip
+// again clears it. The search box stays fully functional for anyone else.
+function auditRenderMentionRoster(wrap) {
+    if (!wrap || wrap.querySelector('.audit-mention-row')) return;
+    const row = document.createElement('div');
+    row.className = 'audit-pick-row audit-mention-row';
+    row.innerHTML = AUDIT_MENTION_ROSTER.map(p =>
+        `<button type="button" class="audit-pick-btn audit-mention-chip" data-oid="${p.open_id}" title="${escHtml(p.email)}">${escHtml(p.name)}</button>`).join('');
+    const label = wrap.querySelector('label');
+    if (label && label.nextSibling) wrap.insertBefore(row, label.nextSibling);
+    else wrap.appendChild(row);
+
+    row.querySelectorAll('.audit-mention-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const person = AUDIT_MENTION_ROSTER.find(p => p.open_id === btn.dataset.oid);
+            if (!person) return;
+            if (btn.classList.contains('active')) {
+                // Tapping the already-active chip clears the pick again.
+                const input = wrap.querySelector('input[id^="twup-"][id$="-input"]');
+                if (input) twClearUserPicker(input.id.slice(0, -6));
+                row.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
+                auditDeducedPerson = '';
+                return;
+            }
+            auditDeducedPerson = ''; // a hand tap now owns the field
+            auditSetMentionedPerson(person, true);
+        });
+    });
+
+    // Clearing via the picker chip's own ✕ should also drop the roster chip
+    // highlight (delegated, so it survives the chip being re-rendered).
+    wrap.addEventListener('click', e => {
+        if (e.target && e.target.closest && e.target.closest('button[title="Clear"]')) {
+            row.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
+            auditDeducedPerson = '';
+        }
+    });
+}
+
+// Sets Mentioned Person through the normal member-picker machinery (chip UI +
+// [{"id": open_id}] payload), without needing a search round-trip.
+function auditSetMentionedPerson(person, markChip) {
+    const wrap = auditMentionWrap();
+    if (!wrap || !person) return;
+    const input = wrap.querySelector('input[id^="twup-"][id$="-input"]');
+    if (!input) return;
+    const pickerId = input.id.slice(0, -6); // strip the trailing "-input"
+    window.__twMemberResults[pickerId] = [{ open_id: person.open_id, name: person.name }];
+    twPickMember(pickerId, 0);
+    if (markChip) {
+        wrap.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.toggle('active', c.dataset.oid === person.open_id));
+    }
+}
+
+// The "intelligence" itself: reads the current Region + ACM + Agency Type and
+// fills Mentioned Person / Mentioned Group with the right teammate and group.
+// Walk-ins are deliberately left empty (Ahmed's rule), and a hand-picked value
+// is never overwritten -- only an empty field or one we filled ourselves.
+function auditDeduceMentions() {
+    const type = (document.getElementById('audfld_Agency_Type')?.value || '').trim();
+    if (!type) return;
+    if (/walkin/i.test(type)) {
+        // Walk-in (plain or sub-agency): Ahmed's rule — nothing is mentioned.
+        // Only values WE filled ourselves are cleared; a hand-picked mention
+        // is the agent's call and stays untouched.
+        const wrap = auditMentionWrap();
+        if (wrap) {
+            let cur = '';
+            try { cur = ((JSON.parse(wrap.dataset.userSelected || '[]')[0]) || {}).id || ''; } catch (err) { /* empty */ }
+            if (cur && cur === auditDeducedPerson) {
+                const input = wrap.querySelector('input[id^="twup-"][id$="-input"]');
+                if (input) twClearUserPicker(input.id.slice(0, -6));
+                wrap.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
+            }
+        }
+        const grpSel = document.getElementById('audfld_Mentioned_Group');
+        if (grpSel && grpSel.value && grpSel.value === auditDeducedGroup) {
+            grpSel.value = '';
+            grpSel.classList.remove('reqfld-autofilled');
+            auditUpdateReminders();
+        }
+        auditDeducedPerson = '';
+        auditDeducedGroup = '';
+        return;
+    }
+
+    const region = (document.getElementById('audfld_Region')?.value || '').trim();
+    const acmField = acmFieldForRegion(region);
+    if (!acmField) return;
+    const acmId = 'audfld_' + acmField.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const acm = (document.getElementById(acmId)?.value || '').trim();
+    if (!acm) return;
+    const hit = AUDIT_ACM_ROSTER[acm.toLowerCase()];
+    if (!hit) return;
+
+    if (hit.person) {
+        const wrap = auditMentionWrap();
+        if (wrap) {
+            let cur = '';
+            try { cur = ((JSON.parse(wrap.dataset.userSelected || '[]')[0]) || {}).id || ''; } catch (err) { /* empty */ }
+            if (!cur || cur === auditDeducedPerson) {
+                auditSetMentionedPerson(AUDIT_MENTION_ROSTER.find(p => p.name === hit.person), true);
+                auditDeducedPerson = AUDIT_MENTION_ROSTER.find(p => p.name === hit.person)?.open_id || '';
+            }
+        }
+    }
+
+    if (hit.group) {
+        const grpSel = document.getElementById('audfld_Mentioned_Group');
+        if (grpSel) {
+            const cur = grpSel.value;
+            if (!cur || cur === auditDeducedGroup) {
+                const opt = Array.from(grpSel.options).find(o => o.value === hit.group);
+                if (opt) {
+                    grpSel.value = opt.value;
+                    grpSel.classList.add('reqfld-autofilled');
+                    auditDeducedGroup = opt.value;
+                    auditUpdateReminders();
+                }
+            }
+        }
+    }
+}
 
 function renderAuditFields() {
     const container = document.getElementById('auditFieldsMain');
@@ -10679,6 +10910,9 @@ function renderAuditFields() {
         if (fName === 'Done by') {
             auditRenderDoneByPicker(el);
         }
+        if (fName === 'Mentioned Person') {
+            auditRenderMentionRoster(el);
+        }
         if (fName === 'Reject Reason') {
             auditRenderRejectReasonPicker(el);
         }
@@ -10687,20 +10921,39 @@ function renderAuditFields() {
     refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
 
     // One delegated listener covers every field in every section, present or
-    // future -- keeps the reminders panel and the section dots live as the
+    // future -- keeps the reminder paints and the section dots live as the
     // agent types, without wiring a handler onto each control individually.
     const form = document.getElementById('auditRequestForm');
     if (form) {
         form.addEventListener('input', auditUpdateReminders);
         form.addEventListener('change', auditUpdateReminders);
-        // Duplicate Radar: auto-scans when the watched ID fields change (the
-        // listeners wired below) and manually via the 📡 button.
-        // Ctrl/Cmd+Enter anywhere inside the workstation files the ticket.
+        // Mention intelligence: any change (Region flip rebuilding the ACM
+        // select, an ACM pick, an Agency Type pick) re-runs the deduction --
+        // it's cheap and self-guarding, so it can just watch everything.
+        form.addEventListener('change', auditDeduceMentions);
+        const acmSlot = document.getElementById('auditAcmSlot');
+        if (acmSlot) acmSlot.addEventListener('change', auditDeduceMentions); // survives slot rebuilds
+        // Submit shortcuts -- and ONLY these file the ticket:
+        //   Ctrl/Cmd+Enter anywhere, or Shift+Enter outside textareas (Ahmed's
+        //   sheet-like shortcut). A PLAIN Enter never submits: inside a text
+        //   input it would otherwise trigger the browser's implicit form
+        //   submission, which is exactly what filed half-filled tickets from
+        //   the searchable dropdown search boxes before.
         form.addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            if (e.key !== 'Enter') return;
+            const tag = e.target && e.target.tagName;
+            if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
                 form.requestSubmit();
+                return;
             }
+            if (e.shiftKey) {
+                if (tag === 'TEXTAREA') return; // newline in the raw text / notes
+                e.preventDefault();
+                form.requestSubmit();
+                return;
+            }
+            if (tag === 'INPUT') e.preventDefault(); // plain Enter: never files
         });
     }
 
@@ -10938,8 +11191,9 @@ let auditFlaggedIds = new Set();
 
 function auditUpdateReminders() {
     auditUpdateCardDots();
-    const panel = document.getElementById('auditReminders');
-    if (!panel) return;
+    // The 💡 Double-check chip strip is gone (Ahmed dropped it) -- what
+    // survives is the paint: every field a rule blames goes RED until it's
+    // filled, then turns GREEN like an auto-fill.
     const reminders = auditComputeReminders();
 
     // Red-paint every field a reminder blames (mirror of the green
@@ -10969,15 +11223,6 @@ function auditUpdateReminders() {
         if (dzBox) dzBox.classList.add('reqfld-autofilled');
     });
     auditFlaggedIds = newFlagged;
-
-    // The workstation's bottom bar keeps this panel always visible: an all-clear
-    // state when nothing is flagged, amber chips the moment something is.
-    if (!reminders.length) {
-        panel.innerHTML = '<span class="aws-rem-ok">✅ Looks complete — good to file</span>';
-        return;
-    }
-    panel.innerHTML = '<span class="aws-rem-title">💡 Double-check:</span>'
-        + reminders.map(r => `<span class="aws-rem-chip">${escHtml(r.msg)}</span>`).join('');
 }
 
 
@@ -11105,9 +11350,11 @@ function auditParseText() {
 
     // Region and Agency Type were just set programmatically above, which
     // doesn't fire an 'input'/'change' event on its own -- refresh the
-    // reminders panel and card dots now that the real values are in, and
-    // send the freshly-parsed IDs through the Duplicate Radar.
+    // reminders paints and card dots now that the real values are in, run
+    // the mention deduction (Person + Group from the ACM), and send the
+    // freshly-parsed IDs through the Duplicate Radar.
     auditUpdateReminders();
+    auditDeduceMentions();
     auditScheduleDupCheck();
 
     ToastManager.show(`Auto-filled ${filled} field(s). Please look over: ${missed.join(', ')}.`, 'warning', 9000);
@@ -11252,7 +11499,12 @@ function auditClearWorkstation(silent) {
     // the member picker's chip/dataset, the Status + Done by quick-pick
     // buttons' "active" highlight, and the Reject Reason toggles.
     const mpWrap = form.querySelector('[data-user-field="Mentioned Person"]');
-    if (mpWrap) twRenderMemberPicker(mpWrap, '<label style="font-size:0.8rem;">Mentioned Person</label>', 'Mentioned Person', []);
+    if (mpWrap) {
+        twRenderMemberPicker(mpWrap, '<label style="font-size:0.8rem;">Mentioned Person</label>', 'Mentioned Person', []);
+        auditRenderMentionRoster(mpWrap); // re-build the roster chips (the re-render wiped them)
+    }
+    auditDeducedPerson = '';
+    auditDeducedGroup = '';
     const dbWrap = form.querySelector('[data-user-field="Done by"]');
     if (dbWrap) dbWrap.dataset.userSelected = '';
     form.querySelectorAll('.audit-pick-btn.active').forEach(b => b.classList.remove('active'));
