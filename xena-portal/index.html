@@ -902,6 +902,55 @@
         .tw-head-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.25);color:var(--text);padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap;}
         .tw-head-chip-label{color:var(--text-muted);font-weight:500;text-transform:uppercase;font-size:.65rem;letter-spacing:.4px;}
 
+        /* ═══════════════ Phase 10: Live Ticket Queue + Ticket Workspace redesign ═══════════════ */
+        /* Queue hero header */
+        .ltq-hero{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;padding:28px 32px;margin-bottom:26px;border-radius:20px;background:linear-gradient(135deg, rgba(0,212,255,0.10) 0%, var(--surface) 45%, rgba(168,85,247,0.08) 100%);border:1px solid rgba(0,212,255,0.25);box-shadow:0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);position:relative;overflow:hidden;}
+        .ltq-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg, var(--accent-cyan), var(--accent-purple), var(--accent-rose));}
+        .ltq-hero-left{display:flex;align-items:center;gap:18px;min-width:0;}
+        .ltq-hero-icon{width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.2), rgba(168,85,247,0.15));border:1px solid rgba(0,212,255,0.35);display:flex;align-items:center;justify-content:center;color:var(--accent-cyan);flex-shrink:0;box-shadow:0 4px 16px rgba(0,212,255,0.15);}
+        .ltq-title{margin:0;font-size:1.65rem;font-weight:800;letter-spacing:.3px;background:linear-gradient(90deg, var(--accent-cyan), #7ee7ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+        .ltq-subtitle{margin:4px 0 0;font-size:.92rem;color:var(--text-muted);}
+        .ltq-hero-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+        .ltq-conn{display:flex;align-items:center;gap:7px;font-size:.85rem;color:var(--text-muted);background:rgba(255,255,255,0.04);border:1px solid var(--border);padding:8px 14px;border-radius:20px;}
+        .ltq-conn-dot{width:9px;height:9px;border-radius:50%;background:var(--text-muted);box-shadow:0 0 8px currentColor;}
+        .ltq-count-badge{font-size:.9rem;font-weight:700;color:var(--accent-cyan);background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);padding:8px 16px;border-radius:20px;}
+        .ltq-pull-btn{background:linear-gradient(135deg, var(--accent-cyan), #0090b8);color:#001a20;border:none;padding:13px 26px;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:9px;box-shadow:0 6px 20px rgba(0,212,255,0.3);transition:transform .15s, box-shadow .15s;font-family:inherit;}
+        .ltq-pull-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,212,255,0.45);}
+        .ltq-pull-btn:disabled{opacity:.6;cursor:wait;}
+        .ltq-pull-icon{display:inline-block;}
+        .ltq-pull-btn:active:not(:disabled) .ltq-pull-icon{transform:rotate(180deg);transition:transform .4s;}
+        /* Queue ticket cards */
+        .ltq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px;}
+        .ltq-card{background:linear-gradient(145deg, var(--surface) 0%, rgba(255,255,255,0.015) 100%);border:1px solid var(--border);border-radius:18px;padding:24px;cursor:pointer;position:relative;overflow:hidden;transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;animation:ltqCardIn .45s cubic-bezier(.2,.9,.3,1.2) backwards;}
+        .ltq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ltq-accent, var(--accent-cyan));box-shadow:0 0 12px var(--ltq-accent, var(--accent-cyan));}
+        .ltq-card:hover{transform:translateY(-4px);border-color:var(--ltq-accent, var(--accent-cyan));box-shadow:0 14px 36px rgba(0,0,0,0.35), 0 0 0 1px var(--ltq-accent, var(--accent-cyan));}
+        .ltq-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;}
+        .ltq-card-type{font-size:.75rem;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--ltq-accent, var(--accent-cyan));background:color-mix(in srgb, var(--ltq-accent, var(--accent-cyan)) 12%, transparent);border:1px solid color-mix(in srgb, var(--ltq-accent, var(--accent-cyan)) 35%, transparent);padding:4px 12px;border-radius:14px;}
+        .ltq-card-num{font-size:.8rem;font-weight:700;color:var(--text-muted);}
+        .ltq-card-main{font-size:1.35rem;font-weight:800;letter-spacing:.3px;margin-bottom:6px;word-break:break-all;}
+        .ltq-card-sub{font-size:.88rem;color:var(--text-muted);display:flex;align-items:center;gap:7px;margin-top:4px;}
+        .ltq-card-open{position:absolute;right:20px;bottom:20px;font-size:.85rem;font-weight:700;color:var(--ltq-accent, var(--accent-cyan));opacity:0;transform:translateX(-6px);transition:opacity .2s, transform .2s;}
+        .ltq-card:hover .ltq-card-open{opacity:1;transform:translateX(0);}
+        @keyframes ltqCardIn{from{opacity:0;transform:translateY(16px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+        .ltq-empty{text-align:center;padding:70px 20px;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border);border-radius:20px;}
+        /* Workspace top bar */
+        .twx-topbar{position:sticky;top:0;z-index:80;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 28px;margin-bottom:22px;border-radius:18px;background:color-mix(in srgb, var(--surface) 88%, transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border);border-bottom:3px solid transparent;border-image:linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)) 1;box-shadow:0 10px 34px rgba(0,0,0,0.3);}
+        .twx-title{margin:0 0 10px;font-size:1.55rem;font-weight:800;letter-spacing:.4px;}
+        .twx-back{width:auto;padding:11px 20px;font-size:.95rem;font-weight:700;}
+        .twx-save{width:auto;padding:13px 30px;font-size:1.02rem;font-weight:800;box-shadow:0 6px 20px rgba(0,230,118,0.25);}
+        /* Workspace section cards */
+        #pg-ticket-workspace .twx-card{padding:32px 34px;border-radius:20px;position:relative;overflow:hidden;}
+        #pg-ticket-workspace .twx-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);}
+        #pg-ticket-workspace .twx-card:hover{border-color:var(--border-hover);}
+        .twx-sec-title{margin:0 0 22px;display:flex;align-items:center;gap:12px;font-size:1.18rem;font-weight:800;letter-spacing:.3px;}
+        .twx-sec-num{color:#000;border-radius:10px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,0.3);}
+        .twx-radar{margin-bottom:6px;}
+        /* Done-by quick picks */
+        .twup-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+        .twup-quick-chip{padding:7px 15px;border-radius:16px;border:1px solid rgba(0,212,255,0.35);background:rgba(0,212,255,0.07);color:var(--accent-cyan);font-size:.83rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit;}
+        .twup-quick-chip:hover{background:rgba(0,212,255,0.18);transform:translateY(-1px);}
+        .twup-quick-chip:disabled{opacity:.5;cursor:wait;}
+
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
             .kpi-grid{grid-template-columns:repeat(2,1fr)}
@@ -2712,49 +2761,53 @@
 
             <!-- Live Ticket Queue (Base) -->
             <div id="pg-live-tickets" style="display:none">
-                <div class="card" style="margin-bottom:20px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-                        <h3 style="color:var(--accent-cyan);margin:0; display:flex; align-items:center; gap:10px;">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
-                            Live Ticket Queue
-                        </h3>
-                        <div style="display:flex;align-items:center;gap:14px">
-                            <button id="ltPullBtn" onclick="ltPullAssigned()" style="background:var(--accent-cyan);color:#001a20;border:none;padding:7px 14px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
-                                🔄 Pull My Ticket
-                            </button>
-                            <span id="ltQueueCount" style="font-size:.85rem;color:var(--text-muted)">0 queued</span>
-                            <span id="ltConnStatus" style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-muted)">
-                                <span id="ltConnDot" style="width:8px;height:8px;border-radius:50%;background:var(--text-muted)"></span>
-                                <span id="ltConnLabel">Connecting…</span>
-                            </span>
+                <!-- Hero header (Phase 10 redesign): bigger, gradient-framed, one-tap pull. -->
+                <div class="ltq-hero">
+                    <div class="ltq-hero-left">
+                        <div class="ltq-hero-icon">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
                         </div>
+                        <div>
+                            <h3 class="ltq-title">Live Ticket Queue</h3>
+                            <p class="ltq-subtitle">Tickets assigned to you land here in real time — click one to open it instantly.</p>
+                        </div>
+                    </div>
+                    <div class="ltq-hero-right">
+                        <span id="ltConnStatus" class="ltq-conn">
+                            <span id="ltConnDot" class="ltq-conn-dot"></span>
+                            <span id="ltConnLabel">Connecting…</span>
+                        </span>
+                        <span id="ltQueueCount" class="ltq-count-badge">0 queued</span>
+                        <button id="ltPullBtn" class="ltq-pull-btn" onclick="ltPullAssigned()">
+                            <span class="ltq-pull-icon">🔄</span> Pull My Ticket
+                        </button>
                     </div>
                 </div>
 
-                <div id="ltQueueGrid" class="qy-grid"></div>
+                <div id="ltQueueGrid" class="ltq-grid"></div>
 
-                <div id="ltEmpty" style="text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
-                    <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
-                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
+                <div id="ltEmpty" class="ltq-empty">
+                    <div style="margin-bottom:18px; opacity:0.5;">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
                     </div>
-                    <p style="font-size:1.1rem; font-weight:500;">No tickets in your queue yet.</p>
-                    <p style="font-size:.85rem;margin-top:6px">New tickets assigned to you will appear here in real time.</p>
+                    <p style="font-size:1.25rem; font-weight:600;">No tickets in your queue yet.</p>
+                    <p style="font-size:.95rem;margin-top:8px">New tickets assigned to you will appear here in real time.</p>
                 </div>
             </div>
             
             <!-- Full Page Ticket Workspace -->
             <div id="pg-ticket-workspace" style="display:none;">
-               <!-- Top Bar -->
-               <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding: 16px 24px; margin-bottom:16px; border-bottom: 2px solid var(--accent-cyan); background: linear-gradient(180deg, var(--surface) 0%, rgba(0,212,255,0.02) 100%);">
-                   <button class="btn btn-outline" onclick="twCloseWorkspace()" style="width:auto; padding:8px 16px;">← Back to Queue</button>
-                   <div style="text-align:center;">
-                       <h3 id="tw-title" style="margin-bottom:8px; font-size:1.3rem;">Ticket ID</h3>
+               <!-- Top Bar (Phase 10 redesign): sticky, frosted, gradient underline. -->
+               <div class="twx-topbar">
+                   <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
+                   <div style="text-align:center;min-width:0;">
+                       <h3 id="tw-title" class="twx-title">Ticket ID</h3>
                        <!-- Fixed ticket-head info -- always these three, regardless of
                             Request Type: Mention this Group, Numbering (shown above as
                             the #ticket id) and Submitted on. Populated by twRenderHeadMeta(). -->
                        <div id="tw-head-meta" class="tw-head-meta"></div>
                    </div>
-                   <button id="twSaveBtn" class="btn btn-primary" onclick="twSaveWorkspace()" style="width:auto; padding:10px 24px;">💾 Save &amp; Resolve</button>
+                   <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
                </div>
                
                <!-- Request Type field-layout preview: purely a viewer switch for which
@@ -2770,29 +2823,49 @@
                <form id="tw-form">
                    <input type="hidden" id="tw-record-id">
                    
-                   <div class="card">
-                       <h4 style="color:var(--accent-cyan);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                           <span style="background:var(--accent-cyan); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">1</span>
+                   <div class="card twx-card">
+                       <h4 class="twx-sec-title" style="color:var(--accent-cyan);">
+                           <span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>
                            Basic Information
                        </h4>
                        <div id="tw-sec-1" class="control-grid"></div>
                    </div>
 
-                   <div class="card" id="tw-sec-2-card">
-                       <h4 style="color:var(--accent-purple);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                           <span style="background:var(--accent-purple); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">2</span>
+                   <div class="card twx-card" id="tw-sec-2-card">
+                       <h4 class="twx-sec-title" style="color:var(--accent-purple);">
+                           <span class="twx-sec-num" style="background:var(--accent-purple);">2</span>
                            Dynamic Request Section
                        </h4>
                        <div id="tw-sec-2" class="control-grid"></div>
                    </div>
 
-                   <div class="card">
-                       <h4 style="color:var(--accent-amber);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                           <span style="background:var(--accent-amber); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">3</span>
+                   <div class="card twx-card">
+                       <h4 class="twx-sec-title" style="color:var(--accent-amber);">
+                           <span class="twx-sec-num" style="background:var(--accent-amber);">3</span>
                            Duplicate Check
                        </h4>
                        <div id="tw-sec-3" class="control-grid">
+                           <!-- Duplicate Radar (Phase 10): the same radar idea from the
+                                Audit workstation, living in the ticket's own Duplicate
+                                Check card. Auto-scans the ticket's User ID / Otherapp ID /
+                                NID against the Grand Table the moment the ticket opens
+                                (and whenever one of those IDs is edited here); the sheet's
+                                own "Duplicated Check" formula result stays right below it. -->
                            <div class="control-group" style="grid-column: 1 / -1;">
+                               <div class="aws-radar twx-radar">
+                                   <button type="button" id="btnTwRadar" class="aws-radar-btn" onclick="twRadarCheck()" title="Check for duplicates now">📡</button>
+                                   <div style="min-width:0;flex:1;">
+                                       <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
+                                       <div id="twRadarSummary" class="aws-radar-summary">Scans on its own when the ticket opens — or click 📡 anytime.</div>
+                                       <div id="twRadarReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
+                                           <button type="button" class="btn-sm btn-outline" onclick="twRadarToggleMatches()" id="btnTwRadarReveal">👀 View matches</button>
+                                       </div>
+                                   </div>
+                               </div>
+                               <div id="twRadarResults" class="qy-grid" style="display:none;margin-top:14px;"></div>
+                           </div>
+                           <div class="control-group" style="grid-column: 1 / -1;">
+                               <label style="font-size:.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Sheet Formula Result</label>
                                <div id="tw-dup-display" style="padding:16px; background:rgba(255,255,255,0.05); border-radius:10px; margin-bottom:12px; font-weight:600;">Not yet checked</div>
                                <button type="button" id="twVerifyBtn" class="btn btn-outline" onclick="twRunVerify()" style="width:auto; border-color:var(--accent-amber); color:var(--accent-amber);">🔄 Run Duplicate Check</button>
                            </div>
@@ -2805,9 +2878,9 @@
                        </div>
                    </div>
 
-                   <div class="card">
-                       <h4 style="color:var(--accent-green);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                           <span style="background:var(--accent-green); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">4</span>
+                   <div class="card twx-card">
+                       <h4 class="twx-sec-title" style="color:var(--accent-green);">
+                           <span class="twx-sec-num" style="background:var(--accent-green);">4</span>
                            Chinese Approval
                        </h4>
                        <div class="control-grid">
@@ -2832,9 +2905,9 @@
                        </div>
                    </div>
 
-                   <div class="card">
-                       <h4 style="color:var(--accent-rose);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                           <span style="background:var(--accent-rose); color:#000; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold;">5</span>
+                   <div class="card twx-card">
+                       <h4 class="twx-sec-title" style="color:var(--accent-rose);">
+                           <span class="twx-sec-num" style="background:var(--accent-rose);">5</span>
                            Audition Action
                        </h4>
                        <div class="control-grid">
@@ -2869,6 +2942,14 @@
                            <div class="control-group" style="grid-column: 1 / -1;">
                                <label>Audition Note</label>
                                <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input"></textarea>
+                           </div>
+                           <!-- Approve Note (Phase 10, Ahmed): writes straight to the
+                                sheet's "approve note" field, same pattern as Audition
+                                note above. Populated by twOpenWorkspace, collected by
+                                twCollectFields via the textarea's name. -->
+                           <div class="control-group" style="grid-column: 1 / -1;">
+                               <label>Approve Note</label>
+                               <textarea id="tw-approve-note" name="approve note" data-feishu-field="approve note" rows="3" class="form-highlight-input" placeholder="Note shown to the approver…"></textarea>
                            </div>
                        </div>
                    </div>
@@ -8287,7 +8368,10 @@ const TICKET_INTERNAL_FIELDS = new Set([
     "Request Type",
     "Reject Reason",
     "Audition note",
-    "Create Way"
+    "Create Way",
+    // Phase 10 (Ahmed): BD Nickname2 lookup leaks into the Dynamic Request Section
+    // via this fallback filter -- hide it (BD Nickname1 stays, he only named 2).
+    "BD Nickname2"
 ]);
 
 function feishuValueToString(value) {
@@ -8336,6 +8420,7 @@ let ltQueue = [];
 let ltActiveTicket = null;
 let ltPusherInstance = null;
 let ltInitialized = false;
+let ltLastPullAt = 0; // Phase 10: last successful (or attempted) queue sync, for auto-pull throttling
 
 function ltFieldsForTicket(ticketFields) {
     const mapped = REQ_BRANCHES[ticketFields['Request Type']];
@@ -8357,7 +8442,8 @@ function ltDupClass(value) {
 
 async function ltPullAssigned() {
     const btn = document.getElementById('ltPullBtn');
-    btn.disabled = true; btn.textContent = '⏳ Checking sheet…';
+    btn.disabled = true; btn.innerHTML = '<span class="ltq-pull-icon">⏳</span> Checking sheet…';
+    ltLastPullAt = Date.now();
     try {
         const res = await fetch(`/api/tickets/pull-assigned?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
         const data = await res.json();
@@ -8375,6 +8461,7 @@ async function ltPullAssigned() {
         const removed = ltQueue.filter(q => !newIds.has(q.record_id || q.id)).length;
 
         ltQueue = tickets;
+        twPrefetchPrune();
         ltRenderQueue();
 
         if (!tickets.length) {
@@ -8390,8 +8477,18 @@ async function ltPullAssigned() {
     } catch (e) {
         ToastManager.show('Pull failed: ' + e.message, 'error', 6000);
     } finally {
-        btn.disabled = false; btn.textContent = '🔄 Pull My Ticket';
+        btn.disabled = false; btn.innerHTML = '<span class="ltq-pull-icon">🔄</span> Pull My Ticket';
     }
+}
+
+// Phase 10: a stable accent color per Request Type, so the queue reads at a
+// glance (all Agency Creation tickets share one color, BD Creation another...).
+const LTQ_TYPE_COLORS = ['#00d4ff', '#a855f7', '#ffab00', '#00e676', '#ff4d6d', '#4d9fff', '#ff8a3d', '#3ddc97'];
+function ltqTypeColor(type) {
+    const s = (type || 'Request').toString();
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return LTQ_TYPE_COLORS[h % LTQ_TYPE_COLORS.length];
 }
 
 function ltRenderQueue() {
@@ -8406,20 +8503,50 @@ function ltRenderQueue() {
         return;
     }
     if (empty) empty.style.display = 'none';
-    if (grid) grid.innerHTML = ltQueue.map(t => `
-        <div class="qy-card" style="cursor:pointer" onclick="twOpenWorkspace('${escHtml(t.record_id || t.id || '')}')">
-            <div class="qy-card-head">
-                <div>
-                    <div class="qy-card-num" style="color:var(--accent-cyan);font-size:.75rem;font-weight:700">${escHtml(t.request_type || 'Request')}</div>
-                    <div class="qy-card-type" style="font-weight:600;margin-top:2px">${escHtml(t.agency_code || t.user_id || '#'+String(t.record_id||'').slice(-6))}</div>
-                </div>
-                <span class="qy-status-pill" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">new</span>
+    if (grid) grid.innerHTML = ltQueue.map((t, i) => {
+        const rid = t.record_id || t.id || '';
+        const type = (t.request_type || 'Request').toString().trim();
+        const color = ltqTypeColor(type);
+        const main = t.agency_code || t.user_id || '#' + String(rid).slice(-6);
+        const num = t.numbering ? '#' + t.numbering : '#' + String(rid).slice(-6);
+        return `
+        <div class="ltq-card" style="--ltq-accent:${color};animation-delay:${Math.min(i * 60, 480)}ms" onclick="twOpenWorkspace('${escHtml(rid)}')">
+            <div class="ltq-card-top">
+                <span class="ltq-card-type">${escHtml(type)}</span>
+                <span class="ltq-card-num">${escHtml(num)}</span>
             </div>
-            <div style="font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:6px">
-                👤 ${escHtml(t.assigned_member || 'Unassigned')}
-            </div>
-        </div>
-    `).join('');
+            <div class="ltq-card-main">${escHtml(main)}</div>
+            <div class="ltq-card-sub">👤 ${escHtml(t.assigned_member || 'Unassigned')}</div>
+            <span class="ltq-card-open">Open →</span>
+        </div>`;
+    }).join('');
+    // Phase 10 (speed): warm the detail cache in the background the moment the
+    // queue renders, so clicking a card opens the workspace instantly instead
+    // of waiting on /api/requests/single. Failures are silent -- a cache miss
+    // just falls back to the normal fetch in twOpenWorkspace.
+    ltQueue.forEach(t => twPrefetchTicket(t.record_id || t.id));
+}
+
+// ─── Phase 10: ticket detail prefetch cache ───
+// record_id -> Promise resolving to the ticket record (or null on failure).
+// The Promise itself is cached so a click mid-prefetch simply awaits the
+// in-flight request instead of firing a second one.
+const twPrefetchCache = new Map();
+function twPrefetchTicket(recordId) {
+    if (!recordId || twPrefetchCache.has(recordId)) return;
+    const p = fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`)
+        .then(r => r.json())
+        .then(data => (data && data.success && data.record) ? data.record : null)
+        .catch(() => null);
+    twPrefetchCache.set(recordId, p);
+}
+// Drop cached details for tickets no longer in the queue (resolved /
+// reassigned elsewhere) so a stale record can never be shown.
+function twPrefetchPrune() {
+    const live = new Set(ltQueue.map(t => t.record_id || t.id));
+    for (const rid of twPrefetchCache.keys()) {
+        if (!live.has(rid)) twPrefetchCache.delete(rid);
+    }
 }
 
 // ISSUE FIX: "Mentioned Person" and "Done by" were listed only in
@@ -8534,13 +8661,25 @@ function twRenderHeadMeta(ticket) {
 }
 
 async function twOpenWorkspace(recordId) {
-    document.getElementById('loadingOverlay').style.display = 'flex';
+    // Phase 10 (speed): if ltRenderQueue's prefetch already fetched (or is
+    // fetching) this record, open from that -- no overlay, no second request.
+    // A prefetch that failed resolves to null and we fall through to the
+    // normal fetch-with-overlay path.
+    let ticket = null;
+    if (twPrefetchCache.has(recordId)) {
+        ticket = await twPrefetchCache.get(recordId);
+        twPrefetchCache.delete(recordId); // single-use: the workspace edits and re-fetches on save/verify
+    }
+    if (!ticket) {
+        document.getElementById('loadingOverlay').style.display = 'flex';
+    }
     try {
-        const res = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        
-        const ticket = data.record;
+        if (!ticket) {
+            const res = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            ticket = data.record;
+        }
         ltActiveTicket = ticket;
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
 
@@ -8596,6 +8735,7 @@ async function twOpenWorkspace(recordId) {
         document.getElementById('tw-audition-approval').checked = ticket.fields['Approval'] || false;
         document.getElementById('tw-audition-status').value = typeof ticket.fields['Status'] === 'string' ? ticket.fields['Status'].trim() : (ticket.fields['Status']?.text?.trim() || '');
         document.getElementById('tw-audition-note').value = ticket.fields['Audition note'] || '';
+        document.getElementById('tw-approve-note').value = feishuValueToString(ticket.fields['approve note']);
         document.getElementById('tw-chinese-action').value = typeof ticket.fields['Type of Action'] === 'string' ? ticket.fields['Type of Action'].trim() : (ticket.fields['Type of Action']?.text?.trim() || '');
         document.getElementById('tw-chinese-note').value = ticket.fields['chinese Note'] || '';
 
@@ -8644,6 +8784,12 @@ async function twOpenWorkspace(recordId) {
         dupCheck.setAttribute('style', ltDupClass(ticket.fields['Duplicated Check']||''));
 
         openInTab('ticket-workspace');
+
+        // Phase 10: the Duplicate Radar fires on its own a beat after the
+        // workspace renders (the form fields need to exist first), scanning
+        // this ticket's IDs against the Grand Table without any clicks.
+        twRadarReset();
+        setTimeout(() => twRadarCheck({ auto: true }), 400);
     } catch(e) {
         ToastManager.show('Failed to open ticket: ' + e.message, 'error');
     }
@@ -9287,6 +9433,7 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
     wrap.innerHTML = `
         ${label}
         <div style="position:relative;">
+            ${key === 'Done by' ? `<div class="twup-quick">${TW_DONE_BY_QUICK_PICKS.map(q => `<button type="button" class="twup-quick-chip" onclick="twQuickPickDoneBy('${pickerId}', '${q}')" title="Set Done by to ${q}">⚡ ${q}</button>`).join('')}</div>` : ''}
             <div id="${pickerId}-chip" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
                 <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</span>
                 <span style="flex:1;font-size:.85rem;">${current ? escHtml(current.name) : ''}</span>
@@ -9299,6 +9446,29 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
             <div id="${pickerId}-menu" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:240px;overflow-y:auto;z-index:60;margin-top:4px;"></div>
         </div>`;
     return wrap;
+}
+
+// Phase 10 (Ahmed): one-tap Done by. The audit team is almost always one of
+// these three, so the picker offers them as instant chips above the search
+// box -- a chip runs the same member search under the hood and selects the
+// best match, exactly as if it had been typed and clicked.
+const TW_DONE_BY_QUICK_PICKS = ['Samurai', 'Noora', 'Mano'];
+async function twQuickPickDoneBy(pickerId, query) {
+    try {
+        const res = await fetch(`/api/members/search?q=${encodeURIComponent(query)}&uat=${encodeURIComponent(loggedUat)}`);
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.results) || !data.results.length) {
+            ToastManager.show(`No member found for "${query}" -- type the name instead.`, 'warning');
+            return;
+        }
+        const q = query.toLowerCase();
+        let idx = data.results.findIndex(m => (m.name || '').toLowerCase().includes(q));
+        if (idx < 0) idx = 0;
+        window.__twMemberResults[pickerId] = data.results;
+        twPickMember(pickerId, idx);
+    } catch (e) {
+        ToastManager.show('Quick pick failed: ' + e.message, 'error');
+    }
 }
 
 let _twMemberSearchTimer = null;
@@ -9644,6 +9814,167 @@ async function twRunVerify() {
 }
 
 
+// ─── Phase 10: Duplicate Radar (ticket workspace) ───
+// Same idea as the Audit workstation's radar (auditCheckDuplicates), but fed
+// from the open ticket's own fields: User ID / Otherapp ID / NID Number are
+// read live out of the workspace form, searched against the Grand Table via
+// /api/query, and merged by ticket number. The ticket ITSELF is filtered out
+// of the matches -- of course its own IDs appear on its own row.
+let twRadarMatches = [];
+let twRadarLastKey = '';
+let twRadarAutoTimer = null;
+
+const TW_RADAR_FIELDS = [
+    ['user_id', 'User ID'],
+    ['otherapp_id', 'Otherapp ID'],
+    ['nid_number', 'NID Number'],
+];
+
+function twRadarReset() {
+    twRadarMatches = [];
+    twRadarLastKey = '';
+    const summary = document.getElementById('twRadarSummary');
+    const reveal = document.getElementById('twRadarReveal');
+    const results = document.getElementById('twRadarResults');
+    const btn = document.getElementById('btnTwRadar');
+    if (summary) summary.innerHTML = 'Scans on its own when the ticket opens — or click 📡 anytime.';
+    if (reveal) reveal.style.display = 'none';
+    if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+    if (btn) btn.classList.remove('alert', 'scanning');
+}
+
+function twRadarFieldValue(label) {
+    const form = document.getElementById('tw-form');
+    if (!form) return '';
+    const el = form.querySelector(`[name="${label}"]`);
+    return el ? (el.value || '').trim() : '';
+}
+
+function twRadarScanKey(fieldsToCheck) {
+    return fieldsToCheck.map(([field, value]) => field + '=' + value).join('|');
+}
+
+async function twRadarCheck(opts) {
+    const isAuto = !!(opts && opts.auto);
+    const summaryEl = document.getElementById('twRadarSummary');
+    const revealWrap = document.getElementById('twRadarReveal');
+    const btn = document.getElementById('btnTwRadar');
+    if (!summaryEl) return;
+
+    const fieldsToCheck = TW_RADAR_FIELDS
+        .map(([field, label]) => [field, twRadarFieldValue(label), label])
+        .filter(([, value]) => value);
+
+    if (!fieldsToCheck.length) {
+        if (isAuto) { twRadarReset(); return; }
+        ToastManager.show('This ticket has no User ID, Otherapp ID, or NID Number to scan.', 'warning');
+        return;
+    }
+
+    const scanKey = twRadarScanKey(fieldsToCheck);
+    if (isAuto && scanKey === twRadarLastKey) return;
+    twRadarLastKey = scanKey;
+
+    const resultsEl = document.getElementById('twRadarResults');
+    if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+    if (revealWrap) revealWrap.style.display = 'none';
+    twRadarMatches = [];
+    summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
+    if (btn) { btn.disabled = true; btn.classList.add('scanning'); btn.classList.remove('alert'); }
+
+    // The open ticket must never flag itself as its own duplicate.
+    const selfNumbering = ltActiveTicket && ltActiveTicket.fields ? String(ltActiveTicket.fields['Numbering'] || '') : '';
+    const selfRecordId = document.getElementById('tw-record-id')?.value || '';
+
+    try {
+        const responses = await Promise.all(fieldsToCheck.map(([field, value]) =>
+            fetch(`/api/query?${new URLSearchParams({ field, value, user: loggedUser || '', email: loggedEmail || '' })}`)
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .catch(err => ({ ok: false, data: { error: err.message } }))
+        ));
+
+        const byKey = new Map(); // ticket key -> { record, matchedOn: Set<label> }
+        let firstError = null;
+        responses.forEach(({ ok, data }, i) => {
+            const label = fieldsToCheck[i][2];
+            if (!ok || data.error) { firstError = firstError || data.error || 'Search failed'; return; }
+            (data.results || []).forEach(r => {
+                if (selfNumbering && String(r.numbering || '') === selfNumbering) return; // self
+                if (selfRecordId && r.record_id && String(r.record_id) === selfRecordId) return; // self
+                const key = r.numbering || `${r.user_id}|${r.agency_code}|${r.otherapp_id}|${r.bd_code}`;
+                if (!byKey.has(key)) byKey.set(key, { record: r, matchedOn: new Set() });
+                byKey.get(key).matchedOn.add(label);
+            });
+        });
+
+        twRadarMatches = Array.from(byKey.values());
+
+        if (!twRadarMatches.length) {
+            summaryEl.innerHTML = `<span class="aws-dup-clean">🟢 No duplicate</span>${firstError ? ' <span style="font-size:.68rem;color:var(--text-muted)">(one search had an issue)</span>' : ''}`;
+            if (firstError && !isAuto) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
+            if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
+            return;
+        }
+
+        const n = twRadarMatches.length;
+        const byField = new Map();
+        twRadarMatches.forEach(({ record, matchedOn }) => {
+            matchedOn.forEach(label => {
+                if (!byField.has(label)) byField.set(label, []);
+                byField.get(label).push('#' + (record.numbering || '—'));
+            });
+        });
+        const hitLines = ['User ID', 'Otherapp ID', 'NID Number']
+            .filter(f => byField.has(f))
+            .map(f => {
+                const nums = byField.get(f);
+                const shown = nums.slice(0, 6).map(escHtml).join(', ');
+                const more = nums.length > 6 ? ` … (+${nums.length - 6} more)` : '';
+                return `<div class="aws-dup-hit">🔴 <b>${escHtml(f)}</b> in Grand Table Ticket: ${shown}${more}</div>`;
+            })
+            .join('');
+        summaryEl.innerHTML = `<div class="aws-dup-verdict" onclick="twRadarToggleMatches(true)" title="Show the matching requests">${hitLines}<div class="aws-dup-cta">👆 Click to review the ${n} matching request${n === 1 ? '' : 's'}</div></div>`;
+        if (revealWrap) {
+            revealWrap.style.display = 'block';
+            const revealBtn = document.getElementById('btnTwRadarReveal');
+            if (revealBtn) revealBtn.textContent = `👀 View ${n} match${n === 1 ? '' : 'es'}`;
+        }
+        if (btn) btn.classList.add('alert');
+
+    } catch (e) {
+        summaryEl.innerHTML = '';
+        ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
+    }
+
+    if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
+}
+
+// Reveal/hide the matching tickets inline, right under the radar. Cards reuse
+// the Audit workstation's auditDupCardHtml so matches look identical there.
+function twRadarToggleMatches(forceOpen) {
+    const resultsEl = document.getElementById('twRadarResults');
+    if (!resultsEl) return;
+    const open = forceOpen === true ? true : resultsEl.style.display === 'none';
+    if (!open) { resultsEl.style.display = 'none'; return; }
+    if (!twRadarMatches.length) return;
+    resultsEl.innerHTML = twRadarMatches.map(({ record, matchedOn }) => auditDupCardHtml(record, matchedOn)).join('');
+    resultsEl.style.display = 'grid';
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Auto re-scan when one of the watched ID fields is edited inside the
+// workspace (the same debounce idea as the Audit radar).
+document.addEventListener('input', (e) => {
+    if (!e.target || !e.target.name) return;
+    const ws = document.getElementById('pg-ticket-workspace');
+    if (!ws || ws.style.display === 'none') return;
+    if (!e.target.closest || !e.target.closest('#tw-form')) return;
+    if (['User ID', 'Otherapp ID', 'NID Number'].includes(e.target.name)) {
+        clearTimeout(twRadarAutoTimer);
+        twRadarAutoTimer = setTimeout(() => twRadarCheck({ auto: true }), 1000);
+    }
+});
+
 function ltSetConnStatus(status) {
     const dot = document.getElementById('ltConnDot');
     const label = document.getElementById('ltConnLabel');
@@ -9718,6 +10049,13 @@ function initLiveTicketWorkspace() {
         ltInitialized = true;
         ltSetConnStatus('connecting');
         ltConnectPusher();
+    }
+    // Phase 10 (speed): sync the queue by itself the moment the tab opens --
+    // first visit ever, or any visit more than 60s after the last sync. The
+    // manual Pull button stays for an on-demand refresh inside that window.
+    if (Date.now() - ltLastPullAt > 60000) {
+        ltLastPullAt = Date.now();
+        ltPullAssigned();
     }
 }
 
@@ -10417,21 +10755,36 @@ function refreshClosingReasonSubfields() {
 // the BD Code field hides (and stops being required -- a hidden required
 // input would block the submit with a browser "not focusable" error). Any
 // typed BD Code is cleared on hide so a stale value can't ride along in the
-// payload. Otherapp ID is never mandatory, and stays that way for Walkin.
+// payload.
+// Walkin extra rule (Ahmed 2026-09-30, comment 7691063311323909300): a
+// walk-in agency applies directly, it does not come from another app, so
+// Otherapp Name and Otherapp ID hide too. Otherapp Name was req:true and
+// blocked the submit; hiding follows the same clear-value + not-required
+// pattern as BD Code. "Walkin sub-agency" is untouched on purpose (it can
+// still carry otherapp info) -- flip the check if Ahmed wants otherwise.
 function reqApplyAgencyTypeRules() {
     const typeSel = document.getElementById('reqfld_Agency_Type');
     const container = document.getElementById('formDynamicFields');
     if (!typeSel || !container) return;
     const t = (typeSel.value || '').trim().toLowerCase();
-    const bdWrap = container.querySelector('[data-field="Bd Code"]');
-    if (!bdWrap) return;
-    const bdInput = bdWrap.querySelector('input, select');
+    const applyRule = (fieldName, hide) => {
+        const wrap = container.querySelector(`[data-field="${fieldName}"]`);
+        if (!wrap) return;
+        const input = wrap.querySelector('input, select, textarea');
+        wrap.style.display = hide ? 'none' : '';
+        if (input) {
+            // Restore the field's OWN required flag when un-hiding -- not
+            // every field here is mandatory (Otherapp ID never is).
+            const def = REQ_FIELD_DEFS[fieldName] || {};
+            input.required = hide ? false : !!def.req;
+            if (hide) input.value = '';
+        }
+    };
     const hideBd = t === 'acm hunting' || t === 'walkin';
-    bdWrap.style.display = hideBd ? 'none' : '';
-    if (bdInput) {
-        bdInput.required = !hideBd;
-        if (hideBd) bdInput.value = '';
-    }
+    applyRule('Bd Code', hideBd);
+    const hideOtherapp = t === 'walkin';
+    applyRule('Otherapp Name', hideOtherapp);
+    applyRule('Otherapp ID', hideOtherapp);
 }
 
 function renderReqFormFields() {
