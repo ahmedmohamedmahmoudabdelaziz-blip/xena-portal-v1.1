@@ -901,6 +901,13 @@
         .tw-head-meta{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;}
         .tw-head-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.25);color:var(--text);padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap;}
         .tw-head-chip-label{color:var(--text-muted);font-weight:500;text-transform:uppercase;font-size:.65rem;letter-spacing:.4px;}
+        /* Phase 10.1: signature color per topbar chip */
+        .tw-head-chip.chip-cyan{background:rgba(0,212,255,0.10);border-color:rgba(0,212,255,0.38);}
+        .tw-head-chip.chip-cyan .tw-head-chip-label{color:var(--accent-cyan);opacity:.85;}
+        .tw-head-chip.chip-purple{background:rgba(168,85,247,0.10);border-color:rgba(168,85,247,0.40);}
+        .tw-head-chip.chip-purple .tw-head-chip-label{color:#c4b5fd;}
+        .tw-head-chip.chip-amber{background:rgba(255,184,0,0.10);border-color:rgba(255,184,0,0.40);}
+        .tw-head-chip.chip-amber .tw-head-chip-label{color:var(--accent-amber);}
 
         /* ═══════════════ Phase 10: Live Ticket Queue + Ticket Workspace redesign ═══════════════ */
         /* Queue hero header */
@@ -933,23 +940,53 @@
         .ltq-card:hover .ltq-card-open{opacity:1;transform:translateX(0);}
         @keyframes ltqCardIn{from{opacity:0;transform:translateY(16px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
         .ltq-empty{text-align:center;padding:70px 20px;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border);border-radius:20px;}
-        /* Workspace top bar */
-        .twx-topbar{position:sticky;top:0;z-index:80;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 28px;margin-bottom:22px;border-radius:18px;background:color-mix(in srgb, var(--surface) 88%, transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border);border-bottom:3px solid transparent;border-image:linear-gradient(90deg, var(--accent-cyan), var(--accent-purple)) 1;box-shadow:0 10px 34px rgba(0,0,0,0.3);}
-        .twx-title{margin:0 0 10px;font-size:1.55rem;font-weight:800;letter-spacing:.4px;}
+        /* Workspace top bar (Phase 10.1): frosted glass over a colorful gradient
+           wash, animated gradient frame, per-chip signature colors, Note toggle. */
+        .twx-topbar{position:sticky;top:0;z-index:80;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 28px;margin-bottom:26px;border-radius:20px;background:linear-gradient(135deg, rgba(0,212,255,0.09) 0%, color-mix(in srgb, var(--surface) 90%, transparent) 42%, rgba(255,184,0,0.07) 100%);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,212,255,0.22);box-shadow:0 14px 42px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.07);overflow:hidden;}
+        .twx-topbar::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg, var(--accent-cyan), var(--accent-purple), var(--accent-amber), var(--accent-rose), var(--accent-cyan));background-size:300% 100%;animation:twxBarSlide 10s linear infinite;}
+        @keyframes twxBarSlide{from{background-position:0% 0;}to{background-position:300% 0;}}
+        .twx-title{margin:0 0 10px;font-size:1.55rem;font-weight:800;letter-spacing:.4px;background:linear-gradient(90deg,#7ee7ff,var(--accent-cyan) 45%,#c4b5fd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
         .twx-back{width:auto;padding:11px 20px;font-size:.95rem;font-weight:700;}
         .twx-save{width:auto;padding:13px 30px;font-size:1.02rem;font-weight:800;box-shadow:0 6px 20px rgba(0,230,118,0.25);}
+        .twx-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+        .twx-note-btn{padding:12px 18px;font-size:.92rem;font-weight:800;display:inline-flex;align-items:center;gap:7px;border-radius:13px;border:1.5px solid rgba(255,184,0,0.45);background:rgba(255,184,0,0.08);color:var(--accent-amber);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;}
+        .twx-note-btn:hover{background:rgba(255,184,0,0.18);transform:translateY(-1px);box-shadow:0 5px 18px rgba(255,184,0,0.25);}
+        .twx-note-btn.active{background:rgba(255,184,0,0.92);color:#241a00;border-color:var(--accent-amber);box-shadow:0 0 18px rgba(255,184,0,0.45);}
         /* Workspace section cards */
-        #pg-ticket-workspace .twx-card{padding:32px 34px;border-radius:20px;position:relative;overflow:hidden;}
+        #pg-ticket-workspace .twx-card{padding:32px 34px;border-radius:20px;position:relative;overflow:hidden;transition:border-color .2s ease, box-shadow .2s ease;}
         #pg-ticket-workspace .twx-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);}
-        #pg-ticket-workspace .twx-card:hover{border-color:var(--border-hover);}
+        #pg-ticket-workspace .twx-card:hover{border-color:var(--border-hover);box-shadow:0 10px 34px rgba(0,0,0,0.30);}
         .twx-sec-title{margin:0 0 22px;display:flex;align-items:center;gap:12px;font-size:1.18rem;font-weight:800;letter-spacing:.3px;}
         .twx-sec-num{color:#000;border-radius:10px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,0.3);}
         .twx-radar{margin-bottom:6px;}
-        /* Done-by quick picks */
-        .twup-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
-        .twup-quick-chip{padding:7px 15px;border-radius:16px;border:1px solid rgba(0,212,255,0.35);background:rgba(0,212,255,0.07);color:var(--accent-cyan);font-size:.83rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit;}
-        .twup-quick-chip:hover{background:rgba(0,212,255,0.18);transform:translateY(-1px);}
-        .twup-quick-chip:disabled{opacity:.5;cursor:wait;}
+        /* Phase 10.1 workspace polish: clearer labels, friendlier grids, glowing focus */
+        #pg-ticket-workspace .control-group > label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:7px;display:block;}
+        #pg-ticket-workspace .control-grid{gap:16px 18px;}
+        #pg-ticket-workspace .form-highlight-input{transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;}
+        #pg-ticket-workspace .form-highlight-input:focus{border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,0.14), 0 0 18px rgba(0,212,255,0.10);outline:none;}
+        /* Queue card "Opening…" state (Phase 10.1) */
+        .ltq-card.opening{pointer-events:none;border-color:var(--ltq-accent, var(--accent-cyan));box-shadow:0 0 0 1px var(--ltq-accent, var(--accent-cyan)), 0 12px 32px rgba(0,0,0,0.35);animation:ltqCardPulse 1.1s ease-in-out infinite;}
+        .ltq-card.opening .ltq-card-open{opacity:1;transform:translateX(0);display:inline-flex;align-items:center;gap:7px;}
+        @keyframes ltqCardPulse{0%,100%{box-shadow:0 0 0 1px var(--ltq-accent, var(--accent-cyan)), 0 12px 32px rgba(0,0,0,0.35);}50%{box-shadow:0 0 0 2px var(--ltq-accent, var(--accent-cyan)), 0 12px 38px color-mix(in srgb, var(--ltq-accent, var(--accent-cyan)) 28%, transparent);}}
+        .ltq-mini-spinner{width:13px;height:13px;border-radius:50%;border:2px solid color-mix(in srgb, var(--ltq-accent, var(--accent-cyan)) 30%, transparent);border-top-color:var(--ltq-accent, var(--accent-cyan));display:inline-block;animation:ltqSpin .7s linear infinite;}
+        @keyframes ltqSpin{to{transform:rotate(360deg);}}
+        /* Floating scratch note (Phase 10.1): sits above EVERYTHING, including
+           the image lightbox (z 9999), so notes can be copied off screenshots
+           without ever closing the picture. Closed via ✕, the Note button, or
+           a successful submit. */
+        #twNotePop{position:fixed;right:24px;bottom:24px;width:330px;max-height:62vh;z-index:10001;display:none;flex-direction:column;background:linear-gradient(160deg, rgba(40,32,12,0.97), rgba(24,24,28,0.97));border:1.5px solid rgba(255,184,0,0.45);border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,0.55), 0 0 24px rgba(255,184,0,0.12);overflow:hidden;}
+        #twNotePop.open{display:flex;animation:twNoteIn .22s cubic-bezier(.2,.9,.3,1.2);}
+        @keyframes twNoteIn{from{opacity:0;transform:translateY(-10px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
+        .twn-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,184,0,0.12);border-bottom:1px solid rgba(255,184,0,0.25);}
+        .twn-title{font-size:.8rem;font-weight:800;letter-spacing:.5px;color:var(--accent-amber);text-transform:uppercase;}
+        .twn-close{background:none;border:none;color:var(--accent-amber);font-size:1.05rem;cursor:pointer;padding:0 4px;line-height:1;}
+        .twn-close:hover{color:#fff;}
+        #twNoteText{width:100%;min-height:170px;resize:vertical;border:none;background:transparent;color:#ffe9b0;padding:14px;font-family:inherit;font-size:.88rem;line-height:1.55;outline:none;box-sizing:border-box;}
+        #twNoteText::placeholder{color:rgba(255,233,176,0.35);}
+        .twn-foot{padding:8px 14px;font-size:.68rem;color:rgba(255,233,176,0.45);border-top:1px solid rgba(255,184,0,0.15);}
+        /* Done-by quick picks: rendered with the audit tab's .audit-pick-btn
+           per-person colors (Ahmed blue / Noora pink / Mano yellow). */
+        .twup-quick{margin-bottom:12px;}
 
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
@@ -2797,17 +2834,34 @@
             
             <!-- Full Page Ticket Workspace -->
             <div id="pg-ticket-workspace" style="display:none;">
-               <!-- Top Bar (Phase 10 redesign): sticky, frosted, gradient underline. -->
+               <!-- Top Bar (Phase 10.1 redesign): sticky, frosted, animated gradient
+          frame, colored info chips, floating scratch-note toggle. -->
                <div class="twx-topbar">
                    <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
                    <div style="text-align:center;min-width:0;">
                        <h3 id="tw-title" class="twx-title">Ticket ID</h3>
-                       <!-- Fixed ticket-head info -- always these three, regardless of
-                            Request Type: Mention this Group, Numbering (shown above as
-                            the #ticket id) and Submitted on. Populated by twRenderHeadMeta(). -->
+                       <!-- Fixed ticket-head info -- Mention this Group, Submitted on
+                            and Respondents, regardless of Request Type. Populated by
+                            twRenderHeadMeta(). -->
                        <div id="tw-head-meta" class="tw-head-meta"></div>
                    </div>
-                   <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
+                   <div class="twx-actions">
+                       <button type="button" id="twNoteBtn" class="twx-note-btn" onclick="twToggleNote()" title="Floating scratch note -- stays on top even over opened pictures">📝 Note</button>
+                       <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
+                   </div>
+               </div>
+
+               <!-- Floating scratch note (Phase 10.1): opens from the topbar Note
+                    button and floats ABOVE everything -- even the image lightbox --
+                    so details can be copied off screenshots without closing them.
+                    Closed by its ✕, the Note button, or a successful submit. -->
+               <div id="twNotePop">
+                   <div class="twn-head">
+                       <span class="twn-title">📝 Scratch Note</span>
+                       <button type="button" class="twn-close" onclick="twToggleNote(false)" title="Close note">✕</button>
+                   </div>
+                   <textarea id="twNoteText" placeholder="Copy details from screenshots here, then type them into the fields below…"></textarea>
+                   <div class="twn-foot">Floats above opened pictures · cleared when the request is submitted</div>
                </div>
                
                <!-- Request Type field-layout preview: purely a viewer switch for which
@@ -8163,7 +8217,7 @@ const LT_FIELD_MAP = {
 };
 const LT_ALWAYS_SHOW = [["applier_note","Applier Note"]];
 
-const FIELD_SCHEMA = {"Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)"]}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Rudra-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed", "Ahmed Samurai"]}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty"]}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"]}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Rudra", "Ravikant", "Ansh", "Rocky", "BELLA", "nabeel"]}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name"]}, "Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )", "Golden Lion Package ( 50 )", "White Lion Package ( 50 )", "Pink Lion Package ( 50 )", "Green Warrior Package ( 50 )", "Lion King Package ( 50 )", "Pink Love Package ( 50 )"]}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "SingleLink"}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}};
+const FIELD_SCHEMA = {"Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Rudra-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin", "Holy", "Rudra", "Ansh", "Vihan"]}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed"]}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )", "Golden Lion Package ( 50 Points )", "White Lion Package ( 50 Points )", "Pink Lion Package ( 50 Points )", "Green Warrior Package ( 50 Points )", "Lion King Package ( 50 Points )", "Pink Love Package ( 50 Points )", "Golden Lion Package ( 50 )"]}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name", "Agency manager in another ID"]}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Rudra", "Ravikant", "Ansh", "Rocky", "BELLA", "Enzo", "Farooq", "nabeel", "Haseeb", "Zohaib", "Mubeen"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "Link"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}};
 
 // Exact per-Request-Type field layout for the ticket workspace's Dynamic Request
 // Section, sourced directly from the live Feishu form (keys match Feishu's
@@ -8251,6 +8305,13 @@ const TICKET_DYNAMIC_FIELDS = {
         "User ID",
         "Agency Code",
         "Type of Action Host sign",
+        "Evidence Screen"
+    ],
+    "App Rating Reward": [
+        "Region",
+        "User ID",
+        "Counter",
+        "Applier Note",
         "Evidence Screen"
     ],
     "Welcome Package": [
@@ -8510,7 +8571,7 @@ function ltRenderQueue() {
         const main = t.agency_code || t.user_id || '#' + String(rid).slice(-6);
         const num = t.numbering ? '#' + t.numbering : '#' + String(rid).slice(-6);
         return `
-        <div class="ltq-card" style="--ltq-accent:${color};animation-delay:${Math.min(i * 60, 480)}ms" onclick="twOpenWorkspace('${escHtml(rid)}')">
+        <div class="ltq-card" style="--ltq-accent:${color};animation-delay:${Math.min(i * 60, 480)}ms" onclick="twCardOpen(this, '${escHtml(rid)}')">
             <div class="ltq-card-top">
                 <span class="ltq-card-type">${escHtml(type)}</span>
                 <span class="ltq-card-num">${escHtml(num)}</span>
@@ -8654,10 +8715,57 @@ function twRenderHeadMeta(ticket) {
     } else if (submittedRaw) {
         submittedVal = feishuValueToString(submittedRaw) || '—';
     }
+    // Respondents is a User field: [{id, name}, ...] -- show the names.
+    const respRaw = ticket.fields['Respondents'];
+    let respondentsVal = '—';
+    if (Array.isArray(respRaw) && respRaw.length && respRaw[0] && typeof respRaw[0] === 'object' && respRaw[0].name) {
+        respondentsVal = respRaw.map(u => u.name).join(', ');
+    } else if (respRaw) {
+        respondentsVal = feishuValueToString(respRaw) || '—';
+    }
     metaEl.innerHTML = `
-        <span class="tw-head-chip"><span class="tw-head-chip-label">Group</span>${escHtml(groupVal)}</span>
-        <span class="tw-head-chip"><span class="tw-head-chip-label">Submitted</span>${escHtml(submittedVal)}</span>
+        <span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Group</span>${escHtml(groupVal)}</span>
+        <span class="tw-head-chip chip-purple"><span class="tw-head-chip-label">Submitted</span>${escHtml(submittedVal)}</span>
+        <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Respondents</span>${escHtml(respondentsVal)}</span>
     `;
+}
+
+// Phase 10.1: floating scratch note -- toggled from the topbar Note button,
+// floats above the image lightbox, cleared on open/submit.
+let twNoteOpen = false;
+function twToggleNote(force) {
+    const pop = document.getElementById('twNotePop');
+    const btn = document.getElementById('twNoteBtn');
+    if (!pop) return;
+    twNoteOpen = (typeof force === 'boolean') ? force : !twNoteOpen;
+    pop.classList.toggle('open', twNoteOpen);
+    if (btn) btn.classList.toggle('active', twNoteOpen);
+    if (twNoteOpen) {
+        const ta = document.getElementById('twNoteText');
+        if (ta) setTimeout(() => ta.focus(), 60);
+    }
+}
+// Close (and optionally wipe) the note -- on new ticket open and on submit.
+function twResetNote(clearText) {
+    twToggleNote(false);
+    if (clearText) {
+        const ta = document.getElementById('twNoteText');
+        if (ta) ta.value = '';
+    }
+}
+
+// Phase 10.1: queue cards show an "Opening…" spinner while the workspace
+// loads -- before this, a slow open looked like the click never registered.
+function twCardOpen(cardEl, recordId) {
+    if (!cardEl || cardEl.classList.contains('opening')) return;
+    cardEl.classList.add('opening');
+    const openHint = cardEl.querySelector('.ltq-card-open');
+    const oldHint = openHint ? openHint.innerHTML : '';
+    if (openHint) openHint.innerHTML = '<span class="ltq-mini-spinner"></span> Opening…';
+    Promise.resolve(twOpenWorkspace(recordId)).finally(() => {
+        cardEl.classList.remove('opening');
+        if (openHint) openHint.innerHTML = oldHint || 'Open →';
+    });
 }
 
 async function twOpenWorkspace(recordId) {
@@ -8682,6 +8790,7 @@ async function twOpenWorkspace(recordId) {
         }
         ltActiveTicket = ticket;
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
+        twResetNote(true); // Phase 10.1: fresh ticket -> close & clear the scratch note
 
         document.getElementById('tw-record-id').value = recordId;
         document.getElementById('tw-title').textContent = `#${ticket.fields['Numbering'] || recordId.slice(-6)}`;
@@ -8761,6 +8870,10 @@ async function twOpenWorkspace(recordId) {
                     <span class="msel-dot" style="border-color:var(--accent-rose)">✓</span>
                     <span class="msel-text">${escHtml(o)}</span>
                 </label>`).join('')}</div>`;
+            // Phase 10.1: same elegant rr-picker (selected chips + filter +
+            // chip cloud) the Audit tab uses, straight on top of the hidden
+            // checkboxes -- collection logic is untouched.
+            auditRenderRejectReasonPicker(rrWrap);
         }
 
         // ISSUE 5 FIX: "Create Way" restored as a dropdown in the Duplicate Check card.
@@ -9433,7 +9546,10 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
     wrap.innerHTML = `
         ${label}
         <div style="position:relative;">
-            ${key === 'Done by' ? `<div class="twup-quick">${TW_DONE_BY_QUICK_PICKS.map(q => `<button type="button" class="twup-quick-chip" onclick="twQuickPickDoneBy('${pickerId}', '${q}')" title="Set Done by to ${q}">⚡ ${q}</button>`).join('')}</div>` : ''}
+            ${key === 'Done by' ? `<div class="twup-quick audit-pick-row">${TW_DONE_BY_QUICK_PICKS.map(q => {
+                const isActive = current && (current.name || '').toLowerCase().includes(q.person.toLowerCase());
+                return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}')" title="Set Done by to ${escHtml(q.person)}">⚡ ${escHtml(q.label)}</button>`;
+            }).join('')}</div>` : ''}
             <div id="${pickerId}-chip" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
                 <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</span>
                 <span style="flex:1;font-size:.85rem;">${current ? escHtml(current.name) : ''}</span>
@@ -9452,7 +9568,24 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
 // these three, so the picker offers them as instant chips above the search
 // box -- a chip runs the same member search under the hood and selects the
 // best match, exactly as if it had been typed and clicked.
-const TW_DONE_BY_QUICK_PICKS = ['Samurai', 'Noora', 'Mano'];
+const TW_DONE_BY_QUICK_PICKS = [
+    { label: 'Samurai', person: 'Ahmed Samurai', query: 'Samurai' },
+    { label: 'Noora', person: 'Noora', query: 'Noora' },
+    { label: 'Mano', person: 'Mano', query: 'Mano' },
+];
+// Lights up the quick-pick chip matching the currently-selected member (and
+// clears the rest) -- called after any pick/clear so the chips always mirror
+// the real picker state.
+function twSyncQuickChips(pickerId, memberName) {
+    const inputEl = document.getElementById(`${pickerId}-input`);
+    const wrap = inputEl ? inputEl.closest('.control-group') : null;
+    if (!wrap) return;
+    const name = (memberName || '').toLowerCase();
+    wrap.querySelectorAll('.twup-quick .audit-pick-btn').forEach(b => {
+        const p = (b.dataset.person || '').toLowerCase();
+        b.classList.toggle('active', !!name && !!p && (name.includes(p) || p.includes(name)));
+    });
+}
 async function twQuickPickDoneBy(pickerId, query) {
     try {
         const res = await fetch(`/api/members/search?q=${encodeURIComponent(query)}&uat=${encodeURIComponent(loggedUat)}`);
@@ -9517,6 +9650,7 @@ function twPickMember(pickerId, idx) {
     const wrap = inputEl ? inputEl.closest('.control-group') : null;
 
     if (wrap) wrap.dataset.userSelected = JSON.stringify([{ id: m.open_id }]);
+    twSyncQuickChips(pickerId, m.name);
     if (chip) {
         chip.style.display = 'flex';
         chip.innerHTML = `
@@ -9540,6 +9674,7 @@ function twClearUserPicker(pickerId) {
     const wrap = inputEl ? inputEl.closest('.control-group') : null;
 
     if (wrap) wrap.dataset.userSelected = '';
+    twSyncQuickChips(pickerId, '');
     if (chip) { chip.style.display = 'none'; chip.innerHTML = ''; }
     if (inputEl) { inputEl.style.display = 'block'; inputEl.value = ''; inputEl.focus(); }
 }
@@ -9617,6 +9752,10 @@ function createTwControl(key, value) {
                 <span class="msel-text">${escHtml(o)}</span>
             </label>`).join('');
         wrap.innerHTML = label + `<div class="msel-wrap">${chks}</div>`;
+        // Phase 10.1: Agency Point Privilege gets the elegant pp-picker card
+        // grid (gold point badges) -- same one the create-request form uses;
+        // the hidden checkboxes above stay the single source of truth.
+        if (key === 'Agency Point Privilege') reqRenderPointPrivilegePicker(wrap);
         return wrap;
     }
     if (meta?.ui_type === 'Checkbox') {
@@ -9766,6 +9905,7 @@ async function twSaveWorkspace() {
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
         ToastManager.show('Ticket saved successfully.', 'success');
+        twResetNote(true); // Phase 10.1: submitted -> close & clear the scratch note
         
         const rid = document.getElementById('tw-record-id').value;
         ltQueue = ltQueue.filter(t => (t.record_id||t.id) !== rid);
@@ -10050,13 +10190,8 @@ function initLiveTicketWorkspace() {
         ltSetConnStatus('connecting');
         ltConnectPusher();
     }
-    // Phase 10 (speed): sync the queue by itself the moment the tab opens --
-    // first visit ever, or any visit more than 60s after the last sync. The
-    // manual Pull button stays for an on-demand refresh inside that window.
-    if (Date.now() - ltLastPullAt > 60000) {
-        ltLastPullAt = Date.now();
-        ltPullAssigned();
-    }
+    // Phase 10.1: NO auto-pull on tab open -- the queue syncs ONLY when Ahmed
+    // clicks the Pull Assigned button (per his request).
 }
 
 
@@ -10780,11 +10915,24 @@ function reqApplyAgencyTypeRules() {
             if (hide) input.value = '';
         }
     };
+    // Show a field but drop its mandatory flag (+ hide the * marker) -- used
+    // for Walkin, where Otherapp Name/ID must stay visible yet optional.
+    const setOptionalRule = (fieldName, optional) => {
+        const wrap = container.querySelector(`[data-field="${fieldName}"]`);
+        if (!wrap) return;
+        const input = wrap.querySelector('input, select, textarea');
+        const def = REQ_FIELD_DEFS[fieldName] || {};
+        wrap.style.display = '';
+        if (input) input.required = optional ? false : !!def.req;
+        const marker = wrap.querySelector('label .req-marker');
+        if (marker) marker.style.display = optional ? 'none' : '';
+    };
     const hideBd = t === 'acm hunting' || t === 'walkin';
     applyRule('Bd Code', hideBd);
-    const hideOtherapp = t === 'walkin';
-    applyRule('Otherapp Name', hideOtherapp);
-    applyRule('Otherapp ID', hideOtherapp);
+    // Walkin: Otherapp Name/ID stay VISIBLE but are NOT mandatory.
+    const otherappOptional = t === 'walkin';
+    setOptionalRule('Otherapp Name', otherappOptional);
+    setOptionalRule('Otherapp ID', otherappOptional);
 }
 
 function renderReqFormFields() {
