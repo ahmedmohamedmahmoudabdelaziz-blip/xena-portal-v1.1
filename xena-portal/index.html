@@ -974,10 +974,15 @@
            the image lightbox (z 9999), so notes can be copied off screenshots
            without ever closing the picture. Closed via ✕, the Note button, or
            a successful submit. */
-        #twNotePop{position:fixed;right:24px;bottom:24px;width:330px;max-height:62vh;z-index:10001;display:none;flex-direction:column;background:linear-gradient(160deg, rgba(40,32,12,0.97), rgba(24,24,28,0.97));border:1.5px solid rgba(255,184,0,0.45);border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,0.55), 0 0 24px rgba(255,184,0,0.12);overflow:hidden;}
+        #twNotePop{position:fixed;top:88px;left:calc(50% - 33px);width:330px;max-height:62vh;z-index:10001;display:none;flex-direction:column;background:linear-gradient(160deg, rgba(40,32,12,0.97), rgba(24,24,28,0.97));border:1.5px solid rgba(255,184,0,0.45);border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,0.55), 0 0 24px rgba(255,184,0,0.12);overflow:hidden;}
         #twNotePop.open{display:flex;animation:twNoteIn .22s cubic-bezier(.2,.9,.3,1.2);}
         @keyframes twNoteIn{from{opacity:0;transform:translateY(-10px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
-        .twn-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,184,0,0.12);border-bottom:1px solid rgba(255,184,0,0.25);}
+        /* Phase 10.4: the note is draggable by its head -- grab anywhere on
+           the amber bar (except the ✕) and park the note wherever it helps. */
+        .twn-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,184,0,0.12);border-bottom:1px solid rgba(255,184,0,0.25);cursor:grab;user-select:none;touch-action:none;}
+        .twn-head:active{cursor:grabbing;}
+        .twn-grip{color:rgba(255,233,176,0.5);font-size:.85rem;letter-spacing:2px;margin-right:8px;}
+        @media(max-width:1024px){ #twNotePop{left:calc(50% - 165px);} }
         .twn-title{font-size:.8rem;font-weight:800;letter-spacing:.5px;color:var(--accent-amber);text-transform:uppercase;}
         .twn-close{background:none;border:none;color:var(--accent-amber);font-size:1.05rem;cursor:pointer;padding:0 4px;line-height:1;}
         .twn-close:hover{color:#fff;}
@@ -991,49 +996,45 @@
         .twup-quick .audit-pick-btn{border-radius:999px;padding:10px 18px;font-size:.8rem;letter-spacing:.4px;font-weight:800;}
         .twup-quick .audit-pick-btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.28);}
 
-        /* ===== Phase 10.2/10.3: three-column workspace layout =====
+        /* ===== Phase 10.2/10.4: three-column workspace layout =====
            Top row: Basic Information · Dynamic Request Section · Audition
-           Action; Duplicate Check is a full-width band below (Phase 10.3).
-           Pure CSS grid placement -- the HTML keeps its original card order
-           (Basic, Dynamic, Duplicate, Audition Action), only the visual
-           placement is reassigned. */
+           Action, side-by-side. (Phase 10.4: the Duplicate Check card is
+           retired -- its useful fields moved into the Dynamic Request
+           Section for Agency Creation tickets; the old card survives as an
+           inert comment next to the form, so its #tw-sec-3-card placement
+           rules below are kept for a one-line restore.) */
         #tw-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start;}
         #tw-form .twx-card{margin-bottom:0;}
-        /* Phase 10.3: the top row is Basic / Dynamic / Audition side-by-side;
-           Duplicate Check is now a full-width band underneath so its Radar /
-           Sheet Formula / Reject Reason tri-split gets real horizontal room. */
         #tw-sec-1-card{grid-column:1;grid-row:1;}
         #tw-sec-2-card{grid-column:2;grid-row:1;}
         #tw-sec-5-card{grid-column:3;grid-row:1;}
-        #tw-sec-3-card{grid-column:1 / -1;grid-row:2;}
         @media(max-width:1500px){
             #tw-form{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);}
             #tw-sec-1-card{grid-column:1;grid-row:1;}
             #tw-sec-2-card{grid-column:2;grid-row:1;}
-            #tw-sec-3-card{grid-column:1 / -1;grid-row:2;}
-            #tw-sec-5-card{grid-column:1 / -1;grid-row:3;}
+            #tw-sec-5-card{grid-column:1 / -1;grid-row:2;}
         }
         @media(max-width:1024px){
             #tw-form{grid-template-columns:minmax(0,1fr);}
-            /* single column: Basic -> Duplicate -> Dynamic -> Audition Action,
-               so the section numbers (1,2,3,4) read in order here too */
+            /* single column: Basic -> Dynamic -> Audition Action */
             #tw-sec-1-card{grid-column:1;grid-row:1;}
-            #tw-sec-3-card{grid-column:1;grid-row:2;}
-            #tw-sec-2-card{grid-column:1;grid-row:3;}
-            #tw-sec-5-card{grid-column:1;grid-row:4;}
+            #tw-sec-2-card{grid-column:1;grid-row:2;}
+            #tw-sec-5-card{grid-column:1;grid-row:3;}
         }
 
         /* Phase 10.2: Preview button in the topbar + its collapsible panel. */
         .twx-preview-btn{padding:12px 18px;font-size:.92rem;font-weight:800;display:inline-flex;align-items:center;gap:7px;border-radius:13px;border:1.5px solid rgba(0,212,255,0.45);background:rgba(0,212,255,0.08);color:var(--accent-cyan);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;}
         .twx-preview-btn:hover{background:rgba(0,212,255,0.18);transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,212,255,0.25);}
         .twx-preview-btn.active{background:rgba(0,212,255,0.92);color:#00222b;border-color:var(--accent-cyan);box-shadow:0 0 18px rgba(0,212,255,0.45);}
-        /* Phase 10.3: the preview panel is a fixed dropdown of the floating
-           action bar (JS anchors its `top` right under the bar) -- frosted,
-           self-scrolling, and it never pushes the form down. */
-        #twPreviewPanel{display:none;position:fixed;top:150px;right:16px;width:min(1180px, calc(100vw - 290px));max-height:min(70vh, 640px);overflow-y:auto;z-index:99;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.10), color-mix(in srgb, var(--surface) 94%, transparent) 55%, rgba(168,85,247,0.08));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,212,255,0.28);box-shadow:0 14px 40px rgba(0,0,0,0.40);}
+        /* Phase 10.3/10.4: the preview panel is a fixed dropdown of the
+           floating action bar (JS anchors its `top` right under the bar) --
+           frosted, self-scrolling, centered under the bar like the bar
+           itself, above the image lightbox, and it never pushes the form
+           down. */
+        #twPreviewPanel{display:none;position:fixed;top:150px;left:calc(50% + 132px);transform:translateX(-50%);width:min(1180px, calc(100vw - 312px));max-height:min(70vh, 640px);overflow-y:auto;z-index:10001;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.10), color-mix(in srgb, var(--surface) 94%, transparent) 55%, rgba(168,85,247,0.08));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,212,255,0.28);box-shadow:0 14px 40px rgba(0,0,0,0.40);}
         #twPreviewPanel.open{display:block;animation:twPreviewIn .22s cubic-bezier(.2,.9,.3,1.15);}
-        @media(max-width:1024px){ #twPreviewPanel{width:calc(100vw - 32px);} }
-        @keyframes twPreviewIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+        @media(max-width:1024px){ #twPreviewPanel{left:50%;width:calc(100vw - 32px);} }
+        @keyframes twPreviewIn{from{opacity:0;transform:translateX(-50%) translateY(-8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
         .tw-preview-hint{font-size:.75rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
         .tw-reqtype-hint{font-size:.75rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
 
@@ -1057,24 +1058,60 @@
         textarea.form-highlight-input{font-family:inherit;line-height:1.5;}
         .tw-txt-auto{overflow-y:hidden;min-height:44px;resize:vertical;}
 
-        /* ===== Phase 10.3: chat-style floating action topbar =====
-           The wrapper is pinned top-right and never affects document flow,
-           so expanding/collapsing causes zero layout shift. Collapsed state
-           is a 60x60 glass circle glowing --accent-cyan; the bar morphs in
-           with a single transform+opacity transition (GPU-only, no stutter). */
-        .twx-topbar-wrapper{position:fixed;top:16px;right:16px;z-index:100;display:flex;justify-content:flex-end;pointer-events:none;}
+        /* ===== Phase 10.4: chat-style floating DOCK (top-center) =====
+           Three floating circles pinned above the content area, z-index above
+           the image lightbox (9999) so they stay usable even over opened
+           photos. Order: [⚡ Topbar] left, [📝 Note] middle, [📡 Radar] right.
+           Everything is transform/opacity-only (GPU, zero layout shift). */
+        .twx-dock{position:fixed;top:16px;left:calc(50% + 132px);transform:translateX(-50%);z-index:10002;display:flex;align-items:flex-start;gap:14px;pointer-events:none;}
+        .twx-dock > *{pointer-events:auto;}
+        .twx-topbar-wrapper{position:relative;width:60px;height:60px;flex:none;pointer-events:none;}
         .twx-topbar-wrapper > *{pointer-events:auto;}
         .twx-fab{width:60px;height:60px;border-radius:50%;border:1px solid rgba(0,212,255,0.45);background:color-mix(in srgb, var(--surface) 72%, transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--accent-cyan);font-size:1.5rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;box-shadow:0 0 0 1px rgba(0,212,255,0.16), 0 6px 24px rgba(0,212,255,0.28), 0 2px 8px rgba(0,0,0,0.40);transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease, box-shadow .2s ease;}
         .twx-fab:hover{transform:scale(1.07);box-shadow:0 0 0 1px rgba(0,212,255,0.38), 0 8px 32px rgba(0,212,255,0.44), 0 2px 8px rgba(0,0,0,0.40);}
-        .twx-topbar-wrapper:not(.chat-collapsed) .twx-fab{position:absolute;top:0;right:0;transform:scale(0.35);opacity:0;pointer-events:none;}
-        .twx-topbar-wrapper .twx-topbar{position:relative;margin-bottom:0;max-width:min(1180px, calc(100vw - 290px));transform-origin:top right;transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease;}
-        .twx-topbar-wrapper.chat-collapsed .twx-topbar{position:absolute;top:0;right:0;transform:scale(0);opacity:0;pointer-events:none;}
+        /* Note fab (amber) */
+        .twx-fab-note{border-color:rgba(255,184,0,0.45);color:var(--accent-amber);box-shadow:0 0 0 1px rgba(255,184,0,0.16), 0 6px 24px rgba(255,184,0,0.26), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-note:hover{box-shadow:0 0 0 1px rgba(255,184,0,0.38), 0 8px 32px rgba(255,184,0,0.42), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-note.active{background:rgba(255,184,0,0.88);color:#2a1e00;}
+        /* Radar fab (rose) + scan/alert pulse */
+        .twx-fab-radar{border-color:rgba(255,77,109,0.45);color:var(--accent-rose);box-shadow:0 0 0 1px rgba(255,77,109,0.16), 0 6px 24px rgba(255,77,109,0.24), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-radar:hover{box-shadow:0 0 0 1px rgba(255,77,109,0.38), 0 8px 32px rgba(255,77,109,0.42), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-radar.scanning{animation:twxRadarPulse 1s ease-in-out infinite;}
+        .twx-fab-radar.alert{border-color:var(--accent-rose);background:rgba(255,77,109,0.18);animation:twxRadarPulse 1.6s ease-in-out infinite;}
+        @keyframes twxRadarPulse{
+            0%,100%{box-shadow:0 0 0 1px rgba(255,77,109,0.16), 0 6px 24px rgba(255,77,109,0.24);}
+            50%{box-shadow:0 0 0 4px rgba(255,77,109,0.35), 0 6px 32px rgba(255,77,109,0.5);}
+        }
+        /* Radar dock: fab + badge + chat-style message bubble */
+        .twx-radar-dock{position:relative;width:60px;height:60px;flex:none;}
+        .twx-radar-badge{position:absolute;top:-5px;right:-5px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(255,77,109,0.55);pointer-events:none;z-index:2;}
+        .twx-radar-badge:empty{display:none;}
+        .twx-radar-msg{display:none;position:absolute;top:calc(100% + 12px);right:0;width:min(320px, calc(100vw - 32px));padding:12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 16px 44px rgba(0,0,0,0.5), 0 0 22px rgba(255,77,109,0.14);cursor:pointer;font-size:.82rem;line-height:1.5;transform-origin:top right;color:var(--text);}
+        .twx-radar-msg.open{display:block;animation:twxRadarMsgIn .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
+        @keyframes twxRadarMsgIn{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
+        .twx-radar-msg:hover{border-color:rgba(255,77,109,0.65);}
+        .twx-radar-sheet{margin-top:6px;font-size:.74rem;color:var(--text-muted);}
+        /* Topbar morphs out of its fixed 60x60 slot; the slot stays 60x60 so
+           the note/radar circles never shift when the bar expands. */
+        .twx-topbar-wrapper:not(.chat-collapsed) > .twx-fab{position:absolute;top:0;left:0;transform:scale(0.35);opacity:0;pointer-events:none;}
+        .twx-topbar-wrapper .twx-topbar{position:fixed;top:88px;left:calc(50% + 132px);transform:translateX(-50%) scale(1);margin-bottom:0;width:min(1180px, calc(100vw - 312px));max-width:none;transform-origin:top center;transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease;}
+        .twx-topbar-wrapper.chat-collapsed .twx-topbar{transform:translateX(-50%) scale(0);opacity:0;pointer-events:none;}
         .twx-head-center{text-align:center;min-width:0;}
         .twx-collapse-btn{padding:12px 16px;font-size:.85rem;font-weight:800;border-radius:13px;border:1.5px solid var(--border);background:var(--surface-hover);color:var(--text-muted);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;}
         .twx-collapse-btn:hover{color:var(--accent-rose);border-color:rgba(255,77,109,0.45);background:rgba(255,77,109,0.08);}
         @media(max-width:1024px){
-            .twx-topbar-wrapper .twx-topbar{max-width:calc(100vw - 32px);flex-wrap:wrap;}
+            .twx-dock{left:50%;gap:10px;}
+            .twx-topbar-wrapper .twx-topbar{left:50%;width:calc(100vw - 32px);flex-wrap:wrap;}
         }
+
+        /* ===== Phase 10.4: Dynamic-Request extras (Agency Creation only) ===== */
+        #tw-sec-2 .twx-dup-reject-group{grid-column:1 / -1;}
+        #tw-sec-2 #tw-reject-reason-wrap{border-color:var(--accent-rose);background:rgba(255,77,109,0.03);}
+        /* Audition Action card: approval row + full-width helpers */
+        #tw-sec-5-card .twx-approval-group{display:flex;align-items:center;}
+        #tw-sec-5-card .twx-approval-label{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:1rem;margin:0;}
+        #tw-audition-approval{width:20px;height:20px;accent-color:var(--accent-rose);}
+        #tw-sec-5-card .twx-full{grid-column:1 / -1;}
 
         /* ===== Phase 10.3: Duplicate Check goes horizontal =====
            Radar / Sheet Formula / Reject Reason share one axis at
@@ -1233,7 +1270,7 @@
     </div>
     <div class="img-lightbox-hint">
         <span id="imgLightboxOcrStatus" style="display:none;color:var(--accent-cyan);"></span>
-        <span>🖐️ Drag to pan · Scroll to zoom · 🔤 select text in image · 📋 extract text · Click outside or press Esc to close</span>
+        <span>🖐️ Drag to pan · Scroll on pic to zoom · scroll inside the text panel to read it · 🔤 select text in image · 📋 extract text · Click outside or press Esc to close</span>
     </div>
     <!-- Lark OCR fallback: a plain copyable text block, separate from the pixel-aligned
          RapidOCR/Tesseract selection layer drawn on the image itself. -->
@@ -2946,44 +2983,51 @@
             
             <!-- Full Page Ticket Workspace -->
             <div id="pg-ticket-workspace" style="display:none;">
-               <!-- Top Bar (Phase 10.3): chat-style floating action widget.
-                    Collapsed by default (chat-collapsed) = a 60x60 glass circle
-                    with a cyan glow pinned top-right; click it and it morphs
-                    into the full frosted action bar, "✖ Close" folds it back.
-                    position:fixed => expanding/collapsing never shifts the
-                    workspace layout. (Phase 10.1 frosted/gradient styling of
-                    the bar itself is unchanged.) -->
-               <div class="twx-topbar-wrapper chat-collapsed" id="twxTopbarWrap">
-                   <button type="button" class="twx-fab" onclick="twToggleTopbar()" title="Open the workspace action bar">⚡</button>
-                   <div class="twx-topbar">
-                       <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
-                       <div class="twx-head-center">
-                           <h3 id="tw-title" class="twx-title">Ticket ID</h3>
-                           <!-- Fixed ticket-head info -- Mention this Group, Submitted on
-                                and Respondents, regardless of Request Type. Populated by
-                                twRenderHeadMeta(). -->
-                           <div id="tw-head-meta" class="tw-head-meta"></div>
+               <!-- Floating DOCK (Phase 10.4): three chat-style floating circles
+                    pinned top-CENTER of the content area -- [⚡ Topbar] left,
+                    [📝 Note] middle, [📡 Duplicate Radar] right. z-index 10002
+                    sits above the image lightbox (9999) so all three stay
+                    clickable even over opened photos. Each circle morphs its
+                    panel open with transform/opacity only (zero layout shift). -->
+               <div class="twx-dock" id="twxDock">
+                   <div class="twx-topbar-wrapper chat-collapsed" id="twxTopbarWrap">
+                       <button type="button" class="twx-fab" onclick="twToggleTopbar()" title="Open the workspace action bar">⚡</button>
+                       <div class="twx-topbar">
+                           <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
+                           <div class="twx-head-center">
+                               <h3 id="tw-title" class="twx-title">Ticket ID</h3>
+                               <!-- Fixed ticket-head info -- Mention this Group, Submitted on
+                                    and Respondents, regardless of Request Type. Populated by
+                                    twRenderHeadMeta(). -->
+                               <div id="tw-head-meta" class="tw-head-meta"></div>
+                           </div>
+                           <div class="twx-actions">
+                               <button type="button" id="twPreviewBtn" class="twx-preview-btn" onclick="twTogglePreview()" title="Preview the field layout of any Request Type (doesn't change the ticket's saved type)">👁️ Preview</button>
+                               <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
+                               <button type="button" class="twx-collapse-btn" onclick="twToggleTopbar(false)" title="Collapse the action bar">✖ Close</button>
+                           </div>
                        </div>
-                       <div class="twx-actions">
-                           <button type="button" id="twPreviewBtn" class="twx-preview-btn" onclick="twTogglePreview()" title="Preview the field layout of any Request Type (doesn't change the ticket's saved type)">👁️ Preview</button>
-                           <button type="button" id="twNoteBtn" class="twx-note-btn" onclick="twToggleNote()" title="Floating scratch note -- stays on top even over opened pictures">📝 Note</button>
-                           <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
-                           <button type="button" class="twx-collapse-btn" onclick="twToggleTopbar(false)" title="Collapse the action bar">✖ Close</button>
-                       </div>
+                   </div>
+                   <button type="button" class="twx-fab twx-fab-note" id="twNoteFab" onclick="twToggleNote()" title="Floating scratch note — drag it anywhere, stays on top even over opened pictures">📝</button>
+                   <div class="twx-radar-dock" id="twRadarDock">
+                       <button type="button" class="twx-fab twx-fab-radar" id="btnTwRadar" onclick="twRadarFabClick()" title="Duplicate Radar — scans User ID / Otherapp ID / NID against the sheet">📡<span class="twx-radar-badge" id="twRadarBadge"></span></button>
+                       <div class="twx-radar-msg" id="twRadarMsg" onclick="twRadarToggleMatches(true)" title="Review the matching requests"></div>
                    </div>
                </div>
 
-               <!-- Floating scratch note (Phase 10.1): opens from the topbar Note
-                    button and floats ABOVE everything -- even the image lightbox --
+               <!-- Floating scratch note (Phase 10.4): opens from the dock's 📝
+                    circle and floats ABOVE everything -- even the image lightbox --
                     so details can be copied off screenshots without closing them.
-                    Closed by its ✕, the Note button, or a successful submit. -->
+                    The head is a drag handle: grab ⠿ and move it anywhere.
+                    Closed by its ✕, the 📝 circle, or a successful submit. -->
                <div id="twNotePop">
                    <div class="twn-head">
+                       <span class="twn-grip">⠿</span>
                        <span class="twn-title">📝 Scratch Note</span>
                        <button type="button" class="twn-close" onclick="twToggleNote(false)" title="Close note">✕</button>
                    </div>
                    <textarea id="twNoteText" placeholder="Copy details from screenshots here, then type them into the fields below…"></textarea>
-                   <div class="twn-foot">Floats above opened pictures · cleared when the request is submitted</div>
+                   <div class="twn-foot">Drag ⠿ to move · floats above opened pictures · cleared when the request is submitted</div>
                </div>
                
                <!-- Phase 10.2: the Request Type field-layout preview moved into a
@@ -3016,24 +3060,32 @@
                        <div id="tw-sec-2" class="control-grid"></div>
                    </div>
 
+                   <!-- ============================================================
+                        PHASE 10.4 NOTE (Ahmed): the whole "Duplicate Check" card is
+                        RETIRED from the workspace, but kept here as a comment so it
+                        can be restored in the future if needed. Its pieces moved:
+                        - Duplicate Radar -> the floating 📡 circle in the top-center
+                          dock (id="btnTwRadar" now lives there; the button below is
+                          inert). Results pop as a chat-style bubble + badge.
+                        - Reject Reason + Create Way -> Dynamic Request Section,
+                          Agency Creation tickets only (twRenderAgencyCreationExtras).
+                        - Sheet Formula result -> shown inside the radar bubble.
+                        The card below is DEAD MARKUP (inner comments stripped so this
+                        outer comment stays valid). TO RESTORE: uncomment, move
+                        id="btnTwRadar" back onto the button below, delete the dock
+                        radar markup, and drop the twRenderAgencyCreationExtras call.
+
                    <div class="card twx-card" id="tw-sec-3-card">
                        <h4 class="twx-sec-title" style="color:var(--accent-amber);">
                            <span class="twx-sec-num" style="background:var(--accent-amber);">2</span>
                            Duplicate Check
                        </h4>
                        <div id="tw-sec-3" class="control-grid">
-                           <!-- Duplicate Radar (Phase 10): the same radar idea from the
-                                Audit workstation, living in the ticket's own Duplicate
-                                Check card. Auto-scans the ticket's User ID / Otherapp ID /
-                                NID against the Grand Table the moment the ticket opens
-                                (and whenever one of those IDs is edited here); the sheet's
-                                own "Duplicated Check" formula result stays right below it. -->
-                           <!-- Phase 10.3: the three children now sit side-by-side
-                                on one horizontal axis (grid 1.2fr / 0.8fr / 1.5fr,
-                                heights stretched uniform) -- no more vertical stack. -->
+                           [was: Duplicate Radar (Phase 10) intro comment]
+                           [was: Phase 10.3 horizontal-axis layout comment]
                            <div class="control-group twx-dup-radar-group">
                                <div class="aws-radar twx-radar">
-                                   <button type="button" id="btnTwRadar" class="aws-radar-btn" onclick="twRadarCheck()" title="Check for duplicates now">📡</button>
+                                   <button type="button" class="aws-radar-btn" onclick="twRadarCheck()" title="Check for duplicates now">📡</button>
                                    <div class="twx-radar-body">
                                        <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
                                        <div id="twRadarSummary" class="aws-radar-summary">Scans on its own when the ticket opens — or click 📡 anytime.</div>
@@ -3048,14 +3100,15 @@
                                <div id="tw-dup-display">Not yet checked</div>
                                <button type="button" id="twVerifyBtn" class="btn btn-outline" onclick="twRunVerify()">🔄 Run Duplicate Check</button>
                            </div>
-                           <!-- ISSUE 4 FIX: Reject Reason (fldf3OhGJT) now lives in the 3rd
-                                section (Duplicate Check), not the Audition Action card. -->
+                           [was: ISSUE 4 FIX comment -- Reject Reason (fldf3OhGJT) lived here]
                            <div class="control-group twx-dup-reject-group">
                                <label>Reject Reason</label>
-                               <div id="tw-reject-reason-wrap" class="sub-opts"></div>
+                               <div id="tw-reject-reason-wrap-old" class="sub-opts"></div>
                            </div>
                        </div>
                    </div>
+                   ============================================================ -->
+
 
                    <!-- ============================================================
                         PHASE 10.2 NOTE (Ahmed): the whole "Chinese Approval" card is
@@ -3099,20 +3152,37 @@
                            Audition Action
                        </h4>
                        <div class="control-grid">
-                           <div class="control-group" style="display:flex; align-items:center;">
-                               <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:1rem; margin:0;">
-                                   <input type="checkbox" id="tw-audition-approval" name="Approval" data-feishu-field="Approval" style="width:20px;height:20px; accent-color:var(--accent-rose);">
+                           <!-- Phase 10.4 (Ahmed): field order matches the live Feishu
+                                form -- Mentioned Person, Approval, Audition note,
+                                Done by, Status, Mentioned Group, approve note. -->
+                           <!-- "Mentioned Person" (fldgOgBYX7): filled in by
+                                twOpenWorkspace via twRenderMemberPicker(). -->
+                           <div class="control-group" id="tw-mentioned-person-wrap"></div>
+                           <div class="control-group twx-approval-group">
+                               <label class="twx-approval-label">
+                                   <input type="checkbox" id="tw-audition-approval" name="Approval" data-feishu-field="Approval">
                                    Approval
                                </label>
                            </div>
+                           <div class="control-group twx-full">
+                               <label>Audition Note</label>
+                               <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input"></textarea>
+                           </div>
+                           <!-- "Done by" (fld1fFCCbr): filled in by twOpenWorkspace
+                                via twRenderMemberPicker(). -->
+                           <div class="control-group" id="tw-done-by-wrap"></div>
                            <div class="control-group">
                                <label>Status</label>
-                               <select id="tw-audition-status" name="Status" data-feishu-field="Status" class="form-highlight-input">
+                               <!-- Phase 10.4: audit-style one-tap pick buttons replace
+                                    the dropdown visually; the real select stays (hidden)
+                                    so twCollectFields reads .value exactly as before. -->
+                               <select id="tw-audition-status" name="Status" data-feishu-field="Status" class="form-highlight-input" data-no-search style="display:none">
                                    <option value="">-- Select --</option>
                                    <option value="Done ">Done </option>
                                    <option value="Rejected">Rejected</option>
                                    <option value="Under Investigation">Under Investigation</option>
                                </select>
+                               <div class="audit-pick-row twx-status-picks" id="twStatusPicks"></div>
                            </div>
                            <!-- ISSUE 4 FIX: Mentioned Group (fld9RClgRw) now rendered here,
                                 in the final Audition Action / Chinese Approval area. -->
@@ -3122,24 +3192,11 @@
                                    <option value="">-- Select --</option>
                                </select>
                            </div>
-                           <!-- Phase 10.2: "Mentioned Person" (fldgOgBYX7) moved here
-                                from the (now commented-out) Chinese Approval card.
-                                Filled in by twOpenWorkspace via twRenderMemberPicker(). -->
-                           <div class="control-group" id="tw-mentioned-person-wrap"></div>
-                           <!-- "Done by" (fld1fFCCbr) lives here, matching the live
-                                Feishu form's "Audition Action" section -- it was
-                                previously mis-grouped into Basic Information. Filled in
-                                by twOpenWorkspace via twRenderMemberPicker(). -->
-                           <div class="control-group" id="tw-done-by-wrap"></div>
-                           <div class="control-group" style="grid-column: 1 / -1;">
-                               <label>Audition Note</label>
-                               <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input"></textarea>
-                           </div>
                            <!-- Approve Note (Phase 10, Ahmed): writes straight to the
                                 sheet's "approve note" field, same pattern as Audition
                                 note above. Populated by twOpenWorkspace, collected by
                                 twCollectFields via the textarea's name. -->
-                           <div class="control-group" style="grid-column: 1 / -1;">
+                           <div class="control-group twx-full">
                                <label>Approve Note</label>
                                <textarea id="tw-approve-note" name="approve note" data-feishu-field="approve note" rows="3" class="form-highlight-input" placeholder="Note shown to the approver…"></textarea>
                            </div>
@@ -8814,8 +8871,13 @@ function twPrefetchPrune() {
 // always shown for every ticket regardless of Request Type or whether the record
 // currently has a value for a given field (createTwControl renders it empty rather
 // than the field disappearing). Not derived from whatever the record happens to have.
-const LT_BASIC_KEYS_ORDERED = ['Region', 'Request Type', 'Respondents', 'User ID', 'Applier Note', 'Acm Name (IN)', 'Acm Name (PK)', 'Parenet sub agency'];
-const LT_BASIC_KEYS = new Set(LT_BASIC_KEYS_ORDERED);
+// Phase 10.4 (Ahmed): "Parenet sub agency" moved OUT of Basic Information --
+// it now renders in the Dynamic Request Section, Agency Creation tickets only,
+// right beside Agency Code (twRenderAgencyCreationExtras). It stays inside
+// LT_BASIC_KEYS (decoupled from ORDERED) so the sec-2 fallback never picks it
+// up for other request types.
+const LT_BASIC_KEYS_ORDERED = ['Region', 'Request Type', 'Respondents', 'User ID', 'Applier Note', 'Acm Name (IN)', 'Acm Name (PK)'];
+const LT_BASIC_KEYS = new Set([...LT_BASIC_KEYS_ORDERED, 'Parenet sub agency']);
 
 // Fields shown via their own dedicated controls elsewhere in the form (Duplicate
 // Check card, Chinese Approval card, Audition Action card, header) -- moved to
@@ -8895,7 +8957,94 @@ function twRenderSection2(ticket, reqTypeOverride) {
         sec2.appendChild(createTwControl(key, ticket.fields[key]));
     });
 
+    // Phase 10.4 (Ahmed): Agency Creation tickets get three extra fields here,
+    // moved out of the retired Duplicate Check card / Basic Information --
+    // Parenet sub agency (right beside Agency Code), Create Way, Reject Reason.
+    if (reqType === 'Agency Creation') twRenderAgencyCreationExtras(sec2, ticket);
+
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
+}
+
+// Phase 10.4: Agency-Creation-only extras appended to the Dynamic Request
+// Section. Parenet sub agency slides in right after the Agency Code group;
+// Create Way and Reject Reason follow at the end (Reject Reason keeps its
+// rr-picker chip cloud -- NOT the Agency Point Privilege card-grid look).
+function twRenderAgencyCreationExtras(sec2, ticket) {
+    // 1) Parenet sub agency, directly beside Agency Code.
+    const psaWrap = createTwControl('Parenet sub agency', ticket.fields['Parenet sub agency']);
+    const acEl = sec2.querySelector('[name="Agency Code"]');
+    const acGroup = acEl && acEl.closest('.control-group');
+    if (acGroup) acGroup.after(psaWrap);
+    else sec2.appendChild(psaWrap);
+
+    // 2) Create Way (same dropdown markup the retired Duplicate Check card used).
+    const cwMeta = FIELD_SCHEMA['Create Way'];
+    const cwVal = feishuValueToString(ticket.fields['Create Way']);
+    const cwOpts = (cwMeta?.options || []).map(o => `<option value="${escHtml(o)}" ${o === cwVal ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+    const cwWrap = document.createElement('div');
+    cwWrap.id = 'tw-create-way-wrap';
+    cwWrap.className = 'control-group';
+    cwWrap.innerHTML = `<label>Create Way</label><select name="Create Way" class="form-highlight-input"><option value="">-- Select --</option>${cwOpts}</select>`;
+    sec2.appendChild(cwWrap);
+
+    // 3) Reject Reason: full-width rr-picker chip cloud on hidden checkboxes
+    // (collection logic identical to before -- twCollectFields reads the
+    // checked inputs by name="Reject Reason").
+    const rrMeta = FIELD_SCHEMA['Reject Reason'];
+    const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
+    const rrGroup = document.createElement('div');
+    rrGroup.className = 'control-group twx-dup-reject-group';
+    rrGroup.innerHTML = `<label>Reject Reason</label><div id="tw-reject-reason-wrap" class="sub-opts"><div class="msel-wrap">${(rrMeta?.options || []).map(o => `
+        <label class="msel-toggle ${rrChecked.has(o) ? 'active' : ''}" onclick="event.preventDefault(); this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
+            <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="display:none">
+            <span class="msel-dot" style="border-color:var(--accent-rose)">✓</span>
+            <span class="msel-text">${escHtml(o)}</span>
+        </label>`).join('')}</div></div>`;
+    sec2.appendChild(rrGroup);
+    const rrWrap = rrGroup.querySelector('#tw-reject-reason-wrap');
+    if (rrWrap) auditRenderRejectReasonPicker(rrWrap);
+}
+
+// Phase 10.4: Status as audit-style one-tap pick buttons (Done green /
+// Rejected rose / Under Investigation amber). The real <select> stays in the
+// DOM hidden, so twCollectFields reads .value exactly as before. Tap the
+// active button again to clear back to "-- Select --". Also heals the
+// trailing-space mismatch: the sheet stores "Done " but old code set the
+// select to the trimmed "Done", which matched no option and would have saved
+// an empty Status -- here the exact option value is restored on sync.
+function twRenderStatusPicks() {
+    const select = document.getElementById('tw-audition-status');
+    const row = document.getElementById('twStatusPicks');
+    if (!select || !row) return;
+    if (!row.dataset.built) {
+        row.innerHTML = Array.from(select.options)
+            .filter(o => o.value)
+            .map(o => `<button type="button" class="audit-pick-btn" data-val="${escHtml(o.value)}">${escHtml(o.textContent.trim())}</button>`)
+            .join('');
+        row.querySelectorAll('.audit-pick-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const already = btn.classList.contains('active');
+                row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.remove('active'));
+                if (already) {
+                    select.value = ''; // tap again = clear
+                } else {
+                    btn.classList.add('active');
+                    select.value = btn.dataset.val;
+                }
+            });
+        });
+        row.dataset.built = '1';
+    }
+    // Sync buttons from the select's current value (trim-insensitive), and
+    // snap the select itself onto the exact matching option value.
+    const cur = (select.value || '').trim();
+    let matched = null;
+    row.querySelectorAll('.audit-pick-btn').forEach(b => {
+        const on = !!cur && b.dataset.val.trim() === cur;
+        b.classList.toggle('active', on);
+        if (on) matched = b.dataset.val;
+    });
+    if (matched && select.value !== matched) select.value = matched;
 }
 
 // Every Request Type gets its own tab -- shown all at once, wrapped onto as many
@@ -8953,12 +9102,12 @@ function twRenderHeadMeta(ticket) {
     `;
 }
 
-// Phase 10.1: floating scratch note -- toggled from the topbar Note button,
-// floats above the image lightbox, cleared on open/submit.
+// Phase 10.4: floating scratch note -- toggled from the dock's 📝 circle,
+// draggable by its head, floats above the image lightbox, cleared on open/submit.
 let twNoteOpen = false;
 function twToggleNote(force) {
     const pop = document.getElementById('twNotePop');
-    const btn = document.getElementById('twNoteBtn');
+    const btn = document.getElementById('twNoteFab') || document.getElementById('twNoteBtn');
     if (!pop) return;
     twNoteOpen = (typeof force === 'boolean') ? force : !twNoteOpen;
     pop.classList.toggle('open', twNoteOpen);
@@ -8976,6 +9125,46 @@ function twResetNote(clearText) {
         if (ta) ta.value = '';
     }
 }
+
+// Phase 10.4 (Ahmed): the note is MOVABLE -- grab its head (the ⠿ grip or the
+// title bar, anywhere except the ✕ button) and drag it wherever it blocks the
+// least. Position is set as inline left/top once dragging starts, clamped to
+// the viewport; until then the CSS default (top-center) applies.
+(function twNoteMakeDraggable() {
+    const pop = document.getElementById('twNotePop');
+    if (!pop) return;
+    const head = pop.querySelector('.twn-head');
+    if (!head) return;
+    head.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.twn-close')) return; // let ✕ click through
+        e.preventDefault();
+        const rect = pop.getBoundingClientRect();
+        const offX = e.clientX - rect.left;
+        const offY = e.clientY - rect.top;
+        // Freeze the current visual position into inline styles so the drag
+        // starts exactly where the note already sits.
+        pop.style.left = rect.left + 'px';
+        pop.style.top = rect.top + 'px';
+        pop.style.right = 'auto';
+        pop.style.bottom = 'auto';
+        head.setPointerCapture(e.pointerId);
+        const onMove = (ev) => {
+            const w = pop.offsetWidth, h = pop.offsetHeight;
+            const x = Math.min(Math.max(ev.clientX - offX, 4), window.innerWidth - w - 4);
+            const y = Math.min(Math.max(ev.clientY - offY, 4), window.innerHeight - h - 4);
+            pop.style.left = x + 'px';
+            pop.style.top = y + 'px';
+        };
+        const onUp = () => {
+            head.removeEventListener('pointermove', onMove);
+            head.removeEventListener('pointerup', onUp);
+            head.removeEventListener('pointercancel', onUp);
+        };
+        head.addEventListener('pointermove', onMove);
+        head.addEventListener('pointerup', onUp);
+        head.addEventListener('pointercancel', onUp);
+    });
+})();
 
 // Phase 10.2: Preview panel toggle -- the topbar "👁️ Preview" button drops
 // down the full Request Type list; clicking a type previews its field layout
@@ -9092,7 +9281,17 @@ async function twOpenWorkspace(recordId) {
         }
 
         document.getElementById('tw-audition-approval').checked = ticket.fields['Approval'] || false;
-        document.getElementById('tw-audition-status').value = typeof ticket.fields['Status'] === 'string' ? ticket.fields['Status'].trim() : (ticket.fields['Status']?.text?.trim() || '');
+        // Phase 10.4: snap the sheet's Status onto the exact option value --
+        // the sheet stores "Done " (trailing space) but old code trimmed it to
+        // "Done", which matched NO option and would silently save Status="".
+        const twStatusRaw = typeof ticket.fields['Status'] === 'string' ? ticket.fields['Status'].trim() : (ticket.fields['Status']?.text?.trim() || '');
+        const twStatusSel = document.getElementById('tw-audition-status');
+        twStatusSel.value = twStatusRaw;
+        if (!twStatusSel.value && twStatusRaw) {
+            const twStatusOpt = Array.from(twStatusSel.options).find(o => o.value.trim() === twStatusRaw);
+            if (twStatusOpt) twStatusSel.value = twStatusOpt.value;
+        }
+        twRenderStatusPicks(); // audit-style colored pick buttons mirror the hidden select
         document.getElementById('tw-audition-note').value = ticket.fields['Audition note'] || '';
         document.getElementById('tw-approve-note').value = feishuValueToString(ticket.fields['approve note']);
         // Phase 10.2: the Chinese Approval card is commented out of the markup
@@ -9113,46 +9312,17 @@ async function twOpenWorkspace(recordId) {
             mgSel.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
         }
 
-        // ISSUE 5 FIX: "Reject Reason" (MultiSelect) now renders real checkboxes instead
-        // of being silently dropped.
-        const rrWrap = document.getElementById('tw-reject-reason-wrap');
-        if (rrWrap) {
-            const rrMeta = FIELD_SCHEMA['Reject Reason'];
-            const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
-            rrWrap.innerHTML = `<div class="msel-wrap">${(rrMeta?.options || []).map(o => `
-                <label class="msel-toggle ${rrChecked.has(o) ? 'active' : ''}" onclick="event.preventDefault(); this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
-                    <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="display:none">
-                    <span class="msel-dot" style="border-color:var(--accent-rose)">✓</span>
-                    <span class="msel-text">${escHtml(o)}</span>
-                </label>`).join('')}</div>`;
-            // Phase 10.1: same elegant rr-picker (selected chips + filter +
-            // chip cloud) the Audit tab uses, straight on top of the hidden
-            // checkboxes -- collection logic is untouched.
-            auditRenderRejectReasonPicker(rrWrap);
-        }
-
-        // ISSUE 5 FIX: "Create Way" restored as a dropdown in the Duplicate Check card.
-        // Phase 10.3: it lives inside the middle (Sheet Formula) column, stacked
-        // above the formula result, so the 1.2fr/0.8fr/1.5fr tri-split keeps its
-        // three top-level groups on one horizontal axis.
-        let cwWrap = document.getElementById('tw-create-way-wrap');
-        const dupFormulaGroup = document.querySelector('#tw-sec-3 .twx-dup-formula-group');
-        if (!cwWrap && dupFormulaGroup) {
-            cwWrap = document.createElement('div');
-            cwWrap.id = 'tw-create-way-wrap';
-            cwWrap.className = 'control-group';
-            dupFormulaGroup.insertBefore(cwWrap, dupFormulaGroup.firstChild);
-        }
-        if (cwWrap) {
-            const cwMeta = FIELD_SCHEMA['Create Way'];
-            const cwVal = feishuValueToString(ticket.fields['Create Way']);
-            const cwOpts = (cwMeta?.options || []).map(o => `<option value="${escHtml(o)}" ${o === cwVal ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
-            cwWrap.innerHTML = `<label>Create Way</label><select name="Create Way" class="form-highlight-input"><option value="">-- Select --</option>${cwOpts}</select>`;
-        }
-
+        // Phase 10.4: "Reject Reason" + "Create Way" moved into the Dynamic
+        // Request Section for Agency Creation tickets (twRenderAgencyCreationExtras,
+        // called from twRenderSection2 above) -- the Duplicate Check card that
+        // used to host them is retired. Sheet Formula result survives inside the
+        // radar bubble (twRadarSheetLine); tw-dup-display only exists again if
+        // the old card is ever restored, hence the null-guard.
         const dupCheck = document.getElementById('tw-dup-display');
-        dupCheck.innerHTML = parseDuplicatedCheck(JSON.stringify(ticket.fields['Duplicated Check']||''));
-        dupCheck.setAttribute('style', ltDupClass(ticket.fields['Duplicated Check']||''));
+        if (dupCheck) {
+            dupCheck.innerHTML = parseDuplicatedCheck(JSON.stringify(ticket.fields['Duplicated Check']||''));
+            dupCheck.setAttribute('style', ltDupClass(ticket.fields['Duplicated Check']||''));
+        }
 
         openInTab('ticket-workspace');
 
@@ -9746,6 +9916,14 @@ function lightboxRenderTextLayer(result, myToken) {
 
 
 function lightboxWheelHandler(e) {
+    // Phase 10.4 (Ahmed's video): the wheel used to zoom the picture no matter
+    // WHERE the cursor was -- so scrolling the extracted-text panel zoomed the
+    // image instead of scrolling the text. Now the wheel only zooms when the
+    // cursor is actually over the picture stage; over the OCR/extract panel,
+    // toolbar or hint it keeps its native behavior (scrolling that panel).
+    const overPic = e.target === e.currentTarget
+        || (e.target.closest && e.target.closest('#imgLightboxStage'));
+    if (!overPic) return; // OCR panel / toolbar / hint: native scroll, no zoom
     e.preventDefault();
     lightboxZoom(e.deltaY < 0 ? 0.25 : -0.25);
 }
@@ -10084,11 +10262,12 @@ function createTwControl(key, value) {
 }
 
 function twCloseWorkspace() {
-    // Phase 10.3: fold the floating action bar and the radar drawer away so
-    // the next ticket opens in the default collapsed state.
+    // Phase 10.4: fold the dock's action bar, the radar bubble and the radar
+    // drawer away so the next ticket opens in the default collapsed state.
     twToggleTopbar(false);
     const dupDrawer = document.getElementById('twDupDrawer');
     if (dupDrawer) dupDrawer.classList.remove('open');
+    twRadarSetMsg('', false);
     activeTabId = 'live-tickets';
     renderTabs();
     executePageLogic('live-tickets');
@@ -10272,6 +10451,43 @@ function twRadarReset() {
     if (results) results.innerHTML = '';
     if (drawer) drawer.classList.remove('open');
     if (btn) btn.classList.remove('alert', 'scanning');
+    twRadarSetBadge(0);
+    twRadarSetMsg('', false);
+}
+
+// Phase 10.4: the radar lives in the top-center dock now. Its verdict pops as
+// a chat-style message bubble from the 📡 circle (+ a count badge); clicking
+// the bubble opens the match-cards drawer; clicking anywhere outside (or Esc)
+// closes it -- the exact same outside-click behavior as the Audit drawer.
+function twRadarSetBadge(n) {
+    const badge = document.getElementById('twRadarBadge');
+    if (badge) badge.textContent = n > 0 ? String(n) : '';
+}
+
+function twRadarSetMsg(html, show) {
+    const msg = document.getElementById('twRadarMsg');
+    if (!msg) return;
+    msg.innerHTML = html || '';
+    msg.classList.toggle('open', !!show && !!html);
+}
+
+// The sheet's own "Duplicated Check" formula result, shown inside the bubble
+// (it used to have its own column in the retired Duplicate Check card).
+function twRadarSheetLine() {
+    const f = ltActiveTicket && ltActiveTicket.fields ? ltActiveTicket.fields['Duplicated Check'] : '';
+    if (!f || (Array.isArray(f) && !f.length)) return ''; // no sheet verdict -> no line
+    const raw = JSON.stringify(f);
+    if (raw === '""' || raw === '[]' || raw === 'null' || raw === '{}') return '';
+    const chips = parseDuplicatedCheck(raw);
+    if (!chips || chips === '—' || !String(chips).trim()) return '';
+    return `<div class="twx-radar-sheet">📋 Sheet formula: ${chips}</div>`;
+}
+
+// 📡 circle click: if matches are already loaded, toggle the review drawer;
+// otherwise run a fresh scan.
+function twRadarFabClick() {
+    if (twRadarMatches && twRadarMatches.length) twRadarToggleMatches();
+    else twRadarCheck();
 }
 
 function twRadarFieldValue(label) {
@@ -10287,10 +10503,12 @@ function twRadarScanKey(fieldsToCheck) {
 
 async function twRadarCheck(opts) {
     const isAuto = !!(opts && opts.auto);
+    // Phase 10.4: the retired Duplicate Check card's #twRadarSummary is gone --
+    // the verdict now lives in the dock bubble (#twRadarMsg) + badge + fab
+    // pulse. Old-element writes stay null-guarded for the restore path only.
     const summaryEl = document.getElementById('twRadarSummary');
     const revealWrap = document.getElementById('twRadarReveal');
     const btn = document.getElementById('btnTwRadar');
-    if (!summaryEl) return;
 
     const fieldsToCheck = TW_RADAR_FIELDS
         .map(([field, label]) => [field, twRadarFieldValue(label), label])
@@ -10312,7 +10530,9 @@ async function twRadarCheck(opts) {
     if (drawerEl) drawerEl.classList.remove('open');
     if (revealWrap) revealWrap.style.display = 'none';
     twRadarMatches = [];
-    summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
+    twRadarSetBadge(0);
+    twRadarSetMsg('', false);
+    if (summaryEl) summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
     if (btn) { btn.disabled = true; btn.classList.add('scanning'); btn.classList.remove('alert'); }
 
     // The open ticket must never flag itself as its own duplicate.
@@ -10343,7 +10563,12 @@ async function twRadarCheck(opts) {
         twRadarMatches = Array.from(byKey.values());
 
         if (!twRadarMatches.length) {
-            summaryEl.innerHTML = `<span class="aws-dup-clean">🟢 No duplicate</span>${firstError ? ' <span style="font-size:.68rem;color:var(--text-muted)">(one search had an issue)</span>' : ''}`;
+            if (summaryEl) summaryEl.innerHTML = `<span class="aws-dup-clean">🟢 No duplicate</span>${firstError ? ' <span style="font-size:.68rem;color:var(--text-muted)">(one search had an issue)</span>' : ''}`;
+            // Auto-scan stays silent on a clean pass; a manual click gets the
+            // green bubble so the agent knows the scan actually ran.
+            if (!isAuto) {
+                twRadarSetMsg(`<span class="aws-dup-clean">🟢 No duplicate</span> — User ID / Otherapp ID / NID are all clear.${twRadarSheetLine()}`, true);
+            }
             if (firstError && !isAuto) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
             if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
             return;
@@ -10366,7 +10591,10 @@ async function twRadarCheck(opts) {
                 return `<div class="aws-dup-hit">🔴 <b>${escHtml(f)}</b> in Grand Table Ticket: ${shown}${more}</div>`;
             })
             .join('');
-        summaryEl.innerHTML = `<div class="aws-dup-verdict" onclick="twRadarToggleMatches(true)" title="Show the matching requests">${hitLines}<div class="aws-dup-cta">👆 Click to review the ${n} matching request${n === 1 ? '' : 's'}</div></div>`;
+        const verdictHtml = `<div class="aws-dup-verdict">${hitLines}${twRadarSheetLine()}<div class="aws-dup-cta">👆 Click to review the ${n} matching request${n === 1 ? '' : 's'}</div></div>`;
+        if (summaryEl) summaryEl.innerHTML = verdictHtml;
+        twRadarSetMsg(verdictHtml, true); // the chat-style bubble pops from the 📡 circle
+        twRadarSetBadge(n);
         if (revealWrap) {
             revealWrap.style.display = 'block';
             const revealBtn = document.getElementById('btnTwRadarReveal');
@@ -10375,7 +10603,7 @@ async function twRadarCheck(opts) {
         if (btn) btn.classList.add('alert');
 
     } catch (e) {
-        summaryEl.innerHTML = '';
+        if (summaryEl) summaryEl.innerHTML = '';
         ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
     }
 
@@ -10395,6 +10623,27 @@ function twRadarToggleMatches(forceOpen) {
     resultsEl.innerHTML = twRadarMatches.map(({ record, matchedOn }) => auditDupCardHtml(record, matchedOn)).join('');
     drawer.classList.add('open');
 }
+
+// Phase 10.4: chat-style dismissal -- clicking anywhere OUTSIDE the radar
+// bubble/drawer (or pressing Escape) closes them, exactly like the Audit
+// workstation's drawer. Clicks inside the 📡 dock or the drawer itself are
+// left alone so reviewing matches never self-closes.
+document.addEventListener('click', (e) => {
+    const msg = document.getElementById('twRadarMsg');
+    const drawer = document.getElementById('twDupDrawer');
+    if (!msg && !drawer) return;
+    const insideRadar = e.target.closest && (e.target.closest('#twRadarDock') || e.target.closest('#twDupDrawer'));
+    if (insideRadar) return;
+    if (msg && msg.classList.contains('open')) msg.classList.remove('open');
+    if (drawer && drawer.classList.contains('open')) drawer.classList.remove('open');
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const msg = document.getElementById('twRadarMsg');
+    const drawer = document.getElementById('twDupDrawer');
+    if (msg && msg.classList.contains('open')) msg.classList.remove('open');
+    if (drawer && drawer.classList.contains('open')) drawer.classList.remove('open');
+});
 
 // Auto re-scan when one of the watched ID fields is edited inside the
 // workspace (the same debounce idea as the Audit radar).
