@@ -991,23 +991,27 @@
         .twup-quick .audit-pick-btn{border-radius:999px;padding:10px 18px;font-size:.8rem;letter-spacing:.4px;font-weight:800;}
         .twup-quick .audit-pick-btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.28);}
 
-        /* ===== Phase 10.2: three-column vertical workspace layout =====
-           Left: Basic Information + Duplicate Check stacked · Middle: Dynamic
-           Request Section · Right: Audition Action. Pure CSS grid placement --
-           the HTML keeps its original card order (Basic, Dynamic, Duplicate,
-           Audition Action), only the visual placement is reassigned. */
+        /* ===== Phase 10.2/10.3: three-column workspace layout =====
+           Top row: Basic Information · Dynamic Request Section · Audition
+           Action; Duplicate Check is a full-width band below (Phase 10.3).
+           Pure CSS grid placement -- the HTML keeps its original card order
+           (Basic, Dynamic, Duplicate, Audition Action), only the visual
+           placement is reassigned. */
         #tw-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start;}
         #tw-form .twx-card{margin-bottom:0;}
+        /* Phase 10.3: the top row is Basic / Dynamic / Audition side-by-side;
+           Duplicate Check is now a full-width band underneath so its Radar /
+           Sheet Formula / Reject Reason tri-split gets real horizontal room. */
         #tw-sec-1-card{grid-column:1;grid-row:1;}
-        #tw-sec-3-card{grid-column:1;grid-row:2;}
-        #tw-sec-2-card{grid-column:2;grid-row:1 / span 2;}
-        #tw-sec-5-card{grid-column:3;grid-row:1 / span 2;}
+        #tw-sec-2-card{grid-column:2;grid-row:1;}
+        #tw-sec-5-card{grid-column:3;grid-row:1;}
+        #tw-sec-3-card{grid-column:1 / -1;grid-row:2;}
         @media(max-width:1500px){
             #tw-form{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);}
             #tw-sec-1-card{grid-column:1;grid-row:1;}
-            #tw-sec-3-card{grid-column:1;grid-row:2;}
             #tw-sec-2-card{grid-column:2;grid-row:1;}
-            #tw-sec-5-card{grid-column:2;grid-row:2;}
+            #tw-sec-3-card{grid-column:1 / -1;grid-row:2;}
+            #tw-sec-5-card{grid-column:1 / -1;grid-row:3;}
         }
         @media(max-width:1024px){
             #tw-form{grid-template-columns:minmax(0,1fr);}
@@ -1023,8 +1027,12 @@
         .twx-preview-btn{padding:12px 18px;font-size:.92rem;font-weight:800;display:inline-flex;align-items:center;gap:7px;border-radius:13px;border:1.5px solid rgba(0,212,255,0.45);background:rgba(0,212,255,0.08);color:var(--accent-cyan);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;}
         .twx-preview-btn:hover{background:rgba(0,212,255,0.18);transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,212,255,0.25);}
         .twx-preview-btn.active{background:rgba(0,212,255,0.92);color:#00222b;border-color:var(--accent-cyan);box-shadow:0 0 18px rgba(0,212,255,0.45);}
-        #twPreviewPanel{display:none;margin:-10px 0 22px;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.07), color-mix(in srgb, var(--surface) 92%, transparent) 55%, rgba(168,85,247,0.06));border:1px solid rgba(0,212,255,0.28);box-shadow:0 10px 30px rgba(0,0,0,0.28);}
+        /* Phase 10.3: the preview panel is a fixed dropdown of the floating
+           action bar (JS anchors its `top` right under the bar) -- frosted,
+           self-scrolling, and it never pushes the form down. */
+        #twPreviewPanel{display:none;position:fixed;top:150px;right:16px;width:min(1180px, calc(100vw - 290px));max-height:min(70vh, 640px);overflow-y:auto;z-index:99;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.10), color-mix(in srgb, var(--surface) 94%, transparent) 55%, rgba(168,85,247,0.08));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,212,255,0.28);box-shadow:0 14px 40px rgba(0,0,0,0.40);}
         #twPreviewPanel.open{display:block;animation:twPreviewIn .22s cubic-bezier(.2,.9,.3,1.15);}
+        @media(max-width:1024px){ #twPreviewPanel{width:calc(100vw - 32px);} }
         @keyframes twPreviewIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
         .tw-preview-hint{font-size:.75rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
         .tw-reqtype-hint{font-size:.75rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
@@ -1048,6 +1056,49 @@
            stretch further) -- same feel as the Applier Note box. */
         textarea.form-highlight-input{font-family:inherit;line-height:1.5;}
         .tw-txt-auto{overflow-y:hidden;min-height:44px;resize:vertical;}
+
+        /* ===== Phase 10.3: chat-style floating action topbar =====
+           The wrapper is pinned top-right and never affects document flow,
+           so expanding/collapsing causes zero layout shift. Collapsed state
+           is a 60x60 glass circle glowing --accent-cyan; the bar morphs in
+           with a single transform+opacity transition (GPU-only, no stutter). */
+        .twx-topbar-wrapper{position:fixed;top:16px;right:16px;z-index:100;display:flex;justify-content:flex-end;pointer-events:none;}
+        .twx-topbar-wrapper > *{pointer-events:auto;}
+        .twx-fab{width:60px;height:60px;border-radius:50%;border:1px solid rgba(0,212,255,0.45);background:color-mix(in srgb, var(--surface) 72%, transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--accent-cyan);font-size:1.5rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;box-shadow:0 0 0 1px rgba(0,212,255,0.16), 0 6px 24px rgba(0,212,255,0.28), 0 2px 8px rgba(0,0,0,0.40);transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease, box-shadow .2s ease;}
+        .twx-fab:hover{transform:scale(1.07);box-shadow:0 0 0 1px rgba(0,212,255,0.38), 0 8px 32px rgba(0,212,255,0.44), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-topbar-wrapper:not(.chat-collapsed) .twx-fab{position:absolute;top:0;right:0;transform:scale(0.35);opacity:0;pointer-events:none;}
+        .twx-topbar-wrapper .twx-topbar{position:relative;margin-bottom:0;max-width:min(1180px, calc(100vw - 290px));transform-origin:top right;transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease;}
+        .twx-topbar-wrapper.chat-collapsed .twx-topbar{position:absolute;top:0;right:0;transform:scale(0);opacity:0;pointer-events:none;}
+        .twx-head-center{text-align:center;min-width:0;}
+        .twx-collapse-btn{padding:12px 16px;font-size:.85rem;font-weight:800;border-radius:13px;border:1.5px solid var(--border);background:var(--surface-hover);color:var(--text-muted);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;}
+        .twx-collapse-btn:hover{color:var(--accent-rose);border-color:rgba(255,77,109,0.45);background:rgba(255,77,109,0.08);}
+        @media(max-width:1024px){
+            .twx-topbar-wrapper .twx-topbar{max-width:calc(100vw - 32px);flex-wrap:wrap;}
+        }
+
+        /* ===== Phase 10.3: Duplicate Check goes horizontal =====
+           Radar / Sheet Formula / Reject Reason share one axis at
+           1.2fr / 0.8fr / 1.5fr; every child stretches to a uniform
+           height so the three read as one unified card-row. */
+        /* .control-grid specificity note: this must out-rank the workspace-wide
+           "#pg-ticket-workspace .control-grid{gap:16px 18px}" rule -- equal
+           specificity, later source order wins. */
+        #tw-sec-3.control-grid{display:grid;grid-template-columns:1.2fr 0.8fr 1.5fr;gap:16px;align-items:stretch;}
+        #tw-sec-3 > .control-group{display:flex;flex-direction:column;min-width:0;}
+        #tw-sec-3 .aws-radar{flex:1;margin-bottom:0;}
+        #tw-sec-3 .twx-radar-body{min-width:0;flex:1;}
+        #tw-sec-3 #tw-dup-display{flex:1;padding:16px;background:rgba(255,255,255,0.05);border-radius:10px;margin-bottom:12px;font-weight:600;display:flex;align-items:center;}
+        #tw-sec-3 #twVerifyBtn{width:auto;align-self:flex-start;border-color:var(--accent-amber);color:var(--accent-amber);}
+        #tw-sec-3 #tw-reject-reason-wrap{flex:1;border-color:var(--accent-rose);background:rgba(255,77,109,0.03);}
+        @media(max-width:1024px){
+            #tw-sec-3.control-grid{grid-template-columns:1fr;}
+        }
+
+        /* ===== Phase 10.3: radar results drawer =====
+           #twDupDrawer reuses .aws-dup-drawer/.open verbatim (same fixed
+           geometry, z-index 300, awsDrawerIn animation); this only lets the
+           results grid fill the drawer's scroll area. */
+        #twDupDrawer #twRadarResults{display:grid;flex:1;min-height:0;align-content:start;}
 
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
@@ -2895,21 +2946,30 @@
             
             <!-- Full Page Ticket Workspace -->
             <div id="pg-ticket-workspace" style="display:none;">
-               <!-- Top Bar (Phase 10.1 redesign): sticky, frosted, animated gradient
-          frame, colored info chips, floating scratch-note toggle. -->
-               <div class="twx-topbar">
-                   <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
-                   <div style="text-align:center;min-width:0;">
-                       <h3 id="tw-title" class="twx-title">Ticket ID</h3>
-                       <!-- Fixed ticket-head info -- Mention this Group, Submitted on
-                            and Respondents, regardless of Request Type. Populated by
-                            twRenderHeadMeta(). -->
-                       <div id="tw-head-meta" class="tw-head-meta"></div>
-                   </div>
-                   <div class="twx-actions">
-                       <button type="button" id="twPreviewBtn" class="twx-preview-btn" onclick="twTogglePreview()" title="Preview the field layout of any Request Type (doesn't change the ticket's saved type)">👁️ Preview</button>
-                       <button type="button" id="twNoteBtn" class="twx-note-btn" onclick="twToggleNote()" title="Floating scratch note -- stays on top even over opened pictures">📝 Note</button>
-                       <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
+               <!-- Top Bar (Phase 10.3): chat-style floating action widget.
+                    Collapsed by default (chat-collapsed) = a 60x60 glass circle
+                    with a cyan glow pinned top-right; click it and it morphs
+                    into the full frosted action bar, "✖ Close" folds it back.
+                    position:fixed => expanding/collapsing never shifts the
+                    workspace layout. (Phase 10.1 frosted/gradient styling of
+                    the bar itself is unchanged.) -->
+               <div class="twx-topbar-wrapper chat-collapsed" id="twxTopbarWrap">
+                   <button type="button" class="twx-fab" onclick="twToggleTopbar()" title="Open the workspace action bar">⚡</button>
+                   <div class="twx-topbar">
+                       <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
+                       <div class="twx-head-center">
+                           <h3 id="tw-title" class="twx-title">Ticket ID</h3>
+                           <!-- Fixed ticket-head info -- Mention this Group, Submitted on
+                                and Respondents, regardless of Request Type. Populated by
+                                twRenderHeadMeta(). -->
+                           <div id="tw-head-meta" class="tw-head-meta"></div>
+                       </div>
+                       <div class="twx-actions">
+                           <button type="button" id="twPreviewBtn" class="twx-preview-btn" onclick="twTogglePreview()" title="Preview the field layout of any Request Type (doesn't change the ticket's saved type)">👁️ Preview</button>
+                           <button type="button" id="twNoteBtn" class="twx-note-btn" onclick="twToggleNote()" title="Floating scratch note -- stays on top even over opened pictures">📝 Note</button>
+                           <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
+                           <button type="button" class="twx-collapse-btn" onclick="twToggleTopbar(false)" title="Collapse the action bar">✖ Close</button>
+                       </div>
                    </div>
                </div>
 
@@ -2968,10 +3028,13 @@
                                 NID against the Grand Table the moment the ticket opens
                                 (and whenever one of those IDs is edited here); the sheet's
                                 own "Duplicated Check" formula result stays right below it. -->
-                           <div class="control-group" style="grid-column: 1 / -1;">
+                           <!-- Phase 10.3: the three children now sit side-by-side
+                                on one horizontal axis (grid 1.2fr / 0.8fr / 1.5fr,
+                                heights stretched uniform) -- no more vertical stack. -->
+                           <div class="control-group twx-dup-radar-group">
                                <div class="aws-radar twx-radar">
                                    <button type="button" id="btnTwRadar" class="aws-radar-btn" onclick="twRadarCheck()" title="Check for duplicates now">📡</button>
-                                   <div style="min-width:0;flex:1;">
+                                   <div class="twx-radar-body">
                                        <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
                                        <div id="twRadarSummary" class="aws-radar-summary">Scans on its own when the ticket opens — or click 📡 anytime.</div>
                                        <div id="twRadarReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
@@ -2979,18 +3042,17 @@
                                        </div>
                                    </div>
                                </div>
-                               <div id="twRadarResults" class="qy-grid" style="display:none;margin-top:14px;"></div>
                            </div>
-                           <div class="control-group" style="grid-column: 1 / -1;">
-                               <label style="font-size:.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Sheet Formula Result</label>
-                               <div id="tw-dup-display" style="padding:16px; background:rgba(255,255,255,0.05); border-radius:10px; margin-bottom:12px; font-weight:600;">Not yet checked</div>
-                               <button type="button" id="twVerifyBtn" class="btn btn-outline" onclick="twRunVerify()" style="width:auto; border-color:var(--accent-amber); color:var(--accent-amber);">🔄 Run Duplicate Check</button>
+                           <div class="control-group twx-dup-formula-group">
+                               <label>Sheet Formula Result</label>
+                               <div id="tw-dup-display">Not yet checked</div>
+                               <button type="button" id="twVerifyBtn" class="btn btn-outline" onclick="twRunVerify()">🔄 Run Duplicate Check</button>
                            </div>
                            <!-- ISSUE 4 FIX: Reject Reason (fldf3OhGJT) now lives in the 3rd
                                 section (Duplicate Check), not the Audition Action card. -->
-                           <div class="control-group" style="grid-column: 1 / -1;">
+                           <div class="control-group twx-dup-reject-group">
                                <label>Reject Reason</label>
-                               <div id="tw-reject-reason-wrap" class="sub-opts" style="border-color:var(--accent-rose); background:rgba(255,77,109,0.03);"></div>
+                               <div id="tw-reject-reason-wrap" class="sub-opts"></div>
                            </div>
                        </div>
                    </div>
@@ -3084,6 +3146,19 @@
                        </div>
                    </div>
                </form>
+
+               <!-- Phase 10.3: radar matches pop up in an audit-style bottom
+                    drawer instead of rendering inline and shoving the form
+                    down. Exact same shell, z-index and animation classes
+                    (.aws-dup-drawer / .open) as the Audit workstation's
+                    #auditDupDrawer. -->
+               <div id="twDupDrawer" class="aws-dup-drawer">
+                   <div class="aws-dup-drawer-head">
+                       <span>📡 Duplicate Radar — matching requests</span>
+                       <button type="button" class="aws-dup-close" onclick="twRadarToggleMatches(false)" title="Close">×</button>
+                   </div>
+                   <div id="twRadarResults" class="qy-grid aws-dup-results"></div>
+               </div>
             </div>
 
             <div id="pg-new-request" style="display:none">
@@ -8912,26 +8987,19 @@ function twTogglePreview(force) {
     const btn = document.getElementById('twPreviewBtn');
     if (!panel) return;
     twPreviewOpen = (typeof force === 'boolean') ? force : !twPreviewOpen;
+    // Phase 10.3: the panel is now a fixed dropdown of the floating action
+    // bar -- opening it always expands the bar first, and it can never be
+    // hidden off-screen or underneath the bar, no matter the scroll position.
+    if (twPreviewOpen) twToggleTopbar(true);
     panel.classList.toggle('open', twPreviewOpen);
     if (btn) btn.classList.toggle('active', twPreviewOpen);
     if (twPreviewOpen) {
-        // Opening while scrolled down would leave the panel hidden above the
-        // viewport (or under the sticky topbar) -- nudge the scroller so the
-        // whole panel sits right below the topbar.
+        // Anchor the dropdown right under the expanded bar. position:fixed =>
+        // zero layout shift and always fully visible without scroll nudges.
         requestAnimationFrame(() => {
-            const topbar = panel.parentElement.querySelector('.twx-topbar') || document.querySelector('.twx-topbar');
-            const anchor = topbar ? topbar.getBoundingClientRect().bottom : 0;
-            const r = panel.getBoundingClientRect();
-            if (r.top < anchor + 10) {
-                // The page scrolls an inner wrapper (not window) -- walk up to
-                // the real scrollable ancestor instead of guessing a class.
-                let scroller = panel.parentElement;
-                while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
-                    scroller = scroller.parentElement;
-                }
-                if (!scroller) scroller = document.scrollingElement;
-                if (scroller) scroller.scrollTop -= (anchor + 10 - r.top);
-            }
+            const topbar = document.querySelector('#twxTopbarWrap .twx-topbar');
+            const anchor = topbar ? topbar.getBoundingClientRect().bottom : 16;
+            panel.style.top = Math.round(anchor + 8) + 'px';
         });
     }
 }
@@ -9064,13 +9132,16 @@ async function twOpenWorkspace(recordId) {
         }
 
         // ISSUE 5 FIX: "Create Way" restored as a dropdown in the Duplicate Check card.
+        // Phase 10.3: it lives inside the middle (Sheet Formula) column, stacked
+        // above the formula result, so the 1.2fr/0.8fr/1.5fr tri-split keeps its
+        // three top-level groups on one horizontal axis.
         let cwWrap = document.getElementById('tw-create-way-wrap');
-        const dupCard = document.getElementById('tw-sec-3');
-        if (!cwWrap && dupCard) {
+        const dupFormulaGroup = document.querySelector('#tw-sec-3 .twx-dup-formula-group');
+        if (!cwWrap && dupFormulaGroup) {
             cwWrap = document.createElement('div');
             cwWrap.id = 'tw-create-way-wrap';
             cwWrap.className = 'control-group';
-            dupCard.insertBefore(cwWrap, dupCard.firstChild);
+            dupFormulaGroup.insertBefore(cwWrap, dupFormulaGroup.firstChild);
         }
         if (cwWrap) {
             const cwMeta = FIELD_SCHEMA['Create Way'];
@@ -9089,6 +9160,9 @@ async function twOpenWorkspace(recordId) {
         // workspace renders (the form fields need to exist first), scanning
         // this ticket's IDs against the Grand Table without any clicks.
         twRadarReset();
+        // Phase 10.3: every ticket opens with the action bar collapsed to its
+        // glass circle -- the agent expands it only when needed.
+        twToggleTopbar(false);
         setTimeout(() => twRadarCheck({ auto: true }), 400);
     } catch(e) {
         ToastManager.show('Failed to open ticket: ' + e.message, 'error');
@@ -10010,6 +10084,11 @@ function createTwControl(key, value) {
 }
 
 function twCloseWorkspace() {
+    // Phase 10.3: fold the floating action bar and the radar drawer away so
+    // the next ticket opens in the default collapsed state.
+    twToggleTopbar(false);
+    const dupDrawer = document.getElementById('twDupDrawer');
+    if (dupDrawer) dupDrawer.classList.remove('open');
     activeTabId = 'live-tickets';
     renderTabs();
     executePageLogic('live-tickets');
@@ -10168,16 +10247,30 @@ const TW_RADAR_FIELDS = [
     ['nid_number', 'NID Number'],
 ];
 
+// Phase 10.3: chat-style floating topbar -- toggles the wrapper between the
+// collapsed glass circle (chat-collapsed) and the full action bar. No page
+// reflow: the wrapper is position:fixed and animates transform/opacity only.
+function twToggleTopbar(expand) {
+    const w = document.getElementById('twxTopbarWrap');
+    if (!w) return;
+    const open = expand === undefined ? w.classList.contains('chat-collapsed') : !!expand;
+    w.classList.toggle('chat-collapsed', !open);
+    // The preview panel is the bar's dropdown -- collapsing the bar closes it.
+    if (!open && typeof twPreviewOpen !== 'undefined' && twPreviewOpen) twTogglePreview(false);
+}
+
 function twRadarReset() {
     twRadarMatches = [];
     twRadarLastKey = '';
     const summary = document.getElementById('twRadarSummary');
     const reveal = document.getElementById('twRadarReveal');
     const results = document.getElementById('twRadarResults');
+    const drawer = document.getElementById('twDupDrawer');
     const btn = document.getElementById('btnTwRadar');
     if (summary) summary.innerHTML = 'Scans on its own when the ticket opens — or click 📡 anytime.';
     if (reveal) reveal.style.display = 'none';
-    if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+    if (results) results.innerHTML = '';
+    if (drawer) drawer.classList.remove('open');
     if (btn) btn.classList.remove('alert', 'scanning');
 }
 
@@ -10214,7 +10307,9 @@ async function twRadarCheck(opts) {
     twRadarLastKey = scanKey;
 
     const resultsEl = document.getElementById('twRadarResults');
-    if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
+    const drawerEl = document.getElementById('twDupDrawer');
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (drawerEl) drawerEl.classList.remove('open');
     if (revealWrap) revealWrap.style.display = 'none';
     twRadarMatches = [];
     summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
@@ -10287,17 +10382,18 @@ async function twRadarCheck(opts) {
     if (btn) { btn.disabled = false; btn.classList.remove('scanning'); }
 }
 
-// Reveal/hide the matching tickets inline, right under the radar. Cards reuse
+// Phase 10.3: matches open in the audit-style bottom drawer (#twDupDrawer)
+// instead of inline -- the workspace layout never shifts. Cards still reuse
 // the Audit workstation's auditDupCardHtml so matches look identical there.
 function twRadarToggleMatches(forceOpen) {
+    const drawer = document.getElementById('twDupDrawer');
     const resultsEl = document.getElementById('twRadarResults');
-    if (!resultsEl) return;
-    const open = forceOpen === true ? true : resultsEl.style.display === 'none';
-    if (!open) { resultsEl.style.display = 'none'; return; }
+    if (!drawer || !resultsEl) return;
+    const open = forceOpen === true ? true : forceOpen === false ? false : !drawer.classList.contains('open');
+    if (!open) { drawer.classList.remove('open'); return; }
     if (!twRadarMatches.length) return;
     resultsEl.innerHTML = twRadarMatches.map(({ record, matchedOn }) => auditDupCardHtml(record, matchedOn)).join('');
-    resultsEl.style.display = 'grid';
-    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    drawer.classList.add('open');
 }
 
 // Auto re-scan when one of the watched ID fields is edited inside the
