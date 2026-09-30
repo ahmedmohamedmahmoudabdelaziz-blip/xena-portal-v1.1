@@ -1005,19 +1005,24 @@
            rules below are kept for a one-line restore.) */
         #tw-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start;}
         #tw-form .twx-card{margin-bottom:0;}
-        #tw-sec-1-card{grid-column:1;grid-row:1;}
+        /* Phase 10.5: col 1 is a flex stack (Basic Information + Reject Reason
+           for Agency Creation) so the second card hugs the first one instead
+           of waiting for the taller middle column's grid row to end. The stack
+           carries the placement rules the sec-1 card used to. */
+        .twx-col1-stack{display:flex;flex-direction:column;gap:20px;min-width:0;}
+        .twx-col1-stack{grid-column:1;grid-row:1;}
         #tw-sec-2-card{grid-column:2;grid-row:1;}
         #tw-sec-5-card{grid-column:3;grid-row:1;}
         @media(max-width:1500px){
             #tw-form{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);}
-            #tw-sec-1-card{grid-column:1;grid-row:1;}
+            .twx-col1-stack{grid-column:1;grid-row:1;}
             #tw-sec-2-card{grid-column:2;grid-row:1;}
             #tw-sec-5-card{grid-column:1 / -1;grid-row:2;}
         }
         @media(max-width:1024px){
             #tw-form{grid-template-columns:minmax(0,1fr);}
             /* single column: Basic -> Dynamic -> Audition Action */
-            #tw-sec-1-card{grid-column:1;grid-row:1;}
+            .twx-col1-stack{grid-column:1;grid-row:1;}
             #tw-sec-2-card{grid-column:1;grid-row:2;}
             #tw-sec-5-card{grid-column:1;grid-row:3;}
         }
@@ -1086,10 +1091,22 @@
         .twx-radar-dock{position:relative;width:60px;height:60px;flex:none;}
         .twx-radar-badge{position:absolute;top:-5px;right:-5px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(255,77,109,0.55);pointer-events:none;z-index:2;}
         .twx-radar-badge:empty{display:none;}
-        .twx-radar-msg{display:none;position:absolute;top:calc(100% + 12px);right:0;width:min(320px, calc(100vw - 32px));padding:12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 16px 44px rgba(0,0,0,0.5), 0 0 22px rgba(255,77,109,0.14);cursor:pointer;font-size:.82rem;line-height:1.5;transform-origin:top right;color:var(--text);}
+        /* Phase 10.5 (Ahmed): the bubble pops on the RIGHT of the 📡 circle
+           (not under it) and STAYS until its own ✕ dismisses it -- outside
+           clicks only close the match-cards drawer, never the message. */
+        .twx-radar-msg{display:none;position:absolute;top:50%;left:calc(100% + 14px);width:min(320px, calc(100vw - 32px));padding:12px 32px 12px 14px;border-radius:16px 16px 16px 4px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 16px 44px rgba(0,0,0,0.5), 0 0 22px rgba(255,77,109,0.14);cursor:pointer;font-size:.82rem;line-height:1.5;transform:translateY(-50%);transform-origin:left center;color:var(--text);}
         .twx-radar-msg.open{display:block;animation:twxRadarMsgIn .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
-        @keyframes twxRadarMsgIn{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
+        @keyframes twxRadarMsgIn{from{opacity:0;transform:translateY(-50%) translateX(-10px) scale(.85);}to{opacity:1;transform:translateY(-50%) translateX(0) scale(1);}}
         .twx-radar-msg:hover{border-color:rgba(255,77,109,0.65);}
+        .twx-radar-msg-x{position:absolute;top:6px;right:8px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text-muted);font-size:.75rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;z-index:2;}
+        .twx-radar-msg-x:hover{background:rgba(255,77,109,.30);color:#fff;}
+        @media(max-width:1024px){
+            /* narrow screens: no room on the right -- the bubble drops back
+               under the circle (still persistent). */
+            .twx-radar-msg{top:calc(100% + 12px);left:auto;right:0;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
+            @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
+        }
         .twx-radar-sheet{margin-top:6px;font-size:.74rem;color:var(--text-muted);}
         /* Topbar morphs out of its fixed 60x60 slot; the slot stays 60x60 so
            the note/radar circles never shift when the bar expands. */
@@ -1103,6 +1120,42 @@
             .twx-dock{left:50%;gap:10px;}
             .twx-topbar-wrapper .twx-topbar{left:50%;width:calc(100vw - 32px);flex-wrap:wrap;}
         }
+
+        /* ===== Phase 10.5 (Ahmed, 1 Oct) ===== */
+        /* 1) Reject Reason now LOOKS like the Agency Point Privilege picker:
+              same card grid + filter + selected chips, but keeps its rose
+              accent (.pp-rose repaints every amber piece of .pp-picker). */
+        .pp-picker.pp-rose .pp-sel-chip{background:rgba(255,77,109,.14);border-color:rgba(255,77,109,.5);color:#ff9db4;}
+        .pp-picker.pp-rose .pp-filter:focus{border-color:var(--accent-rose);}
+        .pp-picker.pp-rose .pp-card:hover{border-color:var(--accent-rose);background:rgba(255,77,109,.05);}
+        .pp-picker.pp-rose .pp-card.active{border-color:var(--accent-rose);background:rgba(255,77,109,.10);box-shadow:0 0 10px rgba(255,77,109,.15);}
+        .pp-picker.pp-rose .pp-card-badge{color:#ff9db4;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.35);}
+        .pp-picker.pp-rose .pp-card-check{color:var(--accent-rose);}
+        .pp-picker.pp-rose .pp-toggle{border-color:rgba(255,77,109,.45);color:var(--accent-rose);background:rgba(255,77,109,.08);}
+        .pp-picker.pp-rose .pp-toggle:hover{background:rgba(255,77,109,.16);}
+        .pp-picker.pp-rose .pp-selected:empty::after{content:'No reason selected yet — click “Show all” to pick.';}
+        /* 2) Reject Reason's own card, parked under Basic Information in the
+              left column (Ahmed's marker "2"); Create Way keeps marker "1" at
+              the end of the Dynamic Request Section. */
+        #twRejectGroup{border-color:rgba(255,77,109,.30);}
+        #twRejectGroup #tw-reject-reason-wrap{border-color:var(--accent-rose);background:rgba(255,77,109,.03);}
+        /* 3) A second Save & Resolve pinned under the Audition Action card
+              (the topbar one stays exactly where it was). */
+        .twx-save-bottom{width:100%;margin-top:16px;padding:14px;font-size:1rem;}
+        /* 4) Collapsible left menu (the Xena Dashboard function from Ahmed's
+              video): one click slides the sidebar away and EVERY tab's
+              content stretches to fit the full page; the dock re-centers. */
+        .sidebar-collapse-btn{display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95rem;cursor:pointer;padding:6px 11px;line-height:1;transition:all .15s;font-family:inherit;}
+        .sidebar-collapse-btn:hover{border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(0,212,255,.07);}
+        body.sidebar-collapsed .sidebar{transform:translateX(-240px);}
+        body.sidebar-collapsed .main-content{margin-left:0;}
+        body.sidebar-collapsed .twx-dock{left:50%;}
+        body.sidebar-collapsed .twx-topbar-wrapper .twx-topbar{left:50%;width:min(1180px, calc(100vw - 32px));}
+        body.sidebar-collapsed #twPreviewPanel{left:50%;width:min(1180px, calc(100vw - 32px));}
+        @media(max-width:900px){.sidebar-collapse-btn{display:none;}}
+        /* 7) Audit tab: head-room under the floating top-center 📡 dock so it
+              never touches the middle panel's title row. */
+        #pg-audit .aws{padding-top:26px;}
 
         /* ===== Phase 10.4: Dynamic-Request extras (Agency Creation only) ===== */
         #tw-sec-2 .twx-dup-reject-group{grid-column:1 / -1;}
@@ -1485,6 +1538,10 @@
         <div class="page-top-bar">
             <div class="top-bar-left">
                 <button class="hamburger" onclick="openSidebar()" aria-label="Open menu">☰</button>
+                <!-- Phase 10.5: desktop sidebar collapse toggle (Xena Dashboard
+                     style) — slides the whole sidebar away so the page fits
+                     full width in every tab. Hidden ≤900px (mobile hamburger). -->
+                <button type="button" id="sidebarCollapseBtn" class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse / expand sidebar">⟨⟨</button>
             </div>
             
             <div class="top-bar-right">
@@ -3044,12 +3101,17 @@
                <form id="tw-form">
                    <input type="hidden" id="tw-record-id">
                    
-                   <div class="card twx-card" id="tw-sec-1-card">
-                       <h4 class="twx-sec-title" style="color:var(--accent-cyan);">
-                           <span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>
-                           Basic Information
-                       </h4>
-                       <div id="tw-sec-1" class="control-grid"></div>
+                   <!-- Phase 10.5: left column is a flex stack so the Agency-Creation
+                        Reject Reason card sits DIRECTLY under Basic Information,
+                        unpushed by the taller middle column. -->
+                   <div class="twx-col1-stack" id="twCol1Stack">
+                       <div class="card twx-card" id="tw-sec-1-card">
+                           <h4 class="twx-sec-title" style="color:var(--accent-cyan);">
+                               <span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>
+                               Basic Information
+                           </h4>
+                           <div id="tw-sec-1" class="control-grid"></div>
+                       </div>
                    </div>
 
                    <div class="card twx-card" id="tw-sec-2-card">
@@ -3201,6 +3263,9 @@
                                <textarea id="tw-approve-note" name="approve note" data-feishu-field="approve note" rows="3" class="form-highlight-input" placeholder="Note shown to the approver…"></textarea>
                            </div>
                        </div>
+                       <!-- Phase 10.5: second Save & Resolve under the Audition
+                            Action card; the topbar button stays exactly as-is. -->
+                       <button type="button" id="twSaveBtn2" class="btn btn-primary twx-save twx-save-bottom" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
                    </div>
                </form>
 
@@ -3253,10 +3318,27 @@
             </div>
 
             <div id="pg-audit" style="display:none">
+                <!-- Phase 10.5: the audit Duplicate Radar leaves the middle
+                     panel and becomes the same chat-style docked 📡 as the
+                     Ticket Workspace -- floating top-center, count badge,
+                     verdict bubble on the RIGHT of the circle, persistent
+                     until its own ✕ (outside clicks close only the drawer). -->
+                <div class="twx-dock" id="awsDock">
+                    <div class="twx-radar-dock" id="awsRadarDock">
+                        <button type="button" class="twx-fab twx-fab-radar" id="btnAuditCheckDup" onclick="auditRadarFabClick()" title="Duplicate Radar — scans User ID / Otherapp ID / NID against the sheet">📡<span class="twx-radar-badge" id="awsRadarBadge"></span></button>
+                        <div class="twx-radar-msg" id="awsRadarMsg" onclick="auditRevealDuplicates()" title="Review the matching requests">
+                            <button type="button" class="twx-radar-msg-x" onclick="event.stopPropagation();awsRadarHideMsg()" title="Dismiss">✕</button>
+                            <div id="auditDupSummary" class="aws-radar-summary">Scans on its own when you fill or edit an ID — or click 📡 anytime.</div>
+                            <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
+                                <button type="button" class="btn-sm btn-outline" onclick="event.stopPropagation();auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Audit Workstation: one screen, three panels + bottom bar.
                      Left = the raw ticket text (stays visible while you work),
-                     middle = duplicate radar pinned on top + the agency data,
-                     right = the decision, bottom = reject reasons + Submit. -->
+                     middle = the agency data, right = the decision,
+                     bottom = reject reasons + Submit. -->
                 <form id="auditRequestForm" class="aws" onsubmit="submitAuditForm(event)">
                     <div class="aws-grid">
                         <section class="aws-panel aws-left">
@@ -3273,18 +3355,9 @@
                                 <span class="aws-panel-title"><span class="audit-card-dot" id="auditDotMain"></span> 🗂️ Agency Data</span>
                                 <span style="font-size:.72rem;color:var(--text-muted)">auto-filled from the text — review &amp; complete</span>
                             </div>
-                            <!-- Duplicate Radar: pinned at the TOP of the middle panel,
-                                 always in view while the agency fields scroll below it. -->
-                            <div class="aws-radar aws-radar-mid">
-                                <button type="button" id="btnAuditCheckDup" class="aws-radar-btn" onclick="auditCheckDuplicates()" title="Check for duplicates now">📡</button>
-                                <div style="min-width:0">
-                                    <div class="aws-radar-label">Duplicate Radar<span class="aws-radar-hint">User ID · Otherapp ID · NID</span></div>
-                                    <div id="auditDupSummary" class="aws-radar-summary">Scans on its own when you fill or edit an ID — or click 📡 anytime.</div>
-                                    <div id="auditDupReveal" class="audit-dup-reveal" style="display:none;margin-top:4px">
-                                        <button type="button" class="btn-sm btn-outline" onclick="auditRevealDuplicates()" id="btnAuditDupReveal">👀 View matches</button>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- Duplicate Radar: moved OUT of this panel in Phase 10.5 --
+                                 it now floats top-center as the #awsDock chat-style 📡
+                                 (same dock idea as the Ticket Workspace). -->
                             <div class="aws-scroll">
                                 <div id="auditFieldsMain" class="control-grid aws-fields"><!-- built by renderAuditFields() --></div>
                             </div>
@@ -4022,11 +4095,20 @@ function buildDropzoneHtml(id, fieldName, required) {
     });
 })();
 
+// Phase 10.5 (Ahmed): "give every select option field for every option its
+// unique colour". Each option position inside a select owns one palette
+// colour -- the dropdown rows, the closed-display text and any remaining
+// native selects all read from the same palette, so a given option keeps its
+// colour in every view of that field.
+const SELECT_OPTION_PALETTE = ['#00d4ff','#00e676','#ffb800','#ff4d6d','#b967ff','#ff8a3d','#4dd0e1','#f06292','#aeea00','#ffd54f','#64b5f6','#4db6ac','#ff8a65','#ba68c8','#7e57c2','#90a4ae'];
+function optionColorAt(idx) { return SELECT_OPTION_PALETTE[idx % SELECT_OPTION_PALETTE.length]; }
+
 function ssSyncDisplay(select, displayText) {
     const opt = select.options[select.selectedIndex];
     const txt = opt ? opt.textContent : '';
     displayText.textContent = txt || (select.options.length ? 'Select…' : 'No options');
     displayText.classList.toggle('ss-placeholder', !opt || !opt.value);
+    displayText.style.color = (opt && opt.value) ? optionColorAt(select.selectedIndex) : '';
 }
 
 function ssRenderOptions(select, optList, filterText, onPick) {
@@ -4039,6 +4121,7 @@ function ssRenderOptions(select, optList, filterText, onPick) {
         const row = document.createElement('div');
         row.className = 'ss-option' + (idx === select.selectedIndex ? ' ss-selected' : '');
         row.textContent = opt.textContent;
+        if (opt.value) row.style.color = optionColorAt(idx); // every option its own colour
         row.addEventListener('mousedown', (e) => {
             e.preventDefault();
             if (select.selectedIndex !== idx) {
@@ -4056,6 +4139,35 @@ function ssRenderOptions(select, optList, filterText, onPick) {
         optList.appendChild(none);
     }
 }
+
+// Native (non-enhanced, e.g. data-no-search) selects get the same per-option
+// colours: each <option> painted + the closed control tinted to the chosen
+// option's colour. Idempotent -- safe to re-run after options change.
+function paintNativeSelectColors(select) {
+    if (!select || !select.options) return;
+    for (let i = 0; i < select.options.length; i++) {
+        select.options[i].style.color = select.options[i].value ? optionColorAt(i) : '';
+    }
+    const sel = select.options[select.selectedIndex];
+    select.style.color = (sel && sel.value) ? optionColorAt(select.selectedIndex) : '';
+}
+document.addEventListener('change', (e) => {
+    if (e.target && e.target.tagName === 'SELECT') paintNativeSelectColors(e.target);
+});
+document.querySelectorAll('select').forEach(paintNativeSelectColors);
+// Selects and options born later (dynamic forms, pickers) get painted too.
+const _optColorObserver = new MutationObserver((muts) => {
+    muts.forEach(m => {
+        if (!m.addedNodes) return;
+        m.addedNodes.forEach(node => {
+            if (node.nodeType !== 1) return;
+            if (node.tagName === 'SELECT') paintNativeSelectColors(node);
+            else if (node.tagName === 'OPTION' && node.parentElement && node.parentElement.tagName === 'SELECT') paintNativeSelectColors(node.parentElement);
+            else if (node.querySelectorAll) node.querySelectorAll('select').forEach(paintNativeSelectColors);
+        });
+    });
+});
+_optColorObserver.observe(document.body, { childList: true, subtree: true });
 
 function enhanceSelect(select) {
     if (!select || select.dataset.ssEnhanced || select.multiple || select.disabled) return;
@@ -4631,6 +4743,26 @@ function closeSidebar(){
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarBackdrop').classList.remove('visible');
 }
+
+// Phase 10.5 (Ahmed, from the Xena Dashboard video): one click on ⟨⟩ in the
+// top bar slides the whole left sidebar away and EVERY tab's content
+// stretches to fit the full page (the .sidebar / .main-content transitions
+// animate it; the floating dock re-centers via body.sidebar-collapsed).
+// The choice is remembered across visits.
+function toggleSidebarCollapse(force) {
+    const collapsed = force === undefined ? !document.body.classList.contains('sidebar-collapsed') : !!force;
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    const btn = document.getElementById('sidebarCollapseBtn');
+    if (btn) btn.textContent = collapsed ? '☰' : '⟨⟨';
+    try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+}
+// Restore the remembered state on load (before first paint would be ideal;
+// DOMContentLoaded is close enough -- the transition makes it a slide, not a flash).
+(function restoreSidebarCollapse() {
+    let collapsed = false;
+    try { collapsed = localStorage.getItem('sidebarCollapsed') === '1'; } catch (e) {}
+    if (collapsed) toggleSidebarCollapse(true);
+})();
 
 const COMPARE_GROUP_COLORS = ['#00d4ff','#00e676','#b967ff','#ffb800'];
 
@@ -8922,6 +9054,10 @@ function twRenderSection2(ticket, reqTypeOverride) {
     const sec2 = document.getElementById('tw-sec-2');
     if (!sec2) return;
     sec2.innerHTML = '';
+    // Phase 10.5: the Agency-Creation-only Reject Reason card lives OUTSIDE
+    // sec2 now (its own #twRejectGroup card under Basic Information), so a
+    // re-render must drop any leftover copy from a previous ticket/tab.
+    document.getElementById('twRejectGroup')?.remove();
 
     const reqType = (reqTypeOverride || ticket.fields['Request Type'] || '').toString().trim();
     // Some live Request Type values carry a trailing space ("Remove BD ",
@@ -8965,10 +9101,14 @@ function twRenderSection2(ticket, reqTypeOverride) {
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
 }
 
-// Phase 10.4: Agency-Creation-only extras appended to the Dynamic Request
-// Section. Parenet sub agency slides in right after the Agency Code group;
-// Create Way and Reject Reason follow at the end (Reject Reason keeps its
-// rr-picker chip cloud -- NOT the Agency Point Privilege card-grid look).
+// Phase 10.4/10.5: Agency-Creation-only extras. Parenet sub agency slides in
+// right after the Agency Code group; Create Way follows at the end of the
+// Dynamic Request Section (Ahmed's marker "1"); Reject Reason moved OUT of
+// sec2 into its own card parked right under Basic Information (marker "2")
+// and now LOOKS like the Agency Point Privilege picker -- the same card-grid
+// + filter + selected-chips, repainted rose (.pp-rose) to keep its danger
+// accent. Collection is unchanged: twCollectFields still reads the checked
+// hidden inputs by name="Reject Reason".
 function twRenderAgencyCreationExtras(sec2, ticket) {
     // 1) Parenet sub agency, directly beside Agency Code.
     const psaWrap = createTwControl('Parenet sub agency', ticket.fields['Parenet sub agency']);
@@ -8987,22 +9127,41 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
     cwWrap.innerHTML = `<label>Create Way</label><select name="Create Way" class="form-highlight-input"><option value="">-- Select --</option>${cwOpts}</select>`;
     sec2.appendChild(cwWrap);
 
-    // 3) Reject Reason: full-width rr-picker chip cloud on hidden checkboxes
-    // (collection logic identical to before -- twCollectFields reads the
-    // checked inputs by name="Reject Reason").
+    // 3) Reject Reason: its own card right after Basic Information (left
+    // column, marker "2"). The hidden-checkboxes .msel-wrap is the exact
+    // same markup the Agency Point Privilege wrap carries, so the shared pp
+    // card-grid picker can skin it (rose variant).
     const rrMeta = FIELD_SCHEMA['Reject Reason'];
     const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
     const rrGroup = document.createElement('div');
-    rrGroup.className = 'control-group twx-dup-reject-group';
-    rrGroup.innerHTML = `<label>Reject Reason</label><div id="tw-reject-reason-wrap" class="sub-opts"><div class="msel-wrap">${(rrMeta?.options || []).map(o => `
+    rrGroup.id = 'twRejectGroup';
+    rrGroup.className = 'card twx-card';
+    rrGroup.innerHTML = `<h4 class="twx-sec-title" style="color:var(--accent-rose);">
+        <span class="twx-sec-num" style="background:var(--accent-rose);">2</span>
+        Reject Reason
+    </h4>
+    <div id="tw-reject-reason-wrap" class="sub-opts"><div class="msel-wrap">${(rrMeta?.options || []).map(o => `
         <label class="msel-toggle ${rrChecked.has(o) ? 'active' : ''}" onclick="event.preventDefault(); this.classList.toggle('active'); this.querySelector('input').checked = this.classList.contains('active');">
             <input type="checkbox" name="Reject Reason" value="${escHtml(o)}" data-multi="true" ${rrChecked.has(o) ? 'checked' : ''} style="display:none">
             <span class="msel-dot" style="border-color:var(--accent-rose)">✓</span>
             <span class="msel-text">${escHtml(o)}</span>
         </label>`).join('')}</div></div>`;
-    sec2.appendChild(rrGroup);
+    // Into the left-column flex stack, DIRECTLY under Basic Information --
+    // a plain grid row would push it below the taller middle column.
+    const col1Stack = document.getElementById('twCol1Stack');
+    if (col1Stack) col1Stack.appendChild(rrGroup);
+    else {
+        const sec1Card = document.getElementById('tw-sec-1-card');
+        if (sec1Card) sec1Card.after(rrGroup);
+        else sec2.appendChild(rrGroup); // should never happen -- safety net
+    }
     const rrWrap = rrGroup.querySelector('#tw-reject-reason-wrap');
-    if (rrWrap) auditRenderRejectReasonPicker(rrWrap);
+    if (rrWrap) reqRenderPointPrivilegePicker(rrWrap, {
+        rose: true,
+        toggleShow: '⊞ Show all reasons',
+        toggleHide: '▾ Done — show selected only',
+        filterPh: '🔍 Filter reasons…',
+    });
 }
 
 // Phase 10.4: Status as audit-style one-tap pick buttons (Done green /
@@ -10333,9 +10492,12 @@ function twCollectFields(form) {
 }
 
 async function twSaveWorkspace() {
-    const btn = document.getElementById('twSaveBtn');
-    btn.disabled = true; btn.textContent = '⏳ Saving…';
-    
+    // Phase 10.5: two Save & Resolve buttons now (topbar #twSaveBtn + the one
+    // pinned under the Audition Action card #twSaveBtn2) -- both disable and
+    // both restore, whichever one was tapped.
+    const btns = ['twSaveBtn', 'twSaveBtn2'].map(id => document.getElementById(id)).filter(Boolean);
+    btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Saving…'; });
+
     const form = document.getElementById('tw-form');
     const fields = twCollectFields(form);
     const finalData = new FormData();
@@ -10370,7 +10532,7 @@ async function twSaveWorkspace() {
     } catch (e) {
         ToastManager.show('Failed to save: ' + e.message, 'error');
     } finally {
-        btn.disabled = false; btn.textContent = '💾 Save & Resolve';
+        btns.forEach(b => { b.disabled = false; b.textContent = '💾 Save & Resolve'; });
     }
 }
 
@@ -10467,8 +10629,16 @@ function twRadarSetBadge(n) {
 function twRadarSetMsg(html, show) {
     const msg = document.getElementById('twRadarMsg');
     if (!msg) return;
-    msg.innerHTML = html || '';
+    // Phase 10.5: every bubble gets its own ✕ -- the ONLY thing that
+    // dismisses it (outside clicks and Escape close the drawer only).
+    msg.innerHTML = html ? '<button type="button" class="twx-radar-msg-x" onclick="event.stopPropagation();twRadarDismissMsg()" title="Dismiss">✕</button>' + html : '';
     msg.classList.toggle('open', !!show && !!html);
+}
+
+// ✕ hides the bubble but keeps its content, so the 📡 circle can bring the
+// verdict straight back without re-running the scan.
+function twRadarDismissMsg() {
+    document.getElementById('twRadarMsg')?.classList.remove('open');
 }
 
 // The sheet's own "Duplicated Check" formula result, shown inside the bubble
@@ -10483,10 +10653,15 @@ function twRadarSheetLine() {
     return `<div class="twx-radar-sheet">📋 Sheet formula: ${chips}</div>`;
 }
 
-// 📡 circle click: if matches are already loaded, toggle the review drawer;
-// otherwise run a fresh scan.
+// 📡 circle click: if matches are already loaded, re-show the verdict bubble
+// (it may have been ✕-dismissed) and toggle the review drawer; otherwise run
+// a fresh scan.
 function twRadarFabClick() {
-    if (twRadarMatches && twRadarMatches.length) twRadarToggleMatches();
+    if (twRadarMatches && twRadarMatches.length) {
+        const msg = document.getElementById('twRadarMsg');
+        if (msg && msg.innerHTML.trim()) msg.classList.add('open');
+        twRadarToggleMatches();
+    }
     else twRadarCheck();
 }
 
@@ -10624,24 +10799,20 @@ function twRadarToggleMatches(forceOpen) {
     drawer.classList.add('open');
 }
 
-// Phase 10.4: chat-style dismissal -- clicking anywhere OUTSIDE the radar
-// bubble/drawer (or pressing Escape) closes them, exactly like the Audit
-// workstation's drawer. Clicks inside the 📡 dock or the drawer itself are
-// left alone so reviewing matches never self-closes.
+// Phase 10.5 (Ahmed): the verdict bubble is PERSISTENT -- "make the msg last
+// not disappear". Outside clicks and Escape close ONLY the match-cards
+// drawer, never the message; the message goes away via its own ✕ (or a fresh
+// scan reset). Clicks inside the 📡 dock or the drawer are left alone.
 document.addEventListener('click', (e) => {
-    const msg = document.getElementById('twRadarMsg');
     const drawer = document.getElementById('twDupDrawer');
-    if (!msg && !drawer) return;
+    if (!drawer) return;
     const insideRadar = e.target.closest && (e.target.closest('#twRadarDock') || e.target.closest('#twDupDrawer'));
     if (insideRadar) return;
-    if (msg && msg.classList.contains('open')) msg.classList.remove('open');
-    if (drawer && drawer.classList.contains('open')) drawer.classList.remove('open');
+    if (drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    const msg = document.getElementById('twRadarMsg');
     const drawer = document.getElementById('twDupDrawer');
-    if (msg && msg.classList.contains('open')) msg.classList.remove('open');
     if (drawer && drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
@@ -11577,7 +11748,15 @@ function renderReqFormFields() {
 // original checkboxes stay in the DOM (hidden) and perfectly in sync, so
 // submitReqForm()'s multiselect validation and payload collection keep
 // working exactly as before.
-function reqRenderPointPrivilegePicker(wrap) {
+function reqRenderPointPrivilegePicker(wrap, opts) {
+    // Phase 10.5: opts lets the Reject Reason card reuse this exact picker
+    // with its own wording and a rose repaint (.pp-rose).
+    const O = Object.assign({
+        toggleShow: '⊞ Show all privileges',
+        toggleHide: '▾ Done — show selected only',
+        filterPh: '🔍 Filter privileges…',
+        rose: false,
+    }, opts || {});
     const msel = wrap.querySelector('.msel-wrap');
     if (!msel) return;
     const boxes = Array.from(msel.querySelectorAll('input[type="checkbox"]'));
@@ -11593,15 +11772,15 @@ function reqRenderPointPrivilegePicker(wrap) {
     };
 
     const picker = document.createElement('div');
-    picker.className = 'pp-picker';
+    picker.className = 'pp-picker' + (O.rose ? ' pp-rose' : '');
     // Phase 10.2: collapsed by default -- only the chosen privileges show as
     // chips. The "Show all" toggle unfolds the full card grid for
     // selecting/unselecting, then folds back to the compact view.
     picker.innerHTML = `
         <div class="pp-selected"></div>
-        <button type="button" class="pp-toggle">⊞ Show all privileges</button>
+        <button type="button" class="pp-toggle">${escHtml(O.toggleShow)}</button>
         <div class="pp-all" style="display:none;">
-            <input type="text" class="pp-filter" placeholder="🔍 Filter privileges…">
+            <input type="text" class="pp-filter" placeholder="${escHtml(O.filterPh)}">
             <div class="pp-grid"></div>
         </div>`;
     wrap.appendChild(picker);
@@ -11614,7 +11793,7 @@ function reqRenderPointPrivilegePicker(wrap) {
     toggleBtn.addEventListener('click', () => {
         const opening = allWrap.style.display === 'none';
         allWrap.style.display = opening ? '' : 'none';
-        toggleBtn.textContent = opening ? '▾ Done — show selected only' : '⊞ Show all privileges';
+        toggleBtn.textContent = opening ? O.toggleHide : O.toggleShow;
         if (opening) setTimeout(() => filter.focus(), 30);
     });
 
@@ -12898,6 +13077,8 @@ function auditClearWorkstation(silent) {
     if (dupSummary) dupSummary.innerHTML = 'Scans on its own when you fill or edit an ID — or click 📡 anytime.';
     if (dupReveal) dupReveal.style.display = 'none';
     if (radarBtn) radarBtn.classList.remove('alert');
+    awsRadarSetBadge(0);
+    awsRadarShowMsg(false);
     auditDupMatches = [];
     auditLastScanKey = '';
     auditCloseDupDrawer();
@@ -12929,6 +13110,33 @@ function auditIdScanKey() {
         .join('|');
 }
 
+// Phase 10.5: the audit radar is the same chat-style docked 📡 as the Ticket
+// Workspace -- count badge on the circle, verdict bubble on its RIGHT, and
+// the bubble is persistent: only its own ✕ hides it (content kept, so the
+// circle can re-show it); outside clicks close only the match-cards drawer.
+function awsRadarSetBadge(n) {
+    const badge = document.getElementById('awsRadarBadge');
+    if (badge) badge.textContent = n > 0 ? String(n) : '';
+}
+function awsRadarShowMsg(show) {
+    const msg = document.getElementById('awsRadarMsg');
+    if (msg) msg.classList.toggle('open', !!show);
+}
+function awsRadarHideMsg() { awsRadarShowMsg(false); }
+
+// 📡 circle click: matches already loaded -> re-show the (maybe ✕-dismissed)
+// bubble and toggle the match-cards drawer; otherwise run a fresh scan.
+function auditRadarFabClick() {
+    if (auditDupMatches && auditDupMatches.length) {
+        awsRadarShowMsg(true);
+        const drawer = document.getElementById('auditDupDrawer');
+        if (drawer && drawer.classList.contains('open')) auditCloseDupDrawer();
+        else auditRevealDuplicates();
+    } else {
+        auditCheckDuplicates();
+    }
+}
+
 // Runs on its own when any of the ID fields is filled/edited (debounced,
 // silent), and on demand via the 📡 button (with toasts).
 async function auditCheckDuplicates(opts) {
@@ -12953,6 +13161,8 @@ async function auditCheckDuplicates(opts) {
             if (summaryEl) summaryEl.innerHTML = 'Scans on its own when you fill or edit an ID — or click 📡 anytime.';
             if (revealWrap) revealWrap.style.display = 'none';
             if (btn) btn.classList.remove('alert');
+            awsRadarSetBadge(0);
+            awsRadarShowMsg(false);
             auditCloseDupDrawer();
             return;
         }
@@ -12971,7 +13181,9 @@ async function auditCheckDuplicates(opts) {
     if (revealWrap) revealWrap.style.display = 'none';
     auditCloseDupDrawer();
     auditDupMatches = [];
+    awsRadarSetBadge(0);
     if (summaryEl) summaryEl.innerHTML = '⏳ Checking for duplicates across every request ever submitted…';
+    if (!isAuto) awsRadarShowMsg(true); // a manual 📡 click sees the progress bubble right away
     if (btn) { btn.disabled = true; btn.classList.add('scanning'); btn.classList.remove('alert'); }
 
     try {
@@ -12997,6 +13209,10 @@ async function auditCheckDuplicates(opts) {
 
         if (!auditDupMatches.length) {
             if (summaryEl) summaryEl.innerHTML = `<span class="aws-dup-clean">🟢 No duplicate</span>${firstError ? ' <span style="font-size:.68rem;color:var(--text-muted)">(one search had an issue)</span>' : ''}`;
+            // Auto-scan stays silent on a clean pass; a manual click keeps
+            // the green bubble up (persistent, dismissed by its own ✕).
+            awsRadarSetBadge(0);
+            awsRadarShowMsg(!isAuto);
             if (firstError && !isAuto) ToastManager.show('Duplicate check: ' + firstError, 'warning', 6000);
             if (btn) { btn.disabled = false; btn.classList.remove('scanning'); btn.classList.remove('alert'); }
             return;
@@ -13030,13 +13246,18 @@ async function auditCheckDuplicates(opts) {
             const revealBtn = document.getElementById('btnAuditDupReveal');
             if (revealBtn) revealBtn.textContent = `👀 View ${n} match${n === 1 ? '' : 'es'}`;
         }
-        // Unmissable but never intrusive: the radar button pulses red and
-        // the verdict glows -- the drawer itself only opens when the agent
-        // asks for it (clicking the verdict, 👀 View matches, or 📡 again).
+        // Unmissable but never intrusive: the radar button pulses red, the
+        // count badge lights up and the verdict bubble pops on the RIGHT of
+        // the 📡 circle (and STAYS) -- the drawer itself only opens when the
+        // agent asks for it (clicking the verdict, 👀 View matches, or 📡).
         if (btn) btn.classList.add('alert');
+        awsRadarSetBadge(n);
+        awsRadarShowMsg(true);
 
     } catch (e) {
         if (summaryEl) summaryEl.innerHTML = '';
+        awsRadarSetBadge(0);
+        awsRadarShowMsg(false);
         ToastManager.show('Duplicate check failed: ' + e.message, 'error', 8000);
     }
 
@@ -13057,13 +13278,15 @@ function auditCloseDupDrawer() {
 }
 
 // Clicking any empty spot on the page closes the drawer, same as tapping ×.
-// The radar strip (📡, the glowing verdict, 👀 View matches) is exempt --
-// those clicks are what open or refresh it. Escape closes it too.
+// The radar dock (📡 circle, the verdict bubble, 👀 View matches) is exempt --
+// those clicks are what open or refresh it. The bubble itself is persistent
+// (Phase 10.5): outside clicks never touch it, only its own ✕ does.
+// Escape closes the drawer too.
 document.addEventListener('click', (e) => {
     const drawer = document.getElementById('auditDupDrawer');
     if (!drawer || !drawer.classList.contains('open')) return;
     if (drawer.contains(e.target)) return;
-    if (e.target.closest && e.target.closest('.aws-radar')) return;
+    if (e.target.closest && e.target.closest('#awsRadarDock')) return;
     drawer.classList.remove('open');
 });
 document.addEventListener('keydown', (e) => {
