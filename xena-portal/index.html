@@ -985,8 +985,69 @@
         #twNoteText::placeholder{color:rgba(255,233,176,0.35);}
         .twn-foot{padding:8px 14px;font-size:.68rem;color:rgba(255,233,176,0.45);border-top:1px solid rgba(255,184,0,0.15);}
         /* Done-by quick picks: rendered with the audit tab's .audit-pick-btn
-           per-person colors (Ahmed blue / Noora pink / Mano yellow). */
+           per-person colors (Ahmed blue / Noora pink / Mano yellow). Phase 10.2:
+           no more ⚡ glyph -- clean pill shape with a subtle lift + glow. */
         .twup-quick{margin-bottom:12px;}
+        .twup-quick .audit-pick-btn{border-radius:999px;padding:10px 18px;font-size:.8rem;letter-spacing:.4px;font-weight:800;}
+        .twup-quick .audit-pick-btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.28);}
+
+        /* ===== Phase 10.2: three-column vertical workspace layout =====
+           Left: Basic Information + Duplicate Check stacked · Middle: Dynamic
+           Request Section · Right: Audition Action. Pure CSS grid placement --
+           the HTML keeps its original card order (Basic, Dynamic, Duplicate,
+           Audition Action), only the visual placement is reassigned. */
+        #tw-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start;}
+        #tw-form .twx-card{margin-bottom:0;}
+        #tw-sec-1-card{grid-column:1;grid-row:1;}
+        #tw-sec-3-card{grid-column:1;grid-row:2;}
+        #tw-sec-2-card{grid-column:2;grid-row:1 / span 2;}
+        #tw-sec-5-card{grid-column:3;grid-row:1 / span 2;}
+        @media(max-width:1500px){
+            #tw-form{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);}
+            #tw-sec-1-card{grid-column:1;grid-row:1;}
+            #tw-sec-3-card{grid-column:1;grid-row:2;}
+            #tw-sec-2-card{grid-column:2;grid-row:1;}
+            #tw-sec-5-card{grid-column:2;grid-row:2;}
+        }
+        @media(max-width:1024px){
+            #tw-form{grid-template-columns:minmax(0,1fr);}
+            /* single column: Basic -> Duplicate -> Dynamic -> Audition Action,
+               so the section numbers (1,2,3,4) read in order here too */
+            #tw-sec-1-card{grid-column:1;grid-row:1;}
+            #tw-sec-3-card{grid-column:1;grid-row:2;}
+            #tw-sec-2-card{grid-column:1;grid-row:3;}
+            #tw-sec-5-card{grid-column:1;grid-row:4;}
+        }
+
+        /* Phase 10.2: Preview button in the topbar + its collapsible panel. */
+        .twx-preview-btn{padding:12px 18px;font-size:.92rem;font-weight:800;display:inline-flex;align-items:center;gap:7px;border-radius:13px;border:1.5px solid rgba(0,212,255,0.45);background:rgba(0,212,255,0.08);color:var(--accent-cyan);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;}
+        .twx-preview-btn:hover{background:rgba(0,212,255,0.18);transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,212,255,0.25);}
+        .twx-preview-btn.active{background:rgba(0,212,255,0.92);color:#00222b;border-color:var(--accent-cyan);box-shadow:0 0 18px rgba(0,212,255,0.45);}
+        #twPreviewPanel{display:none;margin:-10px 0 22px;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.07), color-mix(in srgb, var(--surface) 92%, transparent) 55%, rgba(168,85,247,0.06));border:1px solid rgba(0,212,255,0.28);box-shadow:0 10px 30px rgba(0,0,0,0.28);}
+        #twPreviewPanel.open{display:block;animation:twPreviewIn .22s cubic-bezier(.2,.9,.3,1.15);}
+        @keyframes twPreviewIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+        .tw-preview-hint{font-size:.75rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
+        .tw-reqtype-hint{font-size:.75rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
+
+        /* Phase 10.2: Agency Point Privilege picker -- collapsed by default so
+           only the chosen privileges show; "Show all" unfolds the full card
+           grid for selecting/unselecting, then folds back. */
+        .pp-toggle{margin:10px 0 0;padding:9px 16px;border-radius:999px;border:1.5px solid rgba(255,184,0,0.45);background:rgba(255,184,0,0.08);color:var(--accent-amber);font-family:inherit;font-size:.8rem;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
+        .pp-toggle:hover{background:rgba(255,184,0,0.18);transform:translateY(-1px);box-shadow:0 5px 14px rgba(255,184,0,0.22);}
+        .pp-all{margin-top:10px;}
+        .pp-selected:empty::after{content:'No privilege selected yet — click “Show all” to pick.';font-size:.78rem;color:var(--text-muted);font-style:italic;}
+
+        /* Phase 10.2: searchable-select panels are portaled to <body> (fixed
+           position) so they can never be clipped by a section card's
+           overflow:hidden, and they flip upward near the viewport bottom. */
+        .ss-panel.ss-portaled{position:fixed;z-index:1200;}
+        .ss-options{overscroll-behavior:contain;}
+
+        /* Phase 10.2: every editable text field is now a stretchable,
+           auto-growing textarea (Enter adds a new line, drag the corner to
+           stretch further) -- same feel as the Applier Note box. */
+        textarea.form-highlight-input{font-family:inherit;line-height:1.5;}
+        .tw-txt-auto{overflow-y:hidden;min-height:44px;resize:vertical;}
 
         @media(max-width:900px){
             .chart-grid-3{grid-template-columns:repeat(2,1fr)}
@@ -2846,6 +2907,7 @@
                        <div id="tw-head-meta" class="tw-head-meta"></div>
                    </div>
                    <div class="twx-actions">
+                       <button type="button" id="twPreviewBtn" class="twx-preview-btn" onclick="twTogglePreview()" title="Preview the field layout of any Request Type (doesn't change the ticket's saved type)">👁️ Preview</button>
                        <button type="button" id="twNoteBtn" class="twx-note-btn" onclick="twToggleNote()" title="Floating scratch note -- stays on top even over opened pictures">📝 Note</button>
                        <button id="twSaveBtn" class="btn btn-primary twx-save" onclick="twSaveWorkspace()">💾 Save &amp; Resolve</button>
                    </div>
@@ -2864,20 +2926,21 @@
                    <div class="twn-foot">Floats above opened pictures · cleared when the request is submitted</div>
                </div>
                
-               <!-- Request Type field-layout preview: purely a viewer switch for which
-                    field set shows in the Dynamic Request Section (card 2) below -- picking
-                    a tab does NOT change the ticket's actual saved Request Type. All types
-                    are shown (no hidden "More" menu), wrapped elegantly. To actually change
-                    the Request Type, edit the "Request Type" field in Basic Information. -->
-               <div class="card" style="padding:10px 12px; margin-bottom:16px;">
-                   <div class="tw-reqtype-hint">👁️ Preview field layout for a Request Type (doesn't change the ticket's saved type):</div>
+               <!-- Phase 10.2: the Request Type field-layout preview moved into a
+                    collapsible panel toggled from the topbar's "👁️ Preview" button --
+                    click it and the full type list drops down; click any type to swap
+                    which field set the Dynamic Request Section shows. Still purely a
+                    viewer: it never changes the ticket's saved Request Type. To really
+                    change the type, edit the "Request Type" field in Basic Information. -->
+               <div id="twPreviewPanel">
+                   <div class="tw-preview-hint">👁️ Preview field layout — click a Request Type to load its fields (doesn't change the ticket's saved type):</div>
                    <div id="tw-reqtype-tabs" class="tw-reqtype-tabs-wrap"></div>
                </div>
 
                <form id="tw-form">
                    <input type="hidden" id="tw-record-id">
                    
-                   <div class="card twx-card">
+                   <div class="card twx-card" id="tw-sec-1-card">
                        <h4 class="twx-sec-title" style="color:var(--accent-cyan);">
                            <span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>
                            Basic Information
@@ -2887,15 +2950,15 @@
 
                    <div class="card twx-card" id="tw-sec-2-card">
                        <h4 class="twx-sec-title" style="color:var(--accent-purple);">
-                           <span class="twx-sec-num" style="background:var(--accent-purple);">2</span>
+                           <span class="twx-sec-num" style="background:var(--accent-purple);">3</span>
                            Dynamic Request Section
                        </h4>
                        <div id="tw-sec-2" class="control-grid"></div>
                    </div>
 
-                   <div class="card twx-card">
+                   <div class="card twx-card" id="tw-sec-3-card">
                        <h4 class="twx-sec-title" style="color:var(--accent-amber);">
-                           <span class="twx-sec-num" style="background:var(--accent-amber);">3</span>
+                           <span class="twx-sec-num" style="background:var(--accent-amber);">2</span>
                            Duplicate Check
                        </h4>
                        <div id="tw-sec-3" class="control-grid">
@@ -2932,16 +2995,24 @@
                        </div>
                    </div>
 
+                   <!-- ============================================================
+                        PHASE 10.2 NOTE (Ahmed): the whole "Chinese Approval" card is
+                        REMOVED from the workspace, but kept here as a comment so it
+                        can be restored in the future if needed. "Mentioned Person"
+                        moved into the Audition Action card below. "Type of Action"
+                        (#tw-chinese-action) and "Chinese Note" (#tw-chinese-note) no
+                        longer render -- their JS setters in twOpenWorkspace are
+                        null-guarded, and twCollectFields simply never sends them.
+                        TO RESTORE: uncomment this block, move the
+                        #tw-mentioned-person-wrap div back inside it, and renumber
+                        the Audition Action card from 4 back to 5.
+
                    <div class="card twx-card">
                        <h4 class="twx-sec-title" style="color:var(--accent-green);">
                            <span class="twx-sec-num" style="background:var(--accent-green);">4</span>
                            Chinese Approval
                        </h4>
                        <div class="control-grid">
-                           <!-- "Mentioned Person" (fldgOgBYX7) lives here, matching the
-                                live Feishu form's "chinese approval" section -- it was
-                                previously mis-grouped into Basic Information. Filled in
-                                by twOpenWorkspace via twRenderMemberPicker(). -->
                            <div class="control-group" id="tw-mentioned-person-wrap"></div>
                            <div class="control-group">
                                <label>Type of Action</label>
@@ -2958,10 +3029,11 @@
                            </div>
                        </div>
                    </div>
+                        ============================================================ -->
 
-                   <div class="card twx-card">
+                   <div class="card twx-card" id="tw-sec-5-card">
                        <h4 class="twx-sec-title" style="color:var(--accent-rose);">
-                           <span class="twx-sec-num" style="background:var(--accent-rose);">5</span>
+                           <span class="twx-sec-num" style="background:var(--accent-rose);">4</span>
                            Audition Action
                        </h4>
                        <div class="control-grid">
@@ -2988,6 +3060,10 @@
                                    <option value="">-- Select --</option>
                                </select>
                            </div>
+                           <!-- Phase 10.2: "Mentioned Person" (fldgOgBYX7) moved here
+                                from the (now commented-out) Chinese Approval card.
+                                Filled in by twOpenWorkspace via twRenderMemberPicker(). -->
+                           <div class="control-group" id="tw-mentioned-person-wrap"></div>
                            <!-- "Done by" (fld1fFCCbr) lives here, matching the live
                                 Feishu form's "Audition Action" section -- it was
                                 previously mis-grouped into Basic Information. Filled in
@@ -3887,13 +3963,50 @@ function enhanceSelect(select) {
     panel.appendChild(optList);
     wrapper.appendChild(panel);
 
-    const closePanel = () => { panel.style.display = 'none'; wrapper.classList.remove('ss-open'); };
+    // Phase 10.2: the panel is PORTALED to <body> while open (fixed position
+    // computed from the display's rect) so a section card's overflow:hidden can
+    // never clip it, it flips upward when there isn't room below, and the mouse
+    // wheel scrolls the option list (not the page) whenever the pointer is over
+    // it. It follows the display on scroll/resize and closes if the display
+    // leaves the viewport.
+    const positionPanel = () => {
+        const r = display.getBoundingClientRect();
+        if (r.bottom < -20 || r.top > window.innerHeight + 20) { closePanel(); return; }
+        panel.style.left = r.left + 'px';
+        panel.style.right = 'auto';
+        panel.style.width = r.width + 'px';
+        const estPanelH = 41 + Math.min(220, optList.scrollHeight || 220) + 10;
+        const spaceBelow = window.innerHeight - r.bottom;
+        const spaceAbove = r.top;
+        if (spaceBelow >= Math.min(estPanelH, 280) || spaceBelow >= spaceAbove) {
+            panel.style.top = (r.bottom + 4) + 'px';
+            panel.style.maxHeight = Math.max(140, spaceBelow - 12) + 'px';
+        } else {
+            const h = Math.max(140, Math.min(estPanelH, spaceAbove - 12));
+            panel.style.top = (r.top - 4 - h) + 'px';
+            panel.style.maxHeight = h + 'px';
+        }
+    };
+    const onScrollOrResize = () => { if (panel.style.display !== 'none') positionPanel(); };
+    const closePanel = () => {
+        panel.style.display = 'none';
+        wrapper.classList.remove('ss-open');
+        document.removeEventListener('scroll', onScrollOrResize, true);
+        window.removeEventListener('resize', onScrollOrResize);
+    };
     const openPanel = () => {
         if (select.disabled) return;
         ssRenderOptions(select, optList, '', () => { ssSyncDisplay(select, displayText); closePanel(); });
         searchInput.value = '';
+        if (!panel.classList.contains('ss-portaled')) {
+            panel.classList.add('ss-portaled');
+            document.body.appendChild(panel);
+        }
         panel.style.display = 'block';
         wrapper.classList.add('ss-open');
+        positionPanel();
+        document.addEventListener('scroll', onScrollOrResize, true);
+        window.addEventListener('resize', onScrollOrResize);
         setTimeout(() => searchInput.focus(), 10);
     };
 
@@ -3915,7 +4028,7 @@ function enhanceSelect(select) {
             if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
         }
     });
-    document.addEventListener('click', (e) => { if (!wrapper.contains(e.target)) closePanel(); });
+    document.addEventListener('click', (e) => { if (!wrapper.contains(e.target) && !panel.contains(e.target)) closePanel(); });
 
     // If some later code repopulates this select's <option>s (very common in
     // this app -- filters get re-filled after a fetch), keep the display text
@@ -8642,6 +8755,28 @@ const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Du
 // ticket is opened.
 let twManualReqType = null;
 
+// Phase 10.2 (one delegated listener, two jobs):
+// 1) data-mirror sync -- fields that render twice (User ID lives in Basic
+//    Information AND in the Dynamic Request Section now) mirror each other on
+//    every keystroke, so the last-element-wins collection in twCollectFields
+//    can never silently overwrite an edit made in the other box.
+// 2) .tw-txt-auto auto-grow -- every editable text field is a stretchable
+//    textarea now (Enter = new line, drag the corner to stretch); it also
+//    grows by itself as you type, capped at 240px where it starts scrolling.
+document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t || !t.tagName) return;
+    if (t.dataset && t.dataset.mirror) {
+        document.querySelectorAll(`[data-mirror="${t.dataset.mirror}"]`).forEach(el => {
+            if (el !== t) el.value = t.value;
+        });
+    }
+    if (t.classList && t.classList.contains('tw-txt-auto')) {
+        t.style.height = 'auto';
+        t.style.height = Math.min(240, t.scrollHeight + 2) + 'px';
+    }
+});
+
 // Renders the Dynamic Request Section (card 2) for a given ticket, using
 // reqTypeOverride if provided (manual tab pick) or the record's own "Request Type"
 // otherwise. Pulled out of twOpenWorkspace so twSelectRequestType can call it again
@@ -8652,11 +8787,24 @@ function twRenderSection2(ticket, reqTypeOverride) {
     sec2.innerHTML = '';
 
     const reqType = (reqTypeOverride || ticket.fields['Request Type'] || '').toString().trim();
-    const explicitList = TICKET_DYNAMIC_FIELDS[reqType];
+    // Some live Request Type values carry a trailing space ("Remove BD ",
+    // "Change agency name ", "Change Agency Ownership ") and their
+    // TICKET_DYNAMIC_FIELDS keys keep that space; reqType above is trimmed,
+    // so fall back to a trim-insensitive key match before giving up.
+    let explicitList = TICKET_DYNAMIC_FIELDS[reqType];
+    if (!explicitList) {
+        const k = Object.keys(TICKET_DYNAMIC_FIELDS).find(key => key.trim() === reqType);
+        if (k) explicitList = TICKET_DYNAMIC_FIELDS[k];
+    }
 
     let dynamicKeys;
     if (explicitList) {
-        dynamicKeys = explicitList.filter(k => !LT_BASIC_KEYS.has(k));
+        // Phase 10.2: "User ID" renders inside the Dynamic Request Section for
+        // EVERY Request Type (Ahmed) even though it's also in Basic Information
+        // -- the two boxes stay mirrored (data-mirror sync below) and collect
+        // as one value, so editing either updates both.
+        dynamicKeys = explicitList.filter(k => !LT_BASIC_KEYS.has(k) || k === 'User ID');
+        if (!dynamicKeys.includes('User ID')) dynamicKeys.unshift('User ID');
     } else {
         dynamicKeys = Object.keys(ticket.fields).filter(key => {
             const val = ticket.fields[key];
@@ -8754,6 +8902,40 @@ function twResetNote(clearText) {
     }
 }
 
+// Phase 10.2: Preview panel toggle -- the topbar "👁️ Preview" button drops
+// down the full Request Type list; clicking a type previews its field layout
+// in the Dynamic Request Section (never changes the saved type). The panel
+// stays open while browsing types so several can be compared quickly.
+let twPreviewOpen = false;
+function twTogglePreview(force) {
+    const panel = document.getElementById('twPreviewPanel');
+    const btn = document.getElementById('twPreviewBtn');
+    if (!panel) return;
+    twPreviewOpen = (typeof force === 'boolean') ? force : !twPreviewOpen;
+    panel.classList.toggle('open', twPreviewOpen);
+    if (btn) btn.classList.toggle('active', twPreviewOpen);
+    if (twPreviewOpen) {
+        // Opening while scrolled down would leave the panel hidden above the
+        // viewport (or under the sticky topbar) -- nudge the scroller so the
+        // whole panel sits right below the topbar.
+        requestAnimationFrame(() => {
+            const topbar = panel.parentElement.querySelector('.twx-topbar') || document.querySelector('.twx-topbar');
+            const anchor = topbar ? topbar.getBoundingClientRect().bottom : 0;
+            const r = panel.getBoundingClientRect();
+            if (r.top < anchor + 10) {
+                // The page scrolls an inner wrapper (not window) -- walk up to
+                // the real scrollable ancestor instead of guessing a class.
+                let scroller = panel.parentElement;
+                while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
+                    scroller = scroller.parentElement;
+                }
+                if (!scroller) scroller = document.scrollingElement;
+                if (scroller) scroller.scrollTop -= (anchor + 10 - r.top);
+            }
+        });
+    }
+}
+
 // Phase 10.1: queue cards show an "Opening…" spinner while the workspace
 // loads -- before this, a slow open looked like the click never registered.
 function twCardOpen(cardEl, recordId) {
@@ -8845,8 +9027,13 @@ async function twOpenWorkspace(recordId) {
         document.getElementById('tw-audition-status').value = typeof ticket.fields['Status'] === 'string' ? ticket.fields['Status'].trim() : (ticket.fields['Status']?.text?.trim() || '');
         document.getElementById('tw-audition-note').value = ticket.fields['Audition note'] || '';
         document.getElementById('tw-approve-note').value = feishuValueToString(ticket.fields['approve note']);
-        document.getElementById('tw-chinese-action').value = typeof ticket.fields['Type of Action'] === 'string' ? ticket.fields['Type of Action'].trim() : (ticket.fields['Type of Action']?.text?.trim() || '');
-        document.getElementById('tw-chinese-note').value = ticket.fields['chinese Note'] || '';
+        // Phase 10.2: the Chinese Approval card is commented out of the markup
+        // (kept as a restore note there), so these two elements no longer
+        // exist -- null-guarded instead of deleted, matching that note.
+        const twChineseActionEl = document.getElementById('tw-chinese-action');
+        if (twChineseActionEl) twChineseActionEl.value = typeof ticket.fields['Type of Action'] === 'string' ? ticket.fields['Type of Action'].trim() : (ticket.fields['Type of Action']?.text?.trim() || '');
+        const twChineseNoteEl = document.getElementById('tw-chinese-note');
+        if (twChineseNoteEl) twChineseNoteEl.value = ticket.fields['chinese Note'] || '';
 
         // ISSUE 4 FIX: populate the "Mentioned Group" dropdown (options come straight
         // from the live schema, same pattern used for Create Way below).
@@ -9548,7 +9735,7 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
         <div style="position:relative;">
             ${key === 'Done by' ? `<div class="twup-quick audit-pick-row">${TW_DONE_BY_QUICK_PICKS.map(q => {
                 const isActive = current && (current.name || '').toLowerCase().includes(q.person.toLowerCase());
-                return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}')" title="Set Done by to ${escHtml(q.person)}">⚡ ${escHtml(q.label)}</button>`;
+                return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}')" title="Set Done by to ${escHtml(q.person)}">${escHtml(q.label)}</button>`;
             }).join('')}</div>` : ''}
             <div id="${pickerId}-chip" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
                 <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</span>
@@ -9799,7 +9986,10 @@ function createTwControl(key, value) {
     // clips long pasted text.
     const MULTI_LINE_TEXT_FIELDS = new Set(['User ID', 'Rejected Ids', 'raw_text']);
     if (!readOnly && (MULTI_LINE_TEXT_FIELDS.has(key) || valStr.includes('\n'))) {
-        wrap.innerHTML = label + `<textarea name="${escHtml(key)}" class="form-highlight-input" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
+        // Phase 10.2: "User ID" also renders in the Dynamic Request Section --
+        // data-mirror keeps the two boxes in lockstep.
+        const mirrorAttr = key === 'User ID' ? ' data-mirror="User ID"' : '';
+        wrap.innerHTML = label + `<textarea name="${escHtml(key)}"${mirrorAttr} class="form-highlight-input" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
         return wrap;
     }
     if (readOnly && valStr.includes('\n')) {
@@ -9807,7 +9997,15 @@ function createTwControl(key, value) {
         return wrap;
     }
 
-    wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" ${readOnly ? 'readonly style="opacity:.7;cursor:not-allowed;"' : ''}>`;
+    // Phase 10.2: every editable text field renders as a single-line-looking
+    // textarea that takes new lines with Enter (also Shift/Ctrl+Enter) and
+    // stretches -- auto-grows while typing AND has a manual resize handle,
+    // same feel as the Applier Note box. Read-only fields keep the plain input.
+    if (readOnly) {
+        wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" readonly style="opacity:.7;cursor:not-allowed;">`;
+        return wrap;
+    }
+    wrap.innerHTML = label + `<textarea name="${escHtml(key)}" rows="1" class="form-highlight-input tw-txt-auto">${escHtml(valStr)}</textarea>`;
     return wrap;
 }
 
@@ -11051,15 +11249,29 @@ function reqRenderPointPrivilegePicker(wrap) {
 
     const picker = document.createElement('div');
     picker.className = 'pp-picker';
+    // Phase 10.2: collapsed by default -- only the chosen privileges show as
+    // chips. The "Show all" toggle unfolds the full card grid for
+    // selecting/unselecting, then folds back to the compact view.
     picker.innerHTML = `
         <div class="pp-selected"></div>
-        <input type="text" class="pp-filter" placeholder="🔍 Filter privileges…">
-        <div class="pp-grid"></div>`;
+        <button type="button" class="pp-toggle">⊞ Show all privileges</button>
+        <div class="pp-all" style="display:none;">
+            <input type="text" class="pp-filter" placeholder="🔍 Filter privileges…">
+            <div class="pp-grid"></div>
+        </div>`;
     wrap.appendChild(picker);
 
     const selWrap = picker.querySelector('.pp-selected');
     const grid = picker.querySelector('.pp-grid');
     const filter = picker.querySelector('.pp-filter');
+    const toggleBtn = picker.querySelector('.pp-toggle');
+    const allWrap = picker.querySelector('.pp-all');
+    toggleBtn.addEventListener('click', () => {
+        const opening = allWrap.style.display === 'none';
+        allWrap.style.display = opening ? '' : 'none';
+        toggleBtn.textContent = opening ? '▾ Done — show selected only' : '⊞ Show all privileges';
+        if (opening) setTimeout(() => filter.focus(), 30);
+    });
 
     const sync = () => {
         selWrap.innerHTML = boxes.filter(b => b.checked).map(b =>
