@@ -3296,83 +3296,68 @@ def points_search():
         request.environ['QUERY_STRING'] = urllib.parse.urlencode(args, doseq=True)
     return points_records()
 
-@app.route('/api/query', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
-def query_records():
-    user  = sanitize_text(request.args.get('user',''))
-    email = sanitize_text(request.args.get('email',''))
-    field = sanitize_text(request.args.get('field','')).strip().lower()
-    value = sanitize_text(request.args.get('value',''), 200).strip()
-    ip    = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+# ─── /api/query shared helpers (Phase 10.7) ───
+# The combo-search logic used to live inline inside query_records(); it is now
+# shared with /api/query/batch so BOTH endpoints run byte-for-byte the same
+# search per field (same aliases, same operator order, same first-working-combo
+# rule, same result shaping). Any future fix here automatically applies to both.
+def _query_search_url_and_headers(tat):
+    return (
+        f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true",
+        {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+    )
 
-    if field not in QUERY_FIELD_ALIASES: return jsonify({"error": "Invalid search field."}), 400
-    if not value: return jsonify({"error": "Please enter a value to search."}), 400
+def _query_combos_for_field(field, value):
+    """Every (alias, operator, value) combination tried for one field, in the
+    exact order the first-working-combo rule expects (aliases outer, contains/is/
+    = inner; '=' only for all-digit values)."""
+    combos = []
+    for alias in QUERY_FIELD_ALIASES[field]:
+        for op in ["contains", "is", "="]:
+            if op == "=" and not value.isdigit(): continue
+            val_array = (int(value),) if op == "=" else (value,)
+            combos.append((alias, op, val_array))
+    return combos
 
-    perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("query" in m for m in perms.get("modules", [])):
-        return jsonify({"error": "Access denied"}), 403
+def _query_try_combo(search_url, headers, combo, projection=QUERY_RECORDS_FIELDS):
+    """Fire one combo against Feishu's /records/search. Retries once without the
+    field projection when the base rejects it (1254045), exactly like before."""
+    alias, op, val_array = combo
+    payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
+    if projection: payload["field_names"] = projection
+    try:
+        resp = feishu_session.post(search_url, headers=headers, json=payload, timeout=10)
+        data = resp.json()
+        if data.get("code") == 1254045 and projection:
+            return _query_try_combo(search_url, headers, combo, projection=None)
+        if data.get("code") == 0:
+            return {"combo": combo, "ok": True, "items": data.get("data", {}).get("items", [])}
+        elif data.get("code") not in (1254011, 1254402, 1254010):
+            return {"combo": combo, "ok": False, "error": data.get("msg"), "fatal": data.get("code") == 99991663}
+        return {"combo": combo, "ok": False, "error": None}
+    except Exception as e:
+        return {"combo": combo, "ok": False, "error": str(e)}
 
-    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("query",["all"])
-    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
-    allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
-    allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
+def _query_pick_first_ok(combos, results_by_combo):
+    """The first-working-combo rule: walk combos in order, take the items of the
+    first one that succeeded; remember the last error message otherwise."""
+    all_items, fetch_complete, stop_reason, success = [], False, "", False
+    for combo in combos:
+        res = results_by_combo.get(combo)
+        if res and res.get("ok"):
+            return res["items"], True, "", True
+        if res and res.get("error"):
+            stop_reason = res["error"]
+    return all_items, fetch_complete, stop_reason, success
 
-    audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
-
-    if MOCK_MODE:
-        all_items = MockFeishuDB.generate_requests(10)
-        fetch_complete, stop_reason, success = True, "", True
-    else:
-        tat = get_tenant_access_token()
-        search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-
-        aliases = QUERY_FIELD_ALIASES[field]
-        combos = []
-        for alias in aliases:
-            for op in ["contains", "is", "="]:
-                if op == "=" and not value.isdigit(): continue
-                val_array = (int(value),) if op == "=" else (value,)
-                combos.append((alias, op, val_array))
-
-        def try_combo(combo, projection=QUERY_RECORDS_FIELDS):
-            alias, op, val_array = combo
-            payload = {"page_size": 500, "filter": {"conjunction": "and", "conditions": [{"field_name": alias, "operator": op, "value": val_array}]}}
-            if projection: payload["field_names"] = projection
-            try:
-                resp = http_requests.post(search_url, headers=headers, json=payload, timeout=10)
-                data = resp.json()
-                if data.get("code") == 1254045 and projection:
-                    return try_combo(combo, projection=None)
-                if data.get("code") == 0:
-                    return {"combo": combo, "ok": True, "items": data.get("data", {}).get("items", [])}
-                elif data.get("code") not in (1254011, 1254402, 1254010):
-                    return {"combo": combo, "ok": False, "error": data.get("msg"), "fatal": data.get("code") == 99991663}
-                return {"combo": combo, "ok": False, "error": None}
-            except Exception as e:
-                return {"combo": combo, "ok": False, "error": str(e)}
-
-        results_by_combo = {}
-        with ThreadPoolExecutor(max_workers=min(9, len(combos) or 1)) as executor:
-            for res in executor.map(try_combo, combos):
-                results_by_combo[res["combo"]] = res
-
-        all_items, fetch_complete, stop_reason, success = [], False, "", False
-        for combo in combos:
-            res = results_by_combo.get(combo)
-            if res and res.get("ok"):
-                all_items, success, fetch_complete = res["items"], True, True
-                break
-            if res and res.get("error"):
-                stop_reason = res["error"]
-
-        if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
-
+def _query_format_results(all_items, allowed_acms_set, allowed_regs_set):
+    """Shared raw-item -> response-row shaping (region/ACM inference, permission
+    filtering, date formatting, newest-first sort). Used by both /api/query and
+    /api/query/batch so their rows are always identical for the same items."""
     results = []
-
     for item in all_items:
         fields = item.get("fields", {})
-        
+
         region = clean(get_field_local(fields, "Region", "Agency Region"))
         acm_pk = clean(get_field_local(fields, "Acm Name (PK)"))
         acm_in = clean(get_field_local(fields, "Acm Name (IN)"))
@@ -3410,6 +3395,159 @@ def query_records():
 
     results.sort(key=lambda r: r["_sort_ts"], reverse=True)
     for r in results: r.pop("_sort_ts", None)
+    return results
+
+@app.route('/api/query/batch', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def query_records_batch():
+    """
+    Phase 10.7 (Ahmed): the duplicate radar used to fire 3 separate /api/query
+    calls per scan (one per identity field) -- 3 Vercel invocations, 3 chances
+    of a cold start, 3 permission checks, per ticket open. This endpoint runs
+    the EXACT same per-field logic (shared helpers above: same aliases, same
+    operators, same first-working-combo rule, same row shaping) for every
+    requested field inside ONE invocation, sharing the tenant token and the
+    connection pool. Results are identical to N separate calls -- only cheaper
+    and faster. Body: {"user","email","queries":[{"field","value"}, ...]};
+    response: {"responses":[ ...one /api-query-shaped body per query, in the
+    same order... ]}. Order is preserved because the frontend merges by index.
+    """
+    data  = request.get_json(silent=True) or {}
+    user  = sanitize_text(data.get('user', ''))
+    email = sanitize_text(data.get('email', ''))
+    raw_queries = data.get('queries')
+    ip    = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+    if not isinstance(raw_queries, list) or not raw_queries:
+        return jsonify({"error": "Missing queries list."}), 400
+
+    # Validate up front; bad entries become error slots so the response list
+    # ALWAYS mirrors the request list 1:1 (the frontend merges by index).
+    normalized = []
+    for q in raw_queries[:5]:  # sanity bound -- the radar never asks for more than 3
+        if not isinstance(q, dict):
+            normalized.append(('', '', 'Invalid query entry.'))
+            continue
+        field = sanitize_text(str(q.get('field', ''))).strip().lower()
+        value = sanitize_text(str(q.get('value', '')), 200).strip()
+        if field not in QUERY_FIELD_ALIASES:
+            normalized.append((field, value, 'Invalid search field.'))
+        elif not value:
+            normalized.append((field, value, 'Please enter a value to search.'))
+        else:
+            normalized.append((field, value, None))
+
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("query" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+
+    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("query",["all"])
+    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
+    allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
+    allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
+
+    # Audit trail preserved: one QUERY_SEARCH entry per field, exactly as if
+    # the fields had arrived as separate /api/query calls.
+    for field, value, err in normalized:
+        if not err:
+            audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
+
+    if MOCK_MODE:
+        responses = []
+        for field, value, err in normalized:
+            if err:
+                responses.append({"error": err, "field": field, "value": value})
+                continue
+            results = _query_format_results(MockFeishuDB.generate_requests(10), allowed_acms_set, allowed_regs_set)
+            responses.append({"results": results, "count": len(results), "field": field, "value": value,
+                              "fetch_complete": True, "stop_reason": "", "served_from_background_cache": False})
+        return jsonify({"responses": responses})
+
+    tat = get_tenant_access_token()
+    search_url, headers = _query_search_url_and_headers(tat)
+
+    # Fire every field's combos on ONE shared pool -- the same combos 3
+    # separate calls would have run, picked apart per field afterwards. The
+    # worker ceiling stays at 9 (the per-request ceiling /api/query always
+    # had), so this is actually GENTLER on Feishu's QPS than 3 parallel calls.
+    jobs = []       # (response_index, combos) for valid entries
+    all_combos = []
+    for idx, (field, value, err) in enumerate(normalized):
+        if err: continue
+        combos = _query_combos_for_field(field, value)
+        jobs.append((idx, combos))
+        all_combos.extend(combos)
+
+    combo_results = {}
+    if all_combos:
+        with ThreadPoolExecutor(max_workers=min(9, len(all_combos))) as executor:
+            for res in executor.map(lambda c: _query_try_combo(search_url, headers, c), all_combos):
+                combo_results[res["combo"]] = res
+
+    responses = [None] * len(normalized)
+    for idx, (field, value, err) in enumerate(normalized):
+        if err:
+            responses[idx] = {"error": err, "field": field, "value": value}
+    for idx, combos in jobs:
+        field, value, _ = normalized[idx]
+        results_by_combo = {c: combo_results.get(c) for c in combos}
+        all_items, fetch_complete, stop_reason, success = _query_pick_first_ok(combos, results_by_combo)
+        if not success:
+            responses[idx] = {"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}",
+                              "field": field, "value": value}
+            continue
+        results = _query_format_results(all_items, allowed_acms_set, allowed_regs_set)
+        responses[idx] = {"results": results, "count": len(results), "field": field, "value": value,
+                          "fetch_complete": fetch_complete,
+                          "stop_reason": ("" if fetch_complete else stop_reason),
+                          "served_from_background_cache": False}
+
+    return jsonify({"responses": responses})
+
+@app.route('/api/query', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def query_records():
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    field = sanitize_text(request.args.get('field','')).strip().lower()
+    value = sanitize_text(request.args.get('value',''), 200).strip()
+    ip    = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+    if field not in QUERY_FIELD_ALIASES: return jsonify({"error": "Invalid search field."}), 400
+    if not value: return jsonify({"error": "Please enter a value to search."}), 400
+
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("query" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+
+    allowed_acms = perms.get("permissions",{}).get("acms",{}).get("query",["all"])
+    allowed_regs = perms.get("permissions",{}).get("regions",{}).get("query",["all"])
+    allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
+    allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
+
+    audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
+
+    if MOCK_MODE:
+        all_items = MockFeishuDB.generate_requests(10)
+        fetch_complete, stop_reason, success = True, "", True
+    else:
+        tat = get_tenant_access_token()
+        search_url, headers = _query_search_url_and_headers(tat)
+        # Phase 10.7: the combo search + first-working-combo pick now run
+        # through the shared helpers (/api/query/batch uses them too), so both
+        # endpoints can never drift apart.
+        combos = _query_combos_for_field(field, value)
+
+        results_by_combo = {}
+        with ThreadPoolExecutor(max_workers=min(9, len(combos) or 1)) as executor:
+            for res in executor.map(lambda c: _query_try_combo(search_url, headers, c), combos):
+                results_by_combo[res["combo"]] = res
+
+        all_items, fetch_complete, stop_reason, success = _query_pick_first_ok(combos, results_by_combo)
+
+        if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
+
+    results = _query_format_results(all_items, allowed_acms_set, allowed_regs_set)
 
     return jsonify({
         "results": results, "count": len(results), "field": field, "value": value,
