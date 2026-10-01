@@ -9732,7 +9732,7 @@ async function lightboxExtractText() {
 
         // Feishu's OCR endpoint has a hard 5MB cap. Re-encode as a smaller JPEG via
         // canvas instead of failing outright if the original attachment is bigger.
-        if (blob.size > 4.5 * 1024 * 1024) {
+        if (blob.size > 3 * 1024 * 1024) {
             blob = await lightboxDownscaleForOcr(img);
         }
 
