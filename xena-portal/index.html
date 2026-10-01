@@ -1267,6 +1267,17 @@
             border:1px solid var(--border,rgba(255,255,255,0.15));cursor:zoom-in;background:none;padding:0;
         }
         .img-attach-thumb img{width:100%;height:100%;object-fit:cover}
+        /* Phase 10.6 (Ahmed): tiny N / O / OO visual tag group above every pic in
+           the Agency Creation "NID & Otherapp Screen" field -- same segmented
+           button-group idea as his reference, shrunk so the group's length
+           matches the pic's width. Purely visual: a tap lights one segment. */
+        .pic-tag-wrap{display:inline-flex;flex-direction:column;gap:3px;width:60px;flex-shrink:0;}
+        .pic-tag-wrap-dz{width:64px;}
+        .pic-tag-group{display:flex;width:100%;height:15px;border:1px solid var(--border,rgba(255,255,255,.15));border-radius:5px;overflow:hidden;background:var(--bg,#0d0f1a);}
+        .pic-tag{flex:1 1 0;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-right:1px solid var(--border,rgba(255,255,255,.15));background:transparent;color:var(--text-muted,#8a8fa3);font-size:.5rem;font-weight:800;line-height:1;cursor:pointer;font-family:inherit;}
+        .pic-tag:last-child{border-right:none;}
+        .pic-tag:hover{color:var(--text,#fff);background:rgba(255,255,255,.06);}
+        .pic-tag.active{background:var(--accent-cyan,#00d4ff);color:#00222b;}
     </style>
 </head>
 
@@ -4023,16 +4034,21 @@ function dzRenderThumbs(id) {
     });
     lightboxGalleries[galleryId] = gallery;
 
+    // Phase 10.6: pics uploaded into the NID & Otherapp Screen dropzone get the
+    // same tiny N / O / OO tag group above them as the record's existing pics.
+    const tagThisField = !!document.getElementById(id)?.closest('[data-pic-tags="1"]');
+
     const thumbs = store.map((f, i) => {
         const isImg = f.type && f.type.startsWith('image/');
         if (isImg) {
             const gIdx = galleryIndexByStoreIdx[i];
-            return `<div class="dz-thumb" title="Click to preview">
+            const thumbHtml = `<div class="dz-thumb" title="Click to preview">
                 <button type="button" class="dz-thumb-open" data-gallery-id="${galleryId}" data-gallery-index="${gIdx}" onclick="event.stopPropagation();openImageLightboxFromThumb(this)">
                     <img src="${gallery[gIdx].src}">
                 </button>
                 <button type="button" class="dz-thumb-remove" onclick="event.stopPropagation();dzRemoveFile('${id}',${i})">×</button>
             </div>`;
+            return tagThisField ? `<div class="pic-tag-wrap pic-tag-wrap-dz">${picTagGroupHtml()}${thumbHtml}</div>` : thumbHtml;
         }
         const fileUrl = URL.createObjectURL(f);
         return `<div class="dz-thumb" title="Click to open">
@@ -10087,6 +10103,26 @@ function lightboxWheelHandler(e) {
     lightboxZoom(e.deltaY < 0 ? 0.25 : -0.25);
 }
 
+// Phase 10.6 (Ahmed): tiny N / O / OO segmented tag group parked above every
+// picture in the "NID & Otherapp Screen" field (Agency Creation). Purely a
+// visual tag -- tapping a segment lights it (one per pic, tap again to clear);
+// nothing is sent to the sheet. N = NID, O = Otherapp, OO = Otherapp 2.
+function picTagGroupHtml() {
+    return `<div class="pic-tag-group" onclick="event.stopPropagation()">
+        <button type="button" class="pic-tag" onclick="picTagPick(this)" title="NID">N</button>
+        <button type="button" class="pic-tag" onclick="picTagPick(this)" title="Otherapp">O</button>
+        <button type="button" class="pic-tag" onclick="picTagPick(this)" title="Otherapp 2">OO</button>
+    </div>`;
+}
+function picTagPick(btn) {
+    event.stopPropagation();
+    const g = btn.closest('.pic-tag-group');
+    if (!g) return;
+    const was = btn.classList.contains('active');
+    g.querySelectorAll('.pic-tag').forEach(b => b.classList.remove('active'));
+    if (!was) btn.classList.add('active');
+}
+
 // Attachment-type fields that the user needs to be able to add a picture to even
 // when the field is currently empty (e.g. NID & Otherapp Screen on a request that
 // was created without it). Rendering is driven by the schema's ui_type now, not by
@@ -10094,6 +10130,9 @@ function lightboxWheelHandler(e) {
 function twRenderAttachmentControl(wrap, label, key, meta, value) {
     const arr = Array.isArray(value) ? value.filter(f => f && typeof f === 'object' && f.file_token) : [];
     const fieldIdQS = meta?.field_id ? `&field_id=${encodeURIComponent(meta.field_id)}` : '';
+    // Phase 10.6: only the NID & Otherapp Screen pics get the N/O/OO tag group.
+    const tagThisField = key === 'NID & Otherapp Screen';
+    wrap.dataset.picTags = tagThisField ? '1' : '';
     let html = label;
     if (arr.length > 0) {
         // One gallery per attachment field, stashed on lightboxGalleries so all of this
@@ -10106,7 +10145,8 @@ function twRenderAttachmentControl(wrap, label, key, meta, value) {
         lightboxGalleries[galleryId] = gallery;
         html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
         gallery.forEach((g, idx) => {
-            html += `<button type="button" class="img-attach-thumb" data-gallery-id="${galleryId}" data-gallery-index="${idx}" onclick="openImageLightboxFromThumb(this)" title="Click to preview"><img src="${g.src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
+            const thumbBtn = `<button type="button" class="img-attach-thumb" data-gallery-id="${galleryId}" data-gallery-index="${idx}" onclick="openImageLightboxFromThumb(this)" title="Click to preview"><img src="${g.src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
+            html += tagThisField ? `<div class="pic-tag-wrap">${picTagGroupHtml()}${thumbBtn}</div>` : thumbBtn;
         });
         html += `</div>`;
     } else {
