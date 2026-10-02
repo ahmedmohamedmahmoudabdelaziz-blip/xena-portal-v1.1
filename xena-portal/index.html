@@ -9310,6 +9310,12 @@ function twRenderAgencyPointGate(ticket) {
     document.getElementById('twApGateCard')?.remove();
     const f = ticket.fields;
     twApGate = { charged: false, charging: false, agency: null, receipt: feishuValueToString(f['Transaction Receipt']) };
+    // Double-charge guard: tickets charged by the OLD flow may still carry
+    // "Confirm & Charge" in Order Action on the record. Clear it in the form
+    // so a later Save can't hand that value back to the sheet (that value is
+    // the Base workflow's trigger -- the backend charges directly now).
+    const oaCtrl = document.querySelector('#tw-sec-2 [name="Order Action"]');
+    if (oaCtrl && oaCtrl.value === 'Confirm & Charge') oaCtrl.value = '';
     const card = document.createElement('div');
     card.id = 'twApGateCard';
     card.className = 'card twx-card';
