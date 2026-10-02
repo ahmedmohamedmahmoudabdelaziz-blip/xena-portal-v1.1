@@ -9276,20 +9276,30 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
     });
 }
 
-// ─── Phase 10.8: Agency Point Charge gate (Agency Point Request tickets) ───
-// Mirrors the sheet-side "Agency point calculator" Base workflow 1:1: the
-// portal PREVIEWS the order locally (same price DB, same monthly-limit +
-// wallet math as the sheet's JS handler), and the actual deduction is done
-// by the Base workflow itself -- we set Order Action = "Confirm & Charge" on
-// the record, the workflow deducts the points, updates the Agency Points
-// table (Used Points / Monthly Usage Tracker) and writes the CONFIRMED
-// RECEIPT back onto the ticket. The portal polls the record until that
-// receipt lands, and Status=Done stays blocked until it does. Zero new
-// backend endpoints: /api/search (points lookup), /api/requests/update
-// (fire the workflow), /api/requests/single (poll the receipt).
+// ─── Phase 10.9: Agency Point Charge gate (Agency Point Request tickets) ───
+// The BACKEND does the charge now (one POST /api/agency-points/charge,
+// ~2-4s): the order details travel in the request body, the server reads the
+// ticket + wallet fresh, runs the same allocator math as the sheet's JS
+// handler, updates the Agency Points table (Used Points / Monthly Usage
+// Tracker) and writes the CONFIRMED RECEIPT onto the ticket. The portal only
+// PREVIEWS locally (same price DB, same limit + wallet math) and adopts the
+// returned receipt. Status=Done stays blocked until a charge with an actual
+// deduction lands.
+// HARD RULE: never write "Order Action" = "Confirm & Charge" -- that value is
+// the Base workflow's trigger and would fire the sheet automation on top of
+// the backend charge (double deduction).
 let twApGate = { charged: false, charging: false, agency: null, receipt: '' };
 
-function twApReceiptIsConfirmed(txt) { return /CONFIRMED RECEIPT/i.test(txt || ''); }
+// A receipt only counts as "charged" when it actually deducted points. A
+// zero-approval attempt also carries "CONFIRMED RECEIPT" (with TOTAL
+// DEDUCTED: 0) -- that is a FAILED charge and must stay retryable.
+function twApReceiptDeducted(txt) {
+    const m = String(txt || '').match(/TOTAL DEDUCTED:\s*([\d,]+)/);
+    return m ? parseInt(m[1].replace(/,/g, ''), 10) || 0 : 0;
+}
+function twApReceiptIsConfirmed(txt) {
+    return /CONFIRMED RECEIPT/i.test(txt || '') && twApReceiptDeducted(txt) > 0;
+}
 function twApIsCharged() {
     if (twApGate.charged) return true;
     const ctrl = document.querySelector('#tw-sec-2 [name="Transaction Receipt"]');
@@ -9325,6 +9335,9 @@ function twRenderAgencyPointGate(ticket) {
 
 function twApPaintPending(card, ticket) {
     const code = feishuValueToString(ticket.fields['Agency Code']).trim() || '—';
+    // A previous attempt that approved 0 items leaves a zero-deduction
+    // receipt on the ticket -- tell the agent it's retryable, don't hide it.
+    const failedAttempt = twApGate.receipt && !twApReceiptIsConfirmed(twApGate.receipt);
     card.innerHTML = `
     <h4 class="twx-sec-title" style="color:var(--accent-amber);">
         <span class="twx-sec-num" style="background:var(--accent-amber);">⚡</span>
@@ -9335,10 +9348,11 @@ function twApPaintPending(card, ticket) {
         <div class="apg-kpi"><b style="color:var(--accent-rose)" id="apgUsed">…</b><span>Used</span></div>
         <div class="apg-kpi"><b style="color:var(--accent-green)" id="apgTotal">…</b><span>Total</span></div>
     </div>
+    ${failedAttempt ? `<div class="apg-state" style="color:var(--accent-rose);margin-bottom:6px">⚠️ Last attempt approved 0 items and deducted nothing — adjust the order above and confirm again.</div>` : ''}
     <div class="apg-receipt" id="apgPreview"><span style="color:var(--text-muted)">⏳ Loading points wallet for agency ${escHtml(code)}…</span></div>
     <div class="apg-actions">
         <button type="button" id="twApChargeBtn" class="btn-outline" disabled onclick="twApConfirmCharge()">⚡ Confirm &amp; Charge Points</button>
-        <span class="apg-state" id="apgState">Preview is instant — charging deducts from the agency wallet via the sheet workflow.</span>
+        <span class="apg-state" id="apgState">Preview is instant — confirming deducts from the agency wallet in one click (a few seconds).</span>
     </div>`;
 }
 
@@ -9426,7 +9440,7 @@ function twApRefreshPreview() {
     html.push(`<span style="color:var(--border-hover)">━━━━━━━━━━━━━━</span>`);
     html.push(`<span style="color:var(--accent-rose);font-weight:bold">💰 TOTAL TO DEDUCT: ${total.toLocaleString()} pts</span>`);
     html.push(`<span style="color:var(--accent-cyan);font-weight:bold">💳 BALANCE AFTER: ${remaining.toLocaleString()} pts</span>`);
-    html.push(`<span style="color:var(--text-muted)">📍 ${other ? 'Other agency rate' : 'Same agency rate'} · the sheet workflow computes the final amounts at charge time</span>`);
+    html.push(`<span style="color:var(--text-muted)">📍 ${other ? 'Other agency rate' : 'Same agency rate'} · the server computes the final amounts at charge time</span>`);
     if (prev) prev.innerHTML = html.join('\n');
     if (btn) btn.disabled = total <= 0;
 }
@@ -9437,52 +9451,61 @@ function twApSchedulePreview() {
     twApGate._pvT = setTimeout(twApRefreshPreview, 60);
 }
 
+// One POST to the backend: the order details travel in the request BODY (so
+// the charge never depends on what's saved on the record), the server reads
+// the ticket + wallet fresh, deducts, and returns the receipt it wrote.
+// deducted > 0  -> adopt the receipt, card goes green, Done unblocked.
+// deducted = 0  -> nothing approved: show the rejection receipt, keep the
+//                  typed order untouched, button stays enabled (retryable).
+// The server is idempotent: if the ticket was already charged (by anyone),
+// it answers already_charged with the existing receipt instead of charging
+// twice. This function NEVER touches "Order Action".
 async function twApConfirmCharge() {
     if (twApGate.charging || twApGate.charged) return;
     const btn = document.getElementById('twApChargeBtn');
     const state = document.getElementById('apgState');
     const recordId = document.getElementById('tw-record-id').value;
+    const { privs } = twApOrderLines();
+    const qtyRaw = document.querySelector('#tw-sec-2 [name="Quantities Input"]')?.value || '';
+    const targetRaw = document.querySelector('#tw-sec-2 [name="Target Type"]')?.value || '';
     twApGate.charging = true;
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Charging…'; }
-    if (state) state.textContent = 'Asking the sheet workflow to deduct the points…';
+    if (state) state.textContent = 'Deducting points from the agency wallet…';
     try {
-        // 1) Fresh read first -- if another agent (or the sheet itself) already
-        //    charged this ticket, adopt that receipt instead of charging twice.
-        let fresh = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`).then(r => r.json());
-        if (fresh.success && twApReceiptIsConfirmed(feishuValueToString(fresh.record?.fields?.['Transaction Receipt']))) {
-            twApAdoptCharged(fresh.record);
-            return;
-        }
-        // 2) Fire the sheet workflow: Order Action -> "Confirm & Charge". The
-        //    Base automation triggers on the field CHANGING to that value, so
-        //    if it already holds it (a previous run that never completed),
-        //    clear it first and set it again after a beat.
-        const curAction = feishuValueToString(fresh.record?.fields?.['Order Action']).trim();
-        if (curAction === 'Confirm & Charge') {
-            const clr = new FormData();
-            clr.append('user', loggedUser); clr.append('record_id', recordId);
-            clr.append('fields', JSON.stringify({ 'Order Action': '' }));
-            await fetch('/api/requests/update', { method: 'POST', body: clr }).then(r => r.json());
-            await new Promise(r => setTimeout(r, 1500));
-        }
-        const fd = new FormData();
-        fd.append('user', loggedUser); fd.append('record_id', recordId);
-        fd.append('fields', JSON.stringify({ 'Order Action': 'Confirm & Charge' }));
-        const up = await fetch('/api/requests/update', { method: 'POST', body: fd }).then(r => r.json());
-        if (!up.success) throw new Error(up.error || 'Failed to set Order Action.');
-
-        // 3) Poll until the workflow writes the CONFIRMED RECEIPT back
-        //    (normally a few seconds; Base automations are near-realtime).
-        for (let i = 0; i < 12; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            fresh = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`).then(r => r.json()).catch(() => null);
-            if (fresh && fresh.success && twApReceiptIsConfirmed(feishuValueToString(fresh.record?.fields?.['Transaction Receipt']))) {
-                twApAdoptCharged(fresh.record);
-                return;
+        const res = await fetch('/api/agency-points/charge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                record_id: recordId,
+                user: loggedUser, email: loggedEmail, uat: loggedUat,
+                privileges: privs,
+                quantities_input: qtyRaw,
+                target_type: targetRaw
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.error || `Charge failed (HTTP ${res.status}).`);
+        if ((data.deducted || 0) > 0) {
+            twApAdoptCharged({
+                record_id: recordId,
+                fields: {
+                    ...(ltActiveTicket?.fields || {}),
+                    'Transaction Receipt': data.receipt,
+                    'Latest Usage Tracker': data.tracker,
+                    'Quantities Input': ''
+                }
+            });
+            if (data.ticket_write_failed) {
+                ToastManager.show('⚠️ Points deducted, but the receipt could not be saved onto the ticket — re-open the ticket to sync it.', 'warning', 8000);
             }
+        } else {
+            // Zero-approval attempt: show WHY (per-item rejection reasons are
+            // in the receipt), keep the form exactly as typed, stay retryable.
+            const prev = document.getElementById('apgPreview');
+            if (prev) prev.innerHTML = twApFmtReceipt(data.receipt);
+            if (state) state.textContent = '⚠️ Nothing was approved — 0 pts deducted. Adjust the quantities / target type above and confirm again.';
+            ToastManager.show('Nothing approved — 0 pts deducted. Adjust the order and retry.', 'warning', 6000);
         }
-        if (state) state.innerHTML = '⏳ The sheet workflow is still processing. <a href="#" onclick="twApRecheckCharge();return false;" style="color:var(--accent-cyan)">🔄 Re-check now</a>';
-        ToastManager.show('Charge sent — waiting on the sheet workflow. Use Re-check in a few seconds.', 'warning', 6000);
     } catch (e) {
         ToastManager.show('Charge failed: ' + e.message, 'error');
         if (state) state.textContent = 'Charge failed — nothing was deducted. You can try again.';
@@ -9492,19 +9515,11 @@ async function twApConfirmCharge() {
     }
 }
 
-async function twApRecheckCharge() {
-    const recordId = document.getElementById('tw-record-id').value;
-    const fresh = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`).then(r => r.json()).catch(() => null);
-    if (fresh && fresh.success && twApReceiptIsConfirmed(feishuValueToString(fresh.record?.fields?.['Transaction Receipt']))) {
-        twApAdoptCharged(fresh.record);
-    } else {
-        ToastManager.show('Still processing — try again in a few seconds.', 'warning');
-    }
-}
-
-// Charge confirmed: sync every value the workflow wrote (receipt / tracker /
+// Charge confirmed: sync the values the server wrote (receipt / tracker /
 // cleared quantities) back into the workspace form, so a later Save &amp;
-// Resolve doesn't overwrite the workflow's receipt with the old empty value.
+// Resolve doesn't overwrite the receipt with the old empty value.
+// NEVER sync "Order Action" here: writing "Confirm & Charge" into that
+// control means the next Save fires the Base workflow = double deduction.
 function twApAdoptCharged(record) {
     const f = record.fields;
     const receipt = feishuValueToString(f['Transaction Receipt']);
@@ -9515,8 +9530,6 @@ function twApAdoptCharged(record) {
     sync('Transaction Receipt', receipt);
     sync('Latest Usage Tracker', tracker);
     sync('Quantities Input', feishuValueToString(f['Quantities Input']));
-    const oa = document.querySelector('#tw-sec-2 [name="Order Action"]');
-    if (oa) oa.value = 'Confirm & Charge';
     const card = document.getElementById('twApGateCard');
     if (card) {
         card.classList.remove('twx-missing');
@@ -9528,22 +9541,27 @@ function twApAdoptCharged(record) {
     if (typeof logFrontendAction === 'function') logFrontendAction('AP_CHARGE_CONFIRMED', `Record ${record.record_id || ''}`);
 }
 
-function twApPaintCharged(card, receipt, tracker) {
-    card.classList.add('apg-charged');
-    const fmt = (txt) => escHtml(txt || '')
+// Shared receipt renderer: colorizes the ✅/⚠️/❌/💰/💳 lines of a charge
+// receipt (used for both the confirmed card and a failed zero-approval one).
+function twApFmtReceipt(txt) {
+    return escHtml(txt || '')
         .replace(/(✅[^\n]*)/g, '<span class="ok">$1</span>')
         .replace(/(⚠️[^\n]*)/g, '<span class="warn">$1</span>')
         .replace(/(❌[^\n]*)/g, '<span class="bad">$1</span>')
         .replace(/(💰[^\n]*)/g, '<span style="color:var(--accent-rose);font-weight:bold">$1</span>')
         .replace(/(💳[^\n]*)/g, '<span style="color:var(--accent-cyan);font-weight:bold">$1</span>');
+}
+
+function twApPaintCharged(card, receipt, tracker) {
+    card.classList.add('apg-charged');
     card.innerHTML = `
     <h4 class="twx-sec-title" style="color:var(--accent-green);">
         <span class="twx-sec-num" style="background:var(--accent-green);">✓</span>
         Agency Point Charge — Confirmed
     </h4>
-    <div class="apg-receipt">${fmt(receipt)}</div>
-    ${tracker ? `<div class="apg-state" style="margin-top:4px">${fmt(tracker)}</div>` : ''}
-    <div class="apg-actions"><span class="apg-state" style="color:var(--accent-green)">✅ Points deducted &amp; quantities approved by the sheet workflow — safe to mark Done.</span></div>`;
+    <div class="apg-receipt">${twApFmtReceipt(receipt)}</div>
+    ${tracker ? `<div class="apg-state" style="margin-top:4px">${twApFmtReceipt(tracker)}</div>` : ''}
+    <div class="apg-actions"><span class="apg-state" style="color:var(--accent-green)">✅ Points deducted &amp; quantities approved — safe to mark Done.</span></div>`;
 }
 
 // Phase 10.4: Status as audit-style one-tap pick buttons (Done green /
