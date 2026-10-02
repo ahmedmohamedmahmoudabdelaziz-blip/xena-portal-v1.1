@@ -138,6 +138,37 @@ ORDER_TYPE_LIMITS = {
     "main page banner": 3, "news banner": 5, "live banner": 5, "splash": 10,
 }
 
+# Full price list behind /api/agency-points/charge -- a 1:1 copy of the JS `db`
+# inside the Base workflow's "Agency point calculator" handler (same order,
+# because rule lookup is first-substring-match, same prices, same limits, same
+# per-request "order" flag). If the sheet handler's db ever changes, change it
+# here too -- the portal and the sheet MUST charge identically.
+POINT_PRICE_DB = [
+    {"key": "trend card", "same": 40, "other": 50, "limit": 10},
+    {"key": "traffic card", "same": 30, "other": 40, "limit": 50},
+    {"key": "30 mic 15 days", "same": 150, "other": 175, "limit": 999},
+    {"key": "30 mic 30 days", "same": 300, "other": 350, "limit": 999},
+    {"key": "normal short id ( 2 levels above ) 15 days", "same": 120, "other": 180, "limit": 999},
+    {"key": "normal short id ( 2 levels above ) 30 days", "same": 240, "other": 360, "limit": 999},
+    {"key": "customized short id 15 days", "same": 300, "other": 450, "limit": 999},
+    {"key": "customized short id 30 days", "same": 1200, "other": 1800, "limit": 999},
+    {"key": "room pin-up", "same": 100, "other": 150, "limit": 999},
+    {"key": "welcome package 3", "same": 80, "other": 80, "limit": 15},
+    {"key": "welcome package 2", "same": 30, "other": 30, "limit": 50},
+    {"key": "golden lion package", "same": 50, "other": 50, "limit": 999},
+    {"key": "white lion package", "same": 50, "other": 50, "limit": 999},
+    {"key": "pink lion package", "same": 50, "other": 50, "limit": 999},
+    {"key": "green warrior package", "same": 50, "other": 50, "limit": 999},
+    {"key": "lion king package", "same": 50, "other": 50, "limit": 999},
+    {"key": "pink love package", "same": 50, "other": 50, "limit": 999},
+    # Banners: strictly PER REQUEST limits, tracked monthly -- kept at the END
+    # exactly like the JS db, first-match order matters.
+    {"key": "main page banner", "same": 150, "other": 150, "limit": 3, "type": "order"},
+    {"key": "news banner", "same": 100, "other": 100, "limit": 5, "type": "order"},
+    {"key": "live banner", "same": 150, "other": 150, "limit": 5, "type": "order"},
+    {"key": "splash", "same": 1500, "other": 2000, "limit": 10, "type": "order"},
+]
+
 # ════════════════════════════════════════════════════════════════════
 # CORE UTILITIES & TIMEZONE MANAGEMENT
 # ════════════════════════════════════════════════════════════════════
@@ -2811,6 +2842,268 @@ def update_request():
         return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+
+# ════════════════════════════════════════════════════════════════════
+# AGENCY POINT CHARGE (portal-side, instant)
+# ════════════════════════════════════════════════════════════════════
+# Faithful Python port of the Base workflow's "Agency point calculator" JS
+# handler -- same allocator math, same receipt formats, same tracker formats --
+# so the portal can charge an Agency Point Request in ONE request instead of
+# flipping "Order Action" and polling for the (slow) Base automation. The old
+# flow also had a real failure mode: the workflow reads Quantities Input from
+# the RECORD, so charging before saving meant it approved nothing. Here the
+# order details travel in the request body, exactly as the agent sees them.
+
+def _jsnum(x):
+    """Format a number the way JS template literals print it (200 -> '200',
+    49.0 -> '49', 0.5 -> '0.5') so receipts read identically to the sheet's."""
+    return f"{float(x):g}"
+
+def compute_agency_point_charge(privileges, qty_raw, target_raw, used_points, balance, month_text, now=None):
+    month_names = ["January", "February", "March", "April", "May", "June", "July",
+                   "August", "September", "October", "November", "December"]
+    now = now or cairo_now()
+    submitted_month_name = month_names[now.month - 1]
+
+    privs = [str(p).strip() for p in (privileges or []) if str(p).strip()]
+    qtys = [int(x) for x in re.findall(r"\d+", str(qty_raw or ""))]
+    target = str(target_raw or "").lower()
+    try: used = float(used_points or 0)
+    except (TypeError, ValueError): used = 0.0
+    try: bal = float(balance or 0)
+    except (TypeError, ValueError): bal = 0.0
+
+    if not privs:
+        return {"error": "No items selected."}
+
+    # === month tracker reader (skips decorative lines, same as the JS) ===
+    stored_month = ""
+    monthly = {}
+    for line in str(month_text or "").split("\n"):
+        if "━" in line or "┈" in line:
+            continue
+        m = re.search(r"Month:\s*([A-Za-z0-9]+)", line, re.I)
+        if m:
+            stored_month = m.group(1).strip()
+        elif ":" in line:
+            parts = line.split(":")
+            if len(parts) >= 2:
+                name = re.sub(r"[🔹📋🌟【】]", "", parts[0]).strip()
+                try:
+                    monthly[name] = int(parts[1].strip())
+                except ValueError:
+                    pass
+
+    same_month = stored_month.lower() == submitted_month_name.lower()
+    if not same_month:
+        try:
+            same_month = int(stored_month) == now.month
+        except (TypeError, ValueError):
+            same_month = False
+    if not same_month:
+        monthly = {}
+
+    # === the smart allocator ===
+    remaining = bal
+    total_cost = 0
+    receipt_lines = []
+    current_order = {}
+    for i, p in enumerate(privs):
+        item = p.lower()
+        q = qtys[i] if i < len(qtys) else 0
+        if q <= 0:
+            continue
+        rule = next((r for r in POINT_PRICE_DB if r["key"] in item), None)
+        if not rule:
+            continue
+        price = rule["other"] if "other" in target else rule["same"]
+        display = " ".join((w[:1].upper() + w[1:]) if w else w for w in rule["key"].split(" "))
+        past_usage = monthly.get(display, 0)
+
+        limit_allowed = rule["limit"] if rule.get("type") == "order" else rule["limit"] - past_usage
+        if limit_allowed < 0:
+            limit_allowed = 0
+        desired = min(q, limit_allowed)
+        affordable = int(remaining // price) if price > 0 else 0
+        approved = min(desired, affordable)
+
+        if approved == q:
+            receipt_lines.append(f"✅ FULLY APPROVED: {approved}x {display} @ {price} pts = {approved * price}")
+        elif approved > 0:
+            if q > limit_allowed:
+                reason = f"Max {rule['limit']} allowed per request." if rule.get("type") == "order" else f"Limit maxes out at {limit_allowed} more."
+            else:
+                reason = f"Not enough points for {desired}."
+            receipt_lines.append(f"⚠️ PARTIALLY APPROVED: {approved}x {display} @ {price} pts = {approved * price}\n    └─ (Rejected {q - approved}x: {reason})")
+        else:
+            if limit_allowed == 0:
+                reason = f"Max {rule['limit']} allowed per request." if rule.get("type") == "order" else f"Monthly limit ({rule['limit']}) already reached."
+            else:
+                reason = f"Insufficient points ({_jsnum(remaining)} left)."
+            receipt_lines.append(f"❌ FULLY REJECTED: 0x {display}\n    └─ (Reason: {reason})")
+
+        if approved > 0:
+            total_cost += approved * price
+            remaining -= approved * price
+            current_order[display] = current_order.get(display, 0) + approved
+            monthly[display] = past_usage + approved
+
+    monthly_str = "\n ┈┈┈ \n".join(f"🔹 {k}: {v}" for k, v in monthly.items())
+    new_monthly_tracker = f"🌟 【 MONTH: {submitted_month_name.upper()} 】 🌟\n━━━━━\n" + monthly_str
+    if current_order:
+        current_tracker = "Items approved in this order:\n" + "\n".join(f"🔹 {k}: {v}" for k, v in current_order.items())
+    else:
+        current_tracker = "No items approved in this order."
+    base_receipt = "\n".join(receipt_lines) + f"\n\n💰 TOTAL DEDUCTED: {_jsnum(total_cost)} pts\n💳 REMAINING BALANCE: {_jsnum(remaining)} pts\n"
+    monthly_summary = "\n🌟 **CURRENT MONTH USAGE** 🌟\n━━━━━\n" + monthly_str
+    confirm_receipt = "📝 **CONFIRMED RECEIPT** 📝\n\n" + base_receipt + monthly_summary
+
+    return {
+        "total_cost": total_cost, "remaining": remaining,
+        "new_used_points": used + total_cost,
+        "new_monthly_tracker": new_monthly_tracker,
+        "current_tracker": current_tracker,
+        "receipt": confirm_receipt,
+    }
+
+@app.route('/api/agency-points/charge', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_points_charge():
+    """Instant Agency Point charge for the ticket workspace's ⚡ Confirm & Charge
+    button. Body (JSON): record_id, user, email, privileges[], quantities_input,
+    target_type. Reads the ticket + the agency wallet fresh, runs the SAME
+    allocator as the sheet workflow (compute_agency_point_charge), writes Used
+    Points + Monthly Usage Tracker to the Agency Points table and the CONFIRMED
+    RECEIPT back onto the ticket -- all in one call, no Base automation, no
+    polling. Idempotent: a ticket whose receipt already shows a real deduction
+    (> 0 pts) is never charged twice; a zero-approval receipt (a failed attempt)
+    CAN be charged again after the agent fixes the order. NEVER writes
+    "Order Action" -- that field is the Base workflow's trigger and writing
+    'Confirm & Charge' to it would double-charge via the automation."""
+    payload = request.get_json(silent=True) or {}
+    user = sanitize_text(payload.get('user', ''))
+    email = sanitize_text(payload.get('email', ''))
+    record_id = sanitize_text(payload.get('record_id', ''))
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+    if not user:
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": False, "error": "Mock mode — charge is disabled."}), 400
+
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    # 1) Fresh ticket read -- idempotency guard + agency code.
+    try:
+        resp = feishu_session.get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                                  headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
+        if resp.get("code") != 0:
+            return jsonify({"success": False, "error": resp.get("msg") or "Could not read the ticket."}), 400
+        tfields = resp["data"]["record"].get("fields", {})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
+    m = re.search(r"TOTAL DEDUCTED:\s*([\d,]+)", existing_receipt or "")
+    already_deducted = int(m.group(1).replace(",", "")) if m else 0
+    if "CONFIRMED RECEIPT" in (existing_receipt or "").upper() and already_deducted > 0:
+        # Already charged (portal or sheet) -- adopt, never double-charge.
+        return jsonify({"success": True, "already_charged": True, "deducted": already_deducted,
+                        "receipt": existing_receipt,
+                        "tracker": extract_field_text(get_field_local(tfields, "Latest Usage Tracker"))})
+
+    agency_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
+    if not agency_code:
+        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
+
+    # Order details come from the REQUEST BODY (what the agent sees in the form
+    # right now), falling back to the record. This is THE fix for the old
+    # "No items approved in this order" bug -- the sheet workflow could only
+    # read the record, so charging before saving meant it saw an empty
+    # Quantities Input and approved nothing.
+    privileges = payload.get("privileges")
+    if not isinstance(privileges, list) or not privileges:
+        pv = get_field_local(tfields, "Agency Point Privilege")
+        privileges = pv if isinstance(pv, list) else ([pv] if pv else [])
+    qty_raw = payload.get("quantities_input") or extract_field_text(get_field_local(tfields, "Quantities Input"))
+    target_raw = payload.get("target_type") or extract_field_text(get_field_local(tfields, "Target Type"))
+
+    # 2) Agency wallet (points table), fresh.
+    try:
+        sp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
+            headers=headers,
+            json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [agency_code]}]}},
+            timeout=30).json()
+        if sp.get("code") != 0:
+            return jsonify({"success": False, "error": sp.get("msg") or "Agency Points lookup failed."}), 400
+        agency_rec = None
+        for it in sp.get("data", {}).get("items", []):
+            if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == agency_code:
+                agency_rec = it
+                break
+        if not agency_rec:
+            return jsonify({"success": False, "error": f"Agency {agency_code} not found in the Agency Points table."}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    af = agency_rec.get("fields", {})
+    used_pts = parse_float_safe(extract_field_text(get_field_local(af, "Used Points", "Used")))
+    balance = parse_float_safe(extract_field_text(get_field_local(af, "Point Balance", "Balance")))
+    if balance == 0:
+        total_pts = parse_float_safe(extract_field_text(get_field_local(af, "# Total Points", "Total Points", "Total")))
+        if total_pts > 0:
+            balance = total_pts - used_pts
+    month_text = extract_field_text(get_field_local(af, "Monthly Usage Tracker"))
+
+    # 3) The allocator -- identical math to the sheet's JS handler.
+    charge = compute_agency_point_charge(privileges, qty_raw, target_raw, used_pts, balance, month_text)
+    if charge.get("error"):
+        return jsonify({"success": False, "error": charge["error"]}), 400
+
+    # 4) Write the agency wallet FIRST (Used Points + Monthly Usage Tracker) --
+    # exactly the two fields the sheet workflow's "Update Agency Points table"
+    # step writes. If this fails, nothing was deducted and the ticket is
+    # untouched, so the agent can simply retry.
+    try:
+        wr = feishu_session.put(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
+            headers=headers,
+            json={"fields": {"Used Points": charge["new_used_points"], "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
+            timeout=15).json()
+        if wr.get("code") != 0:
+            return jsonify({"success": False, "error": f"Wallet update failed (nothing deducted): {wr.get('msg')}"}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    # 5) Write the receipt back onto the ticket. If THIS fails the points are
+    # already deducted, so we still return the receipt to the caller (the
+    # workspace shows it and the agent can re-save) instead of pretending the
+    # charge never happened.
+    ticket_write_failed = False
+    try:
+        tw = feishu_session.put(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+            headers=headers,
+            json={"fields": {"Transaction Receipt": charge["receipt"],
+                             "Latest Usage Tracker": charge["current_tracker"],
+                             "Quantities Input": ""}},
+            timeout=15).json()
+        if tw.get("code") != 0:
+            ticket_write_failed = True
+            logger.error("ap_charge_ticket_write_failed", record_id=record_id, response=tw)
+    except Exception as e:
+        ticket_write_failed = True
+        logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
+
+    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}", ip=ip, severity="Info")
+    return jsonify({"success": True, "already_charged": False,
+                    "deducted": charge["total_cost"], "balance_after": charge["remaining"],
+                    "receipt": charge["receipt"], "tracker": charge["current_tracker"],
+                    "ticket_write_failed": ticket_write_failed})
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
