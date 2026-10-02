@@ -328,6 +328,26 @@
         .twx-missing { outline: 2px solid rgba(255,77,109,.7); outline-offset: 3px; border-radius: 14px; animation: twxMissingPulse 1s ease-in-out 2; }
         .twx-missing > label:first-child { color: var(--accent-rose) !important; }
         @keyframes twxMissingPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,109,0); } 50% { box-shadow: 0 0 0 6px rgba(255,77,109,.35); } }
+        /* Phase 10.8: Agency Point Charge gate card (Agency Point Request
+           tickets only) -- parked in the col1 stack under Basic Information,
+           same spot as the Agency-Creation Reject Reason card. Amber while
+           the charge is pending, flips green once the sheet workflow has
+           written the CONFIRMED RECEIPT back onto the ticket. */
+        #twApGateCard{border:1px solid rgba(255,179,0,.35);}
+        #twApGateCard.apg-charged{border-color:rgba(0,230,118,.45);}
+        .apg-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 12px;}
+        .apg-kpi{background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;padding:8px 10px;text-align:center;}
+        .apg-kpi b{display:block;font-size:1.05rem;}
+        .apg-kpi span{font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);}
+        .apg-receipt{background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:.8rem;line-height:1.6;white-space:pre-wrap;font-family:'JetBrains Mono',monospace;margin:10px 0;max-height:300px;overflow-y:auto;}
+        .apg-receipt .ok{color:var(--accent-green);}
+        .apg-receipt .warn{color:var(--accent-amber);}
+        .apg-receipt .bad{color:var(--accent-rose);}
+        .apg-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;}
+        #twApChargeBtn{background:linear-gradient(135deg,rgba(255,179,0,.18),rgba(255,77,109,.14));border:1px solid rgba(255,179,0,.55);color:var(--accent-amber);font-weight:700;width:auto;}
+        #twApChargeBtn:hover:not(:disabled){background:rgba(255,179,0,.28);}
+        #twApChargeBtn:disabled{opacity:.45;cursor:not-allowed;}
+        .apg-state{font-size:.78rem;color:var(--text-muted);}
         /* Compact row mode (many matches): one line per ticket, tap to open
            its full card underneath -- replaces the unreadable micro-card
            grid when a dupe wave returns a dozen+ hits. */
@@ -9136,6 +9156,8 @@ function twRenderSection2(ticket, reqTypeOverride) {
     // sec2 now (its own #twRejectGroup card under Basic Information), so a
     // re-render must drop any leftover copy from a previous ticket/tab.
     document.getElementById('twRejectGroup')?.remove();
+    // Phase 10.8: same leftover-sweep for the Agency Point charge gate card.
+    document.getElementById('twApGateCard')?.remove();
 
     const reqType = (reqTypeOverride || ticket.fields['Request Type'] || '').toString().trim();
     // Some live Request Type values carry a trailing space ("Remove BD ",
@@ -9175,6 +9197,18 @@ function twRenderSection2(ticket, reqTypeOverride) {
     // moved out of the retired Duplicate Check card / Basic Information --
     // Parenet sub agency (right beside Agency Code), Create Way, Reject Reason.
     if (reqType === 'Agency Creation') twRenderAgencyCreationExtras(sec2, ticket);
+
+    // Phase 10.8: Agency Point tickets get the Confirm & Charge gate card.
+    if (reqType === 'Agency Point Request') twRenderAgencyPointGate(ticket);
+
+    // Phase 10.8: live preview — any edit inside sec2 (privilege pick,
+    // quantity, target type) re-runs the client-side estimate. One-time
+    // hook so re-renders don't stack listeners.
+    if (!sec2.dataset.apgHooked) {
+        sec2.dataset.apgHooked = '1';
+        sec2.addEventListener('change', () => twApSchedulePreview());
+        sec2.addEventListener('click', () => twApSchedulePreview());
+    }
 
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
 }
@@ -9240,6 +9274,276 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
         toggleHide: '▾ Done — show selected only',
         filterPh: '🔍 Filter reasons…',
     });
+}
+
+// ─── Phase 10.8: Agency Point Charge gate (Agency Point Request tickets) ───
+// Mirrors the sheet-side "Agency point calculator" Base workflow 1:1: the
+// portal PREVIEWS the order locally (same price DB, same monthly-limit +
+// wallet math as the sheet's JS handler), and the actual deduction is done
+// by the Base workflow itself -- we set Order Action = "Confirm & Charge" on
+// the record, the workflow deducts the points, updates the Agency Points
+// table (Used Points / Monthly Usage Tracker) and writes the CONFIRMED
+// RECEIPT back onto the ticket. The portal polls the record until that
+// receipt lands, and Status=Done stays blocked until it does. Zero new
+// backend endpoints: /api/search (points lookup), /api/requests/update
+// (fire the workflow), /api/requests/single (poll the receipt).
+let twApGate = { charged: false, charging: false, agency: null, receipt: '' };
+
+function twApReceiptIsConfirmed(txt) { return /CONFIRMED RECEIPT/i.test(txt || ''); }
+function twApIsCharged() {
+    if (twApGate.charged) return true;
+    const ctrl = document.querySelector('#tw-sec-2 [name="Transaction Receipt"]');
+    return twApReceiptIsConfirmed(ctrl ? ctrl.value : '') || twApReceiptIsConfirmed(twApGate.receipt);
+}
+
+function twRenderAgencyPointGate(ticket) {
+    document.getElementById('twApGateCard')?.remove();
+    const f = ticket.fields;
+    twApGate = { charged: false, charging: false, agency: null, receipt: feishuValueToString(f['Transaction Receipt']) };
+    const card = document.createElement('div');
+    card.id = 'twApGateCard';
+    card.className = 'card twx-card';
+    const col1 = document.getElementById('twCol1Stack');
+    if (col1) col1.appendChild(card);
+    else document.getElementById('tw-sec-1-card')?.after(card);
+
+    if (twApReceiptIsConfirmed(twApGate.receipt)) {
+        // Already charged (in the sheet or a previous portal session) -- show
+        // the receipt read-only; the save gate is satisfied by the receipt.
+        twApGate.charged = true;
+        twApPaintCharged(card, twApGate.receipt, feishuValueToString(f['Latest Usage Tracker']));
+        return;
+    }
+    twApPaintPending(card, ticket);
+    const code = feishuValueToString(f['Agency Code']).trim();
+    if (code) twApLoadAgency(code);
+    else {
+        const prev = document.getElementById('apgPreview');
+        if (prev) prev.innerHTML = '<span class="bad">❌ No Agency Code on this ticket — cannot load the points wallet.</span>';
+    }
+}
+
+function twApPaintPending(card, ticket) {
+    const code = feishuValueToString(ticket.fields['Agency Code']).trim() || '—';
+    card.innerHTML = `
+    <h4 class="twx-sec-title" style="color:var(--accent-amber);">
+        <span class="twx-sec-num" style="background:var(--accent-amber);">⚡</span>
+        Agency Point Charge
+    </h4>
+    <div class="apg-kpis">
+        <div class="apg-kpi"><b style="color:var(--accent-cyan)" id="apgBalance">…</b><span>Balance</span></div>
+        <div class="apg-kpi"><b style="color:var(--accent-rose)" id="apgUsed">…</b><span>Used</span></div>
+        <div class="apg-kpi"><b style="color:var(--accent-green)" id="apgTotal">…</b><span>Total</span></div>
+    </div>
+    <div class="apg-receipt" id="apgPreview"><span style="color:var(--text-muted)">⏳ Loading points wallet for agency ${escHtml(code)}…</span></div>
+    <div class="apg-actions">
+        <button type="button" id="twApChargeBtn" class="btn-outline" disabled onclick="twApConfirmCharge()">⚡ Confirm &amp; Charge Points</button>
+        <span class="apg-state" id="apgState">Preview is instant — charging deducts from the agency wallet via the sheet workflow.</span>
+    </div>`;
+}
+
+async function twApLoadAgency(code) {
+    try {
+        const res = await fetch(`/api/search?code=${encodeURIComponent(code)}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${loggedUat}&type=points`);
+        const data = await res.json();
+        if (!res.ok || data.found === false) throw new Error(data.error || 'Agency not found in the Agency Points table.');
+        twApGate.agency = data;
+        currentAgencyData = data; // lets findAllocatorLimit() enforce this agency's monthly usage
+        twApRefreshPreview();
+    } catch (e) {
+        const prev = document.getElementById('apgPreview');
+        if (prev) prev.innerHTML = `<span class="bad">❌ Could not load the points wallet: ${escHtml(e.message)}</span>`;
+        const st = document.getElementById('apgState');
+        if (st) st.textContent = 'Charging stays blocked until the wallet loads.';
+    }
+}
+
+// Map a sheet MultiSelect option ("Pink Lion Package ( 50 Points )") to its
+// pointPriceDB key ("pink lion package"): text before the first "(", lowered.
+function twApRuleFor(privOption) {
+    const base = privOption.split('(')[0].trim().toLowerCase().replace(/\s+/g, ' ');
+    return pointPriceDB.find(e => e.key === base)
+        || pointPriceDB.find(e => base.startsWith(e.key))
+        || pointPriceDB.find(e => e.key.startsWith(base) && base.length >= e.key.length - 2)
+        || null;
+}
+
+// Reads the CURRENT form controls (not the stale ticket copy) so edits to
+// privilege / quantities / target type re-price the preview instantly.
+function twApOrderLines() {
+    const privs = Array.from(document.querySelectorAll('#tw-sec-2 [name="Agency Point Privilege"]')).filter(i => i.checked).map(i => i.value);
+    const qtyRaw = document.querySelector('#tw-sec-2 [name="Quantities Input"]')?.value || '';
+    const qtys = (String(qtyRaw).match(/\d+/g) || []).map(Number);
+    const targetRaw = (document.querySelector('#tw-sec-2 [name="Target Type"]')?.value || '').toLowerCase();
+    return { privs, qtys, other: targetRaw.includes('other') };
+}
+
+// Same allocation math as the sheet's JS handler: monthly/per-order limit
+// first, then wallet balance; approved = min(desired, affordable).
+function twApRefreshPreview() {
+    if (twApGate.charged || !twApGate.agency) return;
+    const a = twApGate.agency;
+    const balance = a.point_balance || 0;
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt('apgBalance', balance.toLocaleString());
+    setTxt('apgUsed', (a.used_points || 0).toLocaleString());
+    setTxt('apgTotal', (a.total_points || 0).toLocaleString());
+
+    const { privs, qtys, other } = twApOrderLines();
+    const prev = document.getElementById('apgPreview');
+    const btn = document.getElementById('twApChargeBtn');
+    if (!privs.length) {
+        if (prev) prev.innerHTML = '<span style="color:var(--text-muted)">Select at least one Agency Point Privilege above to preview the charge.</span>';
+        if (btn) btn.disabled = true;
+        return;
+    }
+    let remaining = balance, total = 0;
+    const html = [];
+    privs.forEach((p, i) => {
+        const q = Math.max(1, qtys[i] || 1);
+        const rule = twApRuleFor(p);
+        if (!rule) { html.push(`<span class="bad">❌ UNKNOWN ITEM: ${escHtml(p)} — not in the points price list</span>`); return; }
+        const price = other ? rule.other : rule.same;
+        const disp = rule.key.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+        const { maxAllowed, used, limit, source } = getEffectiveLimit(rule.key);
+        const limitLabel = rule.type === 'order' ? `max ${limit} per request` : (source === 'server' ? `${used}/${limit} used this month` : `limit ${limit}`);
+        if (maxAllowed <= 0) { html.push(`<span class="bad">❌ FULLY REJECTED: ${q}× ${disp} — Reason: limit reached (${limitLabel})</span>`); return; }
+        const desired = Math.min(q, maxAllowed);
+        const affordable = Math.floor(remaining / price);
+        const approved = Math.min(desired, affordable);
+        if (approved >= q) {
+            html.push(`<span class="ok">✅ FULLY APPROVED: ${q}× ${disp} @ ${price} pts = ${q * price}</span>`);
+        } else if (approved > 0) {
+            const reason = desired < q ? `monthly limit — ${limitLabel}` : `not enough points for ${desired}×`;
+            html.push(`<span class="warn">⚠️ PARTIALLY APPROVED: ${approved}× ${disp} @ ${price} pts = ${approved * price}\n   ⤷ (Rejected ${q - approved}×: ${reason})</span>`);
+        } else {
+            const reason = desired < q ? `limit reached (${limitLabel})` : `not enough points (need ${desired * price}, only ${remaining} left)`;
+            html.push(`<span class="bad">❌ FULLY REJECTED: ${disp} — Reason: ${reason}</span>`);
+        }
+        total += approved * price;
+        remaining -= approved * price;
+    });
+    html.push(`<span style="color:var(--border-hover)">━━━━━━━━━━━━━━</span>`);
+    html.push(`<span style="color:var(--accent-rose);font-weight:bold">💰 TOTAL TO DEDUCT: ${total.toLocaleString()} pts</span>`);
+    html.push(`<span style="color:var(--accent-cyan);font-weight:bold">💳 BALANCE AFTER: ${remaining.toLocaleString()} pts</span>`);
+    html.push(`<span style="color:var(--text-muted)">📍 ${other ? 'Other agency rate' : 'Same agency rate'} · the sheet workflow computes the final amounts at charge time</span>`);
+    if (prev) prev.innerHTML = html.join('\n');
+    if (btn) btn.disabled = total <= 0;
+}
+
+function twApSchedulePreview() {
+    if (!twApGate || twApGate.charged || !twApGate.agency) return;
+    clearTimeout(twApGate._pvT);
+    twApGate._pvT = setTimeout(twApRefreshPreview, 60);
+}
+
+async function twApConfirmCharge() {
+    if (twApGate.charging || twApGate.charged) return;
+    const btn = document.getElementById('twApChargeBtn');
+    const state = document.getElementById('apgState');
+    const recordId = document.getElementById('tw-record-id').value;
+    twApGate.charging = true;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Charging…'; }
+    if (state) state.textContent = 'Asking the sheet workflow to deduct the points…';
+    try {
+        // 1) Fresh read first -- if another agent (or the sheet itself) already
+        //    charged this ticket, adopt that receipt instead of charging twice.
+        let fresh = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`).then(r => r.json());
+        if (fresh.success && twApReceiptIsConfirmed(feishuValueToString(fresh.record?.fields?.['Transaction Receipt']))) {
+            twApAdoptCharged(fresh.record);
+            return;
+        }
+        // 2) Fire the sheet workflow: Order Action -> "Confirm & Charge". The
+        //    Base automation triggers on the field CHANGING to that value, so
+        //    if it already holds it (a previous run that never completed),
+        //    clear it first and set it again after a beat.
+        const curAction = feishuValueToString(fresh.record?.fields?.['Order Action']).trim();
+        if (curAction === 'Confirm & Charge') {
+            const clr = new FormData();
+            clr.append('user', loggedUser); clr.append('record_id', recordId);
+            clr.append('fields', JSON.stringify({ 'Order Action': '' }));
+            await fetch('/api/requests/update', { method: 'POST', body: clr }).then(r => r.json());
+            await new Promise(r => setTimeout(r, 1500));
+        }
+        const fd = new FormData();
+        fd.append('user', loggedUser); fd.append('record_id', recordId);
+        fd.append('fields', JSON.stringify({ 'Order Action': 'Confirm & Charge' }));
+        const up = await fetch('/api/requests/update', { method: 'POST', body: fd }).then(r => r.json());
+        if (!up.success) throw new Error(up.error || 'Failed to set Order Action.');
+
+        // 3) Poll until the workflow writes the CONFIRMED RECEIPT back
+        //    (normally a few seconds; Base automations are near-realtime).
+        for (let i = 0; i < 12; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            fresh = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`).then(r => r.json()).catch(() => null);
+            if (fresh && fresh.success && twApReceiptIsConfirmed(feishuValueToString(fresh.record?.fields?.['Transaction Receipt']))) {
+                twApAdoptCharged(fresh.record);
+                return;
+            }
+        }
+        if (state) state.innerHTML = '⏳ The sheet workflow is still processing. <a href="#" onclick="twApRecheckCharge();return false;" style="color:var(--accent-cyan)">🔄 Re-check now</a>';
+        ToastManager.show('Charge sent — waiting on the sheet workflow. Use Re-check in a few seconds.', 'warning', 6000);
+    } catch (e) {
+        ToastManager.show('Charge failed: ' + e.message, 'error');
+        if (state) state.textContent = 'Charge failed — nothing was deducted. You can try again.';
+    } finally {
+        twApGate.charging = false;
+        if (btn && !twApGate.charged) { btn.disabled = false; btn.textContent = '⚡ Confirm & Charge Points'; }
+    }
+}
+
+async function twApRecheckCharge() {
+    const recordId = document.getElementById('tw-record-id').value;
+    const fresh = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`).then(r => r.json()).catch(() => null);
+    if (fresh && fresh.success && twApReceiptIsConfirmed(feishuValueToString(fresh.record?.fields?.['Transaction Receipt']))) {
+        twApAdoptCharged(fresh.record);
+    } else {
+        ToastManager.show('Still processing — try again in a few seconds.', 'warning');
+    }
+}
+
+// Charge confirmed: sync every value the workflow wrote (receipt / tracker /
+// cleared quantities) back into the workspace form, so a later Save &amp;
+// Resolve doesn't overwrite the workflow's receipt with the old empty value.
+function twApAdoptCharged(record) {
+    const f = record.fields;
+    const receipt = feishuValueToString(f['Transaction Receipt']);
+    const tracker = feishuValueToString(f['Latest Usage Tracker']);
+    twApGate.charged = true; twApGate.charging = false; twApGate.receipt = receipt;
+    ltActiveTicket = record;
+    const sync = (name, val) => { const c = document.querySelector(`#tw-sec-2 [name="${name}"]`); if (c) c.value = val; };
+    sync('Transaction Receipt', receipt);
+    sync('Latest Usage Tracker', tracker);
+    sync('Quantities Input', feishuValueToString(f['Quantities Input']));
+    const oa = document.querySelector('#tw-sec-2 [name="Order Action"]');
+    if (oa) oa.value = 'Confirm & Charge';
+    const card = document.getElementById('twApGateCard');
+    if (card) {
+        card.classList.remove('twx-missing');
+        twApPaintCharged(card, receipt, tracker);
+    }
+    const d = receipt.match(/TOTAL DEDUCTED:\s*([\d,]+)/);
+    const m = receipt.match(/REMAINING BALANCE:\s*([\d,]+)/);
+    ToastManager.show(`✅ Points charged — ${d ? d[1] : '?'} pts deducted${m ? `, ${m[1]} pts remaining` : ''}. Safe to mark Done now.`, 'success', 6000);
+    if (typeof logFrontendAction === 'function') logFrontendAction('AP_CHARGE_CONFIRMED', `Record ${record.record_id || ''}`);
+}
+
+function twApPaintCharged(card, receipt, tracker) {
+    card.classList.add('apg-charged');
+    const fmt = (txt) => escHtml(txt || '')
+        .replace(/(✅[^\n]*)/g, '<span class="ok">$1</span>')
+        .replace(/(⚠️[^\n]*)/g, '<span class="warn">$1</span>')
+        .replace(/(❌[^\n]*)/g, '<span class="bad">$1</span>')
+        .replace(/(💰[^\n]*)/g, '<span style="color:var(--accent-rose);font-weight:bold">$1</span>')
+        .replace(/(💳[^\n]*)/g, '<span style="color:var(--accent-cyan);font-weight:bold">$1</span>');
+    card.innerHTML = `
+    <h4 class="twx-sec-title" style="color:var(--accent-green);">
+        <span class="twx-sec-num" style="background:var(--accent-green);">✓</span>
+        Agency Point Charge — Confirmed
+    </h4>
+    <div class="apg-receipt">${fmt(receipt)}</div>
+    ${tracker ? `<div class="apg-state" style="margin-top:4px">${fmt(tracker)}</div>` : ''}
+    <div class="apg-actions"><span class="apg-state" style="color:var(--accent-green)">✅ Points deducted &amp; quantities approved by the sheet workflow — safe to mark Done.</span></div>`;
 }
 
 // Phase 10.4: Status as audit-style one-tap pick buttons (Done green /
@@ -9732,7 +10036,7 @@ async function lightboxExtractText() {
 
         // Feishu's OCR endpoint has a hard 5MB cap. Re-encode as a smaller JPEG via
         // canvas instead of failing outright if the original attachment is bigger.
-        if (blob.size > 3 * 1024 * 1024) {
+        if (blob.size > 4.5 * 1024 * 1024) {
             blob = await lightboxDownscaleForOcr(img);
         }
 
@@ -10619,6 +10923,20 @@ async function twSaveWorkspace() {
         missing.forEach(m => { if (m.el) m.el.classList.add('twx-missing'); });
         ToastManager.show('Before saving, please select: ' + missing.map(m => m.name).join(' + ') + '.', 'warning', 6000);
         if (missing[0].el && missing[0].el.scrollIntoView) missing[0].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    // Phase 10.8 (Ahmed): Agency Point Request tickets may not be marked Done
+    // until the points have actually been charged -- the Confirm & Charge flow
+    // (Base workflow writes the CONFIRMED RECEIPT back) must run first, so the
+    // deduction and the approved quantities are locked in the sheet before the
+    // ticket closes. Rejected tickets skip the charge entirely.
+    const saveReqType = (document.querySelector('#tw-form [name="Request Type"]')?.value || ltActiveTicket?.fields?.['Request Type'] || '').toString().trim();
+    if (saveReqType === 'Agency Point Request' && /^done/i.test((statusSel?.value || '').trim()) && !twApIsCharged()) {
+        const card = document.getElementById('twApGateCard');
+        if (card) card.classList.add('twx-missing');
+        ToastManager.show('⚡ Confirm & Charge the agency points first — the deduction and approved quantities must be confirmed before this request can be marked Done.', 'warning', 7000);
+        if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
 
