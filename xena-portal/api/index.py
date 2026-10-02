@@ -2963,27 +2963,59 @@ def compute_agency_point_charge(privileges, qty_raw, target_raw, used_points, ba
         "new_used_points": used + total_cost,
         "new_monthly_tracker": new_monthly_tracker,
         "current_tracker": current_tracker,
+        "current_order": current_order,
         "receipt": confirm_receipt,
     }
+
+def merge_usage_trackers(existing_tracker, new_order):
+    """Phase 10.10 (charge-more): merge this charge's approved items into the
+    ticket's existing Latest Usage Tracker, so topping up a request
+    (1 Trend + 1 Traffic, then +1 Trend) leaves the ticket showing the
+    CUMULATIVE order (2 Trend + 1 Traffic). Existing entries keep their
+    original order; brand-new items append at the end."""
+    merged = {}
+    for line in str(existing_tracker or "").split("\n"):
+        line = line.strip()
+        if not line or ":" not in line or "━" in line or "┈" in line:
+            continue
+        name_part, _, qty_part = line.partition(":")
+        name = re.sub(r"[🔹📋🌟【】]", "", name_part).strip()
+        if not name or "items approved" in name.lower() or "no items" in name.lower():
+            continue
+        try:
+            merged[name] = merged.get(name, 0) + int(qty_part.strip())
+        except ValueError:
+            pass
+    for name, qty in (new_order or {}).items():
+        merged[name] = merged.get(name, 0) + int(qty)
+    if not merged:
+        return "No items approved in this order."
+    return "Items approved in this order:\n" + "\n".join(f"🔹 {k}: {v}" for k, v in merged.items())
 
 @app.route('/api/agency-points/charge', methods=['POST'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_points_charge():
     """Instant Agency Point charge for the ticket workspace's ⚡ Confirm & Charge
     button. Body (JSON): record_id, user, email, privileges[], quantities_input,
-    target_type. Reads the ticket + the agency wallet fresh, runs the SAME
-    allocator as the sheet workflow (compute_agency_point_charge), writes Used
-    Points + Monthly Usage Tracker to the Agency Points table and the CONFIRMED
-    RECEIPT back onto the ticket -- all in one call, no Base automation, no
-    polling. Idempotent: a ticket whose receipt already shows a real deduction
-    (> 0 pts) is never charged twice; a zero-approval receipt (a failed attempt)
-    CAN be charged again after the agent fixes the order. NEVER writes
-    "Order Action" -- that field is the Base workflow's trigger and writing
-    'Confirm & Charge' to it would double-charge via the automation."""
+    target_type, agency_code (hint). Phase 10.10: the ticket + the agency wallet
+    are fetched in PARALLEL (wallet searched by the agency_code hint the client
+    already has on screen; the ticket stays authoritative -- on mismatch the
+    wallet is re-searched with the ticket's code), and the button stays usable
+    after a successful charge -- CHARGE-MORE: each call deducts only the
+    quantities currently typed, appends an "ADDITIONAL CHARGE" receipt and
+    merges the Latest Usage Tracker into a cumulative view (1 Trend + 1 Traffic
+    charged, then 1 more Trend => tracker shows 2 Trend + 1 Traffic). A 120s
+    Redis duplicate guard replays the result of an identical request
+    (double-click / retry storms) instead of double-deducting. A zero-approval
+    attempt writes nothing to the wallet and never clobbers an existing good
+    receipt. NEVER writes "Order Action" -- that field is the Base workflow's
+    trigger and writing 'Confirm & Charge' to it would double-charge via the
+    automation."""
     payload = request.get_json(silent=True) or {}
     user = sanitize_text(payload.get('user', ''))
     email = sanitize_text(payload.get('email', ''))
     record_id = sanitize_text(payload.get('record_id', ''))
+    agency_code_hint = sanitize_text(payload.get('agency_code', '')).strip()
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     if not user:
@@ -2993,62 +3025,90 @@ def agency_points_charge():
     if MOCK_MODE:
         return jsonify({"success": False, "error": "Mock mode — charge is disabled."}), 400
 
-    tat = get_tenant_access_token()
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-
-    # 1) Fresh ticket read -- idempotency guard + agency code.
-    try:
-        resp = feishu_session.get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                                  headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
-        if resp.get("code") != 0:
-            return jsonify({"success": False, "error": resp.get("msg") or "Could not read the ticket."}), 400
-        tfields = resp["data"]["record"].get("fields", {})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-    existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
-    m = re.search(r"TOTAL DEDUCTED:\s*([\d,]+)", existing_receipt or "")
-    already_deducted = int(m.group(1).replace(",", "")) if m else 0
-    if "CONFIRMED RECEIPT" in (existing_receipt or "").upper() and already_deducted > 0:
-        # Already charged (portal or sheet) -- adopt, never double-charge.
-        return jsonify({"success": True, "already_charged": True, "deducted": already_deducted,
-                        "receipt": existing_receipt,
-                        "tracker": extract_field_text(get_field_local(tfields, "Latest Usage Tracker"))})
-
-    agency_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
-    if not agency_code:
-        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
-
     # Order details come from the REQUEST BODY (what the agent sees in the form
     # right now), falling back to the record. This is THE fix for the old
     # "No items approved in this order" bug -- the sheet workflow could only
     # read the record, so charging before saving meant it saw an empty
     # Quantities Input and approved nothing.
     privileges = payload.get("privileges")
+    qty_raw = payload.get("quantities_input") or ""
+    target_raw = payload.get("target_type") or ""
+
+    # Duplicate guard: an identical charge request within 120s replays the
+    # cached result instead of deducting twice (double-click, retry storm).
+    dup_key = f"xena:ap_charge:{record_id}"
+    dup_sig = hashlib.sha1(json.dumps([record_id, privileges, qty_raw, target_raw], sort_keys=True, default=str).encode()).hexdigest()
+    if REDIS_ENABLED:
+        try:
+            cached = redis_get_json(dup_key)
+            if cached and cached.get("sig") == dup_sig and isinstance(cached.get("result"), dict):
+                replay = dict(cached["result"])
+                replay["duplicate"] = True
+                return jsonify(replay)
+        except Exception:
+            pass
+
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    # 1) Fetch the ticket AND the agency wallet in parallel (the wallet search
+    #    uses the agency_code hint from the client; verified against the ticket
+    #    below).
+    def _fetch_ticket():
+        r = feishu_session.get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                               headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
+        if r.get("code") != 0:
+            raise RuntimeError(r.get("msg") or "Could not read the ticket.")
+        return r["data"]["record"].get("fields", {})
+
+    def _fetch_wallet(code):
+        if not code:
+            return None
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
+            headers=headers,
+            json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}},
+            timeout=30).json()
+        if r.get("code") != 0:
+            raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
+        for it in r.get("data", {}).get("items", []):
+            if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == code:
+                return it
+        return None
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_ticket = pool.submit(_fetch_ticket)
+            fut_wallet = pool.submit(_fetch_wallet, agency_code_hint)
+            tfields = fut_ticket.result()
+            wallet_hint = fut_wallet.result()
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
+    existing_tracker = extract_field_text(get_field_local(tfields, "Latest Usage Tracker"))
+
+    agency_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
+    if not agency_code:
+        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
+
+    # The ticket is authoritative for the agency -- if the hint missed or
+    # pointed at a different wallet, search again with the ticket's code.
+    try:
+        agency_rec = wallet_hint if (wallet_hint and agency_code_hint == agency_code) else _fetch_wallet(agency_code)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    if not agency_rec:
+        return jsonify({"success": False, "error": f"Agency {agency_code} not found in the Agency Points table."}), 404
+
+    # Body values win; fall back to the record for anything the client omitted.
     if not isinstance(privileges, list) or not privileges:
         pv = get_field_local(tfields, "Agency Point Privilege")
         privileges = pv if isinstance(pv, list) else ([pv] if pv else [])
-    qty_raw = payload.get("quantities_input") or extract_field_text(get_field_local(tfields, "Quantities Input"))
-    target_raw = payload.get("target_type") or extract_field_text(get_field_local(tfields, "Target Type"))
-
-    # 2) Agency wallet (points table), fresh.
-    try:
-        sp = feishu_session.post(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
-            headers=headers,
-            json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [agency_code]}]}},
-            timeout=30).json()
-        if sp.get("code") != 0:
-            return jsonify({"success": False, "error": sp.get("msg") or "Agency Points lookup failed."}), 400
-        agency_rec = None
-        for it in sp.get("data", {}).get("items", []):
-            if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == agency_code:
-                agency_rec = it
-                break
-        if not agency_rec:
-            return jsonify({"success": False, "error": f"Agency {agency_code} not found in the Agency Points table."}), 404
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    if not qty_raw:
+        qty_raw = extract_field_text(get_field_local(tfields, "Quantities Input"))
+    if not target_raw:
+        target_raw = extract_field_text(get_field_local(tfields, "Target Type"))
 
     af = agency_rec.get("fields", {})
     used_pts = parse_float_safe(extract_field_text(get_field_local(af, "Used Points", "Used")))
@@ -3064,49 +3124,81 @@ def agency_points_charge():
     if charge.get("error"):
         return jsonify({"success": False, "error": charge["error"]}), 400
 
+    total_cost = charge["total_cost"]
+
     # 4) Write the agency wallet FIRST (Used Points + Monthly Usage Tracker) --
     # exactly the two fields the sheet workflow's "Update Agency Points table"
     # step writes. If this fails, nothing was deducted and the ticket is
-    # untouched, so the agent can simply retry.
+    # untouched, so the agent can simply retry. Only runs when this charge
+    # actually approves something -- a zero-approval attempt changes nothing.
     # NOTE: "Used Points" is a TEXT field in the Agency Points table (the sheet
     # workflow also writes it as text) -- sending a number fails with
     # TextFieldConvFail, so it goes out as a JS-style numeric string.
-    try:
-        wr = feishu_session.put(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
-            headers=headers,
-            json={"fields": {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
-            timeout=15).json()
-        if wr.get("code") != 0:
-            return jsonify({"success": False, "error": f"Wallet update failed (nothing deducted): {wr.get('msg')}"}), 400
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    if total_cost > 0:
+        try:
+            wr = feishu_session.put(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
+                headers=headers,
+                json={"fields": {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
+                timeout=15).json()
+            if wr.get("code") != 0:
+                return jsonify({"success": False, "error": f"Wallet update failed (nothing deducted): {wr.get('msg')}"}), 400
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
 
-    # 5) Write the receipt back onto the ticket. If THIS fails the points are
-    # already deducted, so we still return the receipt to the caller (the
-    # workspace shows it and the agent can re-save) instead of pretending the
-    # charge never happened.
+    # 5) Charge-more bookkeeping: the ticket's tracker becomes CUMULATIVE
+    #    (existing approved items + this charge's items), and every charge
+    #    appends its own receipt after an "ADDITIONAL CHARGE" divider, so the
+    #    full deduction history stays visible on the ticket.
+    if total_cost > 0 and existing_tracker and "No items approved" not in existing_tracker:
+        cumulative_tracker = merge_usage_trackers(existing_tracker, charge["current_order"])
+    elif total_cost > 0:
+        cumulative_tracker = charge["current_tracker"]
+    else:
+        cumulative_tracker = existing_tracker or charge["current_tracker"]
+
+    if total_cost > 0 and existing_receipt and "CONFIRMED RECEIPT" in existing_receipt.upper():
+        full_receipt = existing_receipt.rstrip() + "\n\n➕ ── ADDITIONAL CHARGE ── ➕\n\n" + charge["receipt"]
+    elif total_cost == 0 and existing_receipt:
+        full_receipt = existing_receipt
+    else:
+        full_receipt = charge["receipt"]
+
+    # 6) Write the receipt back onto the ticket -- only when there is something
+    # new to say: a real charge, or the very first (possibly zero-approval)
+    # receipt. A failed zero attempt never clobbers an existing good receipt.
+    # If THIS write fails the points are already deducted, so we still return
+    # the receipt to the caller instead of pretending the charge never happened.
+    write_ticket = total_cost > 0 or not existing_receipt
     ticket_write_failed = False
-    try:
-        tw = feishu_session.put(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-            headers=headers,
-            json={"fields": {"Transaction Receipt": charge["receipt"],
-                             "Latest Usage Tracker": charge["current_tracker"],
-                             "Quantities Input": ""}},
-            timeout=15).json()
-        if tw.get("code") != 0:
+    if write_ticket:
+        try:
+            tw = feishu_session.put(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                headers=headers,
+                json={"fields": {"Transaction Receipt": full_receipt,
+                                 "Latest Usage Tracker": cumulative_tracker,
+                                 "Quantities Input": ""}},
+                timeout=15).json()
+            if tw.get("code") != 0:
+                ticket_write_failed = True
+                logger.error("ap_charge_ticket_write_failed", record_id=record_id, response=tw)
+        except Exception as e:
             ticket_write_failed = True
-            logger.error("ap_charge_ticket_write_failed", record_id=record_id, response=tw)
-    except Exception as e:
-        ticket_write_failed = True
-        logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
+            logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
 
-    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}", ip=ip, severity="Info")
-    return jsonify({"success": True, "already_charged": False,
-                    "deducted": charge["total_cost"], "balance_after": charge["remaining"],
-                    "receipt": charge["receipt"], "tracker": charge["current_tracker"],
-                    "ticket_write_failed": ticket_write_failed})
+    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}", ip=ip, severity="Info")
+    result = {"success": True, "duplicate": False,
+              "deducted": total_cost, "balance_after": charge["remaining"],
+              "receipt": charge["receipt"], "full_receipt": full_receipt,
+              "tracker": cumulative_tracker,
+              "ticket_write_failed": ticket_write_failed}
+    if REDIS_ENABLED:
+        try:
+            redis_set_json(dup_key, {"sig": dup_sig, "result": result}, ttl=120)
+        except Exception:
+            pass
+    return jsonify(result)
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
