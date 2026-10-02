@@ -3068,11 +3068,14 @@ def agency_points_charge():
     # exactly the two fields the sheet workflow's "Update Agency Points table"
     # step writes. If this fails, nothing was deducted and the ticket is
     # untouched, so the agent can simply retry.
+    # NOTE: "Used Points" is a TEXT field in the Agency Points table (the sheet
+    # workflow also writes it as text) -- sending a number fails with
+    # TextFieldConvFail, so it goes out as a JS-style numeric string.
     try:
         wr = feishu_session.put(
             f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
             headers=headers,
-            json={"fields": {"Used Points": charge["new_used_points"], "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
+            json={"fields": {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
             timeout=15).json()
         if wr.get("code") != 0:
             return jsonify({"success": False, "error": f"Wallet update failed (nothing deducted): {wr.get('msg')}"}), 400
