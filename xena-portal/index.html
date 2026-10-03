@@ -163,6 +163,54 @@
         .qy-note-block{margin-top:12px;padding:12px 14px;background:rgba(0,0,0,.2);border-radius:10px;font-size:.8rem;color:var(--text-muted); border-left: 3px solid var(--border-hover);}
         .qy-note-block b{color:var(--text); display:block; margin-bottom: 4px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;}
 
+        /* ─── Phase 10.13: Universal Query card actions (Audition access) ─── */
+        .qy-card-actions{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);flex-wrap:wrap;}
+        .qy-act-btn{flex:1;min-width:150px;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .25s ease;}
+        .qy-act-btn:hover{transform:translateY(-2px);}
+        .qy-act-btn:disabled{opacity:.55;cursor:wait;transform:none;}
+        .qy-act-pics{border-color:rgba(0,212,255,.35);color:var(--accent-cyan);}
+        .qy-act-pics:hover{background:rgba(0,212,255,.1);box-shadow:0 6px 16px rgba(0,212,255,.12);}
+        .qy-act-open{border-color:rgba(185,103,255,.35);color:var(--accent-purple);}
+        .qy-act-open:hover{background:rgba(185,103,255,.1);box-shadow:0 6px 16px rgba(185,103,255,.12);}
+        .qy-pics{margin-top:12px;display:flex;flex-direction:column;gap:12px;}
+        .qy-pics-group{background:rgba(0,0,0,.18);border:1px solid var(--border);border-radius:12px;padding:12px;}
+        .qy-pics-field{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--accent-cyan);margin-bottom:8px;}
+        .qy-pics-thumbs{display:flex;flex-wrap:wrap;gap:8px;}
+        .qy-pic-thumb{width:84px;height:84px;padding:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:rgba(0,0,0,.3);cursor:zoom-in;transition:all .2s ease;}
+        .qy-pic-thumb:hover{border-color:var(--accent-cyan);transform:scale(1.05);box-shadow:0 6px 14px rgba(0,0,0,.4);}
+        .qy-pic-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+        .qy-pics-empty{padding:14px;text-align:center;color:var(--text-muted);font-size:.85rem;background:rgba(0,0,0,.18);border:1px dashed var(--border);border-radius:12px;}
+
+        /* ─── Phase 10.13: Under Investigation rows ─── */
+        .ti-row{display:flex;align-items:center;gap:14px;background:linear-gradient(145deg,var(--surface) 0%,rgba(255,255,255,.01) 100%);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;transition:all .25s ease;}
+        .ti-row:hover{border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.35);}
+        .ti-row-main{flex:1;min-width:0;}
+        .ti-row-title{font-weight:700;font-size:.95rem;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+        .ti-row-num{color:var(--accent-cyan);font-weight:800;letter-spacing:.4px;}
+        .ti-row-chips{display:flex;flex-wrap:wrap;gap:6px;}
+        .ti-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,.22);border:1px solid var(--border);border-radius:999px;padding:4px 11px;font-size:.76rem;font-weight:600;color:var(--text);max-width:100%;}
+        .ti-chip-label{color:var(--text-muted);font-weight:500;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;}
+        /* ID-scoped: must outrank the global .btn{width:100%} declared later. */
+        #tiResults .ti-open-btn{flex:0 0 auto;width:auto;padding:9px 22px;border-radius:10px;font-size:.85rem;font-weight:700;}
+        #tiSearchBtn{flex:0 0 auto;width:auto;padding:12px 30px;}
+
+        /* ─── Phase 10.13: Preview Agent View ─── */
+        .pv-hint{padding:22px;text-align:center;color:var(--text-muted);font-size:.88rem;}
+        .pv-row{display:flex;align-items:center;gap:14px;background:rgba(0,0,0,.16);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;transition:all .25s ease;}
+        .pv-row:hover{border-color:var(--border-hover);}
+        .pv-row-info{flex:1;min-width:0;}
+        .pv-row-email{font-weight:700;font-size:.9rem;color:var(--text);overflow-wrap:anywhere;margin-bottom:6px;}
+        .pv-row-mods{display:flex;flex-wrap:wrap;gap:5px;}
+        .pv-mod-chip{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.22);color:var(--accent-cyan);border-radius:999px;padding:2px 9px;font-size:.68rem;font-weight:600;}
+        .pv-mod-none{background:rgba(255,255,255,.04);border-color:var(--border);color:var(--text-muted);}
+        #pvList .pv-view-btn{flex:0 0 auto;width:auto;padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:700;}
+        #pvBanner{position:fixed;top:0;left:0;right:0;z-index:10050;display:none;align-items:center;justify-content:center;gap:16px;padding:9px 16px;background:linear-gradient(90deg,rgba(185,103,255,.22),rgba(0,212,255,.22));backdrop-filter:blur(12px);border-bottom:1px solid rgba(185,103,255,.45);box-shadow:0 6px 20px rgba(0,0,0,.35);}
+        .pv-banner-text{font-size:.85rem;font-weight:600;color:var(--text);}
+        .pv-banner-text b{color:var(--accent-purple);}
+        .pv-banner-exit{padding:5px 14px;border-radius:999px;border:1px solid rgba(255,77,109,.5);background:rgba(255,77,109,.14);color:var(--accent-rose);font-family:inherit;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s ease;}
+        .pv-banner-exit:hover{background:rgba(255,77,109,.28);}
+        body.pv-active{padding-top:42px;}
+
         .compare-mode-toggle{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
         .compare-mode-btn{flex:1;min-width:160px;padding:10px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.9rem;transition:all .2s;text-align:center}
         .compare-mode-btn.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--accent-cyan);font-weight:700}
@@ -1657,7 +1705,6 @@
                 </div>
                 <div class="nav-group-body" id="navBodySubmit">
                     <div class="nav-item" id="nav-new-request" onclick="openInTab('new-request')"><span data-i18n="newRequest">New Request</span></div>
-                    <div class="nav-item" id="nav-audit" onclick="openInTab('audit')"><span data-i18n="auditQuickCreate">Audit</span></div>
                     <div class="nav-item" id="nav-my-requests" onclick="openInTab('my-requests')"><span data-i18n="myRecentRequests">My Recent Requests</span></div>
                 </div>
             </div>
@@ -1673,6 +1720,12 @@
                 </div>
                 <div class="nav-group-body" id="navBodyTickets">
                     <div class="nav-item" id="nav-live-tickets" onclick="openInTab('live-tickets')"><span data-i18n="liveQueue">Live Queue</span></div>
+                    <div class="nav-item" id="nav-ticket-new" onclick="twOpenCreateWorkspace()"><span>🆕 New Ticket</span></div>
+                    <div class="nav-item" id="nav-tickets-pending" onclick="openInTab('tickets-pending')"><span>🕵️ Under Investigation</span></div>
+                    <!-- Phase 10.13 (Ahmed): Audit moved here from Submit Request.
+                         Its access key is unchanged (submit_audit), only the
+                         sidebar placement moved. -->
+                    <div class="nav-item" id="nav-audit" onclick="openInTab('audit')"><span data-i18n="auditQuickCreate">Audit</span></div>
                 </div>
             </div>
 
@@ -1689,6 +1742,7 @@
                     <div class="nav-item" id="nav-admin-agents" onclick="openInTab('admin-agents')"><span data-i18n="manageAgents">Manage Agents</span></div>
                     <div class="nav-item" id="nav-admin-requests" onclick="openInTab('admin-requests')"><span>Access Requests <span id="pendingRequestsBadge" style="display:none;background:var(--accent-rose);color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:4px"></span><span id="sheetPermAlertBadge" style="display:none;background:var(--accent-amber);color:#000;border-radius:10px;padding:1px 7px;font-size:.7rem;margin-left:4px"></span></span></div>
                     <div class="nav-item" id="nav-admin-audit"  onclick="openInTab('admin-audit')"><span data-i18n="auditLog">Audit Log</span></div>
+                    <div class="nav-item" id="nav-admin-preview" onclick="openInTab('admin-preview')"><span>👁 Preview Agent View</span></div>
                 </div>
             </div>
         </nav>
@@ -2458,6 +2512,7 @@
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_agency_list" checked> ACM Management — Agency List</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_audition_access"> 🎭 Audition access — Universal Query card buttons (View Pictures / Open in Ticket Workspace)</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
@@ -2480,6 +2535,16 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_new"> 🆕 New Ticket (create from empty Ticket Workspace)</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_pending"> 🕵️ Under Investigation list</label>
+                            </div>
+                        </div>
+                        <div class="module-card" style="border-color:var(--accent-cyan)">
+                            <div class="module-header">
+                                <h4 style="color:var(--accent-cyan)">👁 Preview Agent View</h4>
+                            </div>
+                            <div class="sub-opts">
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_preview_access"> Preview access — see the portal exactly as another member (view-only)</label>
                             </div>
                         </div>
                         <div class="module-card" style="border-color:var(--accent-purple)">
@@ -2959,6 +3024,7 @@
                                 <option value="otherapp_id">Otherapp ID</option>
                                 <option value="nid_number">NID Number</option>
                                 <option value="bd_code">Bd Code</option>
+                                <option value="agency_code">Agency Code</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -3483,6 +3549,48 @@
                 </div>
             </div>
 
+            <!-- Phase 10.13 (Ahmed): Under Investigation list. Deliberately
+                 fetches NOTHING on open -- the agent clicks Search, one cheap
+                 targeted query returns basic columns only, and each row's Open
+                 button loads that ticket into the Ticket Workspace. -->
+            <div id="pg-tickets-pending" style="display:none">
+                <div class="card" style="max-width:1200px;margin:0 auto 18px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+                        <div>
+                            <h3 class="ltq-title">🕵️ Under Investigation</h3>
+                            <p class="ltq-subtitle">Requests whose <b>Status</b> is <b>Under Investigation</b>. Nothing loads until you click Search — basic info only, no heavy data.</p>
+                        </div>
+                        <button class="btn btn-primary" id="tiSearchBtn" onclick="tiSearch()">🔍 Search</button>
+                    </div>
+                </div>
+                <div class="card" style="max-width:1200px;margin:0 auto">
+                    <div id="tiCount" style="color:var(--text-muted);font-size:.85rem;margin-bottom:10px">Click <b>Search</b> to load the pending requests.</div>
+                    <div id="tiResults"></div>
+                    <div id="tiEmpty" style="display:none;text-align:center;padding:34px 10px;color:var(--text-muted)">
+                        <div style="font-size:2rem;margin-bottom:8px">🎉</div>
+                        <p>No requests are Under Investigation right now.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 10.13 (Ahmed): Preview Agent View -- the Lark Base
+                 "Previewing as" idea. Pick a member, the portal re-renders with
+                 exactly their access (view-only), a banner offers Exit. Gated
+                 by the 'preview_access' toggle in Access Management. -->
+            <div id="pg-admin-preview" style="display:none">
+                <div class="card" style="max-width:900px;margin:0 auto 18px">
+                    <h3 style="margin-bottom:6px">👁 Preview Agent View</h3>
+                    <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:0">Choose a member to see the portal exactly as they see it — their modules, their pages. Preview is <b>view-only</b>: no saving, submitting or charging while it is active.</p>
+                </div>
+                <div class="card" style="max-width:900px;margin:0 auto">
+                    <div class="control-group" style="margin-bottom:14px">
+                        <label>Find a member</label>
+                        <input type="text" id="pvFilter" class="form-highlight-input" placeholder="Type a name or email…" oninput="pvRenderList()">
+                    </div>
+                    <div id="pvList"></div>
+                </div>
+            </div>
+
             <div id="pg-audit" style="display:none">
                 <!-- Phase 10.5: the audit Duplicate Radar leaves the middle
                      panel and becomes the same chat-style docked 📡 as the
@@ -3707,7 +3815,9 @@ const pageTitlesMap = {
     'new-request': 'New Request',
     'audit': 'Audit',
     'my-requests': 'My Recent Requests',
-    'live-tickets': 'Live Ticket Queue'
+    'live-tickets': 'Live Ticket Queue',
+    'tickets-pending': 'Under Investigation',
+    'admin-preview': 'Preview Agent View'
 };
 
 const zhPageTitlesMap = {
@@ -3729,12 +3839,14 @@ const zhPageTitlesMap = {
     'new-request': '新请求',
     'audit': '审核提交',
     'my-requests': '我的最近请求',
-    'live-tickets': '实时工单队列'
+    'live-tickets': '实时工单队列',
+    'tickets-pending': '待调查请求',
+    'admin-preview': '预览成员视图'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -3905,9 +4017,18 @@ function executePageLogic(page) {
         checkNewRequestSessionOnOpen();
     } else if(page==='audit'){
         document.getElementById('pg-audit').style.display='block';
-        _expandNavGroup('navBodySubmit','navArrSubmit');
+        _expandNavGroup('navBodyTickets','navArrTickets'); // Phase 10.13: Audit moved under Ticket Queue
         renderAuditFields();
         checkNewRequestSessionOnOpen();
+    } else if(page==='tickets-pending'){
+        document.getElementById('pg-tickets-pending').style.display='block';
+        _expandNavGroup('navBodyTickets','navArrTickets');
+        // Phase 10.13: NOTHING is fetched here on purpose -- the agent clicks
+        // Search (tiSearch) so opening this page by mistake costs zero calls.
+    } else if(page==='admin-preview'){
+        document.getElementById('pg-admin-preview').style.display='block';
+        _expandNavGroup('navBodyAdmin','navArrAdmin');
+        pvLoadTargets();
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -6065,7 +6186,8 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue'].forEach(key => {
+     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue',
+     'tickets_new','tickets_pending','audition_access','preview_access'].forEach(key => {
         const master = key.split('_')[0];
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
@@ -6275,6 +6397,7 @@ function closeMonthlyTargetModal() {
 }
 
 async function confirmSaveRole() {
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only.', 'warning'); return; } // Phase 10.13
     const name = document.getElementById('saveRoleName').value.trim();
     if (!name) { ToastManager.show('Enter a role name.', 'warning'); return; }
 
@@ -6285,7 +6408,8 @@ async function confirmSaveRole() {
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue'].forEach(m => {
+     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue',
+     'tickets_new','tickets_pending','audition_access','preview_access'].forEach(m => {
         const cb = document.getElementById(`mod_${m}`);
         if(cb && cb.checked) modules.push(m);
     });
@@ -6372,6 +6496,7 @@ function filterAdminModuleCards(term) {
 }
 
 async function addAgent() {
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only.', 'warning'); return; } // Phase 10.13
     const rawIdentities=document.getElementById('newAgentEmail').value.trim();
     if (!rawIdentities) { ToastManager.show('Please enter at least one Agent Identity.','warning'); return; }
 
@@ -6391,7 +6516,8 @@ async function addAgent() {
      'exchange', 'exchange_needs_push','exchange_movers','exchange_heatmap','exchange_watchlist','target_table',
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
-     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue'].forEach(m => {
+     'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue',
+     'tickets_new','tickets_pending','audition_access','preview_access'].forEach(m => {
         const cb = document.getElementById(`mod_${m}`);
         if(cb && cb.checked) modules.push(m);
     });
@@ -7930,7 +8056,7 @@ async function loadAgencyForAllocator() {
 
 const QY_FIELD_LABELS = {
     user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
-    nid_number: 'NID Number', bd_code: 'Bd Code'
+    nid_number: 'NID Number', bd_code: 'Bd Code', agency_code: 'Agency Code'
 };
 
 (function initQyFieldLabel(){
@@ -7978,6 +8104,230 @@ function qyRow(label, value){
     if (value === undefined || value === null || value === '') return '';
     if (label === 'Duplicated Check') return `<div class="qy-row" style="flex-direction:column;align-items:flex-start"><span class="qy-row-label" style="margin-bottom:4px">${escHtml(label)}</span><span class="qy-row-val" style="text-align:left">${parseDuplicatedCheck(value)}</span></div>`;
     return `<div class="qy-row"><span class="qy-row-label">${escHtml(label)}</span><span class="qy-row-val">${escHtml(String(value))}</span></div>`;
+}
+
+// ─── Phase 10.13: Audition-access card buttons (Universal Query) ───
+// Both buttons exist ONLY for holders of the "Audition access" toggle
+// (module key 'audition_access') -- Ahmed: "no one can see the button on the
+// card never ever unless he have this access". Until View Pictures is
+// clicked the card is exactly as before: no extra data, no extra calls.
+function qyHasAuditionAccess() { return isAdmin || userModules.includes('audition_access'); }
+
+function qyCardActionsHtml(r) {
+    if (!qyHasAuditionAccess() || !r.record_id) return '';
+    const rid = escHtml(r.record_id);
+    return `<div class="qy-card-actions">
+        <button type="button" class="qy-act-btn qy-act-pics" onclick="qyViewPictures('${rid}', this)">🖼️ View Pictures</button>
+        <button type="button" class="qy-act-btn qy-act-open" onclick="qyOpenInWorkspace('${rid}')">🎫 Open in Ticket Workspace</button>
+    </div>
+    <div class="qy-pics" id="qyPics-${rid}" style="display:none"></div>`;
+}
+
+async function qyViewPictures(recordId, btn) {
+    const box = document.getElementById('qyPics-' + recordId);
+    if (!box) return;
+    // Already loaded -> just toggle visibility, never re-fetch.
+    if (box.dataset.loaded === '1') {
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        return;
+    }
+    btn.disabled = true;
+    const origTxt = btn.textContent;
+    btn.textContent = '⏳ Loading pictures…';
+    try {
+        const resp = await fetch(`/api/requests/pictures?record_id=${encodeURIComponent(recordId)}&user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Failed to load pictures');
+        const groups = data.groups || [];
+        if (!groups.length) {
+            box.innerHTML = '<div class="qy-pics-empty">📭 No pictures attached to this request.</div>';
+        } else {
+            box.innerHTML = groups.map((g, gi) => {
+                const gallery = g.pics.map(p => ({
+                    src: `${p.url}${p.url.includes('?') ? '&' : '?'}user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`,
+                    filename: p.name || 'attachment'
+                }));
+                const galleryId = `qy-${recordId}-${gi}`;
+                lightboxGalleries[galleryId] = gallery;
+                return `<div class="qy-pics-group">
+                    <div class="qy-pics-field">${escHtml(g.field)}</div>
+                    <div class="qy-pics-thumbs">${gallery.map((p, pi) => `
+                        <button type="button" class="qy-pic-thumb" data-gallery-id="${galleryId}" data-gallery-index="${pi}" onclick="openImageLightboxFromThumb(this)" title="${escHtml(p.filename)}">
+                            <img src="${p.src}" alt="${escHtml(p.filename)}" loading="lazy">
+                        </button>`).join('')}</div>
+                </div>`;
+            }).join('');
+        }
+        box.dataset.loaded = '1';
+        box.style.display = 'block';
+        btn.textContent = '🖼️ Hide Pictures';
+    } catch (e) {
+        ToastManager.show('Could not load pictures: ' + e.message, 'error');
+        btn.textContent = origTxt;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function qyOpenInWorkspace(recordId) {
+    if (!recordId) return;
+    twOpenWorkspace(recordId);
+}
+
+// ─── Phase 10.13: Under Investigation queue ───
+// Ahmed: "show when open the page nothing reload until i click search so it
+// not cost request or something if i opened by mistake ... show basic info
+// ... and on the right of each request button called open ... so i can edit
+// and then click on save and resolve button". The page therefore fetches
+// NOTHING on open (see executePageLogic) -- tiSearch() is the only fetch,
+// one targeted Status search returning just the basic columns.
+async function tiSearch() {
+    const btn = document.getElementById('tiSearchBtn');
+    const countEl = document.getElementById('tiCount');
+    const resultsEl = document.getElementById('tiResults');
+    const emptyEl = document.getElementById('tiEmpty');
+    if (!resultsEl) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Searching…'; }
+    if (countEl) countEl.textContent = 'Searching the sheet…';
+    resultsEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+    try {
+        const res = await fetch(`/api/tickets/under-investigation?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Search failed');
+        const rows = data.results || [];
+        if (countEl) countEl.textContent = rows.length
+            ? `${rows.length} request${rows.length === 1 ? '' : 's'} under investigation — newest first.`
+            : 'No requests under investigation right now. ✅';
+        if (!rows.length) { if (emptyEl) emptyEl.style.display = ''; return; }
+        resultsEl.innerHTML = rows.map(tiRowHtml).join('');
+    } catch (e) {
+        if (countEl) countEl.textContent = 'Search failed — please try again.';
+        ToastManager.show('Under Investigation search failed: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Search'; }
+    }
+}
+
+function tiRowHtml(r) {
+    const rid = escHtml(r.record_id || '');
+    const chip = (label, val) => `<span class="ti-chip"><span class="ti-chip-label">${label}</span>${escHtml((val === undefined || val === null || val === '') ? '—' : String(val))}</span>`;
+    const num = r.numbering || (r.record_id ? String(r.record_id).slice(-6) : '—');
+    return `<div class="ti-row">
+        <div class="ti-row-main">
+            <div class="ti-row-title"><span class="ti-row-num">#${escHtml(num)}</span>${escHtml(r.request_type || '—')}</div>
+            <div class="ti-row-chips">
+                ${chip('User ID', r.user_id)}
+                ${chip('Agency Code', r.agency_code)}
+                ${chip('Respondents', r.respondents)}
+                ${chip('Region', r.region)}
+                ${chip('Submitted', r.submitted_on)}
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary ti-open-btn" onclick="twOpenWorkspace('${rid}')">🎫 Open</button>
+    </div>`;
+}
+
+// ─── Phase 10.13: Preview Agent View ───
+// Ahmed: "invite new thing under access management option called preview
+// agent view give by a toggle switch named preview access ... then i choose
+// specific member to see their views and access ... same like this function
+// of preview that exist in lark base sheet in Advanced permissions".
+// STRICTLY VIEW-ONLY by construction: the viewer keeps their OWN session
+// (every API call still authenticates as them); only the local module list
+// used by sidebar/card gating is swapped to the target's, and every
+// mutating action (save/submit/charge/admin writes) is blocked while active.
+let previewMode = false;
+let previewSaved = null;        // { modules, isAdmin } snapshot to restore on exit
+let previewTargetsCache = [];   // member list from /api/admin/preview-targets
+
+async function pvLoadTargets() {
+    const listEl = document.getElementById('pvList');
+    if (listEl) listEl.innerHTML = '<div class="pv-hint">⏳ Loading members…</div>';
+    try {
+        const res = await fetch('/api/admin/preview-targets', {
+            headers: { 'X-User-Name': loggedUser, 'X-User-Email': loggedEmail }
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to load members');
+        previewTargetsCache = data.agents || [];
+        pvRenderList();
+    } catch (e) {
+        if (listEl) listEl.innerHTML = `<div class="pv-hint">⚠️ ${escHtml(e.message)}</div>`;
+    }
+}
+
+function pvRenderList() {
+    const listEl = document.getElementById('pvList');
+    if (!listEl) return;
+    const q = (document.getElementById('pvFilter')?.value || '').trim().toLowerCase();
+    const rows = previewTargetsCache.filter(a => !q || (a.email || '').toLowerCase().includes(q));
+    if (!rows.length) {
+        listEl.innerHTML = '<div class="pv-hint">No matching members.</div>';
+        return;
+    }
+    listEl.innerHTML = rows.map(a => {
+        const mail = escHtml(a.email || '');
+        const mods = (a.modules || []).filter(m => !m.startsWith('__ROLE__::'));
+        return `<div class="pv-row">
+            <div class="pv-row-info">
+                <div class="pv-row-email">${mail}</div>
+                <div class="pv-row-mods">${mods.length ? mods.map(m => `<span class="pv-mod-chip">${escHtml(m)}</span>`).join('') : '<span class="pv-mod-chip pv-mod-none">no modules</span>'}</div>
+            </div>
+            <button type="button" class="btn btn-primary pv-view-btn" onclick="pvStart('${mail}')">👁 Preview</button>
+        </div>`;
+    }).join('');
+}
+
+async function pvStart(email) {
+    try {
+        const res = await fetch(`/api/admin/preview-access?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&target=${encodeURIComponent(email)}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Preview failed');
+        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin };
+        previewMode = true;
+        userModules = (data.modules || []).filter(m => !m.startsWith('__ROLE__::'));
+        isAdmin = !!data.is_super_admin;
+        pvShowBanner(email);
+        configureSidebarAndCards();
+        openInTab('welcome');
+        ToastManager.show(`👁 Previewing as ${email} — view only.`, 'success', 5000);
+    } catch (e) {
+        ToastManager.show('Preview failed: ' + e.message, 'error');
+    }
+}
+
+function pvExit() {
+    if (!previewMode) return;
+    previewMode = false;
+    if (previewSaved) {
+        userModules = previewSaved.modules;
+        isAdmin = previewSaved.isAdmin;
+        previewSaved = null;
+    }
+    pvHideBanner();
+    configureSidebarAndCards();
+    openInTab('welcome');
+    ToastManager.show('Preview ended — back to your own access.', 'success');
+}
+
+function pvShowBanner(email) {
+    let banner = document.getElementById('pvBanner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'pvBanner';
+        document.body.appendChild(banner);
+    }
+    banner.innerHTML = `<span class="pv-banner-text">👁 Previewing as <b>${escHtml(email)}</b> — view only, nothing you click can save</span>
+        <button type="button" class="pv-banner-exit" onclick="pvExit()">✕ Exit preview</button>`;
+    banner.style.display = 'flex';
+    document.body.classList.add('pv-active');
+}
+
+function pvHideBanner() {
+    const banner = document.getElementById('pvBanner');
+    if (banner) banner.style.display = 'none';
+    document.body.classList.remove('pv-active');
 }
 
 async function runQuery(){
@@ -8041,6 +8391,7 @@ async function runQuery(){
                 ${r.reject_reason ? `<div class="qy-note-block"><b>Reject Reason:</b> ${escHtml(r.reject_reason)}</div>` : ''}
                 ${r.audition_note ? `<div class="qy-note-block"><b>Audition Note:</b> ${escHtml(r.audition_note)}</div>` : ''}
                 ${r.closing_reason && (r.request_type || '').toLowerCase().includes('closing agency') ? `<div class="qy-note-block"><b>Closing Reason:</b> ${escHtml(r.closing_reason)}</div>` : ''}
+                ${qyCardActionsHtml(r)}
             </div>
         `).join('');
 
@@ -8591,10 +8942,12 @@ function configureSidebarAndCards() {
     const navAudit = document.getElementById('nav-audit');
     const navMyReq = document.getElementById('nav-my-requests');
     if (navNewReq) navNewReq.style.display = (hasSubmitMaster || hasExactMod('submit_new_request')) ? '' : 'none';
+    // Phase 10.13: Audit now lives under Ticket Queue, but keeps its original
+    // access key (submit_audit) -- existing grants keep working unchanged.
     if (navAudit) navAudit.style.display = (hasSubmitMaster || hasExactMod('submit_audit')) ? '' : 'none';
     if (navMyReq) navMyReq.style.display = (hasSubmitMaster || hasExactMod('submit_my_requests')) ? '' : 'none';
     const grpSubmit = document.getElementById('navGrpSubmit');
-    if (grpSubmit) grpSubmit.style.display = [navNewReq, navAudit, navMyReq].some(el => el && el.style.display !== 'none') ? '' : 'none';
+    if (grpSubmit) grpSubmit.style.display = [navNewReq, navMyReq].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     const navQuery = document.getElementById('nav-query');
     const navAgencyList = document.getElementById('nav-agency-list');
@@ -8666,12 +9019,35 @@ function configureSidebarAndCards() {
         targetTableNav.style.display = 'none';
     }
 
-    if (hasExactMod('tickets_live_queue') || hasExactMod('tickets') || isAdmin) {
-        document.getElementById('navGrpTickets').style.display = 'block';
-    }
+    // Phase 10.13: Ticket Queue group children are gated individually now --
+    // Live Queue (tickets_live_queue), New Ticket (tickets_new), Under
+    // Investigation (tickets_pending), and Audit (its original submit_audit
+    // key). The master 'tickets' module and admin see every child.
+    const hasTicketsMaster = isAdmin || userModules.includes('tickets');
+    const navLiveTq = document.getElementById('nav-live-tickets');
+    const navTicketNew = document.getElementById('nav-ticket-new');
+    const navTicketsPending = document.getElementById('nav-tickets-pending');
+    if (navLiveTq) navLiveTq.style.display = (hasTicketsMaster || hasExactMod('tickets_live_queue')) ? '' : 'none';
+    if (navTicketNew) navTicketNew.style.display = (hasTicketsMaster || hasExactMod('tickets_new')) ? '' : 'none';
+    if (navTicketsPending) navTicketsPending.style.display = (hasTicketsMaster || hasExactMod('tickets_pending')) ? '' : 'none';
+    const grpTickets = document.getElementById('navGrpTickets');
+    if (grpTickets) grpTickets.style.display = [navLiveTq, navTicketNew, navTicketsPending, navAudit].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    // Phase 10.13: the Admin group's items are gated individually so a holder
+    // of ONLY 'preview_access' sees just "Preview Agent View" -- never Manage
+    // Agents / Access Requests / Audit Log.
+    const navAdminAgents = document.getElementById('nav-admin-agents');
+    const navAdminRequests = document.getElementById('nav-admin-requests');
+    const navAdminAudit = document.getElementById('nav-admin-audit');
+    const navAdminPreview = document.getElementById('nav-admin-preview');
+    if (navAdminAgents) navAdminAgents.style.display = isAdmin ? '' : 'none';
+    if (navAdminRequests) navAdminRequests.style.display = isAdmin ? '' : 'none';
+    if (navAdminAudit) navAdminAudit.style.display = isAdmin ? '' : 'none';
+    if (navAdminPreview) navAdminPreview.style.display = (isAdmin || hasExactMod('preview_access')) ? '' : 'none';
+    const grpAdmin = document.getElementById('navGrpAdmin');
+    if (grpAdmin) grpAdmin.style.display = [navAdminAgents, navAdminRequests, navAdminAudit, navAdminPreview].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     if (isAdmin) {
-        document.getElementById('navGrpAdmin').style.display = 'block';
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
         let lastSheetPermCount = -1;
         // NOT on a timer anymore -- a 15s interval was ~345k invocations/month
@@ -8728,7 +9104,7 @@ function configureSidebarAndCards() {
     if (hasExactMod('points_check') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('points')"><div class="welcome-card-icon" style="color:var(--accent-amber)">${icons.points}</div><div class="welcome-card-title" data-i18n="checkAgencyPoints">Agency Points</div><div class="welcome-card-desc">Check points balance and history</div></div>`;
     if (hasExactMod('points_allocator') || hasExactMod('points')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('allocator')"><div class="welcome-card-icon" style="color:var(--accent-green)">${icons.allocator}</div><div class="welcome-card-title" data-i18n="smartAllocator">Smart Allocator</div><div class="welcome-card-desc">Plan privilege spending vs balance</div></div>`;
     if (hasExactMod('target_check') || hasExactMod('target')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('target')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.target}</div><div class="welcome-card-title" data-i18n="checkAgencyTarget">Agency Target</div><div class="welcome-card-desc">Monthly target &amp; privilege availability</div></div>`;
-    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID or Bd Code</div></div>`;
+    if (hasExactMod('query_requests') || hasExactMod('query')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('query')"><div class="welcome-card-icon" style="color:var(--accent-cyan)">${icons.query}</div><div class="welcome-card-title" data-i18n="universalQuery">Universal Query</div><div class="welcome-card-desc">Find every request by User ID, Numbering, Otherapp ID, NID, Bd Code or Agency Code</div></div>`;
     
     if (hasSubmitMaster || hasExactMod('submit_new_request')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('new-request')"><div class="welcome-card-icon" style="color:var(--accent-purple)">${icons.form}</div><div class="welcome-card-title" data-i18n="newRequest">New Request</div><div class="welcome-card-desc">Submit new records directly into Feishu</div></div>`;
     if (hasSubmitMaster || hasExactMod('submit_audit')) wc.innerHTML+=`<div class="welcome-card" onclick="openInTab('audit')"><div class="welcome-card-icon" style="color:var(--accent-rose)">${icons.audit}</div><div class="welcome-card-title" data-i18n="auditQuickCreate">Audit Workstation</div><div class="welcome-card-desc">One-screen audit — ticket text, agency data &amp; the decision</div></div>`;
@@ -9225,6 +9601,26 @@ const LT_PROCESSING_KEYS = new Set(['Status','Reject Reason','Audition note','Du
 // ticket is opened.
 let twManualReqType = null;
 
+// Phase 10.13 (Ahmed): "New Ticket" under Ticket Queue -- the SAME Ticket
+// Workspace opened completely blank (zero sheet calls on open) so an agent
+// can file a request from the workspace itself. true while a blank draft is
+// open; the primary button becomes "🚀 Submit Request" and posts to
+// /api/requests/submit instead of /api/requests/update.
+let twCreateMode = false;
+
+// Applies/reverts the create-mode chrome: hides the Audition Action card
+// (Done-by/Status/Mentioned-Group don't apply to a draft) and the Duplicate
+// Check button, and relabels both save buttons. Opening a real ticket or
+// closing the workspace always reverts it.
+function twApplyCreateModeChrome() {
+    const sec5 = document.getElementById('tw-sec-5-card');
+    if (sec5) sec5.style.display = twCreateMode ? 'none' : '';
+    const label = twCreateMode ? '🚀 Submit Request' : '💾 Save & Resolve';
+    ['twSaveBtn', 'twSaveBtn2'].forEach(id => { const b = document.getElementById(id); if (b) b.textContent = label; });
+    const vbtn = document.getElementById('twVerifyBtn');
+    if (vbtn) vbtn.style.display = twCreateMode ? 'none' : '';
+}
+
 // Phase 10.2 (one delegated listener, two jobs):
 // 1) data-mirror sync -- fields that render twice (User ID lives in Basic
 //    Information AND in the Dynamic Request Section now) mirror each other on
@@ -9302,7 +9698,9 @@ function twRenderSection2(ticket, reqTypeOverride) {
     if (reqType === 'Agency Creation') twRenderAgencyCreationExtras(sec2, ticket);
 
     // Phase 10.8: Agency Point tickets get the Confirm & Charge gate card.
-    if (reqType === 'Agency Point Request') twRenderAgencyPointGate(ticket);
+    // Phase 10.13: never in create mode -- a blank draft has no wallet/ticket
+    // to charge; charging becomes relevant only after the request is filed.
+    if (reqType === 'Agency Point Request' && !twCreateMode) twRenderAgencyPointGate(ticket);
 
     // Phase 10.8: live preview — any edit inside sec2 (privilege pick,
     // quantity, target type) re-runs the client-side estimate. One-time
@@ -9631,6 +10029,7 @@ function twApSchedulePreview() {
 // 10.10). The server guards duplicates (identical request within 120s
 // replays the cached result). This function NEVER touches "Order Action".
 async function twApConfirmCharge() {
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only — charging is disabled.', 'warning'); return; } // Phase 10.13
     if (twApGate.charging) return;
     const btn = document.getElementById('twApChargeBtn');
     const state = document.getElementById('apgState');
@@ -9997,6 +10396,11 @@ async function twOpenWorkspace(recordId) {
         ltActiveTicket = ticket;
         twOrigFields = JSON.parse(JSON.stringify(ticket.fields || {})); // fast-save diff base
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
+        // Phase 10.13: opening a REAL ticket always leaves New-Ticket draft
+        // mode (restores the Audition Action card + Save & Resolve labels if
+        // the agent jumped here straight from a blank draft).
+        twCreateMode = false;
+        twApplyCreateModeChrome();
         twResetNote(true); // Phase 10.1: fresh ticket -> close & clear the scratch note
 
         document.getElementById('tw-record-id').value = recordId;
@@ -10109,6 +10513,140 @@ async function twOpenWorkspace(recordId) {
         ToastManager.show('Failed to open ticket: ' + e.message, 'error');
     }
     document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// ─── Phase 10.13: New Ticket (blank Ticket Workspace) ───
+// Ahmed: "invited new option under the Ticket Queue, this option will open
+// empty Ticket Workspace, that allow to fill the option and submit a request
+// ... once the request type choosen the Dynamic Request Section will be
+// change to show the related Request Section of this request type."
+// Opening the draft makes ZERO sheet calls -- the same workspace renders
+// with empty controls; choosing a Request Type (the card-1 select or the tab
+// strip) re-renders the Dynamic Request Section from TICKET_DYNAMIC_FIELDS,
+// and 🚀 Submit Request files through /api/requests/submit exactly like the
+// New Request form does.
+function twOpenCreateWorkspace() {
+    twCreateMode = true;
+    ltActiveTicket = { record_id: null, fields: {} }; // synthetic blank ticket -- twSelectRequestType/twRenderSection2 read from it
+    twOrigFields = {};
+    twManualReqType = null;
+    twResetNote(true);
+
+    document.getElementById('tw-record-id').value = '';
+    document.getElementById('tw-title').textContent = '🆕 New Ticket';
+    const metaEl = document.getElementById('tw-head-meta');
+    if (metaEl) metaEl.innerHTML = `
+        <span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Mode</span>New request draft</span>
+        <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Sheet</span>Nothing sent yet — zero calls until you submit</span>
+    `;
+
+    // Basic Information: the fixed list, all blank. Both ACM dropdowns render
+    // (no Region chosen yet, so neither is filtered out).
+    const sec1 = document.getElementById('tw-sec-1');
+    sec1.innerHTML = '';
+    LT_BASIC_KEYS_ORDERED.forEach(key => {
+        sec1.appendChild(createTwControl(key, undefined));
+    });
+
+    // Picking a Request Type swaps the Dynamic Request Section to that type's
+    // real field list. One delegated hook on card 1 (survives re-renders).
+    if (!sec1.dataset.createHooked) {
+        sec1.dataset.createHooked = '1';
+        sec1.addEventListener('change', (e) => {
+            if (!twCreateMode) return;
+            if (e.target && e.target.name === 'Request Type' && e.target.value) {
+                twSelectRequestType(e.target.value);
+            }
+        });
+    }
+
+    // Dynamic section starts as a placeholder until a type is chosen.
+    twRenderSection2(ltActiveTicket, '');
+    twRenderReqTypeTabs('');
+
+    // Blank member pickers + action fields (their card is hidden in create
+    // mode, but keep the controls clean for the next real ticket).
+    const mpWrap = document.getElementById('tw-mentioned-person-wrap');
+    if (mpWrap) { mpWrap.classList.add('control-group'); twRenderMemberPicker(mpWrap, '<label>Mentioned Person</label>', 'Mentioned Person', null); }
+    const dbWrap = document.getElementById('tw-done-by-wrap');
+    if (dbWrap) { dbWrap.classList.add('control-group'); twRenderMemberPicker(dbWrap, '<label>Done by</label>', 'Done by', null); }
+    const appr = document.getElementById('tw-audition-approval'); if (appr) appr.checked = false;
+    const stSel = document.getElementById('tw-audition-status'); if (stSel) stSel.value = '';
+    twRenderStatusPicks();
+    const an = document.getElementById('tw-audition-note'); if (an) an.value = '';
+    const apn = document.getElementById('tw-approve-note'); if (apn) apn.value = '';
+
+    openInTab('ticket-workspace');
+    twToggleTopbar(false);
+    twApplyCreateModeChrome();
+}
+
+// Fires from the same primary button as Save & Resolve (twSaveWorkspace
+// routes here while twCreateMode is on). Validates that a Request Type was
+// chosen, collects every filled workspace field + any picked attachments,
+// and posts to /api/requests/submit -- the exact contract submitReqForm uses.
+async function twSubmitNewTicket() {
+    const form = document.getElementById('tw-form');
+    const reqType = (form.querySelector('[name="Request Type"]')?.value || '').trim();
+    if (!reqType) {
+        const rt = form.querySelector('[name="Request Type"]');
+        if (rt) {
+            rt.closest('.control-group')?.classList.add('twx-missing');
+            rt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        ToastManager.show('Please choose a Request Type first — the Dynamic Request Section follows your choice.', 'warning', 6000);
+        return;
+    }
+
+    const btns = ['twSaveBtn', 'twSaveBtn2'].map(id => document.getElementById(id)).filter(Boolean);
+    btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Submitting…'; });
+
+    // twCollectFields gathers every named control (including the hidden
+    // Audition Action card's) -- drop empty values so the sheet only gets
+    // what the agent actually filled, same as the New Request form.
+    const fields = twCollectFields(form);
+    Object.keys(fields).forEach(k => {
+        const v = fields[k];
+        if (v === '' || v === null || v === undefined) delete fields[k];
+        else if (Array.isArray(v) && v.length === 0) delete fields[k];
+    });
+    fields['Request Type'] = reqType; // the backend keys everything off this
+
+    const finalData = new FormData();
+    finalData.append('user', loggedUser);
+    finalData.append('email', loggedEmail);
+    if (loggedUat) finalData.append('uat', loggedUat);
+    const submitterOpenId = localStorage.getItem('xenaOpenId') || '';
+    if (submitterOpenId) finalData.append('open_id', submitterOpenId);
+    finalData.append('payload', JSON.stringify(fields));
+    form.querySelectorAll('input[type="file"]').forEach(fInput => {
+        if (fInput.files.length > 0) {
+            Array.from(fInput.files).forEach(file => finalData.append(fInput.name, file));
+        }
+    });
+
+    try {
+        const res = await fetch('/api/requests/submit', { method: 'POST', body: finalData });
+        let data;
+        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response.'); }
+        // Same session-expiry handling as submitReqForm: nothing was created,
+        // so the draft stays filled for a resubmit right after re-login.
+        if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
+            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
+            return;
+        }
+        if (!res.ok) throw new Error(data.error || 'Submission failed');
+        ToastManager.show('Request successfully submitted to Feishu!', 'success');
+        if (data.created_via && String(data.created_via).startsWith('tenant_token')) {
+            ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
+        }
+        twResetNote(true);
+        twCloseWorkspace(); // resets create mode + returns to the queue
+    } catch (e) {
+        ToastManager.show('Failed to submit: ' + e.message, 'error');
+    } finally {
+        btns.forEach(b => { b.disabled = false; b.textContent = twCreateMode ? '🚀 Submit Request' : '💾 Save & Resolve'; });
+    }
 }
 
 // ISSUE 2 FIX: image lightbox/modal with zoom + rotate + pan + gallery nav + OCR text
@@ -11099,6 +11637,12 @@ function createTwControl(key, value) {
 }
 
 function twCloseWorkspace() {
+    // Phase 10.13: leaving a blank New-Ticket draft resets create mode and
+    // restores the hidden Audition Action card / Save & Resolve labels.
+    if (twCreateMode) {
+        twCreateMode = false;
+        twApplyCreateModeChrome();
+    }
     // Phase 10.4: fold the dock's action bar, the radar bubble and the radar
     // drawer away so the next ticket opens in the default collapsed state.
     twToggleTopbar(false);
@@ -11211,6 +11755,13 @@ function twNormForCompare(v) {
 }
 
 async function twSaveWorkspace() {
+    // Phase 10.13: Preview Agent View is strictly view-only -- no save path
+    // may fire while previewing another member's access.
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only — saving is disabled.', 'warning'); return; }
+    // Phase 10.13: a blank New-Ticket draft files a NEW request instead of
+    // saving an existing one. This branch MUST stay ahead of the
+    // Done-by/Status/Mentioned-Group gate -- those don't apply to drafts.
+    if (twCreateMode) { twSubmitNewTicket(); return; }
     // Phase 10.7 (Ahmed): Save & Resolve is BLOCKED until the three decision
     // fields are actually chosen -- Done by + Status + Mentioned Group -- for
     // every request type. Each missing field gets the rose .twx-missing
@@ -11291,6 +11842,7 @@ async function twSaveWorkspace() {
 }
 
 async function twRunVerify() {
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only.', 'warning'); return; } // Phase 10.13
     const recordId = document.getElementById('tw-record-id').value;
     const btn = document.getElementById('twVerifyBtn');
     btn.disabled = true; btn.textContent = '⏳ Checking…';
@@ -12738,6 +13290,7 @@ async function reqAgencyPreviewUpdate(branch) {
 
 async function submitReqForm(e) {
     e.preventDefault();
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only — submitting is disabled.', 'warning'); return; } // Phase 10.13
     const form = e.target;
     const branch = document.getElementById('formRequestType').value;
     if (!branch) return;
@@ -13696,6 +14249,7 @@ function auditParseText(opts) {
 
 async function submitAuditForm(e) {
     e.preventDefault();
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only — submitting is disabled.', 'warning'); return; } // Phase 10.13
     const form = e.target;
 
     // Ahmed's hard gate (2026-09-30): an audit ticket may NOT be filed until
