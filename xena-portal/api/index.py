@@ -2446,6 +2446,76 @@ def _require_admin():
         is_authorized = bool(perms.get("is_super_admin"))
     return is_authorized, admin_name, admin_email
 
+def _preview_access_granted(perms):
+    """Phase 10.13: 'Preview agent view' is its own Access Management toggle
+    (module key 'preview_access'); super admins / admin-module holders always
+    have it. Same convention as every other module check in this file."""
+    if perms.get("is_super_admin"): return True
+    return any(m in ("preview_access", "admin") for m in perms.get("modules", []))
+
+@app.route('/api/admin/preview-targets', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def preview_targets():
+    """
+    Phase 10.13 (Ahmed): the member list for "Preview agent view" under Access
+    Management. Returns every real agent row (role presets excluded) with
+    their module string so the preview holder can pick whose view to simulate.
+    """
+    user  = sanitize_text(request.headers.get('X-User-Name','') or request.args.get('user',''))
+    email = sanitize_text(request.headers.get('X-User-Email','') or request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    if not _preview_access_granted(perms):
+        return jsonify({"success": False, "error": "Access denied: Preview access required."}), 403
+    if MOCK_MODE:
+        return jsonify({"success": True, "agents": [
+            {"email": "agent.one@example.com", "modules": "query, query_requests"},
+            {"email": "agent.two@example.com", "modules": "tickets, tickets_live_queue"},
+            {"email": "agent.three@example.com", "modules": "submit, submit_new_request, submit_my_requests"},
+        ]})
+    tat = get_tenant_access_token()
+    headers  = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
+    try:
+        res = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        agents = []
+        for item in res.get("data", {}).get("items", []):
+            fields = item.get("fields", {})
+            display_email = extract_field_text(fields.get("Email", "")) or extract_field_text(fields.get("Person", ""))
+            if not display_email or display_email.startswith("__ROLE__::"):
+                continue
+            agents.append({"email": display_email,
+                           "modules": extract_field_text(fields.get("Modules", ""))})
+        agents.sort(key=lambda a: a["email"].lower())
+        return jsonify({"success": True, "agents": agents})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/admin/preview-access', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def preview_access_view():
+    """
+    Phase 10.13 (Ahmed): resolves the TARGET member's permissions so the
+    portal can re-render exactly what they would see -- the Lark Base
+    "Previewing as" idea. View-only by construction: the viewer keeps their
+    own session/identity; the frontend only swaps the module list used for
+    rendering and blocks every mutating action while preview is active.
+    """
+    user   = sanitize_text(request.args.get('user',''))
+    email  = sanitize_text(request.args.get('email',''))
+    target = sanitize_text(request.args.get('target',''))
+    if not target:
+        return jsonify({"success": False, "error": "Missing target"}), 400
+    perms = get_user_permissions(email, user)
+    if not _preview_access_granted(perms):
+        return jsonify({"success": False, "error": "Access denied: Preview access required."}), 403
+    audit.log(user, "PREVIEW_AGENT_VIEW", target, ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+    target_perms = get_user_permissions(target, target)
+    return jsonify({"success": True, "target": target, "permissions": {
+        "modules":        target_perms.get("modules", []),
+        "is_super_admin": bool(target_perms.get("is_super_admin")),
+        "permissions":    target_perms.get("permissions", {}),
+    }})
+
 @app.route('/api/admin/alerts-summary', methods=['GET'])
 def admin_alerts_summary():
     """ONE call for both alert types, used by the recurring 15s poll and the
@@ -2591,6 +2661,46 @@ def get_single_request():
         if data.get("code") == 0:
             return jsonify({"success": True, "record": data["data"]["record"]})
         return jsonify({"success": False, "error": data.get("msg")}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/requests/pictures', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def get_request_pictures():
+    """
+    Phase 10.13 (Ahmed): backs the Universal Query card's "View Pictures"
+    button. Lazily fetches ONLY this record's attachment fields (Evidence
+    Screen / Evidence Screen 2 / NID & Otherapp Screen / NIDs) -- nothing is
+    fetched until the button is clicked, and the button itself only exists
+    for holders of the "Audition access" toggle in Access Management (module
+    key 'audition_access'), enforced here server-side too.
+    """
+    user      = sanitize_text(request.args.get('user',''))
+    email     = sanitize_text(request.args.get('email',''))
+    record_id = sanitize_text(request.args.get('record_id',''))
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any(m in ("audition_access", "admin") for m in perms.get("modules", [])):
+        return jsonify({"success": False, "error": "Access denied: Audition access required."}), 403
+    if MOCK_MODE:
+        return jsonify({"success": True, "groups": [
+            {"field": "Evidence Screen", "pics": [{"name": "evidence-1.png", "url": "/api/attachments/mock_tok_1?field_id=fldhBymdRS"}]},
+        ]})
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+    try:
+        resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        data = resp.json()
+        if data.get("code") != 0:
+            return jsonify({"success": False, "error": data.get("msg")}), 400
+        fields = data["data"]["record"].get("fields", {})
+        groups = []
+        for att_field, fid in ATTACHMENT_FIELD_IDS.items():
+            pics = extract_attachments(fields.get(att_field), fid)
+            if pics:
+                groups.append({"field": att_field, "pics": pics})
+        return jsonify({"success": True, "groups": groups})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -4037,6 +4147,11 @@ def _query_format_results(all_items, allowed_acms_set, allowed_regs_set):
         submitted_dt  = parse_feishu_date(submitted_raw)
 
         results.append({
+            # Phase 10.13: record_id rides along (it is already on every search
+            # item -- zero extra calls) so the Universal Query card's
+            # Audition-access buttons (View Pictures / Open in Ticket Workspace)
+            # can act on the exact record.
+            "record_id":        item.get("record_id"),
             "numbering":        extract_field_text(get_field_local(fields, "Numbering")),
             "request_type":     extract_field_text(get_field_local(fields, "Request Type", "Type")),
             "submitted_on":     submitted_dt.strftime("%Y-%m-%d") if submitted_dt else extract_field_text(submitted_raw),
@@ -5889,13 +6004,82 @@ def proxy_attachment(file_token):
         logger.error("attachment_proxy_failed", file_token=file_token, error=str(e))
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/tickets/under-investigation', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def list_under_investigation():
+    """
+    Phase 10.13 (Ahmed): the "Under Investigation" page under Ticket Queue.
+    ONE targeted search, fired only when the agent clicks Search on that page
+    (opening the page fetches nothing), returning just the basic columns so
+    the list stays cheap. Each row carries record_id so its "Open" button can
+    load the ticket straight into the Ticket Workspace.
+    """
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any("tickets" in m for m in perms.get("modules", [])):
+        return jsonify({"error": "Access denied"}), 403
+    audit.log(user, "TICKETS_UNDER_INVESTIGATION", "search", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+
+    BASIC_FIELDS = ["Numbering", "Submitted on Copy", "Submitted on", "Request Type",
+                    "Respondents", "Region", "User ID", "Agency Code", "Status"]
+
+    if MOCK_MODE:
+        items = MockFeishuDB.generate_requests(6)
+    else:
+        tat = get_tenant_access_token()
+        search_url, headers = _query_search_url_and_headers(tat)
+        payload = {
+            "page_size": 500,
+            "filter": {"conjunction": "and", "conditions": [
+                {"field_name": "Status", "operator": "is", "value": ["Under Investigation"]}
+            ]},
+            "field_names": BASIC_FIELDS,
+        }
+        try:
+            resp = feishu_session.post(search_url, headers=headers, json=payload, timeout=15)
+            data = resp.json()
+            if data.get("code") == 1254045:  # projection rejected -> retry without it (same fallback as /api/query)
+                payload.pop("field_names", None)
+                resp = feishu_session.post(search_url, headers=headers, json=payload, timeout=15)
+                data = resp.json()
+            if data.get("code") != 0:
+                return jsonify({"error": f"Data fetch failed: Feishu API Error: {data.get('msg','Invalid Filter.')}"}), 502
+            items = data.get("data", {}).get("items", [])
+        except Exception as e:
+            return jsonify({"error": f"Data fetch failed: {str(e)}"}), 502
+
+    rows = []
+    for item in items:
+        fields = item.get("fields", {})
+        submitted_raw = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
+        submitted_dt  = parse_feishu_date(submitted_raw)
+        rows.append({
+            "record_id":    item.get("record_id"),
+            "numbering":    extract_field_text(get_field_local(fields, "Numbering")),
+            "submitted_on": submitted_dt.strftime("%Y-%m-%d") if submitted_dt else extract_field_text(submitted_raw),
+            "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
+            "respondents":  extract_field_text(get_field_local(fields, "Respondents", "Created By")),
+            "region":       extract_field_text(get_field_local(fields, "Region", "Agency Region")),
+            "user_id":      extract_field_text(get_field_local(fields, "User ID")),
+            "agency_code":  extract_field_text(get_field_local(fields, "Agency Code")),
+            "_sort_ts":     submitted_dt.timestamp() if submitted_dt else 0,
+        })
+    rows.sort(key=lambda r: r["_sort_ts"], reverse=True)
+    for r in rows: r.pop("_sort_ts", None)
+    return jsonify({"success": True, "results": rows, "count": len(rows)})
+
 @app.route('/api/tickets/pull-assigned', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def pull_assigned_ticket():
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("tickets" in m for m in perms.get("modules", [])):
+    # Phase 10.13: exact-key check. The new granular Ticket Queue sub-keys
+    # (tickets_new / tickets_pending) contain the substring "tickets" but must
+    # NOT implicitly grant live-queue pulling -- only the master 'tickets'
+    # module or the Live Queue sub-key may pull, exactly as before.
+    if not perms.get("is_super_admin") and not any(m in ("tickets", "tickets_live_queue") for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
     if not user:
         return jsonify({"error": "Missing user"}), 400
