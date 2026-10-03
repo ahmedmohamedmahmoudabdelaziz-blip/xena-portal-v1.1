@@ -2826,6 +2826,16 @@ def update_request():
         # this workspace -- that specific alert only matters on the create path.
         fields = strip_invalid_user_fields(fields, field_types, actor=user, audit_on_bad_submitted_by=False)
 
+    # Phase 10.12 (fast save): the frontend now diffs against the opened record
+    # and sends only fields that actually changed (attachment tokens only when
+    # new files were picked). When nothing changed the payload arrives empty --
+    # skip the Feishu PUT entirely (saves the write AND the Base recalculation
+    # it triggers, which was most of the save time) and tell the client.
+    if not fields:
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+        audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | No changes", ip=ip, severity="Info")
+        return jsonify({"success": True, "unchanged": True})
+
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -3199,6 +3209,271 @@ def agency_points_charge():
         except Exception:
             pass
     return jsonify(result)
+
+# ════════════════════════════════════════════════════════════════════
+# AGENCY POINT CHARGE CORRECTION (Phase 10.12 — edit the last charge)
+# ════════════════════════════════════════════════════════════════════
+# The agent confirmed a charge with the wrong quantities (wanted 2 Trend +
+# 1 Traffic, typed 1 + 2). This endpoint reverses the LAST charge on the
+# ticket — points back into the wallet, its items subtracted from both the
+# ticket's Latest Usage Tracker and the wallet's Monthly Usage Tracker — then
+# runs the freshly typed quantities through the SAME allocator as a normal
+# charge, so monthly limits and the (restored) balance are enforced again.
+
+AP_DIVIDER = "➕ ── ADDITIONAL CHARGE ── ➕"
+_AP_LINE_RE = re.compile(r"(?:✅ FULLY APPROVED|⚠️ PARTIALLY APPROVED):\s*(\d+)x\s+(.+?)\s+@\s*[\d.]+\s*pts\s*=\s*[\d.]+")
+_AP_TOTAL_RE = re.compile(r"TOTAL DEDUCTED:\s*([\d.]+)\s*pts")
+
+def parse_last_charge_segment(receipt):
+    """Split a possibly multi-charge receipt on the ADDITIONAL CHARGE divider
+    and parse the LAST segment's approved lines + total deduction, so exactly
+    that charge can be reversed. Returns None when there is no parseable
+    confirmed deduction to reverse."""
+    text = str(receipt or "")
+    if "CONFIRMED RECEIPT" not in text.upper():
+        return None
+    parts = text.split(AP_DIVIDER)
+    head = AP_DIVIDER.join(parts[:-1]).rstrip() if len(parts) > 1 else ""
+    segment = parts[-1].strip()
+    order = {}
+    for m in _AP_LINE_RE.finditer(segment):
+        qty = int(m.group(1))
+        if qty <= 0:
+            continue
+        name = m.group(2).strip()
+        order[name] = order.get(name, 0) + qty
+    tm = _AP_TOTAL_RE.search(segment)
+    deducted = float(tm.group(1)) if tm else 0.0
+    if not order or deducted <= 0:
+        return None
+    return {"head": head, "order": order, "deducted": deducted, "segment": segment}
+
+def _subtract_order_from_lines(text, order):
+    """Parse '🔹 Name: qty' tracker lines and subtract the given order's
+    quantities (clamped at 0; emptied entries drop out). Original line order
+    is preserved; decorative (━/┈) and header lines are ignored."""
+    items = {}
+    for line in str(text or "").split("\n"):
+        line = line.strip()
+        if not line or ":" not in line or "━" in line or "┈" in line:
+            continue
+        name_part, _, qty_part = line.partition(":")
+        name = re.sub(r"[🔹📋🌟【】]", "", name_part).strip()
+        if not name or "items approved" in name.lower() or "no items" in name.lower() or "month" in name.lower():
+            continue
+        try:
+            items[name] = int(qty_part.strip())
+        except ValueError:
+            pass
+    for name, qty in (order or {}).items():
+        if name in items:
+            items[name] = max(0, items[name] - int(qty))
+    return {k: v for k, v in items.items() if v > 0}
+
+def subtract_from_ticket_tracker(tracker_text, order):
+    items = _subtract_order_from_lines(tracker_text, order)
+    if not items:
+        return "No items approved in this order."
+    return "Items approved in this order:\n" + "\n".join(f"🔹 {k}: {v}" for k, v in items.items())
+
+def reverse_month_tracker(month_text, order, now=None):
+    """Subtract a reversed charge from the wallet's Monthly Usage Tracker,
+    keeping the decorative month header. When the stored tracker belongs to a
+    different month the allocator resets it anyway, so it is returned as-is."""
+    month_names = ["January", "February", "March", "April", "May", "June", "July",
+                   "August", "September", "October", "November", "December"]
+    now = now or cairo_now()
+    text = str(month_text or "")
+    stored = ""
+    for line in text.split("\n"):
+        m = re.search(r"Month:\s*([A-Za-z0-9]+)", line, re.I)
+        if m:
+            stored = m.group(1).strip()
+            break
+    month_name = month_names[now.month - 1]
+    same = stored.lower() == month_name.lower()
+    if not same:
+        try:
+            same = int(stored) == now.month
+        except (TypeError, ValueError):
+            same = False
+    if not same:
+        return text
+    items = _subtract_order_from_lines(text, order)
+    monthly_str = "\n ┈┈┈ \n".join(f"🔹 {k}: {v}" for k, v in items.items())
+    return f"🌟 【 MONTH: {month_name.upper()} 】 🌟\n━━━━━\n" + monthly_str
+
+@app.route('/api/agency-points/correct-charge', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_points_correct_charge():
+    """Edit-last-charge for the ticket workspace. Body (JSON): same shape as
+    /api/agency-points/charge. The wallet write ALWAYS happens (the reversal
+    must persist even when the corrected order approves nothing); the receipt
+    keeps every earlier charge (the head before the last ADDITIONAL CHARGE
+    segment) and replaces only the last one. The 120s duplicate guard from the
+    original charge is invalidated so the correction is never replay-blocked.
+    NEVER writes "Order Action" (the Base workflow trigger)."""
+    payload = request.get_json(silent=True) or {}
+    user = sanitize_text(payload.get('user', ''))
+    record_id = sanitize_text(payload.get('record_id', ''))
+    agency_code_hint = sanitize_text(payload.get('agency_code', '')).strip()
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+    if not user:
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": False, "error": "Mock mode — charge is disabled."}), 400
+
+    privileges = payload.get("privileges")
+    qty_raw = payload.get("quantities_input") or ""
+    target_raw = payload.get("target_type") or ""
+
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    def _fetch_ticket():
+        r = feishu_session.get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                               headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
+        if r.get("code") != 0:
+            raise RuntimeError(r.get("msg") or "Could not read the ticket.")
+        return r["data"]["record"].get("fields", {})
+
+    def _fetch_wallet(code):
+        if not code:
+            return None
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
+            headers=headers,
+            json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}},
+            timeout=30).json()
+        if r.get("code") != 0:
+            raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
+        for it in r.get("data", {}).get("items", []):
+            if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == code:
+                return it
+        return None
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_ticket = pool.submit(_fetch_ticket)
+            fut_wallet = pool.submit(_fetch_wallet, agency_code_hint)
+            tfields = fut_ticket.result()
+            wallet_hint = fut_wallet.result()
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
+    existing_tracker = extract_field_text(get_field_local(tfields, "Latest Usage Tracker"))
+
+    seg = parse_last_charge_segment(existing_receipt)
+    if not seg:
+        return jsonify({"success": False, "error": "No completed charge found to edit."}), 400
+
+    agency_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
+    if not agency_code:
+        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
+
+    try:
+        agency_rec = wallet_hint if (wallet_hint and agency_code_hint == agency_code) else _fetch_wallet(agency_code)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    if not agency_rec:
+        return jsonify({"success": False, "error": f"Agency {agency_code} not found in the Agency Points table."}), 404
+
+    if not isinstance(privileges, list) or not privileges:
+        pv = get_field_local(tfields, "Agency Point Privilege")
+        privileges = pv if isinstance(pv, list) else ([pv] if pv else [])
+    if not qty_raw:
+        qty_raw = extract_field_text(get_field_local(tfields, "Quantities Input"))
+    if not target_raw:
+        target_raw = extract_field_text(get_field_local(tfields, "Target Type"))
+
+    af = agency_rec.get("fields", {})
+    used_pts = parse_float_safe(extract_field_text(get_field_local(af, "Used Points", "Used")))
+    balance = parse_float_safe(extract_field_text(get_field_local(af, "Point Balance", "Balance")))
+    if balance == 0:
+        total_pts = parse_float_safe(extract_field_text(get_field_local(af, "# Total Points", "Total Points", "Total")))
+        if total_pts > 0:
+            balance = total_pts - used_pts
+    month_text = extract_field_text(get_field_local(af, "Monthly Usage Tracker"))
+
+    # 1) Reverse the last charge: its points go back to the balance, its items
+    #    come out of the wallet's month tracker.
+    reversed_used = max(0.0, used_pts - seg["deducted"])
+    reversed_balance = balance + seg["deducted"]
+    reversed_month = reverse_month_tracker(month_text, seg["order"])
+
+    # 2) Re-run the allocator on the reversed state — limits and the restored
+    #    balance are enforced exactly like a fresh charge.
+    charge = compute_agency_point_charge(privileges, qty_raw, target_raw, reversed_used, reversed_balance, reversed_month)
+    if charge.get("error"):
+        return jsonify({"success": False, "error": charge["error"]}), 400
+
+    # 3) ONE wallet write, always: even a corrected order that approves
+    #    nothing must still persist the reversal (used -= old deduction).
+    try:
+        wr = feishu_session.put(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
+            headers=headers,
+            json={"fields": {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
+            timeout=15).json()
+        if wr.get("code") != 0:
+            return jsonify({"success": False, "error": f"Wallet update failed (nothing changed): {wr.get('msg')}"}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    # 4) Ticket bookkeeping: tracker = old tracker minus the reversed items,
+    #    plus the corrected order's items; receipt = everything before the
+    #    last charge + the new corrected receipt.
+    reversed_ticket_tracker = subtract_from_ticket_tracker(existing_tracker, seg["order"])
+    if charge["total_cost"] > 0:
+        if reversed_ticket_tracker and "No items approved" not in reversed_ticket_tracker:
+            cumulative_tracker = merge_usage_trackers(reversed_ticket_tracker, charge["current_order"])
+        else:
+            cumulative_tracker = charge["current_tracker"]
+    else:
+        cumulative_tracker = reversed_ticket_tracker
+
+    if seg["head"]:
+        full_receipt = seg["head"] + "\n\n" + AP_DIVIDER + "\n\n" + charge["receipt"]
+    else:
+        full_receipt = charge["receipt"]
+
+    # If THIS write fails the wallet is already corrected, so the result is
+    # still returned (flagged) rather than pretending nothing happened.
+    ticket_write_failed = False
+    try:
+        tw = feishu_session.put(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+            headers=headers,
+            json={"fields": {"Transaction Receipt": full_receipt,
+                             "Latest Usage Tracker": cumulative_tracker,
+                             "Quantities Input": ""}},
+            timeout=15).json()
+        if tw.get("code") != 0:
+            ticket_write_failed = True
+            logger.error("ap_correct_ticket_write_failed", record_id=record_id, response=tw)
+    except Exception as e:
+        ticket_write_failed = True
+        logger.error("ap_correct_ticket_write_error", record_id=record_id, error=str(e))
+
+    # The correction changed the wallet state — any cached duplicate of the
+    # original charge is stale and must not be replayed.
+    if REDIS_ENABLED:
+        try:
+            redis_cmd("DEL", f"xena:ap_charge:{record_id}")
+        except Exception:
+            pass
+
+    audit.log(user, "AP_CORRECT", f"Record: {record_id} | Agency: {agency_code} | Reversed: {seg['deducted']} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}", ip=ip, severity="Info")
+    return jsonify({"success": True, "duplicate": False, "corrected": True,
+                    "reversed": seg["deducted"],
+                    "deducted": charge["total_cost"], "balance_after": charge["remaining"],
+                    "receipt": charge["receipt"], "full_receipt": full_receipt,
+                    "tracker": cumulative_tracker,
+                    "ticket_write_failed": ticket_write_failed})
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
