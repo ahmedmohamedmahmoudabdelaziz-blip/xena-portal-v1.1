@@ -2468,9 +2468,9 @@ def preview_targets():
         return jsonify({"success": False, "error": "Access denied: Preview access required."}), 403
     if MOCK_MODE:
         return jsonify({"success": True, "agents": [
-            {"email": "agent.one@example.com", "modules": "query, query_requests"},
-            {"email": "agent.two@example.com", "modules": "tickets, tickets_live_queue"},
-            {"email": "agent.three@example.com", "modules": "submit, submit_new_request, submit_my_requests"},
+            {"email": "agent.one@example.com", "modules": ["query", "query_requests"]},
+            {"email": "agent.two@example.com", "modules": ["tickets", "tickets_live_queue"]},
+            {"email": "agent.three@example.com", "modules": ["submit", "submit_new_request", "submit_my_requests"]},
         ]})
     tat = get_tenant_access_token()
     headers  = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
@@ -2483,8 +2483,13 @@ def preview_targets():
             display_email = extract_field_text(fields.get("Email", "")) or extract_field_text(fields.get("Person", ""))
             if not display_email or display_email.startswith("__ROLE__::"):
                 continue
+            # Phase 10.13.1: modules go out as a real LIST (the access table
+            # stores them as one comma-joined string; the picker chips need
+            # an array -- a raw string broke the page with ".filter is not a
+            # function").
+            modules_raw = extract_field_text(fields.get("Modules", "")) or ""
             agents.append({"email": display_email,
-                           "modules": extract_field_text(fields.get("Modules", ""))})
+                           "modules": [m.strip() for m in modules_raw.split(",") if m.strip()]})
         agents.sort(key=lambda a: a["email"].lower())
         return jsonify({"success": True, "agents": agents})
     except Exception as e:
@@ -6021,8 +6026,11 @@ def list_under_investigation():
         return jsonify({"error": "Access denied"}), 403
     audit.log(user, "TICKETS_UNDER_INVESTIGATION", "search", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
 
+    # Phase 10.13.1 (Ahmed): the list now mirrors the sheet's own grid -- it
+    # must also carry Mentioned Person, Type of Action and the ACM columns.
     BASIC_FIELDS = ["Numbering", "Submitted on Copy", "Submitted on", "Request Type",
-                    "Respondents", "Region", "User ID", "Agency Code", "Status"]
+                    "Respondents", "Mentioned Person", "Type of Action", "Region",
+                    "Acm Name (IN)", "Acm Name (PK)", "User ID", "Agency Code", "Status"]
 
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(6)
@@ -6054,13 +6062,20 @@ def list_under_investigation():
         fields = item.get("fields", {})
         submitted_raw = get_field_local(fields, "Submitted on Copy", "Submitted on", "Created Time")
         submitted_dt  = parse_feishu_date(submitted_raw)
+        # Phase 10.13.1: ACM is one column in the grid -- the sheet splits it
+        # into "Acm Name (IN)" / "Acm Name (PK)", so show whichever is filled.
+        acm_in = extract_field_text(get_field_local(fields, "Acm Name (IN)"))
+        acm_pk = extract_field_text(get_field_local(fields, "Acm Name (PK)"))
         rows.append({
             "record_id":    item.get("record_id"),
             "numbering":    extract_field_text(get_field_local(fields, "Numbering")),
             "submitted_on": submitted_dt.strftime("%Y-%m-%d") if submitted_dt else extract_field_text(submitted_raw),
             "request_type": extract_field_text(get_field_local(fields, "Request Type", "Type")),
             "respondents":  extract_field_text(get_field_local(fields, "Respondents", "Created By")),
+            "mentioned_person": extract_field_text(get_field_local(fields, "Mentioned Person")),
+            "type_of_action":   extract_field_text(get_field_local(fields, "Type of Action")),
             "region":       extract_field_text(get_field_local(fields, "Region", "Agency Region")),
+            "acm":          acm_in or acm_pk,
             "user_id":      extract_field_text(get_field_local(fields, "User ID")),
             "agency_code":  extract_field_text(get_field_local(fields, "Agency Code")),
             "_sort_ts":     submitted_dt.timestamp() if submitted_dt else 0,
