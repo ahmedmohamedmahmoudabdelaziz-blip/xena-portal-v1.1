@@ -193,6 +193,18 @@
         /* ID-scoped: must outrank the global .btn{width:100%} declared later. */
         #tiResults .ti-open-btn{flex:0 0 auto;width:auto;padding:9px 22px;border-radius:10px;font-size:.85rem;font-weight:700;}
         #tiSearchBtn{flex:0 0 auto;width:auto;padding:12px 30px;}
+        /* Phase 10.13.1: sheet-style grid for the Under Investigation list
+           (mirrors the Bitable view: sticky header, horizontal scroll on
+           narrow screens, Open button pinned right). */
+        .ti-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:linear-gradient(145deg,var(--surface) 0%,rgba(255,255,255,.01) 100%);}
+        .ti-table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:1060px;}
+        .ti-table th{position:sticky;top:0;z-index:2;background:rgba(10,12,22,.96);color:var(--text-muted);text-transform:uppercase;font-size:.66rem;letter-spacing:.6px;font-weight:700;text-align:left;padding:11px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+        .ti-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text);vertical-align:middle;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+        .ti-table tbody tr{transition:background .18s ease;}
+        .ti-table tbody tr:hover{background:rgba(0,212,255,.05);}
+        .ti-table tbody tr:last-child td{border-bottom:none;}
+        .ti-table .ti-act-cell{text-align:right;white-space:nowrap;}
+        .ti-table .ti-open-btn{padding:7px 18px;font-size:.78rem;}
 
         /* ─── Phase 10.13: Preview Agent View ─── */
         .pv-hint{padding:22px;text-align:center;color:var(--text-muted);font-size:.88rem;}
@@ -537,22 +549,25 @@
         .rr-chip.active { background: rgba(255,77,109,.16); border-color: var(--accent-rose); color: #ff9db4; }
         /* Agency Point Privilege picker (New Request > Agency Point Request):
            a card grid where the privilege name leads and its point cost is a
-           gold badge, instead of one long cramped checkbox list. */
+           calm cyan badge, instead of one long cramped checkbox list.
+           Phase 10.13.2: repainted from the harsh gold/amber to the app's
+           stable cyan accent (Ahmed: "the colour yellow is not good to the
+           eye") -- flat tints, no glow, same shapes as before. */
         .pp-picker { margin-top: 6px; }
         .pp-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
         .pp-selected:empty { display: none; }
-        .pp-sel-chip { display: inline-flex; align-items: center; gap: 7px; background: linear-gradient(135deg, rgba(255,184,0,.20), rgba(255,122,0,.10)); border: 1px solid rgba(255,184,0,.55); color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif; font-size: .76rem; font-weight: 700; padding: 5px 7px 5px 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(255,184,0,.10); }
-        .pp-sel-chip button { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; background: rgba(255,184,0,.18); border: none; border-radius: 50%; color: inherit; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0; opacity: .85; transition: all .12s; }
-        .pp-sel-chip button:hover { opacity: 1; background: var(--accent-amber); color: #241300; }
+        .pp-sel-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(0,212,255,.10); border: 1px solid rgba(0,212,255,.40); color: var(--accent-cyan); font-family: 'Space Grotesk', sans-serif; font-size: .76rem; font-weight: 700; padding: 5px 7px 5px 12px; border-radius: 10px; }
+        .pp-sel-chip button { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; background: rgba(0,212,255,.14); border: none; border-radius: 50%; color: inherit; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0; opacity: .85; transition: all .12s; }
+        .pp-sel-chip button:hover { opacity: 1; background: var(--accent-cyan); color: #001318; }
         .pp-filter { width: 100%; box-sizing: border-box; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); font-size: .8rem; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color .15s; }
-        .pp-filter:focus { border-color: var(--accent-amber); }
+        .pp-filter:focus { border-color: var(--accent-cyan); }
         .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
         .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 11px 13px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .15s; }
-        .pp-card:hover { border-color: var(--accent-amber); background: rgba(255,184,0,.06); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.25); }
-        .pp-card.active { border-color: var(--accent-amber); background: linear-gradient(135deg, rgba(255,184,0,.16), rgba(255,122,0,.07)); box-shadow: 0 0 14px rgba(255,184,0,.20), inset 0 1px 0 rgba(255,255,255,.06); }
+        .pp-card:hover { border-color: rgba(0,212,255,.55); background: rgba(0,212,255,.05); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.25); }
+        .pp-card.active { border-color: var(--accent-cyan); background: rgba(0,212,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
         .pp-card-name { font-family: 'Space Grotesk', sans-serif; font-size: .82rem; font-weight: 700; color: var(--text); line-height: 1.25; padding-right: 16px; }
-        .pp-card-badge { font-family: 'Space Grotesk', sans-serif; font-size: .66rem; font-weight: 700; letter-spacing: .3px; color: #241300; background: linear-gradient(135deg, #ffd76a, var(--accent-amber)); border: none; border-radius: 8px; padding: 3px 9px; box-shadow: 0 2px 6px rgba(255,184,0,.25); }
-        .pp-card-check { position: absolute; top: 8px; right: 10px; font-size: .82rem; font-weight: 700; color: var(--accent-amber); opacity: 0; transition: opacity .12s; }
+        .pp-card-badge { font-family: 'Space Grotesk', sans-serif; font-size: .66rem; font-weight: 700; letter-spacing: .3px; color: var(--accent-cyan); background: rgba(0,212,255,.10); border: 1px solid rgba(0,212,255,.35); border-radius: 8px; padding: 3px 9px; }
+        .pp-card-check { position: absolute; top: 8px; right: 10px; font-size: .82rem; font-weight: 700; color: var(--accent-cyan); opacity: 0; transition: opacity .12s; }
         .pp-card.active .pp-card-check { opacity: 1; }
         /* Fields a 💡 Double-check reminder blames get painted red, the same
            way auto-filled fields get painted green (.reqfld-autofilled). */
@@ -848,8 +863,14 @@
         .slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}
         input:checked+.slider{background:var(--accent-cyan)}
         input:checked+.slider:before{transform:translateX(20px)}
-        .admin-toggle{background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
+        .admin-toggle{background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:14px}
         .admin-toggle h4{color:var(--accent-amber);margin:0;font-size:1rem}
+        /* Phase 10.13.1: the 🎭 Audition / 👁 Preview toggles get their own
+           accent colors so the three switches are visually distinct. */
+        .admin-toggle:has(#mod_audition_access){background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.3)}
+        .admin-toggle:has(#mod_audition_access) h4{color:var(--accent-cyan)}
+        .admin-toggle:has(#mod_preview_access){background:rgba(168,85,247,.08);border-color:rgba(168,85,247,.3)}
+        .admin-toggle:has(#mod_preview_access) h4{color:#c4b5fd}
         
         .user-list{display:flex;flex-direction:column;gap:10px}
         .user-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:.2s;flex-wrap:wrap;gap:8px}
@@ -1234,8 +1255,8 @@
         /* Phase 10.2: Agency Point Privilege picker -- collapsed by default so
            only the chosen privileges show; "Show all" unfolds the full card
            grid for selecting/unselecting, then folds back. */
-        .pp-toggle{margin:10px 0 0;padding:9px 18px;border-radius:12px;border:1px solid rgba(255,184,0,0.5);background:linear-gradient(135deg,rgba(255,184,0,0.14),rgba(255,122,0,0.06));color:var(--accent-amber);font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.6px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
-        .pp-toggle:hover{background:rgba(255,184,0,0.18);transform:translateY(-1px);box-shadow:0 5px 14px rgba(255,184,0,0.22);}
+        .pp-toggle{margin:10px 0 0;padding:9px 18px;border-radius:12px;border:1px solid rgba(0,212,255,0.4);background:rgba(0,212,255,0.08);color:var(--accent-cyan);font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.6px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
+        .pp-toggle:hover{background:rgba(0,212,255,0.14);transform:translateY(-1px);box-shadow:0 5px 14px rgba(0,212,255,0.15);}
         .pp-all{margin-top:10px;}
         .pp-selected:empty::after{content:'No privilege selected yet — click “Show all” to pick.';font-size:.78rem;color:var(--text-muted);font-style:italic;}
 
@@ -2429,6 +2450,26 @@
                             </div>
                             <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
                         </div>
+                        <!-- Phase 10.13.1 (Ahmed): Audition access & Preview access are
+                             TOGGLE SWITCHES like 👑 Grant Admin Privileges above -- not
+                             checkboxes inside the module cards. The ids stay
+                             mod_audition_access / mod_preview_access so
+                             applyConfigToForm / confirmSaveRole / addAgent keep working
+                             unchanged. -->
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>🎭 Audition Access</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Shows the 🖼️ View Pictures and 🎫 Open buttons on Universal Query result cards. Nobody sees those buttons without this access.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_audition_access"><span class="slider"></span></label>
+                        </div>
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>👁 Preview Access</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Lets this member open Preview Agent View and see the portal exactly as another member sees it (view-only).</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_preview_access"><span class="slider"></span></label>
+                        </div>
                         <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
                         <div class="admin-modules-grid">
                         <div class="module-card">
@@ -2512,7 +2553,6 @@
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_requests"> Query Requests</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_query_agency_list" checked> ACM Management — Agency List</label>
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_audition_access"> 🎭 Audition access — Universal Query card buttons (View Pictures / Open in Ticket Workspace)</label>
                             </div>
                             <div class="control-grid" style="margin-bottom:0">
                                 <div class="control-group"><label>ACMs</label><div class="pill-select-container" id="queryAcmSelect"></div></div>
@@ -2537,14 +2577,6 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_new"> 🆕 New Ticket (create from empty Ticket Workspace)</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_pending"> 🕵️ Under Investigation list</label>
-                            </div>
-                        </div>
-                        <div class="module-card" style="border-color:var(--accent-cyan)">
-                            <div class="module-header">
-                                <h4 style="color:var(--accent-cyan)">👁 Preview Agent View</h4>
-                            </div>
-                            <div class="sub-opts">
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_preview_access"> Preview access — see the portal exactly as another member (view-only)</label>
                             </div>
                         </div>
                         <div class="module-card" style="border-color:var(--accent-purple)">
@@ -3433,7 +3465,7 @@
                            </div>
                            <div class="control-group" style="grid-column: 1 / -1;">
                                <label>Chinese Note</label>
-                               <textarea id="tw-chinese-note" name="chinese Note" data-feishu-field="chinese Note" rows="2" class="form-highlight-input"></textarea>
+                               <textarea id="tw-chinese-note" name="chinese Note" data-feishu-field="chinese Note" rows="2" class="form-highlight-input tw-txt-auto"></textarea>
                            </div>
                        </div>
                    </div>
@@ -3459,7 +3491,7 @@
                            </div>
                            <div class="control-group twx-full">
                                <label>Audition Note</label>
-                               <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input"></textarea>
+                               <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input tw-txt-auto"></textarea>
                            </div>
                            <!-- "Done by" (fld1fFCCbr): filled in by twOpenWorkspace
                                 via twRenderMemberPicker(). -->
@@ -3491,7 +3523,7 @@
                                 twCollectFields via the textarea's name. -->
                            <div class="control-group twx-full">
                                <label>Approve Note</label>
-                               <textarea id="tw-approve-note" name="approve note" data-feishu-field="approve note" rows="3" class="form-highlight-input" placeholder="Note shown to the approver…"></textarea>
+                               <textarea id="tw-approve-note" name="approve note" data-feishu-field="approve note" rows="3" class="form-highlight-input tw-txt-auto" placeholder="Note shown to the approver…"></textarea>
                            </div>
                        </div>
                        <!-- Phase 10.5: second Save & Resolve under the Audition
@@ -3886,9 +3918,13 @@ function renderTabs() {
     const titlesMap = currentLang === 'zh' ? zhPageTitlesMap : pageTitlesMap;
 
     openTabs.forEach(page => {
-        if(page === 'ticket-workspace') return; // Don't render workspace as a tab
-        
-        const title = titlesMap[page] || page;
+        // Real tickets don't get their own tab (the queue tab they came from
+        // stays active). Phase 10.13.1 (Ahmed): a New Ticket DRAFT does get a
+        // tab -- "why it not have tab?" -- so the open draft is visible and
+        // switchable in the tab bar exactly like any other page.
+        if(page === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode)) return;
+
+        const title = page === 'ticket-workspace' ? '🆕 New Ticket' : (titlesMap[page] || page);
         const isActive = page === activeTabId || (page === 'live-tickets' && activeTabId === 'ticket-workspace');
         
         const tabEl = document.createElement('div');
@@ -3927,7 +3963,12 @@ function renderTabs() {
             const closeBtn = document.createElement('button');
             closeBtn.className = 'tab-close';
             closeBtn.innerHTML = '×';
-            closeBtn.onclick = (e) => closeTab(page, e);
+            // Closing the New Ticket draft's tab closes the workspace itself
+            // (resets create mode + returns to the queue), not just the tab.
+            closeBtn.onclick = (e) => {
+                if (page === 'ticket-workspace') { e.stopPropagation(); twCloseWorkspace(); return; }
+                closeTab(page, e);
+            };
             tabEl.appendChild(closeBtn);
         }
         
@@ -6356,6 +6397,9 @@ function copyAccessFromAgent(agentId) {
 function resetAgentForm() {
     document.getElementById('newAgentEmail').value = '';
     document.getElementById('modAdmin').checked = false;
+    // Phase 10.13.1: these two live in admin-toggle switches now (not inside
+    // .sub-opt-lbl), so the generic clear below doesn't reach them.
+    ['mod_audition_access','mod_preview_access'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
@@ -6561,6 +6605,7 @@ async function addAgent() {
         ToastManager.show(identities.length > 1 ? `${successCount} agents saved successfully.` : 'Agent saved successfully.', 'success');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
+        ['mod_audition_access','mod_preview_access'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
     }
     document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
@@ -8200,7 +8245,7 @@ async function tiSearch() {
             ? `${rows.length} request${rows.length === 1 ? '' : 's'} under investigation — newest first.`
             : 'No requests under investigation right now. ✅';
         if (!rows.length) { if (emptyEl) emptyEl.style.display = ''; return; }
-        resultsEl.innerHTML = rows.map(tiRowHtml).join('');
+        resultsEl.innerHTML = tiTableHtml(rows);
     } catch (e) {
         if (countEl) countEl.textContent = 'Search failed — please try again.';
         ToastManager.show('Under Investigation search failed: ' + e.message, 'error');
@@ -8209,23 +8254,37 @@ async function tiSearch() {
     }
 }
 
-function tiRowHtml(r) {
-    const rid = escHtml(r.record_id || '');
-    const chip = (label, val) => `<span class="ti-chip"><span class="ti-chip-label">${label}</span>${escHtml((val === undefined || val === null || val === '') ? '—' : String(val))}</span>`;
-    const num = r.numbering || (r.record_id ? String(r.record_id).slice(-6) : '—');
-    return `<div class="ti-row">
-        <div class="ti-row-main">
-            <div class="ti-row-title"><span class="ti-row-num">#${escHtml(num)}</span>${escHtml(r.request_type || '—')}</div>
-            <div class="ti-row-chips">
-                ${chip('User ID', r.user_id)}
-                ${chip('Agency Code', r.agency_code)}
-                ${chip('Respondents', r.respondents)}
-                ${chip('Region', r.region)}
-                ${chip('Submitted', r.submitted_on)}
-            </div>
-        </div>
-        <button type="button" class="btn btn-primary ti-open-btn" onclick="twOpenWorkspace('${rid}')">🎫 Open</button>
-    </div>`;
+// Phase 10.13.1 (Ahmed): the list is a real sheet-style grid now -- same
+// columns as the Bitable view he screenshotted: Numbering / Submitted on /
+// Request Type / Respondents / Mentioned Person / Type of Action / Region /
+// ACM / User ID / Agency Code, with the 🎫 Open button pinned at the right.
+function tiTableHtml(rows) {
+    const cell = (val) => `<td>${escHtml((val === undefined || val === null || val === '') ? '—' : String(val))}</td>`;
+    const body = rows.map(r => {
+        const rid = escHtml(r.record_id || '');
+        const num = r.numbering || (r.record_id ? String(r.record_id).slice(-6) : '—');
+        return `<tr>
+            <td><span class="ti-row-num">#${escHtml(num)}</span></td>
+            ${cell(r.submitted_on)}
+            ${cell(r.request_type)}
+            ${cell(r.respondents)}
+            ${cell(r.mentioned_person)}
+            ${cell(r.type_of_action)}
+            ${cell(r.region)}
+            ${cell(r.acm)}
+            ${cell(r.user_id)}
+            ${cell(r.agency_code)}
+            <td class="ti-act-cell"><button type="button" class="btn btn-primary ti-open-btn" onclick="twOpenWorkspace('${rid}')">🎫 Open</button></td>
+        </tr>`;
+    }).join('');
+    return `<div class="ti-table-wrap"><table class="ti-table">
+        <thead><tr>
+            <th>#</th><th>Submitted on</th><th>Request Type</th><th>Respondents</th>
+            <th>Mentioned Person</th><th>Type of Action</th><th>Region</th><th>ACM</th>
+            <th>User ID</th><th>Agency Code</th><th></th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+    </table></div>`;
 }
 
 // ─── Phase 10.13: Preview Agent View ───
@@ -8268,7 +8327,12 @@ function pvRenderList() {
     }
     listEl.innerHTML = rows.map(a => {
         const mail = escHtml(a.email || '');
-        const mods = (a.modules || []).filter(m => !m.startsWith('__ROLE__::'));
+        // Phase 10.13.1: the backend stores modules as one comma-joined string
+        // in the access table -- accept BOTH a string and an array here so the
+        // chips render either way (a raw string broke this with ".filter is
+        // not a function").
+        const rawMods = Array.isArray(a.modules) ? a.modules : String(a.modules || '').split(',');
+        const mods = rawMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
         return `<div class="pv-row">
             <div class="pv-row-info">
                 <div class="pv-row-email">${mail}</div>
@@ -8284,10 +8348,15 @@ async function pvStart(email) {
         const res = await fetch(`/api/admin/preview-access?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&target=${encodeURIComponent(email)}`);
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Preview failed');
+        // Phase 10.13.1: the backend nests the target's access under
+        // "permissions" ({permissions:{modules,is_super_admin,...}}) -- read
+        // that, with a top-level fallback so older backends still work.
+        const permsBlock = data.permissions || data;
+        const targetMods = Array.isArray(permsBlock.modules) ? permsBlock.modules : String(permsBlock.modules || '').split(',');
         if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin };
         previewMode = true;
-        userModules = (data.modules || []).filter(m => !m.startsWith('__ROLE__::'));
-        isAdmin = !!data.is_super_admin;
+        userModules = targetMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
+        isAdmin = !!permsBlock.is_super_admin;
         pvShowBanner(email);
         configureSidebarAndCards();
         openInTab('welcome');
@@ -9607,18 +9676,40 @@ let twManualReqType = null;
 // open; the primary button becomes "🚀 Submit Request" and posts to
 // /api/requests/submit instead of /api/requests/update.
 let twCreateMode = false;
+// Phase 10.13.1: where twCloseWorkspace returns to. Real tickets keep the
+// old behavior (always back to Live Queue); a New Ticket draft goes back to
+// whichever page the agent was on when he clicked "🆕 New Ticket".
+let twReturnTo = 'live-tickets';
 
-// Applies/reverts the create-mode chrome: hides the Audition Action card
-// (Done-by/Status/Mentioned-Group don't apply to a draft) and the Duplicate
-// Check button, and relabels both save buttons. Opening a real ticket or
-// closing the workspace always reverts it.
+// Applies/reverts the create-mode chrome: relabels both save buttons and
+// hides the Duplicate Check button. Phase 10.13.1 (Ahmed): the Audition
+// Action card STAYS VISIBLE in create mode -- he wants to set Mentioned
+// Person / Approval / Audition Note / Done by / Status / Mentioned Group /
+// Approve Note while filing a new ticket; anything filled simply travels in
+// the submit payload (twSaveWorkspace routes to twSubmitNewTicket BEFORE the
+// Done-by/Status gate, so none of it is required). Opening a real ticket or
+// closing the workspace always reverts the labels.
 function twApplyCreateModeChrome() {
-    const sec5 = document.getElementById('tw-sec-5-card');
-    if (sec5) sec5.style.display = twCreateMode ? 'none' : '';
     const label = twCreateMode ? '🚀 Submit Request' : '💾 Save & Resolve';
     ['twSaveBtn', 'twSaveBtn2'].forEach(id => { const b = document.getElementById(id); if (b) b.textContent = label; });
     const vbtn = document.getElementById('twVerifyBtn');
     if (vbtn) vbtn.style.display = twCreateMode ? 'none' : '';
+}
+
+// Phase 10.13.2: auto-grow helper -- stretches a .tw-txt-auto textarea to FIT
+// its content (not only while typing: on render, populate and Parse & Fill
+// too). Past the cap it switches to a scrollbar instead of silently clipping
+// (the old overflow-y:hidden made over-cap content unreachable).
+function twAutoGrowTxt(t) {
+    if (!t || !t.classList || !t.classList.contains('tw-txt-auto')) return;
+    t.style.height = '1px'; // collapse first -- 'auto' keeps the rows height, so scrollHeight would never report less than it
+    const need = t.scrollHeight + 2;
+    const cap = 320;
+    t.style.height = Math.max(46, Math.min(cap, need)) + 'px';
+    t.style.overflowY = need > cap ? 'auto' : 'hidden';
+}
+function twAutoGrowAll(root) {
+    (root || document).querySelectorAll('textarea.tw-txt-auto').forEach(twAutoGrowTxt);
 }
 
 // Phase 10.2 (one delegated listener, two jobs):
@@ -9628,19 +9719,16 @@ function twApplyCreateModeChrome() {
 //    can never silently overwrite an edit made in the other box.
 // 2) .tw-txt-auto auto-grow -- every editable text field is a stretchable
 //    textarea now (Enter = new line, drag the corner to stretch); it also
-//    grows by itself as you type, capped at 240px where it starts scrolling.
+//    grows by itself as you type, capped at 320px where it starts scrolling.
 document.addEventListener('input', (e) => {
     const t = e.target;
     if (!t || !t.tagName) return;
     if (t.dataset && t.dataset.mirror) {
         document.querySelectorAll(`[data-mirror="${t.dataset.mirror}"]`).forEach(el => {
-            if (el !== t) el.value = t.value;
+            if (el !== t) { el.value = t.value; twAutoGrowTxt(el); } // Phase 10.13.2: the mirrored copy grows too
         });
     }
-    if (t.classList && t.classList.contains('tw-txt-auto')) {
-        t.style.height = 'auto';
-        t.style.height = Math.min(240, t.scrollHeight + 2) + 'px';
-    }
+    twAutoGrowTxt(t);
 });
 
 // Renders the Dynamic Request Section (card 2) for a given ticket, using
@@ -10397,9 +10485,10 @@ async function twOpenWorkspace(recordId) {
         twOrigFields = JSON.parse(JSON.stringify(ticket.fields || {})); // fast-save diff base
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
         // Phase 10.13: opening a REAL ticket always leaves New-Ticket draft
-        // mode (restores the Audition Action card + Save & Resolve labels if
-        // the agent jumped here straight from a blank draft).
+        // mode (restores the Save & Resolve labels if the agent jumped here
+        // straight from a blank draft).
         twCreateMode = false;
+        twReturnTo = 'live-tickets'; // real tickets keep the old close behavior
         twApplyCreateModeChrome();
         twResetNote(true); // Phase 10.1: fresh ticket -> close & clear the scratch note
 
@@ -10497,7 +10586,9 @@ async function twOpenWorkspace(recordId) {
         }
 
         openInTab('ticket-workspace');
-
+        // Phase 10.13.2: stretch every auto textarea to fit the content just
+        // loaded into it (static notes + any field createTwControl rendered).
+        requestAnimationFrame(() => twAutoGrowAll(document.getElementById('pg-ticket-workspace') || document));
         // Phase 10: the Duplicate Radar fires on its own a beat after the
         // workspace renders (the form fields need to exist first), scanning
         // this ticket's IDs against the Grand Table without any clicks.
@@ -10527,6 +10618,7 @@ async function twOpenWorkspace(recordId) {
 // New Request form does.
 function twOpenCreateWorkspace() {
     twCreateMode = true;
+    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'welcome';
     ltActiveTicket = { record_id: null, fields: {} }; // synthetic blank ticket -- twSelectRequestType/twRenderSection2 read from it
     twOrigFields = {};
     twManualReqType = null;
@@ -10564,8 +10656,8 @@ function twOpenCreateWorkspace() {
     twRenderSection2(ltActiveTicket, '');
     twRenderReqTypeTabs('');
 
-    // Blank member pickers + action fields (their card is hidden in create
-    // mode, but keep the controls clean for the next real ticket).
+    // Blank Audition Action card controls (Phase 10.13.1: the card is VISIBLE
+    // in create mode -- anything filled here travels in the submit payload).
     const mpWrap = document.getElementById('tw-mentioned-person-wrap');
     if (mpWrap) { mpWrap.classList.add('control-group'); twRenderMemberPicker(mpWrap, '<label>Mentioned Person</label>', 'Mentioned Person', null); }
     const dbWrap = document.getElementById('tw-done-by-wrap');
@@ -10575,6 +10667,12 @@ function twOpenCreateWorkspace() {
     twRenderStatusPicks();
     const an = document.getElementById('tw-audition-note'); if (an) an.value = '';
     const apn = document.getElementById('tw-approve-note'); if (apn) apn.value = '';
+    // Mentioned Group options come from the live schema, same as twOpenWorkspace.
+    const mgSelCreate = document.getElementById('tw-mentioned-group');
+    if (mgSelCreate) {
+        const mgOpts = ((FIELD_SCHEMA['Mentioned Group'] || {}).options || []).map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+        mgSelCreate.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
+    }
 
     openInTab('ticket-workspace');
     twToggleTopbar(false);
@@ -11616,11 +11714,13 @@ function createTwControl(key, value) {
         // Phase 10.2: "User ID" also renders in the Dynamic Request Section --
         // data-mirror keeps the two boxes in lockstep.
         const mirrorAttr = key === 'User ID' ? ' data-mirror="User ID"' : '';
-        wrap.innerHTML = label + `<textarea name="${escHtml(key)}"${mirrorAttr} class="form-highlight-input" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
+        wrap.innerHTML = label + `<textarea name="${escHtml(key)}"${mirrorAttr} class="form-highlight-input tw-txt-auto" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
+        requestAnimationFrame(() => twAutoGrowAll(wrap)); // Phase 10.13.2: fit the content on render, not only on typing
         return wrap;
     }
     if (readOnly && valStr.includes('\n')) {
-        wrap.innerHTML = label + `<textarea name="${escHtml(key)}" class="form-highlight-input" rows="4" style="resize:vertical;font-family:inherit;opacity:.7;cursor:not-allowed;" readonly>${escHtml(valStr)}</textarea>`;
+        wrap.innerHTML = label + `<textarea name="${escHtml(key)}" class="form-highlight-input tw-txt-auto" rows="4" style="resize:vertical;font-family:inherit;opacity:.7;cursor:not-allowed;" readonly>${escHtml(valStr)}</textarea>`;
+        requestAnimationFrame(() => twAutoGrowAll(wrap));
         return wrap;
     }
 
@@ -11633,12 +11733,13 @@ function createTwControl(key, value) {
         return wrap;
     }
     wrap.innerHTML = label + `<textarea name="${escHtml(key)}" rows="1" class="form-highlight-input tw-txt-auto">${escHtml(valStr)}</textarea>`;
+    requestAnimationFrame(() => twAutoGrowAll(wrap)); // Phase 10.13.2: fit the content on render, not only on typing
     return wrap;
 }
 
 function twCloseWorkspace() {
     // Phase 10.13: leaving a blank New-Ticket draft resets create mode and
-    // restores the hidden Audition Action card / Save & Resolve labels.
+    // restores the Save & Resolve labels.
     if (twCreateMode) {
         twCreateMode = false;
         twApplyCreateModeChrome();
@@ -11649,9 +11750,12 @@ function twCloseWorkspace() {
     const dupDrawer = document.getElementById('twDupDrawer');
     if (dupDrawer) dupDrawer.classList.remove('open');
     twRadarSetMsg('', false);
-    activeTabId = 'live-tickets';
+    // Phase 10.13.1: return to where the workspace was opened FROM (a
+    // tickets_new-only agent must not land on the Live Queue he can't see).
+    const back = (typeof twReturnTo !== 'undefined' && twReturnTo) ? twReturnTo : 'live-tickets';
+    activeTabId = back;
     renderTabs();
-    executePageLogic('live-tickets');
+    executePageLogic(back);
 }
 
 // Shared by twSaveWorkspace and twRunVerify. Collects text/number/select/textarea
@@ -12800,7 +12904,7 @@ function buildFieldControl(fName, def, req, idPrefix) {
     if (def.type === 'text') {
         wrap.innerHTML += `<input type="text" id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} placeholder="Enter ${escHtml(fName)}" class="form-highlight-input">`;
     } else if (def.type === 'textarea') {
-        wrap.innerHTML += `<textarea id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} rows="3" placeholder="Enter ${escHtml(fName)}" class="form-highlight-input" style="font-family:inherit;resize:vertical;"></textarea>`;
+        wrap.innerHTML += `<textarea id="${idSafe}" name="${escHtml(fName)}" ${req ? 'required' : ''} rows="3" placeholder="Enter ${escHtml(fName)}" class="form-highlight-input tw-txt-auto" style="font-family:inherit;resize:vertical;"></textarea>`;
     } else if (def.type === 'select') {
         let opts = `<option value="">-- Select --</option>`;
         // Options are plain strings, or {v, l} when the label should read
@@ -13567,6 +13671,15 @@ const AUDIT_ACM_ROSTER = {
 // earlier guess while never stomping a choice the agent made by hand.
 let auditDeducedPerson = '';
 let auditDeducedGroup = '';
+// Phase 10.13.2: a deliberate manual CLEAR is remembered ("-- Select --" on
+// Mentioned Group, the picker chip's ✕, re-tapping the active roster chip),
+// so the auto-deduction never resurrects a mention the agent just removed --
+// an empty Mentioned Group means "no group message" and stays empty. The
+// memory resets when the case context (Region / ACM / Agency Type) changes
+// or the workstation is cleared -- a fresh case wants fresh mentions.
+let auditPersonClearedByHand = false;
+let auditGroupClearedByHand = false;
+let auditLastDeduceCtx = '';
 
 function auditMentionWrap() {
     return document.querySelector('#auditRequestForm [data-user-field="Mentioned Person"]');
@@ -13598,9 +13711,11 @@ function auditRenderMentionRoster(wrap) {
                 if (input) twClearUserPicker(input.id.slice(0, -6));
                 row.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
                 auditDeducedPerson = '';
+                auditPersonClearedByHand = true; // Phase 10.13.2: a hand clear owns the field -- never resurrect it
                 return;
             }
             auditDeducedPerson = ''; // a hand tap now owns the field
+            auditPersonClearedByHand = false; // Phase 10.13.2: a hand PICK drops the cleared memory
             auditSetMentionedPerson(person, true, true);
         });
     });
@@ -13611,6 +13726,7 @@ function auditRenderMentionRoster(wrap) {
         if (e.target && e.target.closest && e.target.closest('button[title="Clear"]')) {
             row.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
             auditDeducedPerson = '';
+            auditPersonClearedByHand = true; // Phase 10.13.2: a hand clear owns the field -- never resurrect it
         }
     });
 }
@@ -13657,10 +13773,35 @@ async function auditSetMentionedPerson(person, markChip, force) {
 // Only a PLAIN "Walkin" is left empty (Ahmed's rule) — a "Walkin sub-agency"
 // ticket still belongs to an ACM, so person + group are deducted for it.
 // A hand-picked value is never overwritten -- only an empty field or one we
-// filled ourselves.
-async function auditDeduceMentions() {
+// filled ourselves. Phase 10.13.2: a field the agent deliberately CLEARED is
+// left empty too (auditPersonClearedByHand / auditGroupClearedByHand) --
+// clearing Mentioned Group to "-- Select --" is how the agent says "no group
+// message for this one", and the deduction must not fight that.
+async function auditDeduceMentions(e) {
+    // A hand change on the Mentioned Group select owns that field: picking
+    // "-- Select --" (empty) means "no group message" and is remembered;
+    // picking a real group by hand drops the cleared memory again.
+    if (e && e.target && e.target.id === 'audfld_Mentioned_Group') {
+        auditGroupClearedByHand = !(e.target.value || '').trim();
+        if (!auditGroupClearedByHand) auditDeducedGroup = '';
+    }
     const type = (document.getElementById('audfld_Agency_Type')?.value || '').trim();
     if (!type) return;
+    const region = (document.getElementById('audfld_Region')?.value || '').trim();
+    const acmField = acmFieldForRegion(region);
+    let acm = '';
+    if (acmField) {
+        const acmId = 'audfld_' + acmField.name.replace(/[^a-zA-Z0-9]/g, '_');
+        acm = (document.getElementById(acmId)?.value || '').trim();
+    }
+    // A new case context (Region / ACM / Agency Type changed) forgets the
+    // cleared-by-hand memory -- a fresh case wants fresh mentions again.
+    const ctxKey = [type, region, acm].join('|');
+    if (ctxKey !== auditLastDeduceCtx) {
+        auditLastDeduceCtx = ctxKey;
+        auditPersonClearedByHand = false;
+        auditGroupClearedByHand = false;
+    }
     if (/^\s*walkin\s*$/i.test(type)) {
         // Plain walk-in only (sub-agency walk-ins keep their ACM mentions):
         // Only values WE filled ourselves are cleared; a hand-picked mention
@@ -13686,16 +13827,11 @@ async function auditDeduceMentions() {
         return;
     }
 
-    const region = (document.getElementById('audfld_Region')?.value || '').trim();
-    const acmField = acmFieldForRegion(region);
-    if (!acmField) return;
-    const acmId = 'audfld_' + acmField.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const acm = (document.getElementById(acmId)?.value || '').trim();
     if (!acm) return;
     const hit = AUDIT_ACM_ROSTER[acm.toLowerCase()];
     if (!hit) return;
 
-    if (hit.person) {
+    if (hit.person && !auditPersonClearedByHand) {
         const wrap = auditMentionWrap();
         if (wrap) {
             let cur = '';
@@ -13708,7 +13844,7 @@ async function auditDeduceMentions() {
         }
     }
 
-    if (hit.group) {
+    if (hit.group && !auditGroupClearedByHand) {
         const grpSel = document.getElementById('audfld_Mentioned_Group');
         if (grpSel) {
             const cur = grpSel.value;
@@ -14241,6 +14377,7 @@ function auditParseText(opts) {
     auditUpdateReminders();
     auditDeduceMentions();
     auditScheduleDupCheck();
+    twAutoGrowAll(document.getElementById('auditRequestForm')); // Phase 10.13.2: stretch textareas to fit the parsed content
 
     if (!quiet) {
         ToastManager.show(`Auto-filled ${filled} field(s). Please look over: ${missed.join(', ')}.`, 'warning', 9000);
@@ -14410,6 +14547,9 @@ function auditClearWorkstation(silent) {
         if (dt) ssSyncDisplay(sel, dt);
     });
     document.getElementById('audRawText').value = '';
+    // Phase 10.13.2: auto-grown textareas keep their stretched height after a
+    // reset -- let them shrink back to their natural rows height.
+    form.querySelectorAll('textarea.tw-txt-auto').forEach(t => { t.style.height = ''; t.style.overflowY = ''; });
     form.querySelectorAll('.reqfld-autofilled').forEach(el => el.classList.remove('reqfld-autofilled'));
     form.querySelectorAll('.control-group.aws-flag').forEach(g => g.classList.remove('aws-flag'));
     // form.reset() only touches native input/select/checkbox elements --
@@ -14423,6 +14563,9 @@ function auditClearWorkstation(silent) {
     }
     auditDeducedPerson = '';
     auditDeducedGroup = '';
+    auditPersonClearedByHand = false; // Phase 10.13.2: a wiped workstation forgets the cleared-by-hand memory
+    auditGroupClearedByHand = false;
+    auditLastDeduceCtx = '';
     const dbWrap = form.querySelector('[data-user-field="Done by"]');
     if (dbWrap) dbWrap.dataset.userSelected = '';
     form.querySelectorAll('.audit-pick-btn.active').forEach(b => b.classList.remove('active'));
