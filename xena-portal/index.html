@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Yuji+Syuku&family=Shippori+Mincho:wght@700;800&family=Syne:wght@700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Yuji+Syuku&family=Shippori+Mincho:wght@700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <!-- SAMURAI_ASSET_VERSION: bump this (and the matching literal in playSamuraiIntro()
          below) any time samurai_moon_portrait.png / samurai_moon_landscape.png are
          swapped on the server. /api/samurai-image is cached hard (Cache-Control:
@@ -349,7 +349,7 @@
         .apg-title{display:flex;align-items:center;gap:13px;margin:0;}
         .apg-badge{width:42px;height:42px;flex:none;display:flex;align-items:center;justify-content:center;font-size:1.25rem;border-radius:13px;background:linear-gradient(135deg,rgba(255,179,0,.28),rgba(255,77,109,.18));border:1px solid rgba(255,179,0,.45);box-shadow:0 4px 14px rgba(255,179,0,.18),inset 0 1px 0 rgba(255,255,255,.12);}
         .apg-charged .apg-badge{background:linear-gradient(135deg,rgba(0,230,118,.24),rgba(0,212,255,.14));border-color:rgba(0,230,118,.45);box-shadow:0 4px 14px rgba(0,230,118,.16),inset 0 1px 0 rgba(255,255,255,.12);}
-        .apg-title-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.06rem;letter-spacing:.4px;line-height:1.15;color:var(--text);}
+        .apg-title-text{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.02rem;letter-spacing:.2px;line-height:1.15;color:var(--text);}
         .apg-title-sub{display:block;font-family:'Inter',sans-serif;font-weight:500;font-size:.64rem;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-muted);margin-top:3px;}
         .apg-pill{display:inline-flex;align-items:center;gap:7px;font-family:'Space Grotesk',sans-serif;font-size:.64rem;font-weight:600;letter-spacing:1.4px;padding:6px 14px;border-radius:999px;border:1px solid rgba(255,179,0,.5);color:var(--accent-amber);background:rgba(255,179,0,.08);}
         .apg-pill i{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;animation:apgDotPulse 1.6s ease-in-out infinite;}
@@ -359,7 +359,7 @@
         .apg-wallet{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:16px 0 6px;padding:18px 20px;border-radius:18px;border:1px solid var(--border);background:linear-gradient(135deg,rgba(255,179,0,.09),rgba(0,212,255,.05) 55%,rgba(185,103,255,.06));box-shadow:inset 0 1px 0 rgba(255,255,255,.06);}
         .apg-coin{width:54px;height:54px;flex:none;display:flex;align-items:center;justify-content:center;font-size:1.55rem;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,226,138,.35),rgba(255,179,0,.10) 62%);border:1px solid rgba(255,179,0,.5);box-shadow:0 0 0 5px rgba(255,179,0,.07),0 6px 18px rgba(255,179,0,.20);}
         .apg-bal{flex:1 1 140px;min-width:0;}
-        .apg-bal b{display:block;font-family:'Syne',sans-serif;font-weight:800;font-size:2.05rem;line-height:1;letter-spacing:.5px;white-space:nowrap;background:linear-gradient(92deg,#ffd76a,var(--accent-amber) 45%,var(--accent-cyan));-webkit-background-clip:text;background-clip:text;color:transparent;}
+        .apg-bal b{display:block;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:2rem;line-height:1;letter-spacing:.3px;white-space:nowrap;background:linear-gradient(92deg,#ffd76a,var(--accent-amber) 45%,var(--accent-cyan));-webkit-background-clip:text;background-clip:text;color:transparent;}
         .apg-bal span{display:block;font-family:'Space Grotesk',sans-serif;font-size:.68rem;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-muted);margin-top:5px;}
         .apg-bal .apg-bal-code{font-size:.62rem;letter-spacing:1px;opacity:.75;margin-top:2px;text-transform:none;}
         .apg-wallet-side{margin-left:auto;display:flex;flex-direction:column;gap:7px;flex:1 1 150px;min-width:118px;padding-left:16px;border-left:1px solid var(--border);}
@@ -379,17 +379,42 @@
         .apg-receipt{background:rgba(0,0,0,.34);border:1px solid var(--border);border-radius:14px;padding:14px 16px;font-size:.8rem;line-height:1.65;white-space:pre-wrap;font-family:'JetBrains Mono',monospace;margin:0;max-height:300px;overflow-y:auto;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
         .apg-receipt::-webkit-scrollbar{width:8px;}
         .apg-receipt::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:8px;}
-        .apg-receipt .ok{color:var(--accent-green);}
-        .apg-receipt .warn{color:var(--accent-amber);}
-        .apg-receipt .bad{color:var(--accent-rose);}
-        .apg-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;}
-        #twApChargeBtn{position:relative;overflow:hidden;width:auto;padding:13px 26px;border:none;border-radius:14px;font-family:'Syne',sans-serif;font-weight:800;font-size:.86rem;letter-spacing:.8px;color:#241300;background:linear-gradient(135deg,#ffd76a,var(--accent-amber) 55%,#ff9a3d);box-shadow:0 8px 22px rgba(255,179,0,.28),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .18s ease,box-shadow .18s ease;cursor:pointer;}
-        #twApChargeBtn::after{content:'';position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-20deg);transition:left .55s ease;}
+        .apg-receipt .ok, .apg-preview .ok{color:var(--accent-green);}
+        .apg-receipt .warn, .apg-preview .warn{color:var(--accent-amber);}
+        .apg-receipt .bad, .apg-preview .bad{color:var(--accent-rose);}
+        /* Phase 10.12: the live preview becomes a structured graphic -- one
+           row per ordered item (icon + name + math + line cost), then two
+           gradient sum chips (deduct / balance after). The confirmed receipt
+           stays the mono .apg-receipt panel above it. */
+        .apg-preview{background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin:0;display:flex;flex-direction:column;gap:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
+        .apg-pv-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);}
+        .apg-pv-ic{flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:.85rem;border-radius:8px;background:rgba(255,255,255,.05);}
+        .apg-pv-row.ok .apg-pv-ic{background:rgba(0,230,118,.12);}
+        .apg-pv-row.warn .apg-pv-ic{background:rgba(255,179,0,.12);}
+        .apg-pv-row.bad .apg-pv-ic{background:rgba(255,77,109,.12);}
+        .apg-pv-name{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:.84rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .apg-pv-name small{display:block;font-family:'Inter',sans-serif;font-weight:500;font-size:.64rem;letter-spacing:.4px;color:var(--text-muted);margin-top:2px;white-space:normal;}
+        .apg-pv-row>b{flex:none;font-family:'Space Grotesk',sans-serif;font-size:.92rem;font-weight:700;color:var(--text);}
+        .apg-pv-row.ok>b{color:var(--accent-green);}
+        .apg-pv-row.warn>b{color:var(--accent-amber);}
+        .apg-pv-row.bad>b{color:var(--accent-rose);}
+        .apg-pv-note{font-size:.7rem;color:var(--text-muted);padding:2px 4px 0;line-height:1.5;}
+        .apg-pv-sum{display:flex;align-items:center;gap:9px;padding:10px 14px;border-radius:11px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.86rem;letter-spacing:.3px;}
+        .apg-pv-sum.total{color:#ffd0da;background:linear-gradient(90deg,rgba(255,77,109,.20),rgba(255,77,109,.05));border:1px solid rgba(255,77,109,.45);}
+        .apg-pv-sum.after{color:#9df5c9;background:linear-gradient(90deg,rgba(0,230,118,.16),rgba(0,212,255,.06));border:1px solid rgba(0,230,118,.4);}
+        /* Phase 10.12 button: full-width, one line, Space Grotesk uppercase --
+           no shine sweep, just a clean gradient + glow. */
+        .apg-actions{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+        .apg-actions-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+        #twApChargeBtn{width:100%;padding:14px 22px;border:none;border-radius:13px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:1.4px;text-transform:uppercase;color:#241300;background:linear-gradient(135deg,#ffd76a,var(--accent-amber) 55%,#ff9a3d);box-shadow:0 8px 22px rgba(255,179,0,.28),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .18s ease,box-shadow .18s ease;cursor:pointer;}
         #twApChargeBtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 28px rgba(255,179,0,.36),inset 0 1px 0 rgba(255,255,255,.35);}
-        #twApChargeBtn:hover:not(:disabled)::after{left:130%;}
         #twApChargeBtn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;}
         #twApChargeBtn.apg-btn-more{color:#03252b;background:linear-gradient(135deg,#7ef0ff,var(--accent-cyan) 55%,#4d9dff);box-shadow:0 8px 22px rgba(0,212,255,.26),inset 0 1px 0 rgba(255,255,255,.35);}
         #twApChargeBtn.apg-btn-more:hover:not(:disabled){box-shadow:0 12px 28px rgba(0,212,255,.34),inset 0 1px 0 rgba(255,255,255,.35);}
+        #twApChargeBtn.apg-correcting{color:#1d0533;background:linear-gradient(135deg,#d3a6ff,#b967ff 55%,#8f4df0);box-shadow:0 8px 22px rgba(185,103,255,.30),inset 0 1px 0 rgba(255,255,255,.35);}
+        #twApChargeBtn.apg-correcting:hover:not(:disabled){box-shadow:0 12px 28px rgba(185,103,255,.38),inset 0 1px 0 rgba(255,255,255,.35);}
+        .apg-edit-btn{padding:7px 14px;border-radius:10px;border:1px solid rgba(185,103,255,.45);background:rgba(185,103,255,.10);color:#d3a6ff;font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:600;letter-spacing:.5px;cursor:pointer;transition:all .15s;}
+        .apg-edit-btn:hover{background:rgba(185,103,255,.20);transform:translateY(-1px);}
         .apg-state{font-size:.78rem;color:var(--text-muted);}
         .apg-locked{opacity:.55;cursor:not-allowed !important;background:rgba(0,0,0,.15) !important;}
         .apg-lock-note{display:block;font-size:.68rem;color:var(--text-muted);margin-top:6px;line-height:1.5;}
@@ -404,6 +429,16 @@
         .twcf-balance.zero b{color:var(--accent-amber);}
         .twcf-balance.neg b{color:var(--accent-rose);}
         .twcf-balance span.sub{font-size:.68rem;color:var(--text-muted);display:block;margin-top:2px;}
+        /* Phase 10.12: Point Balance fits ONE compact grid cell (sits next to
+           User ID like any other field) -- a slim input-height chip instead of
+           the old full-width hero. */
+        .twcf-bal-mini{display:flex;align-items:center;gap:9px;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--border);background:linear-gradient(90deg,rgba(255,179,0,.09),rgba(0,212,255,.05));}
+        .twcf-bal-mini .coin{font-size:1.05rem;filter:drop-shadow(0 1px 4px rgba(255,179,0,.4));}
+        .twcf-bal-mini b{font-family:'Space Grotesk',sans-serif;font-size:1.02rem;font-weight:700;line-height:1;}
+        .twcf-bal-mini.pos b{color:var(--accent-green);}
+        .twcf-bal-mini.zero b{color:var(--accent-amber);}
+        .twcf-bal-mini.neg b{color:var(--accent-rose);}
+        .twcf-bal-mini span.sub{font-size:.62rem;color:var(--text-muted);letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
         .twcf-chips{display:flex;flex-wrap:wrap;gap:8px;}
         .twcf-chip{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-hover);min-width:110px;flex:0 1 auto;}
         .twcf-chip span{font-size:.6rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);}
@@ -458,17 +493,17 @@
         .pp-picker { margin-top: 6px; }
         .pp-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
         .pp-selected:empty { display: none; }
-        .pp-sel-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,184,0,.14); border: 1px solid rgba(255,184,0,.5); color: var(--accent-amber); font-size: .76rem; font-weight: 700; padding: 4px 6px 4px 10px; border-radius: 20px; }
-        .pp-sel-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: .95rem; line-height: 1; padding: 0 2px; opacity: .75; }
-        .pp-sel-chip button:hover { opacity: 1; color: #fff; }
+        .pp-sel-chip { display: inline-flex; align-items: center; gap: 7px; background: linear-gradient(135deg, rgba(255,184,0,.20), rgba(255,122,0,.10)); border: 1px solid rgba(255,184,0,.55); color: var(--accent-amber); font-family: 'Space Grotesk', sans-serif; font-size: .76rem; font-weight: 700; padding: 5px 7px 5px 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(255,184,0,.10); }
+        .pp-sel-chip button { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; background: rgba(255,184,0,.18); border: none; border-radius: 50%; color: inherit; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0; opacity: .85; transition: all .12s; }
+        .pp-sel-chip button:hover { opacity: 1; background: var(--accent-amber); color: #241300; }
         .pp-filter { width: 100%; box-sizing: border-box; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); font-size: .8rem; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color .15s; }
         .pp-filter:focus { border-color: var(--accent-amber); }
         .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
-        .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .12s; }
-        .pp-card:hover { border-color: var(--accent-amber); background: rgba(255,184,0,.05); }
-        .pp-card.active { border-color: var(--accent-amber); background: rgba(255,184,0,.10); box-shadow: 0 0 10px rgba(255,184,0,.15); }
-        .pp-card-name { font-size: .82rem; font-weight: 700; color: var(--text); line-height: 1.25; padding-right: 14px; }
-        .pp-card-badge { font-size: .67rem; font-weight: 600; color: var(--accent-amber); background: rgba(255,184,0,.12); border: 1px solid rgba(255,184,0,.35); border-radius: 12px; padding: 2px 8px; }
+        .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 11px 13px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .15s; }
+        .pp-card:hover { border-color: var(--accent-amber); background: rgba(255,184,0,.06); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.25); }
+        .pp-card.active { border-color: var(--accent-amber); background: linear-gradient(135deg, rgba(255,184,0,.16), rgba(255,122,0,.07)); box-shadow: 0 0 14px rgba(255,184,0,.20), inset 0 1px 0 rgba(255,255,255,.06); }
+        .pp-card-name { font-family: 'Space Grotesk', sans-serif; font-size: .82rem; font-weight: 700; color: var(--text); line-height: 1.25; padding-right: 16px; }
+        .pp-card-badge { font-family: 'Space Grotesk', sans-serif; font-size: .66rem; font-weight: 700; letter-spacing: .3px; color: #241300; background: linear-gradient(135deg, #ffd76a, var(--accent-amber)); border: none; border-radius: 8px; padding: 3px 9px; box-shadow: 0 2px 6px rgba(255,184,0,.25); }
         .pp-card-check { position: absolute; top: 8px; right: 10px; font-size: .82rem; font-weight: 700; color: var(--accent-amber); opacity: 0; transition: opacity .12s; }
         .pp-card.active .pp-card-check { opacity: 1; }
         /* Fields a 💡 Double-check reminder blames get painted red, the same
@@ -1151,7 +1186,7 @@
         /* Phase 10.2: Agency Point Privilege picker -- collapsed by default so
            only the chosen privileges show; "Show all" unfolds the full card
            grid for selecting/unselecting, then folds back. */
-        .pp-toggle{margin:10px 0 0;padding:9px 16px;border-radius:999px;border:1.5px solid rgba(255,184,0,0.45);background:rgba(255,184,0,0.08);color:var(--accent-amber);font-family:inherit;font-size:.8rem;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
+        .pp-toggle{margin:10px 0 0;padding:9px 18px;border-radius:12px;border:1px solid rgba(255,184,0,0.5);background:linear-gradient(135deg,rgba(255,184,0,0.14),rgba(255,122,0,0.06));color:var(--accent-amber);font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.6px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
         .pp-toggle:hover{background:rgba(255,184,0,0.18);transform:translateY(-1px);box-shadow:0 5px 14px rgba(255,184,0,0.22);}
         .pp-all{margin-top:10px;}
         .pp-selected:empty::after{content:'No privilege selected yet — click “Show all” to pick.';font-size:.78rem;color:var(--text-muted);font-style:italic;}
@@ -1242,13 +1277,15 @@
         /* 1) Reject Reason now LOOKS like the Agency Point Privilege picker:
               same card grid + filter + selected chips, but keeps its rose
               accent (.pp-rose repaints every amber piece of .pp-picker). */
-        .pp-picker.pp-rose .pp-sel-chip{background:rgba(255,77,109,.14);border-color:rgba(255,77,109,.5);color:#ff9db4;}
+        .pp-picker.pp-rose .pp-sel-chip{background:linear-gradient(135deg,rgba(255,77,109,.20),rgba(255,77,109,.08));border-color:rgba(255,77,109,.55);color:#ff9db4;box-shadow:0 2px 8px rgba(255,77,109,.10);}
+        .pp-picker.pp-rose .pp-sel-chip button{background:rgba(255,77,109,.18);}
+        .pp-picker.pp-rose .pp-sel-chip button:hover{background:var(--accent-rose);color:#2b050d;}
         .pp-picker.pp-rose .pp-filter:focus{border-color:var(--accent-rose);}
         .pp-picker.pp-rose .pp-card:hover{border-color:var(--accent-rose);background:rgba(255,77,109,.05);}
-        .pp-picker.pp-rose .pp-card.active{border-color:var(--accent-rose);background:rgba(255,77,109,.10);box-shadow:0 0 10px rgba(255,77,109,.15);}
-        .pp-picker.pp-rose .pp-card-badge{color:#ff9db4;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.35);}
+        .pp-picker.pp-rose .pp-card.active{border-color:var(--accent-rose);background:linear-gradient(135deg,rgba(255,77,109,.16),rgba(255,77,109,.06));box-shadow:0 0 14px rgba(255,77,109,.20),inset 0 1px 0 rgba(255,255,255,.06);}
+        .pp-picker.pp-rose .pp-card-badge{color:#2b050d;background:linear-gradient(135deg,#ff9db4,var(--accent-rose));box-shadow:0 2px 6px rgba(255,77,109,.25);}
         .pp-picker.pp-rose .pp-card-check{color:var(--accent-rose);}
-        .pp-picker.pp-rose .pp-toggle{border-color:rgba(255,77,109,.45);color:var(--accent-rose);background:rgba(255,77,109,.08);}
+        .pp-picker.pp-rose .pp-toggle{border-color:rgba(255,77,109,.5);color:var(--accent-rose);background:linear-gradient(135deg,rgba(255,77,109,.14),rgba(255,77,109,.05));}
         .pp-picker.pp-rose .pp-toggle:hover{background:rgba(255,77,109,.16);}
         .pp-picker.pp-rose .pp-selected:empty::after{content:'No reason selected yet — click “Show all” to pick.';}
         /* 2) Reject Reason's own card, parked under Basic Information in the
@@ -8991,6 +9028,11 @@ function feishuValueToList(value) {
 
 let ltQueue = [];
 let ltActiveTicket = null;
+// Phase 10.12 (fast save): frozen copy of the record's fields as OPENED --
+// twCollectFields diffs against this and sends only changed fields. It must
+// be a SEPARATE snapshot (not ltActiveTicket) because twApAdoptCharged()
+// mutates ltActiveTicket.fields after a charge.
+let twOrigFields = null;
 let ltPusherInstance = null;
 let ltInitialized = false;
 let ltLastPullAt = 0; // Phase 10: last successful (or attempted) queue sync, for auto-pull throttling
@@ -9376,7 +9418,7 @@ function twApIsCharged() {
 function twRenderAgencyPointGate(ticket) {
     document.getElementById('twApGateCard')?.remove();
     const f = ticket.fields;
-    twApGate = { charged: false, charging: false, agency: null, receipt: feishuValueToString(f['Transaction Receipt']) };
+    twApGate = { charged: false, charging: false, correcting: false, agency: null, receipt: feishuValueToString(f['Transaction Receipt']) };
     // Double-charge guard: tickets charged by the OLD flow may still carry
     // "Confirm & Charge" in Order Action on the record. Clear it in the form
     // so a later Save can't hand that value back to the sheet (that value is
@@ -9409,6 +9451,7 @@ function twRenderAgencyPointGate(ticket) {
 // / twApChargeBtn.
 function twApPaintGate(card, ticket) {
     const charged = twApGate.charged;
+    const correcting = !!twApGate.correcting;
     const code = feishuValueToString(ticket.fields['Agency Code']).trim() || '—';
     // A previous attempt that approved 0 items leaves a zero-deduction
     // receipt on the ticket -- tell the agent it's retryable, don't hide it.
@@ -9437,12 +9480,37 @@ function twApPaintGate(card, ticket) {
     <div class="apg-block-title">🧾 Receipt${chargeCount > 1 ? ` · ${chargeCount} charges` : ''} <span style="color:var(--accent-green);letter-spacing:0;text-transform:none">— ${twApReceiptDeducted(twApGate.receipt).toLocaleString()} pts deducted total</span></div>
     <div class="apg-receipt">${twApFmtReceipt(twApGate.receipt)}</div>
     ${twApGate.tracker ? `<div class="apg-state" style="margin-top:6px">${twApFmtReceipt(twApGate.tracker)}</div>` : ''}` : ''}
-    <div class="apg-block-title">${charged ? '➕ Charge more — live preview' : '🧮 Live preview'}</div>
-    <div class="apg-receipt" id="apgPreview"><span style="color:var(--text-muted)">⏳ Loading points wallet…</span></div>
+    <div class="apg-block-title">${correcting ? '✏️ Edit last charge — type the CORRECT quantities' : (charged ? '➕ Charge more — live preview' : '🧮 Live preview')}</div>
+    <div class="apg-preview" id="apgPreview"><span style="color:var(--text-muted)">⏳ Loading points wallet…</span></div>
     <div class="apg-actions">
-        <button type="button" id="twApChargeBtn" class="${charged ? 'apg-btn-more' : ''}" disabled onclick="twApConfirmCharge()">${charged ? '⚡ Charge More Points' : '⚡ Confirm &amp; Charge Points'}</button>
-        <span class="apg-state" id="apgState">${charged ? 'Type new quantities above and charge again — only the new items are deducted.' : 'Preview is instant — confirming deducts from the agency wallet in one click (a few seconds).'}</span>
+        <button type="button" id="twApChargeBtn" class="${correcting ? 'apg-correcting' : (charged ? 'apg-btn-more' : '')}" disabled onclick="twApConfirmCharge()">${correcting ? '✏️ Apply Correction' : (charged ? '⚡ Charge More Points' : '⚡ Confirm &amp; Charge Points')}</button>
+        <div class="apg-actions-foot">
+            <span class="apg-state" id="apgState">${correcting ? 'The last charge is reversed first, then your corrected quantities are charged — limits and balance re-checked.' : (charged ? 'Type new quantities above and charge again — only the new items are deducted.' : 'Preview is instant — confirming deducts from the agency wallet in one click (a few seconds).')}</span>
+            ${charged ? `<button type="button" class="apg-edit-btn" onclick="twApToggleCorrect()">${correcting ? '✕ Cancel edit' : '✏️ Edit last charge'}</button>` : ''}
+        </div>
     </div>`;
+}
+
+// Phase 10.12 (edit-last-charge): flips the gate into correction mode — the
+// button becomes "Apply Correction" (purple), the preview prices against the
+// balance the reversal restores, and confirming posts to
+// /api/agency-points/correct-charge instead of /charge.
+function twApToggleCorrect() {
+    twApGate.correcting = !twApGate.correcting;
+    const card = document.getElementById('twApGateCard');
+    if (card && ltActiveTicket) {
+        twApPaintGate(card, ltActiveTicket);
+        twApRefreshPreview();
+    }
+}
+
+// How many points the LAST charge on the receipt deducted — the amount the
+// correction puts back into the wallet before re-charging.
+function twApLastChargeDeducted() {
+    const parts = String(twApGate.receipt || '').split('➕ ── ADDITIONAL CHARGE ── ➕');
+    const seg = parts[parts.length - 1];
+    const m = seg.match(/TOTAL DEDUCTED:\s*([\d.]+)\s*pts/);
+    return m ? parseFloat(m[1]) || 0 : 0;
 }
 
 async function twApLoadAgency(code) {
@@ -9506,39 +9574,43 @@ function twApRefreshPreview() {
         return;
     }
     let remaining = balance, total = 0;
-    const html = [];
+    const correcting = !!twApGate.correcting;
+    if (correcting) remaining += twApLastChargeDeducted(); // the reversal restores these first
+    const rows = [];
     privs.forEach((p, i) => {
         // Parity with the backend allocator: a checked privilege with no
         // quantity typed is SKIPPED (qty 0), not treated as 1.
         const q = qtys[i] || 0;
-        if (q <= 0) { html.push(`<span style="color:var(--text-muted)">▫️ ${escHtml(p.split('(')[0].trim())} — no quantity typed, skipped</span>`); return; }
+        const itemName = escHtml(p.split('(')[0].trim());
+        if (q <= 0) { rows.push(`<div class="apg-pv-row"><span class="apg-pv-ic">▫️</span><span class="apg-pv-name">${itemName}<small>no quantity typed — skipped</small></span><b>—</b></div>`); return; }
         const rule = twApRuleFor(p);
-        if (!rule) { html.push(`<span class="bad">❌ UNKNOWN ITEM: ${escHtml(p)} — not in the points price list</span>`); return; }
+        if (!rule) { rows.push(`<div class="apg-pv-row bad"><span class="apg-pv-ic">❌</span><span class="apg-pv-name">${escHtml(p)}<small>UNKNOWN ITEM — not in the points price list</small></span><b>—</b></div>`); return; }
         const price = other ? rule.other : rule.same;
         const disp = rule.key.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
         const { maxAllowed, used, limit, source } = getEffectiveLimit(rule.key);
         const limitLabel = rule.type === 'order' ? `max ${limit} per request` : (source === 'server' ? `${used}/${limit} used this month` : `limit ${limit}`);
-        if (maxAllowed <= 0) { html.push(`<span class="bad">❌ FULLY REJECTED: ${q}× ${disp} — Reason: limit reached (${limitLabel})</span>`); return; }
+        if (maxAllowed <= 0) { rows.push(`<div class="apg-pv-row bad"><span class="apg-pv-ic">❌</span><span class="apg-pv-name">${disp}<small>FULLY REJECTED: ${q}× — limit reached (${limitLabel})</small></span><b>0</b></div>`); return; }
         const desired = Math.min(q, maxAllowed);
         const affordable = Math.floor(remaining / price);
         const approved = Math.min(desired, affordable);
         if (approved >= q) {
-            html.push(`<span class="ok">✅ FULLY APPROVED: ${q}× ${disp} @ ${price} pts = ${q * price}</span>`);
+            rows.push(`<div class="apg-pv-row ok"><span class="apg-pv-ic">✅</span><span class="apg-pv-name">${disp}<small>FULLY APPROVED · ${q} × ${price} pts</small></span><b>${q * price}</b></div>`);
         } else if (approved > 0) {
             const reason = desired < q ? `monthly limit — ${limitLabel}` : `not enough points for ${desired}×`;
-            html.push(`<span class="warn">⚠️ PARTIALLY APPROVED: ${approved}× ${disp} @ ${price} pts = ${approved * price}\n   ⤷ (Rejected ${q - approved}×: ${reason})</span>`);
+            rows.push(`<div class="apg-pv-row warn"><span class="apg-pv-ic">⚠️</span><span class="apg-pv-name">${disp}<small>PARTIALLY APPROVED · ${approved} × ${price} pts (rejected ${q - approved}×: ${reason})</small></span><b>${approved * price}</b></div>`);
         } else {
             const reason = desired < q ? `limit reached (${limitLabel})` : `not enough points (need ${desired * price}, only ${remaining} left)`;
-            html.push(`<span class="bad">❌ FULLY REJECTED: ${disp} — Reason: ${reason}</span>`);
+            rows.push(`<div class="apg-pv-row bad"><span class="apg-pv-ic">❌</span><span class="apg-pv-name">${disp}<small>FULLY REJECTED — ${reason}</small></span><b>0</b></div>`);
         }
         total += approved * price;
         remaining -= approved * price;
     });
-    html.push(`<span style="color:var(--border-hover)">━━━━━━━━━━━━━━</span>`);
-    html.push(`<span style="color:var(--accent-rose);font-weight:bold">💰 TOTAL TO DEDUCT: ${total.toLocaleString()} pts</span>`);
-    html.push(`<span style="color:var(--accent-cyan);font-weight:bold">💳 BALANCE AFTER: ${remaining.toLocaleString()} pts</span>`);
-    html.push(`<span style="color:var(--text-muted)">📍 ${other ? 'Other agency rate' : 'Same agency rate'} · the server computes the final amounts at charge time</span>`);
-    if (prev) prev.innerHTML = html.join('\n');
+    // Single-span chips: innerText must keep "TOTAL TO DEDUCT: N" /
+    // "BALANCE AFTER: N" on one line (the test suite matches those strings).
+    rows.push(`<div class="apg-pv-sum total"><span>💰 TOTAL TO DEDUCT: ${total.toLocaleString()} pts</span></div>`);
+    rows.push(`<div class="apg-pv-sum after"><span>💳 BALANCE AFTER: ${remaining.toLocaleString()} pts</span></div>`);
+    rows.push(`<div class="apg-pv-note">📍 ${other ? 'Other agency rate' : 'Same agency rate'} · the server computes the final amounts at charge time${correcting ? ' · editing: the balance above includes the reversed last charge' : ''}</div>`);
+    if (prev) prev.innerHTML = rows.join('');
     if (btn) btn.disabled = total <= 0;
 }
 
@@ -9568,12 +9640,13 @@ async function twApConfirmCharge() {
     const targetRaw = document.querySelector('#tw-sec-2 [name="Target Type"]')?.value || '';
     const agencyCode = document.querySelector('#tw-sec-2 [name="Agency Code"]')?.value?.trim()
         || feishuValueToString(ltActiveTicket?.fields?.['Agency Code']).trim();
+    const correcting = !!twApGate.correcting;
     twApGate.charging = true;
     let zeroAttempt = false; // keeps the rejection receipt visible (no preview refresh)
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Charging…'; }
-    if (state) state.textContent = 'Deducting points from the agency wallet…';
+    if (btn) { btn.disabled = true; btn.textContent = correcting ? '⏳ Correcting…' : '⏳ Charging…'; }
+    if (state) state.textContent = correcting ? 'Reversing the last charge, then applying your correction…' : 'Deducting points from the agency wallet…';
     try {
-        const res = await fetch('/api/agency-points/charge', {
+        const res = await fetch(correcting ? '/api/agency-points/correct-charge' : '/api/agency-points/charge', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -9589,11 +9662,13 @@ async function twApConfirmCharge() {
         if (!res.ok || !data.success) throw new Error(data.error || `Charge failed (HTTP ${res.status}).`);
         if ((data.deducted || 0) > 0) {
             // Keep the on-screen wallet honest without a reload: balance comes
-            // back from the server; used goes up by this charge's deduction.
+            // back from the server; used goes up by this charge's deduction
+            // (a correction first takes the reversed charge back out).
             if (twApGate.agency) {
                 if (typeof data.balance_after === 'number') twApGate.agency.point_balance = data.balance_after;
-                twApGate.agency.used_points = (twApGate.agency.used_points || 0) + (data.deducted || 0);
+                twApGate.agency.used_points = Math.max(0, (twApGate.agency.used_points || 0) - (data.reversed || 0) + (data.deducted || 0));
             }
+            twApGate.correcting = false;
             twApAdoptCharged({
                 record_id: recordId,
                 fields: {
@@ -9610,9 +9685,33 @@ async function twApConfirmCharge() {
             // Zero-approval attempt: show WHY (per-item rejection reasons are
             // in the receipt), keep the form exactly as typed, stay retryable.
             zeroAttempt = true;
+            // A zero CORRECTION still reversed the last charge server-side
+            // (that write always happens) -- sync the restored wallet + the
+            // new receipt/tracker FIRST (it repaints the card), then show the
+            // rejection receipt so the repaint can't clobber it.
+            if (data.corrected) {
+                if (twApGate.agency) {
+                    if (typeof data.balance_after === 'number') twApGate.agency.point_balance = data.balance_after;
+                    twApGate.agency.used_points = Math.max(0, (twApGate.agency.used_points || 0) - (data.reversed || 0));
+                }
+                twApGate.correcting = false;
+                twApGate.receipt = data.full_receipt || data.receipt;
+                twApGate.tracker = data.tracker || twApGate.tracker;
+                twApGate.charged = twApReceiptIsConfirmed(twApGate.receipt);
+                const syncC = (name, val) => { const c = document.querySelector(`#tw-sec-2 [name="${name}"]`); if (c) c.value = val; };
+                syncC('Transaction Receipt', twApGate.receipt);
+                syncC('Latest Usage Tracker', twApGate.tracker);
+                if (ltActiveTicket?.fields) {
+                    ltActiveTicket.fields['Transaction Receipt'] = twApGate.receipt;
+                    ltActiveTicket.fields['Latest Usage Tracker'] = twApGate.tracker;
+                }
+                const card = document.getElementById('twApGateCard');
+                if (card && ltActiveTicket) twApPaintGate(card, ltActiveTicket);
+            }
             const prev = document.getElementById('apgPreview');
             if (prev) prev.innerHTML = twApFmtReceipt(data.receipt);
-            if (state) state.textContent = '⚠️ Nothing was approved — 0 pts deducted. Adjust the quantities / target type above and charge again.';
+            const st2 = document.getElementById('apgState');
+            if (st2) st2.textContent = '⚠️ Nothing was approved — 0 pts deducted. Adjust the quantities / target type above and charge again.';
             ToastManager.show('Nothing approved — 0 pts deducted. Adjust the order and retry.', 'warning', 6000);
         }
     } catch (e) {
@@ -9622,7 +9721,9 @@ async function twApConfirmCharge() {
         twApGate.charging = false;
         if (btn && document.getElementById('twApChargeBtn') === btn) {
             btn.disabled = false;
-            btn.textContent = twApGate.charged ? '⚡ Charge More Points' : '⚡ Confirm & Charge Points';
+            btn.classList.toggle('apg-correcting', !!twApGate.correcting);
+            btn.classList.toggle('apg-btn-more', !twApGate.correcting && !!twApGate.charged);
+            btn.textContent = twApGate.correcting ? '✏️ Apply Correction' : (twApGate.charged ? '⚡ Charge More Points' : '⚡ Confirm & Charge Points');
             if (!zeroAttempt) twApRefreshPreview(); // don't clobber a rejection receipt
         }
     }
@@ -9894,6 +9995,7 @@ async function twOpenWorkspace(recordId) {
             ticket = data.record;
         }
         ltActiveTicket = ticket;
+        twOrigFields = JSON.parse(JSON.stringify(ticket.fields || {})); // fast-save diff base
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
         twResetNote(true); // Phase 10.1: fresh ticket -> close & clear the scratch note
 
@@ -10822,7 +10924,7 @@ function twComputedFieldHtml(key, valStr) {
         const n = parseFloat(String(valStr).replace(/[^\d.\-]/g, ''));
         const hasN = Number.isFinite(n);
         const cls = !hasN ? 'zero' : (n > 0 ? 'pos' : (n < 0 ? 'neg' : 'zero'));
-        return `<div class="twcf-balance ${cls}"><span class="coin">🪙</span><div><b>${hasN ? n.toLocaleString() : escHtml(valStr || '—')}</b><span class="sub">points remaining · updates automatically (Total − Used)</span></div></div>`;
+        return `<div class="twcf-bal-mini ${cls}"><span class="coin">🪙</span><b>${hasN ? n.toLocaleString() : escHtml(valStr || '—')}</b><span class="sub">points remaining</span></div>`;
     }
     const parts = String(valStr || '').split('|').map(s => s.trim()).filter(Boolean);
     const pairs = parts.map(p => { const i = p.indexOf(':'); return i > 0 ? [p.slice(0, i).trim(), p.slice(i + 1).trim()] : null; });
@@ -10942,11 +11044,18 @@ function createTwControl(key, value) {
 
     // Phase 10.10: computed (Formula) fields get designed, readable renderings
     // instead of a cramped read-only input -- "Point Balance" becomes a 🪙
-    // numeric hero chip (color-coded), and the pipe-separated "Formula"
+    // color-coded chip, and the pipe-separated "Formula"
     // summary ("Agency Code: 23918 | Privilege: 30 Mics | ...") becomes a chip
     // grid of Key: Value pairs. Both render WITHOUT a name attribute, so
     // twCollectFields never picks them up (they were read-only anyway).
-    if (key === 'Point Balance' || key === 'Formula') {
+    // Phase 10.12: Point Balance shrinks to ONE compact grid cell (input-height
+    // mini chip) so it sits in the form flow like any other field; Formula
+    // keeps the full-width chip grid.
+    if (key === 'Point Balance') {
+        wrap.innerHTML = label + twComputedFieldHtml(key, valStr);
+        return wrap;
+    }
+    if (key === 'Formula') {
         wrap.style.gridColumn = '1 / -1';
         wrap.innerHTML = label + twComputedFieldHtml(key, valStr);
         return wrap;
@@ -11018,10 +11127,15 @@ function twCollectFields(form) {
     // ISSUE FIX (new attachment uploads wiping the old ones): resend each attachment
     // field's existing (valid) file tokens -- stashed on the control by
     // twRenderAttachmentControl() -- so the backend can merge them with any newly
-    // uploaded files instead of overwriting the whole cell. Only sent when there's at
-    // least one existing attachment; an empty field with a fresh upload doesn't need
-    // this (nothing to preserve).
+    // uploaded files instead of overwriting the whole cell.
+    // Phase 10.12 (fast save): ONLY when the agent actually picked new files
+    // for that field. An untouched attachment field sends nothing at all --
+    // re-shipping the same tokens forced Feishu to reprocess every image on
+    // the row and was a big part of the save time. (There is no removal UI,
+    // so "unchanged" and "removed" can't be confused here.)
     form.querySelectorAll('[data-attachment-field]').forEach(el => {
+        const hasNewFiles = !!el.querySelector('input[type="file"]')?.files?.length;
+        if (!hasNewFiles) { delete fields[el.dataset.attachmentField]; return; }
         try {
             const existing = JSON.parse(el.dataset.attachmentExisting || '[]');
             if (Array.isArray(existing) && existing.length > 0) {
@@ -11062,7 +11176,38 @@ function twCollectFields(form) {
     // it's because the admin edited the actual <select name="Request Type"> in Basic
     // Information, which the generic select-collection loop above already captured.
 
+    // Phase 10.12 (fast save): send ONLY what actually changed. The old
+    // full-field PUT made Feishu re-validate and recalculate every formula /
+    // lookup / rollup on the row -- that was most of the Save & Resolve time.
+    // Diff base is twOrigFields (frozen at open; ltActiveTicket gets mutated
+    // by twApAdoptCharged, which is exactly why the cleared "Quantities Input"
+    // after a charge still diffs as changed and reaches the sheet).
+    if (twOrigFields) {
+        Object.keys(fields).forEach(k => {
+            if (fields[k] === false && (twOrigFields[k] === undefined || twOrigFields[k] === null || twOrigFields[k] === false)) {
+                delete fields[k]; // unchecked checkbox vs empty record -- not a change
+                return;
+            }
+            if (twNormForCompare(fields[k]) === twNormForCompare(twOrigFields[k])) delete fields[k];
+        });
+    }
+
     return fields;
+}
+
+// Normalizes a form value OR a raw Feishu field value into one comparable
+// string: arrays (multi-select, users, attachments, rich text) become a
+// sorted "|" join of their ids/tokens/texts; scalars become trimmed strings.
+function twNormForCompare(v) {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) {
+        return v.map(x => {
+            if (x && typeof x === 'object') return String(x.id || x.file_token || x.text || x.name || '');
+            return String(x);
+        }).filter(s => s !== '').sort().join('|');
+    }
+    if (typeof v === 'object') return String(v.id || v.file_token || v.text || v.name || JSON.stringify(v));
+    return String(v).trim();
 }
 
 async function twSaveWorkspace() {
@@ -11131,7 +11276,7 @@ async function twSaveWorkspace() {
         });
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
-        ToastManager.show('Ticket saved successfully.', 'success');
+        ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : 'Ticket saved successfully.', 'success');
         twResetNote(true); // Phase 10.1: submitted -> close & clear the scratch note
         
         const rid = document.getElementById('tw-record-id').value;
