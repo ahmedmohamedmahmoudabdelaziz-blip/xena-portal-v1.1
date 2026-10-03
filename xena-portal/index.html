@@ -203,7 +203,12 @@
         .ti-table tbody tr{transition:background .18s ease;}
         .ti-table tbody tr:hover{background:rgba(0,212,255,.05);}
         .ti-table tbody tr:last-child td{border-bottom:none;}
-        .ti-table .ti-act-cell{text-align:right;white-space:nowrap;}
+        /* Phase 10.13.3 (Ahmed): the 🎫 Open column is pinned to the right
+           edge so it can NEVER scroll out of view, even if the viewport is
+           narrow enough to force horizontal scrolling on the rest. */
+        .ti-table .ti-act-cell{text-align:right;white-space:nowrap;position:sticky;right:0;z-index:1;background:#171927;box-shadow:-10px 0 14px rgba(0,0,0,.38);}
+        .ti-table tbody tr:hover .ti-act-cell{background:#1b1e31;}
+        .ti-table thead th.ti-act-cell{right:0;z-index:4;background:rgba(10,12,22,.98);box-shadow:-10px 0 14px rgba(0,0,0,.38);}
         .ti-table .ti-open-btn{padding:7px 18px;font-size:.78rem;}
 
         /* ─── Phase 10.13: Preview Agent View ─── */
@@ -549,26 +554,31 @@
         .rr-chip.active { background: rgba(255,77,109,.16); border-color: var(--accent-rose); color: #ff9db4; }
         /* Agency Point Privilege picker (New Request > Agency Point Request):
            a card grid where the privilege name leads and its point cost is a
-           calm cyan badge, instead of one long cramped checkbox list.
-           Phase 10.13.2: repainted from the harsh gold/amber to the app's
-           stable cyan accent (Ahmed: "the colour yellow is not good to the
-           eye") -- flat tints, no glow, same shapes as before. */
+           readable badge, instead of one long cramped checkbox list.
+           Phase 10.13.3: repainted to ROYAL INDIGO (Ahmed rejected both the
+           gold and the cyan) and the selection design got a real affordance --
+           every card carries an always-visible check circle that fills when
+           picked, the badge is a solid readable pill (dark text on light
+           indigo), fonts bumped up for legibility, and an empty-state hint
+           tells the agent where to click. The .pp-rose variant below still
+           repaints everything for Reject Reason. */
         .pp-picker { margin-top: 6px; }
-        .pp-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-        .pp-selected:empty { display: none; }
-        .pp-sel-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(0,212,255,.10); border: 1px solid rgba(0,212,255,.40); color: var(--accent-cyan); font-family: 'Space Grotesk', sans-serif; font-size: .76rem; font-weight: 700; padding: 5px 7px 5px 12px; border-radius: 10px; }
-        .pp-sel-chip button { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; background: rgba(0,212,255,.14); border: none; border-radius: 50%; color: inherit; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0; opacity: .85; transition: all .12s; }
-        .pp-sel-chip button:hover { opacity: 1; background: var(--accent-cyan); color: #001318; }
-        .pp-filter { width: 100%; box-sizing: border-box; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); font-size: .8rem; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color .15s; }
-        .pp-filter:focus { border-color: var(--accent-cyan); }
-        .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
-        .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 11px 13px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .15s; }
-        .pp-card:hover { border-color: rgba(0,212,255,.55); background: rgba(0,212,255,.05); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.25); }
-        .pp-card.active { border-color: var(--accent-cyan); background: rgba(0,212,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
-        .pp-card-name { font-family: 'Space Grotesk', sans-serif; font-size: .82rem; font-weight: 700; color: var(--text); line-height: 1.25; padding-right: 16px; }
-        .pp-card-badge { font-family: 'Space Grotesk', sans-serif; font-size: .66rem; font-weight: 700; letter-spacing: .3px; color: var(--accent-cyan); background: rgba(0,212,255,.10); border: 1px solid rgba(0,212,255,.35); border-radius: 8px; padding: 3px 9px; }
-        .pp-card-check { position: absolute; top: 8px; right: 10px; font-size: .82rem; font-weight: 700; color: var(--accent-cyan); opacity: 0; transition: opacity .12s; }
-        .pp-card.active .pp-card-check { opacity: 1; }
+        .pp-selected { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 9px; }
+        .pp-picker:not(.pp-rose) .pp-selected:empty::after { content: 'No privilege selected yet — tap “⊞ Show all privileges” to pick.'; font-size: .75rem; color: var(--text-muted); font-style: italic; }
+        .pp-sel-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(139,124,246,.15); border: 1px solid rgba(139,124,246,.55); color: #ddd6ff; font-family: 'Space Grotesk', sans-serif; font-size: .78rem; font-weight: 700; padding: 5px 7px 5px 12px; border-radius: 10px; }
+        .pp-sel-chip button { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; background: rgba(139,124,246,.20); border: none; border-radius: 50%; color: inherit; cursor: pointer; font-size: .85rem; line-height: 1; padding: 0; opacity: .9; transition: all .12s; }
+        .pp-sel-chip button:hover { opacity: 1; background: #8b7cf6; color: #16102e; }
+        .pp-filter { width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); font-size: .82rem; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color .15s; }
+        .pp-filter:focus { border-color: #8b7cf6; box-shadow: 0 0 0 3px rgba(139,124,246,.14); }
+        .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 9px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
+        .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .15s; }
+        .pp-card:hover { border-color: rgba(139,124,246,.60); background: rgba(139,124,246,.06); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.28); }
+        .pp-card.active { border-color: #8b7cf6; background: rgba(139,124,246,.13); box-shadow: 0 0 0 1px rgba(139,124,246,.35), inset 0 1px 0 rgba(255,255,255,.06); }
+        .pp-card-name { font-family: 'Space Grotesk', sans-serif; font-size: .85rem; font-weight: 700; color: #f1eeff; line-height: 1.3; padding-right: 24px; }
+        .pp-card-badge { font-family: 'Space Grotesk', sans-serif; font-size: .68rem; font-weight: 700; letter-spacing: .3px; color: #1b1338; background: linear-gradient(135deg, #cfc6ff, #8b7cf6); border: none; border-radius: 8px; padding: 3px 10px; }
+        .pp-card-check { position: absolute; top: 10px; right: 10px; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.30); display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 800; color: transparent; transition: all .15s; }
+        .pp-card:hover .pp-card-check { border-color: rgba(139,124,246,.75); }
+        .pp-card.active .pp-card-check { background: #8b7cf6; border-color: #8b7cf6; color: #16102e; }
         /* Fields a 💡 Double-check reminder blames get painted red, the same
            way auto-filled fields get painted green (.reqfld-autofilled). */
         .control-group.aws-flag > label { color: #ff8fa3; }
@@ -1255,10 +1265,9 @@
         /* Phase 10.2: Agency Point Privilege picker -- collapsed by default so
            only the chosen privileges show; "Show all" unfolds the full card
            grid for selecting/unselecting, then folds back. */
-        .pp-toggle{margin:10px 0 0;padding:9px 18px;border-radius:12px;border:1px solid rgba(0,212,255,0.4);background:rgba(0,212,255,0.08);color:var(--accent-cyan);font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.6px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
-        .pp-toggle:hover{background:rgba(0,212,255,0.14);transform:translateY(-1px);box-shadow:0 5px 14px rgba(0,212,255,0.15);}
+        .pp-toggle{margin:10px 0 0;padding:9px 18px;border-radius:12px;border:1px solid rgba(139,124,246,0.5);background:rgba(139,124,246,0.09);color:#c9bfff;font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.6px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
+        .pp-toggle:hover{background:rgba(139,124,246,0.16);transform:translateY(-1px);box-shadow:0 5px 14px rgba(139,124,246,0.18);}
         .pp-all{margin-top:10px;}
-        .pp-selected:empty::after{content:'No privilege selected yet — click “Show all” to pick.';font-size:.78rem;color:var(--text-muted);font-style:italic;}
 
         /* Phase 10.2: searchable-select panels are portaled to <body> (fixed
            position) so they can never be clipped by a section card's
@@ -1353,7 +1362,9 @@
         .pp-picker.pp-rose .pp-card:hover{border-color:var(--accent-rose);background:rgba(255,77,109,.05);}
         .pp-picker.pp-rose .pp-card.active{border-color:var(--accent-rose);background:linear-gradient(135deg,rgba(255,77,109,.16),rgba(255,77,109,.06));box-shadow:0 0 14px rgba(255,77,109,.20),inset 0 1px 0 rgba(255,255,255,.06);}
         .pp-picker.pp-rose .pp-card-badge{color:#2b050d;background:linear-gradient(135deg,#ff9db4,var(--accent-rose));box-shadow:0 2px 6px rgba(255,77,109,.25);}
-        .pp-picker.pp-rose .pp-card-check{color:var(--accent-rose);}
+        .pp-picker.pp-rose .pp-card-check{color:transparent;border-color:rgba(255,255,255,.30);}
+        .pp-picker.pp-rose .pp-card:hover .pp-card-check{border-color:rgba(255,77,109,.75);}
+        .pp-picker.pp-rose .pp-card.active .pp-card-check{background:var(--accent-rose);border-color:var(--accent-rose);color:#2b050d;}
         .pp-picker.pp-rose .pp-toggle{border-color:rgba(255,77,109,.5);color:var(--accent-rose);background:linear-gradient(135deg,rgba(255,77,109,.14),rgba(255,77,109,.05));}
         .pp-picker.pp-rose .pp-toggle:hover{background:rgba(255,77,109,.16);}
         .pp-picker.pp-rose .pp-selected:empty::after{content:'No reason selected yet — click “Show all” to pick.';}
@@ -3586,7 +3597,7 @@
                  targeted query returns basic columns only, and each row's Open
                  button loads that ticket into the Ticket Workspace. -->
             <div id="pg-tickets-pending" style="display:none">
-                <div class="card" style="max-width:1200px;margin:0 auto 18px">
+                <div class="card" style="margin:0 0 18px">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
                         <div>
                             <h3 class="ltq-title">🕵️ Under Investigation</h3>
@@ -3595,7 +3606,7 @@
                         <button class="btn btn-primary" id="tiSearchBtn" onclick="tiSearch()">🔍 Search</button>
                     </div>
                 </div>
-                <div class="card" style="max-width:1200px;margin:0 auto">
+                <div class="card" style="margin:0">
                     <div id="tiCount" style="color:var(--text-muted);font-size:.85rem;margin-bottom:10px">Click <b>Search</b> to load the pending requests.</div>
                     <div id="tiResults"></div>
                     <div id="tiEmpty" style="display:none;text-align:center;padding:34px 10px;color:var(--text-muted)">
@@ -8259,7 +8270,13 @@ async function tiSearch() {
 // Request Type / Respondents / Mentioned Person / Type of Action / Region /
 // ACM / User ID / Agency Code, with the 🎫 Open button pinned at the right.
 function tiTableHtml(rows) {
-    const cell = (val) => `<td>${escHtml((val === undefined || val === null || val === '') ? '—' : String(val))}</td>`;
+    // Phase 10.13.3 (Ahmed): every cell carries its FULL text in title= so
+    // hover reveals whatever the ellipsis clipped ("not show the remaining
+    // info"), and the action column header gets the sticky class too.
+    const cell = (val) => {
+        const txt = (val === undefined || val === null || val === '') ? '—' : String(val);
+        return `<td title="${escHtml(txt)}">${escHtml(txt)}</td>`;
+    };
     const body = rows.map(r => {
         const rid = escHtml(r.record_id || '');
         const num = r.numbering || (r.record_id ? String(r.record_id).slice(-6) : '—');
@@ -8281,7 +8298,7 @@ function tiTableHtml(rows) {
         <thead><tr>
             <th>#</th><th>Submitted on</th><th>Request Type</th><th>Respondents</th>
             <th>Mentioned Person</th><th>Type of Action</th><th>Region</th><th>ACM</th>
-            <th>User ID</th><th>Agency Code</th><th></th>
+            <th>User ID</th><th>Agency Code</th><th class="ti-act-cell"></th>
         </tr></thead>
         <tbody>${body}</tbody>
     </table></div>`;
@@ -9731,6 +9748,33 @@ document.addEventListener('input', (e) => {
     twAutoGrowTxt(t);
 });
 
+// Phase 10.13.3 (Ahmed): one click inside "Latest Usage Tracker" or
+// "Transaction Receipt" selects the WHOLE content, exactly like tapping a
+// cell in the sheet -- these two boxes hold system-written evidence text the
+// agent copies into group messages, never hand-edits, so one-tap select-all
+// beats cursor placement here. (Ahmed: "when click several time not select
+// the content of the Latest Usage Tracker unlike the sheet".)
+// Rapid repeated clicks fire a DOUBLE-click too, whose default word-selection
+// runs during the dblclick dispatch AFTER our click handler and collapses the
+// selection back to a cursor -- so the select-all is re-asserted on dblclick
+// and once more after the whole sequence settles (rAF, before paint).
+function twSelectWholeBox(t) {
+    t.focus();
+    t.select();
+    requestAnimationFrame(() => { if (document.activeElement === t) t.select(); });
+}
+const TW_SELECT_ALL_SEL = 'textarea[name="Latest Usage Tracker"], textarea[name="Transaction Receipt"], input[name="Latest Usage Tracker"], input[name="Transaction Receipt"]';
+document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches(TW_SELECT_ALL_SEL)) return;
+    twSelectWholeBox(t);
+});
+document.addEventListener('dblclick', (e) => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches(TW_SELECT_ALL_SEL)) return;
+    twSelectWholeBox(t);
+});
+
 // Renders the Dynamic Request Section (card 2) for a given ticket, using
 // reqTypeOverride if provided (manual tab pick) or the record's own "Request Type"
 // otherwise. Pulled out of twOpenWorkspace so twSelectRequestType can call it again
@@ -9786,17 +9830,19 @@ function twRenderSection2(ticket, reqTypeOverride) {
     if (reqType === 'Agency Creation') twRenderAgencyCreationExtras(sec2, ticket);
 
     // Phase 10.8: Agency Point tickets get the Confirm & Charge gate card.
-    // Phase 10.13: never in create mode -- a blank draft has no wallet/ticket
-    // to charge; charging becomes relevant only after the request is filed.
-    if (reqType === 'Agency Point Request' && !twCreateMode) twRenderAgencyPointGate(ticket);
+    // Phase 10.13.3 (Ahmed): the gate renders in the New Ticket draft too --
+    // the wallet loads as soon as an Agency Code is typed, and confirming a
+    // charge on a draft files the ticket first, then charges the new record.
+    if (reqType === 'Agency Point Request') twRenderAgencyPointGate(ticket);
 
     // Phase 10.8: live preview — any edit inside sec2 (privilege pick,
     // quantity, target type) re-runs the client-side estimate. One-time
     // hook so re-renders don't stack listeners.
     if (!sec2.dataset.apgHooked) {
         sec2.dataset.apgHooked = '1';
-        sec2.addEventListener('change', () => twApSchedulePreview());
+        sec2.addEventListener('change', (e) => { twApSchedulePreview(); twApMaybeLoadWallet(e && e.target); });
         sec2.addEventListener('click', () => twApSchedulePreview());
+        sec2.addEventListener('input', (e) => twApMaybeLoadWallet(e && e.target)); // Agency Code typed in the draft -> wallet loads live
     }
 
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
@@ -9925,10 +9971,37 @@ function twRenderAgencyPointGate(ticket) {
     twApGate.tracker = feishuValueToString(f['Latest Usage Tracker']);
     twApPaintGate(card, ticket);
     const code = feishuValueToString(f['Agency Code']).trim();
+    twApGate.loadedCode = code; // Phase 10.13.3: baseline for the Agency Code watcher
     if (code) twApLoadAgency(code);
     else {
         const prev = document.getElementById('apgPreview');
-        if (prev) prev.innerHTML = '<span class="bad">❌ No Agency Code on this ticket — cannot load the points wallet.</span>';
+        if (prev) prev.innerHTML = twCreateMode
+            ? '<span style="color:var(--text-muted)">✍️ Type the <b>Agency Code</b> above — the points wallet loads automatically.</span>'
+            : '<span class="bad">❌ No Agency Code on this ticket — cannot load the points wallet.</span>';
+    }
+}
+
+// Phase 10.13.3: in the New Ticket draft the gate card renders before any
+// record exists, so the wallet can only load AFTER the agent types an Agency
+// Code. This watcher (hooked on sec2 change+input) reloads the wallet the
+// moment the code changes, and keeps the wallet hero's "agency NNN" label in
+// sync. No-ops unless the gate card is on screen and the field is Agency Code.
+function twApMaybeLoadWallet(el) {
+    if (!el || el.name !== 'Agency Code' || typeof twApGate === 'undefined' || !twApGate) return;
+    if (!document.getElementById('twApGateCard')) return;
+    const code = (el.value || '').trim();
+    if (code === (twApGate.loadedCode || '')) return;
+    twApGate.loadedCode = code;
+    const lbl = document.querySelector('#twApGateCard .apg-bal-code');
+    if (lbl) lbl.textContent = code ? `agency ${code}` : 'agency —';
+    if (code.length >= 3) {
+        twApLoadAgency(code);
+    } else {
+        twApGate.agency = null;
+        const prev = document.getElementById('apgPreview');
+        if (prev) prev.innerHTML = '<span style="color:var(--text-muted)">✍️ Type the <b>Agency Code</b> above — the points wallet loads automatically.</span>';
+        const btn = document.getElementById('twApChargeBtn');
+        if (btn) btn.disabled = true;
     }
 }
 
@@ -10052,6 +10125,15 @@ function twApRefreshPreview() {
     const { privs, qtys, other } = twApOrderLines();
     const prev = document.getElementById('apgPreview');
     const btn = document.getElementById('twApChargeBtn');
+    // Phase 10.13.3 (Ahmed): no charging unless a Target Type is chosen --
+    // the rate (same-agency vs others) is unknown until then, so the preview
+    // and the charge button both stay locked behind the pick.
+    const targetChosen = !!(document.querySelector('#tw-sec-2 [name="Target Type"]')?.value || '').trim();
+    if (!targetChosen) {
+        if (prev) prev.innerHTML = '<span style="color:var(--accent-amber)">🎯 Choose a <b>Target Type</b> first (Same agency / Others) — the point rate depends on it, so charging stays locked until you pick one.</span>';
+        if (btn) btn.disabled = true;
+        return;
+    }
     if (!privs.length) {
         if (prev) prev.innerHTML = twApGate.charged
             ? '<span style="color:var(--text-muted)">Select privileges + type new quantities above to charge more — only what you type now is deducted.</span>'
@@ -10121,13 +10203,43 @@ async function twApConfirmCharge() {
     if (twApGate.charging) return;
     const btn = document.getElementById('twApChargeBtn');
     const state = document.getElementById('apgState');
-    const recordId = document.getElementById('tw-record-id').value;
+    let recordId = document.getElementById('tw-record-id').value;
     const { privs } = twApOrderLines();
     const qtyRaw = document.querySelector('#tw-sec-2 [name="Quantities Input"]')?.value || '';
     const targetRaw = document.querySelector('#tw-sec-2 [name="Target Type"]')?.value || '';
     const agencyCode = document.querySelector('#tw-sec-2 [name="Agency Code"]')?.value?.trim()
         || feishuValueToString(ltActiveTicket?.fields?.['Agency Code']).trim();
     const correcting = !!twApGate.correcting;
+    // Phase 10.13.3 (Ahmed): hard block -- no Target Type, no charge. The
+    // preview already locks the button; this is the second line of defense
+    // (Enter key, stale DOM, scripted click).
+    if (!targetRaw.trim()) {
+        ToastManager.show('🎯 Choose a Target Type first (Same agency / Others) — charging stays locked until then.', 'warning', 6000);
+        const tt = document.querySelector('#tw-sec-2 [name="Target Type"]');
+        tt?.closest('.control-group')?.classList.add('twx-missing');
+        tt?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+    // Phase 10.13.3 (Ahmed): New Ticket draft -- the ticket doesn't exist
+    // yet, so file it FIRST (the exact /api/requests/submit contract the
+    // 🚀 Submit Request button uses), adopt the new record as the live
+    // ticket, then charge it. A failed filing cancels the charge outright --
+    // nothing is deducted.
+    if (!recordId) {
+        if (state) state.textContent = '📝 Filing the ticket first — the charge needs a record to land on…';
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Filing ticket…'; }
+        const filed = await twSubmitNewTicketCore();
+        if (!filed || !filed.record_id) {
+            if (state) state.textContent = 'Ticket filing failed — the charge was cancelled. Nothing was deducted.';
+            if (btn) { btn.disabled = false; btn.textContent = '⚡ Confirm & Charge Points'; }
+            return;
+        }
+        recordId = filed.record_id;
+        document.getElementById('tw-record-id').value = recordId;
+        if (ltActiveTicket) ltActiveTicket.record_id = recordId;
+        twExitCreateMode();
+        ToastManager.show('🎫 Ticket filed — charging the agency wallet now…', 'success', 4000);
+    }
     twApGate.charging = true;
     let zeroAttempt = false; // keeps the rejection receipt visible (no preview refresh)
     if (btn) { btn.disabled = true; btn.textContent = correcting ? '⏳ Correcting…' : '⏳ Charging…'; }
@@ -10683,7 +10795,30 @@ function twOpenCreateWorkspace() {
 // routes here while twCreateMode is on). Validates that a Request Type was
 // chosen, collects every filled workspace field + any picked attachments,
 // and posts to /api/requests/submit -- the exact contract submitReqForm uses.
+// Phase 10.13.3: the actual submit is twSubmitNewTicketCore() so the
+// create-mode CHARGE flow can file-then-charge in one click; this wrapper
+// only adds the button chrome + the success toasts + the close.
 async function twSubmitNewTicket() {
+    const btns = ['twSaveBtn', 'twSaveBtn2'].map(id => document.getElementById(id)).filter(Boolean);
+    btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Submitting…'; });
+    const filed = await twSubmitNewTicketCore();
+    if (filed && filed.record_id) {
+        ToastManager.show('Request successfully submitted to Feishu!', 'success');
+        if (filed.created_via && String(filed.created_via).startsWith('tenant_token')) {
+            ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
+        }
+        twResetNote(true);
+        twCloseWorkspace(); // resets create mode + returns to the queue
+    }
+    btns.forEach(b => { b.disabled = false; b.textContent = twCreateMode ? '🚀 Submit Request' : '💾 Save & Resolve'; });
+}
+
+// The submit itself, UI-free: validates Request Type, collects fields +
+// attachments, posts to /api/requests/submit. Resolves to the server's
+// response object ({record_id, created_via, ...}) on success, null on any
+// failure (it toasts the reason itself). Used by both the 🚀 Submit Request
+// button and the create-mode charge flow (Phase 10.13.3).
+async function twSubmitNewTicketCore() {
     const form = document.getElementById('tw-form');
     const reqType = (form.querySelector('[name="Request Type"]')?.value || '').trim();
     if (!reqType) {
@@ -10693,11 +10828,8 @@ async function twSubmitNewTicket() {
             rt.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         ToastManager.show('Please choose a Request Type first — the Dynamic Request Section follows your choice.', 'warning', 6000);
-        return;
+        return null;
     }
-
-    const btns = ['twSaveBtn', 'twSaveBtn2'].map(id => document.getElementById(id)).filter(Boolean);
-    btns.forEach(b => { b.disabled = true; b.textContent = '⏳ Submitting…'; });
 
     // twCollectFields gathers every named control (including the hidden
     // Audition Action card's) -- drop empty values so the sheet only gets
@@ -10731,20 +10863,32 @@ async function twSubmitNewTicket() {
         // so the draft stays filled for a resubmit right after re-login.
         if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
             forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
-            return;
+            return null;
         }
         if (!res.ok) throw new Error(data.error || 'Submission failed');
-        ToastManager.show('Request successfully submitted to Feishu!', 'success');
-        if (data.created_via && String(data.created_via).startsWith('tenant_token')) {
-            ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
-        }
-        twResetNote(true);
-        twCloseWorkspace(); // resets create mode + returns to the queue
+        return data;
     } catch (e) {
         ToastManager.show('Failed to submit: ' + e.message, 'error');
-    } finally {
-        btns.forEach(b => { b.disabled = false; b.textContent = twCreateMode ? '🚀 Submit Request' : '💾 Save & Resolve'; });
+        return null;
     }
+}
+
+// Phase 10.13.3: a create-mode CHARGE files the ticket mid-flow -- flip the
+// workspace out of draft chrome (save-button labels, hidden verify button,
+// title, head meta) WITHOUT closing it, so the flow continues as a normal
+// ticket workspace on the brand-new record.
+function twExitCreateMode() {
+    if (!twCreateMode) return;
+    twCreateMode = false;
+    twApplyCreateModeChrome(); // the flag is off -> labels revert to Save & Resolve, verify button returns
+    const t = document.getElementById('tw-title');
+    if (t) t.textContent = '🎫 Ticket (just filed)';
+    const metaEl = document.getElementById('tw-head-meta');
+    if (metaEl) metaEl.innerHTML = `
+        <span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Mode</span>Filed from the New Ticket draft</span>
+        <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Sheet</span>Record created — charges and saves land on it now</span>
+    `;
+    if (typeof renderTabs === 'function') renderTabs(); // the 🆕 New Ticket draft tab folds back into the queue tab, same as any real ticket
 }
 
 // ISSUE 2 FIX: image lightbox/modal with zoom + rotate + pan + gallery nav + OCR text
