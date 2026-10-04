@@ -1543,15 +1543,20 @@
         .img-lightbox-nav:hover{background:rgba(255,255,255,.22)}
         .img-lightbox-nav-prev{left:18px}
         .img-lightbox-nav-next{right:18px}
+        /* Phase 10.19 (Ahmed): stage + extract panel sit SIDE BY SIDE in one row --
+           the stage flexes to fill whatever width the panel doesn't take. */
+        .img-lightbox-main{
+            display:flex;align-items:center;justify-content:center;gap:14px;width:100%;padding:0 16px;box-sizing:border-box;
+        }
         .img-lightbox-stage{
-            width:90vw;height:82vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+            flex:1 1 auto;min-width:0;height:82vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
         }
         .img-lightbox-canvas{
             position:relative;display:inline-block;cursor:grab;transition:transform .12s ease-out;touch-action:none;
         }
         .img-lightbox-canvas.dragging{cursor:grabbing;transition:none;}
         .img-lightbox-canvas img{
-            display:block;max-width:85vw;max-height:78vh;object-fit:contain;user-select:none;-webkit-user-drag:none;
+            display:block;max-width:calc(100vw - 470px);max-height:78vh;object-fit:contain;user-select:none;-webkit-user-drag:none;
         }
         .img-lightbox-text-layer{position:absolute;inset:0;}
         .img-lightbox-text-layer span{
@@ -1559,7 +1564,19 @@
         }
         .img-lightbox-text-layer span::selection{background:rgba(0,212,255,.45);color:transparent}
         .img-lightbox-hint{color:var(--text-muted,#8a8fa3);font-size:.75rem;margin-top:10px;display:flex;align-items:center;gap:6px}
-        .img-lightbox-extract-panel{background:rgba(18,20,32,.97);border:1px solid rgba(255,255,255,.12);border-radius:10px;max-width:520px;width:90%;margin:10px auto 0;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+        /* Phase 10.19 (Ahmed): the extract panel moved from UNDER the pic to BESIDE
+           it on the right, full stage height (82vh) so almost the whole extraction
+           is visible without scrolling; the <pre> inside flexes to fill it. Shown
+           via display:flex (JS), hidden via display:none. */
+        .img-lightbox-extract-panel{background:rgba(18,20,32,.97);border:1px solid rgba(255,255,255,.12);border-radius:10px;flex:0 0 360px;width:360px;max-width:360px;margin:0;align-self:stretch;max-height:82vh;box-shadow:0 8px 24px rgba(0,0,0,.4);flex-direction:column;overflow:hidden;}
+        #imgLightboxExtractBody{display:flex;flex-direction:column;flex:1;min-height:0;}
+        /* Narrow screens: stack panel under the pic again, capped height. */
+        @media (max-width:900px){
+            .img-lightbox-main{flex-direction:column;gap:8px;}
+            .img-lightbox-stage{width:100%;flex:none;height:52vh;}
+            .img-lightbox-canvas img{max-width:85vw;max-height:48vh;}
+            .img-lightbox-extract-panel{flex:none;width:92%;max-width:92%;align-self:center;max-height:34vh;}
+        }
         .img-attach-thumb{
             display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;
             border:1px solid var(--border,rgba(255,255,255,0.15));cursor:zoom-in;background:none;padding:0;
@@ -1624,22 +1641,28 @@
     </div>
     <button type="button" id="imgLightboxPrevBtn" class="img-lightbox-nav img-lightbox-nav-prev" style="display:none;" onclick="event.stopPropagation(); lightboxPrev()" title="Previous image">‹</button>
     <button type="button" id="imgLightboxNextBtn" class="img-lightbox-nav img-lightbox-nav-next" style="display:none;" onclick="event.stopPropagation(); lightboxNext()" title="Next image">›</button>
-    <div class="img-lightbox-stage" id="imgLightboxStage" onclick="if(event.target===this) closeImageLightbox()">
-        <div class="img-lightbox-canvas" id="imgLightboxCanvas">
-            <img id="imgLightboxImg" src="" alt="Attachment preview" draggable="false">
-            <div class="img-lightbox-text-layer" id="imgLightboxTextLayer"></div>
+    <!-- Phase 10.19 (Ahmed): stage + extract panel in ONE ROW -- the Lark OCR
+         text box sits BESIDE the pic on the right at full height ("move this box
+         text from under the pic to be beside it on the right and make it long"),
+         instead of a short block under the pic that needed constant scrolling. -->
+    <div class="img-lightbox-main">
+        <div class="img-lightbox-stage" id="imgLightboxStage" onclick="if(event.target===this) closeImageLightbox()">
+            <div class="img-lightbox-canvas" id="imgLightboxCanvas">
+                <img id="imgLightboxImg" src="" alt="Attachment preview" draggable="false">
+                <div class="img-lightbox-text-layer" id="imgLightboxTextLayer"></div>
+            </div>
+        </div>
+        <!-- Lark OCR: a plain copyable text block, separate from the pixel-aligned
+             RapidOCR/Tesseract selection layer drawn on the image itself. Auto-runs
+             on every picture open (Phase 10.15, Ahmed). -->
+        <div class="img-lightbox-extract-panel" id="imgLightboxExtractPanel" style="display:none;" onclick="event.stopPropagation()">
+            <div style="font-size:.72rem;color:var(--text-muted);padding:8px 14px 0;flex:none;">Extracted text (Lark OCR) — select &amp; copy directly</div>
+            <div id="imgLightboxExtractBody"></div>
         </div>
     </div>
     <div class="img-lightbox-hint">
         <span id="imgLightboxOcrStatus" style="display:none;color:var(--accent-cyan);"></span>
-        <span>🖐️ Drag to pan · Scroll on pic to zoom · select text right on the pic · 📋 Lark OCR text auto-extracts below · Click outside or press Esc to close</span>
-    </div>
-    <!-- Lark OCR: a plain copyable text block, separate from the pixel-aligned
-         RapidOCR/Tesseract selection layer drawn on the image itself. Auto-runs
-         on every picture open (Phase 10.15, Ahmed). -->
-    <div class="img-lightbox-extract-panel" id="imgLightboxExtractPanel" style="display:none;" onclick="event.stopPropagation()">
-        <div style="font-size:.72rem;color:var(--text-muted);padding:8px 14px 0;">Extracted text (Lark OCR) — select &amp; copy directly</div>
-        <div id="imgLightboxExtractBody"></div>
+        <span>🖐️ Drag to pan · Scroll on pic to zoom · select text right on the pic · 📋 Lark OCR text auto-extracts on the right · Click outside or press Esc to close</span>
     </div>
 </div>
 
@@ -11300,7 +11323,7 @@ function lightboxRenderExtractResult(result) {
     const panel = document.getElementById('imgLightboxExtractPanel');
     const body = document.getElementById('imgLightboxExtractBody');
     if (!panel || !body) return;
-    panel.style.display = 'block';
+    panel.style.display = 'flex'; // Phase 10.19: side panel is a flex column
     if (!result.success) {
         body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(result.error || 'Text extraction failed')}</div>`;
         return;
@@ -11310,8 +11333,8 @@ function lightboxRenderExtractResult(result) {
         return;
     }
     body.innerHTML = `
-        <pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.82rem;color:var(--text-primary,#e8eaf0);margin:0;padding:6px 14px 10px;max-height:200px;overflow:auto;">${escHtml(result.text)}</pre>
-        <button type="button" onclick="lightboxCopyExtractedText()" style="margin:0 14px 12px;padding:5px 12px;font-size:.78rem;border-radius:6px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,#00d4ff);cursor:pointer;">📋 Copy text</button>`;
+        <pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.82rem;color:var(--text-primary,#e8eaf0);margin:0;padding:6px 14px 10px;flex:1;min-height:0;overflow:auto;">${escHtml(result.text)}</pre>
+        <button type="button" onclick="lightboxCopyExtractedText()" style="margin:0 14px 12px;padding:5px 12px;font-size:.78rem;border-radius:6px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,#00d4ff);cursor:pointer;flex:none;">📋 Copy text</button>`;
 }
 
 async function lightboxRunLarkExtract(src, myToken, force) {
@@ -11327,7 +11350,7 @@ async function lightboxRunLarkExtract(src, myToken, force) {
     }
 
     if (myToken === lightboxExtractToken) {
-        panel.style.display = 'block';
+        panel.style.display = 'flex'; // Phase 10.19: side panel is a flex column
         body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">Extracting text (Lark OCR)…</div>`;
     }
 
