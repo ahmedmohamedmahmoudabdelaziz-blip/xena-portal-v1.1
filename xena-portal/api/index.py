@@ -2268,8 +2268,12 @@ def manage_users():
         users = []
         for item in res.get("data",{}).get("items",[]):
             fields = item.get("fields",{})
-            display_email = extract_field_text(fields.get("Email","")) or extract_field_text(fields.get("Person",""))
+            person_text = extract_field_text(fields.get("Person",""))
+            display_email = extract_field_text(fields.get("Email","")) or person_text
             users.append({"id":item.get("record_id"),"email":display_email,
+                          # Person rides the same records fetch (zero extra API calls)
+                          # so the frontend can show real Lark names on agent cards.
+                          "person":person_text,
                           "modules":extract_field_text(fields.get("Modules","")),
                           "acms_raw":extract_field_text(fields.get("ACMs","")),
                           "regions_raw":extract_field_text(fields.get("Regions","all")),
@@ -5056,7 +5060,9 @@ def analytics():
         except ValueError: pass
 
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules",[])):
+    # Namespace-safe check (matches frontend hasNs): raw substring matching leaked
+    # analytics endpoints to target_analytics holders ("analytics" in "target_analytics").
+    if not perms.get("is_super_admin") and not any(m == "analytics" or m.startswith("analytics_") for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
     region_filter = region.lower() if region.lower() != "all" else "all"
@@ -5125,7 +5131,9 @@ def compare():
     ip     = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("analytics" in m for m in perms.get("modules",[])):
+    # Namespace-safe check (matches frontend hasNs): raw substring matching leaked
+    # analytics endpoints to target_analytics holders ("analytics" in "target_analytics").
+    if not perms.get("is_super_admin") and not any(m == "analytics" or m.startswith("analytics_") for m in perms.get("modules",[])):
         return jsonify({"error":"Access denied"}), 403
 
     allowed_acms = perms.get("permissions",{}).get("acms",{}).get("analytics",["all"])
@@ -5691,7 +5699,9 @@ def exchange_board():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("analytics" in m or "exchange" in m for m in perms.get("modules", [])):
+    # Namespace-safe check (matches frontend hasNs): raw substring matching leaked
+    # these endpoints to target_analytics / unrelated-module holders.
+    if not perms.get("is_super_admin") and not any(m == "analytics" or m.startswith("analytics_") or m == "exchange" or m.startswith("exchange_") for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
@@ -5764,7 +5774,9 @@ def exchange_agency_detail(code):
     user  = sanitize_text(request.args.get('user', ''))
     email = sanitize_text(request.args.get('email', ''))
     perms = get_user_permissions(email, user)
-    if not perms.get("is_super_admin") and not any("analytics" in m or "exchange" in m for m in perms.get("modules", [])):
+    # Namespace-safe check (matches frontend hasNs): raw substring matching leaked
+    # these endpoints to target_analytics / unrelated-module holders.
+    if not perms.get("is_super_admin") and not any(m == "analytics" or m.startswith("analytics_") or m == "exchange" or m.startswith("exchange_") for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"])
@@ -5970,7 +5982,9 @@ def agency_target_table():
     perms = get_user_permissions(email, user)
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
-    if not perms.get("is_super_admin") and not any(("analytics" in m or "points" in m) for m in perms.get("modules", [])):
+    # Namespace-safe check (matches frontend hasNs): raw substring matching leaked
+    # this endpoint to target_analytics / unrelated-module holders.
+    if not perms.get("is_super_admin") and not any(m == "analytics" or m.startswith("analytics_") or m == "points" or m.startswith("points_") for m in perms.get("modules", [])):
         return jsonify({"error": "Access denied"}), 403
 
     allowed_acms = perms.get("permissions", {}).get("acms", {}).get("points", perms.get("permissions", {}).get("acms", {}).get("analytics", ["all"]))
