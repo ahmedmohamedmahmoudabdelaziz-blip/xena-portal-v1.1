@@ -625,15 +625,41 @@
            Module cards become a responsive grid of collapsible panels, each
            with a live "granted n/total" badge; the Save button rides a sticky
            bar at the bottom so it's never a long scroll away. */
-        .admin-modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 14px; align-items: start; }
-        #pg-admin-agents .module-card .module-header { cursor: pointer; user-select: none; margin-bottom: 0; border-bottom: 1px solid transparent; padding-bottom: 0; transition: padding .2s, margin .2s, border-color .2s; }
-        #pg-admin-agents .module-card:not(.collapsed) .module-header { margin-bottom: 12px; border-bottom-color: var(--border); padding-bottom: 12px; }
+        .admin-modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 16px; align-items: start; }
+        /* Phase 10.14 (Ahmed): Manage Agents card redesign -- "the design of
+           the cards ... look messy and Distracted, need it more orgnize,
+           elegant". One unified chrome for every module card: a quiet header
+           BAND (title + granted-count badge + collapse arrow), body content
+           on a consistent side rhythm, sub-options as a tidy 2-column chip
+           grid that lights up when granted, and the ACM/Region pickers in a
+           calm footer strip. All ids, classes and JS hooks are unchanged --
+           this is pure presentation. */
+        #pg-admin-agents .module-card { padding: 0; overflow: hidden; border-radius: 14px; background: rgba(255,255,255,.025); position: relative; }
+        #pg-admin-agents .module-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(0,212,255,.38), transparent); }
+        #pg-admin-agents .module-card:hover { box-shadow: 0 8px 26px rgba(0,0,0,.28); }
+        #pg-admin-agents .module-card .module-header { cursor: pointer; user-select: none; margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.18); transition: background .2s; }
+        #pg-admin-agents .module-card .module-header:hover { background: rgba(0,0,0,.26); }
+        #pg-admin-agents .module-card .module-header h4 { font-size: .95rem; letter-spacing: .2px; }
+        #pg-admin-agents .module-card.collapsed .module-header { border-bottom-color: transparent; }
         #pg-admin-agents .module-card.collapsed > *:not(.module-header) { display: none; }
+        #pg-admin-agents .module-card > .sub-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 18px 8px; padding: 0; background: none; border: none; }
+        #pg-admin-agents .module-card > .sub-opts:last-child { margin-bottom: 16px; }
+        #pg-admin-agents .module-card > p { margin: 0 18px 10px; }
+        #pg-admin-agents .module-card > .control-grid { margin: 10px 0 0; padding: 12px 18px 16px; background: rgba(0,0,0,.14); border-top: 1px dashed var(--border); }
+        #pg-admin-agents .module-card .sub-opt-lbl { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; transition: border-color .15s, background .15s; }
+        #pg-admin-agents .module-card .sub-opt-lbl:hover { border-color: var(--border-hover); background: rgba(255,255,255,.05); }
+        #pg-admin-agents .module-card .sub-opt-lbl:has(input:checked) { border-color: rgba(0,212,255,.45); background: rgba(0,212,255,.07); }
         .mod-head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .mod-count { font-size: .68rem; font-weight: 700; padding: 2px 9px; border-radius: 12px; background: rgba(255,255,255,.06); color: var(--text-muted); border: 1px solid var(--border); transition: all .2s; }
         .mod-count.on { background: rgba(0,230,118,.12); color: var(--accent-green); border-color: rgba(0,230,118,.35); }
         .mod-collapse-arr { color: var(--text-muted); font-size: .72rem; transition: transform .25s; }
         #pg-admin-agents .module-card:not(.collapsed) .mod-collapse-arr { transform: rotate(90deg); }
+        /* The four person-level switches (👑 Admin / 🎭 Audition / 👁 Preview /
+           💾 Data Export) sit two-per-row in their own grid above the module
+           cards. */
+        .admin-toggles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+        .admin-toggles-grid .admin-toggle { margin-bottom: 0; }
+        @media (max-width: 900px) { .admin-toggles-grid { grid-template-columns: 1fr; } }
         .admin-save-bar { position: sticky; bottom: 12px; z-index: 50; margin-top: 8px; }
         .admin-save-bar .btn { box-shadow: 0 10px 32px rgba(0,212,255,.28); }
         .admin-agent-search { width: 100%; max-width: 360px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,.2); color: var(--text); font-size: .88rem; margin-bottom: 12px; outline: none; transition: border-color .2s; font-family: inherit; }
@@ -881,6 +907,10 @@
         .admin-toggle:has(#mod_audition_access) h4{color:var(--accent-cyan)}
         .admin-toggle:has(#mod_preview_access){background:rgba(168,85,247,.08);border-color:rgba(168,85,247,.3)}
         .admin-toggle:has(#mod_preview_access) h4{color:#c4b5fd}
+        /* Phase 10.14: 💾 Data Export joins the switch row (was a lone
+           checkbox in the retired 💾 Global Settings card). */
+        .admin-toggle:has(#mod_export_data){background:rgba(0,230,118,.08);border-color:rgba(0,230,118,.3)}
+        .admin-toggle:has(#mod_export_data) h4{color:var(--accent-green)}
         
         .user-list{display:flex;flex-direction:column;gap:10px}
         .user-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:.2s;flex-wrap:wrap;gap:8px}
@@ -943,6 +973,15 @@
         .msel-toggle span.msel-text{flex:1;pointer-events:none;white-space:normal;line-height:1.3}
         .msel-toggle .msel-dot{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border-hover);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;color:transparent;transition:.15s;pointer-events:none}
         .msel-toggle.active .msel-dot{background:var(--accent-cyan);border-color:var(--accent-cyan);color:#04202a}
+        /* Phase 10.15 (Ahmed): Regions pickers in Manage Agents are three
+           toggle switches (All Regions / PK / IN) instead of a checkbox list.
+           Exactly one is on at a time; turning the active one off falls back
+           to All Regions. Reuses the global .switch/.slider iOS toggle look. */
+        .reg-toggle-row{display:flex;gap:10px;flex-wrap:wrap;padding:6px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.15)}
+        .reg-toggle-item{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:10px;font-size:.82rem;color:var(--text-muted);cursor:pointer;transition:.15s;user-select:none}
+        .reg-toggle-item:hover{border-color:var(--accent-cyan);color:var(--text)}
+        .reg-toggle-item.active{background:rgba(0,212,255,.1);border-color:var(--accent-cyan);color:var(--text);font-weight:600}
+        .reg-toggle-item .switch{pointer-events:none;flex-shrink:0}
         .multiid-wrap{border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.15);padding:10px}
         .multiid-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
         .multiid-chips:empty{display:none}
@@ -1554,7 +1593,7 @@
         <button type="button" onclick="lightboxRotate(90)" title="Rotate right">↻</button>
         <button type="button" onclick="lightboxReset()" title="Reset pan/zoom">⟲</button>
         <button type="button" id="imgLightboxOcrBtn" class="active" onclick="lightboxToggleOcr()" title="Toggle selectable text (OCR)">🔤</button>
-        <button type="button" id="imgLightboxExtractBtn" onclick="lightboxExtractText()" title="Extract text (Lark OCR fallback) into a copyable block below the image">📋</button>
+        <button type="button" id="imgLightboxExtractBtn" onclick="lightboxExtractText()" title="Selectable text (Lark OCR) — auto-extracts the moment a picture opens; click to re-run">📋</button>
         <button type="button" onclick="lightboxDownload()" title="Download">⬇️</button>
         <button type="button" onclick="closeImageLightbox()" title="Close">✕</button>
     </div>
@@ -1568,12 +1607,13 @@
     </div>
     <div class="img-lightbox-hint">
         <span id="imgLightboxOcrStatus" style="display:none;color:var(--accent-cyan);"></span>
-        <span>🖐️ Drag to pan · Scroll on pic to zoom · scroll inside the text panel to read it · 🔤 select text in image · 📋 extract text · Click outside or press Esc to close</span>
+        <span>🖐️ Drag to pan · Scroll on pic to zoom · select text right on the pic · 📋 Lark OCR text auto-extracts below · Click outside or press Esc to close</span>
     </div>
-    <!-- Lark OCR fallback: a plain copyable text block, separate from the pixel-aligned
-         RapidOCR/Tesseract selection layer drawn on the image itself. -->
+    <!-- Lark OCR: a plain copyable text block, separate from the pixel-aligned
+         RapidOCR/Tesseract selection layer drawn on the image itself. Auto-runs
+         on every picture open (Phase 10.15, Ahmed). -->
     <div class="img-lightbox-extract-panel" id="imgLightboxExtractPanel" style="display:none;" onclick="event.stopPropagation()">
-        <div style="font-size:.72rem;color:var(--text-muted);padding:8px 14px 0;">Extracted text (Lark OCR fallback)</div>
+        <div style="font-size:.72rem;color:var(--text-muted);padding:8px 14px 0;">Extracted text (Lark OCR) — select &amp; copy directly</div>
         <div id="imgLightboxExtractBody"></div>
     </div>
 </div>
@@ -2454,6 +2494,15 @@
                             <label>Agent Identity (Exact Lark Name OR Email) — one per line, or comma-separated, to add multiple people at once</label>
                             <textarea id="newAgentEmail" placeholder="e.g., Muhammad Usman&#10;another.agent@company.com" aria-label="Agent identity" rows="2" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.9rem;resize:vertical"></textarea>
                         </div>
+                        <!-- Phase 10.14 (Ahmed): all four person-level switches --
+                             👑 Admin / 🎭 Audition / 👁 Preview / 💾 Data Export --
+                             live in one 2x2 grid ("make the Allow Data Export same
+                             as Audition Access and Grant Admin Privileges and
+                             preview, and make the each 2 beside each others").
+                             💾 moved here from the retired Global Settings card;
+                             its id stays mod_export_data so applyConfigToForm /
+                             confirmSaveRole / addAgent keep working unchanged. -->
+                        <div class="admin-toggles-grid">
                         <div class="admin-toggle">
                             <div>
                                 <h4>👑 Grant Admin Privileges</h4>
@@ -2461,12 +2510,6 @@
                             </div>
                             <label class="switch"><input type="checkbox" id="modAdmin"><span class="slider"></span></label>
                         </div>
-                        <!-- Phase 10.13.1 (Ahmed): Audition access & Preview access are
-                             TOGGLE SWITCHES like 👑 Grant Admin Privileges above -- not
-                             checkboxes inside the module cards. The ids stay
-                             mod_audition_access / mod_preview_access so
-                             applyConfigToForm / confirmSaveRole / addAgent keep working
-                             unchanged. -->
                         <div class="admin-toggle">
                             <div>
                                 <h4>🎭 Audition Access</h4>
@@ -2480,6 +2523,14 @@
                                 <span style="font-size:.8rem;color:var(--text-muted)">Lets this member open Preview Agent View and see the portal exactly as another member sees it (view-only).</span>
                             </div>
                             <label class="switch"><input type="checkbox" id="mod_preview_access"><span class="slider"></span></label>
+                        </div>
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>💾 Allow Data Export (CSV / Excel)</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Lets this member download tables and reports as CSV / Excel files.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_export_data" checked><span class="slider"></span></label>
+                        </div>
                         </div>
                         <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
                         <div class="admin-modules-grid">
@@ -2527,7 +2578,7 @@
                                 <div class="control-group"><label>Regions</label><div class="pill-select-container" id="analyticsRegSelect"></div></div>
                             </div>
                         </div>
-                        <div class="module-card" style="border-color:rgba(0,212,255,.25)">
+                        <div class="module-card">
                             <div class="module-header">
                                 <h4>🏛 Agency Exchange Module</h4>
                             </div>
@@ -2544,7 +2595,7 @@
                                 <div class="control-group"><label>Regions</label><div class="pill-select-container" id="exchangeRegSelect"></div></div>
                             </div>
                         </div>
-                        <div class="module-card" style="border-color:rgba(185,103,255,.25)">
+                        <div class="module-card">
                             <div class="module-header">
                                 <h4>⚖️ Compare — Sub-Features</h4>
                             </div>
@@ -2588,14 +2639,6 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_new"> 🆕 New Ticket (create from empty Ticket Workspace)</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_pending"> 🕵️ Under Investigation list</label>
-                            </div>
-                        </div>
-                        <div class="module-card" style="border-color:var(--accent-purple)">
-                            <div class="module-header">
-                                <h4 style="color:var(--accent-purple)">💾 Global Settings</h4>
-                            </div>
-                            <div class="sub-opts">
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_export_data" checked> Allow Data Export (CSV / Excel)</label>
                             </div>
                         </div>
                         </div>
@@ -3324,7 +3367,7 @@
                    <div class="twx-topbar-wrapper chat-collapsed" id="twxTopbarWrap">
                        <button type="button" class="twx-fab" onclick="twToggleTopbar()" title="Open the workspace action bar">⚡</button>
                        <div class="twx-topbar">
-                           <button class="btn btn-outline twx-back" onclick="twCloseWorkspace()">← Back to Queue</button>
+                           <button class="btn btn-outline twx-back" id="twBackBtn" onclick="twCloseWorkspace()">← Back to Queue</button>
                            <div class="twx-head-center">
                                <h3 id="tw-title" class="twx-title">Ticket ID</h3>
                                <!-- Fixed ticket-head info -- Mention this Group, Submitted on
@@ -4712,8 +4755,15 @@ const hashRegion=hashParams.get('region'),hashAcm=hashParams.get('acm');
 // silently -- once that's really gone, independent of anything the client
 // reports), so search/browsing gets cut off at the same points too, not just
 // submits.
-const SESSION_LIMIT_MS = 4 * 60 * 60 * 1000; // 4 hours
-const IDLE_LIMIT_MS = 2 * 60 * 60 * 1000;    // 2 hours
+// Phase 10.14 (Ahmed): 4h/2h was cutting agents off mid-shift ("expire when
+// submit request"). The server-side refresh token now lives 24h and is
+// renewed on every use, so an 8h work day stays inside one session with a
+// wide safety margin on both clocks.
+// Phase 10.15 (Ahmed): keep the 24h server token + 12h session cap, but put
+// the NO-ACTIVITY logout back to 4 hours ("keep the logic of the token 24
+// like you did but the no active return it for 4 hour").
+const SESSION_LIMIT_MS = 12 * 60 * 60 * 1000; // 12 hours
+const IDLE_LIMIT_MS = 4 * 60 * 60 * 1000;     // 4 hours of no activity -> auto logout
 
 // Forces an immediate, hard logout -- clears local session state and reloads
 // to the login screen. Used by the timers below and by the Submit Request
@@ -4736,7 +4786,7 @@ function forceSessionExpiredLogout(message) {
 // agency lookup) and clicks Submit -- which is where this used to first
 // surface, via the 401 SESSION_EXPIRED handling in submitReqForm(). This is a
 // real server round-trip (see /api/auth/check-session), not just the client-
-// side 4h/2h clock above, since the token can die server-side well before
+// side 12h/8h clock above, since the token can die server-side well before
 // either of those local timers would ever notice.
 let _nrSessionCheckToken = 0;
 async function checkNewRequestSessionOnOpen() {
@@ -4768,20 +4818,20 @@ function checkSessionExpiry() {
     // expired too, not skipped -- otherwise a session like that would never
     // time out at all.
     if (loginTs <= 0 || (Date.now() - loginTs > SESSION_LIMIT_MS)) {
-        forceSessionExpiredLogout('Your session has expired after 4 hours. Please log in again.');
+        forceSessionExpiredLogout('Your session has expired after 12 hours. Please log in again.');
         return;
     }
     const idleTs = parseInt(localStorage.getItem('xenaLastActivity') || '0', 10);
     // Same treatment for a missing idle timestamp -- don't give it the benefit
     // of the doubt, force the check to fail closed rather than open.
     if (idleTs <= 0 || (Date.now() - idleTs > IDLE_LIMIT_MS)) {
-        forceSessionExpiredLogout('You were inactive for 2 hours, so you were logged out for security. Please log in again.');
+        forceSessionExpiredLogout('You were inactive for 4 hours, so you were logged out for security. Please log in again.');
     }
 }
 
 // --- Idle-activity tracking ---
-// Any real interaction resets the 2-hour idle clock. Throttled to at most one
-// localStorage write per 20s so this doesn't fire on every single mousemove.
+// Any real interaction resets the idle clock (4h, see IDLE_LIMIT_MS). Throttled
+// to at most one localStorage write per 20s so this doesn't fire on every move.
 let _lastActivityWrite = 0;
 function markActivity() {
     const now = Date.now();
@@ -4799,8 +4849,14 @@ function markActivity() {
 // matches what the server is currently running, a new deploy has shipped
 // mid-session -- force a fresh login so the agent is never left running code
 // the server has moved on from.
+let _lastAppVersionCheck = 0;
 async function checkAppVersion() {
     if (!localStorage.getItem('xenaUser')) return;
+    // Phase 10.14: focus/visibilitychange can fire this many times a minute;
+    // the version can't change faster than a deploy, so one call per ~4.5 min
+    // is plenty (matches the 5-min interval below) and saves serverless calls.
+    if (Date.now() - _lastAppVersionCheck < 4.5 * 60000) return;
+    _lastAppVersionCheck = Date.now();
     try {
         const res = await fetch('/api/app-version');
         const data = await res.json();
@@ -6408,9 +6464,9 @@ function copyAccessFromAgent(agentId) {
 function resetAgentForm() {
     document.getElementById('newAgentEmail').value = '';
     document.getElementById('modAdmin').checked = false;
-    // Phase 10.13.1: these two live in admin-toggle switches now (not inside
-    // .sub-opt-lbl), so the generic clear below doesn't reach them.
-    ['mod_audition_access','mod_preview_access'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+    // Phase 10.13.1/10.14: these three live in admin-toggle switches now (not
+    // inside .sub-opt-lbl), so the generic clear below doesn't reach them.
+    ['mod_audition_access','mod_preview_access','mod_export_data'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
@@ -6616,7 +6672,7 @@ async function addAgent() {
         ToastManager.show(identities.length > 1 ? `${successCount} agents saved successfully.` : 'Agent saved successfully.', 'success');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
-        ['mod_audition_access','mod_preview_access'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+        ['mod_audition_access','mod_preview_access','mod_export_data'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
     }
     document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
@@ -7014,18 +7070,79 @@ class ChecklistMultiSelect {
     }
 }
 
+// Phase 10.15 (Ahmed): Regions in Manage Agents are three toggle switches
+// (All Regions / PK / IN), not a checkbox list -- "the default is all, but if
+// I click the toggle of PK it goes active and disables all". Exactly one is on
+// at a time; clicking the active one falls back to All Regions (nothing can
+// ever be fully off). Same getValues()/setValues() contract the old
+// ChecklistMultiSelect exposed, so applyConfigToForm / confirmSaveRole /
+// addAgent keep working untouched.
+class RegionToggleSelect {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.selected = ['all'];
+        this.render();
+    }
+    render() {
+        if (!this.container) return;
+        this.container.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'reg-toggle-row';
+        this.items = {};
+        [['all','🌍 All Regions'],['pk','🇵🇰 PK'],['in','🇮🇳 IN']].forEach(([val, label]) => {
+            const item = document.createElement('div');
+            item.className = 'reg-toggle-item';
+            item.dataset.value = val;
+            item.innerHTML = `<label class="switch"><input type="checkbox" tabindex="-1"><span class="slider"></span></label><span>${label}</span>`;
+            item.onclick = () => {
+                if (this.selected.includes(val)) {
+                    // Tapping the active switch turns it off -> fall back to All
+                    // (unless it IS All -- All always stays on).
+                    if (val !== 'all') this.selected = ['all'];
+                } else {
+                    this.selected = [val]; // mutually exclusive: this one on, rest off
+                }
+                this.sync();
+            };
+            row.appendChild(item);
+            this.items[val] = item;
+        });
+        this.container.appendChild(row);
+        this.sync();
+    }
+    sync() {
+        Object.entries(this.items || {}).forEach(([v, item]) => {
+            const on = this.selected.includes(v);
+            item.classList.toggle('active', on);
+            const input = item.querySelector('input');
+            if (input) input.checked = on;
+        });
+    }
+    getValues() { return this.selected; }
+    setValues(vals) {
+        const v = (vals || []).map(x => String(x).toLowerCase());
+        // Legacy data could hold 'pk,in' (both ticked under the old checkboxes)
+        // -- that covers everything, so it maps to All.
+        if (v.includes('all') || (v.includes('pk') && v.includes('in'))) this.selected = ['all'];
+        else if (v.includes('pk')) this.selected = ['pk'];
+        else if (v.includes('in')) this.selected = ['in'];
+        else this.selected = ['all'];
+        this.sync();
+    }
+}
+
 function initPills() {
     pTargetAcm=new MultiSelectDropdown('targetAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pTargetReg=new ChecklistMultiSelect('targetRegSelect',allRegs,{allLabel:'All Regions'});
+    pTargetReg=new RegionToggleSelect('targetRegSelect');
     pPointsAcm=new MultiSelectDropdown('pointsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pPointsReg=new ChecklistMultiSelect('pointsRegSelect',allRegs,{allLabel:'All Regions'});
+    pPointsReg=new RegionToggleSelect('pointsRegSelect');
     pAnalyticsAcm=new MultiSelectDropdown('analyticsAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pAnalyticsReg=new ChecklistMultiSelect('analyticsRegSelect',allRegs,{allLabel:'All Regions'});
+    pAnalyticsReg=new RegionToggleSelect('analyticsRegSelect');
 
     pQueryAcm=new MultiSelectDropdown('queryAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pQueryReg=new ChecklistMultiSelect('queryRegSelect',allRegs,{allLabel:'All Regions'});
+    pQueryReg=new RegionToggleSelect('queryRegSelect');
     pExchangeAcm=new MultiSelectDropdown('exchangeAcmSelect',allAcms,{allLabel:'All ACMs',unitLabel:'ACMs'});
-    pExchangeReg=new ChecklistMultiSelect('exchangeRegSelect',allRegs,{allLabel:'All Regions'});
+    pExchangeReg=new RegionToggleSelect('exchangeRegSelect');
 }
 
 function crossFilter(dimension, value) {
@@ -8174,7 +8291,7 @@ function qyCardActionsHtml(r) {
     const rid = escHtml(r.record_id);
     return `<div class="qy-card-actions">
         <button type="button" class="qy-act-btn qy-act-pics" onclick="qyViewPictures('${rid}', this)">🖼️ View Pictures</button>
-        <button type="button" class="qy-act-btn qy-act-open" onclick="qyOpenInWorkspace('${rid}')">🎫 Open in Ticket Workspace</button>
+        <button type="button" class="qy-act-btn qy-act-open" onclick="qyOpenInWorkspace('${rid}')" onmouseenter="twPrefetchTicket('${rid}', true)" ontouchstart="twPrefetchTicket('${rid}', true)">🎫 Open in Ticket Workspace</button>
     </div>
     <div class="qy-pics" id="qyPics-${rid}" style="display:none"></div>`;
 }
@@ -8257,6 +8374,9 @@ async function tiSearch() {
             : 'No requests under investigation right now. ✅';
         if (!rows.length) { if (emptyEl) emptyEl.style.display = ''; return; }
         resultsEl.innerHTML = tiTableHtml(rows);
+        // Phase 10.14 (speed): warm the first rows' ticket details right after
+        // the list lands, so opening any of the top results feels instant.
+        rows.slice(0, 5).forEach(r => twPrefetchTicket(r.record_id));
     } catch (e) {
         if (countEl) countEl.textContent = 'Search failed — please try again.';
         ToastManager.show('Under Investigation search failed: ' + e.message, 'error');
@@ -8291,7 +8411,7 @@ function tiTableHtml(rows) {
             ${cell(r.acm)}
             ${cell(r.user_id)}
             ${cell(r.agency_code)}
-            <td class="ti-act-cell"><button type="button" class="btn btn-primary ti-open-btn" onclick="twOpenWorkspace('${rid}')">🎫 Open</button></td>
+            <td class="ti-act-cell"><button type="button" class="btn btn-primary ti-open-btn" onclick="twOpenWorkspace('${rid}')" onmouseenter="twPrefetchTicket('${rid}', true)" ontouchstart="twPrefetchTicket('${rid}', true)">🎫 Open</button></td>
         </tr>`;
     }).join('');
     return `<div class="ti-table-wrap"><table class="ti-table">
@@ -8370,12 +8490,17 @@ async function pvStart(email) {
         // that, with a top-level fallback so older backends still work.
         const permsBlock = data.permissions || data;
         const targetMods = Array.isArray(permsBlock.modules) ? permsBlock.modules : String(permsBlock.modules || '').split(',');
-        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin };
+        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, openTabs: openTabs.slice(), activeTab: activeTabId };
         previewMode = true;
         userModules = targetMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
         isAdmin = !!permsBlock.is_super_admin;
         pvShowBanner(email);
         configureSidebarAndCards();
+        // Phase 10.14 (Ahmed): preview must NOT keep the admin's own open
+        // tabs -- the tab bar is gated by userModules, so stale tabs would
+        // still show (and open) pages the previewed member can't access.
+        // Reset to a single Welcome tab; the admin's tabs return on exit.
+        openTabs = ['welcome'];
         openInTab('welcome');
         ToastManager.show(`👁 Previewing as ${email} — view only.`, 'success', 5000);
     } catch (e) {
@@ -8386,14 +8511,25 @@ async function pvStart(email) {
 function pvExit() {
     if (!previewMode) return;
     previewMode = false;
+    let savedTabs = null, savedActive = null;
     if (previewSaved) {
         userModules = previewSaved.modules;
         isAdmin = previewSaved.isAdmin;
+        savedTabs = previewSaved.openTabs || null;
+        savedActive = previewSaved.activeTab || null;
         previewSaved = null;
     }
     pvHideBanner();
     configureSidebarAndCards();
-    openInTab('welcome');
+    // Phase 10.14: give the admin his own tabs back (validated against the
+    // pages that still exist), landing on the tab he left from.
+    if (savedTabs && savedTabs.length) {
+        openTabs = savedTabs.filter(p => document.getElementById('pg-' + p));
+        if (!openTabs.length) openTabs = ['welcome'];
+        openInTab(openTabs.includes(savedActive) ? savedActive : openTabs[openTabs.length - 1]);
+    } else {
+        openInTab('welcome');
+    }
     ToastManager.show('Preview ended — back to your own access.', 'success');
 }
 
@@ -8480,6 +8616,10 @@ async function runQuery(){
                 ${qyCardActionsHtml(r)}
             </div>
         `).join('');
+
+        // Phase 10.14 (speed): warm the top hits' ticket details so opening
+        // one of the first cards feels instant (hover prefetches too).
+        if (qyHasAuditionAccess()) results.slice(0, 3).forEach(r => { if (r.record_id) twPrefetchTicket(r.record_id); });
 
     } catch (e) {
         if (spinner) spinner.style.display = 'none';
@@ -9693,10 +9833,22 @@ let twManualReqType = null;
 // open; the primary button becomes "🚀 Submit Request" and posts to
 // /api/requests/submit instead of /api/requests/update.
 let twCreateMode = false;
-// Phase 10.13.1: where twCloseWorkspace returns to. Real tickets keep the
-// old behavior (always back to Live Queue); a New Ticket draft goes back to
-// whichever page the agent was on when he clicked "🆕 New Ticket".
+// Phase 10.14: where twCloseWorkspace returns to. BOTH real tickets and New
+// Ticket drafts go back to whichever page the agent was on when the workspace
+// was opened (Live Queue, Under Investigation, Universal Query, ...).
 let twReturnTo = 'live-tickets';
+
+// Phase 10.14: the Back button names the page it will actually return to
+// (Live Queue / Under Investigation / Universal Query / ...), so the agent
+// always knows where "back" lands before clicking it.
+function twSyncBackButton() {
+    const btn = document.getElementById('twBackBtn');
+    if (!btn) return;
+    const titlesMap = (typeof currentLang !== 'undefined' && currentLang === 'zh') ? zhPageTitlesMap : pageTitlesMap;
+    const back = (typeof twReturnTo !== 'undefined' && twReturnTo) ? twReturnTo : 'live-tickets';
+    const name = titlesMap[back] || pageTitlesMap[back] || pageTitlesMap['live-tickets'];
+    btn.textContent = (typeof currentLang !== 'undefined' && currentLang === 'zh') ? `← 返回${name}` : `← Back to ${name}`;
+}
 
 // Applies/reverts the create-mode chrome: relabels both save buttons and
 // hides the Duplicate Check button. Phase 10.13.1 (Ahmed): the Audition
@@ -10574,6 +10726,10 @@ function twCardOpen(cardEl, recordId) {
 }
 
 async function twOpenWorkspace(recordId) {
+    // Phase 10.14: remember WHERE the workspace was opened from, BEFORE any
+    // await runs (activeTabId is still the origin page until openInTab below).
+    // twCloseWorkspace returns here instead of always landing on Live Queue.
+    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'live-tickets';
     // Phase 10 (speed): if ltRenderQueue's prefetch already fetched (or is
     // fetching) this record, open from that -- no overlay, no second request.
     // A prefetch that failed resolves to null and we fall through to the
@@ -10600,8 +10756,10 @@ async function twOpenWorkspace(recordId) {
         // mode (restores the Save & Resolve labels if the agent jumped here
         // straight from a blank draft).
         twCreateMode = false;
-        twReturnTo = 'live-tickets'; // real tickets keep the old close behavior
+        // twReturnTo was captured at twOpenWorkspace entry (Phase 10.14) --
+        // real tickets also return to the page they were opened from now.
         twApplyCreateModeChrome();
+        twSyncBackButton();
         twResetNote(true); // Phase 10.1: fresh ticket -> close & clear the scratch note
 
         document.getElementById('tw-record-id').value = recordId;
@@ -10731,6 +10889,7 @@ async function twOpenWorkspace(recordId) {
 function twOpenCreateWorkspace() {
     twCreateMode = true;
     twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'welcome';
+    twSyncBackButton(); // Phase 10.14: Back button names the origin page
     ltActiveTicket = { record_id: null, fields: {} }; // synthetic blank ticket -- twSelectRequestType/twRenderSection2 read from it
     twOrigFields = {};
     twManualReqType = null;
@@ -10902,9 +11061,14 @@ let lightboxRotation = 0;
 let lightboxPanX = 0;
 let lightboxPanY = 0;
 let lightboxFilename = 'attachment';
-let lightboxOcrEnabled = true;
 let lightboxOcrCache = {};    // src -> { words, naturalWidth, naturalHeight }
 let lightboxOcrRunToken = 0;  // bumped on every image switch so a stale OCR result never renders over the wrong image
+let lightboxOcrEnabled = true; // 🔤 toggle (Phase 10.16: restored by request) -- show/hide the on-picture selectable text layer
+// Phase 10.15 (Ahmed): Lark OCR auto-extracts on every picture open now (📋 button
+// force re-runs). Per-src cache so Next/Prev back to an already-read picture
+// doesn't burn another OCR API call; token invalidates stale runs.
+let lightboxLarkOcrCache = {};  // src -> { success:true, text } | { success:false, error }
+let lightboxExtractToken = 0;   // bumped on every image switch / close
 let lightboxOcrWorkerPromise = null; // one Tesseract worker (fallback engine), created once and reused
 let lightboxRapidOcrPromise = null;  // one RapidOCR engine (primary), created once and reused
 let lightboxOcrEngine = 'auto';      // 'auto' (try RapidOCR first) | 'rapidocr' | 'tesseract' -- pinned once we know which one actually works, so we don't retry a broken engine on every single image
@@ -10955,9 +11119,14 @@ function lightboxLoadCurrent() {
     lightboxClearTextLayer();
     lightboxSetOcrStatus('');
     lightboxHideExtractPanel();
+    const myExtractToken = ++lightboxExtractToken;
     img.src = item.src;
     lightboxUpdateNav();
     lightboxRunOcr(item.src);
+    // Phase 10.15 (Ahmed): Lark OCR fires automatically the moment the picture
+    // opens ("make it selectable once the pic opened") -- cached per picture, so
+    // navigating back to an already-read image re-shows instantly, no extra call.
+    lightboxRunLarkExtract(item.src, myExtractToken, false);
 }
 
 function lightboxHideExtractPanel() {
@@ -11017,30 +11186,60 @@ async function lightboxDownload() {
     }
 }
 
-// --- Lark OCR fallback ("Extract Text" button) ------------------------------------
-// Distinct from lightboxRunOcr() above: that one drives the pixel-aligned selectable
-// text layer drawn on top of the image (RapidOCR, falling back to Tesseract, both
-// running in-browser). Feishu's own OCR API only returns a flat list of recognized
-// text strings with no coordinates, so it can't feed that overlay -- instead this
-// dumps its output into a plain copyable text block below the image, as a fallback
-// for when the on-image selection is fuzzy or misses text entirely.
-async function lightboxExtractText() {
-    const img = document.getElementById('imgLightboxImg');
+// --- Lark OCR (single 📋 button, auto-runs on open) -------------------------------
+// Phase 10.15 (Ahmed): the old 🔤 toggle button is gone -- the on-pic selectable
+// layer is simply always on, and THIS Lark-quality extraction now fires by itself
+// the moment a picture opens, so the text is ready to select & copy with zero
+// clicks ("lark is best in ocr"). Distinct from lightboxRunOcr(): that one drives
+// the pixel-aligned selectable layer drawn on top of the image (RapidOCR, falling
+// back to Tesseract, both in-browser). Feishu's own OCR API only returns a flat
+// list of recognized strings with no coordinates, so it can't feed that overlay --
+// its output lives in the copyable text block below the image instead.
+// Results are cached per picture for the session: flipping Next/Prev back to an
+// already-read image re-shows instantly without another OCR API call.
+function lightboxRenderExtractResult(result) {
     const panel = document.getElementById('imgLightboxExtractPanel');
     const body = document.getElementById('imgLightboxExtractBody');
-    if (!img || !img.src || !panel || !body) return;
-
+    if (!panel || !body) return;
     panel.style.display = 'block';
-    body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">Extracting text…</div>`;
+    if (!result.success) {
+        body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(result.error || 'Text extraction failed')}</div>`;
+        return;
+    }
+    if (!result.text || !result.text.trim()) {
+        body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">No text found in this image.</div>`;
+        return;
+    }
+    body.innerHTML = `
+        <pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.82rem;color:var(--text-primary,#e8eaf0);margin:0;padding:6px 14px 10px;max-height:200px;overflow:auto;">${escHtml(result.text)}</pre>
+        <button type="button" onclick="lightboxCopyExtractedText()" style="margin:0 14px 12px;padding:5px 12px;font-size:.78rem;border-radius:6px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,#00d4ff);cursor:pointer;">📋 Copy text</button>`;
+}
+
+async function lightboxRunLarkExtract(src, myToken, force) {
+    const panel = document.getElementById('imgLightboxExtractPanel');
+    const body = document.getElementById('imgLightboxExtractBody');
+    const img = document.getElementById('imgLightboxImg');
+    if (!src || !panel || !body) return;
+
+    // Cache hit (and not a manual re-run): show instantly, no API call.
+    if (!force && lightboxLarkOcrCache[src]) {
+        if (myToken === lightboxExtractToken) lightboxRenderExtractResult(lightboxLarkOcrCache[src]);
+        return;
+    }
+
+    if (myToken === lightboxExtractToken) {
+        panel.style.display = 'block';
+        body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">Extracting text (Lark OCR)…</div>`;
+    }
 
     try {
-        const resp = await fetch(img.src);
+        const resp = await fetch(src);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         let blob = await resp.blob();
 
         // Feishu's OCR endpoint has a hard 5MB cap. Re-encode as a smaller JPEG via
         // canvas instead of failing outright if the original attachment is bigger.
-        if (blob.size > 4.5 * 1024 * 1024) {
+        if (blob.size > 4.5 * 1024 * 1024 && img) {
             blob = await lightboxDownscaleForOcr(img);
         }
 
@@ -11053,19 +11252,28 @@ async function lightboxExtractText() {
         const data = await res.json();
 
         if (!data.success) {
-            body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">${escHtml(data.error || 'Text extraction failed')}</div>`;
-            return;
+            const result = { success: false, error: data.error || 'Text extraction failed' };
+            if (myToken === lightboxExtractToken) lightboxRenderExtractResult(result);
+            return; // failures are NOT cached -- the next open retries fresh
         }
-        if (!data.text || !data.text.trim()) {
-            body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--text-muted);">No text found in this image.</div>`;
-            return;
-        }
-        body.innerHTML = `
-            <pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.82rem;color:var(--text-primary,#e8eaf0);margin:0;padding:6px 14px 10px;max-height:200px;overflow:auto;">${escHtml(data.text)}</pre>
-            <button type="button" onclick="lightboxCopyExtractedText()" style="margin:0 14px 12px;padding:5px 12px;font-size:.78rem;border-radius:6px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,#00d4ff);cursor:pointer;">📋 Copy text</button>`;
+        const result = { success: true, text: data.text || '' };
+        lightboxLarkOcrCache[src] = result;
+        if (myToken === lightboxExtractToken) lightboxRenderExtractResult(result);
     } catch (e) {
-        body.innerHTML = `<div style="padding:10px 14px;font-size:.8rem;color:var(--accent-rose);">Extraction failed: ${escHtml(e.message)}</div>`;
+        // Network hiccup: not cached either, a later open retries.
+        if (myToken === lightboxExtractToken) {
+            lightboxRenderExtractResult({ success: false, error: 'Extraction failed: ' + e.message });
+        }
     }
+}
+
+// The single 📋 toolbar button: force a FRESH Lark OCR run on the current picture
+// (bypasses the per-picture cache) -- for when the auto result looks off or the
+// picture was rotated/zoomed and the agent wants a re-read.
+async function lightboxExtractText() {
+    const img = document.getElementById('imgLightboxImg');
+    if (!img || !img.src) return;
+    await lightboxRunLarkExtract(img.src, lightboxExtractToken, true);
 }
 
 function lightboxBlobToBase64(blob) {
@@ -11116,6 +11324,7 @@ function closeImageLightbox() {
     lightboxGallery = [];
     lightboxIndex = 0;
     lightboxOcrRunToken++; // invalidate any OCR run still in flight for the closed image
+    lightboxExtractToken++; // same for a Lark extraction still in flight
     lightboxClearTextLayer();
     lightboxSetOcrStatus('');
     lightboxHideExtractPanel();
@@ -11235,6 +11444,9 @@ function lightboxClearTextLayer() {
     if (layer) layer.innerHTML = '';
 }
 
+// Phase 10.16 (Ahmed): the 🔤 toggle is BACK by request -- it hides/shows the
+// on-picture selectable text layer. OCR keeps running/caching either way; the
+// toggle is purely visual, same as before Phase 10.15.
 function lightboxToggleOcr() {
     lightboxOcrEnabled = !lightboxOcrEnabled;
     const layer = document.getElementById('imgLightboxTextLayer');
@@ -11242,6 +11454,15 @@ function lightboxToggleOcr() {
     if (layer) layer.style.display = lightboxOcrEnabled ? '' : 'none';
     if (btn) btn.classList.toggle('active', lightboxOcrEnabled);
 }
+
+// Phase 10.17 (Ahmed): the Lark-on-picture text merge from 10.16 is REVERTED at
+// his request -- the two engines stay fully separate: the local engine owns the
+// on-picture selectable layer, Lark OCR owns the 📋 text panel. (His proposed
+// alternative -- a "Document AI OCR" endpoint returning q_boxes coordinates --
+// was checked against Lark's official AI API catalog: no OCR endpoint returns
+// coordinates anywhere; the document_ai family is document-type-specific field
+// extractors that return named type/value entities, e.g. vat_invoice recognize
+// returns buyer_name/invoice_no strings, no boxes.)
 
 // --- Primary OCR engine: RapidOCR (PP-OCR models via ONNX Runtime Web) -----------
 // A dedicated OCR engine (client-side-ocr, MIT), meaningfully more accurate than
@@ -11462,7 +11683,7 @@ function lightboxRenderTextLayer(result, myToken) {
         const fontSize = Math.max(height * 0.82, 6);
         return `<span style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;font-size:${fontSize}px;">${escHtml(w.text)}</span>`;
     }).join('');
-    layer.style.display = lightboxOcrEnabled ? '' : 'none';
+    layer.style.display = lightboxOcrEnabled ? '' : 'none'; // Phase 10.16: 🔤 toggle restored -- honors the show/hide state
 }
 
 
