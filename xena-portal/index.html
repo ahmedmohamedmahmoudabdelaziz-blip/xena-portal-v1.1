@@ -925,6 +925,31 @@
         .del-btn{background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500;transition:.2s;font-family:inherit;font-size:.85rem}
         .del-btn:hover{background:var(--accent-rose);color:#000}
 
+        /* ═══ Phase 10.18: Current Active Agents — elegant agent cards ═══
+           Deterministic-gradient initial avatar + Lark name (Person field,
+           zero extra request cost) with the email underneath. Real Lark
+           profile photos would need one contact-API call PER agent, which
+           Ahmed explicitly ruled out ("no more request cost"). */
+        .agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+        .agents-count-badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;padding:2px 9px;margin-left:8px;border-radius:999px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.35);color:var(--accent-cyan);font-size:.75rem;font-weight:700;vertical-align:middle}
+        .agent-card{position:relative;display:flex;flex-direction:column;gap:12px;padding:18px 18px 14px;background:linear-gradient(160deg,rgba(255,255,255,.03),rgba(255,255,255,0) 45%),var(--bg);border:1px solid var(--border);border-radius:16px;transition:transform .25s,border-color .25s,box-shadow .25s;overflow:hidden}
+        .agent-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--agent-accent,linear-gradient(90deg,var(--accent-cyan),var(--accent-purple)));opacity:.9}
+        .agent-card:hover{transform:translateY(-3px);border-color:var(--accent-cyan);box-shadow:0 12px 32px rgba(0,0,0,.35)}
+        .agent-card.agent-orphan{border-color:rgba(255,77,109,.5)}
+        .agent-card-head{display:flex;align-items:center;gap:14px}
+        .agent-avatar{position:relative;flex:0 0 auto;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:#fff;letter-spacing:.5px;background:var(--agent-avatar-bg,linear-gradient(135deg,#00d4ff,#7b61ff));box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.15);text-transform:uppercase}
+        .agent-admin-crown{position:absolute;top:-9px;right:-7px;font-size:1rem;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
+        .agent-id-block{min-width:0;flex:1}
+        .agent-name{font-weight:700;font-size:1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .agent-email{font-size:.78rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;direction:ltr}
+        .agent-admin-chip{background:var(--accent-amber);color:#000;padding:1px 7px;border-radius:5px;font-size:.65rem;font-weight:800;margin-left:6px;vertical-align:middle;letter-spacing:.4px}
+        .agent-orphan-chip{background:var(--accent-rose);color:#fff;padding:1px 7px;border-radius:5px;font-size:.65rem;font-weight:800;margin-left:6px;vertical-align:middle}
+        .agent-mods{display:flex;flex-wrap:wrap;gap:6px;min-height:20px}
+        .agent-mod-chip{font-size:.68rem;padding:3px 9px;border-radius:999px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.22);color:var(--accent-cyan);white-space:nowrap}
+        .agent-mod-chip.chip-none{background:rgba(255,255,255,.04);border-color:var(--border);color:var(--text-muted)}
+        .agent-card-foot{display:flex;gap:8px;margin-top:auto;padding-top:12px;border-top:1px dashed var(--border)}
+        .agent-card-foot button{flex:1}
+
         .pill-select-container{position:relative;width:100%}
 
         /* ── Multi-select dropdown (checkbox list, no pills/chips) ── */
@@ -2627,7 +2652,6 @@
                             </div>
                             <div class="sub-opts">
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_new_request" checked> New Request</label>
-                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_audit" checked> ⚡ Audit Workstation</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_my_requests" checked> My Recent Requests</label>
                             </div>
                         </div>
@@ -2639,6 +2663,11 @@
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_new"> 🆕 New Ticket (create from empty Ticket Workspace)</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_pending"> 🕵️ Under Investigation list</label>
+                                <!-- Phase 10.18 (Ahmed): Audit Workstation belongs with the
+                                     Ticket Queue tools, not Submit Request -- same grant key
+                                     (mod_submit_audit), so every existing grant keeps working
+                                     unchanged; only the Manage Agents grouping moved. -->
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_submit_audit" checked> ⚡ Audit Workstation</label>
                             </div>
                         </div>
                         </div>
@@ -2651,8 +2680,8 @@
                     <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:10px">Roles are reusable presets (e.g. "CS Pakistan", "ACM India") — build one once via Quick Setup above, then apply it to any number of agents.</p>
                     <div class="user-list" id="adminRoleList"></div>
 
-                    <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">Current Active Agents</h3>
-                    <div class="user-list" id="adminUserList"></div>
+                    <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">👥 Current Active Agents <span id="agentsCountBadge" class="agents-count-badge">0</span></h3>
+                    <div class="agents-grid" id="adminUserList"></div>
                 </div>
             </div>
 
@@ -3954,14 +3983,21 @@ function setActiveTab(page) {
 
 function closeTab(page, event) {
     if(event) event.stopPropagation();
-    if(page === 'welcome') return; 
+    if(page === 'welcome') return;
 
     openTabs = openTabs.filter(t => t !== page);
-    
+
     if (activeTabId === page) {
-        activeTabId = openTabs[openTabs.length - 1];
+        // Phase 10.18 (ghost-workspace fix): fall back to the last entry that
+        // actually OWNS a tab. 'ticket-workspace' sits in openTabs without a
+        // tab for real tickets (renderTabs skips it), so closing e.g. the Live
+        // Queue tab used to land on a workspace page with NO tab in the bar --
+        // the ticket the agent had already left popping back on screen.
+        const ownsTab = p => !(p === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode));
+        const candidates = openTabs.filter(ownsTab);
+        activeTabId = candidates.length ? candidates[candidates.length - 1] : 'welcome';
     }
-    
+
     setActiveTab(activeTabId);
 }
 
@@ -6389,10 +6425,37 @@ async function fetchAdminUsers() {
         users.forEach(u=>{
             let dispEmail=u.email||u.person;
             const isOrphan = !dispEmail || !dispEmail.trim();
-            let badge=u.modules.includes('admin')?'<span style="background:var(--accent-amber);color:#000;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px">ADMIN</span>':'';
-            if (isOrphan) badge += '<span style="background:var(--accent-rose);color:#fff;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:bold;margin-left:4px" title="This row has no email/identity attached — it cannot be edited by identity. Safe to remove.">⚠ NO IDENTITY</span>';
-            const row=document.createElement('div'); row.className='user-row';
-            if (isOrphan) row.style.borderColor = 'var(--accent-rose)';
+            // Phase 10.18: elegant agent card -- deterministic-gradient initial
+            // avatar + Lark name (the access table's Person field, returned by
+            // the backend inside the SAME records fetch = zero extra request
+            // cost) with the email underneath. Real Lark profile photos would
+            // need one contact-API call PER agent -- explicitly ruled out
+            // ("no more request cost") -- so avatars are initials-based.
+            const AGENT_PALETTES = [
+                ['#00d4ff','#7b61ff'], ['#ff4d6d','#ff9a3d'], ['#22c55e','#00d4ff'],
+                ['#f59e0b','#ff4d6d'], ['#7b61ff','#ff4d9e'], ['#00c2a8','#22c55e'],
+                ['#4d7cff','#00d4ff'], ['#ff9a3d','#f59e0b']
+            ];
+            const agentPalette = (key) => {
+                let h = 0; const s = String(key || '?');
+                for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+                return AGENT_PALETTES[h % AGENT_PALETTES.length];
+            };
+            const agentDisplayName = (uu, em) => {
+                const person = (uu.person || '').trim();
+                if (person && person.toLowerCase() !== String(em || '').toLowerCase()) return person;
+                const local = String(em || '').split('@')[0] || '';
+                return local.split(/[._\-+]/).filter(Boolean).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+            };
+            const agentInitials = (nm) => {
+                const parts = String(nm || '').trim().split(/\s+/).filter(Boolean);
+                if (!parts.length) return '?';
+                return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]);
+            };
+            const isAdminAgent = (u.modules||'').includes('admin');
+            const dispName = agentDisplayName(u, dispEmail);
+            const initials = agentInitials(dispName);
+            const [c1, c2] = agentPalette(dispEmail || dispName);
 
             const safeEmail = escapeJSArgs(dispEmail);
             const safeModules = escapeJSArgs(u.modules);
@@ -6400,19 +6463,30 @@ async function fetchAdminUsers() {
             const safeRegs = escapeJSArgs(u.regions_raw);
             const safeId = escapeJSArgs(u.id);
 
-            row.innerHTML=`
-                 <div class="user-info">
-                    <span class="user-email">${isOrphan ? '<em style="color:var(--text-muted)">(no identity set)</em>' : escHtml(dispEmail)}${badge}</span>
-                    <div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${escHtml(u.modules||'none')}</span></div>
+            const modChips = String(u.modules||'').split(',').map(m => m.trim()).filter(Boolean);
+            const card=document.createElement('div'); card.className='agent-card' + (isOrphan?' agent-orphan':'');
+            card.style.setProperty('--agent-avatar-bg', `linear-gradient(135deg,${c1},${c2})`);
+            card.style.setProperty('--agent-accent', `linear-gradient(90deg,${c1},${c2})`);
+
+            card.innerHTML=`
+                <div class="agent-card-head">
+                    <div class="agent-avatar">${escHtml(initials)}${isAdminAgent?'<span class="agent-admin-crown" title="Admin privileges">👑</span>':''}</div>
+                    <div class="agent-id-block">
+                        <div class="agent-name">${isOrphan ? '<em style="color:var(--text-muted)">(no identity set)</em>' : escHtml(dispName)}${isAdminAgent?'<span class="agent-admin-chip">ADMIN</span>':''}${isOrphan?'<span class="agent-orphan-chip" title="This row has no email/identity attached — it cannot be edited by identity. Safe to remove.">⚠ NO IDENTITY</span>':''}</div>
+                        <div class="agent-email">${isOrphan ? '&nbsp;' : escHtml(dispEmail)}</div>
+                    </div>
                 </div>
-                <div class="action-btns">
-                    <button class="edit-btn" onclick="editAgent('${safeEmail}','${safeModules}','${safeAcms}','${safeRegs}')" ${isOrphan?'disabled title="Cannot edit a row with no identity — remove it instead"':''}>Edit</button>
-                    <button class="edit-btn" onclick="copyAccessFromAgent('${safeId}')" style="background:rgba(0,212,255,.1);color:var(--accent-cyan)">Copy</button>
-                    <button class="del-btn" onclick="deleteAgent('${safeId}')">Remove</button>
+                <div class="agent-mods">${modChips.length ? modChips.map(m => `<span class="agent-mod-chip">${escHtml(m)}</span>`).join('') : '<span class="agent-mod-chip chip-none">no modules</span>'}</div>
+                <div class="agent-card-foot">
+                    <button class="edit-btn" onclick="editAgent('${safeEmail}','${safeModules}','${safeAcms}','${safeRegs}')" ${isOrphan?'disabled title="Cannot edit a row with no identity — remove it instead"':''}>✏️ Edit</button>
+                    <button class="edit-btn" onclick="copyAccessFromAgent('${safeId}')" style="background:rgba(0,212,255,.1);color:var(--accent-cyan)">📋 Copy</button>
+                    <button class="del-btn" onclick="deleteAgent('${safeId}')">🗑 Remove</button>
                 </div>
             `;
-            listDiv.appendChild(row);
+            listDiv.appendChild(card);
         });
+        const cntBadge = document.getElementById('agentsCountBadge');
+        if (cntBadge) cntBadge.textContent = users.length;
     } catch(e) {
         listDiv.innerHTML='<div style="color:var(--accent-rose)">Failed to load agents.</div>';
         if (roleListDiv) roleListDiv.innerHTML='<div style="color:var(--accent-rose)">Failed to load roles.</div>';
@@ -9140,21 +9214,32 @@ function enforceLocks() {
 }
 
 function hasMod(m) { return isAdmin || userModules.some(um => um.includes(m)); }
+// Phase 10.18: NAMESPACE-safe matcher. hasMod() is a raw substring match, so
+// hasMod('analytics') was TRUE for the key 'target_analytics' (it CONTAINS the
+// word "analytics") and hasMod('target') was TRUE for 'target_check' -- that is
+// exactly how unchecked features (Agency Target Table, Target Analytics,
+// Executive Intelligence, the whole Analytics group) leaked into agents who
+// were never granted them. hasNs() only matches the exact master key or keys
+// of the same namespace ('target' / 'target_*'), never a different namespace
+// that happens to contain the word.
+function hasNs(prefix) { return isAdmin || userModules.some(um => um === prefix || um.startsWith(prefix + '_')); }
 
 // Sub-feature gating: an admin can grant a narrow module key (e.g. 'exchange_needs_push')
-// to give someone just that one panel. Anyone with the broader existing Analytics
-// access (analytics_report/analytics_compare/etc, matched via hasMod substring same
-// as the backend) keeps seeing every sub-feature exactly as before -- this is
-// additive-only and never removes access an existing agent already has.
-function hasSubFeature(key) { return hasExactMod(key) || hasMod('analytics') || isAdmin; }
+// to give someone just that one panel. Anyone with broader ANALYTICS-namespace
+// access (the master 'analytics' key or any 'analytics_*' module) keeps seeing
+// every sub-feature exactly as before -- additive-only, and (Phase 10.18) no
+// longer triggered by the unrelated 'target_analytics' key.
+function hasSubFeature(key) { return hasExactMod(key) || hasNs('analytics'); }
 function hasExactMod(m) { return isAdmin || userModules.includes(m); }
 // Target Analytics is its own grantable permission (mod_target_analytics in
 // Manage Agents), independent of hasSubFeature()'s fallback above -- that one
 // falls back to broad "analytics" (the Analytics Report module), which has
 // nothing to do with this card. Target Analytics only ever appears on Check
-// Agency Target (never Check Agency Points, by design), so the fallback here
-// is scoped to broad Target access only.
-function hasTargetAnalyticsAccess() { return hasExactMod('target_analytics') || hasMod('target') || isAdmin; }
+// Agency Target (never Check Agency Points, by design). Phase 10.18: the broad
+// fallback is the EXACT master 'target' key only -- previously hasMod('target')
+// substring-matched 'target_check'/'target_timeline'/'target_table', so every
+// agent with plain Check Agency Target saw this unchecked card.
+function hasTargetAnalyticsAccess() { return hasExactMod('target_analytics') || hasExactMod('target'); }
 
 function configureSidebarAndCards() {
     // Submit Request + Universal Query groups: each nav item follows its own
@@ -9184,66 +9269,80 @@ function configureSidebarAndCards() {
     const grpAcm = document.getElementById('navGrpAcmMgmt');
     if (grpAcm) grpAcm.style.display = (navAgencyList && navAgencyList.style.display !== 'none') ? '' : 'none';
 
-    if (!hasMod('target')) document.getElementById('navGrpTarget').style.display = 'none';
-    else {
-        if (!hasExactMod('target_check') && !hasExactMod('target')) document.getElementById('nav-target').style.display = 'none';
-        if (!hasExactMod('target_timeline') && !hasExactMod('target')) document.getElementById('nav-target-timeline').style.display = 'none';
-    }
-
-    // RESTORED: Agency Points security locks
-    if (!hasMod('points')) document.getElementById('navGrpPoints').style.display = 'none';
-    else {
-        if (!hasExactMod('points_check') && !hasExactMod('points')) document.getElementById('nav-points').style.display = 'none';
-        if (!hasExactMod('points_allocator') && !hasExactMod('points')) document.getElementById('nav-allocator').style.display = 'none';
-        if (!hasExactMod('points_records') && !hasExactMod('points')) document.getElementById('nav-points-records').style.display = 'none';
-        if (!hasExactMod('points_table') && !hasExactMod('points')) document.getElementById('nav-points-table').style.display = 'none';
-    }
-
-    if (!hasMod('analytics')) document.getElementById('navGrpAnalytics').style.display = 'none';
-    else {
-        if (!hasExactMod('analytics_report') && !hasExactMod('analytics')) document.getElementById('nav-analytics').style.display = 'none';
-        if (!hasExactMod('analytics_compare') && !hasExactMod('analytics')) document.getElementById('nav-compare').style.display = 'none';
-    }
-
+    // Phase 10.18: EVERY gate from here down assigns display BOTH ways
+    // ('' / 'none'). These used to be hide-only ("if (no access) hide"), which
+    // worked once at login but broke Preview Agent View: previewing a
+    // restricted agent HID groups/items, and previewing the next agent (or
+    // exiting back to admin) never UN-hid them -- the portal kept showing the
+    // previous agent's access until a full logout/login. Visibility is now
+    // fully re-derived from the CURRENT userModules on every run. Group
+    // headers follow their children (a group with zero visible items
+    // disappears, so single-panel grants like target_analytics or
+    // analytics_exec_insights never leave an empty group header behind).
+    const navTarget = document.getElementById('nav-target');
+    const navTargetTimeline = document.getElementById('nav-target-timeline');
+    const targetTableNav = document.getElementById('nav-agency-target-table');
     const hasFullAnalytics = hasExactMod('analytics') || isAdmin;
-    if (!hasMod('exchange') && !hasFullAnalytics) {
-        document.getElementById('navGrpExchange').style.display = 'none';
-    } else {
-        if (!hasExactMod('exchange') && !hasFullAnalytics) {
-            const el = document.getElementById('nav-exchange');
-            if (el) el.style.display = 'none';
-        }
-    }
+    if (navTarget) navTarget.style.display = (hasExactMod('target_check') || hasExactMod('target')) ? '' : 'none';
+    if (navTargetTimeline) navTargetTimeline.style.display = (hasExactMod('target_timeline') || hasExactMod('target')) ? '' : 'none';
+    // Agency Target Table nav item -- uses the 'target_table' key, the EXACT
+    // master 'target' key (Phase 10.18: was hasMod('target'), which substring-
+    // matched 'target_check' and showed the table to every Check Agency Target
+    // agent), or full Analytics access.
+    if (targetTableNav) targetTableNav.style.display = (hasExactMod('target_table') || hasExactMod('target') || hasFullAnalytics) ? '' : 'none';
+    const grpTarget = document.getElementById('navGrpTarget');
+    if (grpTarget) grpTarget.style.display = [navTarget, navTargetTimeline, targetTableNav].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    // Agency Points security locks
+    const navPoints = document.getElementById('nav-points');
+    const navAllocator = document.getElementById('nav-allocator');
+    const navPointsRecords = document.getElementById('nav-points-records');
+    const navPointsTable = document.getElementById('nav-points-table');
+    if (navPoints) navPoints.style.display = (hasExactMod('points_check') || hasExactMod('points')) ? '' : 'none';
+    if (navAllocator) navAllocator.style.display = (hasExactMod('points_allocator') || hasExactMod('points')) ? '' : 'none';
+    if (navPointsRecords) navPointsRecords.style.display = (hasExactMod('points_records') || hasExactMod('points')) ? '' : 'none';
+    if (navPointsTable) navPointsTable.style.display = (hasExactMod('points_table') || hasExactMod('points')) ? '' : 'none';
+    const grpPoints = document.getElementById('navGrpPoints');
+    if (grpPoints) grpPoints.style.display = [navPoints, navAllocator, navPointsRecords, navPointsTable].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    const navAnalytics = document.getElementById('nav-analytics');
+    const navCompare = document.getElementById('nav-compare');
+    if (navAnalytics) navAnalytics.style.display = (hasExactMod('analytics_report') || hasExactMod('analytics')) ? '' : 'none';
+    if (navCompare) navCompare.style.display = (hasExactMod('analytics_compare') || hasExactMod('analytics')) ? '' : 'none';
+    const grpAnalytics = document.getElementById('navGrpAnalytics');
+    if (grpAnalytics) grpAnalytics.style.display = [navAnalytics, navCompare].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    const navExchange = document.getElementById('nav-exchange');
+    if (navExchange) navExchange.style.display = (hasExactMod('exchange') || hasFullAnalytics) ? '' : 'none';
+    const grpExchange = document.getElementById('navGrpExchange');
+    // Exchange sub-feature keys (exchange_needs_push etc.) keep the group
+    // header visible exactly as hasMod('exchange') used to, but namespace-safe.
+    if (grpExchange) grpExchange.style.display = (hasNs('exchange') || hasFullAnalytics) ? '' : 'none';
 
     // Sub-feature gating (Exchange). Additive-only per hasSubFeature() -- never
     // hides anything from someone who already had broader analytics access.
+    // Phase 10.18: these are BOTH-way too (they used to be hide-only, so a
+    // restricted preview permanently hid panels for the rest of the session).
     const exNeedsPushCard = document.getElementById('exNeedsPushPanel')?.closest('.card');
-    if (exNeedsPushCard && !hasSubFeature('exchange_needs_push')) exNeedsPushCard.style.display = 'none';
+    if (exNeedsPushCard) exNeedsPushCard.style.display = hasSubFeature('exchange_needs_push') ? '' : 'none';
     const exMoversCard = document.getElementById('exMoversPanel')?.closest('.card');
-    if (exMoversCard && !hasSubFeature('exchange_movers')) exMoversCard.style.display = 'none';
+    if (exMoversCard) exMoversCard.style.display = hasSubFeature('exchange_movers') ? '' : 'none';
     const exHeatmapBtn = document.getElementById('exViewBtn-heatmap');
-    if (exHeatmapBtn && !hasSubFeature('exchange_heatmap')) exHeatmapBtn.style.display = 'none';
+    if (exHeatmapBtn) exHeatmapBtn.style.display = hasSubFeature('exchange_heatmap') ? '' : 'none';
     const exWatchlistBtn = document.getElementById('exViewBtn-watchlist');
-    if (exWatchlistBtn && !hasSubFeature('exchange_watchlist')) exWatchlistBtn.style.display = 'none';
+    if (exWatchlistBtn) exWatchlistBtn.style.display = hasSubFeature('exchange_watchlist') ? '' : 'none';
 
     // Sub-feature gating (Compare).
     const cmpRadarCard = document.getElementById('cmpAdvRadarChart')?.closest('.card');
-    if (cmpRadarCard && !hasSubFeature('compare_radar')) cmpRadarCard.style.display = 'none';
+    if (cmpRadarCard) cmpRadarCard.style.display = hasSubFeature('compare_radar') ? '' : 'none';
     const cmpDiffCard = document.getElementById('cmpDiffTableWrap')?.closest('.card');
-    if (cmpDiffCard && !hasSubFeature('compare_diff')) cmpDiffCard.style.display = 'none';
+    if (cmpDiffCard) cmpDiffCard.style.display = hasSubFeature('compare_diff') ? '' : 'none';
     const cmpAreaCard = document.getElementById('cmpAdvTargetAreaChart')?.closest('.card');
-    if (cmpAreaCard && !hasSubFeature('compare_area_chart')) cmpAreaCard.style.display = 'none';
+    if (cmpAreaCard) cmpAreaCard.style.display = hasSubFeature('compare_area_chart') ? '' : 'none';
     const cmpLeaderboardCard = document.getElementById('cmpLeaderboard')?.closest('.card');
-    if (cmpLeaderboardCard && !hasSubFeature('compare_leaderboard')) cmpLeaderboardCard.style.display = 'none';
+    if (cmpLeaderboardCard) cmpLeaderboardCard.style.display = hasSubFeature('compare_leaderboard') ? '' : 'none';
     const cmpConsistencyCard = document.getElementById('cmpConsistency')?.closest('.card');
-    if (cmpConsistencyCard && !hasSubFeature('compare_consistency')) cmpConsistencyCard.style.display = 'none';
-
-    // Agency Target Table nav item -- uses the 'target_table' key (falls back to
-    // the bare 'target' module too, matching applyConfigToForm's convention).
-    const targetTableNav = document.getElementById('nav-agency-target-table');
-    if (targetTableNav && !hasExactMod('target_table') && !hasMod('target') && !hasFullAnalytics) {
-        targetTableNav.style.display = 'none';
-    }
+    if (cmpConsistencyCard) cmpConsistencyCard.style.display = hasSubFeature('compare_consistency') ? '' : 'none';
 
     // Phase 10.13: Ticket Queue group children are gated individually now --
     // Live Queue (tickets_live_queue), New Ticket (tickets_new), Under
@@ -12118,6 +12217,11 @@ function twCloseWorkspace() {
     // Phase 10.13.1: return to where the workspace was opened FROM (a
     // tickets_new-only agent must not land on the Live Queue he can't see).
     const back = (typeof twReturnTo !== 'undefined' && twReturnTo) ? twReturnTo : 'live-tickets';
+    // Phase 10.18 (ghost-workspace fix): the workspace is CLOSED now, so drop
+    // it from openTabs entirely. It used to linger there (tab-less for real
+    // tickets), and closeTab()'s "activate the last open tab" fallback could
+    // then land on it -- the closed ticket's workspace reappearing with no tab.
+    openTabs = openTabs.filter(t => t !== 'ticket-workspace');
     activeTabId = back;
     renderTabs();
     executePageLogic(back);
