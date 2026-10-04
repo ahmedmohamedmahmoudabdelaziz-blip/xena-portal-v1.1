@@ -323,7 +323,14 @@ def _refresh_user_token(open_id):
         uat_ttl = max(int(data.get("expires_in", 7200)) - 300, 60)
         redis_cmd("SET", f"xena:uat:{open_id}", new_uat, "EX", uat_ttl)
         if new_rt:
-            redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 4 * 3600)
+            # Phase 10.14 (Ahmed): the refresh token used to be kept for only
+            # 4h, which killed every session at the 4-hour mark even while the
+            # agent was actively working ("the token expire so fast ... expire
+            # when submit request"). Feishu's own refresh_token lives ~30
+            # days; we now keep it for 24h (renewed on every refresh), which
+            # comfortably covers the 12h client-side session limit -- submits
+            # hours into a shift refresh silently instead of dying.
+            redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 24 * 3600)
         return new_uat
 def _get_cached_uat(open_id):
     """Freshest server-side user token for this agent, if we hold one (set at login
@@ -2146,7 +2153,8 @@ def callback():
 
         refresh_token = (token_resp.get("data") or {}).get("refresh_token") or token_resp.get("refresh_token")
         if refresh_token and lark_open_id and REDIS_ENABLED:
-            redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 4 * 3600)
+            # Phase 10.14: 24h (was 4h) -- see _refresh_user_token for why.
+            redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 24 * 3600)
         uat_expires_in = (token_resp.get("data") or {}).get("expires_in") or token_resp.get("expires_in") or 7200
         if lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
@@ -4128,6 +4136,114 @@ def _query_pick_first_ok(combos, results_by_combo):
             stop_reason = res["error"]
     return all_items, fetch_complete, stop_reason, success
 
+# ─── Phase 10.14 (Ahmed): ONE Feishu search per radar scan ───
+# /api/query/batch used to fan every field's alias×operator combos out as
+# separate /records/search calls (up to ~18 Feishu API hits and 3 audit
+# lines for a single radar scan -- "it still send as 3 request and recive
+# as 3 request and this cost alot"). When every searched value is
+# all-digits (the radar's User ID / Otherapp ID / NID always are), the exact
+# same search runs as ONE /records/search call whose filter ORs each field's
+# working alias; the hits are then sorted back into their per-field slots
+# server-side. Feishu evaluates the very same (alias, operator, value)
+# conditions the combo probe would have picked, and digits have no case, so
+# the local contains/is/= re-check reproduces Feishu's own match decision
+# exactly -- results are identical, just one request. Anything unusual (a
+# non-digit value, a renamed column that breaks the OR filter) falls back
+# to the legacy per-field combo probe unchanged, and that probe re-teaches
+# the alias cache which column name currently works.
+_COMBO_MAP_REDIS_KEY = "xena:query_combo_map"
+_combo_map_cache = {"data": None, "ts": 0, "lock": threading.Lock()}
+
+def _query_combo_map_get():
+    """field -> [alias, operator] that last worked, cached in Redis (24h) so
+    every warm instance can skip the probe entirely."""
+    with _combo_map_cache["lock"]:
+        if _combo_map_cache["data"] is not None and time.time() - _combo_map_cache["ts"] < 24 * 3600:
+            return dict(_combo_map_cache["data"])
+    data = redis_get_json(_COMBO_MAP_REDIS_KEY) if REDIS_ENABLED else None
+    if isinstance(data, dict):
+        with _combo_map_cache["lock"]:
+            _combo_map_cache["data"] = data
+            _combo_map_cache["ts"] = time.time()
+        return dict(data)
+    return {}
+
+def _query_combo_map_set(mapping):
+    with _combo_map_cache["lock"]:
+        _combo_map_cache["data"] = dict(mapping)
+        _combo_map_cache["ts"] = time.time()
+    if REDIS_ENABLED:
+        redis_set_json(_COMBO_MAP_REDIS_KEY, mapping, ttl=24 * 3600)
+
+def _query_combo_map_drop():
+    with _combo_map_cache["lock"]:
+        _combo_map_cache["data"] = None
+        _combo_map_cache["ts"] = 0
+    if REDIS_ENABLED:
+        redis_cmd("DEL", _COMBO_MAP_REDIS_KEY)
+
+def _query_local_match(fields, field, op, value):
+    """Reproduces Feishu's own decision for ONE (field, operator, value)
+    condition, used to sort OR-search hits back into per-field slots. Only
+    ever called with all-digit values (the OR path is gated on that), where
+    contains/is/= have exact, case-free local equivalents. The field's text
+    is extracted through the same alias chain the combo search filters on."""
+    txt = ""
+    for alias in QUERY_FIELD_ALIASES[field]:
+        txt = extract_field_text(get_field_local(fields, alias))
+        if txt:
+            break
+    if not txt:
+        return False
+    if op == "contains":
+        return value in txt
+    if op == "is":
+        return txt == value
+    if op == "=":
+        return txt.isdigit() and int(txt) == int(value)
+    return False
+
+def _query_try_or_search(search_url, headers, conditions, projection):
+    """Fires ONE /records/search whose filter ORs every field's condition,
+    following pagination (up to 3 pages = 1,500 records, matching the old
+    500-per-field ceiling). Same retry-without-projection and same
+    error-shape conventions as _query_try_combo."""
+    items, page_token, complete = [], None, True
+    for _ in range(3):
+        payload = {"page_size": 500,
+                   "filter": {"conjunction": "or", "conditions": conditions}}
+        if projection: payload["field_names"] = projection
+        if page_token: payload["page_token"] = page_token
+        try:
+            resp = feishu_session.post(search_url, headers=headers, json=payload, timeout=15)
+            data = resp.json()
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        if data.get("code") == 1254045 and projection:
+            return _query_try_or_search(search_url, headers, conditions, projection=None)
+        if data.get("code") != 0:
+            if data.get("code") in (1254011, 1254402, 1254010):
+                # bad filter / unknown column -- silent, caller falls back
+                # to the per-field probe which re-learns the working alias.
+                return {"ok": False, "error": None}
+            return {"ok": False, "error": data.get("msg"), "fatal": data.get("code") == 99991663}
+        block = data.get("data", {}) or {}
+        items.extend(block.get("items", []) or [])
+        page_token = block.get("page_token")
+        if not page_token or not block.get("has_more"):
+            break
+    else:
+        complete = False  # page cap hit -- same honesty as fetch_complete elsewhere
+    # One record can satisfy several OR conditions; Feishu returns it once,
+    # but dedupe defensively by record_id.
+    seen, uniq = set(), []
+    for it in items:
+        rid = it.get("record_id")
+        if rid and rid in seen: continue
+        if rid: seen.add(rid)
+        uniq.append(it)
+    return {"ok": True, "items": uniq, "complete": complete}
+
 def _query_format_results(all_items, allowed_acms_set, allowed_regs_set):
     """Shared raw-item -> response-row shaping (region/ACM inference, permission
     filtering, date formatting, newest-first sort). Used by both /api/query and
@@ -4229,11 +4345,13 @@ def query_records_batch():
     allowed_acms_set = set(a.lower() for a in allowed_acms) if allowed_acms else {"all"}
     allowed_regs_set = set(r.lower() for r in allowed_regs) if allowed_regs else {"all"}
 
-    # Audit trail preserved: one QUERY_SEARCH entry per field, exactly as if
-    # the fields had arrived as separate /api/query calls.
-    for field, value, err in normalized:
-        if not err:
-            audit.log(user, "QUERY_SEARCH", f"{field}={value}", ip=ip, severity="Info")
+    # Phase 10.14 (Ahmed): ONE audit line per scan, not one per field -- the
+    # whole radar scan is a single search now ("need all the duplicated radar
+    # request to be send and recive as one request"). The per-field values
+    # stay fully visible inside that one line, so the trail loses nothing.
+    audit_fields = ",".join(f"{f}={v}" for f, v, err in normalized if not err)
+    if audit_fields:
+        audit.log(user, "QUERY_SEARCH", f"batch:{audit_fields}", ip=ip, severity="Info")
 
     if MOCK_MODE:
         responses = []
@@ -4249,16 +4367,71 @@ def query_records_batch():
     tat = get_tenant_access_token()
     search_url, headers = _query_search_url_and_headers(tat)
 
+    jobs = []       # (response_index, field, value) for valid entries
+    for idx, (field, value, err) in enumerate(normalized):
+        if not err:
+            jobs.append((idx, field, value))
+
+    responses = [None] * len(normalized)
+    for idx, (field, value, err) in enumerate(normalized):
+        if err:
+            responses[idx] = {"error": err, "field": field, "value": value}
+
+    # ── Phase 10.14 fast path: ONE OR-search for the whole scan ──
+    # Gated on every value being all-digits (always true for the radar's
+    # User ID / Otherapp ID / NID) so the server-side slot classification is
+    # an exact reproduction of Feishu's own per-condition decision. Any
+    # non-digit value takes the legacy probe below instead -- zero accuracy
+    # risk either way.
+    if jobs and all(value.isdigit() for _, _, value in jobs):
+        combo_map = _query_combo_map_get()
+        conditions, chosen = [], {}
+        for _, field, value in jobs:
+            alias, op = (combo_map.get(field) or [QUERY_FIELD_ALIASES[field][0], "contains"])
+            chosen[field] = (alias, op)
+            conditions.append({"field_name": alias, "operator": op,
+                               "value": [int(value)] if op == "=" else [value]})
+        # The projection must cover every alias we filter on, or the local
+        # slot classification would read an empty field.
+        projection = list(QUERY_RECORDS_FIELDS)
+        for alias, _op in chosen.values():
+            if alias not in projection:
+                projection.append(alias)
+        or_res = _query_try_or_search(search_url, headers, conditions, projection)
+        if or_res.get("ok"):
+            for idx, field, value in jobs:
+                alias, op = chosen[field]
+                slot_items = [it for it in or_res["items"]
+                              if _query_local_match(it.get("fields", {}) or {}, field, op, value)]
+                results = _query_format_results(slot_items, allowed_acms_set, allowed_regs_set)
+                responses[idx] = {"results": results, "count": len(results), "field": field, "value": value,
+                                  "fetch_complete": or_res["complete"],
+                                  "stop_reason": ("" if or_res["complete"] else "page_cap_reached"),
+                                  "served_from_background_cache": False}
+            if not combo_map:
+                # First good scan on this instance -- remember the aliases
+                # that worked so later scans skip straight to them.
+                _query_combo_map_set({f: [a, o] for f, (a, o) in chosen.items()})
+            return jsonify({"responses": responses})
+        # The OR filter was rejected (a column got renamed / schema changed):
+        # drop the stale alias map and fall through to the legacy probe,
+        # which re-teaches the cache below from its per-field winners.
+        if combo_map:
+            _query_combo_map_drop()
+
+    # ── Legacy per-field combo probe ──
+    # The exact pre-10.14 behavior, kept as the automatic fallback (non-digit
+    # values, OR filter rejected) and as the teacher for the alias cache:
+    # each field's first working combo is what the OR path reuses next scan.
     # Fire every field's combos on ONE shared pool -- the same combos 3
     # separate calls would have run, picked apart per field afterwards. The
     # worker ceiling stays at 9 (the per-request ceiling /api/query always
     # had), so this is actually GENTLER on Feishu's QPS than 3 parallel calls.
-    jobs = []       # (response_index, combos) for valid entries
     all_combos = []
-    for idx, (field, value, err) in enumerate(normalized):
-        if err: continue
+    legacy_jobs = []  # (response_index, combos)
+    for idx, field, value in jobs:
         combos = _query_combos_for_field(field, value)
-        jobs.append((idx, combos))
+        legacy_jobs.append((idx, combos))
         all_combos.extend(combos)
 
     combo_results = {}
@@ -4267,11 +4440,8 @@ def query_records_batch():
             for res in executor.map(lambda c: _query_try_combo(search_url, headers, c), all_combos):
                 combo_results[res["combo"]] = res
 
-    responses = [None] * len(normalized)
-    for idx, (field, value, err) in enumerate(normalized):
-        if err:
-            responses[idx] = {"error": err, "field": field, "value": value}
-    for idx, combos in jobs:
+    learned = {}
+    for idx, combos in legacy_jobs:
         field, value, _ = normalized[idx]
         results_by_combo = {c: combo_results.get(c) for c in combos}
         all_items, fetch_complete, stop_reason, success = _query_pick_first_ok(combos, results_by_combo)
@@ -4279,11 +4449,19 @@ def query_records_batch():
             responses[idx] = {"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}",
                               "field": field, "value": value}
             continue
+        winner = next((c for c in combos if (results_by_combo.get(c) or {}).get("ok")), None)
+        if winner:
+            learned[field] = [winner[0], winner[1]]
         results = _query_format_results(all_items, allowed_acms_set, allowed_regs_set)
         responses[idx] = {"results": results, "count": len(results), "field": field, "value": value,
                           "fetch_complete": fetch_complete,
                           "stop_reason": ("" if fetch_complete else stop_reason),
                           "served_from_background_cache": False}
+
+    if learned:
+        merged = _query_combo_map_get()
+        merged.update(learned)
+        _query_combo_map_set(merged)
 
     return jsonify({"responses": responses})
 
