@@ -1583,9 +1583,10 @@
         }
         .img-attach-thumb img{width:100%;height:100%;object-fit:cover}
         /* Phase 10.6 (Ahmed): tiny N / O / OO visual tag group above every pic in
-           the Agency Creation "NID & Otherapp Screen" field -- same segmented
-           button-group idea as his reference, shrunk so the group's length
-           matches the pic's width. Purely visual: a tap lights one segment. */
+           the "NID & Otherapp Screen" field (Agency Creation; Phase 10.20 extended
+           it to BD Creation and to the Submit Request / Audit form dropzones) --
+           same segmented button-group idea as his reference, shrunk so the group's
+           length matches the pic's width. Purely visual: a tap lights one segment. */
         .pic-tag-wrap{display:inline-flex;flex-direction:column;gap:3px;width:60px;flex-shrink:0;}
         .pic-tag-wrap-dz{width:64px;}
         .pic-tag-group{display:flex;width:100%;height:15px;border:1px solid var(--border,rgba(255,255,255,.15));border-radius:5px;overflow:hidden;background:var(--bg,#0d0f1a);}
@@ -4939,6 +4940,45 @@ setInterval(checkAppVersion, 5 * 60000);
 // before the next scheduled check.
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { markActivity(); checkSessionExpiry(); checkAppVersion(); } });
 window.addEventListener('focus', () => { markActivity(); checkSessionExpiry(); checkAppVersion(); });
+// ------------------------------------------
+
+// ─── Phase 10.21 (speed): open timing + backend keep-warm ───
+// Ahmed's screen recording showed ~15s click→open on a just-landed ticket
+// (card "Opening…" ~11s, then full-screen "Crunching Feishu data…" ~4s).
+// Suspects: a cold serverless instance + the cross-border Vercel→Feishu China
+// hop make the first /api/requests/single slow enough to fail, and the click
+// then has to redo the whole trip. Four fixes landed together: priority
+// prefetch-on-arrival (ltPullAssigned), this keep-warm ping, an instant
+// workspace shell that renders before the record arrives (twOpenWorkspace),
+// and this timing log so the real split is measurable (window.__twPerfLog).
+const TW_PERF_MAX = 20;
+window.__twPerfLog = window.__twPerfLog || [];
+function twPerfNow() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+function twPerfLogOpen(entry) {
+    try {
+        window.__twPerfLog.push(entry);
+        if (window.__twPerfLog.length > TW_PERF_MAX) window.__twPerfLog.shift();
+        console.info(`[tw-perf] open #${String(entry.record_id).slice(-6)} — shell ${entry.shell_ms}ms · record ${entry.record_ms}ms (${entry.source}) · render ${entry.render_ms}ms · total ${entry.total_ms}ms`);
+    } catch (e) { /* logging must never break the open flow */ }
+}
+// Keep-warm: a cheap /api/health hit every ~4 min (and on tab refocus) so the
+// serverless instance -- and its in-memory tenant-token cache -- never goes
+// cold between tickets. /api/health touches no Feishu APIs, so each ping
+// costs a few ms and zero Feishu quota.
+let _lastKeepWarmAt = 0;
+async function twKeepWarm() {
+    if (!localStorage.getItem('xenaUser')) return;
+    if (Date.now() - _lastKeepWarmAt < 3.5 * 60000) return;
+    _lastKeepWarmAt = Date.now();
+    const t0 = twPerfNow();
+    try {
+        await fetch('/api/health', { cache: 'no-store' });
+        console.debug(`[tw-perf] keep-warm ping ${Math.round(twPerfNow() - t0)}ms`);
+    } catch (e) { /* offline or unreachable -- ignore */ }
+}
+setInterval(twKeepWarm, 4 * 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) twKeepWarm(); });
+window.addEventListener('focus', twKeepWarm);
 // ------------------------------------------
 
 // Samurai cinematic intro -- a still image (samurai silhouetted against a blood
@@ -9796,11 +9836,37 @@ async function ltPullAssigned() {
         const tickets = data.tickets || [];
         const prevIds = new Set(ltQueue.map(q => q.record_id || q.id));
         const newIds = new Set(tickets.map(t => t.record_id || t.id));
-        const added = tickets.filter(t => !prevIds.has(t.record_id || t.id)).length;
+        const addedTickets = tickets.filter(t => !prevIds.has(t.record_id || t.id));
+        const added = addedTickets.length;
         const removed = ltQueue.filter(q => !newIds.has(q.record_id || q.id)).length;
 
         ltQueue = tickets;
         twPrefetchPrune();
+        // Phase 10.22 (speed, Ahmed): the backend's pull already downloaded
+        // every ticket's FULL record (its Feishu search returns all fields)
+        // and rides it along as full_fields -- seed the prefetch cache with
+        // it. Opening a queued ticket then needs NO /api/requests/single call
+        // at all: zero extra Feishu quota, zero extra invocations, and the
+        // workspace fills instantly even when the click comes ONE second
+        // after the pull -- Ahmed's fresh-ticket workflow, where even a
+        // priority prefetch had no time to finish. Older backends send no
+        // full_fields; then nothing is seeded and the 10.21 prefetch path
+        // below runs exactly as before.
+        tickets.forEach(t => {
+            const rid = t.record_id || t.id;
+            if (rid && t.full_fields) {
+                twPrefetchCache.set(rid, Promise.resolve({ record_id: rid, fields: t.full_fields }));
+                twPrefetchSeededAt.set(rid, Date.now());
+            }
+        });
+        // Phase 10.21 (speed): a ticket that LANDS in the queue starts its
+        // detail fetch RIGHT NOW, at the front of the prefetch queue -- before
+        // the agent can possibly click it. Ahmed's recording showed the click
+        // coming ~2s after the "1 new" toast; a back-of-queue prefetch had no
+        // chance to finish by then. Priority ones go first, ltRenderQueue's
+        // bulk warm fills in the rest behind them. (No-op for tickets already
+        // seeded from full_fields above.)
+        addedTickets.forEach(t => twPrefetchTicket(t.record_id || t.id, true));
         ltRenderQueue();
 
         if (!tickets.length) {
@@ -9880,6 +9946,12 @@ const twPrefetchCache = new Map();
 const twPrefetchPending = [];
 let twPrefetchActive = 0;
 const TW_PREFETCH_CONCURRENCY = 3;
+// Phase 10.22 (speed, Ahmed): pull-seeded cache entries (full_fields riding
+// the pull-assigned response) are only as fresh as the pull itself. If one
+// sits unopened for more than 3 minutes -- the sheet could have been edited
+// meanwhile -- twOpenWorkspace drops it and fetches live instead.
+const twPrefetchSeededAt = new Map();
+const TW_SEEDED_TTL_MS = 3 * 60000;
 function twPrefetchTicket(recordId, priority) {
     if (!recordId || twPrefetchCache.has(recordId)) return;
     const i = twPrefetchPending.indexOf(recordId);
@@ -9895,10 +9967,21 @@ function twPrefetchPump() {
         const rid = twPrefetchPending.shift();
         if (!rid || twPrefetchCache.has(rid)) continue;
         twPrefetchActive++;
+        const t0 = twPerfNow();
         const p = fetch(`/api/requests/single?record_id=${encodeURIComponent(rid)}`)
             .then(r => r.json())
             .then(data => (data && data.success && data.record) ? data.record : null)
             .catch(() => null)
+            .then(rec => {
+                console.debug(`[tw-perf] prefetch #${String(rid).slice(-6)} ${rec ? 'ok' : 'FAILED'} in ${Math.round(twPerfNow() - t0)}ms`);
+                // Phase 10.21: a failed prefetch must not poison the cache --
+                // with the null-resolving promise dropped, a later hover or
+                // queue render starts a FRESH fetch instead of every future
+                // click awaiting a dead one. (The exact failure Ahmed's video
+                // caught: prefetch died ~12s in, click then redid the fetch.)
+                if (!rec && twPrefetchCache.get(rid) === p) twPrefetchCache.delete(rid);
+                return rec;
+            })
             .finally(() => { twPrefetchActive--; twPrefetchPump(); });
         twPrefetchCache.set(rid, p);
     }
@@ -9908,7 +9991,7 @@ function twPrefetchPump() {
 function twPrefetchPrune() {
     const live = new Set(ltQueue.map(t => t.record_id || t.id));
     for (const rid of twPrefetchCache.keys()) {
-        if (!live.has(rid)) twPrefetchCache.delete(rid);
+        if (!live.has(rid)) { twPrefetchCache.delete(rid); twPrefetchSeededAt.delete(rid); }
     }
 }
 
@@ -10847,22 +10930,82 @@ function twCardOpen(cardEl, recordId) {
     });
 }
 
+// Phase 10.21 (speed): latest click wins -- a stale open whose fetch resolves
+// after a newer click (or after the agent closed the workspace) must NOT fill
+// the form on top of the newer state.
+let twOpenSeq = 0;
+// True between the instant shell render and the record fill -- Save is
+// blocked in that window so an empty form can never be written to the sheet.
+let twWorkspaceLoading = false;
+
 async function twOpenWorkspace(recordId) {
+    const seq = ++twOpenSeq;
+    const t0 = twPerfNow();
+    let tShell = t0, tRec = t0, perfSource = 'cold-fetch';
     // Phase 10.14: remember WHERE the workspace was opened from, BEFORE any
     // await runs (activeTabId is still the origin page until openInTab below).
     // twCloseWorkspace returns here instead of always landing on Live Queue.
     twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'live-tickets';
+
+    // ── Phase 10.21 (speed): INSTANT SHELL ──
+    // The workspace frame renders IMMEDIATELY -- same controls, empty values,
+    // a "Loading ticket from Feishu…" chip -- and every field fills the moment
+    // the record lands. The agent is looking at the workspace in <100ms
+    // instead of staring at "Opening…" on the card plus the full-screen
+    // "Crunching Feishu data…" overlay for the whole fetch (Ahmed's
+    // recording: ~15s). Same blank-render pattern the New-Ticket draft
+    // already uses (twOpenCreateWorkspace), so no control renders any
+    // differently than it will after the fill.
+    twWorkspaceLoading = true;
+    twCreateMode = false;
+    twManualReqType = null;
+    twOrigFields = {};
+    document.getElementById('tw-record-id').value = recordId;
+    document.getElementById('tw-title').textContent = `⏳ Opening #${String(recordId).slice(-6)}…`;
+    const twShellMeta = document.getElementById('tw-head-meta');
+    if (twShellMeta) twShellMeta.innerHTML = `<span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Status</span>Loading ticket from Feishu…</span>`;
+    const sec1Shell = document.getElementById('tw-sec-1');
+    sec1Shell.innerHTML = '';
+    LT_BASIC_KEYS_ORDERED.forEach(key => sec1Shell.appendChild(createTwControl(key, undefined)));
+    twRenderSection2({ record_id: recordId, fields: {} }, '');
+    twRenderReqTypeTabs('');
+    const mpShell = document.getElementById('tw-mentioned-person-wrap');
+    if (mpShell) { mpShell.classList.add('control-group'); twRenderMemberPicker(mpShell, '<label>Mentioned Person</label>', 'Mentioned Person', null); }
+    const dbShell = document.getElementById('tw-done-by-wrap');
+    if (dbShell) { dbShell.classList.add('control-group'); twRenderMemberPicker(dbShell, '<label>Done by</label>', 'Done by', null); }
+    const apprShell = document.getElementById('tw-audition-approval'); if (apprShell) apprShell.checked = false;
+    const stShell = document.getElementById('tw-audition-status'); if (stShell) stShell.value = '';
+    twRenderStatusPicks();
+    const anShell = document.getElementById('tw-audition-note'); if (anShell) anShell.value = '';
+    const apnShell = document.getElementById('tw-approve-note'); if (apnShell) apnShell.value = '';
+    const mgShell = document.getElementById('tw-mentioned-group'); if (mgShell) mgShell.innerHTML = '<option value="">-- Select --</option>';
+    const dupShell = document.getElementById('tw-dup-display'); if (dupShell) dupShell.innerHTML = '';
+    twApplyCreateModeChrome();
+    twSyncBackButton();
+    twResetNote(true);
+    twToggleTopbar(false);
+    openInTab('ticket-workspace');
+    tShell = twPerfNow();
+
+    // ── record fetch: consume the prefetch if one exists, else fetch live ──
     // Phase 10 (speed): if ltRenderQueue's prefetch already fetched (or is
-    // fetching) this record, open from that -- no overlay, no second request.
-    // A prefetch that failed resolves to null and we fall through to the
-    // normal fetch-with-overlay path.
+    // fetching) this record, open from that -- no second request. A prefetch
+    // that failed resolves to null and we fall through to the normal fetch.
     let ticket = null;
     if (twPrefetchCache.has(recordId)) {
-        ticket = await twPrefetchCache.get(recordId);
-        twPrefetchCache.delete(recordId); // single-use: the workspace edits and re-fetches on save/verify
-    }
-    if (!ticket) {
-        document.getElementById('loadingOverlay').style.display = 'flex';
+        const seededAt = twPrefetchSeededAt.get(recordId);
+        if (seededAt && (Date.now() - seededAt > TW_SEEDED_TTL_MS)) {
+            // Phase 10.22: a pull-seeded entry older than 3 minutes may no
+            // longer match the sheet -- drop it and take the live-fetch path.
+            twPrefetchCache.delete(recordId);
+            twPrefetchSeededAt.delete(recordId);
+        } else {
+            perfSource = seededAt ? 'pull-seeded' : 'prefetch';
+            ticket = await twPrefetchCache.get(recordId);
+            twPrefetchCache.delete(recordId); // single-use: the workspace edits and re-fetches on save/verify
+            twPrefetchSeededAt.delete(recordId);
+            if (!ticket) perfSource = 'prefetch-failed-refetch';
+        }
     }
     try {
         if (!ticket) {
@@ -10871,6 +11014,10 @@ async function twOpenWorkspace(recordId) {
             if (!data.success) throw new Error(data.error);
             ticket = data.record;
         }
+        tRec = twPerfNow();
+        // A newer click (or a close) happened while the fetch was in flight --
+        // that newer state owns the workspace now, so this open stops here.
+        if (seq !== twOpenSeq) return;
         ltActiveTicket = ticket;
         twOrigFields = JSON.parse(JSON.stringify(ticket.fields || {})); // fast-save diff base
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
@@ -10991,10 +11138,28 @@ async function twOpenWorkspace(recordId) {
         // Phase 10.7 (speed): the radar fires almost immediately now -- the
         // form fields it reads are rendered synchronously above, and the
         // scan itself is one batched request instead of three.
+        twWorkspaceLoading = false;
         setTimeout(() => twRadarCheck({ auto: true }), 150);
+        // Phase 10.21 (speed): one console line + a window.__twPerfLog entry
+        // per open -- the shell / record-source / render split that proves
+        // where the wait went and keeps the 15s regression measurable.
+        twPerfLogOpen({
+            record_id: recordId, source: perfSource,
+            shell_ms: Math.round(tShell - t0), record_ms: Math.round(tRec - tShell),
+            render_ms: Math.round(twPerfNow() - tRec), total_ms: Math.round(twPerfNow() - t0),
+            at: new Date().toISOString(),
+        });
     } catch(e) {
-        ToastManager.show('Failed to open ticket: ' + e.message, 'error');
+        twWorkspaceLoading = false;
+        if (seq === twOpenSeq) {
+            ToastManager.show('Failed to open ticket: ' + e.message, 'error');
+            // The instant shell is already on screen -- don't strand the
+            // agent on an empty workspace after a failed open.
+            twCloseWorkspace();
+        }
     }
+    // The overlay is no longer part of the open flow (the instant shell IS
+    // the loading state) -- this only clears one left over from another page.
     document.getElementById('loadingOverlay').style.display = 'none';
 }
 
@@ -11009,6 +11174,10 @@ async function twOpenWorkspace(recordId) {
 // and 🚀 Submit Request files through /api/requests/submit exactly like the
 // New Request form does.
 function twOpenCreateWorkspace() {
+    // Phase 10.21: opening the draft aborts any real-ticket open still in
+    // flight (its post-fetch fill would otherwise land on top of the draft).
+    twOpenSeq++;
+    twWorkspaceLoading = false;
     twCreateMode = true;
     twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'welcome';
     twSyncBackButton(); // Phase 10.14: Back button names the origin page
@@ -11823,9 +11992,10 @@ function lightboxWheelHandler(e) {
 }
 
 // Phase 10.6 (Ahmed): tiny N / O / OO segmented tag group parked above every
-// picture in the "NID & Otherapp Screen" field (Agency Creation). Purely a
-// visual tag -- tapping a segment lights it (one per pic, tap again to clear);
-// nothing is sent to the sheet. N = NID, O = Otherapp, OO = Otherapp 2.
+// picture in the "NID & Otherapp Screen" field (Agency Creation; Phase 10.20
+// extended it to BD Creation + the Submit Request / Audit form dropzones).
+// Purely a visual tag -- tapping a segment lights it (one per pic, tap again
+// to clear); nothing is sent to the sheet. N = NID, O = Otherapp, OO = Otherapp 2.
 function picTagGroupHtml() {
     return `<div class="pic-tag-group" onclick="event.stopPropagation()">
         <button type="button" class="pic-tag" onclick="picTagPick(this)" title="NID">N</button>
@@ -12225,6 +12395,11 @@ function createTwControl(key, value) {
 }
 
 function twCloseWorkspace() {
+    // Phase 10.21: closing while an open is still fetching must abort that
+    // open -- bumping the sequence makes its post-fetch fill bail out instead
+    // of resurrecting the ticket the agent just closed.
+    twOpenSeq++;
+    twWorkspaceLoading = false;
     // Phase 10.13: leaving a blank New-Ticket draft resets create mode and
     // restores the Save & Resolve labels.
     if (twCreateMode) {
@@ -12354,6 +12529,9 @@ async function twSaveWorkspace() {
     // Phase 10.13: Preview Agent View is strictly view-only -- no save path
     // may fire while previewing another member's access.
     if (previewMode) { ToastManager.show('👁 Preview mode is view-only — saving is disabled.', 'warning'); return; }
+    // Phase 10.21: the instant shell renders the form BEFORE the record
+    // lands -- never let a save fire against those empty controls.
+    if (typeof twWorkspaceLoading !== 'undefined' && twWorkspaceLoading) { ToastManager.show('Ticket is still loading — one moment…', 'info'); return; }
     // Phase 10.13: a blank New-Ticket draft files a NEW request instead of
     // saving an existing one. This branch MUST stay ahead of the
     // Done-by/Status/Mentioned-Group gate -- those don't apply to drafts.
@@ -13432,6 +13610,11 @@ function buildFieldControl(fName, def, req, idPrefix) {
             </div>`;
     } else if (def.type === 'file') {
         wrap.innerHTML += buildDropzoneHtml(idSafe, fName, req);
+        // Phase 10.20 (Ahmed): the N / O / OO pic-tag group (Phase 10.6, ticket
+        // workspace) now also rides the Submit Request / Audit form dropzones for
+        // the same "NID & Otherapp Screen" field -- so BD Creation requests get it
+        // exactly like Agency Creation. Purely visual; nothing extra is posted.
+        if (fName === 'NID & Otherapp Screen') wrap.dataset.picTags = '1';
     } else if (def.type === 'user') {
         // Real, searchable member picker (backed by /api/members/search) --
         // same control the Ticket Workspace uses for "Done by"/"Mentioned
