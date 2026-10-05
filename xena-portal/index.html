@@ -9855,7 +9855,7 @@ async function ltPullAssigned() {
         tickets.forEach(t => {
             const rid = t.record_id || t.id;
             if (rid && t.full_fields) {
-                twPrefetchCache.set(rid, Promise.resolve({ record_id: rid, fields: t.full_fields }));
+                twPrefetchCache.set(rid, Promise.resolve({ record_id: rid, fields: twNormalizeSeededFields(t.full_fields) }));
                 twPrefetchSeededAt.set(rid, Date.now());
             }
         });
@@ -9952,6 +9952,29 @@ const TW_PREFETCH_CONCURRENCY = 3;
 // meanwhile -- twOpenWorkspace drops it and fetches live instead.
 const twPrefetchSeededAt = new Map();
 const TW_SEEDED_TTL_MS = 3 * 60000;
+// Phase 10.23 (accuracy, Ahmed): the pull-assigned search calls Feishu with
+// automatic_fields=true, which wraps formula/lookup/rollup values in a
+// {"type":N,"value":X} envelope -- while the live /api/requests/single GET
+// returns the same fields PLAIN. Seeded opens therefore showed formula
+// columns as "[object Object]" and the sheet duplicate verdict as raw JSON.
+// Unwrap the envelope at seed time so a seeded record is byte-for-byte the
+// same shape the workspace renderers were built for (live GET). Only an
+// object with EXACTLY {type:int, value} is touched -- attachments, person
+// fields, links, text segments all keep their original shape.
+function twUnwrapAutoFieldValue(v) {
+    if (v && typeof v === 'object' && !Array.isArray(v)
+        && Object.keys(v).length === 2
+        && typeof v.type === 'number' && 'value' in v) {
+        return v.value;
+    }
+    return v;
+}
+function twNormalizeSeededFields(fields) {
+    if (!fields || typeof fields !== 'object') return fields;
+    const out = {};
+    for (const k in fields) out[k] = twUnwrapAutoFieldValue(fields[k]);
+    return out;
+}
 function twPrefetchTicket(recordId, priority) {
     if (!recordId || twPrefetchCache.has(recordId)) return;
     const i = twPrefetchPending.indexOf(recordId);
