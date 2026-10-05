@@ -10639,6 +10639,13 @@ async function twApConfirmCharge() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) throw new Error(data.error || `Charge failed (HTTP ${res.status}).`);
+        // Phase 10.25 (Ahmed): the ticket's stored Agency Code was stale and
+        // the backend honored the corrected code typed in the form (healing
+        // the ticket in the same write) -- say so, and sync local state.
+        if (data.agency_code_corrected && data.agency_code) {
+            if (ltActiveTicket?.fields) ltActiveTicket.fields['Agency Code'] = data.agency_code;
+            ToastManager.show(`🔧 Charged the corrected Agency Code ${data.agency_code} — the ticket's stored code was updated to match.`, 'info', 7000);
+        }
         if ((data.deducted || 0) > 0) {
             // Keep the on-screen wallet honest without a reload: balance comes
             // back from the server; used goes up by this charge's deduction
