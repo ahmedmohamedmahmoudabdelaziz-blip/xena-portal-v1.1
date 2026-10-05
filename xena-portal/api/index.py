@@ -6331,7 +6331,23 @@ def pull_assigned_ticket():
                 if user_clean in assigned_member:
                     filtered_items.append(it)
                     
-            matches = [build_ticket_payload(it) for it in filtered_items[:20]]
+            matches = []
+            for it in filtered_items[:20]:
+                t = build_ticket_payload(it)
+                # Phase 10.22 (speed, Ahmed): the records/search above ALREADY
+                # returned every field of this record -- ride the full record
+                # along so the portal can seed its prefetch cache straight
+                # from the pull. Opening a queued ticket then needs NO
+                # /api/requests/single call at all: zero extra Feishu quota,
+                # zero extra invocations -- just a bigger pull payload
+                # (attachment cells are file tokens, not the files). Same
+                # staleness as the old prefetch: fetched moments before the
+                # click, and the workspace still re-fetches on save/verify.
+                # Built for Ahmed's fresh-ticket workflow (ticket assigned ->
+                # pulled -> clicked within seconds), where even a priority
+                # prefetch had no time to finish before the click.
+                t["full_fields"] = it.get("fields", {})
+                matches.append(t)
         else:
             logger.error("pull_assigned_failed", error=data.get("msg"))
     except Exception as e:
