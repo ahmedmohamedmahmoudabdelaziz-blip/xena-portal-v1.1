@@ -3129,6 +3129,39 @@ def merge_usage_trackers(existing_tracker, new_order):
         return "No items approved in this order."
     return "Items approved in this order:\n" + "\n".join(f"🔹 {k}: {v}" for k, v in merged.items())
 
+def _resolve_agency_wallet(tfields, agency_code_hint, wallet_hint, fetch_wallet):
+    """Phase 10.25 (Ahmed): the ticket is still authoritative for which wallet
+    gets charged, BUT the agent can correct a wrong Agency Code right in the
+    form (ticket filed as 327999, fixed to 32799) without a Save first. The
+    on-screen wallet card resolves the TYPED code, while the charge used to
+    key off the ticket's stale stored code -- so the wallet was visibly found
+    on screen (5,179 pts, agency 32799) yet every charge answered "Agency
+    327999 not found" forever. Now: when the ticket's stored code is blank or
+    finds no wallet, and the typed hint does resolve one, the hinted wallet is
+    charged and the caller heals the ticket's Agency Code in the same receipt
+    write (zero extra Feishu calls -- the hinted wallet was already fetched in
+    the parallel step). When BOTH codes resolve to wallets the ticket still
+    wins -- that mismatch is a fat-finger hazard, not a correction.
+    Returns (agency_record|None, agency_code, code_corrected)."""
+    stored_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
+    agency_code = stored_code or agency_code_hint
+    if not agency_code:
+        return None, "", False
+    if agency_code_hint == agency_code:
+        # The parallel wallet fetch already searched this exact code -- its
+        # result (found or None) IS the answer, no second search needed.
+        return wallet_hint, agency_code, bool(not stored_code and agency_code)
+    agency_rec = fetch_wallet(agency_code)
+    if agency_rec:
+        return agency_rec, agency_code, False
+    # The stored code found no wallet -- fall back to the agent's typed
+    # correction. wallet_hint already IS that hint's search result (the
+    # parallel step searches the hint whenever one was sent), so a falsy
+    # wallet_hint means the hint found nothing too -- no second search.
+    if wallet_hint:
+        return wallet_hint, agency_code_hint, True
+    return None, agency_code, False
+
 @app.route('/api/agency-points/charge', methods=['POST'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_points_charge():
@@ -3225,16 +3258,17 @@ def agency_points_charge():
     existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
     existing_tracker = extract_field_text(get_field_local(tfields, "Latest Usage Tracker"))
 
-    agency_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
-    if not agency_code:
-        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
-
-    # The ticket is authoritative for the agency -- if the hint missed or
-    # pointed at a different wallet, search again with the ticket's code.
+    # Phase 10.25: wallet resolution via _resolve_agency_wallet -- the ticket
+    # stays authoritative, but a code the agent just corrected in the form
+    # (stored code finds no wallet, typed code does) is honored, and the
+    # ticket's stale code is healed in the receipt write below.
     try:
-        agency_rec = wallet_hint if (wallet_hint and agency_code_hint == agency_code) else _fetch_wallet(agency_code)
+        agency_rec, agency_code, code_corrected = _resolve_agency_wallet(
+            tfields, agency_code_hint, wallet_hint, _fetch_wallet)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
+    if not agency_code:
+        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
     if not agency_rec:
         return jsonify({"success": False, "error": f"Agency {agency_code} not found in the Agency Points table."}), 404
 
@@ -3310,12 +3344,18 @@ def agency_points_charge():
     ticket_write_failed = False
     if write_ticket:
         try:
+            ticket_fields = {"Transaction Receipt": full_receipt,
+                             "Latest Usage Tracker": cumulative_tracker,
+                             "Quantities Input": ""}
+            if code_corrected:
+                # Heal the ticket's stale/blank Agency Code with the code the
+                # agent actually charged -- rides the same write, zero extra
+                # Feishu calls (Phase 10.25).
+                ticket_fields["Agency Code"] = agency_code
             tw = feishu_session.put(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
                 headers=headers,
-                json={"fields": {"Transaction Receipt": full_receipt,
-                                 "Latest Usage Tracker": cumulative_tracker,
-                                 "Quantities Input": ""}},
+                json={"fields": ticket_fields},
                 timeout=15).json()
             if tw.get("code") != 0:
                 ticket_write_failed = True
@@ -3324,11 +3364,12 @@ def agency_points_charge():
             ticket_write_failed = True
             logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
 
-    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}", ip=ip, severity="Info")
+    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else ""), ip=ip, severity="Info")
     result = {"success": True, "duplicate": False,
               "deducted": total_cost, "balance_after": charge["remaining"],
               "receipt": charge["receipt"], "full_receipt": full_receipt,
               "tracker": cumulative_tracker,
+              "agency_code": agency_code, "agency_code_corrected": code_corrected,
               "ticket_write_failed": ticket_write_failed}
     if REDIS_ENABLED:
         try:
@@ -3498,14 +3539,14 @@ def agency_points_correct_charge():
     if not seg:
         return jsonify({"success": False, "error": "No completed charge found to edit."}), 400
 
-    agency_code = extract_field_text(get_field_local(tfields, "Agency Code")).strip()
-    if not agency_code:
-        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
-
+    # Phase 10.25: same corrected-code resolution as the charge endpoint.
     try:
-        agency_rec = wallet_hint if (wallet_hint and agency_code_hint == agency_code) else _fetch_wallet(agency_code)
+        agency_rec, agency_code, code_corrected = _resolve_agency_wallet(
+            tfields, agency_code_hint, wallet_hint, _fetch_wallet)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
+    if not agency_code:
+        return jsonify({"success": False, "error": "This ticket has no Agency Code."}), 400
     if not agency_rec:
         return jsonify({"success": False, "error": f"Agency {agency_code} not found in the Agency Points table."}), 404
 
@@ -3572,12 +3613,15 @@ def agency_points_correct_charge():
     # still returned (flagged) rather than pretending nothing happened.
     ticket_write_failed = False
     try:
+        ticket_fields = {"Transaction Receipt": full_receipt,
+                         "Latest Usage Tracker": cumulative_tracker,
+                         "Quantities Input": ""}
+        if code_corrected:
+            ticket_fields["Agency Code"] = agency_code  # Phase 10.25 heal, same write
         tw = feishu_session.put(
             f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
             headers=headers,
-            json={"fields": {"Transaction Receipt": full_receipt,
-                             "Latest Usage Tracker": cumulative_tracker,
-                             "Quantities Input": ""}},
+            json={"fields": ticket_fields},
             timeout=15).json()
         if tw.get("code") != 0:
             ticket_write_failed = True
@@ -3594,12 +3638,13 @@ def agency_points_correct_charge():
         except Exception:
             pass
 
-    audit.log(user, "AP_CORRECT", f"Record: {record_id} | Agency: {agency_code} | Reversed: {seg['deducted']} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}", ip=ip, severity="Info")
+    audit.log(user, "AP_CORRECT", f"Record: {record_id} | Agency: {agency_code} | Reversed: {seg['deducted']} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else ""), ip=ip, severity="Info")
     return jsonify({"success": True, "duplicate": False, "corrected": True,
                     "reversed": seg["deducted"],
                     "deducted": charge["total_cost"], "balance_after": charge["remaining"],
                     "receipt": charge["receipt"], "full_receipt": full_receipt,
                     "tracker": cumulative_tracker,
+                    "agency_code": agency_code, "agency_code_corrected": code_corrected,
                     "ticket_write_failed": ticket_write_failed})
 
 @app.route('/api/requests/submit', methods=['POST'])
@@ -3666,51 +3711,60 @@ def submit_request():
             if val not in (None, "", []):
                 final_fields[key] = val
 
+    # Phase 10.24 (speed, Ahmed): attachment files used to upload ONE BY ONE --
+    # each a full cross-border round-trip Vercel -> Feishu on a FRESH connection
+    # (raw http_requests, no keep-alive), so a 4-file submit waited 4 sequential
+    # uploads before the record was even created. The same uploads now run in
+    # PARALLEL (max 4 workers) over the shared keep-alive feishu_session -- the
+    # same pattern the charge endpoint already uses for its parallel reads.
+    # Same number of Feishu calls, same quota cost, same uat->tat fallback,
+    # same failure contract (any failed file aborts the whole submit BEFORE
+    # anything is created); only the wall-clock wait drops -- biggest for
+    # multi-file tickets. pool.map preserves job order, so each field's
+    # file_token list keeps the exact order the agent attached them in.
+    upload_jobs = []  # (field_name, filename, mimetype, file_bytes)
     for field_name in request.files:
         if field_name in EXCLUDED_SUBMIT_FIELDS:
             continue
-            
-        file_list = request.files.getlist(field_name)
-        tokens = []
-        
-        for f in file_list:
-            if not f.filename: continue
-                
+        for f in request.files.getlist(field_name):
+            if not f.filename:
+                continue
             file_bytes = f.read()
-            if not file_bytes: continue
-                
-            try:
-                form_data = {
-                    'file_name': f.filename,
-                    'parent_type': 'bitable_file',
-                    'parent_node': BASE_ID,
-                    'size': str(len(file_bytes))
-                }
-                files = {'file': (f.filename, file_bytes, f.mimetype)}
-                h = {"Authorization": f"Bearer {api_token}"}
-                
-                up_res = http_requests.post(
-                    "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
-                    headers=h, data=form_data, files=files, timeout=30
-                ).json()
-                
-                if up_res.get("code") != 0 and api_token != tat:
-                    h = {"Authorization": f"Bearer {tat}"}
-                    up_res = http_requests.post(
-                        "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", 
-                        headers=h, data=form_data, files=files, timeout=30
-                    ).json()
+            if not file_bytes:
+                continue
+            upload_jobs.append((field_name, f.filename, f.mimetype, file_bytes))
 
-                if up_res.get("code") == 0:
-                    tokens.append({"file_token": up_res["data"]["file_token"]})
-                else:
-                    raise Exception(f"Upload API failed: {up_res.get('msg')}")
-            except Exception as e:
-                logger.error("file_upload_failed", error=str(e), filename=f.filename)
-                return jsonify({"error": f"Failed to upload {f.filename}. Error: {str(e)}"}), 502
+    def _upload_one(job):
+        field_name, fname, mtype, file_bytes = job
+        form_data = {
+            'file_name': fname,
+            'parent_type': 'bitable_file',
+            'parent_node': BASE_ID,
+            'size': str(len(file_bytes))
+        }
+        files = {'file': (fname, file_bytes, mtype)}
+        up_res = feishu_session.post(
+            "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all",
+            headers={"Authorization": f"Bearer {api_token}"}, data=form_data, files=files, timeout=30
+        ).json()
+        if up_res.get("code") != 0 and api_token != tat:
+            up_res = feishu_session.post(
+                "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all",
+                headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30
+            ).json()
+        if up_res.get("code") != 0:
+            raise Exception(f"Failed to upload {fname}. Error: Upload API failed: {up_res.get('msg')}")
+        return (field_name, up_res["data"]["file_token"])
 
-        if tokens:
-            final_fields[field_name] = tokens
+    if upload_jobs:
+        try:
+            with ThreadPoolExecutor(max_workers=min(4, len(upload_jobs))) as pool:
+                uploaded = list(pool.map(_upload_one, upload_jobs))
+        except Exception as e:
+            logger.error("file_upload_failed", error=str(e))
+            return jsonify({"error": str(e)}), 502
+        for field_name, tok in uploaded:
+            final_fields.setdefault(field_name, []).append({"file_token": tok})
 
     # AUDIT WORKSTATION FILINGS land already-decided: the auditor made the call
     # (Done / Rejected / Under Investigation) while filing, so the ticket should
@@ -3784,7 +3838,9 @@ def submit_request():
         # submitter AND the data lands at the same time, so there's nothing to roll
         # back if it fails -- a failed call here just never creates a row at all.
         create_headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-        resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
+        # Phase 10.24: ride the shared keep-alive session (same single Feishu
+        # call, same quota -- just no fresh TCP+TLS handshake per create).
+        resp = feishu_session.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
         data = resp.json()
 
         if data.get("code") != 0:
@@ -3798,7 +3854,7 @@ def submit_request():
                 if fresh_uat:
                     logger.info("submit_retry_with_refreshed_uat", user=user)
                     create_headers["Authorization"] = f"Bearer {fresh_uat}"
-                    resp = http_requests.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
+                    resp = feishu_session.post(url, headers=create_headers, json={"fields": final_fields}, timeout=15)
                     data = resp.json()
                     if data.get("code") == 0:
                         created_via = "user_token_refreshed"
@@ -3839,7 +3895,7 @@ def submit_request():
                 if actual_fields and SUBMITTED_BY_FIELD_NAME in actual_fields:
                     fallback_fields[SUBMITTED_BY_FIELD_NAME] = user
                 create_headers["Authorization"] = f"Bearer {tat}"
-                resp = http_requests.post(url, headers=create_headers, json={"fields": fallback_fields}, timeout=15)
+                resp = feishu_session.post(url, headers=create_headers, json={"fields": fallback_fields}, timeout=15)
                 data = resp.json()
                 created_via = "tenant_token_fallback"
                 # Flag this for admins the same way an Access Request shows up --
