@@ -1003,7 +1003,11 @@
         .pill-select-container{position:relative;width:100%}
 
         /* ── Multi-select dropdown (checkbox list, no pills/chips) ── */
-        .msdd-box{width:100%;padding:12px 14px;background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none}
+        /* Phase 10.36 (Ahmed): "why the design of the Assigned ACM not like
+           the others?" -- the msdd closed box was taller/darker/bigger-font
+           than the searchable selects (.ss-display) next to it. Same metrics
+           now, so the Analytics filters read as one row of identical fields. */
+        .msdd-box{width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface,var(--bg));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.87rem;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;transition:.15s}
         .msdd-box:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
         .msdd-box::after{content:'▾';color:var(--text-muted);flex-shrink:0;font-size:.8rem}
         .msdd-menu{position:absolute;top:100%;left:0;right:0;margin-top:6px;background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:var(--shadow);display:none;padding:6px}
@@ -1447,7 +1451,15 @@
            The element is portaled to <body> on load (see the DOMContentLoaded
            hook below) because .twx-dock's translateX(-50%) would otherwise
            trap position:fixed inside the dock. */
-        .twx-radar-msg{display:none;position:fixed;top:44px;left:auto;right:24px;z-index:10003;width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
+        /* Phase 10.36 (Ahmed): "move the msg place to be like in the pic" --
+           his red rectangle sat INSIDE the top header strip, in the empty
+           gap between the last top-center dock icon (ends ~x833 on his 1366
+           screen) and the first header utility icon (starts ~x1073) -- NOT
+           over his profile name (the 10.35 spot overlapped it). top:4px
+           parks it in the header; right:305px + 210px width puts it at
+           x851-1061, squarely in that gap. Below ~1280px the gap no longer
+           fits it, so the media query tucks it back under the header. */
+        .twx-radar-msg{display:none;position:fixed;top:4px;left:auto;right:305px;z-index:10003;width:min(210px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
         /* Phase 10.7 (Ahmed): the bubble grows DOWNWARD from the circle, so
            max-height + its own scrollbar guarantees even the tallest verdict
            stays fully on-screen. */
@@ -1462,6 +1474,12 @@
         .twx-radar-msg:hover{border-color:rgba(255,77,109,0.65);}
         .twx-radar-msg-x{position:absolute;top:6px;right:8px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text-muted);font-size:.75rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;z-index:2;}
         .twx-radar-msg-x:hover{background:rgba(255,77,109,.30);color:#fff;}
+        /* Phase 10.36: below ~1330px the centered dock icons slide left into
+           the header gap and the bubble would cover them -- fall back to
+           just under the header at the right edge for those widths. */
+        @media(min-width:1025px) and (max-width:1330px){
+            .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;transform-origin:top right;}
+        }
         @media(max-width:1024px){
             /* narrow screens: the bubble stays fixed top-right (Phase 10.34),
                just tucked closer to the edge so it never collides with the
@@ -4117,6 +4135,7 @@ function setActiveTab(page) {
     if(navEl) navEl.classList.add('active', 'active-nav');
 
     executePageLogic(page);
+    twxRadarSyncVisibility(); // Phase 10.36: radar bubbles follow their owning page
 }
 
 function closeTab(page, event) {
@@ -11886,6 +11905,7 @@ function twWsStashCurrent() {
         inst.parentNode.removeChild(inst); // DETACHED, not destroyed
     }
     twWsActiveKey = null;
+    twxRadarSyncVisibility(); // Phase 10.36: hide the stashed workspace's bubble
 }
 
 function twWsMount(key) {
@@ -11902,6 +11922,7 @@ function twWsMount(key) {
     twReturnTo = rec.returnTo || 'live-tickets';
     twApplyCreateModeChrome();
     twSyncBackButton();
+    twxRadarSyncVisibility(); // Phase 10.36: restore this workspace's bubble (or hide another's)
     requestAnimationFrame(() => twAutoGrowAll(rec.node));
 }
 
@@ -11933,6 +11954,7 @@ function twWsNewInstance(key, recordId) {
     twWsTabs[key] = { key, recordId: recordId || null,
         node, createMode: key === 'create', returnTo: twReturnTo,
         ltActiveTicket: null, twOrigFields: {}, twManualReqType: null };
+    twxRadarSyncVisibility(); // Phase 10.36: a fresh instance owns no bubble yet
 }
 
 async function twOpenWorkspace(recordId) {
@@ -13813,6 +13835,15 @@ function twRadarSetMsg(html, show, state) {
     // dismisses it (outside clicks and Escape close the drawer only).
     msg.innerHTML = html ? '<button type="button" class="twx-radar-msg-x" onclick="event.stopPropagation();twRadarDismissMsg()" title="Dismiss">✕</button>' + html : '';
     msg.classList.toggle('open', !!show && !!html);
+    // Phase 10.36 (Ahmed): tag the bubble with the workspace that produced it
+    // so twxRadarSyncVisibility can hide it on other tabs/workspaces and
+    // bring it back when its owner remounts (the pre-10.34 inline behavior).
+    if (show && html) {
+        msg.dataset.wsOwner = (typeof twWsActiveKey !== 'undefined' && twWsActiveKey) || '';
+        delete msg.dataset.wsWasOpen;
+    } else if (!show) {
+        delete msg.dataset.wsWasOpen;
+    }
     // Phase 10.7: 'scanning' repaints the bubble amber with a breathing dot
     // while a scan is in flight -- visible proof the radar is working.
     msg.classList.toggle('scanning', state === 'scanning');
@@ -13852,7 +13883,44 @@ async function dupRadarQueryFields(fieldsToCheck) {
 // ✕ hides the bubble but keeps its content, so the 📡 circle can bring the
 // verdict straight back without re-running the scan.
 function twRadarDismissMsg() {
-    document.getElementById('twRadarMsg')?.classList.remove('open');
+    const msg = document.getElementById('twRadarMsg');
+    if (msg) { msg.classList.remove('open'); delete msg.dataset.wsWasOpen; } // Phase 10.36: ✕ stays dismissed across tab switches
+}
+
+// Phase 10.36 (Ahmed): "the msg of the duplicated still appears even I moved
+// and opened another tab -- this wasn't happen before". Before 10.34 the
+// bubble was INLINE inside the workspace/audit page, so it vanished the
+// moment the page did; the body-portaled bubble (10.34, to stop it shifting
+// the workspace layout) is global and stayed on screen everywhere. Tie each
+// bubble to its owner: visible only while its owner is the active
+// tab+workspace; hidden (remembered, then restored) on any switch -- exactly
+// the old inline behavior. Runs on every tab change and every workspace
+// mount/stash; idempotent.
+function twxRadarSyncVisibility() {
+    const activePage = (typeof activeTabId !== 'undefined' && activeTabId) || '';
+    const activeWs = (typeof twWsActiveKey !== 'undefined' && twWsActiveKey) || '';
+    const wsMsg = document.getElementById('twRadarMsg');
+    if (wsMsg && wsMsg.innerHTML.trim()) {
+        const owner = wsMsg.dataset.wsOwner || '';
+        const here = activePage === 'ticket-workspace' && owner && owner === activeWs;
+        if (!here) {
+            if (wsMsg.classList.contains('open')) wsMsg.dataset.wsWasOpen = '1';
+            wsMsg.classList.remove('open');
+        } else if (wsMsg.dataset.wsWasOpen === '1') {
+            delete wsMsg.dataset.wsWasOpen;
+            wsMsg.classList.add('open');
+        }
+    }
+    const awMsg = document.getElementById('awsRadarMsg');
+    if (awMsg && awMsg.innerHTML.trim()) {
+        if (activePage !== 'audit') {
+            if (awMsg.classList.contains('open')) awMsg.dataset.wsWasOpen = '1';
+            awMsg.classList.remove('open');
+        } else if (awMsg.dataset.wsWasOpen === '1') {
+            delete awMsg.dataset.wsWasOpen;
+            awMsg.classList.add('open');
+        }
+    }
 }
 
 // The sheet's own "Duplicated Check" formula result, shown inside the bubble
@@ -16520,7 +16588,9 @@ function awsRadarSetBadge(n) {
 }
 function awsRadarShowMsg(show) {
     const msg = document.getElementById('awsRadarMsg');
-    if (msg) msg.classList.toggle('open', !!show);
+    if (!msg) return;
+    msg.classList.toggle('open', !!show);
+    delete msg.dataset.wsWasOpen; // Phase 10.36: explicit show/hide wins over the tab-switch restore memory
 }
 function awsRadarHideMsg() { awsRadarShowMsg(false); }
 
