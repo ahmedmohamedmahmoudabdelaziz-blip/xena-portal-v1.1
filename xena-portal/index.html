@@ -199,6 +199,7 @@
            crushed the member input to a sliver. Same ID-scoped fix as
            #tiSearchBtn above: compact button, wide input. */
         #pvSearchBtn{flex:0 0 auto;width:auto;padding:12px 26px;}
+        #pvLoadBtn{flex:0 0 auto;width:auto;padding:12px 20px;background:linear-gradient(135deg,rgba(139,124,246,.25),rgba(0,212,255,.18));}
         /* Phase 10.13.1: sheet-style grid for the Under Investigation list
            (mirrors the Bitable view: sticky header, horizontal scroll on
            narrow screens, Open button pinned right). */
@@ -1446,7 +1447,7 @@
            The element is portaled to <body> on load (see the DOMContentLoaded
            hook below) because .twx-dock's translateX(-50%) would otherwise
            trap position:fixed inside the dock. */
-        .twx-radar-msg{display:none;position:fixed;top:84px;left:auto;right:24px;z-index:10003;width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
+        .twx-radar-msg{display:none;position:fixed;top:44px;left:auto;right:24px;z-index:10003;width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
         /* Phase 10.7 (Ahmed): the bubble grows DOWNWARD from the circle, so
            max-height + its own scrollbar guarantees even the tallest verdict
            stays fully on-screen. */
@@ -1465,7 +1466,7 @@
             /* narrow screens: the bubble stays fixed top-right (Phase 10.34),
                just tucked closer to the edge so it never collides with the
                collapsed-header icons. */
-            .twx-radar-msg{top:76px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
             .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
             @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         }
@@ -3813,6 +3814,11 @@
                                  still filters live exactly as before; the button just makes
                                  the action visible. -->
                             <button type="button" class="btn btn-primary" id="pvSearchBtn" onclick="pvSearch()">🔍 Search</button>
+                            <!-- Phase 10.35 (Ahmed): "add button load agent to the perview
+                                 page also to load the agents that have access so i can
+                                 perview their view" -- one click fetches the members and
+                                 shows the FULL list, no typing required. -->
+                            <button type="button" class="btn btn-primary" id="pvLoadBtn" onclick="pvLoadAgentsBtn()">🔄 Load agents</button>
                         </div>
                     </div>
                     <div id="pvList">
@@ -8882,12 +8888,24 @@ function pvSearch() {
     pvRenderList();
 }
 
+// Phase 10.35 (Ahmed): "add button load agent to the perview page also to
+// load the agents that have access so i can perview their view" -- the 🔄
+// button always re-fetches the members with access and shows the FULL list
+// right away (no typing required). Searching afterwards still just filters.
+let pvShowAll = false;
+async function pvLoadAgentsBtn() {
+    pvShowAll = true;
+    previewTargetsCache = []; // explicit click = explicit refetch (fresh list)
+    await pvLoadTargets();    // ends in pvRenderList()
+}
+
 function pvRenderList() {
     const listEl = document.getElementById('pvList');
     if (!listEl) return;
     const q = (document.getElementById('pvFilter')?.value || '').trim().toLowerCase();
-    // No query typed -> never show records (and never fetch).
-    if (!q) {
+    // No query typed -> show the full list ONLY after an explicit 🔄 Load;
+    // otherwise stay request-free idle.
+    if (!q && !(pvShowAll && previewTargetsCache.length)) {
         listEl.innerHTML = previewTargetsCache.length
             ? `<div class="pv-idle"><div class="pv-idle-icon">👥</div><p>${previewTargetsCache.length} members loaded — type to filter.</p><p class="pv-idle-sub">Nothing is shown until you search, so the page stays request-free.</p></div>`
             : PV_IDLE_HTML;
@@ -8898,7 +8916,7 @@ function pvRenderList() {
         if (!pvLoading) pvLoadTargets();
         return;
     }
-    const rows = previewTargetsCache.filter(a =>
+    const rows = !q ? previewTargetsCache : previewTargetsCache.filter(a =>
         (a.email || '').toLowerCase().includes(q) ||
         (a.person || '').toLowerCase().includes(q) ||
         pvDisplayName(a).toLowerCase().includes(q));
@@ -8906,7 +8924,8 @@ function pvRenderList() {
         listEl.innerHTML = '<div class="pv-idle"><div class="pv-idle-icon">🔍</div><p>No matching members.</p></div>';
         return;
     }
-    listEl.innerHTML = rows.map(a => {
+    const showAllHeader = !q ? `<div style="color:var(--text-muted);font-size:.82rem;margin-bottom:10px">👥 <b>${rows.length}</b> members with access — pick one to preview their view.</div>` : '';
+    listEl.innerHTML = showAllHeader + rows.map(a => {
         const mail = escHtml(a.email || '');
         const name = escHtml(pvDisplayName(a));
         const initials = escHtml(pvInitials(pvDisplayName(a)));
@@ -11808,6 +11827,24 @@ function twWsCaptureTemplate() {
     if (twWsTemplate) return;
     const inst = document.getElementById('twWsInstance');
     if (inst) {
+        // Phase 10.35 (Ahmed): "the mentioned group still not work at all" --
+        // DOMContentLoaded's enhanceAllSelects() wraps every select in the
+        // as-shipped instance with the searchable-select shell and hides the
+        // native select. cloneNode(true) copies that shell but NOT its
+        // listeners / MutationObservers, so every cloned workspace rendered a
+        // pretty but DEAD dropdown -- clicking did nothing at all. Un-enhance
+        // the original BEFORE capturing so the template is pristine; every
+        // clone is then freshly enhanced in twWsNewInstance with its own
+        // listeners intact.
+        inst.querySelectorAll('.ss-wrapper').forEach(w => {
+            const sel = w.querySelector('select');
+            if (sel) {
+                w.parentNode.insertBefore(sel, w);
+                delete sel.dataset.ssEnhanced;
+                sel.classList.remove('ss-native-hidden');
+            }
+            w.parentNode.removeChild(w);
+        });
         twWsTemplate = inst.cloneNode(true);
         // Phase 10.32 (BUG B): the as-shipped instance must LEAVE the DOM once
         // cloned -- it used to stay put, so every open stacked a second
@@ -11882,6 +11919,11 @@ function twWsNewInstance(key, recordId) {
     // (NOTE the key: dataset.dragHooked -> data-drag-hooked; a wrong-cased
     // key here deletes nothing and the drag silently dies on every clone.)
     if (pop) { delete pop.dataset.dragHooked; twNoteMakeDraggable(pop); }
+    // Phase 10.35: the template is captured PRISTINE (see twWsCaptureTemplate),
+    // so every clone gets its searchable-selects freshly wired HERE -- with
+    // their own listeners, display sync and option observers. (This is what
+    // makes the Mentioned Group dropdown actually open.)
+    enhanceAllSelects(node);
     document.getElementById('pg-ticket-workspace').appendChild(node);
     twWsDedupeDom(node);
     twWsActiveKey = key;
