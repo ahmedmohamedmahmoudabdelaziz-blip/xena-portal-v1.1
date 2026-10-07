@@ -634,6 +634,72 @@ def cache_invalidate(prefix=""):
         for k in keys:
             del _cache[k]
 
+# ════════════════════════════════════════════════════════════════════
+# Phase 10.27 (Ahmed): ZERO-COST PRESENCE ("online / offline + last active")
+# Every authenticated API call already carries the caller's identity -- a
+# before_request hook stamps it into a Redis hash (one HSET, throttled to
+# one write per user per minute, so the added latency is ~zero and there is
+# NO new HTTP request anywhere: the 4-minute keep-warm ping every open
+# client already sends doubles as the heartbeat). The Manage Agents page
+# then reads the same hash inside the EXISTING /api/admin/users response.
+# Online  = seen in the last 5 minutes (keep-warm cadence is 4 min).
+# Idle    = seen in the last 30 minutes.
+# Offline = anything older, or never seen.
+# ════════════════════════════════════════════════════════════════════
+PRESENCE_KEY = "xena:presence"
+PRESENCE_ONLINE_S = 5 * 60
+PRESENCE_IDLE_S = 30 * 60
+_presence_local: dict = {}   # email -> {"name","ts","wrote_epoch"} (fallback + write throttle)
+_presence_lock = threading.Lock()
+
+def presence_touch(email, name=""):
+    """Stamp a user's last-seen time. Never raises, never blocks the request
+    meaningfully: in-memory stamp always; the Redis HSET rides at most once
+    per minute per user (the local dict is the throttle memory)."""
+    email = (email or "").strip().lower()
+    if not email or email.startswith("__role__::"):
+        return
+    name = (name or "").strip()
+    now_iso = cairo_now().isoformat()
+    do_write = False
+    with _presence_lock:
+        prev = _presence_local.get(email) or {}
+        wrote = prev.get("wrote_epoch") or 0
+        if time.time() - wrote >= 60:
+            do_write = True
+        _presence_local[email] = {
+            "name": name or prev.get("name", ""),
+            "ts": now_iso,
+            "wrote_epoch": time.time() if do_write else wrote,
+        }
+    if do_write and REDIS_ENABLED:
+        try:
+            redis_cmd("HSET", PRESENCE_KEY, email,
+                      json.dumps({"name": _presence_local[email]["name"], "ts": now_iso}))
+        except Exception:
+            pass
+
+def presence_map():
+    """email -> {"name","ts"} for every seen user: Redis hash first, the
+    in-process dict fills any gap (local dev / Redis down)."""
+    out = {}
+    if REDIS_ENABLED:
+        try:
+            raw = redis_cmd("HGETALL", PRESENCE_KEY)
+            pairs = raw.items() if isinstance(raw, dict) else zip((raw or [])[::2], (raw or [])[1::2])
+            for k, v in pairs:
+                try:
+                    out[str(k)] = json.loads(v)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    with _presence_lock:
+        for k, v in _presence_local.items():
+            if k not in out and v.get("ts"):
+                out[k] = {"name": v.get("name", ""), "ts": v["ts"]}
+    return out
+
 _rate_store: dict = defaultdict(list)
 _rate_lock = threading.Lock()
 
@@ -1150,7 +1216,7 @@ def parse_granular_string(raw_str):
             if mod in res: res[mod] = val_list
     return res
 
-def get_user_permissions(email, name):
+def _get_user_permissions_raw(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
     
@@ -1197,6 +1263,34 @@ def get_user_permissions(email, name):
     
     fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
     return fallback
+
+def get_user_permissions(email, name):
+    """Phase 10.26 (Ahmed): full-faithful Preview Agent View. While an admin
+    previews another member, the frontend stamps every /api request with the
+    X-Preview-As header (the target's email). When the REAL caller is a super
+    admin / admin-module holder, resolve the TARGET's permissions instead --
+    every data endpoint then filters exactly what the target would see
+    (regions / ACMs / modules), and any mutation that slipped past the
+    view-only frontend is authorized as the target too (defense in depth).
+
+    Guards:
+    - /api/admin/* always uses the real identity, so the preview console
+      itself (preview-targets / preview-access) keeps working mid-preview.
+    - A forged X-Preview-As from anyone WITHOUT full admin rights is ignored
+      (falls through to the real identity) -- a plain preview_access holder
+      can NOT escalate by pointing the header at a more privileged member.
+    """
+    target = ""
+    try:
+        if request.path.startswith("/api/") and not request.path.startswith("/api/admin/"):
+            target = sanitize_text(request.headers.get("X-Preview-As", ""), 200).strip()
+    except RuntimeError:
+        target = ""  # no request context (scripts / tests)
+    if target:
+        real = _get_user_permissions_raw(email, name)
+        if real.get("is_super_admin") or "admin" in real.get("modules", []):
+            return _get_user_permissions_raw(target, target)
+    return _get_user_permissions_raw(email, name)
 
 def generate_executive_insights(stats, cmp_stats=None):
     insights = []
@@ -1988,6 +2082,21 @@ def ensure_points_sync_started():
             threading.Thread(target=_background_sync_points_loop, daemon=True).start()
             _bg_points_thread_started = True
 
+def kick_table_resync():
+    """Phase 10.29 (Ahmed): write-through freshness for the warm snapshots.
+    A portal write (charge / correct-charge) lands in Feishu instantly, but
+    the background loop only re-reads the tables every BACKGROUND_SYNC_INTERVAL
+    (180s) -- and the Feishu webhook that would have made it instant can't
+    reach the deployment through the GFW. So every successful portal write
+    kicks an immediate background re-sync of BOTH tables: the Live Formula
+    chips and the Target Board reflect the new numbers within seconds, still
+    with zero extra Feishu calls on the read path."""
+    try:
+        threading.Thread(target=_background_sync_points_table, daemon=True).start()
+        threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+    except Exception:
+        pass
+
 def get_points_snapshot_from_public_file():
     """Target Board (Agency Exchange) data source: ONLY the public build snapshot
     (public/data/points.json), exactly like Search Records' preferred source.
@@ -2044,6 +2153,30 @@ def get_points_table_snapshot():
 
 
 app = Flask(__name__)
+
+@app.before_request
+def _presence_before_request():
+    """Phase 10.27 (Ahmed): piggyback presence on traffic that ALREADY
+    happens -- zero extra requests. Identity comes from the same
+    headers/params the endpoints themselves read. The X-Preview-As target is
+    deliberately NOT stamped (previewing a member must not mark THEM online)."""
+    try:
+        if not request.path.startswith("/api/"):
+            return
+        email = (request.headers.get("X-User-Email", "") or request.args.get("email", "")
+                 or request.form.get("email", "") or "")
+        name = (request.headers.get("X-User-Name", "") or request.args.get("user", "")
+                or request.form.get("user", "") or "")
+        if not email and request.is_json:
+            body = request.get_json(silent=True) or {}
+            email = str(body.get("email", "") or "")
+            name = name or str(body.get("user", "") or "")
+        # Key by email when we have it; some endpoints only carry the caller's
+        # NAME (`user` param) -- the admin/users merge checks both keys.
+        presence_touch(sanitize_text(email, 200) or sanitize_text(name, 120),
+                       sanitize_text(name, 120))
+    except Exception:
+        pass
 
 @app.route('/api/webhook/feishu', methods=['GET', 'POST'])
 def feishu_webhook():
@@ -2283,6 +2416,13 @@ def manage_users():
                           # needing a new Feishu table. The frontend splits these out
                           # from real agent rows using this flag.
                           "is_role": display_email.startswith("__ROLE__::")})
+        # Phase 10.27 (Ahmed): presence rides INSIDE this same response (zero
+        # extra requests) -- one Redis HGETALL for everyone, keyed by the
+        # lowercased email/name the before_request hook stamps.
+        pmap = presence_map()
+        for u in users:
+            p = pmap.get((u["email"] or "").lower()) or pmap.get((u.get("person") or "").lower())
+            u["last_seen"] = (p or {}).get("ts")
         return jsonify(users)
 
     elif request.method == 'POST':
@@ -2546,6 +2686,10 @@ def admin_alerts_summary():
     return jsonify({
         "access_requests": _derive_access_requests(logs),
         "sheet_permission_alerts": _derive_sheet_permission_alerts(logs),
+        # Phase 10.27 (Ahmed): presence map (email/name -> {name, ts}) rides
+        # this existing call too, so an open Manage Agents page keeps its
+        # online/last-active pills fresh with zero extra requests.
+        "presence": presence_map(),
     })
 
 @app.route('/api/admin/access-requests', methods=['GET'])
@@ -2895,29 +3039,73 @@ def update_request():
     # index.html), so here we merge the newly uploaded tokens onto whatever existing
     # ones were sent instead of overwriting -- new images land side by side with the
     # old ones, matching how the sheet is expected to behave.
+    # Phase 10.27 (speed, Ahmed): same parallel-upload treatment submit got in
+    # 10.24 -- each file used to wait its own sequential cross-border round-trip
+    # on a FRESH connection (raw http_requests, no keep-alive). All attachments
+    # across all fields now upload in PARALLEL (max 4 workers) over the shared
+    # keep-alive feishu_session. Same number of Feishu calls / quota; pool.map
+    # preserves job order, so each field's token list keeps the agent's attach
+    # order.
+    # Phase 10.29 (failure contract, Ahmed): a failed file used to be logged
+    # and SKIPPED while the save proceeded -- the ticket then looked saved but
+    # was silently missing an attachment. Now every file gets ONE automatic
+    # retry (a second attempt rides the same keep-alive connection, so it
+    # costs ~nothing on a healthy link), and if any file still fails the WHOLE
+    # save is aborted with 502 BEFORE the record PUT: nothing is written, the
+    # frontend names the failed file(s), and the agent just hits save again.
+    # All-or-nothing accuracy, parallel speed kept.
+    update_upload_jobs = []  # (field_name, filename, mimetype, file_bytes)
     for field_name in request.files:
         if field_name in EXCLUDED_UPDATE_FIELDS: continue
-        file_list = request.files.getlist(field_name)
-        tokens = []
-        for f in file_list:
+        for f in request.files.getlist(field_name):
             if not f.filename: continue
             file_bytes = f.read()
             if not file_bytes: continue
+            update_upload_jobs.append((field_name, f.filename, f.mimetype, file_bytes))
+
+    def _update_upload_one(job):
+        field_name, fname, mtype, file_bytes = job
+        form_data = {'file_name': fname, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
+        files = {'file': (fname, file_bytes, mtype)}
+        last_msg = "unknown upload error"
+        for attempt in (1, 2):  # one automatic retry per file (Phase 10.29)
             try:
-                form_data = {'file_name': f.filename, 'parent_type': 'bitable_file', 'parent_node': BASE_ID, 'size': str(len(file_bytes))}
-                files = {'file': (f.filename, file_bytes, f.mimetype)}
-                up_res = http_requests.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
+                up_res = feishu_session.post("https://open.feishu.cn/open-apis/drive/v1/medias/upload_all", headers={"Authorization": f"Bearer {tat}"}, data=form_data, files=files, timeout=30).json()
                 if up_res.get("code") == 0:
-                    tokens.append({"file_token": up_res["data"]["file_token"]})
+                    return (field_name, up_res["data"]["file_token"])
+                last_msg = f"upload code {up_res.get('code')}: {up_res.get('msg')}"
             except Exception as e:
-                logger.error("file_upload_failed", error=str(e))
-        if tokens:
-            existing = fields.get(field_name)
-            existing_tokens = []
-            if isinstance(existing, list):
-                existing_tokens = [{"file_token": x["file_token"]} for x in existing
-                                    if isinstance(x, dict) and x.get("file_token")]
-            fields[field_name] = existing_tokens + tokens
+                last_msg = str(e)
+                files = {'file': (fname, file_bytes, mtype)}  # rebuild for retry
+        raise Exception(last_msg)
+
+    if update_upload_jobs:
+        update_tokens = {}  # field_name -> [tokens in attach order]
+        failed_uploads = []  # (field_name, filename, error)
+        with ThreadPoolExecutor(max_workers=min(4, len(update_upload_jobs))) as pool:
+            # futures with per-job error capture so every file gets its
+            # attempts even when a sibling file fails.
+            futures = [pool.submit(_update_upload_one, j) for j in update_upload_jobs]
+            for j, fut in zip(update_upload_jobs, futures):
+                try:
+                    field_name, tok = fut.result()
+                    update_tokens.setdefault(field_name, []).append({"file_token": tok})
+                except Exception as e:
+                    logger.error("file_upload_failed", field=j[0], filename=j[1], error=str(e))
+                    failed_uploads.append((j[0], j[1], str(e)))
+        if failed_uploads:
+            names = ", ".join(f"{fn} ({fld})" for fld, fn, _ in failed_uploads)
+            return jsonify({"success": False,
+                            "error": f"{len(failed_uploads)} file(s) failed to upload: {names}. Nothing was saved -- please hit Save again.",
+                            "failed_files": [{"field": fld, "filename": fn, "error": err} for fld, fn, err in failed_uploads]}), 502
+        for field_name, tokens in update_tokens.items():
+            if tokens:
+                existing = fields.get(field_name)
+                existing_tokens = []
+                if isinstance(existing, list):
+                    existing_tokens = [{"file_token": x["file_token"]} for x in existing
+                                        if isinstance(x, dict) and x.get("file_token")]
+                fields[field_name] = existing_tokens + tokens
 
     # Drop read-only fields so Feishu doesn't reject the save attempt
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
@@ -2975,6 +3163,9 @@ def update_request():
         if data.get("code") == 0:
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
+            # Phase 10.29: write-through freshness -- saves can change status /
+            # claim fields that feed the Live Formula ledger.
+            kick_table_resync()
             return jsonify({"success": True})
         return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
@@ -3376,6 +3567,10 @@ def agency_points_charge():
             redis_set_json(dup_key, {"sig": dup_sig, "result": result}, ttl=120)
         except Exception:
             pass
+    # Phase 10.29: write-through freshness — the charge just changed the
+    # wallet table, so refresh the warm snapshots now instead of waiting up
+    # to 3 min for the background loop.
+    kick_table_resync()
     return jsonify(result)
 
 # ════════════════════════════════════════════════════════════════════
@@ -3639,6 +3834,8 @@ def agency_points_correct_charge():
             pass
 
     audit.log(user, "AP_CORRECT", f"Record: {record_id} | Agency: {agency_code} | Reversed: {seg['deducted']} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else ""), ip=ip, severity="Info")
+    # Phase 10.29: write-through freshness — correction changed the wallet.
+    kick_table_resync()
     return jsonify({"success": True, "duplicate": False, "corrected": True,
                     "reversed": seg["deducted"],
                     "deducted": charge["total_cost"], "balance_after": charge["remaining"],
@@ -3928,6 +4125,10 @@ def submit_request():
     # "Mentioned Group" up front, then sets that one field ~3s later so the
     # @mention notification fires once the ticket's other data has settled.
     new_record_id = (data.get("data") or {}).get("record", {}).get("record_id")
+    # Phase 10.29: write-through freshness -- a new ticket can carry a claim,
+    # so the Live Formula ledger should see it within seconds, not after the
+    # next 3-min background cycle.
+    kick_table_resync()
     return jsonify({"success": True, "message": f"Successfully submitted {req_type}!", "created_via": created_via, "record_id": new_record_id})
 
 @app.route('/api/points/records', methods=['GET'])
@@ -6023,6 +6224,243 @@ def compute_agency_privilege_ledger(points_items, requests_items, acm_filter, re
             "total_rejected": sum(p["rejected"] for p in privileges),
         })
     return rows
+
+def compute_single_agency_target_ledger(points_items, requests_items, code):
+    """Phase 10.27 (Ahmed): ONE agency's target-privilege ledger -- the exact
+    same math as compute_agency_privilege_ledger (same month window, same
+    tier quotas, same status buckets) but short-circuited to a single Agency
+    Code, so the ticket workspace / New-Ticket draft can recompute the
+    sheet's "Formula" field LIVE on every edit instead of waiting for a save
+    + Feishu recalculation. Reads only the two warm bulk snapshots -- no live
+    Feishu calls, same zero-cost model as Check Agency Target itself."""
+    code = (code or "").strip()
+    if not code:
+        return None
+
+    base_pts, meta = 0, None
+    for item in points_items:
+        f = item.get("fields", {})
+        if extract_field_text(get_field_local(f, "Agency Code")).strip() != code:
+            continue
+        acm = extract_field_text(get_field_local(f, "Acm", "Acm Name (PK)", "Acm Name (IN)", "Assigned Member")).strip()
+        region = 'PK' if acm.lower() in PK_ACMS else ('IN' if acm.lower() in IN_ACMS else clean(get_field_local(f, "Region")).upper())
+        base_pts = parse_float_safe(extract_field_text(get_field_local(f, "Base Points")))
+        meta = {
+            "agency_name": extract_field_text(get_field_local(f, "Agency Name", "Name")) or code,
+            "acm": acm.title(), "region": region.upper(),
+        }
+        break
+    if meta is None:
+        return None
+
+    now = cairo_now()
+    cur_month, cur_year = now.month, now.year
+    counts = defaultdict(lambda: {"used": 0, "pending": 0, "rejected": 0})
+    for item in requests_items:
+        f = item.get("fields", {})
+        req_type = extract_field_text(get_field_local(f, "Request Type")).strip().lower()
+        if "target" not in req_type:
+            continue
+        if extract_field_text(get_field_local(f, "Agency Code")).strip() != code:
+            continue
+        d = parse_feishu_date(get_field_local(f, "Submitted on Copy", "Submitted on", "Created Time"))
+        if not d or d.month != cur_month or d.year != cur_year:
+            continue
+        priv_type = classify_privilege_type(extract_field_text(get_field_local(f, "Agency Point Privilege", "Privilege", "Agency Privilege")).strip())
+        if not priv_type:
+            continue
+        status = extract_field_text(get_field_local(f, "Status")).strip().lower()
+        raw_counter = extract_field_text(get_field_local(f, "Counter", "Qty", "Quantities Input")).strip()
+        qty = 1
+        if raw_counter:
+            m = re.search(r'\d+', raw_counter)
+            if m: qty = int(m.group())
+        if any(ok in status for ok in ("done", "complet", "approv", "confirm")):
+            counts[priv_type]["used"] += qty
+        elif any(rej in status for rej in ("reject", "fail", "decline")):
+            counts[priv_type]["rejected"] += qty
+        else:
+            counts[priv_type]["pending"] += qty
+
+    privileges = []
+    for priv_type in PRIVILEGE_TYPE_ORDER:
+        c = counts.get(priv_type, {"used": 0, "pending": 0, "rejected": 0})
+        claimed = privilege_total_earned_quota(priv_type, base_pts)
+        privileges.append({
+            "privilege": priv_type, "claimed": claimed,
+            "used": c["used"], "remaining": max(0, claimed - c["used"]),
+            "pending": c["pending"], "rejected": c["rejected"],
+        })
+    return {
+        "agency_code": code, "agency_name": meta["agency_name"],
+        "acm": meta["acm"], "region": meta["region"],
+        "base_points": base_pts, "privileges": privileges,
+    }
+
+@app.route('/api/agency-target/formula', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_target_formula():
+    """Phase 10.27 (Ahmed): LIVE recompute of the sheet's target "Formula"
+    for one Agency Code -- "i edit but it still show the wrong code and
+    didn't update the FORMULA ... we can use the same logic of check agency
+    target". Exactly that: the same ledger logic as the Check Agency Target
+    page, over the same warm snapshots, scoped to one agency so it answers
+    in milliseconds. The workspace calls this on open + on every Agency Code
+    / Privilege edit (debounced), and the New-Ticket draft uses it to fill
+    the Formula card before the record even exists."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    # A workspace tool, not a data page: any module holder (or super admin)
+    # may recompute -- the payload is one agency's quota counts, the same
+    # numbers the sheet formula already shows that agent on the ticket.
+    if not perms.get("is_super_admin") and not perms.get("modules"):
+        return jsonify({"error": "Access denied"}), 403
+
+    code = sanitize_text(request.args.get('code', '')).strip()
+    if not code:
+        return jsonify({"success": False, "error": "Missing code"}), 400
+
+    # Optional: the privilege picked in the workspace form. The frontend shows
+    # the sheet's Formula chips for THAT privilege, so the ledger row the
+    # agent is editing is returned as "selected" (matched via the same
+    # classify_privilege_type used everywhere else).
+    priv_raw = sanitize_text(request.args.get('privilege', '')).strip()
+    priv_type = classify_privilege_type(priv_raw) if priv_raw else None
+
+    def _with_selected(row_dict):
+        sel = None
+        if priv_type:
+            sel = next((p for p in row_dict.get("privileges", [])
+                        if p.get("privilege") == priv_type), None)
+        return {**row_dict, "selected": sel}
+
+    if MOCK_MODE:
+        row = {"agency_code": code, "agency_name": f"Agency {code}", "acm": "Ehtisham",
+               "region": "PK", "base_points": 350,
+               "privileges": [{"privilege": p, "claimed": 1, "used": 0, "remaining": 1,
+                               "pending": 0, "rejected": 0} for p in PRIVILEGE_TYPE_ORDER]}
+        return jsonify({"success": True, "found": True, **_with_selected(row),
+                        "generated_at": cairo_now().isoformat()})
+
+    points_items, _pc, _pr, _pcache = get_points_table_snapshot()
+    requests_items, _keys, _rc, _rr, _rcache = get_requests_table_snapshot()
+    row = compute_single_agency_target_ledger(points_items, requests_items, code)
+    if row is None:
+        return jsonify({"success": True, "found": False, "agency_code": code,
+                        "selected": None,
+                        "generated_at": cairo_now().isoformat()})
+    return jsonify({"success": True, "found": True, **_with_selected(row),
+                    "generated_at": cairo_now().isoformat()})
+
+# ─── Phase 10.30 (Ahmed): LIVE per-agency formula ────────────────────────
+# "find way to be live not 3 min late bcs maybe same agency has request one
+# min and get it and then they submit request again and i was need to edit
+# the agency code so it will show me still 1 left while it already taken and
+# the second one should be rejected ... maybe cost one request to be". His
+# race is real: the snapshot loop refreshes every 3 min, so two tickets for
+# the same agency inside one window can both look valid. The fix is NOT a
+# faster loop -- it is a TARGETED live read: for ONE agency code the whole
+# ledger needs just 2 Feishu calls (the wallet row + this agency's request
+# rows, fired in parallel), which is ~1-2s and a tiny quota cost paid only
+# when an agent is actually looking at that agency's Formula. The snapshot
+# endpoint stays as the instant first paint; this endpoint is the
+# authoritative second paint.
+
+def _live_agency_points_row(code, headers):
+    """Live wallet-row lookup for ONE agency -- same contains + exact-match
+    pattern as the charge path's _fetch_wallet."""
+    r = feishu_session.post(
+        f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
+        headers=headers,
+        json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}},
+        timeout=30).json()
+    if r.get("code") != 0:
+        raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
+    for it in r.get("data", {}).get("items", []):
+        if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == code:
+            return it
+    return None
+
+
+def _live_agency_requests_rows(code, headers, cap=500):
+    """Live Requests-table rows for ONE agency (paginated, capped)."""
+    items, token = [], None
+    while True:
+        payload = {"page_size": 100,
+                   "filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}}
+        if token:
+            payload["page_token"] = token
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true",
+            headers=headers, json=payload, timeout=30).json()
+        if r.get("code") != 0:
+            raise RuntimeError(r.get("msg") or "Requests lookup failed.")
+        d = r.get("data", {})
+        items.extend(d.get("items", []))
+        if not d.get("has_more") or len(items) >= cap:
+            break
+        token = d.get("page_token")
+    return items
+
+
+@app.route('/api/agency-target/formula/live', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_target_formula_live():
+    """Phase 10.30 (Ahmed): the SAME single-agency ledger as
+    /api/agency-target/formula but computed from a LIVE targeted read (2
+    Feishu searches in parallel) instead of the warm snapshots -- answers
+    "is there REALLY 1 left right now?" in ~1-2s. Costs quota only when an
+    agent actually views/edits an agency's Formula card (or taps the badge),
+    never on a timer."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not perms.get("modules"):
+        return jsonify({"error": "Access denied"}), 403
+
+    code = sanitize_text(request.args.get('code', '')).strip()
+    if not code:
+        return jsonify({"success": False, "error": "Missing code"}), 400
+
+    priv_raw = sanitize_text(request.args.get('privilege', '')).strip()
+    priv_type = classify_privilege_type(priv_raw) if priv_raw else None
+
+    def _with_selected(row_dict):
+        sel = None
+        if priv_type:
+            sel = next((p for p in row_dict.get("privileges", [])
+                        if p.get("privilege") == priv_type), None)
+        return {**row_dict, "selected": sel}
+
+    if MOCK_MODE:
+        row = {"agency_code": code, "agency_name": f"Agency {code}", "acm": "Ehtisham",
+               "region": "PK", "base_points": 350,
+               "privileges": [{"privilege": p, "claimed": 1, "used": 0, "remaining": 1,
+                               "pending": 0, "rejected": 0} for p in PRIVILEGE_TYPE_ORDER]}
+        return jsonify({"success": True, "found": True, "live": True, **_with_selected(row),
+                        "generated_at": cairo_now().isoformat()})
+
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_wallet = pool.submit(_live_agency_points_row, code, headers)
+            fut_reqs = pool.submit(_live_agency_requests_rows, code, headers)
+            wallet_row = fut_wallet.result()
+            req_items = fut_reqs.result()
+    except Exception as e:
+        logger.error("formula_live_failed", code=code, error=str(e))
+        return jsonify({"success": False, "error": str(e)}), 502
+
+    row = compute_single_agency_target_ledger([wallet_row] if wallet_row else [],
+                                              req_items, code)
+    if row is None:
+        return jsonify({"success": True, "found": False, "live": True,
+                        "agency_code": code, "selected": None,
+                        "generated_at": cairo_now().isoformat()})
+    return jsonify({"success": True, "found": True, "live": True, **_with_selected(row),
+                    "generated_at": cairo_now().isoformat()})
 
 @app.route('/api/agency-target-table', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
