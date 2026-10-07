@@ -193,6 +193,12 @@
         /* ID-scoped: must outrank the global .btn{width:100%} declared later. */
         #tiResults .ti-open-btn{flex:0 0 auto;width:auto;padding:9px 22px;border-radius:10px;font-size:.85rem;font-weight:700;}
         #tiSearchBtn{flex:0 0 auto;width:auto;padding:12px 30px;}
+        /* Phase 10.34 (Ahmed): "check the design of the search button why it
+           this" -- the Preview Agent View search button inherited the global
+           .btn{width:100%}, which stretched it across the whole row and
+           crushed the member input to a sliver. Same ID-scoped fix as
+           #tiSearchBtn above: compact button, wide input. */
+        #pvSearchBtn{flex:0 0 auto;width:auto;padding:12px 26px;}
         /* Phase 10.13.1: sheet-style grid for the Under Investigation list
            (mirrors the Bitable view: sticky header, horizontal scroll on
            narrow screens, Open button pinned right). */
@@ -1375,6 +1381,13 @@
         .pp-toggle{margin:10px 0 0;padding:9px 18px;border-radius:12px;border:1px solid rgba(139,124,246,0.5);background:rgba(139,124,246,0.09);color:#c9bfff;font-family:'Space Grotesk',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.6px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
         .pp-toggle:hover{background:rgba(139,124,246,0.16);transform:translateY(-1px);box-shadow:0 5px 14px rgba(139,124,246,0.18);}
         .pp-all{margin-top:10px;}
+        /* Phase 10.34 (Ahmed): the "show all" panel floats as an anchored
+           glass overlay instead of unfolding inline -- the page never gets
+           pushed down and nothing needs scrolling into view. */
+        .pp-all.pp-portaled{position:fixed;z-index:10060;margin-top:0;flex-direction:column;gap:10px;padding:14px;background:linear-gradient(160deg,rgba(30,30,38,.98),rgba(20,20,26,.98));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1.5px solid rgba(139,124,246,.45);border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.60);animation:ppOverlayIn .22s cubic-bezier(.2,.9,.3,1.2);}
+        .pp-all.pp-portaled .pp-grid{flex:1 1 auto;max-height:none;overflow-y:auto;}
+        .pp-picker.pp-rose .pp-all.pp-portaled{border-color:rgba(255,77,109,.45);box-shadow:0 22px 60px rgba(0,0,0,.60),0 0 0 1px rgba(255,77,109,.12);}
+        @keyframes ppOverlayIn{from{opacity:0;transform:translateY(-8px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
 
         /* Phase 10.2: searchable-select panels are portaled to <body> (fixed
            position) so they can never be clipped by a section card's
@@ -1426,7 +1439,14 @@
            (right-aligned) instead of popping on its right -- beside the
            circle it sat on top of the tab bar and the glow washed over the
            duplicate count. */
-        .twx-radar-msg{display:none;position:absolute;top:calc(100% + 12px);left:auto;right:0;width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
+        /* Phase 10.34 (Ahmed): "make the message of the duplicated radar
+           appear like i highlight in the second screen" -- the bubble now
+           parks at the TOP-RIGHT of the viewport (his red rectangle), fixed
+           below the topbar, instead of dropping under the top-center circle.
+           The element is portaled to <body> on load (see the DOMContentLoaded
+           hook below) because .twx-dock's translateX(-50%) would otherwise
+           trap position:fixed inside the dock. */
+        .twx-radar-msg{display:none;position:fixed;top:84px;left:auto;right:24px;z-index:10003;width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
         /* Phase 10.7 (Ahmed): the bubble grows DOWNWARD from the circle, so
            max-height + its own scrollbar guarantees even the tallest verdict
            stays fully on-screen. */
@@ -1442,9 +1462,10 @@
         .twx-radar-msg-x{position:absolute;top:6px;right:8px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text-muted);font-size:.75rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;z-index:2;}
         .twx-radar-msg-x:hover{background:rgba(255,77,109,.30);color:#fff;}
         @media(max-width:1024px){
-            /* narrow screens: no room on the right -- the bubble drops back
-               under the circle (still persistent). */
-            .twx-radar-msg{top:calc(100% + 12px);left:auto;right:0;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            /* narrow screens: the bubble stays fixed top-right (Phase 10.34),
+               just tucked closer to the edge so it never collides with the
+               collapsed-header icons. */
+            .twx-radar-msg{top:76px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
             .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
             @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         }
@@ -3791,7 +3812,7 @@
                                  preview?" -- an explicit 🔍 button next to the box. Typing
                                  still filters live exactly as before; the button just makes
                                  the action visible. -->
-                            <button type="button" class="btn btn-primary" onclick="pvSearch()" style="flex:none;">🔍 Search</button>
+                            <button type="button" class="btn btn-primary" id="pvSearchBtn" onclick="pvSearch()">🔍 Search</button>
                         </div>
                     </div>
                     <div id="pvList">
@@ -4223,7 +4244,10 @@ function executePageLogic(page) {
     } else if(page==='admin-agents'){
         document.getElementById('pg-admin-agents').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
-        fetchAdminUsers();
+        // Phase 10.34 (Ahmed): "make loading agents button ... by button not
+        // automatic load the agents" -- opening Manage Agents now costs ZERO
+        // requests; the agent/role lists load only when he clicks the button.
+        adminAgentsIdle();
         initAdminModulesUI();
     } else if(page==='admin-requests'){
         document.getElementById('pg-admin-requests').style.display='block';
@@ -4833,6 +4857,18 @@ function enhanceAllSelects(root) {
 }
 
 document.addEventListener('DOMContentLoaded', () => enhanceAllSelects());
+// Phase 10.34 (Ahmed): the duplicate-radar bubbles (#twRadarMsg workspace,
+// #awsRadarMsg audit) render position:fixed at the viewport top-right now.
+// Their home dock (.twx-dock) is translateX(-50%)-centered, and ANY
+// transformed ancestor traps position:fixed -- so both bubbles are portaled
+// to <body> once at load. Every script addresses them by id, nothing reads
+// their parent, so the move is invisible to the rest of the app.
+document.addEventListener('DOMContentLoaded', () => {
+    ['twRadarMsg', 'awsRadarMsg'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.parentElement !== document.body) document.body.appendChild(el);
+    });
+});
 const _ssGlobalObserver = new MutationObserver((mutations) => {
     for (const m of mutations) {
         m.addedNodes.forEach(node => {
@@ -6572,6 +6608,26 @@ function pvRepaintPresencePills() {
 // no network traffic at all.
 setInterval(pvRepaintPresencePills, 30000);
 let latestAdminRoles = [];  // role presets only
+// Phase 10.34 (Ahmed): Manage Agents no longer auto-loads on open. The page
+// opens to an idle state with an explicit "Load agents" button; only a click
+// (or a save/delete refresh) hits /api/admin/users. Once loaded, re-opening
+// the page keeps the rendered lists instead of bouncing back to idle.
+let adminUsersLoaded = false;
+function adminAgentsIdle() {
+    if (adminUsersLoaded) return; // already loaded this session -- keep the lists
+    const listDiv = document.getElementById('adminUserList');
+    const roleListDiv = document.getElementById('adminRoleList');
+    const badge = document.getElementById('agentsCountBadge');
+    if (badge) badge.textContent = '–';
+    if (roleListDiv) roleListDiv.innerHTML = `<div style="color:var(--text-muted);font-size:.85rem;padding:6px 0">Roles load together with the agents — hit <b>🔄 Load agents</b> below.</div>`;
+    if (listDiv) listDiv.innerHTML = `
+        <div class="empty-state" style="padding:44px 20px;text-align:center">
+            <div style="font-size:2.2rem;margin-bottom:10px;opacity:.85">👥</div>
+            <h3 style="margin-bottom:6px">Agents not loaded yet</h3>
+            <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:18px">Opening this page costs zero requests now — the agents that have access load only when you ask for them.</p>
+            <button type="button" class="btn btn-primary" id="adminLoadAgentsBtn" onclick="fetchAdminUsers()" style="max-width:280px;margin:0 auto">🔄 Load agents</button>
+        </div>`;
+}
 
 async function fetchAdminUsers() {
     const listDiv=document.getElementById('adminUserList');
@@ -6588,6 +6644,7 @@ async function fetchAdminUsers() {
         const users = allRows.filter(u => !u.is_role);
         latestAdminUsers = users;
         latestAdminRoles = roles;
+        adminUsersLoaded = true; // Phase 10.34: page re-opens keep these lists
 
         populateQuickSetupSelects();
 
@@ -8655,9 +8712,16 @@ async function tiSearch() {
             : 'No requests under investigation right now. ✅';
         if (!rows.length) { if (emptyEl) emptyEl.style.display = ''; return; }
         resultsEl.innerHTML = tiTableHtml(rows);
-        // Phase 10.14 (speed): warm the first rows' ticket details right after
-        // the list lands, so opening any of the top results feels instant.
-        rows.slice(0, 5).forEach(r => twPrefetchTicket(r.record_id));
+        // Phase 10.34 (speed, zero cost): the backend now rides every row's
+        // full fields along (its Feishu search already downloaded them), so
+        // EVERY row seeds the prefetch cache -- opening any result, not just
+        // the top 5, is instant with zero /api/requests/single calls. Older
+        // backends send no full_fields: fall back to warming the top 5.
+        if (rows.length && rows[0].full_fields) {
+            rows.forEach(r => twSeedTicketFromList(r.record_id, r.full_fields, 'list'));
+        } else {
+            rows.slice(0, 5).forEach(r => twPrefetchTicket(r.record_id));
+        }
     } catch (e) {
         if (countEl) countEl.textContent = 'Search failed — please try again.';
         ToastManager.show('Under Investigation search failed: ' + e.message, 'error');
@@ -9015,9 +9079,18 @@ async function runQuery(){
             </div>
         `).join('');
 
-        // Phase 10.14 (speed): warm the top hits' ticket details so opening
-        // one of the first cards feels instant (hover prefetches too).
-        if (qyHasAuditionAccess()) results.slice(0, 3).forEach(r => { if (r.record_id) twPrefetchTicket(r.record_id); });
+        // Phase 10.34 (speed, zero cost): same list-seeding as Under
+        // Investigation -- every card's full fields ride the query response,
+        // so ANY card opens instantly with zero /api/requests/single calls
+        // (the old top-3 warm fetches are gone). Older backends without
+        // full_fields fall back to warming the top 3.
+        if (qyHasAuditionAccess()) {
+            if (results.length && results[0].full_fields) {
+                results.forEach(r => twSeedTicketFromList(r.record_id, r.full_fields, 'list'));
+            } else {
+                results.slice(0, 3).forEach(r => { if (r.record_id) twPrefetchTicket(r.record_id); });
+            }
+        }
 
     } catch (e) {
         if (spinner) spinner.style.display = 'none';
@@ -10136,10 +10209,9 @@ async function ltPullAssigned() {
         // below runs exactly as before.
         tickets.forEach(t => {
             const rid = t.record_id || t.id;
-            if (rid && t.full_fields) {
-                twPrefetchCache.set(rid, Promise.resolve({ record_id: rid, fields: twNormalizeSeededFields(t.full_fields) }));
-                twPrefetchSeededAt.set(rid, Date.now());
-            }
+            // Phase 10.34: seeds are source-tagged ('pull') so twPrefetchPrune
+            // never evicts them while they sit in the queue.
+            if (rid && t.full_fields) twSeedTicketFromList(rid, t.full_fields, 'pull');
         });
         // Phase 10.21 (speed): a ticket that LANDS in the queue starts its
         // detail fetch RIGHT NOW, at the front of the prefetch queue -- before
@@ -10257,6 +10329,39 @@ function twNormalizeSeededFields(fields) {
     for (const k in fields) out[k] = twUnwrapAutoFieldValue(fields[k]);
     return out;
 }
+// Phase 10.34 (speed, Ahmed): "why when open the workspace in the query or
+// under investage it take time to show the data of the tkt? can you make it
+// faster without cost" -- the Under Investigation and Universal Query list
+// endpoints now ride every row's FULL record fields along (their Feishu
+// search already downloaded them -- dropping the field projection costs zero
+// extra calls), so each rendered row seeds the prefetch cache exactly like
+// pull-assigned does: opening ANY result is instant with ZERO
+// /api/requests/single calls, and the old top-3/top-5 warm fetches are gone
+// (fewer calls than before, not more).
+// twPrefetchSeedSource remembers WHERE a seed came from: twPrefetchPrune may
+// only evict queue-sourced entries when the Live Queue syncs -- list seeds
+// belong to the Query / Under Investigation results and survive a pull.
+const twPrefetchSeedSource = new Map();
+// List seeds skip queue-prune, so cap their total instead: past 600 cached
+// entries, the OLDEST list seeds (that are not in the live queue) are dropped
+// -- the 3-minute TTL at open time already guards their freshness.
+const TW_LIST_SEED_CAP = 600;
+function twSeedTicketFromList(recordId, rawFields, source) {
+    if (!recordId || !rawFields) return;
+    twPrefetchCache.set(recordId, Promise.resolve({ record_id: recordId, fields: twNormalizeSeededFields(rawFields) }));
+    twPrefetchSeededAt.set(recordId, Date.now());
+    twPrefetchSeedSource.set(recordId, source || 'list');
+    if (twPrefetchCache.size > TW_LIST_SEED_CAP) {
+        const live = new Set(ltQueue.map(t => t.record_id || t.id));
+        const listRids = [...twPrefetchSeedSource.keys()]
+            .filter(r => twPrefetchSeedSource.get(r) === 'list' && !live.has(r))
+            .sort((a, b) => (twPrefetchSeededAt.get(a) || 0) - (twPrefetchSeededAt.get(b) || 0));
+        while (twPrefetchCache.size > TW_LIST_SEED_CAP && listRids.length) {
+            const rid = listRids.shift();
+            twPrefetchCache.delete(rid); twPrefetchSeededAt.delete(rid); twPrefetchSeedSource.delete(rid);
+        }
+    }
+}
 function twPrefetchTicket(recordId, priority) {
     if (!recordId || twPrefetchCache.has(recordId)) return;
     const i = twPrefetchPending.indexOf(recordId);
@@ -10296,7 +10401,10 @@ function twPrefetchPump() {
 function twPrefetchPrune() {
     const live = new Set(ltQueue.map(t => t.record_id || t.id));
     for (const rid of twPrefetchCache.keys()) {
-        if (!live.has(rid)) { twPrefetchCache.delete(rid); twPrefetchSeededAt.delete(rid); }
+        // Phase 10.34: 'list' seeds (Under Investigation / Universal Query
+        // results) are not queue members -- a queue sync must not evict them.
+        if (twPrefetchSeedSource.get(rid) === 'list') continue;
+        if (!live.has(rid)) { twPrefetchCache.delete(rid); twPrefetchSeededAt.delete(rid); twPrefetchSeedSource.delete(rid); }
     }
 }
 
@@ -11786,6 +11894,7 @@ function twWsNewInstance(key, recordId) {
 }
 
 async function twOpenWorkspace(recordId) {
+    ppCloseAnyPortaled(); // Phase 10.34: never leave a floating reasons panel behind
     const t0 = twPerfNow();
     let tShell = t0, tRec = t0, perfSource = 'cold-fetch';
     // Phase 10.14: remember WHERE the workspace was opened from, BEFORE any
@@ -11853,7 +11962,18 @@ async function twOpenWorkspace(recordId) {
     twRenderStatusPicks();
     const anShell = document.getElementById('tw-audition-note'); if (anShell) anShell.value = '';
     const apnShell = document.getElementById('tw-approve-note'); if (apnShell) apnShell.value = '';
-    const mgShell = document.getElementById('tw-mentioned-group'); if (mgShell) mgShell.innerHTML = '<option value="">-- Select --</option>';
+    // Phase 10.34 (Ahmed): "mentioned group field in the workspace doesn't
+    // work" -- the shell used to render the select with ONLY "-- Select --"
+    // until the record fill re-populated it, so any open path that showed the
+    // shell longer than a click (or a build whose fill never ran) left a dead
+    // dropdown. The options are static schema metadata -- render them at shell
+    // time too, so the dropdown is fully usable the instant it is visible.
+    const mgShell = document.getElementById('tw-mentioned-group');
+    if (mgShell) {
+        const mgShellOpts = (((typeof FIELD_SCHEMA !== 'undefined' && FIELD_SCHEMA['Mentioned Group']) || {}).options || [])
+            .map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+        mgShell.innerHTML = `<option value="">-- Select --</option>${mgShellOpts}`;
+    }
     const dupShell = document.getElementById('tw-dup-display'); if (dupShell) dupShell.innerHTML = '';
     twApplyCreateModeChrome();
     twSyncBackButton();
@@ -11874,11 +11994,15 @@ async function twOpenWorkspace(recordId) {
             // longer match the sheet -- drop it and take the live-fetch path.
             twPrefetchCache.delete(recordId);
             twPrefetchSeededAt.delete(recordId);
+            twPrefetchSeedSource.delete(recordId);
         } else {
+            // Phase 10.34: perfSource 'pull-seeded' now also covers list seeds
+            // (Under Investigation / Universal Query) -- same zero-fetch open.
             perfSource = seededAt ? 'pull-seeded' : 'prefetch';
             ticket = await twPrefetchCache.get(recordId);
             twPrefetchCache.delete(recordId); // single-use: the workspace edits and re-fetches on save/verify
             twPrefetchSeededAt.delete(recordId);
+            twPrefetchSeedSource.delete(recordId);
             if (!ticket) perfSource = 'prefetch-failed-refetch';
         }
     }
@@ -13324,6 +13448,7 @@ function twCloseWorkspace() {
     // of resurrecting the ticket the agent just closed.
     twOpenSeq++;
     twWorkspaceLoading = false;
+    ppCloseAnyPortaled(); // Phase 10.34: re-home any floating reasons panel
     // Phase 10.13: leaving a blank New-Ticket draft resets create mode and
     // restores the Save & Resolve labels.
     if (twCreateMode) {
@@ -14816,6 +14941,16 @@ function renderReqFormFields() {
 // original checkboxes stay in the DOM (hidden) and perfectly in sync, so
 // submitReqForm()'s multiselect validation and payload collection keep
 // working exactly as before.
+// Phase 10.34: re-home every floating picker panel before a workspace
+// open/close/stash -- 10.33's keep-alive detaches (not destroys) workspace
+// DOM, and a portaled panel must never outlive its picker on screen.
+function ppCloseAnyPortaled() {
+    document.querySelectorAll('.pp-all.pp-portaled').forEach(el => {
+        if (typeof el._ppClose === 'function') el._ppClose();
+        else el.remove();
+    });
+}
+
 function reqRenderPointPrivilegePicker(wrap, opts) {
     // Phase 10.5: opts lets the Reject Reason card reuse this exact picker
     // with its own wording and a rose repaint (.pp-rose).
@@ -14858,11 +14993,60 @@ function reqRenderPointPrivilegePicker(wrap, opts) {
     const filter = picker.querySelector('.pp-filter');
     const toggleBtn = picker.querySelector('.pp-toggle');
     const allWrap = picker.querySelector('.pp-all');
+    // Phase 10.34 (Ahmed): "why the Reject Reason option open like that down
+    // and i need to scroll to see them? think in another more elegant
+    // creative way" -- the panel no longer unfolds inline and shoves the
+    // whole page down. It floats as a glass overlay anchored to the toggle
+    // (flipping up when there's no room below), scrolls its own card grid
+    // internally, and closes on outside tap / ESC. The page never moves.
+    const positionAll = () => {
+        const r = toggleBtn.getBoundingClientRect();
+        const w = Math.min(Math.max(r.width, 360), window.innerWidth - 24);
+        const maxH = Math.min(430, window.innerHeight - 96);
+        const left = Math.min(Math.max(12, r.left), window.innerWidth - w - 12);
+        let top = r.bottom + 8;
+        if (top + maxH > window.innerHeight - 12) top = Math.max(12, r.top - 8 - maxH); // flip above
+        allWrap.style.width = w + 'px';
+        allWrap.style.left = left + 'px';
+        allWrap.style.top = top + 'px';
+        allWrap.style.maxHeight = maxH + 'px';
+    };
+    const onDocDown = (e) => {
+        if (allWrap.contains(e.target) || toggleBtn.contains(e.target)) return;
+        closeAll();
+    };
+    const onDocKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeAll(); } };
+    const onWinScroll = () => {
+        if (!picker.isConnected) { closeAll(); return; } // workspace stashed under us
+        positionAll();
+    };
+    const closeAll = () => {
+        if (!allWrap.classList.contains('pp-portaled')) return;
+        document.removeEventListener('mousedown', onDocDown, true);
+        document.removeEventListener('keydown', onDocKey, true);
+        window.removeEventListener('scroll', onWinScroll, true);
+        window.removeEventListener('resize', positionAll);
+        allWrap.classList.remove('pp-portaled');
+        allWrap.style.cssText = 'display:none;';
+        toggleBtn.insertAdjacentElement('afterend', allWrap); // re-home into the picker
+        toggleBtn.textContent = O.toggleShow;
+    };
+    const openAll = () => {
+        ppCloseAnyPortaled(); // one overlay at a time, orphans included
+        document.body.appendChild(allWrap);
+        allWrap.classList.add('pp-portaled');
+        allWrap.style.display = 'flex';
+        positionAll();
+        toggleBtn.textContent = O.toggleHide;
+        document.addEventListener('mousedown', onDocDown, true);
+        document.addEventListener('keydown', onDocKey, true);
+        window.addEventListener('scroll', onWinScroll, true);
+        window.addEventListener('resize', positionAll);
+        setTimeout(() => filter.focus(), 30);
+    };
+    allWrap._ppClose = closeAll;
     toggleBtn.addEventListener('click', () => {
-        const opening = allWrap.style.display === 'none';
-        allWrap.style.display = opening ? '' : 'none';
-        toggleBtn.textContent = opening ? O.toggleHide : O.toggleShow;
-        if (opening) setTimeout(() => filter.focus(), 30);
+        if (allWrap.classList.contains('pp-portaled')) closeAll(); else openAll();
     });
 
     const sync = () => {
