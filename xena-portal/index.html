@@ -1397,37 +1397,41 @@
         .twx-dock > *{pointer-events:auto;}
         .twx-topbar-wrapper{position:relative;width:60px;height:60px;flex:none;pointer-events:none;}
         .twx-topbar-wrapper > *{pointer-events:auto;}
-        .twx-fab{width:60px;height:60px;border-radius:50%;border:1px solid rgba(0,212,255,0.45);background:color-mix(in srgb, var(--surface) 72%, transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--accent-cyan);font-size:1.5rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;box-shadow:0 0 0 1px rgba(0,212,255,0.16), 0 6px 24px rgba(0,212,255,0.28), 0 2px 8px rgba(0,0,0,0.40);transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease, box-shadow .2s ease;}
-        .twx-fab:hover{transform:scale(1.07);box-shadow:0 0 0 1px rgba(0,212,255,0.38), 0 8px 32px rgba(0,212,255,0.44), 0 2px 8px rgba(0,0,0,0.40);}
+        /* Phase 10.32 (Ahmed): "why there is light out of the circles? it
+           covers the number of duplicated in the radar" -- the glow halos are
+           toned way down now (subtle edge + soft drop shadow, no big colored
+           bloom washing over neighbouring content). */
+        .twx-fab{width:60px;height:60px;border-radius:50%;border:1px solid rgba(0,212,255,0.45);background:color-mix(in srgb, var(--surface) 72%, transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--accent-cyan);font-size:1.5rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;box-shadow:0 0 0 1px rgba(0,212,255,0.10), 0 4px 12px rgba(0,212,255,0.12), 0 2px 8px rgba(0,0,0,0.40);transition:transform .28s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity .16s ease, box-shadow .2s ease;}
+        .twx-fab:hover{transform:scale(1.07);box-shadow:0 0 0 1px rgba(0,212,255,0.30), 0 6px 18px rgba(0,212,255,0.22), 0 2px 8px rgba(0,0,0,0.40);}
         /* Note fab (amber) */
-        .twx-fab-note{border-color:rgba(255,184,0,0.45);color:var(--accent-amber);box-shadow:0 0 0 1px rgba(255,184,0,0.16), 0 6px 24px rgba(255,184,0,0.26), 0 2px 8px rgba(0,0,0,0.40);}
-        .twx-fab-note:hover{box-shadow:0 0 0 1px rgba(255,184,0,0.38), 0 8px 32px rgba(255,184,0,0.42), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-note{border-color:rgba(255,184,0,0.45);color:var(--accent-amber);box-shadow:0 0 0 1px rgba(255,184,0,0.10), 0 4px 12px rgba(255,184,0,0.12), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-note:hover{box-shadow:0 0 0 1px rgba(255,184,0,0.30), 0 6px 18px rgba(255,184,0,0.22), 0 2px 8px rgba(0,0,0,0.40);}
         .twx-fab-note.active{background:rgba(255,184,0,0.88);color:#2a1e00;}
         /* Radar fab (rose) + scan/alert pulse */
-        .twx-fab-radar{border-color:rgba(255,77,109,0.45);color:var(--accent-rose);box-shadow:0 0 0 1px rgba(255,77,109,0.16), 0 6px 24px rgba(255,77,109,0.24), 0 2px 8px rgba(0,0,0,0.40);}
-        .twx-fab-radar:hover{box-shadow:0 0 0 1px rgba(255,77,109,0.38), 0 8px 32px rgba(255,77,109,0.42), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-radar{border-color:rgba(255,77,109,0.45);color:var(--accent-rose);box-shadow:0 0 0 1px rgba(255,77,109,0.10), 0 4px 12px rgba(255,77,109,0.11), 0 2px 8px rgba(0,0,0,0.40);}
+        .twx-fab-radar:hover{box-shadow:0 0 0 1px rgba(255,77,109,0.30), 0 6px 18px rgba(255,77,109,0.22), 0 2px 8px rgba(0,0,0,0.40);}
         .twx-fab-radar.scanning{animation:twxRadarPulse 1s ease-in-out infinite;}
         .twx-fab-radar.alert{border-color:var(--accent-rose);background:rgba(255,77,109,0.18);animation:twxRadarPulse 1.6s ease-in-out infinite;}
         @keyframes twxRadarPulse{
-            0%,100%{box-shadow:0 0 0 1px rgba(255,77,109,0.16), 0 6px 24px rgba(255,77,109,0.24);}
-            50%{box-shadow:0 0 0 4px rgba(255,77,109,0.35), 0 6px 32px rgba(255,77,109,0.5);}
+            0%,100%{box-shadow:0 0 0 1px rgba(255,77,109,0.10), 0 4px 12px rgba(255,77,109,0.11);}
+            50%{box-shadow:0 0 0 3px rgba(255,77,109,0.22), 0 4px 16px rgba(255,77,109,0.26);}
         }
         /* Radar dock: fab + badge + chat-style message bubble */
         .twx-radar-dock{position:relative;width:60px;height:60px;flex:none;}
-        .twx-radar-badge{position:absolute;top:-5px;right:-5px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(255,77,109,0.55);pointer-events:none;z-index:2;}
+        .twx-radar-badge{position:absolute;top:-5px;right:-5px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(255,77,109,0.30);pointer-events:none;z-index:2;}
         .twx-radar-badge:empty{display:none;}
-        /* Phase 10.5 (Ahmed): the bubble pops on the RIGHT of the 📡 circle
-           (not under it) and STAYS until its own ✕ dismisses it -- outside
-           clicks only close the match-cards drawer, never the message. */
-        .twx-radar-msg{display:none;position:absolute;top:0;left:calc(100% + 14px);width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 16px 4px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 16px 44px rgba(0,0,0,0.5), 0 0 22px rgba(255,77,109,0.14);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:left top;color:var(--text);}
-        /* Phase 10.7 (Ahmed): the bubble is anchored to the circle's TOP and
-           grows DOWNWARD (it used to be vertically centered on the 60px
-           circle, so anything taller than ~46px spilled off the top edge of
-           the screen -- the "only the bottom half shows" bug). max-height +
-           its own scrollbar guarantees even the tallest verdict stays fully
-           on-screen. */
+        /* Phase 10.5 (Ahmed): the bubble STAYS until its own ✕ dismisses it
+           -- outside clicks only close the match-cards drawer, never the
+           message. Phase 10.32 (Ahmed): it now drops UNDER the 📡 circle
+           (right-aligned) instead of popping on its right -- beside the
+           circle it sat on top of the tab bar and the glow washed over the
+           duplicate count. */
+        .twx-radar-msg{display:none;position:absolute;top:calc(100% + 12px);left:auto;right:0;width:min(320px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), rgba(24,24,28,0.97));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
+        /* Phase 10.7 (Ahmed): the bubble grows DOWNWARD from the circle, so
+           max-height + its own scrollbar guarantees even the tallest verdict
+           stays fully on-screen. */
         .twx-radar-msg.open{display:block;animation:twxRadarMsgIn .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
-        @keyframes twxRadarMsgIn{from{opacity:0;transform:translateX(-10px) scale(.85);}to{opacity:1;transform:translateX(0) scale(1);}}
+        @keyframes twxRadarMsgIn{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         /* Scanning state: amber edge + a breathing dot so an in-progress
            auto-scan is visible proof the radar is alive (Phase 10.7). */
         .twx-radar-msg.scanning{border-color:rgba(255,184,0,0.55);box-shadow:0 16px 44px rgba(0,0,0,0.5), 0 0 22px rgba(255,184,0,0.16);}
@@ -3781,7 +3785,14 @@
                 <div class="card" style="max-width:1080px;margin:0 auto">
                     <div class="control-group" style="margin-bottom:14px">
                         <label>Find a member</label>
-                        <input type="text" id="pvFilter" class="form-highlight-input" placeholder="🔍 Type a name or email — members load when you search" oninput="pvRenderList()">
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="pvFilter" class="form-highlight-input" style="flex:1;" placeholder="🔍 Type a name or email — members load when you search" oninput="pvRenderList()" onkeydown="if(event.key==='Enter')pvSearch()">
+                            <!-- Phase 10.32 (Ahmed): "where is the search button in the
+                                 preview?" -- an explicit 🔍 button next to the box. Typing
+                                 still filters live exactly as before; the button just makes
+                                 the action visible. -->
+                            <button type="button" class="btn btn-primary" onclick="pvSearch()" style="flex:none;">🔍 Search</button>
+                        </div>
                     </div>
                     <div id="pvList">
                         <div class="pv-idle">
@@ -4071,17 +4082,6 @@ function openInTab(page) {
 }
 
 function setActiveTab(page) {
-    // Phase 10.27 (Ahmed): per-ticket keep-alive tabs -- 'ws:<key>' entries
-    // each own a detached workspace instance; activating one mounts it.
-    if (page.startsWith('ws:')) {
-        const wsKey = page.slice(3);
-        if (typeof twWsTabs !== 'undefined' && twWsTabs[wsKey] && twWsActiveKey !== wsKey) twWsMount(wsKey);
-        activeTabId = page;
-        renderTabs();
-        document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
-        executePageLogic('ticket-workspace');
-        return;
-    }
     activeTabId = page;
     renderTabs();
 
@@ -4095,16 +4095,17 @@ function setActiveTab(page) {
 function closeTab(page, event) {
     if(event) event.stopPropagation();
     if(page === 'welcome') return;
-    // Phase 10.27: workspace tabs dispose through their own closer (keep-alive
-    // instances must be dropped from twWsTabs too, not just from openTabs).
-    if (page.startsWith('ws:')) { twWsCloseTab(page.slice(3)); return; }
 
     openTabs = openTabs.filter(t => t !== page);
 
     if (activeTabId === page) {
-        // Every entry in openTabs owns a real tab now (workspace tabs are
-        // 'ws:<key>' entries), so the plain "last tab" fallback is safe.
-        activeTabId = openTabs.length ? openTabs[openTabs.length - 1] : 'welcome';
+        // 'ticket-workspace' sits in openTabs without a tab for real tickets
+        // (renderTabs skips it), so fall back to the last entry that actually
+        // OWNS a tab -- closing e.g. the Live Queue tab must never land on a
+        // workspace page with NO tab in the bar (the ghost-workspace bug).
+        const ownsTab = p => !(p === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode));
+        const candidates = openTabs.filter(ownsTab);
+        activeTabId = candidates.length ? candidates[candidates.length - 1] : 'welcome';
     }
 
     setActiveTab(activeTabId);
@@ -4117,18 +4118,18 @@ function renderTabs() {
     const titlesMap = currentLang === 'zh' ? zhPageTitlesMap : pageTitlesMap;
 
     openTabs.forEach(page => {
-        // Phase 10.27 (Ahmed): EVERY open ticket now owns a 'ws:<key>' tab --
-        // "why when open new request it show that 2 tab opening the new
-        // request and live ?? ... when open pending requests workspace ... it
-        // open in the live tab ???". The old line below hard-marked the Live
-        // Queue tab active for ANY workspace, which was exactly both bugs.
-        // Legacy plain 'ticket-workspace' entries never occur anymore; skip.
-        if(page === 'ticket-workspace') return;
+        // Phase 10.33 (Ahmed): NO per-ticket tabs -- "return it as it was ...
+        // no new tab". A real ticket's workspace opens UNDER the tab of the
+        // module it was opened from; that module's tab stays highlighted
+        // (below), so an under-investigation ticket opens "in the tab of
+        // under investigated", never under Live Queue. Only the New-Ticket
+        // DRAFT keeps its own tab (10.13.1) so the open draft is visible and
+        // switchable like any other page.
+        if(page === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode)) return;
 
-        const isWs = page.startsWith('ws:');
-        const wsRec = isWs && typeof twWsTabs !== 'undefined' ? twWsTabs[page.slice(3)] : null;
-        const title = isWs ? ((wsRec && wsRec.title) || '🎫 Ticket') : (titlesMap[page] || page);
-        const isActive = page === activeTabId;
+        const title = page === 'ticket-workspace' ? '🆕 New Ticket' : (titlesMap[page] || page);
+        const isActive = page === activeTabId ||
+            (activeTabId === 'ticket-workspace' && typeof twReturnTo !== 'undefined' && page === twReturnTo);
         
         const tabEl = document.createElement('div');
         tabEl.className = `tab-item ${isActive ? 'active' : ''}`;
@@ -4166,17 +4167,20 @@ function renderTabs() {
             const closeBtn = document.createElement('button');
             closeBtn.className = 'tab-close';
             closeBtn.innerHTML = '×';
-            // Workspace tabs close through twWsCloseTab (disposes the keep-alive
-            // instance; the mounted one runs the full twCloseWorkspace flow).
-            closeBtn.onclick = (e) => {
-                if (isWs) { e.stopPropagation(); twWsCloseTab(page.slice(3)); return; }
-                closeTab(page, e);
-            };
+            closeBtn.onclick = (e) => { closeTab(page, e); };
             tabEl.appendChild(closeBtn);
         }
         
         container.appendChild(tabEl);
     });
+
+    // Phase 10.32 (Ahmed): keep the ACTIVE tab scrolled into view -- the bar
+    // scrolls (overflow-x:auto) once several pages are open, and the freshly
+    // activated tab could sit off-screen, looking like it "was never opened".
+    const activeTabEl = container.querySelector('.tab-item.active');
+    if (activeTabEl && activeTabEl.scrollIntoView) {
+        try { activeTabEl.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
+    }
 }
 
 function executePageLogic(page) {
@@ -8799,6 +8803,21 @@ async function pvLoadTargets() {
     pvRenderList();
 }
 
+// Phase 10.32 (Ahmed): "where is the search button in the preview?" -- the
+// button/Enter handler. Typing still filters live (oninput hook unchanged);
+// this just makes the action discoverable and works when the list is not
+// loaded yet (lazy one-time fetch).
+function pvSearch() {
+    const q = (document.getElementById('pvFilter')?.value || '').trim();
+    if (!q) {
+        const listEl = document.getElementById('pvList');
+        if (listEl) listEl.innerHTML = PV_IDLE_HTML;
+        return;
+    }
+    if (!previewTargetsCache.length && !pvLoading) { pvLoadTargets(); return; }
+    pvRenderList();
+}
+
 function pvRenderList() {
     const listEl = document.getElementById('pvList');
     if (!listEl) return;
@@ -8903,7 +8922,7 @@ function pvExit() {
     // Phase 10.14: give the admin his own tabs back (validated against the
     // pages that still exist), landing on the tab he left from.
     if (savedTabs && savedTabs.length) {
-        openTabs = savedTabs.filter(p => p.startsWith('ws:') || document.getElementById('pg-' + p));
+        openTabs = savedTabs.filter(p => !p.startsWith('ws:') && document.getElementById('pg-' + p)); // drop legacy per-ticket ws: entries (Phase 10.33 removed them)
         if (!openTabs.length) openTabs = ['welcome'];
         openInTab(openTabs.includes(savedActive) ? savedActive : openTabs[openTabs.length - 1]);
     } else {
@@ -10536,11 +10555,11 @@ function twRenderSection2(ticket, reqTypeOverride) {
 
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
 
-    // Phase 10.27: Agency Target tickets recompute the sheet Formula LIVE on
-    // open (and on every Agency Code / Privilege edit) using the same ledger
-    // as Check Agency Target -- the stored sheet text was only as fresh as
-    // its last save, and drafts have no stored text at all.
-    if (reqType === 'Agency Target Privilege') twScheduleFormulaLive();
+    // Phase 10.27 + 10.32: on open the Agency Target formula card only
+    // re-checks the ZERO-REQUEST fast path (the stored sheet Formula already
+    // renders with the card) -- requests fire only on a committed Agency Code
+    // edit or a badge tap.
+    if (reqType === 'Agency Target Privilege') twScheduleFormulaLive('open');
 }
 
 // ─── Phase 10.28 (Ahmed): follow-up → Agency Creation paste converter ───
@@ -10695,16 +10714,31 @@ function twFollowupConvert(ta) {
 // Two-stage: /api/agency-target/formula paints instantly from the warm
 // snapshot, then /api/agency-target/formula/live re-reads JUST this agency
 // (wallet row + its request rows, 2 parallel Feishu calls) and wins the card.
-// Runs on open, on every Agency Code / Privilege keystroke (debounced), in
-// New-Ticket drafts, and on badge tap.
+// Phase 10.31 zero-cost fast path: while the ticket's own sheet Formula (a
+// live self-aggregating [Grand Table].FILTER formula) matches the Agency Code
+// on screen, it IS the card -- the two-stage check runs only when the code
+// was edited, in New-Ticket drafts, or on badge tap.
 let twFormulaLiveTimer = null, twFormulaLiveSeq = 0;
-function twScheduleFormulaLive() {
+// Phase 10.32 (Ahmed, verbatim): "no request run at all ... take the formula
+// field and present it on the numbers cards and no live run unless i click
+// on the button or the agency code changed ... in the case the agency code
+// changed need to go to update the tkt and wait the formula field updated
+// and then return and show the data this when the tkt is already exist".
+// Sources: 'open' / 'input' -> ZERO requests ever (fast path + badge hint).
+//          'commit'         -> code edit committed on an EXISTING ticket:
+//                              /api/agency-target/formula/sync (PUT the code
+//                              to the ticket -> wait for Feishu to recalc the
+//                              sheet Formula -> re-fetch -> paint). Drafts
+//                              keep the 10.30 two-stage live compute.
+//          'badge' (tap)    -> same routing, forced (skips the fast path).
+function twScheduleFormulaLive(source) {
     const form = document.getElementById('tw-form'); if (!form) return;
     if (!form.querySelector('[data-formula-live="1"]')) return;
     clearTimeout(twFormulaLiveTimer);
-    twFormulaLiveTimer = setTimeout(twRefreshFormulaLive, 500);
+    const delay = source === 'commit' ? 150 : 500;
+    twFormulaLiveTimer = setTimeout(() => twRefreshFormulaLive(false, source || 'input'), delay);
 }
-async function twRefreshFormulaLive() {
+async function twRefreshFormulaLive(forceLive, source) {
     const form = document.getElementById('tw-form'); if (!form) return;
     const grp = form.querySelector('[data-formula-live="1"]'); if (!grp) return;
     // Agency Code can render twice (Basic Info + Dynamic Section) -- take the
@@ -10714,6 +10748,87 @@ async function twRefreshFormulaLive() {
     if (!code) return;
     const seq = ++twFormulaLiveSeq;
     const badge = grp.querySelector('.twcf-live-badge');
+    // Phase 10.31 (Ahmed): "now i made this field to this purpose to read how
+    // left right now always live ... make the formula designed into the cards
+    // number and we can use it if the agency code typed wrong and after edit
+    // need to refresh so we click the button". Verified against the base:
+    // the sheet Formula self-aggregates through [Grand Table].FILTER(...) and
+    // [Agency Points].FILTER(...), so FEISHU recalculates it live when any
+    // sibling ticket flips Status or the wallet row changes. FAST PATH --
+    // while the stored Formula describes the Agency Code currently on screen,
+    // trust it (it arrived free with the ticket) and spend ZERO requests.
+    if (!forceLive) {
+        const sf = grp.dataset.sheetFormula || '';
+        const m = /(?:Agency Code|Code):\s*([^|]+)/.exec(sf);
+        if (m && m[1].trim() === code) {
+            if (grp.dataset.lastFormulaStr && grp.dataset.lastFormulaStr !== sf) {
+                // A previous live paint (code was edited then reverted) --
+                // restore the sheet-formula chips.
+                const old = grp.querySelector('.twcf-chips, .twcf-text');
+                if (old) old.outerHTML = twComputedFieldHtml('Formula', sf);
+            }
+            grp.dataset.lastFormulaStr = sf;
+            if (badge) badge.textContent = '✅ live · sheet formula';
+            return;
+        }
+    }
+    const isExisting = !!(ltActiveTicket && ltActiveTicket.record_id) && !twCreateMode;
+    // Phase 10.32: opening a ticket and mid-typing NEVER fire requests. The
+    // badge just says what will happen next.
+    if (!forceLive && source !== 'commit') {
+        if (badge) badge.textContent = (source === 'open')
+            ? '⚡ tap to sync the live sheet formula'
+            : (isExisting ? '✏️ edited — syncs when you leave the field'
+                          : '✏️ edited — checks live when you leave the field');
+        return;
+    }
+    if (isExisting) {
+        // ── EXISTING ticket, committed code edit or badge tap: SYNC ──
+        // "go to update the tkt and wait the formula field updated and then
+        // return and show the data". The backend PUTs the code to the ticket,
+        // polls until Feishu's own sheet Formula reports it, and hands the
+        // fresh string back -- the card then shows the SHEET's numbers, not
+        // our own computation.
+        if (badge) badge.textContent = '⏳ saving to ticket & waiting for sheet formula…';
+        try {
+            const res = await fetch('/api/agency-target/formula/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ record_id: ltActiveTicket.record_id, code,
+                                       user: loggedUser || '', email: loggedEmail || '' })
+            });
+            const data = await res.json();
+            if (seq !== twFormulaLiveSeq) return; // a newer edit owns the card
+            if (data.success && data.formula && !data.stale) {
+                const old = grp.querySelector('.twcf-chips, .twcf-text');
+                if (old) old.outerHTML = twComputedFieldHtml('Formula', data.formula);
+                grp.dataset.lastFormulaStr = data.formula;
+                grp.dataset.sheetFormula = data.formula; // sheet now describes THIS code
+                if (badge) badge.textContent = '✅ live · sheet formula';
+                // The ticket's stored Agency Code IS this code now -- keep the
+                // local copies (and the fast-save diff base) honest.
+                if (ltActiveTicket && ltActiveTicket.fields) ltActiveTicket.fields['Agency Code'] = code;
+                if (twOrigFields) twOrigFields['Agency Code'] = code;
+                return;
+            }
+            if (data.success && data.stale) {
+                if (data.formula) {
+                    const old = grp.querySelector('.twcf-chips, .twcf-text');
+                    if (old) old.outerHTML = twComputedFieldHtml('Formula', data.formula);
+                    grp.dataset.lastFormulaStr = data.formula;
+                }
+                if (badge) badge.textContent = '⚠️ sheet formula not updated yet · tap to retry';
+                return;
+            }
+            if (badge) badge.textContent = '⚠️ sync failed · tap to retry';
+        } catch (e) {
+            if (seq === twFormulaLiveSeq && badge) badge.textContent = '⚠️ sync failed · tap to retry';
+        }
+        return;
+    }
+    // ── New-Ticket DRAFT (no record => no sheet formula): the 10.30
+    // two-stage live compute stays -- Ahmed: "same thing with the new
+    // request ... it not maded yet so it not has formula field to be get".
     if (badge) badge.textContent = '⏳ updating…';
     // Phase 10.30 (Ahmed): TWO-STAGE paint. Stage 1 is the instant snapshot
     // (zero Feishu calls, can be up to 3 min stale). Stage 2 is a TARGETED
@@ -10766,24 +10881,27 @@ async function twRefreshFormulaLive() {
         if (seq === twFormulaLiveSeq && badge) badge.textContent = '⚡ snapshot · tap to retry';
     }
 }
-// Phase 10.30: the badge is also Ahmed's "search button" -- tapping it forces
-// a fresh live re-check of the agency on screen.
+// Phase 10.30 + 10.31 + 10.32: the badge is Ahmed's "search button" --
+// tapping it FORCES a fresh live sync of the agency on screen (skips the
+// sheet-formula fast path), exactly his "after edit need to refresh so we
+// click the button".
 document.addEventListener('click', (e) => {
     const b = e.target && e.target.closest ? e.target.closest('.twcf-live-badge') : null;
-    if (b) twRefreshFormulaLive();
+    if (b) twRefreshFormulaLive(true, 'badge');
 });
-// Keystroke / pick hooks: any Agency Code or Privilege edit inside the
-// workspace re-runs the live formula (debounced). Document-level, so it works
-// on every keep-alive workspace instance with no per-clone wiring.
+// Keystroke / pick hooks. Phase 10.32: 'input' (mid-typing) only re-checks
+// the ZERO-REQUEST fast path -- requests fire on 'change' (the edit is
+// committed) or on badge tap, never per keystroke. Document-level, so it
+// works on every keep-alive workspace instance with no per-clone wiring.
 document.addEventListener('input', (e) => {
     const t = e.target;
     if (!t || !t.closest || !t.closest('#tw-form')) return;
-    if (t.name === 'Agency Code' || t.name === 'Privilege') twScheduleFormulaLive();
+    if (t.name === 'Agency Code' || t.name === 'Privilege') twScheduleFormulaLive('input');
 });
 document.addEventListener('change', (e) => {
     const t = e.target;
     if (!t || !t.closest || !t.closest('#tw-form')) return;
-    if (t.name === 'Agency Code' || t.name === 'Privilege' || t.name === 'Request Type') twScheduleFormulaLive();
+    if (t.name === 'Agency Code' || t.name === 'Privilege' || t.name === 'Request Type') twScheduleFormulaLive('commit');
 });
 
 // Phase 10.4/10.5: Agency-Creation-only extras. Parenet sub agency slides in
@@ -11448,6 +11566,21 @@ function twNoteMakeDraggable(pop) {
     pop.dataset.dragHooked = '1';
     const head = pop.querySelector('.twn-head');
     if (!head) return;
+    // Phase 10.32 (Ahmed): the note REMEMBERS where it was dropped (per
+    // session) -- every workspace instance restores the saved position, so
+    // reopening a ticket doesn't send it back to top-center.
+    try {
+        const saved = JSON.parse(sessionStorage.getItem('twNotePos') || 'null');
+        if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+            const w = pop.offsetWidth || 330, h = pop.offsetHeight || 220;
+            const x = Math.min(Math.max(saved.x, 4), Math.max(4, window.innerWidth - w - 4));
+            const y = Math.min(Math.max(saved.y, 4), Math.max(4, window.innerHeight - h - 4));
+            pop.style.left = x + 'px';
+            pop.style.top = y + 'px';
+            pop.style.right = 'auto';
+            pop.style.bottom = 'auto';
+        }
+    } catch (e) { /* private mode / quota -- position just resets, harmless */ }
     head.addEventListener('pointerdown', (e) => {
         if (e.target.closest('.twn-close')) return; // let ✕ click through
         e.preventDefault();
@@ -11460,7 +11593,11 @@ function twNoteMakeDraggable(pop) {
         pop.style.top = rect.top + 'px';
         pop.style.right = 'auto';
         pop.style.bottom = 'auto';
-        head.setPointerCapture(e.pointerId);
+        // Phase 10.32: window-level drag listeners -- setPointerCapture proved
+        // unreliable inside the full app (moves stopped reaching the head in
+        // some contexts), so the move/up handlers live on window for the
+        // duration of the drag; capture is kept only as a best-effort extra.
+        try { head.setPointerCapture(e.pointerId); } catch (err) { /* best-effort */ }
         const onMove = (ev) => {
             const w = pop.offsetWidth, h = pop.offsetHeight;
             const x = Math.min(Math.max(ev.clientX - offX, 4), window.innerWidth - w - 4);
@@ -11469,13 +11606,20 @@ function twNoteMakeDraggable(pop) {
             pop.style.top = y + 'px';
         };
         const onUp = () => {
-            head.removeEventListener('pointermove', onMove);
-            head.removeEventListener('pointerup', onUp);
-            head.removeEventListener('pointercancel', onUp);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+            // Phase 10.32: persist the dropped position for the session.
+            try {
+                sessionStorage.setItem('twNotePos', JSON.stringify({
+                    x: parseInt(pop.style.left, 10) || 0,
+                    y: parseInt(pop.style.top, 10) || 0
+                }));
+            } catch (e) { /* best-effort only */ }
         };
-        head.addEventListener('pointermove', onMove);
-        head.addEventListener('pointerup', onUp);
-        head.addEventListener('pointercancel', onUp);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
     });
 }
 twNoteMakeDraggable(document.getElementById('twNotePop'));
@@ -11529,32 +11673,50 @@ let twOpenSeq = 0;
 // blocked in that window so an empty form can never be written to the sheet.
 let twWorkspaceLoading = false;
 
-// ─── Phase 10.27 (Ahmed): EVERY ticket gets its OWN keep-alive tab ───
-// "why when open new request it show that 2 tab opening the new request and
-// live ?? ... when open pending requests workspace or workspace of tkt from
-// query it open in the live tab ??? what if the agent was having request live
-// and was need to check related somthing in the pending request or query ...
-// his live tkt workspace will close ... solve this with most creative way
-// without destroy the work."
-// Root causes: (1) the tab bar hard-coded the Live Queue tab as active for
-// ANY workspace, (2) one shared workspace DOM was reused per open, so ticket
-// B wiped ticket A's half-filled form. Now every opened ticket owns a
-// 'ws:<recordId>' tab whose WHOLE workspace DOM is detached (never rebuilt)
-// when another tab takes over -- every input value, picked file, scroll
-// position and listener survives -- and switching back is a reattach with
-// zero refetch. New instances clone a pristine template captured before the
-// first open; the few addEventListener wirings re-attach per instance (the
-// note drag here, the sec1/sec2 delegated hooks via their dataset guards).
-let twWsTabs = {};        // key -> { key, recordId, title, node, createMode, returnTo, ltActiveTicket, twOrigFields, twManualReqType }
+// ─── Phase 10.33 (Ahmed): ONE keep-alive workspace PER MODULE, NO tabs ───
+// "return it as it was ... no new tab ... my idea was that make the workspace
+// logic for every type of them -- for the live query it has its own
+// workspace, for the under investigated has its own workspace that open in
+// same tab of under investigated, not on the tab of the live."
+// So 10.27's per-ticket 'ws:<recordId>' tabs are GONE (no new tab per
+// ticket, ever). Instead each MODULE page (live queue, under-investigation,
+// query results, ...) owns ONE keep-alive workspace instance keyed
+// 'mod:<pageId>', and the New-Ticket draft owns 'create'. Opening a ticket
+// mounts that module's instance -- the WHOLE workspace DOM is detached and
+// reattached, never rebuilt, so listeners survive. Opening a DIFFERENT
+// ticket from the same module reuses the same node and the classic
+// instant-shell + fill overwrites every value (exactly the pre-10.27
+// render). Re-clicking the SAME ticket remounts instantly -- every input,
+// picked file and scroll position exactly as left, zero requests -- unless a
+// fresh pull-seed is waiting, which wins so re-pull always shows LIVE data
+// (the Phase 10.23 contract). The origin module's tab stays highlighted
+// while its workspace is open (renderTabs), so an under-investigation ticket
+// opens "in the tab of under investigated", never under Live Queue.
+let twWsTabs = {};        // key ('mod:<pageId>' | 'create') -> { key, recordId, node, createMode, returnTo, ltActiveTicket, twOrigFields, twManualReqType }
 let twWsActiveKey = null; // the instance currently mounted inside #pg-ticket-workspace
 let twWsTemplate = null;  // pristine #twWsInstance clone, captured before the first open
-
-function twWsKeyFor(recordId) { return 'r_' + recordId; }
 
 function twWsCaptureTemplate() {
     if (twWsTemplate) return;
     const inst = document.getElementById('twWsInstance');
-    if (inst) twWsTemplate = inst.cloneNode(true);
+    if (inst) {
+        twWsTemplate = inst.cloneNode(true);
+        // Phase 10.32 (BUG B): the as-shipped instance must LEAVE the DOM once
+        // cloned -- it used to stay put, so every open stacked a second
+        // #twWsInstance under it and document.getElementById (first-in-DOM)
+        // kept hitting the hidden original: fills landed on the wrong
+        // instance, the note drag was bound to a node nobody sees, and the
+        // formula fast path read an empty dataset.sheetFormula.
+        inst.parentNode.removeChild(inst);
+    }
+}
+
+// Phase 10.32: belt-and-braces -- after any mount there must be EXACTLY ONE
+// #twWsInstance in the DOM (the one just mounted).
+function twWsDedupeDom(keepNode) {
+    document.querySelectorAll('#twWsInstance').forEach(el => {
+        if (el !== keepNode && el.parentNode) el.parentNode.removeChild(el);
+    });
 }
 
 function twWsStashCurrent() {
@@ -11568,7 +11730,12 @@ function twWsStashCurrent() {
         rec.twOrigFields = twOrigFields;
         rec.twManualReqType = twManualReqType;
         rec.createMode = twCreateMode;
-        rec.returnTo = twReturnTo;
+        // Phase 10.33: rec.returnTo is NOT refreshed here. It belongs to the
+        // stashed instance's own origin (set at twWsNewInstance creation and
+        // stamped at fill); the CURRENT twReturnTo already belongs to the
+        // NEXT open, and copying it corrupted cross-module stashes (a Live
+        // ticket stashed while opening a Pending ticket came back thinking
+        // its origin tab was Pending).
         const titleEl = inst.querySelector('#tw-title');
         if (titleEl && titleEl.textContent) rec.title = titleEl.textContent;
         inst.parentNode.removeChild(inst); // DETACHED, not destroyed
@@ -11581,6 +11748,7 @@ function twWsMount(key) {
     if (!rec || !rec.node) return;
     twWsStashCurrent();
     document.getElementById('pg-ticket-workspace').appendChild(rec.node);
+    twWsDedupeDom(rec.node);
     twWsActiveKey = key;
     ltActiveTicket = rec.ltActiveTicket;
     twOrigFields = rec.twOrigFields || {};
@@ -11600,42 +11768,59 @@ function twWsNewInstance(key, recordId) {
     // bits (note drag). sec1/sec2 delegated hooks re-attach themselves on the
     // instance's first render (their dataset guards are unset on the clone).
     const pop = node.querySelector('#twNotePop');
-    if (pop) twNoteMakeDraggable(pop);
+    // Phase 10.32: cloneNode(true) copies the dataset but NOT the listeners,
+    // so the template pop still carries the load-time dragHooked='1' flag and
+    // would silently skip wiring -- clear it so every instance re-hooks.
+    // (NOTE the key: dataset.dragHooked -> data-drag-hooked; a wrong-cased
+    // key here deletes nothing and the drag silently dies on every clone.)
+    if (pop) { delete pop.dataset.dragHooked; twNoteMakeDraggable(pop); }
     document.getElementById('pg-ticket-workspace').appendChild(node);
+    twWsDedupeDom(node);
     twWsActiveKey = key;
+    // recordId starts null for module instances and is stamped only AFTER a
+    // successful fill (twOpenWorkspace) -- a failed open must never poison
+    // the same-ticket instant-remount fast path.
     twWsTabs[key] = { key, recordId: recordId || null,
-        title: recordId ? `⏳ #${String(recordId).slice(-6)}` : '🆕 New Ticket',
-        node, createMode: !recordId, returnTo: twReturnTo,
+        node, createMode: key === 'create', returnTo: twReturnTo,
         ltActiveTicket: null, twOrigFields: {}, twManualReqType: null };
 }
 
-function twWsCloseTab(key) {
-    const rec = twWsTabs[key];
-    if (!rec) return;
-    // Closing the MOUNTED ticket runs the full close flow (chrome reset +
-    // return-to-origin); closing a background one just disposes its tab and
-    // detached instance -- every other ticket keeps its work untouched.
-    if (twWsActiveKey === key) { twCloseWorkspace(); return; }
-    openTabs = openTabs.filter(t => t !== 'ws:' + key);
-    delete twWsTabs[key];
-    renderTabs();
-}
-
 async function twOpenWorkspace(recordId) {
-    // Phase 10.27: already open in its own tab? Just switch to it -- no
-    // refetch, no rebuild, the agent's work-in-progress is exactly as left.
-    const wsKey = twWsKeyFor(recordId);
-    if (twWsTabs[wsKey]) { openInTab('ws:' + wsKey); return; }
-    const seq = ++twOpenSeq;
     const t0 = twPerfNow();
     let tShell = t0, tRec = t0, perfSource = 'cold-fetch';
     // Phase 10.14: remember WHERE the workspace was opened from, BEFORE any
     // await runs (activeTabId is still the origin page until openInTab below).
     // twCloseWorkspace returns here instead of always landing on Live Queue.
-    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace' && !String(activeTabId).startsWith('ws:')) ? activeTabId : 'live-tickets';
-    // Phase 10.27: mount a FRESH workspace instance for this ticket -- the
-    // classic instant-shell + fill below renders into it exactly as before.
-    twWsNewInstance(wsKey, recordId);
+    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'live-tickets';
+    // Phase 10.33 (Ahmed's idea): ONE keep-alive workspace PER MODULE, no
+    // tabs. The module key is simply the page the ticket was opened from.
+    const wsKey = 'mod:' + twReturnTo;
+    const existing = twWsTabs[wsKey];
+    if (existing && existing.node && existing.recordId === recordId && !twPrefetchCache.has(recordId)) {
+        // SAME ticket re-clicked in its own module and nothing fresher was
+        // pulled: instant remount -- every input, picked file and scroll
+        // position exactly as left, ZERO requests. (A fresh pull-seed or
+        // prefetch entry falls through to the fill below instead, so a
+        // re-pull always shows LIVE data -- the Phase 10.23 contract.)
+        if (twWsActiveKey !== wsKey) twWsMount(wsKey);
+        openInTab('ticket-workspace');
+        return;
+    }
+    if (existing && existing.node) {
+        // A DIFFERENT ticket in the same module: reuse the module's kept-alive
+        // instance (every listener intact); the instant-shell + fill below
+        // overwrites all values -- the exact pre-10.27 render, in-place.
+        if (twWsActiveKey !== wsKey) twWsMount(wsKey);
+    } else {
+        twWsNewInstance(wsKey, null);
+    }
+    // Phase 10.32 (BUG A): capture the open-sequence AFTER any instance
+    // swap. twWsNewInstance/twWsMount -> twWsStashCurrent bumps twOpenSeq (to
+    // kill fills aimed at the PREVIOUS instance); capturing seq BEFORE the
+    // swap meant the stash's bump instantly invalidated OUR seq, so the
+    // post-fetch fill below aborted on EVERY open while another workspace
+    // was mounted -- the eternal empty shell ("live doesn't even loaded").
+    const seq = ++twOpenSeq;
 
     // ── Phase 10.21 (speed): INSTANT SHELL ──
     // The workspace frame renders IMMEDIATELY -- same controls, empty values,
@@ -11674,7 +11859,7 @@ async function twOpenWorkspace(recordId) {
     twSyncBackButton();
     twResetNote(true);
     twToggleTopbar(false);
-    openInTab('ws:' + wsKey);
+    openInTab('ticket-workspace'); // Phase 10.33: no per-ticket tab -- the origin module's tab stays highlighted
     tShell = twPerfNow();
 
     // ── record fetch: consume the prefetch if one exists, else fetch live ──
@@ -11814,9 +11999,11 @@ async function twOpenWorkspace(recordId) {
             dupCheck.setAttribute('style', ltDupClass(ticket.fields['Duplicated Check']||''));
         }
 
-        // Phase 10.27: the ticket's own tab takes its real title once filled.
-        if (twWsTabs[wsKey]) twWsTabs[wsKey].title = document.getElementById('tw-title').textContent;
-        openInTab('ws:' + wsKey);
+        // Phase 10.33: the module's workspace now officially holds THIS
+        // ticket. Stamped only AFTER a successful fill so a failed open can
+        // never poison the same-ticket instant-remount fast path.
+        if (twWsTabs[wsKey]) { twWsTabs[wsKey].recordId = recordId; twWsTabs[wsKey].returnTo = twReturnTo; }
+        openInTab('ticket-workspace');
         // Phase 10.13.2: stretch every auto textarea to fit the content just
         // loaded into it (static notes + any field createTwControl rendered).
         requestAnimationFrame(() => twAutoGrowAll(document.getElementById('pg-ticket-workspace') || document));
@@ -11866,16 +12053,22 @@ async function twOpenWorkspace(recordId) {
 // and 🚀 Submit Request files through /api/requests/submit exactly like the
 // New Request form does.
 function twOpenCreateWorkspace() {
-    // Phase 10.27: one draft, one tab -- clicking "New Ticket" again just
-    // switches back to the existing draft, every field exactly as left.
-    if (twWsTabs['create']) { openInTab('ws:create'); return; }
+    // Phase 10.33: one draft, kept alive -- clicking "New Ticket" again
+    // remounts the same instance, every field exactly as left (no tab per
+    // draft beyond the single '🆕 New Ticket' one renderTabs shows).
+    if (twWsTabs['create'] && twWsTabs['create'].node) {
+        if (twWsActiveKey !== 'create') twWsMount('create');
+        openInTab('ticket-workspace');
+        return;
+    }
     // Phase 10.21: opening the draft aborts any real-ticket open still in
     // flight (its post-fetch fill would otherwise land on top of the draft).
     twOpenSeq++;
     twWorkspaceLoading = false;
     twCreateMode = true;
-    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace' && !String(activeTabId).startsWith('ws:')) ? activeTabId : 'welcome';
-    // Phase 10.27: the draft gets its own fresh workspace instance + tab.
+    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'welcome';
+    // Phase 10.33: the draft gets its own fresh workspace instance (key
+    // 'create'); renderTabs shows the single '🆕 New Ticket' tab for it.
     twWsNewInstance('create', null);
     twSyncBackButton(); // Phase 10.14: Back button names the origin page
     ltActiveTicket = { record_id: null, fields: {} }; // synthetic blank ticket -- twSelectRequestType/twRenderSection2 read from it
@@ -11933,7 +12126,7 @@ function twOpenCreateWorkspace() {
         mgSelCreate.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
     }
 
-    openInTab('ws:create');
+    openInTab('ticket-workspace');
     twToggleTopbar(false);
     twApplyCreateModeChrome();
 }
@@ -12035,20 +12228,25 @@ function twExitCreateMode(recordId) {
         <span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Mode</span>Filed from the New Ticket draft</span>
         <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Sheet</span>Record created — charges and saves land on it now</span>
     `;
-    // Phase 10.27: the draft's tab becomes the brand-new ticket's own tab
-    // (re-key 'ws:create' -> 'ws:r_<recordId>') instead of folding away.
+    // Phase 10.33: the filed draft becomes the ORIGIN MODULE's kept-alive
+    // workspace (re-key 'create' -> 'mod:<origin>') holding the brand-new
+    // record. The '🆕 New Ticket' tab folds away (twCreateMode just flipped
+    // off) and the origin module's tab stays highlighted instead.
     if (recordId && twWsTabs['create']) {
         const rec = twWsTabs['create'];
         delete twWsTabs['create'];
-        const newKey = twWsKeyFor(recordId);
+        const newKey = 'mod:' + (rec.returnTo && rec.returnTo !== 'welcome' ? rec.returnTo : 'live-tickets');
+        if (twWsActiveKey !== newKey && twWsTabs[newKey]) {
+            // The module already had a kept-alive instance (an older ticket)
+            // -- drop it; the freshly filed ticket IS this module's
+            // workspace now. Its node is detached, so GC takes it.
+            delete twWsTabs[newKey];
+        }
         rec.key = newKey;
         rec.recordId = recordId;
         rec.createMode = false;
-        rec.title = `🎫 #${String(recordId).slice(-6)}`;
         twWsTabs[newKey] = rec;
         if (twWsActiveKey === 'create') twWsActiveKey = newKey;
-        openTabs = openTabs.map(tb => tb === 'ws:create' ? 'ws:' + newKey : tb);
-        if (activeTabId === 'ws:create') activeTabId = 'ws:' + newKey;
     }
     if (typeof renderTabs === 'function') renderTabs();
 }
@@ -13062,14 +13260,21 @@ function createTwControl(key, value) {
     }
     if (key === 'Formula') {
         wrap.style.gridColumn = '1 / -1';
-        // Phase 10.27 (Ahmed): the sheet's stored Formula text is only as fresh
-        // as its last save -- fix a wrong Agency Code and the stale numbers
-        // just sit there ("i edit but it still show the wrong code and didn't
-        // update the FORMULA"), and a New-Ticket draft has no record at all.
-        // This control now recomputes LIVE (twRefreshFormulaLive) off the
-        // Check-Agency-Target ledger on every Agency Code / Privilege edit.
+        // Phase 10.27 (Ahmed): fixing a wrong Agency Code must refresh the
+        // numbers for the NEW code, and a New-Ticket draft has no record at
+        // all -- this control recomputes LIVE (twRefreshFormulaLive) off the
+        // Check-Agency-Target ledger whenever the Agency Code on screen
+        // diverges from the stored formula.
+        // Phase 10.31 (Ahmed): "now i made this field to this purpose to read
+        // how left right now always live". Verified: the sheet Formula
+        // self-aggregates via [Grand Table].FILTER(...) over the agency's
+        // sibling tickets, so FEISHU recalcs it live the moment any sibling
+        // flips Status -- while it matches the Agency Code on screen, the
+        // card trusts it and spends ZERO requests. Keep the stored string
+        // here so twRefreshFormulaLive can compare against it.
         wrap.dataset.formulaLive = '1';
-        wrap.innerHTML = label + `<span class="twcf-live-badge" title="Recomputed from the Check Agency Target ledger — always matches the Agency Code on screen. Tap to force a fresh live re-check.">⚡ live</span>` + twComputedFieldHtml(key, valStr);
+        wrap.dataset.sheetFormula = valStr;
+        wrap.innerHTML = label + `<span class="twcf-live-badge" title="Live from the sheet formula (Feishu recalculates it as sibling tickets change). Tap to force a fresh live re-check from the tables — needed after editing the Agency Code.">⚡ live</span>` + twComputedFieldHtml(key, valStr);
         return wrap;
     }
 
@@ -13133,19 +13338,13 @@ function twCloseWorkspace() {
     twRadarSetMsg('', false);
     // Phase 10.13.1: return to where the workspace was opened FROM (a
     // tickets_new-only agent must not land on the Live Queue he can't see).
-    const back = (typeof twReturnTo !== 'undefined' && twReturnTo && !String(twReturnTo).startsWith('ws:')) ? twReturnTo : 'live-tickets';
-    // Phase 10.27: closing = closing THIS ticket's own tab and disposing its
-    // keep-alive instance. Every other open ticket keeps its tab and its
-    // untouched work; the agent lands back on the page he came from.
-    const wsKey = twWsActiveKey;
-    if (wsKey && twWsTabs[wsKey]) {
-        const inst = document.getElementById('twWsInstance');
-        if (inst && twWsTabs[wsKey].node === inst) inst.parentNode.removeChild(inst);
-        delete twWsTabs[wsKey];
-        twWsActiveKey = null;
-        openTabs = openTabs.filter(t => t !== 'ws:' + wsKey);
-    }
-    openTabs = openTabs.filter(t => t !== 'ticket-workspace'); // legacy guard
+    const back = (typeof twReturnTo !== 'undefined' && twReturnTo) ? twReturnTo : 'live-tickets';
+    // Phase 10.33: closing STASHES the module's keep-alive instance
+    // (detached, never destroyed) -- re-clicking the same ticket remounts it
+    // instantly with the work exactly as left; opening a different ticket in
+    // that module reuses the node and overwrites it. No tab to close.
+    twWsStashCurrent();
+    openTabs = openTabs.filter(t => t !== 'ticket-workspace');
     activeTabId = openTabs.includes(back) ? back : (openTabs[openTabs.length - 1] || 'welcome');
     setActiveTab(activeTabId);
 }
