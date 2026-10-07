@@ -6462,6 +6462,109 @@ def agency_target_formula_live():
     return jsonify({"success": True, "found": True, "live": True, **_with_selected(row),
                     "generated_at": cairo_now().isoformat()})
 
+@app.route('/api/agency-target/formula/sync', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def agency_target_formula_sync():
+    """Phase 10.32 (Ahmed, verbatim): "in the case the agency code changed
+    need to go to update the tkt and wait the formula field updated and then
+    return and show the data this when the tkt is already exist".
+
+    For an EXISTING ticket whose Agency Code was edited on screen: write the
+    new code to the ticket (PUT), then poll the record until Feishu's own
+    sheet "Formula" field (live-recalculated) reports the new code, and hand
+    that formula string back. Zero requests happen unless the code actually
+    changed or the agent taps the badge -- the fast path on ticket open still
+    trusts the formula that arrived with the ticket.
+    """
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not perms.get("modules"):
+        return jsonify({"error": "Access denied"}), 403
+
+    record_id = sanitize_text(body.get('record_id', '')).strip()
+    code = sanitize_text(body.get('code', '')).strip()
+    if not record_id or not code:
+        return jsonify({"success": False, "error": "Missing record_id or code"}), 400
+
+    code_re = re.compile(r'(?:Agency Code|Code):\s*([^|]+)')
+
+    def _formula_code(formula_str):
+        m = code_re.search(formula_str or '')
+        return m.group(1).strip() if m else ''
+
+    if MOCK_MODE:
+        return jsonify({"success": True, "formula":
+                        (f"Agency Code: {code} | Privilege: Dynamic Avatar | Total Earned: 1 | "
+                         f"Claimed: 0 | Remaining: 1 | Pending: 0 | Rejected: 0"),
+                        "updated": True, "stale": False, "waited_ms": 0})
+
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    rec_url = (f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}"
+               f"/tables/{REQUESTS_TABLE_ID}/records/{record_id}")
+
+    def _get_fields():
+        resp = feishu_session.get(rec_url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(data.get("msg") or "record fetch failed")
+        return (data.get("data", {}).get("record", {}) or {}).get("fields", {}) or {}
+
+    started = time.time()
+    try:
+        fields = _get_fields()
+    except Exception as e:
+        logger.error("formula_sync_fetch_failed", record_id=record_id, error=str(e))
+        return jsonify({"success": False, "error": str(e)}), 502
+
+    baseline_formula = extract_field_text(get_field_local(fields, "Formula")).strip()
+    stored_code = extract_field_text(get_field_local(fields, "Agency Code")).strip()
+
+    updated = False
+    if stored_code != code:
+        try:
+            tw = feishu_session.put(rec_url, headers=headers,
+                                    json={"fields": {"Agency Code": code}},
+                                    timeout=15).json()
+            if tw.get("code") != 0:
+                logger.error("formula_sync_put_failed", record_id=record_id, response=tw)
+                return jsonify({"success": False,
+                                "error": tw.get("msg") or "ticket code update failed"}), 502
+            updated = True
+        except Exception as e:
+            logger.error("formula_sync_put_error", record_id=record_id, error=str(e))
+            return jsonify({"success": False, "error": str(e)}), 502
+
+    # Poll until the sheet's own Formula field catches up with the code we
+    # wrote (or confirms the already-stored code). ~14s ceiling, 1.2s cadence.
+    deadline = started + 14.0
+    formula = baseline_formula
+    stale = True
+    while True:
+        if _formula_code(formula) == code and (not updated or formula != baseline_formula):
+            stale = False
+            break
+        if time.time() >= deadline:
+            break
+        time.sleep(1.2)
+        try:
+            fields = _get_fields()
+            formula = extract_field_text(get_field_local(fields, "Formula")).strip()
+        except Exception as e:
+            logger.error("formula_sync_poll_failed", record_id=record_id, error=str(e))
+            break
+
+    waited_ms = int((time.time() - started) * 1000)
+    if stale:
+        # Sheet formula still shows the old/blank code after the wait -- hand
+        # back what we have and let the frontend offer a tap-to-retry.
+        return jsonify({"success": True, "formula": formula, "updated": updated,
+                        "stale": True, "waited_ms": waited_ms})
+    return jsonify({"success": True, "formula": formula, "updated": updated,
+                    "stale": False, "waited_ms": waited_ms})
+
 @app.route('/api/agency-target-table', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_target_table():
