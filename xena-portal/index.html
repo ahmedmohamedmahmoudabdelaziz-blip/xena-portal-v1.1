@@ -221,6 +221,34 @@
         .pv-mod-chip{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.22);color:var(--accent-cyan);border-radius:999px;padding:2px 9px;font-size:.68rem;font-weight:600;}
         .pv-mod-none{background:rgba(255,255,255,.04);border-color:var(--border);color:var(--text-muted);}
         #pvList .pv-view-btn{flex:0 0 auto;width:auto;padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:700;}
+        /* ─── Phase 10.27: agent presence pills (online / idle / offline) ─── */
+        .agent-presence{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:700;letter-spacing:.02em;width:fit-content;}
+        .agent-presence i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 auto;}
+        .agent-presence .pres-ago{font-weight:500;opacity:.78;margin-left:2px;}
+        .agent-presence.pres-on{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:#4ade80;}
+        .agent-presence.pres-on i{background:#22c55e;box-shadow:0 0 6px #22c55e;animation:presPulse 1.6s ease-in-out infinite;}
+        .agent-presence.pres-idle{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fbbf24;}
+        .agent-presence.pres-idle i{background:#f59e0b;}
+        .agent-presence.pres-off{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-muted);}
+        .agent-presence.pres-off i{background:#6b7280;}
+        @keyframes presPulse{0%,100%{opacity:1}50%{opacity:.35}}
+        /* ─── Phase 10.27: Preview Agent View -- elegant member cards, lazy search ─── */
+        #pvList{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px;}
+        .pv-card{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:10px;background:rgba(0,0,0,.18);border:1px solid var(--border);border-radius:14px;padding:14px;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;}
+        .pv-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--pv-accent,linear-gradient(90deg,#00d4ff,#7b61ff));opacity:.85;}
+        .pv-card:hover{transform:translateY(-2px);border-color:var(--border-hover);box-shadow:0 10px 26px rgba(0,0,0,.35);}
+        .pv-card-head{display:flex;align-items:center;gap:11px;min-width:0;}
+        .pv-avatar{flex:0 0 auto;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff;background:var(--pv-avatar-bg,linear-gradient(135deg,#00d4ff,#7b61ff));box-shadow:0 4px 12px rgba(0,0,0,.35);text-transform:uppercase;}
+        .pv-name{font-weight:700;font-size:.9rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .pv-email{font-size:.72rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .pv-mods{display:flex;flex-wrap:wrap;gap:5px;min-height:20px;}
+        .pv-card .pv-view-btn{align-self:stretch;width:100%;padding:8px 0;border-radius:10px;font-size:.82rem;font-weight:700;}
+        .pv-idle{grid-column:1/-1;padding:34px 20px;text-align:center;color:var(--text-muted);}
+        .pv-idle .pv-idle-icon{font-size:1.9rem;margin-bottom:8px;}
+        .pv-idle p{margin:4px 0;font-size:.85rem;}
+        .pv-idle .pv-idle-sub{font-size:.72rem;opacity:.75;}
+        /* Phase 10.27: live-formula badge on the workspace Formula card */
+        .twcf-live-badge{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font-size:.62rem;font-weight:700;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent-cyan);vertical-align:middle;cursor:pointer;}
         #pvBanner{position:fixed;top:0;left:0;right:0;z-index:10050;display:none;align-items:center;justify-content:center;gap:16px;padding:9px 16px;background:linear-gradient(90deg,rgba(185,103,255,.22),rgba(0,212,255,.22));backdrop-filter:blur(12px);border-bottom:1px solid rgba(185,103,255,.45);box-shadow:0 6px 20px rgba(0,0,0,.35);}
         .pv-banner-text{font-size:.85rem;font-weight:600;color:var(--text);}
         .pv-banner-text b{color:var(--accent-purple);}
@@ -333,7 +361,6 @@
         .aws-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
         .aws-fields { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-bottom: 0; }
         .aws-fields-1col { grid-template-columns: 1fr; }
-        .aws-bottom { flex-shrink: 0; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; box-shadow: var(--shadow); }
         .aws-radar { display: flex; align-items: center; gap: 14px; min-width: 0; }
         /* Radar pinned at the top of the middle panel (its own always-visible
            strip above the scrolling agency fields). */
@@ -593,20 +620,37 @@
            .ss-display, dropzones paint the .elegant-dropzone shell. */
         .ss-wrapper:has(> select.reqfld-autofilled) > .ss-display { border-color: var(--accent-green) !important; background: rgba(0,230,118,.06) !important; }
         .elegant-dropzone.reqfld-autofilled { border-color: var(--accent-green) !important; background: rgba(0,230,118,.05) !important; }
-        /* Reject Reason's own section, living in the bottom bar (the radar's
-           old spot) so the Decision panel fits whole with no scrolling. */
-        .aws-rr-section { min-width: 0; }
-        .aws-rr-head { font-size: .85rem; font-weight: 700; color: var(--accent-rose); margin-bottom: 6px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        /* Phase 10.28: Reject Reason's compact collapsed card, parked under
+           the Ticket Text in the left panel (Ahmed's pic 2). The bottom bar
+           is gone -- Submit closes the Decision panel, Clear All rides its
+           header -- so Agency Data / The Decision stretch full-height into
+           the freed space. */
+        .aws-rr-card { flex-shrink: 0; padding: 12px 18px 14px; border-top: 1px solid var(--border); background: rgba(255,77,109,.03); }
+        .aws-rr-head { font-size: .85rem; font-weight: 700; color: var(--accent-rose); margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .aws-rr-head .aws-rr-hint { font-size: .68rem; color: var(--text-muted); font-weight: 400; }
+        .aws-rr-box { border: 1px solid rgba(255,77,109,.35); border-radius: 12px; padding: 10px 12px; background: rgba(0,0,0,.12); }
+        .aws-rr-summary { font-size: .76rem; color: var(--text-muted); font-style: italic; margin-bottom: 8px; line-height: 1.55; word-break: break-word; }
+        .aws-rr-summary.has-sel { color: #ff9db4; font-style: normal; font-weight: 600; }
+        .aws-rr-toggle { background: rgba(255,77,109,.10); color: var(--accent-rose); border: 1px solid rgba(255,77,109,.35); border-radius: 8px; padding: 5px 12px; font-weight: 600; font-size: .75rem; cursor: pointer; transition: all .15s; font-family: inherit; }
+        .aws-rr-toggle:hover { background: rgba(255,77,109,.20); transform: translateY(-1px); }
         #auditFieldsReject > .control-group > label { display: none; }
-        .aws-rr-section .rr-picker { margin-top: 2px; }
-        .aws-rr-section .rr-filter { margin-bottom: 6px; padding: 5px 12px; }
-        .aws-rr-section .rr-cloud { max-height: 92px; overflow-y: auto; padding-right: 4px; }
+        .aws-rr-card .rr-picker { margin-top: 10px; }
+        .aws-rr-card .rr-filter { margin-bottom: 6px; padding: 5px 12px; }
+        .aws-rr-card .rr-cloud { max-height: 132px; overflow-y: auto; padding-right: 4px; }
+        /* The Decision panel's own Submit (its last element) + the header's
+           mini Clear All. */
+        .aws-right-foot { flex-shrink: 0; padding: 12px 18px; border-top: 1px solid var(--border); background: rgba(255,255,255,.015); }
+        .aws-right-foot .aws-submit { width: 100%; }
+        .aws-head-side { display: flex; align-items: center; gap: 10px; }
+        .aws-clear-mini { width: auto; padding: 4px 12px; font-size: .72rem; white-space: nowrap; }
         /* Mentioned Person roster chips sit between the label and the member
-           search box -- one tap picks a teammate, the box stays for anyone else. */
-        .audit-mention-row { margin: 2px 0 8px; }
-        .audit-mention-chip { font-size: .72rem; padding: 4px 10px; }
-        /* 🧹 Clear All -- quiet outline companion under the submit button. */
+           search box, filtered to the picked Region (Phase 10.28: IN shows
+           only the six IN ACMs, PK the twelve PK ones -- a clean 3-column
+           grid, no half-empty rows of the other region's names). */
+        .audit-mention-row { margin: 2px 0 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .audit-mention-chip { font-size: .72rem; padding: 5px 6px; min-width: 0; text-align: center; }
+        .audit-mention-hint { grid-column: 1 / -1; font-size: .72rem; color: var(--text-muted); font-style: italic; padding: 2px 0; }
+        /* 🧹 Clear All -- quiet outline companion (now in the Decision header). */
         .aws-clear-btn { width: 100%; padding: 7px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-weight: 600; font-size: .78rem; cursor: pointer; transition: all .18s; font-family: inherit; }
         .aws-clear-btn:hover { border-color: var(--accent-rose); color: var(--accent-rose); background: rgba(255,77,109,.07); }
         @media (max-width: 1280px) { .aws-grid { grid-template-columns: 290px 1fr 380px; } }
@@ -615,7 +659,6 @@
             .aws-grid { grid-template-columns: 1fr; overflow-y: auto; }
             .aws-panel { min-height: 280px; }
             .aws-left { min-height: 320px; }
-            .aws-bottom { grid-template-columns: 1fr; }
             .aws-reminders { border: none; padding: 4px 0; max-height: none; }
             .aws-submit { width: 100%; }
             .aws-dup-drawer { left: 24px; bottom: 24px; }
@@ -1458,6 +1501,15 @@
         /* ===== Phase 10.4: Dynamic-Request extras (Agency Creation only) ===== */
         #tw-sec-2 .twx-dup-reject-group{grid-column:1 / -1;}
         #tw-sec-2 #tw-reject-reason-wrap{border-color:var(--accent-rose);background:rgba(255,77,109,0.03);}
+        /* Phase 10.28: the follow-up 📋 Ticket Text paste card -- a cyan-rimmed
+           mini version of the Audit tab's left panel, full row of the Dynamic
+           Request Section, and never collected (no name attr on its box). */
+        #tw-sec-2 .tw-followup-paste{border:1px solid rgba(0,212,255,.35);border-radius:12px;padding:10px 12px;background:rgba(0,212,255,.04);}
+        #tw-sec-2 .tw-followup-paste > label{color:var(--accent-cyan);font-weight:700;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+        #tw-sec-2 .tw-followup-paste-hint{font-size:.68rem;color:var(--text-muted);font-weight:400;}
+        #tw-sec-2 .tw-followup-paste-box{width:100%;box-sizing:border-box;min-height:74px;max-height:180px;resize:vertical;margin-top:6px;border-radius:9px;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--text);padding:9px 12px;font-family:inherit;font-size:.82rem;line-height:1.6;outline:none;transition:border-color .15s;}
+        #tw-sec-2 .tw-followup-paste-box:focus{border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.10);}
+        #tw-sec-2 .tw-followup-paste-box::placeholder{color:var(--text-muted);opacity:.7;}
         /* Audition Action card: approval row + full-width helpers */
         #tw-sec-5-card .twx-approval-group{display:flex;align-items:center;}
         #tw-sec-5-card .twx-approval-label{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:1rem;margin:0;}
@@ -3410,6 +3462,10 @@
             
             <!-- Full Page Ticket Workspace -->
             <div id="pg-ticket-workspace" style="display:none;">
+            <!-- Phase 10.27: #twWsInstance wraps EVERYTHING workspace (dock, note,
+                 preview panel, form, radar drawer) so each open ticket's whole
+                 workspace can be detached/reattached as one keep-alive tab node. -->
+            <div id="twWsInstance">
                <!-- Floating DOCK (Phase 10.4): three chat-style floating circles
                     pinned top-CENTER of the content area -- [⚡ Topbar] left,
                     [📝 Note] middle, [📡 Duplicate Radar] right. z-index 10002
@@ -3652,6 +3708,7 @@
                    <div id="twRadarResults" class="qy-grid aws-dup-results" onscroll="awsDupUpdateMore('twDupDrawer')"></div>
                    <div class="aws-dup-more">▼ Scroll — more matches below</div>
                </div>
+            </div><!-- /#twWsInstance -->
             </div>
 
             <div id="pg-new-request" style="display:none">
@@ -3721,12 +3778,18 @@
                     <h3 style="margin-bottom:6px">👁 Preview Agent View</h3>
                     <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:0">Choose a member to see the portal exactly as they see it — their modules, their pages. Preview is <b>view-only</b>: no saving, submitting or charging while it is active.</p>
                 </div>
-                <div class="card" style="max-width:900px;margin:0 auto">
+                <div class="card" style="max-width:1080px;margin:0 auto">
                     <div class="control-group" style="margin-bottom:14px">
                         <label>Find a member</label>
-                        <input type="text" id="pvFilter" class="form-highlight-input" placeholder="Type a name or email…" oninput="pvRenderList()">
+                        <input type="text" id="pvFilter" class="form-highlight-input" placeholder="🔍 Type a name or email — members load when you search" oninput="pvRenderList()">
                     </div>
-                    <div id="pvList"></div>
+                    <div id="pvList">
+                        <div class="pv-idle">
+                            <div class="pv-idle-icon">👁️</div>
+                            <p>Type above to find a member.</p>
+                            <p class="pv-idle-sub">The member list loads on your first search — opening this page costs zero requests.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3748,10 +3811,13 @@
                         </div>
                     </div>
                 </div>
-                <!-- Audit Workstation: one screen, three panels + bottom bar.
-                     Left = the raw ticket text (stays visible while you work),
-                     middle = the agency data, right = the decision,
-                     bottom = reject reasons + Submit. -->
+                <!-- Audit Workstation: one screen, three full-height panels.
+                     Left = the raw ticket text (stays visible while you work)
+                     with the compact Reject Reason card parked under it,
+                     middle = the agency data, right = the decision (Clear All
+                     rides its header, Submit closes it at the bottom).
+                     Phase 10.28: the old bottom bar is gone, so Agency Data
+                     and The Decision stretch into the freed space. -->
                 <form id="auditRequestForm" class="aws" onsubmit="submitAuditForm(event)">
                     <div class="aws-grid">
                         <section class="aws-panel aws-left">
@@ -3761,6 +3827,19 @@
                             </div>
                             <textarea id="audRawText" class="aws-rawtext" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)"></textarea>
                             <div class="aws-left-foot">Auto-parses the moment you paste · the ticket stays in view while you work</div>
+                            <!-- Phase 10.28 (Ahmed, pic 2): Reject Reason leaves the
+                                 bottom bar for this compact collapsed card under the
+                                 Ticket Text -- one summary line + a "Show all" toggle;
+                                 the full picker unfolds only when asked (and opens by
+                                 itself when the decision flips to Rejected). -->
+                            <div class="aws-rr-card" id="awsRrCard">
+                                <div class="aws-rr-head">🚫 Reject Reason <span class="aws-rr-hint">only for a Rejected decision</span></div>
+                                <div class="aws-rr-box">
+                                    <div class="aws-rr-summary" id="awsRrSummary">No reason selected yet — click "Show all" to pick.</div>
+                                    <button type="button" class="aws-rr-toggle" id="awsRrToggle" onclick="awsRrTogglePicker()">⊞ Show all reasons</button>
+                                    <div id="auditFieldsReject" class="control-grid aws-fields aws-fields-1col" style="display:none"></div>
+                                </div>
+                            </div>
                         </section>
 
                         <section class="aws-panel aws-mid">
@@ -3779,10 +3858,27 @@
                         <section class="aws-panel aws-right">
                             <div class="aws-panel-head">
                                 <span class="aws-panel-title"><span class="audit-card-dot" id="auditDotAction"></span> 🎯 The Decision</span>
-                                <span style="font-size:.72rem;color:var(--text-muted)">one tap per field</span>
+                                <span class="aws-head-side">
+                                    <span style="font-size:.72rem;color:var(--text-muted)">one tap per field</span>
+                                    <!-- Phase 10.28 (Ahmed, pic 1): Clear All moved up
+                                         from the retired bottom bar into this header. -->
+                                    <button type="button" class="aws-clear-btn aws-clear-mini" id="btnAuditClear" onclick="auditClearWorkstation()" title="Wipe every field, the pasted text and the radar">🧹 Clear All</button>
+                                </span>
                             </div>
                             <div class="aws-scroll">
                                 <div id="auditFieldsAction" class="control-grid aws-fields aws-fields-1col"><!-- built by renderAuditFields() --></div>
+                            </div>
+                            <!-- Phase 10.28 (Ahmed): Submit closes The Decision panel
+                                 at its very end -- the last thing the agent sees in
+                                 the exact panel they just finished deciding in. -->
+                            <div class="aws-right-foot">
+                                <button type="submit" class="btn btn-primary aws-submit" id="btnSubmitAudit">
+                                    <span style="display:flex;align-items:center;gap:8px;justify-content:center">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                        Secure Submit to Feishu
+                                    </span>
+                                    <span class="aws-submit-hint">Ctrl / Shift + Enter · clears for the next ticket</span>
+                                </button>
                             </div>
                         </section>
                     </div>
@@ -3794,26 +3890,6 @@
                         </div>
                         <div id="auditDupResults" class="qy-grid aws-dup-results" onscroll="awsDupUpdateMore('auditDupDrawer')"></div>
                         <div class="aws-dup-more">▼ Scroll — more matches below</div>
-                    </div>
-
-                    <div class="aws-bottom">
-                        <!-- Reject Reason took over the radar's old bottom-bar spot --
-                             the whole reason cloud is one glance away, and the Decision
-                             panel above never needs scrolling. -->
-                        <div class="aws-rr-section">
-                            <div class="aws-rr-head">🚫 Reject Reason <span class="aws-rr-hint">tap every reason that applies — only for a Rejected decision</span></div>
-                            <div id="auditFieldsReject" class="control-grid aws-fields aws-fields-1col"></div>
-                        </div>
-                        <div style="display:flex;flex-direction:column;gap:8px;">
-                            <button type="submit" class="btn btn-primary aws-submit" id="btnSubmitAudit">
-                                <span style="display:flex;align-items:center;gap:8px">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                                    Secure Submit to Feishu
-                                </span>
-                                <span class="aws-submit-hint">Ctrl / Shift + Enter · clears for the next ticket</span>
-                            </button>
-                            <button type="button" class="aws-clear-btn" id="btnAuditClear" onclick="auditClearWorkstation()" title="Wipe every field, the pasted text and the radar">🧹 Clear All</button>
-                        </div>
                     </div>
                 </form>
             </div>
@@ -3995,31 +4071,40 @@ function openInTab(page) {
 }
 
 function setActiveTab(page) {
+    // Phase 10.27 (Ahmed): per-ticket keep-alive tabs -- 'ws:<key>' entries
+    // each own a detached workspace instance; activating one mounts it.
+    if (page.startsWith('ws:')) {
+        const wsKey = page.slice(3);
+        if (typeof twWsTabs !== 'undefined' && twWsTabs[wsKey] && twWsActiveKey !== wsKey) twWsMount(wsKey);
+        activeTabId = page;
+        renderTabs();
+        document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
+        executePageLogic('ticket-workspace');
+        return;
+    }
     activeTabId = page;
     renderTabs();
-    
+
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
     const navEl = document.getElementById('nav-' + page);
     if(navEl) navEl.classList.add('active', 'active-nav');
-    
+
     executePageLogic(page);
 }
 
 function closeTab(page, event) {
     if(event) event.stopPropagation();
     if(page === 'welcome') return;
+    // Phase 10.27: workspace tabs dispose through their own closer (keep-alive
+    // instances must be dropped from twWsTabs too, not just from openTabs).
+    if (page.startsWith('ws:')) { twWsCloseTab(page.slice(3)); return; }
 
     openTabs = openTabs.filter(t => t !== page);
 
     if (activeTabId === page) {
-        // Phase 10.18 (ghost-workspace fix): fall back to the last entry that
-        // actually OWNS a tab. 'ticket-workspace' sits in openTabs without a
-        // tab for real tickets (renderTabs skips it), so closing e.g. the Live
-        // Queue tab used to land on a workspace page with NO tab in the bar --
-        // the ticket the agent had already left popping back on screen.
-        const ownsTab = p => !(p === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode));
-        const candidates = openTabs.filter(ownsTab);
-        activeTabId = candidates.length ? candidates[candidates.length - 1] : 'welcome';
+        // Every entry in openTabs owns a real tab now (workspace tabs are
+        // 'ws:<key>' entries), so the plain "last tab" fallback is safe.
+        activeTabId = openTabs.length ? openTabs[openTabs.length - 1] : 'welcome';
     }
 
     setActiveTab(activeTabId);
@@ -4032,14 +4117,18 @@ function renderTabs() {
     const titlesMap = currentLang === 'zh' ? zhPageTitlesMap : pageTitlesMap;
 
     openTabs.forEach(page => {
-        // Real tickets don't get their own tab (the queue tab they came from
-        // stays active). Phase 10.13.1 (Ahmed): a New Ticket DRAFT does get a
-        // tab -- "why it not have tab?" -- so the open draft is visible and
-        // switchable in the tab bar exactly like any other page.
-        if(page === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode)) return;
+        // Phase 10.27 (Ahmed): EVERY open ticket now owns a 'ws:<key>' tab --
+        // "why when open new request it show that 2 tab opening the new
+        // request and live ?? ... when open pending requests workspace ... it
+        // open in the live tab ???". The old line below hard-marked the Live
+        // Queue tab active for ANY workspace, which was exactly both bugs.
+        // Legacy plain 'ticket-workspace' entries never occur anymore; skip.
+        if(page === 'ticket-workspace') return;
 
-        const title = page === 'ticket-workspace' ? '🆕 New Ticket' : (titlesMap[page] || page);
-        const isActive = page === activeTabId || (page === 'live-tickets' && activeTabId === 'ticket-workspace');
+        const isWs = page.startsWith('ws:');
+        const wsRec = isWs && typeof twWsTabs !== 'undefined' ? twWsTabs[page.slice(3)] : null;
+        const title = isWs ? ((wsRec && wsRec.title) || '🎫 Ticket') : (titlesMap[page] || page);
+        const isActive = page === activeTabId;
         
         const tabEl = document.createElement('div');
         tabEl.className = `tab-item ${isActive ? 'active' : ''}`;
@@ -4077,10 +4166,10 @@ function renderTabs() {
             const closeBtn = document.createElement('button');
             closeBtn.className = 'tab-close';
             closeBtn.innerHTML = '×';
-            // Closing the New Ticket draft's tab closes the workspace itself
-            // (resets create mode + returns to the queue), not just the tab.
+            // Workspace tabs close through twWsCloseTab (disposes the keep-alive
+            // instance; the mounted one runs the full twCloseWorkspace flow).
             closeBtn.onclick = (e) => {
-                if (page === 'ticket-workspace') { e.stopPropagation(); twCloseWorkspace(); return; }
+                if (isWs) { e.stopPropagation(); twWsCloseTab(page.slice(3)); return; }
                 closeTab(page, e);
             };
             tabEl.appendChild(closeBtn);
@@ -4183,7 +4272,7 @@ function executePageLogic(page) {
     } else if(page==='admin-preview'){
         document.getElementById('pg-admin-preview').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
-        pvLoadTargets();
+        pvOnOpen(); // Phase 10.27: idle state only — members load on first search, zero requests on open
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -4972,7 +5061,13 @@ async function twKeepWarm() {
     _lastKeepWarmAt = Date.now();
     const t0 = twPerfNow();
     try {
-        await fetch('/api/health', { cache: 'no-store' });
+        // Phase 10.27: the ping doubles as the presence heartbeat -- identity
+        // rides along as plain query params so the backend's before_request
+        // hook can stamp "last seen". ZERO extra requests (this call already
+        // existed), which is exactly Ahmed's "without costing any requests".
+        const kwUser = (typeof loggedUser !== 'undefined' && loggedUser) || '';
+        const kwEmail = (typeof loggedEmail !== 'undefined' && loggedEmail) || '';
+        await fetch(`/api/health?user=${encodeURIComponent(kwUser)}&email=${encodeURIComponent(kwEmail)}`, { cache: 'no-store' });
         console.debug(`[tw-perf] keep-warm ping ${Math.round(twPerfNow() - t0)}ms`);
     } catch (e) { /* offline or unreachable -- ignore */ }
 }
@@ -6428,6 +6523,50 @@ function editAgent(email,modulesStr,acmsRaw,regRaw) {
 }
 
 let latestAdminUsers = [];  // real agents only (roles excluded), used by "Copy access from…"
+
+// ─── Phase 10.27 (Ahmed): agent PRESENCE (online / idle / offline) ───
+// "add new thing in the 👥 Current Active Agents online or offline from
+// (duration) stauts if this person opening the website now ... and active
+// time that last time action is taking, and without costing any requests".
+// The stamp itself is free: the backend's before_request hook lifts identity
+// off traffic the portal ALREADY makes (every API call + the 4-min keep-warm
+// heartbeat), and the pills here render from last_seen values that arrive
+// piggybacked on /api/admin/users and /api/admin/alerts-summary -- responses
+// the page was fetching anyway. No poll, no extra endpoint, no extra call.
+function agentPresenceHtml(u) {
+    const em = escHtml(String(u.email || u.person || '').toLowerCase());
+    const ts = u.last_seen ? Date.parse(u.last_seen) : 0;
+    if (!ts) return `<span class="agent-presence pres-off" data-pres-email="${em}"><i></i>Offline<span class="pres-ago">no activity yet</span></span>`;
+    const mins = (Date.now() - ts) / 60000;
+    const ago = mins < 1 ? 'just now' : (mins < 60 ? Math.floor(mins) + 'm ago' : `${Math.floor(mins / 60)}h ${Math.floor(mins % 60)}m ago`);
+    if (mins < 5) return `<span class="agent-presence pres-on" data-pres-email="${em}"><i></i>Online<span class="pres-ago">active ${ago}</span></span>`;
+    if (mins < 30) return `<span class="agent-presence pres-idle" data-pres-email="${em}"><i></i>Idle<span class="pres-ago">last active ${ago}</span></span>`;
+    return `<span class="agent-presence pres-off" data-pres-email="${em}"><i></i>Offline<span class="pres-ago">last active ${ago}</span></span>`;
+}
+// Merge a presence map ({email:{name,ts}} -- piggybacked on alerts-summary)
+// into the cached agent list, then refresh just the pills. Zero requests.
+function pvMergePresence(pmap) {
+    if (!pmap || typeof latestAdminUsers === 'undefined' || !latestAdminUsers.length) return;
+    latestAdminUsers.forEach(u => {
+        const p = pmap[String(u.email || '').toLowerCase()] || pmap[String(u.person || '').toLowerCase()];
+        if (p && p.ts) u.last_seen = p.ts;
+    });
+    pvRepaintPresencePills();
+}
+function pvRepaintPresencePills() {
+    const page = document.getElementById('pg-admin-agents');
+    if (!page || page.style.display === 'none') return;
+    if (typeof latestAdminUsers === 'undefined' || !latestAdminUsers.length) return;
+    document.querySelectorAll('.agent-presence[data-pres-email]').forEach(el => {
+        const em = el.dataset.presEmail;
+        const u = latestAdminUsers.find(x => String(x.email || x.person || '').toLowerCase() === em);
+        if (u) el.outerHTML = agentPresenceHtml(u);
+    });
+}
+// Client-side ageing repaint: "Xm ago" labels and the Online -> Idle ->
+// Offline transitions re-render every 30s from the cached stamps -- pure DOM,
+// no network traffic at all.
+setInterval(pvRepaintPresencePills, 30000);
 let latestAdminRoles = [];  // role presets only
 
 async function fetchAdminUsers() {
@@ -6537,6 +6676,7 @@ async function fetchAdminUsers() {
                     <div class="agent-id-block">
                         <div class="agent-name">${isOrphan ? '<em style="color:var(--text-muted)">(no identity set)</em>' : escHtml(dispName)}${isAdminAgent?'<span class="agent-admin-chip">ADMIN</span>':''}${isOrphan?'<span class="agent-orphan-chip" title="This row has no email/identity attached — it cannot be edited by identity. Safe to remove.">⚠ NO IDENTITY</span>':''}</div>
                         <div class="agent-email">${isOrphan ? '&nbsp;' : escHtml(dispEmail)}</div>
+                        ${isOrphan ? '' : agentPresenceHtml(u)}
                     </div>
                 </div>
                 <div class="agent-mods">${modChips.length ? modChips.map(m => `<span class="agent-mod-chip">${escHtml(m)}</span>`).join('') : '<span class="agent-mod-chip chip-none">no modules</span>'}</div>
@@ -8573,10 +8713,76 @@ function tiTableHtml(rows) {
 let previewMode = false;
 let previewSaved = null;        // { modules, isAdmin } snapshot to restore on exit
 let previewTargetsCache = [];   // member list from /api/admin/preview-targets
+let previewTargetEmail = null;  // Phase 10.26: active preview target (drives X-Preview-As)
+
+// Phase 10.26 (Ahmed): full-faithful preview -- while previewing, every /api
+// call (except /api/admin/*, which must keep the real identity so the preview
+// console itself keeps working) carries X-Preview-As. The backend then
+// resolves the TARGET's permissions for that request, so every data page is
+// filtered exactly as the target would see it (regions / ACMs / modules).
+const _pvOrigFetch = window.fetch.bind(window);
+window.fetch = function (url, opts) {
+    try {
+        if (previewMode && previewTargetEmail && typeof url === 'string'
+            && url.startsWith('/api/') && !url.startsWith('/api/admin/')) {
+            const h = new Headers((opts && opts.headers) || {});
+            h.set('X-Preview-As', previewTargetEmail);
+            opts = Object.assign({}, opts, { headers: h });
+        }
+    } catch (e) { /* never break a fetch over preview stamping */ }
+    return _pvOrigFetch(url, opts);
+};
+
+// Phase 10.27 (Ahmed): preview page is now SEARCH-FIRST -- opening it costs
+// zero requests ("make it only show the records when type search so no waste
+// the requests and quota"). The member list is fetched ONCE on the first
+// keystroke, then every render is a pure client-side filter of the cache.
+const PV_PALETTES = [
+    ['#00d4ff','#7b61ff'], ['#ff4d6d','#ff9a3d'], ['#22c55e','#00d4ff'],
+    ['#f59e0b','#ff4d6d'], ['#7b61ff','#ff4d9e'], ['#00c2a8','#22c55e'],
+    ['#4d7cff','#00d4ff'], ['#ff9a3d','#f59e0b']
+];
+function pvPalette(key) {
+    let h = 0; const s = String(key || '?');
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return PV_PALETTES[h % PV_PALETTES.length];
+}
+function pvDisplayName(a) {
+    const person = (a.person || '').trim();
+    const em = a.email || '';
+    if (person && person.toLowerCase() !== String(em).toLowerCase()) return person;
+    const local = String(em).split('@')[0] || '';
+    return local.split(/[._\-+]/).filter(Boolean).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || em;
+}
+function pvInitials(nm) {
+    const parts = String(nm || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]);
+}
+let pvLoading = false;
+const PV_IDLE_HTML = `<div class="pv-idle">
+    <div class="pv-idle-icon">👁️</div>
+    <p>Type above to find a member.</p>
+    <p class="pv-idle-sub">The member list loads on your first search — opening this page costs zero requests.</p>
+</div>`;
+
+function pvOnOpen() {
+    // Restore the idle state if nothing has been searched yet; if a search
+    // is already typed (tab re-visit), just re-render from cache.
+    const q = (document.getElementById('pvFilter')?.value || '').trim();
+    if (!q && !previewTargetsCache.length) {
+        const listEl = document.getElementById('pvList');
+        if (listEl) listEl.innerHTML = PV_IDLE_HTML;
+    } else {
+        pvRenderList();
+    }
+}
 
 async function pvLoadTargets() {
+    if (pvLoading) return;
+    pvLoading = true;
     const listEl = document.getElementById('pvList');
-    if (listEl) listEl.innerHTML = '<div class="pv-hint">⏳ Loading members…</div>';
+    if (listEl) listEl.innerHTML = '<div class="pv-idle"><div class="pv-idle-icon">⏳</div><p>Loading members…</p></div>';
     try {
         const res = await fetch('/api/admin/preview-targets', {
             headers: { 'X-User-Name': loggedUser, 'X-User-Email': loggedEmail }
@@ -8584,35 +8790,61 @@ async function pvLoadTargets() {
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Failed to load members');
         previewTargetsCache = data.agents || [];
-        pvRenderList();
     } catch (e) {
-        if (listEl) listEl.innerHTML = `<div class="pv-hint">⚠️ ${escHtml(e.message)}</div>`;
+        pvLoading = false;
+        if (listEl) listEl.innerHTML = `<div class="pv-idle"><div class="pv-idle-icon">⚠️</div><p>${escHtml(e.message)}</p></div>`;
+        return;
     }
+    pvLoading = false;
+    pvRenderList();
 }
 
 function pvRenderList() {
     const listEl = document.getElementById('pvList');
     if (!listEl) return;
     const q = (document.getElementById('pvFilter')?.value || '').trim().toLowerCase();
-    const rows = previewTargetsCache.filter(a => !q || (a.email || '').toLowerCase().includes(q));
+    // No query typed -> never show records (and never fetch).
+    if (!q) {
+        listEl.innerHTML = previewTargetsCache.length
+            ? `<div class="pv-idle"><div class="pv-idle-icon">👥</div><p>${previewTargetsCache.length} members loaded — type to filter.</p><p class="pv-idle-sub">Nothing is shown until you search, so the page stays request-free.</p></div>`
+            : PV_IDLE_HTML;
+        return;
+    }
+    // First keystroke with an empty cache -> lazy one-time fetch, then render.
+    if (!previewTargetsCache.length) {
+        if (!pvLoading) pvLoadTargets();
+        return;
+    }
+    const rows = previewTargetsCache.filter(a =>
+        (a.email || '').toLowerCase().includes(q) ||
+        (a.person || '').toLowerCase().includes(q) ||
+        pvDisplayName(a).toLowerCase().includes(q));
     if (!rows.length) {
-        listEl.innerHTML = '<div class="pv-hint">No matching members.</div>';
+        listEl.innerHTML = '<div class="pv-idle"><div class="pv-idle-icon">🔍</div><p>No matching members.</p></div>';
         return;
     }
     listEl.innerHTML = rows.map(a => {
         const mail = escHtml(a.email || '');
+        const name = escHtml(pvDisplayName(a));
+        const initials = escHtml(pvInitials(pvDisplayName(a)));
+        const [c1, c2] = pvPalette(a.email || name);
         // Phase 10.13.1: the backend stores modules as one comma-joined string
         // in the access table -- accept BOTH a string and an array here so the
         // chips render either way (a raw string broke this with ".filter is
         // not a function").
         const rawMods = Array.isArray(a.modules) ? a.modules : String(a.modules || '').split(',');
         const mods = rawMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
-        return `<div class="pv-row">
-            <div class="pv-row-info">
-                <div class="pv-row-email">${mail}</div>
-                <div class="pv-row-mods">${mods.length ? mods.map(m => `<span class="pv-mod-chip">${escHtml(m)}</span>`).join('') : '<span class="pv-mod-chip pv-mod-none">no modules</span>'}</div>
+        const isAdminAgent = mods.some(m => m.toLowerCase() === 'admin');
+        return `<div class="pv-card" style="--pv-avatar-bg:linear-gradient(135deg,${c1},${c2});--pv-accent:linear-gradient(90deg,${c1},${c2});">
+            <div class="pv-card-head">
+                <div class="pv-avatar">${initials}</div>
+                <div style="min-width:0">
+                    <div class="pv-name">${name}${isAdminAgent ? ' <span style="font-size:.62rem;font-weight:800;color:var(--accent-purple);vertical-align:middle">👑 ADMIN</span>' : ''}</div>
+                    <div class="pv-email">${mail}</div>
+                </div>
             </div>
-            <button type="button" class="btn btn-primary pv-view-btn" onclick="pvStart('${mail}')">👁 Preview</button>
+            <div class="pv-mods">${mods.length ? mods.map(m => `<span class="pv-mod-chip">${escHtml(m)}</span>`).join('') : '<span class="pv-mod-chip pv-mod-none">no modules</span>'}</div>
+            <button type="button" class="btn btn-primary pv-view-btn" onclick="pvStart('${mail}')">👁 Preview as ${name}</button>
         </div>`;
     }).join('');
 }
@@ -8627,11 +8859,18 @@ async function pvStart(email) {
         // that, with a top-level fallback so older backends still work.
         const permsBlock = data.permissions || data;
         const targetMods = Array.isArray(permsBlock.modules) ? permsBlock.modules : String(permsBlock.modules || '').split(',');
-        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, openTabs: openTabs.slice(), activeTab: activeTabId };
+        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, openTabs: openTabs.slice(), activeTab: activeTabId, userPermissions: userPermissions };
         previewMode = true;
+        previewTargetEmail = email; // Phase 10.26: the fetch wrapper stamps API calls with this
         userModules = targetMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
         isAdmin = !!permsBlock.is_super_admin;
+        // Phase 10.26 (Ahmed): full-faithful preview -- swap the region/ACM
+        // permission object too, so enforceLocks() narrows the dropdowns
+        // exactly as the target's own login would (the backend filters the
+        // data itself via X-Preview-As).
+        userPermissions = { is_super_admin: !!permsBlock.is_super_admin, modules: userModules.slice(), permissions: permsBlock.permissions || {} };
         pvShowBanner(email);
+        enforceLocks();
         configureSidebarAndCards();
         // Phase 10.14 (Ahmed): preview must NOT keep the admin's own open
         // tabs -- the tab bar is gated by userModules, so stale tabs would
@@ -8648,20 +8887,23 @@ async function pvStart(email) {
 function pvExit() {
     if (!previewMode) return;
     previewMode = false;
+    previewTargetEmail = null; // Phase 10.26: stop stamping API calls
     let savedTabs = null, savedActive = null;
     if (previewSaved) {
         userModules = previewSaved.modules;
         isAdmin = previewSaved.isAdmin;
+        userPermissions = previewSaved.userPermissions || userPermissions; // Phase 10.26: restore own region/ACM scope
         savedTabs = previewSaved.openTabs || null;
         savedActive = previewSaved.activeTab || null;
         previewSaved = null;
     }
     pvHideBanner();
+    enforceLocks(); // Phase 10.26: rebuild the dropdowns for the admin's own scope
     configureSidebarAndCards();
     // Phase 10.14: give the admin his own tabs back (validated against the
     // pages that still exist), landing on the tab he left from.
     if (savedTabs && savedTabs.length) {
-        openTabs = savedTabs.filter(p => document.getElementById('pg-' + p));
+        openTabs = savedTabs.filter(p => p.startsWith('ws:') || document.getElementById('pg-' + p));
         if (!openTabs.length) openTabs = ['welcome'];
         openInTab(openTabs.includes(savedActive) ? savedActive : openTabs[openTabs.length - 1]);
     } else {
@@ -9216,6 +9458,22 @@ function enforceExportLocks() {
     });
 }
 
+// Phase 10.26: pristine-option snapshot for every select enforceLocks()
+// rewrites. Preview mode swaps userPermissions and re-runs enforceLocks() per
+// target; without a restore, leaving a restricted preview (or switching
+// targets) kept the previous narrowing baked into the DOM.
+const _lockSelectSnapshot = {};
+function _resetLockSelects() {
+    ['anaRegion', 'prRegion', 'ptRegion', 'prAcm', 'ptAcm', 'alAcm'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        if (!(id in _lockSelectSnapshot)) _lockSelectSnapshot[id] = sel.innerHTML;
+        else sel.innerHTML = _lockSelectSnapshot[id];
+        sel.style.pointerEvents = '';
+        sel.style.opacity = '';
+    });
+}
+
 function populateAcmFilterSelect() {
     ['prAcm', 'ptAcm'].forEach(id => {
         const sel = document.getElementById(id);
@@ -9227,6 +9485,7 @@ function populateAcmFilterSelect() {
 }
 
 function enforceLocks() {
+    _resetLockSelects(); // Phase 10.26: undo any previous preview narrowing first
     populateAcmFilterSelect();
     enforceExportLocks();
     if (isAdmin) return;
@@ -9450,6 +9709,10 @@ function configureSidebarAndCards() {
         // would need real push notifications (a service worker + Web Push),
         // which is a bigger, separate feature -- ask if you want that built.
         window.updateAdminAlertBadges = (data, { silent } = {}) => {
+            // Phase 10.27: alerts-summary also carries the presence map now --
+            // fold it into the agent cards' online/idle/offline pills. Same
+            // response the badges were already fetching, zero extra requests.
+            if (data.presence && typeof pvMergePresence === 'function') pvMergePresence(data.presence);
             const reqs = data.access_requests || [];
             const alerts = data.sheet_permission_alerts || [];
             const badge1 = document.getElementById('pendingRequestsBadge');
@@ -10073,7 +10336,10 @@ function twSyncBackButton() {
     const btn = document.getElementById('twBackBtn');
     if (!btn) return;
     const titlesMap = (typeof currentLang !== 'undefined' && currentLang === 'zh') ? zhPageTitlesMap : pageTitlesMap;
-    const back = (typeof twReturnTo !== 'undefined' && twReturnTo) ? twReturnTo : 'live-tickets';
+    // Phase 10.27: twReturnTo is always a real page now (workspace tab ids are
+    // filtered out at capture), but guard anyway so a stale ws: id can never
+    // render as a broken "Back to ws:r_..." label.
+    const back = (typeof twReturnTo !== 'undefined' && twReturnTo && !String(twReturnTo).startsWith('ws:')) ? twReturnTo : 'live-tickets';
     const name = titlesMap[back] || pageTitlesMap[back] || pageTitlesMap['live-tickets'];
     btn.textContent = (typeof currentLang !== 'undefined' && currentLang === 'zh') ? `← 返回${name}` : `← Back to ${name}`;
 }
@@ -10127,6 +10393,39 @@ document.addEventListener('input', (e) => {
     }
     twAutoGrowTxt(t);
 });
+
+// Phase 10.28 (Ahmed): number-shaped pastes self-clean. When the WHOLE pasted
+// string is digits plus separators -- "36501-9280632-9" or "3032 7211 0706"
+// -- it lands as pure digits ("3650192806329" / "303272110706"), dashes and
+// spaces gone. A paste containing ANY letter passes through untouched, so
+// names, sentences and mixed IDs are never mangled. Phase 10.29 (Ahmed):
+// scoped to the SCRATCH NOTE ONLY (#twNotePop) -- ticket-workspace and audit
+// fields keep the pasted text exactly as copied. Delegated at document level
+// in the capture phase, so cloned note pops need no per-node wiring.
+function twIsNumberishPaste(text) {
+    const t = (text || '').trim();
+    if (t.length < 5) return false;                       // too short to be an ID with separators
+    if (!/^\+?\d[\d\s\-().]*\d$/.test(t)) return false;   // digits + separators only, no letters
+    return /[\s\-().]/.test(t);                           // ...and at least one separator to strip
+}
+document.addEventListener('paste', (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    if (!t.closest('#twNotePop')) return; // Phase 10.29: scratch note ONLY
+    if (t.tagName !== 'TEXTAREA' && t.tagName !== 'INPUT') return;
+    if (t.readOnly || t.disabled || t.type === 'password' || t.type === 'file') return;
+    const clip = ((e.clipboardData || window.clipboardData) || {}).getData
+        ? (e.clipboardData || window.clipboardData).getData('text') : '';
+    if (!twIsNumberishPaste(clip)) return;
+    e.preventDefault();
+    const clean = clip.trim().replace(/\D/g, '');
+    const start = (typeof t.selectionStart === 'number') ? t.selectionStart : t.value.length;
+    const end = (typeof t.selectionEnd === 'number') ? t.selectionEnd : t.value.length;
+    t.value = t.value.slice(0, start) + clean + t.value.slice(end);
+    const pos = start + clean.length;
+    try { t.setSelectionRange(pos, pos); } catch (err) { /* non-text input */ }
+    t.dispatchEvent(new Event('input', { bubbles: true })); // mirror sync / auto-grow / reminders see it
+}, true);
 
 // Phase 10.13.3 (Ahmed): one click inside "Latest Usage Tracker" or
 // "Transaction Receipt" selects the WHOLE content, exactly like tapping a
@@ -10204,6 +10503,16 @@ function twRenderSection2(ticket, reqTypeOverride) {
         sec2.appendChild(createTwControl(key, ticket.fields[key]));
     });
 
+    // Phase 10.28 (Ahmed): follow-up tickets get a 📋 Ticket Text paste card
+    // on top of the Dynamic Request Section. Pasting the new application text
+    // flips the ticket to Agency Creation and fills every parsed field --
+    // exactly the Audit workstation's flow. The card carries NO name attr, so
+    // twCollectFields never picks it up: it lives only in the UI and is never
+    // written back to the sheet.
+    if (reqType === 'Agency applied already by ACM or BD link ( follow-up )') {
+        sec2.prepend(twBuildFollowupPasteCard(''));
+    }
+
     // Phase 10.4 (Ahmed): Agency Creation tickets get three extra fields here,
     // moved out of the retired Duplicate Check card / Basic Information --
     // Parenet sub agency (right beside Agency Code), Create Way, Reject Reason.
@@ -10226,7 +10535,256 @@ function twRenderSection2(ticket, reqTypeOverride) {
     }
 
     if (sec2.children.length === 0) sec2.innerHTML = '<div style="color:var(--text-muted);font-size:.85rem;padding:10px;">No additional dynamic fields found.</div>';
+
+    // Phase 10.27: Agency Target tickets recompute the sheet Formula LIVE on
+    // open (and on every Agency Code / Privilege edit) using the same ledger
+    // as Check Agency Target -- the stored sheet text was only as fresh as
+    // its last save, and drafts have no stored text at all.
+    if (reqType === 'Agency Target Privilege') twScheduleFormulaLive();
 }
+
+// ─── Phase 10.28 (Ahmed): follow-up → Agency Creation paste converter ───
+// "in the workspace include field in the Dynamic Request Section of the
+// Request Type 'Agency applied already by ACM or BD link ( follow-up )' ...
+// once this is paste into this field the request type will be agency creation
+// and the view ... will be the view of the request type agency creation that
+// will be have all the filled, same as in audit". The card below is that
+// field: UI-only (no name attr -> twCollectFields ignores it -> the sheet is
+// never touched by it), parsing with the exact shared rtExtract* machinery
+// the Audit tab uses.
+function twBuildFollowupPasteCard(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'control-group tw-followup-paste';
+    wrap.style.gridColumn = '1 / -1';
+    wrap.innerHTML = `
+        <label>📋 Ticket Text <span class="tw-followup-paste-hint">paste the application text — converts this follow-up into a filled Agency Creation · never saved to the sheet</span></label>
+        <textarea class="tw-followup-paste-box" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)"></textarea>`;
+    const ta = wrap.querySelector('textarea');
+    ta.value = text || '';
+    ta.addEventListener('paste', () => setTimeout(() => twFollowupConvert(ta), 120));
+    return wrap;
+}
+
+// Sets a value into every editable control carrying this name inside the
+// workspace form (User ID renders twice -- Basic Info + Dynamic Section --
+// and both get it; the mirror sync would cover the other box anyway via the
+// dispatched input event). Selects match case-insensitively on value first,
+// then on the visible label ("Zohaib Ahmed" the label vs "Zohaib" the value),
+// exactly like the Audit parser's rtSetFieldValue.
+function twSetNamedControl(form, name, val) {
+    if (!val) return false;
+    const els = Array.from(form.querySelectorAll(`[name="${name}"]`))
+        .filter(el => (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type !== 'checkbox' && el.type !== 'file')) && !el.disabled && !el.readOnly);
+    if (!els.length) return false;
+    let ok = false;
+    els.forEach(el => {
+        if (el.tagName === 'SELECT') {
+            const opt = Array.from(el.options).find(o => o.value.toLowerCase() === val.toLowerCase())
+                     || Array.from(el.options).find(o => (o.textContent || '').trim().toLowerCase() === val.toLowerCase());
+            if (!opt) return;
+            el.value = opt.value;
+        } else {
+            el.value = val;
+        }
+        ok = true;
+        el.classList.add('reqfld-autofilled');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    return ok;
+}
+
+// Basic Information renders only the ACM dropdown for the ticket's saved
+// Region (a PK ticket never shows the IN list). A paste whose Region differs
+// from the saved one needs the other region's dropdown instead -- swap them,
+// keeping whatever value the matching dropdown already holds.
+function twEnsureAcmField(region) {
+    const sec1 = document.getElementById('tw-sec-1');
+    if (!sec1) return;
+    const want = region === 'PK' ? 'Acm Name (PK)' : (region === 'IN' ? 'Acm Name (IN)' : '');
+    if (!want) return;
+    const other = want === 'Acm Name (PK)' ? 'Acm Name (IN)' : 'Acm Name (PK)';
+    sec1.querySelectorAll(`[name="${other}"]`).forEach(el => el.closest('.control-group')?.remove());
+    if (!sec1.querySelector(`[name="${want}"]`)) {
+        const cur = (typeof ltActiveTicket !== 'undefined' && ltActiveTicket && ltActiveTicket.fields) ? ltActiveTicket.fields[want] : undefined;
+        sec1.appendChild(createTwControl(want, cur)); // ACM dropdowns are the last two of Basic Information
+    }
+}
+
+// The paste itself: flip Request Type to Agency Creation (the Dynamic
+// Section re-renders with that type's full field list), then pour every
+// parsed value into its control -- same fill set and same toast style as the
+// Audit workstation, and the pasted text stays parked on top of the new
+// section so the ticket remains in view while the agent works.
+function twFollowupConvert(ta) {
+    const text = (ta.value || '').trim();
+    if (!text) return;
+    const form = document.getElementById('tw-form');
+    if (!form) return;
+
+    // 1) Flip the type. twSelectRequestType re-renders the Dynamic Section
+    //    AND the preview tab strip; the Request Type select itself changes
+    //    too, so the next Save / Submit files it as Agency Creation.
+    const rtSel = form.querySelector('[name="Request Type"]');
+    if (rtSel) {
+        rtSel.value = 'Agency Creation';
+        rtSel.dispatchEvent(new Event('change', { bubbles: true })); // create-mode hook + formula-live watcher
+    }
+    if (typeof ltActiveTicket !== 'undefined' && ltActiveTicket) {
+        twSelectRequestType('Agency Creation');
+    }
+
+    // 2) Region first -- the ACM dropdown that should exist depends on it.
+    const region = rtExtractRegion(text);
+    twEnsureAcmField(region);
+
+    // 3) Fill the shared field set (same mapping as auditParseText).
+    const fillMap = [
+        ['Region', region],
+        ['User ID', rtExtractApplierId(text)],
+        ['Agency Name', rtExtractAgencyName(text)],
+        ['Applier real name', rtExtractRealName(text)],
+        ['Agency Type', rtExtractAgencyType(text)],
+        ['Bd Code', rtExtractBdId(text)],
+        ['Whatsapp Number', rtExtractWhatsapp(text)],
+        ['NID Number', rtExtractNid(text)],
+        ['Otherapp ID', rtExtractOtherappId(text)],
+    ];
+    let filled = 0; const missed = [];
+    fillMap.forEach(([name, val]) => {
+        if (twSetNamedControl(form, name, val)) filled++;
+        else missed.push(name);
+    });
+    // ACM last, into the region-matched dropdown; an off-roster name is
+    // appended as a new option so the ticket keeps its real ACM (same rule
+    // as the Audit tab).
+    const acmField = acmFieldForRegion(region);
+    if (acmField) {
+        const acmVal = rtExtractAcm(text);
+        if (acmVal && !twSetNamedControl(form, acmField.name, acmVal)) {
+            const sel = form.querySelector(`select[name="${acmField.name}"]`);
+            if (sel) {
+                sel.add(new Option(acmVal, acmVal));
+                if (twSetNamedControl(form, acmField.name, acmVal)) filled++;
+                else missed.push('ACM');
+            } else missed.push('ACM');
+        } else if (acmVal) filled++;
+        else missed.push('ACM');
+    } else {
+        missed.push('ACM (Region not recognized)');
+    }
+    missed.push('Agency Code', 'Otherapp Name', 'NID & Otherapp Screen (upload)');
+
+    // 4) Keep the ticket text in view on top of the fresh Agency Creation
+    //    section (the re-render wiped the card along with the old section).
+    const sec2 = document.getElementById('tw-sec-2');
+    if (sec2 && !sec2.querySelector('.tw-followup-paste')) {
+        sec2.prepend(twBuildFollowupPasteCard(text));
+    }
+
+    ToastManager.show(`Converted to Agency Creation — auto-filled ${filled} field(s). Please look over: ${missed.join(', ')}.`, 'success', 9000);
+}
+
+// ─── Phase 10.27 + 10.30 (Ahmed): LIVE Agency-Target Formula ───
+// "in agency target the agency code come wrong and i edit but it still show
+// the wrong code and didn't update the FORMULA ... also the formula it don't
+// work while making new request ... we can use the same logic of check agency
+// target". 10.30 adds the freshness fix: "find way to be live not 3 min late
+// bcs maybe same agency has request one min and get it and then they submit
+// request again ... it will show me still 1 left while it already taken".
+// Two-stage: /api/agency-target/formula paints instantly from the warm
+// snapshot, then /api/agency-target/formula/live re-reads JUST this agency
+// (wallet row + its request rows, 2 parallel Feishu calls) and wins the card.
+// Runs on open, on every Agency Code / Privilege keystroke (debounced), in
+// New-Ticket drafts, and on badge tap.
+let twFormulaLiveTimer = null, twFormulaLiveSeq = 0;
+function twScheduleFormulaLive() {
+    const form = document.getElementById('tw-form'); if (!form) return;
+    if (!form.querySelector('[data-formula-live="1"]')) return;
+    clearTimeout(twFormulaLiveTimer);
+    twFormulaLiveTimer = setTimeout(twRefreshFormulaLive, 500);
+}
+async function twRefreshFormulaLive() {
+    const form = document.getElementById('tw-form'); if (!form) return;
+    const grp = form.querySelector('[data-formula-live="1"]'); if (!grp) return;
+    // Agency Code can render twice (Basic Info + Dynamic Section) -- take the
+    // last non-empty value so a half-mirrored pair never reads the blank one.
+    const codeEls = Array.from(form.querySelectorAll('[name="Agency Code"]'));
+    const code = codeEls.map(el => (el.value || '').trim()).filter(Boolean).pop() || '';
+    if (!code) return;
+    const seq = ++twFormulaLiveSeq;
+    const badge = grp.querySelector('.twcf-live-badge');
+    if (badge) badge.textContent = '⏳ updating…';
+    // Phase 10.30 (Ahmed): TWO-STAGE paint. Stage 1 is the instant snapshot
+    // (zero Feishu calls, can be up to 3 min stale). Stage 2 is a TARGETED
+    // live read of just this agency (wallet row + its request rows, 2 Feishu
+    // calls in parallel, ~1-2s) -- Ahmed's race: "same agency has request one
+    // min and get it and then they submit request again ... it will show me
+    // still 1 left while it already taken". The live stage is authoritative
+    // and always wins the card; if it fails, the snapshot paint stays and the
+    // badge says so. Clicking the badge re-runs the whole check on demand.
+    const paint = (data, badgeText) => {
+        const hit = data.selected || null;
+        let valStr;
+        if (hit) {
+            // Same labels the sheet Formula uses.
+            valStr = [`Code: ${data.agency_code}`, `Privilege: ${hit.privilege}`, `Total Earned: ${hit.claimed}`, `Claimed: ${hit.used}`, `Remaining: ${hit.remaining}`, `Pending: ${hit.pending}`, `Rejected: ${hit.rejected}`].join(' | ');
+        } else {
+            // No Privilege picked yet -- show the agency headline instead.
+            valStr = [`Code: ${data.agency_code}`, `Agency: ${data.agency_name || '—'}`, `Base Points: ${data.base_points ?? '—'}`, `ACM: ${data.acm || '—'}`, `Region: ${data.region || '—'}`].join(' | ');
+        }
+        if (grp.dataset.lastFormulaStr !== valStr) { // no flicker on identical numbers
+            const old = grp.querySelector('.twcf-chips, .twcf-text');
+            if (old) old.outerHTML = twComputedFieldHtml('Formula', valStr);
+            grp.dataset.lastFormulaStr = valStr;
+        }
+        if (badge) badge.textContent = badgeText;
+    };
+    try {
+        const priv = ((form.querySelector('[name="Privilege"]') || {}).value || '').trim();
+        const qs = `code=${encodeURIComponent(code)}&privilege=${encodeURIComponent(priv)}&user=${encodeURIComponent(loggedUser || '')}&email=${encodeURIComponent(loggedEmail || '')}`;
+        // Stage 1: instant snapshot paint.
+        const snap = await (await fetch(`/api/agency-target/formula?${qs}`)).json();
+        if (seq !== twFormulaLiveSeq) return; // a newer keystroke owns the card now
+        const snapOk = snap.success && snap.found;
+        if (snapOk) paint(snap, '⏳ checking live…');
+        // Stage 2: authoritative live read (2 targeted Feishu searches).
+        const live = await (await fetch(`/api/agency-target/formula/live?${qs}`)).json();
+        if (seq !== twFormulaLiveSeq) return;
+        if (live.success && live.found) { paint(live, '✅ live now'); return; }
+        if (live.success && !live.found) {
+            const nfStr = `Code: ${code} | ⚠️ not found in the Agency Points table`;
+            const old = grp.querySelector('.twcf-chips, .twcf-text');
+            if (old) old.outerHTML = twComputedFieldHtml('Formula', nfStr);
+            grp.dataset.lastFormulaStr = nfStr;
+            if (badge) badge.textContent = '⚠️ not in Points table (live)';
+            return;
+        }
+        // Live call itself failed -- keep whatever stage 1 painted.
+        if (badge) badge.textContent = snapOk ? '⚡ snapshot · tap to retry' : '⚠️ live check failed · tap to retry';
+    } catch (e) {
+        if (seq === twFormulaLiveSeq && badge) badge.textContent = '⚡ snapshot · tap to retry';
+    }
+}
+// Phase 10.30: the badge is also Ahmed's "search button" -- tapping it forces
+// a fresh live re-check of the agency on screen.
+document.addEventListener('click', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('.twcf-live-badge') : null;
+    if (b) twRefreshFormulaLive();
+});
+// Keystroke / pick hooks: any Agency Code or Privilege edit inside the
+// workspace re-runs the live formula (debounced). Document-level, so it works
+// on every keep-alive workspace instance with no per-clone wiring.
+document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t || !t.closest || !t.closest('#tw-form')) return;
+    if (t.name === 'Agency Code' || t.name === 'Privilege') twScheduleFormulaLive();
+});
+document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t || !t.closest || !t.closest('#tw-form')) return;
+    if (t.name === 'Agency Code' || t.name === 'Privilege' || t.name === 'Request Type') twScheduleFormulaLive();
+});
 
 // Phase 10.4/10.5: Agency-Creation-only extras. Parenet sub agency slides in
 // right after the Agency Code group; Create Way follows at the end of the
@@ -10617,7 +11175,7 @@ async function twApConfirmCharge() {
         recordId = filed.record_id;
         document.getElementById('tw-record-id').value = recordId;
         if (ltActiveTicket) ltActiveTicket.record_id = recordId;
-        twExitCreateMode();
+        twExitCreateMode(recordId);
         ToastManager.show('🎫 Ticket filed — charging the agency wallet now…', 'success', 4000);
     }
     twApGate.charging = true;
@@ -10883,9 +11441,11 @@ function twResetNote(clearText) {
 // title bar, anywhere except the ✕ button) and drag it wherever it blocks the
 // least. Position is set as inline left/top once dragging starts, clamped to
 // the viewport; until then the CSS default (top-center) applies.
-(function twNoteMakeDraggable() {
-    const pop = document.getElementById('twNotePop');
-    if (!pop) return;
+// Phase 10.27: named + idempotent now -- every keep-alive workspace instance
+// cloned from the pristine template re-attaches this on its own #twNotePop.
+function twNoteMakeDraggable(pop) {
+    if (!pop || pop.dataset.dragHooked) return;
+    pop.dataset.dragHooked = '1';
     const head = pop.querySelector('.twn-head');
     if (!head) return;
     head.addEventListener('pointerdown', (e) => {
@@ -10917,7 +11477,8 @@ function twResetNote(clearText) {
         head.addEventListener('pointerup', onUp);
         head.addEventListener('pointercancel', onUp);
     });
-})();
+}
+twNoteMakeDraggable(document.getElementById('twNotePop'));
 
 // Phase 10.2: Preview panel toggle -- the topbar "👁️ Preview" button drops
 // down the full Request Type list; clicking a type previews its field layout
@@ -10968,14 +11529,113 @@ let twOpenSeq = 0;
 // blocked in that window so an empty form can never be written to the sheet.
 let twWorkspaceLoading = false;
 
+// ─── Phase 10.27 (Ahmed): EVERY ticket gets its OWN keep-alive tab ───
+// "why when open new request it show that 2 tab opening the new request and
+// live ?? ... when open pending requests workspace or workspace of tkt from
+// query it open in the live tab ??? what if the agent was having request live
+// and was need to check related somthing in the pending request or query ...
+// his live tkt workspace will close ... solve this with most creative way
+// without destroy the work."
+// Root causes: (1) the tab bar hard-coded the Live Queue tab as active for
+// ANY workspace, (2) one shared workspace DOM was reused per open, so ticket
+// B wiped ticket A's half-filled form. Now every opened ticket owns a
+// 'ws:<recordId>' tab whose WHOLE workspace DOM is detached (never rebuilt)
+// when another tab takes over -- every input value, picked file, scroll
+// position and listener survives -- and switching back is a reattach with
+// zero refetch. New instances clone a pristine template captured before the
+// first open; the few addEventListener wirings re-attach per instance (the
+// note drag here, the sec1/sec2 delegated hooks via their dataset guards).
+let twWsTabs = {};        // key -> { key, recordId, title, node, createMode, returnTo, ltActiveTicket, twOrigFields, twManualReqType }
+let twWsActiveKey = null; // the instance currently mounted inside #pg-ticket-workspace
+let twWsTemplate = null;  // pristine #twWsInstance clone, captured before the first open
+
+function twWsKeyFor(recordId) { return 'r_' + recordId; }
+
+function twWsCaptureTemplate() {
+    if (twWsTemplate) return;
+    const inst = document.getElementById('twWsInstance');
+    if (inst) twWsTemplate = inst.cloneNode(true);
+}
+
+function twWsStashCurrent() {
+    if (!twWsActiveKey) return;
+    const rec = twWsTabs[twWsActiveKey];
+    const inst = document.getElementById('twWsInstance');
+    if (rec && inst) {
+        twOpenSeq++; // abort any in-flight fill aimed at this instance
+        rec.node = inst;
+        rec.ltActiveTicket = ltActiveTicket;
+        rec.twOrigFields = twOrigFields;
+        rec.twManualReqType = twManualReqType;
+        rec.createMode = twCreateMode;
+        rec.returnTo = twReturnTo;
+        const titleEl = inst.querySelector('#tw-title');
+        if (titleEl && titleEl.textContent) rec.title = titleEl.textContent;
+        inst.parentNode.removeChild(inst); // DETACHED, not destroyed
+    }
+    twWsActiveKey = null;
+}
+
+function twWsMount(key) {
+    const rec = twWsTabs[key];
+    if (!rec || !rec.node) return;
+    twWsStashCurrent();
+    document.getElementById('pg-ticket-workspace').appendChild(rec.node);
+    twWsActiveKey = key;
+    ltActiveTicket = rec.ltActiveTicket;
+    twOrigFields = rec.twOrigFields || {};
+    twManualReqType = rec.twManualReqType || null;
+    twCreateMode = !!rec.createMode;
+    twReturnTo = rec.returnTo || 'live-tickets';
+    twApplyCreateModeChrome();
+    twSyncBackButton();
+    requestAnimationFrame(() => twAutoGrowAll(rec.node));
+}
+
+function twWsNewInstance(key, recordId) {
+    twWsCaptureTemplate();
+    twWsStashCurrent();
+    const node = twWsTemplate.cloneNode(true);
+    // The clone loses addEventListener wiring -- re-attach the per-instance
+    // bits (note drag). sec1/sec2 delegated hooks re-attach themselves on the
+    // instance's first render (their dataset guards are unset on the clone).
+    const pop = node.querySelector('#twNotePop');
+    if (pop) twNoteMakeDraggable(pop);
+    document.getElementById('pg-ticket-workspace').appendChild(node);
+    twWsActiveKey = key;
+    twWsTabs[key] = { key, recordId: recordId || null,
+        title: recordId ? `⏳ #${String(recordId).slice(-6)}` : '🆕 New Ticket',
+        node, createMode: !recordId, returnTo: twReturnTo,
+        ltActiveTicket: null, twOrigFields: {}, twManualReqType: null };
+}
+
+function twWsCloseTab(key) {
+    const rec = twWsTabs[key];
+    if (!rec) return;
+    // Closing the MOUNTED ticket runs the full close flow (chrome reset +
+    // return-to-origin); closing a background one just disposes its tab and
+    // detached instance -- every other ticket keeps its work untouched.
+    if (twWsActiveKey === key) { twCloseWorkspace(); return; }
+    openTabs = openTabs.filter(t => t !== 'ws:' + key);
+    delete twWsTabs[key];
+    renderTabs();
+}
+
 async function twOpenWorkspace(recordId) {
+    // Phase 10.27: already open in its own tab? Just switch to it -- no
+    // refetch, no rebuild, the agent's work-in-progress is exactly as left.
+    const wsKey = twWsKeyFor(recordId);
+    if (twWsTabs[wsKey]) { openInTab('ws:' + wsKey); return; }
     const seq = ++twOpenSeq;
     const t0 = twPerfNow();
     let tShell = t0, tRec = t0, perfSource = 'cold-fetch';
     // Phase 10.14: remember WHERE the workspace was opened from, BEFORE any
     // await runs (activeTabId is still the origin page until openInTab below).
     // twCloseWorkspace returns here instead of always landing on Live Queue.
-    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'live-tickets';
+    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace' && !String(activeTabId).startsWith('ws:')) ? activeTabId : 'live-tickets';
+    // Phase 10.27: mount a FRESH workspace instance for this ticket -- the
+    // classic instant-shell + fill below renders into it exactly as before.
+    twWsNewInstance(wsKey, recordId);
 
     // ── Phase 10.21 (speed): INSTANT SHELL ──
     // The workspace frame renders IMMEDIATELY -- same controls, empty values,
@@ -11014,7 +11674,7 @@ async function twOpenWorkspace(recordId) {
     twSyncBackButton();
     twResetNote(true);
     twToggleTopbar(false);
-    openInTab('ticket-workspace');
+    openInTab('ws:' + wsKey);
     tShell = twPerfNow();
 
     // ── record fetch: consume the prefetch if one exists, else fetch live ──
@@ -11154,7 +11814,9 @@ async function twOpenWorkspace(recordId) {
             dupCheck.setAttribute('style', ltDupClass(ticket.fields['Duplicated Check']||''));
         }
 
-        openInTab('ticket-workspace');
+        // Phase 10.27: the ticket's own tab takes its real title once filled.
+        if (twWsTabs[wsKey]) twWsTabs[wsKey].title = document.getElementById('tw-title').textContent;
+        openInTab('ws:' + wsKey);
         // Phase 10.13.2: stretch every auto textarea to fit the content just
         // loaded into it (static notes + any field createTwControl rendered).
         requestAnimationFrame(() => twAutoGrowAll(document.getElementById('pg-ticket-workspace') || document));
@@ -11204,12 +11866,17 @@ async function twOpenWorkspace(recordId) {
 // and 🚀 Submit Request files through /api/requests/submit exactly like the
 // New Request form does.
 function twOpenCreateWorkspace() {
+    // Phase 10.27: one draft, one tab -- clicking "New Ticket" again just
+    // switches back to the existing draft, every field exactly as left.
+    if (twWsTabs['create']) { openInTab('ws:create'); return; }
     // Phase 10.21: opening the draft aborts any real-ticket open still in
     // flight (its post-fetch fill would otherwise land on top of the draft).
     twOpenSeq++;
     twWorkspaceLoading = false;
     twCreateMode = true;
-    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'welcome';
+    twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace' && !String(activeTabId).startsWith('ws:')) ? activeTabId : 'welcome';
+    // Phase 10.27: the draft gets its own fresh workspace instance + tab.
+    twWsNewInstance('create', null);
     twSyncBackButton(); // Phase 10.14: Back button names the origin page
     ltActiveTicket = { record_id: null, fields: {} }; // synthetic blank ticket -- twSelectRequestType/twRenderSection2 read from it
     twOrigFields = {};
@@ -11266,7 +11933,7 @@ function twOpenCreateWorkspace() {
         mgSelCreate.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
     }
 
-    openInTab('ticket-workspace');
+    openInTab('ws:create');
     twToggleTopbar(false);
     twApplyCreateModeChrome();
 }
@@ -11357,7 +12024,7 @@ async function twSubmitNewTicketCore() {
 // workspace out of draft chrome (save-button labels, hidden verify button,
 // title, head meta) WITHOUT closing it, so the flow continues as a normal
 // ticket workspace on the brand-new record.
-function twExitCreateMode() {
+function twExitCreateMode(recordId) {
     if (!twCreateMode) return;
     twCreateMode = false;
     twApplyCreateModeChrome(); // the flag is off -> labels revert to Save & Resolve, verify button returns
@@ -11368,7 +12035,22 @@ function twExitCreateMode() {
         <span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Mode</span>Filed from the New Ticket draft</span>
         <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Sheet</span>Record created — charges and saves land on it now</span>
     `;
-    if (typeof renderTabs === 'function') renderTabs(); // the 🆕 New Ticket draft tab folds back into the queue tab, same as any real ticket
+    // Phase 10.27: the draft's tab becomes the brand-new ticket's own tab
+    // (re-key 'ws:create' -> 'ws:r_<recordId>') instead of folding away.
+    if (recordId && twWsTabs['create']) {
+        const rec = twWsTabs['create'];
+        delete twWsTabs['create'];
+        const newKey = twWsKeyFor(recordId);
+        rec.key = newKey;
+        rec.recordId = recordId;
+        rec.createMode = false;
+        rec.title = `🎫 #${String(recordId).slice(-6)}`;
+        twWsTabs[newKey] = rec;
+        if (twWsActiveKey === 'create') twWsActiveKey = newKey;
+        openTabs = openTabs.map(tb => tb === 'ws:create' ? 'ws:' + newKey : tb);
+        if (activeTabId === 'ws:create') activeTabId = 'ws:' + newKey;
+    }
+    if (typeof renderTabs === 'function') renderTabs();
 }
 
 // ISSUE 2 FIX: image lightbox/modal with zoom + rotate + pan + gallery nav + OCR text
@@ -12380,7 +13062,14 @@ function createTwControl(key, value) {
     }
     if (key === 'Formula') {
         wrap.style.gridColumn = '1 / -1';
-        wrap.innerHTML = label + twComputedFieldHtml(key, valStr);
+        // Phase 10.27 (Ahmed): the sheet's stored Formula text is only as fresh
+        // as its last save -- fix a wrong Agency Code and the stale numbers
+        // just sit there ("i edit but it still show the wrong code and didn't
+        // update the FORMULA"), and a New-Ticket draft has no record at all.
+        // This control now recomputes LIVE (twRefreshFormulaLive) off the
+        // Check-Agency-Target ledger on every Agency Code / Privilege edit.
+        wrap.dataset.formulaLive = '1';
+        wrap.innerHTML = label + `<span class="twcf-live-badge" title="Recomputed from the Check Agency Target ledger — always matches the Agency Code on screen. Tap to force a fresh live re-check.">⚡ live</span>` + twComputedFieldHtml(key, valStr);
         return wrap;
     }
 
@@ -12444,15 +13133,21 @@ function twCloseWorkspace() {
     twRadarSetMsg('', false);
     // Phase 10.13.1: return to where the workspace was opened FROM (a
     // tickets_new-only agent must not land on the Live Queue he can't see).
-    const back = (typeof twReturnTo !== 'undefined' && twReturnTo) ? twReturnTo : 'live-tickets';
-    // Phase 10.18 (ghost-workspace fix): the workspace is CLOSED now, so drop
-    // it from openTabs entirely. It used to linger there (tab-less for real
-    // tickets), and closeTab()'s "activate the last open tab" fallback could
-    // then land on it -- the closed ticket's workspace reappearing with no tab.
-    openTabs = openTabs.filter(t => t !== 'ticket-workspace');
-    activeTabId = back;
-    renderTabs();
-    executePageLogic(back);
+    const back = (typeof twReturnTo !== 'undefined' && twReturnTo && !String(twReturnTo).startsWith('ws:')) ? twReturnTo : 'live-tickets';
+    // Phase 10.27: closing = closing THIS ticket's own tab and disposing its
+    // keep-alive instance. Every other open ticket keeps its tab and its
+    // untouched work; the agent lands back on the page he came from.
+    const wsKey = twWsActiveKey;
+    if (wsKey && twWsTabs[wsKey]) {
+        const inst = document.getElementById('twWsInstance');
+        if (inst && twWsTabs[wsKey].node === inst) inst.parentNode.removeChild(inst);
+        delete twWsTabs[wsKey];
+        twWsActiveKey = null;
+        openTabs = openTabs.filter(t => t !== 'ws:' + wsKey);
+    }
+    openTabs = openTabs.filter(t => t !== 'ticket-workspace'); // legacy guard
+    activeTabId = openTabs.includes(back) ? back : (openTabs[openTabs.length - 1] || 'welcome');
+    setActiveTab(activeTabId);
 }
 
 // Shared by twSaveWorkspace and twRunVerify. Collects text/number/select/textarea
@@ -12630,7 +13325,16 @@ async function twSaveWorkspace() {
             body: finalData
         });
         const data = await res.json();
-        if (!data.success) throw new Error(data.error);
+        // Phase 10.29 (Ahmed): the backend now aborts the WHOLE save when any
+        // attachment fails to upload (502 + failed_files) instead of silently
+        // skipping the file. Surface that as a longer WARNING naming the
+        // file(s) -- nothing was written, the workspace stays open, and the
+        // agent just hits Save again.
+        if (!data.success) {
+            const err = new Error(data.error || 'Save failed');
+            err.isUploadAbort = !!(data.failed_files && data.failed_files.length);
+            throw err;
+        }
         ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : 'Ticket saved successfully.', 'success');
         twResetNote(true); // Phase 10.1: submitted -> close & clear the scratch note
         
@@ -12639,7 +13343,7 @@ async function twSaveWorkspace() {
         
         twCloseWorkspace();
     } catch (e) {
-        ToastManager.show('Failed to save: ' + e.message, 'error');
+        ToastManager.show('Failed to save: ' + e.message, e.isUploadAbort ? 'warning' : 'error', e.isUploadAbort ? 9000 : 5000);
     } finally {
         btns.forEach(b => { b.disabled = false; b.textContent = '💾 Save & Resolve'; });
     }
@@ -14298,25 +15002,28 @@ let auditDoneByCache = {};
 // happened on the first roster-chip submission. Instead each person is
 // resolved once through THIS app's own /api/members/search (the same
 // endpoint the Done-by quick picks use, which submits cleanly) and cached.
+// Phase 10.28: each person is tagged with their region so the quick-pick
+// row shows ONLY the ACMs that belong to the ticket's Region (IN = the 6
+// India ACMs, PK = the 12 Pakistan ACMs) -- no more half-empty chip grid.
 const AUDIT_MENTION_ROSTER = [
-    { name: 'Ritu Pant',      email: 'ritupant@micous.com' },
-    { name: 'Holy',           email: 'holy@micous.com' },
-    { name: 'Ravikant',       email: 'ravikant@micous.com' },
-    { name: 'Vihan',          email: 'vihan@micous.com' },
-    { name: 'Ansh',           email: 'ansh@micous.com' },
-    { name: 'Rudra',          email: 'rudra@micous.com' },
-    { name: 'Zohaib Ahmed',   email: 'zohaibahmed@micous.com' },
-    { name: 'Haseeb Malik',   email: 'haseebmalik@micous.com' },
-    { name: 'Farooq',         email: 'farooq@micous.com' },
-    { name: 'Mubeen',         email: 'mubeen@micous.com' },
-    { name: 'Ehtisham',       email: 'ehtisham@micous.com' },
-    { name: 'Cruz',           email: 'cruz@micous.com' },
-    { name: 'Sehar Choudhry', email: 'seharch@micous.com' },
-    { name: 'Hamza Malik',    email: 'hamzamalik@micous.com' },
-    { name: 'Usama',          email: 'usama@micous.com' },
-    { name: 'Nabeel',         email: 'nabeeliqbal@micous.com' },
-    { name: 'Eagle (Adnan)',  email: 'muhammadnan@micous.com' },
-    { name: 'Enzo',           email: 'enzo@micous.com' },
+    { name: 'Ritu Pant',      email: 'ritupant@micous.com',    region: 'IN' },
+    { name: 'Holy',           email: 'holy@micous.com',        region: 'IN' },
+    { name: 'Ravikant',       email: 'ravikant@micous.com',    region: 'IN' },
+    { name: 'Vihan',          email: 'vihan@micous.com',       region: 'IN' },
+    { name: 'Ansh',           email: 'ansh@micous.com',        region: 'IN' },
+    { name: 'Rudra',          email: 'rudra@micous.com',       region: 'IN' },
+    { name: 'Zohaib Ahmed',   email: 'zohaibahmed@micous.com', region: 'PK' },
+    { name: 'Haseeb Malik',   email: 'haseebmalik@micous.com', region: 'PK' },
+    { name: 'Farooq',         email: 'farooq@micous.com',      region: 'PK' },
+    { name: 'Mubeen',         email: 'mubeen@micous.com',      region: 'PK' },
+    { name: 'Ehtisham',       email: 'ehtisham@micous.com',    region: 'PK' },
+    { name: 'Cruz',           email: 'cruz@micous.com',        region: 'PK' },
+    { name: 'Sehar Choudhry', email: 'seharch@micous.com',     region: 'PK' },
+    { name: 'Hamza Malik',    email: 'hamzamalik@micous.com',  region: 'PK' },
+    { name: 'Usama',          email: 'usama@micous.com',       region: 'PK' },
+    { name: 'Nabeel',         email: 'nabeeliqbal@micous.com', region: 'PK' },
+    { name: 'Eagle (Adnan)',  email: 'muhammadnan@micous.com', region: 'PK' },
+    { name: 'Enzo',           email: 'enzo@micous.com',        region: 'PK' },
 ];
 
 const auditMentionCache = {}; // email -> { open_id, name } resolved through this app's member search
@@ -14400,29 +15107,29 @@ function auditRenderMentionRoster(wrap) {
     if (!wrap || wrap.querySelector('.audit-mention-row')) return;
     const row = document.createElement('div');
     row.className = 'audit-pick-row audit-mention-row';
-    row.innerHTML = AUDIT_MENTION_ROSTER.map(p =>
-        `<button type="button" class="audit-pick-btn audit-mention-chip" data-email="${escHtml(p.email)}">${escHtml(p.name)}</button>`).join('');
     const label = wrap.querySelector('label');
     if (label && label.nextSibling) wrap.insertBefore(row, label.nextSibling);
     else wrap.appendChild(row);
 
-    row.querySelectorAll('.audit-mention-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const person = AUDIT_MENTION_ROSTER.find(p => p.email === btn.dataset.email);
-            if (!person) return;
-            if (btn.classList.contains('active')) {
-                // Tapping the already-active chip clears the pick again.
-                const input = wrap.querySelector('input[id^="twup-"][id$="-input"]');
-                if (input) twClearUserPicker(input.id.slice(0, -6));
-                row.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
-                auditDeducedPerson = '';
-                auditPersonClearedByHand = true; // Phase 10.13.2: a hand clear owns the field -- never resurrect it
-                return;
-            }
-            auditDeducedPerson = ''; // a hand tap now owns the field
-            auditPersonClearedByHand = false; // Phase 10.13.2: a hand PICK drops the cleared memory
-            auditSetMentionedPerson(person, true, true);
-        });
+    // Chips are re-rendered every time Region changes (Phase 10.28), so the
+    // click handling is delegated on the row -- it survives re-renders.
+    row.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('.audit-mention-chip') : null;
+        if (!btn) return;
+        const person = AUDIT_MENTION_ROSTER.find(p => p.email === btn.dataset.email);
+        if (!person) return;
+        if (btn.classList.contains('active')) {
+            // Tapping the already-active chip clears the pick again.
+            const input = wrap.querySelector('input[id^="twup-"][id$="-input"]');
+            if (input) twClearUserPicker(input.id.slice(0, -6));
+            row.querySelectorAll('.audit-mention-chip').forEach(c => c.classList.remove('active'));
+            auditDeducedPerson = '';
+            auditPersonClearedByHand = true; // Phase 10.13.2: a hand clear owns the field -- never resurrect it
+            return;
+        }
+        auditDeducedPerson = ''; // a hand tap now owns the field
+        auditPersonClearedByHand = false; // Phase 10.13.2: a hand PICK drops the cleared memory
+        auditSetMentionedPerson(person, true, true);
     });
 
     // Clearing via the picker chip's own ✕ should also drop the roster chip
@@ -14434,6 +15141,32 @@ function auditRenderMentionRoster(wrap) {
             auditPersonClearedByHand = true; // Phase 10.13.2: a hand clear owns the field -- never resurrect it
         }
     });
+
+    auditRefreshMentionRoster();
+}
+
+// Phase 10.28: region-scoped quick picks. The chip row shows ONLY the ACMs
+// of the ticket's Region (IN -> the 6 India ACMs, PK -> the 12 Pakistan
+// ACMs), packed into the 3-col grid so no dead space is left. No Region
+// picked yet -> a muted hint line instead of chips. Re-runs on every Region
+// change; a still-listed active chip keeps its highlight across re-renders.
+function auditRefreshMentionRoster() {
+    const wrap = auditMentionWrap();
+    const row = wrap ? wrap.querySelector('.audit-mention-row') : null;
+    if (!row) return;
+    const regionEl = document.getElementById('audfld_Region');
+    const region = regionEl ? (regionEl.value || '').trim().toUpperCase() : '';
+    const people = (region === 'IN' || region === 'PK')
+        ? AUDIT_MENTION_ROSTER.filter(p => p.region === region)
+        : [];
+    if (!people.length) {
+        row.innerHTML = '<div class="audit-mention-hint">Pick a Region above — its ACM quick-picks appear here.</div>';
+        return;
+    }
+    const activeChip = row.querySelector('.audit-mention-chip.active');
+    const activeEmail = activeChip ? activeChip.dataset.email : '';
+    row.innerHTML = people.map(p =>
+        `<button type="button" class="audit-pick-btn audit-mention-chip${p.email === activeEmail ? ' active' : ''}" data-email="${escHtml(p.email)}">${escHtml(p.name)}</button>`).join('');
 }
 
 // Sets Mentioned Person through the normal member-picker machinery (chip UI +
@@ -14600,7 +15333,10 @@ function renderAuditFields() {
         }
         target.appendChild(el);
         if (fName === 'Region') {
-            el.querySelector('select').addEventListener('change', () => refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false));
+            el.querySelector('select').addEventListener('change', () => {
+                refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
+                auditRefreshMentionRoster(); // Phase 10.28: region-scoped ACM quick picks
+            });
         }
         if (fName === 'Status') {
             auditRenderPickButtons(el, 'audfld_Status');
@@ -14708,6 +15444,9 @@ function auditRenderPickButtons(wrap, selectId) {
             select.value = btn.dataset.val;
             row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
             auditUpdateReminders();
+            // Phase 10.28: picking Rejected unfolds the compact Reject Reason
+            // card under 📋 Ticket Text; any other status folds it back.
+            if (selectId === 'audfld_Status') awsRrTogglePicker(btn.dataset.val === 'Rejected');
         });
     });
 }
@@ -14771,6 +15510,30 @@ function auditRenderDoneByPicker(wrap) {
     });
 }
 
+// Phase 10.28: the Reject Reason field lives in a compact collapsible card
+// under 📋 Ticket Text (aws-left). The summary line mirrors the checked
+// boxes (chip taps set .checked programmatically, firing no events, so this
+// is called from inside the picker's sync()), and the toggle unfolds/folds
+// the full picker. force=true/false pins the state; no argument flips it.
+function awsRrUpdateSummary() {
+    const summary = document.getElementById('awsRrSummary');
+    if (!summary) return;
+    const host = document.getElementById('auditFieldsReject');
+    const picked = host ? Array.from(host.querySelectorAll('input[type="checkbox"]:checked')).map(b => (b.value || '').trim()).filter(Boolean) : [];
+    summary.textContent = picked.length ? picked.join('  ·  ') : 'No reason selected yet — click "Show all" to pick.';
+    summary.classList.toggle('has-sel', picked.length > 0);
+}
+
+function awsRrTogglePicker(force) {
+    const host = document.getElementById('auditFieldsReject');
+    const btn = document.getElementById('awsRrToggle');
+    if (!host || !btn) return;
+    const show = (typeof force === 'boolean') ? force : (host.style.display === 'none');
+    host.style.display = show ? '' : 'none';
+    btn.textContent = show ? '⊟ Hide reasons' : '⊞ Show all reasons';
+    btn.classList.toggle('open', show);
+}
+
 // "Reject Reason" quick-picker: the raw field is a 21-option checkbox list,
 // which means endless up-and-down scrolling inside the Decision panel. This
 // swaps it (visually) for selected-chips on top, a filter box, and a
@@ -14803,6 +15566,7 @@ function auditRenderRejectReasonPicker(wrap) {
             const box = boxes.find(b => b.value === c.dataset.val);
             c.classList.toggle('active', !!(box && box.checked));
         });
+        awsRrUpdateSummary(); // Phase 10.28: keep the compact card's summary line in sync
     };
 
     cloud.innerHTML = boxes.map(b => `<button type="button" class="rr-chip" data-val="${escHtml(b.value)}">${escHtml(b.value.trim())}</button>`).join('');
@@ -15289,6 +16053,11 @@ function auditClearWorkstation(silent) {
     auditLastScanKey = '';
     auditCloseDupDrawer();
     refreshAcmAutoSlot('audfld_Region', 'auditAcmSlot', 'audfld_', false);
+    // Phase 10.28: fold the compact Reject Reason card back and reset its
+    // summary line + region-scoped ACM quick picks for the next ticket.
+    awsRrTogglePicker(false);
+    awsRrUpdateSummary();
+    auditRefreshMentionRoster();
     auditUpdateReminders();
     if (!silent) ToastManager.show('Workstation cleared — ready for the next ticket.', 'success', 2500);
 }
