@@ -1009,7 +1009,13 @@
            now, so the Analytics filters read as one row of identical fields. */
         .msdd-box{width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface,var(--bg));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.87rem;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;transition:.15s}
         .msdd-box:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
-        .msdd-box::after{content:'▾';color:var(--text-muted);flex-shrink:0;font-size:.8rem}
+        .msdd-box::after{content:'▾';color:var(--text-muted);flex-shrink:0;font-size:.7rem}
+        /* Phase 10.37 (Ahmed): "Assigned ACM still in same shape" -- the
+           searchable selects colour their chosen value (ssSyncDisplay's
+           palette, first colour = accent cyan) while the multi-select
+           summary stayed plain white, so it still read as a different
+           control. Same cyan now; box metrics were matched in 10.36. */
+        #anaAcmSelect .msdd-box{color:var(--accent-cyan);}
         .msdd-menu{position:absolute;top:100%;left:0;right:0;margin-top:6px;background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;z-index:100;box-shadow:var(--shadow);display:none;padding:6px}
         .msdd-search{width:100%;padding:8px 10px;margin-bottom:6px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:.85rem;font-family:inherit;position:sticky;top:0}
         .msdd-search:focus{outline:none;border-color:var(--accent-cyan)}
@@ -1474,9 +1480,21 @@
         .twx-radar-msg:hover{border-color:rgba(255,77,109,0.65);}
         .twx-radar-msg-x{position:absolute;top:6px;right:8px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text-muted);font-size:.75rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;z-index:2;}
         .twx-radar-msg-x:hover{background:rgba(255,77,109,.30);color:#fff;}
+        /* Phase 10.37 (Ahmed): "move the message of duplicated to right to be
+           next of the radar icon" -- right:305 parked the bubble at x851,
+           which COVERED the 📡 circle (dock right edge = 50%+236 ≈ x919).
+           Now the bubble is glued to the radar dock: immediately RIGHT of the
+           📡 icon (twxRadarPositionMsg measures the live rect on every show /
+           resize / sidebar toggle; these rules are the pre-JS fallback).
+           Sharp corner moves to bottom-LEFT so the chat tail points back at
+           the icon it belongs to. */
+        #twRadarMsg{right:auto;left:calc(50% + 244px);top:16px;width:min(190px, calc(100vw - 32px));border-radius:16px 16px 16px 4px;transform-origin:bottom left;}
+        body.sidebar-collapsed #twRadarMsg{left:calc(50% + 112px);}
         /* Phase 10.36: below ~1330px the centered dock icons slide left into
            the header gap and the bubble would cover them -- fall back to
-           just under the header at the right edge for those widths. */
+           just under the header at the right edge for those widths.
+           (10.37: #twRadarMsg is dock-anchored by ID rules + JS, so this
+           fallback now only governs the audit bubble #awsRadarMsg.) */
         @media(min-width:1025px) and (max-width:1330px){
             .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;transform-origin:top right;}
         }
@@ -1485,6 +1503,9 @@
                just tucked closer to the edge so it never collides with the
                collapsed-header icons. */
             .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            /* 10.37: beat the #twRadarMsg dock-anchor ID rules above so the
+               narrow fallback still wins on small screens. */
+            #twRadarMsg{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
             .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
             @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         }
@@ -13841,6 +13862,7 @@ function twRadarSetMsg(html, show, state) {
     if (show && html) {
         msg.dataset.wsOwner = (typeof twWsActiveKey !== 'undefined' && twWsActiveKey) || '';
         delete msg.dataset.wsWasOpen;
+        twxRadarPositionMsg(msg); // Phase 10.37: glue it to the 📡 icon
     } else if (!show) {
         delete msg.dataset.wsWasOpen;
     }
@@ -13909,6 +13931,7 @@ function twxRadarSyncVisibility() {
         } else if (wsMsg.dataset.wsWasOpen === '1') {
             delete wsMsg.dataset.wsWasOpen;
             wsMsg.classList.add('open');
+            twxRadarPositionMsg(wsMsg); // 10.37: re-glue to the 📡 icon on restore
         }
     }
     const awMsg = document.getElementById('awsRadarMsg');
@@ -13922,6 +13945,47 @@ function twxRadarSyncVisibility() {
         }
     }
 }
+
+// Phase 10.37 (Ahmed): "move the message of duplicated to right to be next
+// of the radar icon". The bubble is measured against the LIVE 📡 dock rect
+// on every show, so it hugs the icon at any viewport width / zoom / sidebar
+// state -- immediately to its RIGHT, top-aligned with the circle. If the gap
+// to the screen edge gets too tight (<150px) it drops UNDER the circle
+// instead. Narrow screens (<=1024px) stay pure-CSS (inline styles cleared so
+// the media fallback can win).
+function twxRadarPositionMsg(msg) {
+    msg = msg || document.getElementById('twRadarMsg');
+    if (!msg) return;
+    if (window.innerWidth <= 1024) {
+        msg.style.left = ''; msg.style.top = ''; msg.style.right = ''; msg.style.width = '';
+        return;
+    }
+    const dock = document.getElementById('twRadarDock');
+    if (!dock) return; // CSS fallback (50% + 244px) covers this
+    const r = dock.getBoundingClientRect();
+    const W = window.innerWidth;
+    let left = Math.round(r.right + 8);
+    let top = Math.round(r.top);
+    let width = Math.min(190, W - 12 - left);
+    if (width < 150) { // not enough room on the right -> drop under the circle
+        width = Math.min(210, W - 24);
+        left = Math.max(12, Math.min(Math.round(r.left + r.width / 2 - width / 2), W - 12 - width));
+        top = Math.round(r.bottom + 8);
+    }
+    msg.style.left = left + 'px';
+    msg.style.top = top + 'px';
+    msg.style.right = 'auto';
+    msg.style.width = width + 'px';
+}
+window.addEventListener('resize', () => {
+    const m = document.getElementById('twRadarMsg');
+    if (m && m.classList.contains('open')) twxRadarPositionMsg(m);
+});
+// Sidebar collapse shifts the centered dock WITHOUT a window resize.
+new MutationObserver(() => {
+    const m = document.getElementById('twRadarMsg');
+    if (m && m.classList.contains('open')) twxRadarPositionMsg(m);
+}).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
 // The sheet's own "Duplicated Check" formula result, shown inside the bubble
 // (it used to have its own column in the retired Duplicate Check card).
