@@ -4760,9 +4760,16 @@ def query_records():
         # endpoints can never drift apart.
         combos = _query_combos_for_field(field, value)
 
+        # Phase 10.34 (speed, zero cost): projection=None -- Feishu's
+        # records/search costs per CALL, not per field, and it already
+        # downloads every field of each hit. Full fields ride each result row
+        # so the frontend seeds the ticket workspace on open: zero
+        # /api/requests/single calls (and the old top-3 warm prefetches are
+        # gone -- FEWER calls than before). /api/query/batch keeps its slim
+        # projection on purpose (radar rows never open a workspace).
         results_by_combo = {}
         with ThreadPoolExecutor(max_workers=min(9, len(combos) or 1)) as executor:
-            for res in executor.map(lambda c: _query_try_combo(search_url, headers, c), combos):
+            for res in executor.map(lambda c: _query_try_combo(search_url, headers, c, projection=None), combos):
                 results_by_combo[res["combo"]] = res
 
         all_items, fetch_complete, stop_reason, success = _query_pick_first_ok(combos, results_by_combo)
@@ -4770,6 +4777,12 @@ def query_records():
         if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
 
     results = _query_format_results(all_items, allowed_acms_set, allowed_regs_set)
+
+    # Phase 10.34: attach full fields per row (keyed by record_id) AFTER the
+    # shared formatter ran -- the formatter itself stays slim for /api/query/batch.
+    _ff_by_id = {it.get("record_id"): it.get("fields", {}) for it in all_items if it.get("record_id")}
+    for r in results:
+        r["full_fields"] = _ff_by_id.get(r.get("record_id"))
 
     return jsonify({
         "results": results, "count": len(results), "field": field, "value": value,
@@ -6815,12 +6828,13 @@ def list_under_investigation():
         return jsonify({"error": "Access denied"}), 403
     audit.log(user, "TICKETS_UNDER_INVESTIGATION", "search", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
 
-    # Phase 10.13.1 (Ahmed): the list now mirrors the sheet's own grid -- it
-    # must also carry Mentioned Person, Type of Action and the ACM columns.
-    BASIC_FIELDS = ["Numbering", "Submitted on Copy", "Submitted on", "Request Type",
-                    "Respondents", "Mentioned Person", "Type of Action", "Region",
-                    "Acm Name (IN)", "Acm Name (PK)", "User ID", "Agency Code", "Status"]
-
+    # Phase 10.34 (speed, zero cost): the field projection is GONE. Feishu's
+    # records/search costs per CALL, not per field, and the search already
+    # downloads every field of each matching record -- asking for fewer
+    # fields bought nothing. Each row now rides its full fields along so the
+    # frontend can seed the ticket workspace: opening ANY result needs zero
+    # /api/requests/single calls (the old top-5 warm prefetches are gone too,
+    # so this is FEWER calls than before, not more).
     if MOCK_MODE:
         items = MockFeishuDB.generate_requests(6)
     else:
@@ -6831,15 +6845,10 @@ def list_under_investigation():
             "filter": {"conjunction": "and", "conditions": [
                 {"field_name": "Status", "operator": "is", "value": ["Under Investigation"]}
             ]},
-            "field_names": BASIC_FIELDS,
         }
         try:
             resp = feishu_session.post(search_url, headers=headers, json=payload, timeout=15)
             data = resp.json()
-            if data.get("code") == 1254045:  # projection rejected -> retry without it (same fallback as /api/query)
-                payload.pop("field_names", None)
-                resp = feishu_session.post(search_url, headers=headers, json=payload, timeout=15)
-                data = resp.json()
             if data.get("code") != 0:
                 return jsonify({"error": f"Data fetch failed: Feishu API Error: {data.get('msg','Invalid Filter.')}"}), 502
             items = data.get("data", {}).get("items", [])
@@ -6867,6 +6876,7 @@ def list_under_investigation():
             "acm":          acm_in or acm_pk,
             "user_id":      extract_field_text(get_field_local(fields, "User ID")),
             "agency_code":  extract_field_text(get_field_local(fields, "Agency Code")),
+            "full_fields":  fields,  # Phase 10.34: seed the workspace on open -- zero extra calls
             "_sort_ts":     submitted_dt.timestamp() if submitted_dt else 0,
         })
     rows.sort(key=lambda r: r["_sort_ts"], reverse=True)
