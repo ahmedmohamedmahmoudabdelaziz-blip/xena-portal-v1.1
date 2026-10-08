@@ -314,6 +314,12 @@
            stays in the DOM (hidden or backing dataset), so submitAuditForm()
            and the reminders logic don't need to know these are buttons. */
         .audit-pick-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+        /* Phase 10.38: the "send msg again" checkbox chip beside the Mentioned
+           Group label -- small, muted until ticked, cyan when armed. */
+        .tw-mg-resend { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); font-size: .68rem; font-weight: 700; color: var(--text-muted); cursor: pointer; vertical-align: middle; text-transform: none; letter-spacing: 0; transition: all .15s; }
+        .tw-mg-resend:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .tw-mg-resend:has(input:checked) { border-color: var(--accent-cyan); background: rgba(0,212,255,.12); color: var(--accent-cyan); }
+        .tw-mg-resend input { width: 12px; height: 12px; margin: 0; accent-color: var(--accent-cyan); cursor: pointer; }
         .audit-pick-btn { flex: 1; min-width: 110px; padding: 12px; border-radius: 10px; border: 1.5px solid var(--border); background: transparent; font-weight: 700; font-size: .82rem; cursor: pointer; transition: all .15s; color: var(--text-muted); }
         .audit-pick-btn:hover { border-color: var(--border-hover); transform: translateY(-1px); }
         .audit-pick-btn[data-val="Done "] { border-color: var(--accent-green); color: var(--accent-green); }
@@ -1490,22 +1496,24 @@
            the icon it belongs to. */
         #twRadarMsg{right:auto;left:calc(50% + 244px);top:16px;width:min(190px, calc(100vw - 32px));border-radius:16px 16px 16px 4px;transform-origin:bottom left;}
         body.sidebar-collapsed #twRadarMsg{left:calc(50% + 112px);}
-        /* Phase 10.36: below ~1330px the centered dock icons slide left into
-           the header gap and the bubble would cover them -- fall back to
-           just under the header at the right edge for those widths.
-           (10.37: #twRadarMsg is dock-anchored by ID rules + JS, so this
-           fallback now only governs the audit bubble #awsRadarMsg.) */
-        @media(min-width:1025px) and (max-width:1330px){
-            .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;transform-origin:top right;}
-        }
+        /* Phase 10.38 (Ahmed): "why the duplicated radar msg appeare like
+           this in the audit not like the appeare in the work space?" -- the
+           audit bubble never got the 10.37 glue, so it still rendered at the
+           stale top-right spot (right:305) while its 📡 circle floats
+           top-center. Same dock-anchored treatment now: the audit dock holds
+           ONE 60px circle, so its right edge is 50%+162 (workspace: +236);
+           JS (twxRadarPositionMsg) measures the live #awsRadarDock rect on
+           every show, these rules are just the pre-JS fallback. */
+        #awsRadarMsg{right:auto;left:calc(50% + 170px);top:16px;width:min(190px, calc(100vw - 32px));border-radius:16px 16px 16px 4px;transform-origin:bottom left;}
+        body.sidebar-collapsed #awsRadarMsg{left:calc(50% + 38px);}
         @media(max-width:1024px){
             /* narrow screens: the bubble stays fixed top-right (Phase 10.34),
                just tucked closer to the edge so it never collides with the
                collapsed-header icons. */
             .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
-            /* 10.37: beat the #twRadarMsg dock-anchor ID rules above so the
-               narrow fallback still wins on small screens. */
-            #twRadarMsg{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            /* 10.37/10.38: beat the dock-anchor ID rules above so the narrow
+               fallback still wins on small screens (both bubbles). */
+            #twRadarMsg,#awsRadarMsg{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
             .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
             @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         }
@@ -3738,9 +3746,16 @@
                                <div class="audit-pick-row twx-status-picks" id="twStatusPicks"></div>
                            </div>
                            <!-- ISSUE 4 FIX: Mentioned Group (fld9RClgRw) now rendered here,
-                                in the final Audition Action / Chinese Approval area. -->
+                                in the final Audition Action / Chinese Approval area.
+                                Phase 10.38 (Ahmed): a "send msg again" checkbox rides
+                                beside the label, visible ONLY when the ticket came with
+                                a group already set -- re-selecting the same group never
+                                re-fires the Base group-message automation, so a checked
+                                box makes Save empty the sheet field first, then re-set
+                                it (two ordered writes = the bot posts again). Unchecked:
+                                Mentioned Group is left exactly as the diff decides. -->
                            <div class="control-group">
-                               <label>Mentioned Group</label>
+                               <label>Mentioned Group <span class="tw-mg-resend" id="twMgResendWrap" style="display:none"><input type="checkbox" id="twMgResend" tabindex="0"> <span>send msg again</span></span></label>
                                <select id="tw-mentioned-group" name="Mentioned Group" data-feishu-field="Mentioned Group" class="form-highlight-input">
                                    <option value="">-- Select --</option>
                                </select>
@@ -10167,6 +10182,11 @@ function feishuValueToString(value) {
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
     if (Array.isArray(value)) {
         if (value.length === 0) return '';
+        // Phase 10.39: Feishu TEXT SEGMENTS ([{type:'text'/'mention'/'url', text:'…'}])
+        // are fragments of ONE string -- concatenate, never comma-join (a note
+        // with a mention would otherwise gain a stray ", " between fragments).
+        const isTextSegments = value.every(it => it && typeof it === 'object' && typeof it.text === 'string' && typeof it.type === 'string');
+        if (isTextSegments) return value.map(it => it.text).join('');
         return value.map(item => {
             if (item && typeof item === 'object') {
                 for (const k of ['text','name','en_name','email','value','id']) {
@@ -10179,7 +10199,10 @@ function feishuValueToString(value) {
     }
     if (typeof value === 'object') {
         for (const k of ['text','name','en_name','email','value','label','id']) {
-            if (value[k] !== undefined && value[k] !== null && value[k] !== '') return String(value[k]);
+            // Phase 10.39: recurse instead of String() -- a {type:N, value:[...]}
+            // automatic_fields envelope (or any nested segment) must unwrap to
+            // plain text, not "[object Object],[object Object]".
+            if (value[k] !== undefined && value[k] !== null && value[k] !== '') return feishuValueToString(value[k]);
         }
         return '';
     }
@@ -11489,6 +11512,21 @@ async function twApConfirmCharge() {
             if (ltActiveTicket?.fields) ltActiveTicket.fields['Agency Code'] = data.agency_code;
             ToastManager.show(`🔧 Charged the corrected Agency Code ${data.agency_code} — the ticket's stored code was updated to match.`, 'info', 7000);
         }
+        // Phase 10.38 (Ahmed): the charge also wrote the wallet's ACM onto
+        // the ticket (same call) -- reflect it on the open form + local state
+        // so a later Save doesn't push the old ACM back.
+        if (data.acm_name && data.acm_field) {
+            if (ltActiveTicket?.fields) ltActiveTicket.fields[data.acm_field] = data.acm_name;
+            const ac = document.querySelector(`#tw-form [name="${data.acm_field}"]`);
+            if (ac) {
+                if (!Array.from(ac.options || []).some(o => o.value === data.acm_name)) {
+                    ac.appendChild(new Option(data.acm_name, data.acm_name));
+                }
+                ac.value = data.acm_name; // ss display auto-resyncs via the .value setter override
+                if (typeof twOrigFields !== 'undefined' && twOrigFields) twOrigFields[data.acm_field] = data.acm_name; // not a "change" to save
+            }
+            ToastManager.show(`👤 ACM Name updated from the Agency Points table: ${data.acm_name}.`, 'info', 5000);
+        }
         if ((data.deducted || 0) > 0) {
             // Keep the on-screen wallet honest without a reload: balance comes
             // back from the server; used goes up by this charge's deduction
@@ -12176,7 +12214,15 @@ async function twOpenWorkspace(recordId) {
             if (twStatusOpt) twStatusSel.value = twStatusOpt.value;
         }
         twRenderStatusPicks(); // audit-style colored pick buttons mirror the hidden select
-        document.getElementById('tw-audition-note').value = ticket.fields['Audition note'] || '';
+        // Phase 10.39 (Ahmed): "[object Object]" in AUDITION NOTE -- the sheet
+        // can return this as a structured value (text-segment array when the
+        // note carries a mention/link), and a raw .value assignment stringifies
+        // the array. feishuValueToString unwraps segments to plain text. The
+        // diff base is synced to the SAME string form, so an untouched note is
+        // not re-saved as a phantom change (and an edited one saves cleanly).
+        const twAudNoteStr = feishuValueToString(ticket.fields['Audition note']);
+        document.getElementById('tw-audition-note').value = twAudNoteStr;
+        if (typeof twOrigFields !== 'undefined' && twOrigFields && 'Audition note' in twOrigFields) twOrigFields['Audition note'] = twAudNoteStr;
         document.getElementById('tw-approve-note').value = feishuValueToString(ticket.fields['approve note']);
         // Phase 10.2: the Chinese Approval card is commented out of the markup
         // (kept as a restore note there), so these two elements no longer
@@ -12184,7 +12230,9 @@ async function twOpenWorkspace(recordId) {
         const twChineseActionEl = document.getElementById('tw-chinese-action');
         if (twChineseActionEl) twChineseActionEl.value = typeof ticket.fields['Type of Action'] === 'string' ? ticket.fields['Type of Action'].trim() : (ticket.fields['Type of Action']?.text?.trim() || '');
         const twChineseNoteEl = document.getElementById('tw-chinese-note');
-        if (twChineseNoteEl) twChineseNoteEl.value = ticket.fields['chinese Note'] || '';
+        const twChineseNoteStr = feishuValueToString(ticket.fields['chinese Note']); // Phase 10.39: same [object Object] guard
+        if (twChineseNoteEl) twChineseNoteEl.value = twChineseNoteStr;
+        if (typeof twOrigFields !== 'undefined' && twOrigFields && 'chinese Note' in twOrigFields) twOrigFields['chinese Note'] = twChineseNoteStr;
 
         // ISSUE 4 FIX: populate the "Mentioned Group" dropdown (options come straight
         // from the live schema, same pattern used for Create Way below).
@@ -12194,6 +12242,11 @@ async function twOpenWorkspace(recordId) {
             const mgVal = feishuValueToString(ticket.fields['Mentioned Group']);
             const mgOpts = (mgMeta?.options || []).map(o => `<option value="${escHtml(o)}" ${o === mgVal ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
             mgSel.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
+            // Phase 10.38: fresh open = fresh choice; the "send msg again"
+            // chip appears only when the sheet already has a group set.
+            const mgResendCb = document.getElementById('twMgResend');
+            if (mgResendCb) mgResendCb.checked = false;
+            twxMgResendSync(mgVal);
         }
 
         // Phase 10.4: "Reject Reason" + "Create Way" moved into the Dynamic
@@ -12333,6 +12386,7 @@ function twOpenCreateWorkspace() {
     if (mgSelCreate) {
         const mgOpts = ((FIELD_SCHEMA['Mentioned Group'] || {}).options || []).map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
         mgSelCreate.innerHTML = `<option value="">-- Select --</option>${mgOpts}`;
+        twxMgResendSync(''); // Phase 10.38: a blank draft has no group yet -- chip stays hidden
     }
 
     openInTab('ticket-workspace');
@@ -13559,6 +13613,29 @@ function twCloseWorkspace() {
     setActiveTab(activeTabId);
 }
 
+// Phase 10.38 (Ahmed): the "send msg again" chip beside the Mentioned Group
+// label. Visible ONLY when the ticket CAME with a group already set (origVal
+// = the sheet value at open) -- re-selecting the same group never re-fires
+// the Base group-message automation, so the chip offers the empty-then-reset
+// re-send (handled in twSaveWorkspace). The whole chip is one click target
+// (the outer field <label> would otherwise focus the select on tap).
+function twxMgResendSync(origVal) {
+    const wrap = document.getElementById('twMgResendWrap');
+    const cb = document.getElementById('twMgResend');
+    if (!wrap || !cb) return;
+    if (origVal === undefined) origVal = feishuValueToString((twOrigFields || {})['Mentioned Group']);
+    const show = !!String(origVal == null ? '' : origVal).trim();
+    wrap.style.display = show ? 'inline-flex' : 'none';
+    if (!show) cb.checked = false;
+    if (!wrap.dataset.bound) {
+        wrap.dataset.bound = '1';
+        wrap.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            cb.checked = !cb.checked;
+        });
+    }
+}
+
 // Shared by twSaveWorkspace and twRunVerify. Collects text/number/select/textarea
 // values, groups MultiSelect checkboxes (data-multi="true") into arrays per field name,
 // and skips read-only Formula/Lookup/computed inputs (Feishu rejects writes to these).
@@ -13713,8 +13790,38 @@ async function twSaveWorkspace() {
 
     const form = document.getElementById('tw-form');
     const fields = twCollectFields(form);
+
+    // Phase 10.38 (Ahmed): "send msg again". The Base group-message automation
+    // fires on a Mentioned Group CHANGE, so re-saving the same group does
+    // nothing. With the chip ticked, Save becomes TWO ordered writes: first
+    // empty the sheet's Mentioned Group (its own update call), then the
+    // normal save re-sets it with the website value -- the bot posts again.
+    // Unticked: Mentioned Group follows the normal diff (same value = not
+    // sent at all). The empty-write failing aborts the whole save BEFORE
+    // anything else lands, so the ticket is never left half-updated.
+    const mgResendCb = document.getElementById('twMgResend');
+    const mgResendArmed = !!(mgResendCb && mgResendCb.checked &&
+        document.getElementById('twMgResendWrap')?.style.display !== 'none');
+    if (mgResendArmed) {
+        const mgVal = (document.getElementById('tw-mentioned-group')?.value || '').trim();
+        if (mgVal) {
+            const clearData = new FormData();
+            clearData.append('user', loggedUser);
+            clearData.append('record_id', document.getElementById('tw-record-id').value);
+            clearData.append('fields', JSON.stringify({ 'Mentioned Group': '' }));
+            const clrRes = await fetch('/api/requests/update', { method: 'POST', body: clearData });
+            const clrData = await clrRes.json().catch(() => ({}));
+            if (!clrRes.ok || clrData.success === false) {
+                btns.forEach(b => { b.disabled = false; b.textContent = '💾 Save & Resolve'; });
+                ToastManager.show('Could not clear Mentioned Group for the re-send (' + (clrData.error || ('HTTP ' + clrRes.status)) + ') — nothing was saved.', 'error', 7000);
+                return;
+            }
+            fields['Mentioned Group'] = mgVal; // step 2 rides the normal save below
+        }
+    }
+
     const finalData = new FormData();
-    
+
     finalData.append('user', loggedUser);
     finalData.append('record_id', document.getElementById('tw-record-id').value);
 
@@ -13745,6 +13852,7 @@ async function twSaveWorkspace() {
             throw err;
         }
         ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : 'Ticket saved successfully.', 'success');
+        if (mgResendArmed) ToastManager.show('📣 Mentioned Group was cleared and re-set — the group message will be sent again.', 'info', 6000); // Phase 10.38
         twResetNote(true); // Phase 10.1: submitted -> close & clear the scratch note
         
         const rid = document.getElementById('tw-record-id').value;
@@ -13942,6 +14050,7 @@ function twxRadarSyncVisibility() {
         } else if (awMsg.dataset.wsWasOpen === '1') {
             delete awMsg.dataset.wsWasOpen;
             awMsg.classList.add('open');
+            twxRadarPositionMsg(awMsg); // 10.38: re-glue to the audit 📡 icon on restore
         }
     }
 }
@@ -13960,9 +14069,16 @@ function twxRadarPositionMsg(msg) {
         msg.style.left = ''; msg.style.top = ''; msg.style.right = ''; msg.style.width = '';
         return;
     }
-    const dock = document.getElementById('twRadarDock');
-    if (!dock) return; // CSS fallback (50% + 244px) covers this
+    // Phase 10.38: each bubble glues to ITS OWN 📡 dock -- the audit bubble
+    // (#awsRadarMsg) anchors to the single-circle #awsRadarDock, the
+    // workspace bubble to #twRadarDock. Same math otherwise.
+    const dock = document.getElementById(msg.id === 'awsRadarMsg' ? 'awsRadarDock' : 'twRadarDock');
+    if (!dock) return; // CSS fallback (50% + 244px / + 170px) covers this
     const r = dock.getBoundingClientRect();
+    if (!r.width && !r.height) { // dock's page is hidden (tab switch mid-resize) — CSS fallback, never glue to (8,0)
+        msg.style.left = ''; msg.style.top = ''; msg.style.right = ''; msg.style.width = '';
+        return;
+    }
     const W = window.innerWidth;
     let left = Math.round(r.right + 8);
     let top = Math.round(r.top);
@@ -13977,15 +14093,16 @@ function twxRadarPositionMsg(msg) {
     msg.style.right = 'auto';
     msg.style.width = width + 'px';
 }
-window.addEventListener('resize', () => {
-    const m = document.getElementById('twRadarMsg');
-    if (m && m.classList.contains('open')) twxRadarPositionMsg(m);
-});
+// 10.38: reposition whichever bubble is open (workspace AND audit).
+function twxRadarRepositionAll() {
+    ['twRadarMsg', 'awsRadarMsg'].forEach(id => {
+        const m = document.getElementById(id);
+        if (m && m.classList.contains('open')) twxRadarPositionMsg(m);
+    });
+}
+window.addEventListener('resize', twxRadarRepositionAll);
 // Sidebar collapse shifts the centered dock WITHOUT a window resize.
-new MutationObserver(() => {
-    const m = document.getElementById('twRadarMsg');
-    if (m && m.classList.contains('open')) twxRadarPositionMsg(m);
-}).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+new MutationObserver(twxRadarRepositionAll).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
 // The sheet's own "Duplicated Check" formula result, shown inside the bubble
 // (it used to have its own column in the retired Duplicate Check card).
@@ -16654,6 +16771,7 @@ function awsRadarShowMsg(show) {
     const msg = document.getElementById('awsRadarMsg');
     if (!msg) return;
     msg.classList.toggle('open', !!show);
+    if (show) twxRadarPositionMsg(msg); // Phase 10.38: glue to the audit 📡 icon (same as the workspace bubble)
     delete msg.dataset.wsWasOpen; // Phase 10.36: explicit show/hide wins over the tab-switch restore memory
 }
 function awsRadarHideMsg() { awsRadarShowMsg(false); }
