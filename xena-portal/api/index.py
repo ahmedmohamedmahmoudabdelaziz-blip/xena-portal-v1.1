@@ -3353,6 +3353,33 @@ def _resolve_agency_wallet(tfields, agency_code_hint, wallet_hint, fetch_wallet)
         return wallet_hint, agency_code_hint, True
     return None, agency_code, False
 
+def _wallet_acm_for_ticket(af, tfields):
+    """Phase 10.38 (Ahmed): "when do the recharge also please update the acm
+    name in the same call it exist in the agency point table so update it in
+    the request". The Agency Points (wallet) row is the ACM source of truth;
+    the ticket's region-appropriate Acm Name field gets that value in the same
+    receipt PUT (zero extra Feishu calls). Returns (ticket_field_name,
+    acm_name) or (None, "") when the wallet carries no ACM -- nothing is
+    written then. Region comes from the ticket first, then the wallet; if
+    neither says PK/IN, the wallet's own filled column decides (PK wins ties,
+    matching the audit-list read priority at the agency-list endpoint)."""
+    acm_pk = extract_field_text(get_field_local(af, "Acm Name (PK)")).strip()
+    acm_in = extract_field_text(get_field_local(af, "Acm Name (IN)")).strip()
+    acm_alias = extract_field_text(get_field_local(af, "Acm", "Assigned Member")).strip()
+    if not (acm_pk or acm_in or acm_alias):
+        return None, ""
+    region = (extract_field_text(get_field_local(tfields, "Region")) or
+              extract_field_text(get_field_local(af, "Region", "Agency Region"))).strip().upper()
+    if region == "IN":
+        # Region known -> the region-matched column is the value source
+        # (both columns filled: the IN wallet of an IN agency wins).
+        return "Acm Name (IN)", (acm_in or acm_pk or acm_alias)
+    if region == "PK":
+        return "Acm Name (PK)", (acm_pk or acm_in or acm_alias)
+    if acm_in and not acm_pk:
+        return "Acm Name (IN)", acm_in
+    return "Acm Name (PK)", (acm_pk or acm_in or acm_alias)
+
 @app.route('/api/agency-points/charge', methods=['POST'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_points_charge():
@@ -3533,6 +3560,7 @@ def agency_points_charge():
     # the receipt to the caller instead of pretending the charge never happened.
     write_ticket = total_cost > 0 or not existing_receipt
     ticket_write_failed = False
+    acm_field, acm_name = None, ""  # Phase 10.38: wallet ACM ride-along (set inside the write)
     if write_ticket:
         try:
             ticket_fields = {"Transaction Receipt": full_receipt,
@@ -3543,6 +3571,12 @@ def agency_points_charge():
                 # agent actually charged -- rides the same write, zero extra
                 # Feishu calls (Phase 10.25).
                 ticket_fields["Agency Code"] = agency_code
+            # Phase 10.38 (Ahmed): the wallet's ACM lands on the ticket's
+            # Acm Name (PK)/(IN) field in the SAME write -- "update the acm
+            # name in the same call it exist in the agency point table".
+            acm_field, acm_name = _wallet_acm_for_ticket(af, tfields)
+            if acm_field:
+                ticket_fields[acm_field] = acm_name
             tw = feishu_session.put(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
                 headers=headers,
@@ -3555,13 +3589,18 @@ def agency_points_charge():
             ticket_write_failed = True
             logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
 
-    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else ""), ip=ip, severity="Info")
+    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else "") + (f" | ticket ACM synced: {acm_name}" if acm_field else ""), ip=ip, severity="Info")
     result = {"success": True, "duplicate": False,
               "deducted": total_cost, "balance_after": charge["remaining"],
               "receipt": charge["receipt"], "full_receipt": full_receipt,
               "tracker": cumulative_tracker,
               "agency_code": agency_code, "agency_code_corrected": code_corrected,
               "ticket_write_failed": ticket_write_failed}
+    if acm_field:
+        # Lets the open workspace sync its ACM control + ltActiveTicket
+        # without a re-fetch (Phase 10.38).
+        result["acm_field"] = acm_field
+        result["acm_name"] = acm_name
     if REDIS_ENABLED:
         try:
             redis_set_json(dup_key, {"sig": dup_sig, "result": result}, ttl=120)
@@ -3807,12 +3846,16 @@ def agency_points_correct_charge():
     # If THIS write fails the wallet is already corrected, so the result is
     # still returned (flagged) rather than pretending nothing happened.
     ticket_write_failed = False
+    # Phase 10.38: same wallet-ACM ride-along as the charge endpoint.
+    acm_field, acm_name = _wallet_acm_for_ticket(af, tfields)
     try:
         ticket_fields = {"Transaction Receipt": full_receipt,
                          "Latest Usage Tracker": cumulative_tracker,
                          "Quantities Input": ""}
         if code_corrected:
             ticket_fields["Agency Code"] = agency_code  # Phase 10.25 heal, same write
+        if acm_field:
+            ticket_fields[acm_field] = acm_name  # Phase 10.38 ACM sync, same write
         tw = feishu_session.put(
             f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
             headers=headers,
@@ -3833,16 +3876,20 @@ def agency_points_correct_charge():
         except Exception:
             pass
 
-    audit.log(user, "AP_CORRECT", f"Record: {record_id} | Agency: {agency_code} | Reversed: {seg['deducted']} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else ""), ip=ip, severity="Info")
+    audit.log(user, "AP_CORRECT", f"Record: {record_id} | Agency: {agency_code} | Reversed: {seg['deducted']} | Deducted: {charge['total_cost']} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else "") + (f" | ticket ACM synced: {acm_name}" if acm_field else ""), ip=ip, severity="Info")
     # Phase 10.29: write-through freshness — correction changed the wallet.
     kick_table_resync()
-    return jsonify({"success": True, "duplicate": False, "corrected": True,
-                    "reversed": seg["deducted"],
-                    "deducted": charge["total_cost"], "balance_after": charge["remaining"],
-                    "receipt": charge["receipt"], "full_receipt": full_receipt,
-                    "tracker": cumulative_tracker,
-                    "agency_code": agency_code, "agency_code_corrected": code_corrected,
-                    "ticket_write_failed": ticket_write_failed})
+    result = {"success": True, "duplicate": False, "corrected": True,
+              "reversed": seg["deducted"],
+              "deducted": charge["total_cost"], "balance_after": charge["remaining"],
+              "receipt": charge["receipt"], "full_receipt": full_receipt,
+              "tracker": cumulative_tracker,
+              "agency_code": agency_code, "agency_code_corrected": code_corrected,
+              "ticket_write_failed": ticket_write_failed}
+    if acm_field:
+        result["acm_field"] = acm_field  # Phase 10.38: workspace syncs its ACM control
+        result["acm_name"] = acm_name
+    return jsonify(result)
 
 @app.route('/api/requests/submit', methods=['POST'])
 def submit_request():
