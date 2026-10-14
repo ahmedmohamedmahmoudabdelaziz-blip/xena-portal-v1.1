@@ -1736,7 +1736,11 @@
         #twcList{max-height:380px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;}
         .twc-empty{color:var(--text-muted,#8a8fa3);font-size:.8rem;text-align:center;padding:18px 0;}
         .twc-item{display:flex;gap:10px;}
-        .twc-avatar{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;}
+        .twc-avatar{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;}
+.twc-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+.twc-rx-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.twc-rx{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:.72rem;line-height:1.5;cursor:default;}
+.twc-rx b{font-weight:700;color:var(--accent-cyan,#00d4ff);font-size:.7rem;}
         .twc-item-main{flex:1;min-width:0;}
         .twc-item-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
         .twc-author{font-size:.8rem;font-weight:700;color:var(--text,#fff);}
@@ -1790,6 +1794,15 @@
         .cmn-item-text{font-size:.76rem;color:var(--text,#fff);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
         .cmn-item-meta{font-size:.64rem;color:var(--text-muted,#8a8fa3);margin-top:3px;display:flex;gap:10px;}
         .cmn-item-meta .cmn-atme{color:var(--accent-cyan,#00d4ff);font-weight:700;}
+        .cmn-avatar{flex:none;width:24px;height:24px;border-radius:50%;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.56rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;margin-top:1px;}
+        .cmn-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+        .cmn-rx-chip{display:inline-flex;align-items:center;gap:2px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:.64rem;line-height:1.6;}
+        .cmn-rx-line{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+        .cmn-rx-verb{font-size:.66rem;color:var(--text-muted,#8a8fa3);}
+        .tw-pchip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);font-size:.76rem;margin:2px 4px 2px 0;vertical-align:middle;}
+        .tw-pchip-av{flex:none;width:20px;height:20px;border-radius:50%;background:rgba(0,212,255,.22);color:var(--accent-cyan,#00d4ff);font-size:.58rem;font-weight:800;display:inline-flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;}
+        .tw-pchip-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+        .tw-pchips-row{display:flex;flex-wrap:wrap;align-items:center;}
         .cmn-empty{color:var(--text-muted,#8a8fa3);font-size:.78rem;text-align:center;padding:26px 0;}
         @media (max-width:600px){
             #cmnPanel{top:52px;right:8px;width:calc(100vw - 16px);}
@@ -4284,29 +4297,46 @@ function openInTab(page) {
 }
 
 function setActiveTab(page) {
-    // Phase 10.40 (Ahmed): park/restore the OPEN workspace across tab
-    // switches. Leaving the workspace for another tab PARKS it (the node
-    // stays mounted, every input intact). Coming BACK to the workspace's
-    // origin tab from a DIFFERENT page restores the workspace instead of
-    // showing the module page -- no re-open, zero requests, nothing lost.
-    // Clicking the origin tab while the workspace is the current view parks
-    // it and shows the module page (the only way to reach the queue without
-    // closing); re-clicking that SAME tab while already on it does NOT
-    // bounce back (activeTabId === page guard).
-    if (activeTabId === 'ticket-workspace' && page !== 'ticket-workspace') {
-        twWsParked = true;
-    } else if (page !== 'ticket-workspace' && twWsParked && activeTabId !== page &&
-               typeof twWsActiveKey !== 'undefined' && twWsActiveKey &&
-               twWsTabs[twWsActiveKey] && (twWsTabs[twWsActiveKey].returnTo || 'live-tickets') === page) {
-        twWsParked = false;
-        openInTab('ticket-workspace');
-        return;
+    // Phase 10.46 (Ahmed, videos 1 & 4): PER-MODULE workspace keep-alive.
+    // Every module page P owns its own kept-alive workspace instance
+    // (twWsTabs['mod:'+P], created by twOpenWorkspace). Clicking a module
+    // tab must NEVER silently drop that module's open workspace:
+    //   A) arriving at P from a DIFFERENT page while P owns a live workspace
+    //      (and it was not deliberately parked) -> remount it and land back
+    //      on the workspace exactly as left (query -> New -> query, query ->
+    //      live -> query, ... all restore).
+    //   B) clicking P while P's own workspace is the current view -> park it
+    //      and show P's list (the only way to reach the queue without
+    //      closing the ticket).
+    //   C) arriving at P while it is deliberately parked -> show the list
+    //      this once and consume the park (the NEXT arrival restores).
+    //   D) landing on the workspace page by any other path clears the park.
+    if (page !== 'ticket-workspace' && typeof twWsTabs !== 'undefined') {
+        const key = 'mod:' + page;
+        const inst = twWsTabs[key];
+        const viewingItsWs = activeTabId === 'ticket-workspace' &&
+            typeof twWsActiveKey !== 'undefined' && twWsActiveKey === key;
+        if (viewingItsWs) {
+            // B -- deliberate park: the user clicked the origin tab while
+            // looking at its workspace; they want the queue.
+            twWsParked = true; twWsParkedKey = key;
+        } else if (!window.__xdRestoringLayout && activeTabId !== page && inst && inst.node && inst.recordId) {
+            if (twWsParked && twWsParkedKey === key) {
+                // C -- consume the deliberate park; show the list this once.
+                twWsParked = false; twWsParkedKey = null;
+            } else {
+                // A -- restore THIS module's own workspace, zero requests.
+                twWsParked = false; twWsParkedKey = null;
+                if (twWsActiveKey !== key) twWsMount(key);
+                openInTab('ticket-workspace');
+                return;
+            }
+        }
     }
-    // Phase 10.42: landing ON the workspace by any path (e.g. clicking the
-    // 🆕 New Ticket tab, which mounts the draft without a stash) means it is
-    // no longer parked -- clear a stale flag so the restore clause above
-    // can't hijack a later click on the origin tab.
-    if (page === 'ticket-workspace') twWsParked = false;
+    // D -- landing ON the workspace by any path (e.g. clicking the 🆕 New
+    // Ticket tab, which mounts the draft without a stash) means nothing is
+    // parked -- clear a stale flag so a later module click can't misfire.
+    if (page === 'ticket-workspace') { twWsParked = false; twWsParkedKey = null; }
     activeTabId = page;
     renderTabs();
 
@@ -5494,8 +5524,22 @@ function xdCaptureAll() {
             if (!st || !st.node) return;
             const f = st.node.querySelector('#tw-form');
             if (!f) return;
-            grab(st.recordId && !st.createMode ? 'ws:' + st.recordId : 'wsCreate:' + st.key, f);
+            grab(st.recordId && !st.createMode ? 'ws:' + st.recordId : 'wsCreate:' + st.key, f, { __wsKey: st.key });
         });
+    } catch (e) {}
+    // Phase 10.46 (video 4): park the TAB LAYOUT too -- open module tabs,
+    // the active one, and every workspace instance's own module key -- so a
+    // re-login (or a discarded browser tab) puts the whole desk back, not
+    // just one lonely New-Ticket tab.
+    try {
+        const wsList = Object.values(twWsTabs || {}).filter(st => st && st.node)
+            .map(st => ({ key: st.key, recordId: st.recordId || null, createMode: !!st.createMode }));
+        all['__session'] = {
+            ts: now,
+            openTabs: (typeof openTabs !== 'undefined' ? [...openTabs] : []),
+            activeTabId: (typeof activeTabId !== 'undefined' ? activeTabId : 'welcome'),
+            ws: wsList
+        };
     } catch (e) {}
     // The active instance is always covered above, but grab it from the live
     // DOM too in case the tab registry is mid-swap.
@@ -5562,16 +5606,117 @@ async function xdAutoRestore() {
                 if (rid && typeof twOpenWorkspace === 'function') {
                     window.__xdPending = window.__xdPending || {};
                     window.__xdPending[rid] = all[k].values;
+                    // Phase 10.46: re-open under the workspace's OWN saved
+                    // module key, so several restored tickets keep their own
+                    // instances instead of piling under one tab.
+                    window.__xdRestoreKey = all[k].values.__wsKey || null;
                     await twOpenWorkspace(rid); // the fill-end hook applies + clears
                     restored++;
                 }
             }
         } catch (e) { console.warn('xd restore failed for', k, e); }
     }
+    // Phase 10.46 (video 4): put the TAB LAYOUT back as well -- Ahmed
+    // re-logged in with 4 tabs open and only one (New Ticket) came back.
+    // Module tabs reopen first (rule-A restore is suspended so opening a tab
+    // doesn't bounce into its workspace), then the saved active tab lands.
+    try {
+        const sess = all['__session'];
+        if (sess && (now - (sess.ts || 0)) < XD_TTL_MS) {
+            window.__xdRestoringLayout = true;
+            try {
+                (sess.openTabs || []).forEach(p => {
+                    if (!p || p === 'welcome' || p === 'ticket-workspace') return;
+                    if (typeof openTabs !== 'undefined' && !openTabs.includes(p) && typeof openInTab === 'function') {
+                        try { openInTab(p); } catch (e) {}
+                    }
+                });
+            } finally { window.__xdRestoringLayout = false; }
+            const want = sess.activeTabId;
+            if (want && want !== 'welcome' && typeof setActiveTab === 'function') {
+                if (want === 'ticket-workspace') {
+                    if (typeof twWsActiveKey !== 'undefined' && twWsActiveKey) {
+                        try { openInTab('ticket-workspace'); } catch (e) {}
+                    }
+                } else if (typeof openTabs !== 'undefined' && openTabs.includes(want)) {
+                    try { setActiveTab(want); } catch (e) {}
+                }
+            }
+            delete all['__session']; xdSaveAll(all);
+        }
+    } catch (e) { console.warn('xd layout restore failed', e); }
     if (restored) ToastManager.show(`💾 Restored your unsent work (${restored} form${restored > 1 ? 's' : ''}) — pick up right where you left off.`, 'success', 9000);
 }
 if (loggedUser) setTimeout(() => { try { xdAutoRestore(); } catch (e) {} }, 1500);
 // ─── end Phase 10.44 ───
+
+// ─── Phase 10.46: Lark profile photos + live sheet options ───
+// twHydrateAvatars: every [data-uid] chip (person fields, Respondents,
+// member pickers) gets its real Lark photo from /api/users/lookup -- one
+// batched call per render pass, cached for the session, initials stay as
+// the offline/permission fallback.
+const __twAvCache = new Map(); // open_id -> {name, avatar_url} | null
+let __twAvChain = null;
+function twHydrateAvatars(root) {
+    const scope = (root && root.querySelectorAll) ? root : document;
+    const els = [...scope.querySelectorAll('[data-uid]:not([data-av-done])')].filter(el => el.dataset.uid);
+    if (!els.length) return;
+    els.forEach(el => { el.dataset.avDone = '1'; });
+    const applyAll = () => {
+        els.forEach(el => {
+            const p = __twAvCache.get(el.dataset.uid);
+            if (!p || !p.avatar_url) return;
+            const slot = el.querySelector('.tw-pchip-av') || el.querySelector('[data-av-slot]');
+            if (slot && !slot.querySelector('img')) {
+                const initials = (slot.textContent || '?').trim().replace(/'/g, '') || '?';
+                slot.innerHTML = `<img src="${p.avatar_url}" alt="" loading="lazy" onerror="this.parentNode.textContent='${initials}'">`;
+            }
+        });
+    };
+    const unknown = [...new Set(els.map(el => el.dataset.uid))].filter(id => !__twAvCache.has(id));
+    if (!unknown.length) { applyAll(); return; }
+    __twAvChain = (__twAvChain || Promise.resolve()).then(async () => {
+        const need = unknown.filter(id => !__twAvCache.has(id));
+        if (!need.length) return;
+        try {
+            const r = await fetch(`/api/users/lookup?ids=${encodeURIComponent(need.join(','))}&${twcAuthQ()}`);
+            const d = await r.json();
+            if (d && d.success && d.users) need.forEach(id => __twAvCache.set(id, d.users[id] || null));
+        } catch (e) { /* offline: initials stay */ }
+    }).then(applyAll);
+}
+
+// schemaSyncOptions (Ahmed: "make the options filed sync from the sheet to
+// be sure it's updated"): FIELD_SCHEMA ships hardcoded; at boot this pulls
+// the LIVE select options from the Base metadata (/api/schema/fields,
+// server-cached 10 min) and merges them over the hardcoded copy, so a
+// dropdown option added in the sheet appears in the portal on next login.
+// The two ACM roster selects are EXCLUDED -- their options are
+// permission-filtered per agent (REQ_FIELD_DEFS); a raw sheet merge would
+// leak the full roster to restricted members.
+const SCHEMA_SYNC_SKIP = new Set(['Acm Name (PK)', 'Acm Name (IN)']);
+async function schemaSyncOptions() {
+    if (!loggedUser || typeof FIELD_SCHEMA === 'undefined') return;
+    try {
+        const r = await fetch(`/api/schema/fields?${twcAuthQ()}`);
+        const d = await r.json();
+        if (!d || !d.success || !d.fields) return;
+        let changed = 0;
+        Object.keys(d.fields).forEach(name => {
+            if (SCHEMA_SYNC_SKIP.has(name)) return;
+            const remote = d.fields[name];
+            if (!remote || !Array.isArray(remote.options) || !remote.options.length) return;
+            if (!FIELD_SCHEMA[name]) FIELD_SCHEMA[name] = { field_id: '', ui_type: remote.ui_type || 'SingleSelect' };
+            if (JSON.stringify(FIELD_SCHEMA[name].options || []) !== JSON.stringify(remote.options)) {
+                FIELD_SCHEMA[name].options = remote.options;
+                changed++;
+            }
+        });
+        if (changed) console.info(`[schema] synced live options for ${changed} field(s) from the sheet`);
+    } catch (e) { /* offline -- the hardcoded schema carries on */ }
+}
+if (loggedUser) setTimeout(() => { try { schemaSyncOptions(); } catch (e) {} }, 900);
+// ─── end Phase 10.46 ───
 
 // ─── Phase 10.21 (speed): open timing + backend keep-warm ───
 // Ahmed's screen recording showed ~15s click→open on a just-landed ticket
@@ -11163,12 +11308,15 @@ function twRenderSection2(ticket, reqTypeOverride) {
         // EVERY Request Type (Ahmed) even though it's also in Basic Information
         // -- the two boxes stay mirrored (data-mirror sync below) and collect
         // as one value, so editing either updates both.
-        dynamicKeys = explicitList.filter(k => !LT_BASIC_KEYS.has(k) || k === 'User ID');
+        // Phase 10.46: 'Reject Reason' renders as its own card for EVERY type
+        // (twRenderRejectReasonCard below) -- never as a plain sec2 control.
+        dynamicKeys = explicitList.filter(k => (!LT_BASIC_KEYS.has(k) || k === 'User ID') && k !== 'Reject Reason');
         if (!dynamicKeys.includes('User ID')) dynamicKeys.unshift('User ID');
     } else {
         dynamicKeys = Object.keys(ticket.fields).filter(key => {
             const val = ticket.fields[key];
             if (val === undefined || val === null || val === '') return false;
+            if (key === 'Reject Reason') return false; // Phase 10.46: own card
             if (LT_PROCESSING_KEYS.has(key)) return false;
             if (LT_BASIC_KEYS.has(key)) return false;
             if (TICKET_INTERNAL_FIELDS.has(key)) return false;
@@ -11204,6 +11352,16 @@ function twRenderSection2(ticket, reqTypeOverride) {
         }
         twSyncPossibleBdIdVisibility();
     }
+
+    // Phase 10.46 (Ahmed, video 3): the Reject Reason card renders for EVERY
+    // request type now (not just Agency Creation) -- a rejection on any
+    // ticket must carry at least one reason, enforced in twSaveWorkspace.
+    // The sweep at the top of this function already dropped any leftover
+    // copy, so this always builds the card fresh from THIS ticket's values.
+    twRenderRejectReasonCard(ticket);
+    // Phase 10.46: person chips rendered above (and in the rest of the fill,
+    // which is synchronous) get their Lark photos swapped in right after.
+    setTimeout(() => { try { twHydrateAvatars(); } catch (e) {} }, 0);
 
     // Phase 10.8: Agency Point tickets get the Confirm & Charge gate card.
     // Phase 10.13.3 (Ahmed): the gate renders in the New Ticket draft too --
@@ -11597,11 +11755,20 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
     cwWrap.className = 'control-group';
     cwWrap.innerHTML = `<label>Create Way</label><select name="Create Way" class="form-highlight-input"><option value="">-- Select --</option>${cwOpts}</select>`;
     sec2.appendChild(cwWrap);
+    // Reject Reason moved OUT of the Agency-Creation-only extras in Phase
+    // 10.46 -- twRenderRejectReasonCard(ticket) renders it for EVERY request
+    // type (call site: twRenderSection2), so a rejection on any ticket can
+    // carry a reason and the save gate can require one uniformly.
+}
 
-    // 3) Reject Reason: its own card right after Basic Information (left
-    // column, marker "2"). The hidden-checkboxes .msel-wrap is the exact
-    // same markup the Agency Point Privilege wrap carries, so the shared pp
-    // card-grid picker can skin it (rose variant).
+// Phase 10.46 (Ahmed, video 3): the Reject Reason card is no longer an
+// Agency-Creation-only extra -- it renders for EVERY request type, parked
+// directly under Basic Information (left column), same hidden-checkbox
+// .msel-wrap markup the Agency Point Privilege wrap carries (the shared pp
+// card-grid picker skins it, rose variant). Save & Resolve refuses a
+// Rejected status with zero reasons picked (see twSaveWorkspace).
+function twRenderRejectReasonCard(ticket) {
+    if (document.getElementById('twRejectGroup')) return; // never double-render
     const rrMeta = FIELD_SCHEMA['Reject Reason'];
     const rrChecked = new Set(feishuValueToList(ticket.fields['Reject Reason']));
     const rrGroup = document.createElement('div');
@@ -11624,7 +11791,7 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
     else {
         const sec1Card = document.getElementById('tw-sec-1-card');
         if (sec1Card) sec1Card.after(rrGroup);
-        else sec2.appendChild(rrGroup); // should never happen -- safety net
+        else { const sec2 = document.getElementById('tw-sec-2'); if (sec2) sec2.appendChild(rrGroup); }
     }
     const rrWrap = rrGroup.querySelector('#tw-reject-reason-wrap');
     if (rrWrap) reqRenderPointPrivilegePicker(rrWrap, {
@@ -12254,19 +12421,24 @@ function twRenderHeadMeta(ticket) {
     } else if (submittedRaw) {
         submittedVal = feishuValueToString(submittedRaw) || '—';
     }
-    // Respondents is a User field: [{id, name}, ...] -- show the names.
+    // Respondents is a User field: [{id, name}, ...] -- Phase 10.46 (Ahmed,
+    // pics 2+3): render per-person chips with the real Lark photo (hydrated
+    // by data-uid), like the sheet's own person cells.
     const respRaw = ticket.fields['Respondents'];
-    let respondentsVal = '—';
+    let respondentsHtml = '—';
     if (Array.isArray(respRaw) && respRaw.length && respRaw[0] && typeof respRaw[0] === 'object' && respRaw[0].name) {
-        respondentsVal = respRaw.map(u => u.name).join(', ');
+        respondentsHtml = respRaw.map(u =>
+            `<span class="tw-pchip" data-uid="${escHtml(u.id)}"><span class="tw-pchip-av">${escHtml((u.name || '?').slice(0, 1).toUpperCase())}</span><span>${escHtml(u.name)}</span></span>`
+        ).join('');
     } else if (respRaw) {
-        respondentsVal = feishuValueToString(respRaw) || '—';
+        respondentsHtml = escHtml(feishuValueToString(respRaw) || '—');
     }
     metaEl.innerHTML = `
         <span class="tw-head-chip chip-cyan"><span class="tw-head-chip-label">Group</span>${escHtml(groupVal)}</span>
         <span class="tw-head-chip chip-purple"><span class="tw-head-chip-label">Submitted</span>${escHtml(submittedVal)}</span>
-        <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Respondents</span>${escHtml(respondentsVal)}</span>
+        <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Respondents</span>${respondentsHtml}</span>
     `;
+    setTimeout(() => { try { twHydrateAvatars(metaEl); } catch (e) {} }, 0);
 }
 
 // Phase 10.4: floating scratch note -- toggled from the dock's 📝 circle,
@@ -12439,6 +12611,9 @@ let twWsTemplate = null;  // pristine #twWsInstance clone, captured before the f
 // from an OPEN workspace to another tab -- coming back to the workspace's
 // origin tab restores the workspace exactly as left (see setActiveTab).
 let twWsParked = false;
+// Phase 10.46: WHICH module instance the park belongs to (park semantics are
+// per-module now -- a park on 'mod:query-tickets' must not affect Live).
+let twWsParkedKey = null;
 
 function twWsCaptureTemplate() {
     if (twWsTemplate) return;
@@ -12483,6 +12658,7 @@ function twWsDedupeDom(keepNode) {
 
 function twWsStashCurrent() {
     twWsParked = false; // Phase 10.40: any mount/close/new-instance re-anchors the park state
+    twWsParkedKey = null;
     if (!twWsActiveKey) return;
     const rec = twWsTabs[twWsActiveKey];
     const inst = document.getElementById('twWsInstance');
@@ -12566,7 +12742,14 @@ async function twOpenWorkspace(recordId) {
     twReturnTo = (typeof activeTabId !== 'undefined' && activeTabId && activeTabId !== 'ticket-workspace') ? activeTabId : 'live-tickets';
     // Phase 10.33 (Ahmed's idea): ONE keep-alive workspace PER MODULE, no
     // tabs. The module key is simply the page the ticket was opened from.
-    const wsKey = 'mod:' + twReturnTo;
+    // Phase 10.46 (video 4): xdAutoRestore re-opens every parked workspace
+    // under its OWN saved module key (window.__xdRestoreKey) instead of
+    // whatever tab happens to be active -- restoring 4 workspaces no longer
+    // piles them all under one module or steals each other's view.
+    const __xdKey = (typeof window !== 'undefined' && window.__xdRestoreKey) || null;
+    window.__xdRestoreKey = null;
+    if (__xdKey && __xdKey.startsWith('mod:')) twReturnTo = __xdKey.slice(4);
+    const wsKey = __xdKey || ('mod:' + twReturnTo);
     const existing = twWsTabs[wsKey];
     // Phase 10.40 (Ahmed): a HOVER-prefetch entry must never clobber unsaved
     // work. Parking the workspace to peek at the queue and re-clicking the
@@ -12689,10 +12872,24 @@ async function twOpenWorkspace(recordId) {
     }
     try {
         if (!ticket) {
-            const res = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`);
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error);
-            ticket = data.record;
+            // Phase 10.46 (Ahmed): "Failed to open ticket … Read timed out
+            // (read timeout=10)" on a notification click. The server now
+            // retries its own Feishu GET with a 20s window; here the portal
+            // itself gets ONE silent retry before the error toast, so a
+            // single slow cross-border hop never reaches the agent.
+            let lastErr = null;
+            for (let attempt = 0; attempt < 2 && !ticket; attempt++) {
+                try {
+                    const res = await fetch(`/api/requests/single?record_id=${encodeURIComponent(recordId)}`);
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error);
+                    ticket = data.record;
+                } catch (err) {
+                    lastErr = err;
+                    if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
+                }
+            }
+            if (!ticket) throw lastErr || new Error('Open failed');
         }
         tRec = twPerfNow();
         // A newer click (or a close) happened while the fetch was in flight --
@@ -13865,8 +14062,8 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
                 const isActive = current && (current.name || '').toLowerCase().includes(q.person.toLowerCase());
                 return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}', this)" title="Set Done by to ${escHtml(q.person)}">${escHtml(q.label)}</button>`;
             }).join('')}</div>` : ''}
-            <div id="${pickerId}-chip" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
-                <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</span>
+            <div id="${pickerId}-chip" data-uid="${current ? escHtml(current.open_id) : ''}" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
+                <span data-av-slot style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${initial}</span>
                 <span style="flex:1;font-size:.85rem;">${current ? escHtml(current.name) : ''}</span>
                 <button type="button" onclick="twClearUserPicker('${pickerId}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0 4px;" title="Clear">✕</button>
             </div>
@@ -13973,8 +14170,12 @@ function twPickMember(pickerId, idx) {
     twSyncQuickChips(pickerId, m.name);
     if (chip) {
         chip.style.display = 'flex';
+        chip.dataset.uid = m.open_id || ''; // Phase 10.46: avatar hydration tag
+        const avInner = m.avatar_url
+            ? `<img src="${escHtml(m.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`
+            : escHtml((m.name || '?').slice(0, 1).toUpperCase());
         chip.innerHTML = `
-            <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escHtml((m.name || '?').slice(0, 1).toUpperCase())}</span>
+            <span data-av-slot style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${avInner}</span>
             <span style="flex:1;font-size:.85rem;">${escHtml(m.name)}</span>
             <button type="button" onclick="twClearUserPicker('${pickerId}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0 4px;" title="Clear">✕</button>`;
     }
@@ -13995,7 +14196,7 @@ function twClearUserPicker(pickerId) {
 
     if (wrap) wrap.dataset.userSelected = '';
     twSyncQuickChips(pickerId, '');
-    if (chip) { chip.style.display = 'none'; chip.innerHTML = ''; }
+    if (chip) { chip.style.display = 'none'; chip.innerHTML = ''; delete chip.dataset.uid; delete chip.dataset.avDone; }
     if (inputEl) { inputEl.style.display = 'block'; inputEl.value = ''; inputEl.focus(); }
 }
 
@@ -14051,8 +14252,13 @@ function createTwControl(key, value) {
         return twRenderMemberPicker(wrap, label, key, currentArr);
     }
     if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].id && value[0].name) {
-        const str = value.map(v => v.name).join(', ');
-        wrap.innerHTML = label + `<input type="text" value="${escHtml(str)}" class="form-highlight-input" readonly style="opacity:.7;cursor:not-allowed;">`;
+        // Phase 10.46 (Ahmed, pics 2+3): person fields render as CHIPS with
+        // the real Lark profile photo (hydrated from /api/users/lookup by
+        // data-uid), not a flat readonly text box of names.
+        const chips = value.map(v =>
+            `<span class="tw-pchip" data-uid="${escHtml(v.id)}"><span class="tw-pchip-av">${escHtml((v.name || '?').slice(0, 1).toUpperCase())}</span><span>${escHtml(v.name)}</span></span>`
+        ).join('');
+        wrap.innerHTML = label + `<div class="tw-pchips-row" style="padding:6px 8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;opacity:.85;">${chips}</div>`;
         return wrap;
     }
     // ISSUE FIX: a User-type field with NO value yet used to fall through to the
@@ -14380,6 +14586,11 @@ async function twSaveWorkspace() {
     // every request type. Each missing field gets the rose .twx-missing
     // outline (cleared automatically the moment a valid value is picked) and
     // one toast names everything that's missing.
+    // Phase 10.46 (Ahmed, videos 2+3): two more gates joined the list --
+    // ・ Agency Creation may not save with Create Way still "-- Select --".
+    // ・ Status = Rejected requires AT LEAST ONE Reject Reason ticked, for
+    //   every request type (the card renders universally since 10.46).
+    const saveReqType = (document.querySelector('#tw-form [name="Request Type"]')?.value || ltActiveTicket?.fields?.['Request Type'] || '').toString().trim();
     const missing = [];
     const dbWrap = document.getElementById('tw-done-by-wrap');
     let dbSelected = false;
@@ -14389,8 +14600,25 @@ async function twSaveWorkspace() {
     if (!statusSel || !statusSel.value.trim()) missing.push({ el: statusSel ? statusSel.closest('.control-group') : null, name: 'Status' });
     const mgSel = document.getElementById('tw-mentioned-group');
     if (!mgSel || !mgSel.value.trim()) missing.push({ el: mgSel ? mgSel.closest('.control-group') : null, name: 'Mentioned Group' });
+    if (saveReqType === 'Agency Creation') {
+        const cwSel = document.querySelector('#tw-form select[name="Create Way"]');
+        if (cwSel && !cwSel.value.trim()) missing.push({ el: document.getElementById('tw-create-way-wrap') || cwSel.closest('.control-group'), name: 'Create Way' });
+    }
+    if (/^reject/i.test((statusSel?.value || '').trim()) && document.getElementById('twRejectGroup')) {
+        const rrPicked = document.querySelectorAll('#twRejectGroup input[name="Reject Reason"]:checked').length;
+        if (!rrPicked) missing.push({ el: document.getElementById('twRejectGroup'), name: 'Reject Reason (at least one)' });
+    }
     if (missing.length) {
-        missing.forEach(m => { if (m.el) m.el.classList.add('twx-missing'); });
+        missing.forEach(m => {
+            if (!m.el) return;
+            m.el.classList.add('twx-missing');
+            // Clear the highlight the instant the field is touched -- 'change'
+            // covers the selects, 'click' covers the msel toggle labels (their
+            // checkbox is set programmatically, which fires no change event).
+            const clear = () => m.el.classList.remove('twx-missing');
+            m.el.addEventListener('change', clear, { once: true });
+            m.el.addEventListener('click', clear, { once: true });
+        });
         ToastManager.show('Before saving, please select: ' + missing.map(m => m.name).join(' + ') + '.', 'warning', 6000);
         if (missing[0].el && missing[0].el.scrollIntoView) missing[0].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
@@ -14401,7 +14629,6 @@ async function twSaveWorkspace() {
     // (Base workflow writes the CONFIRMED RECEIPT back) must run first, so the
     // deduction and the approved quantities are locked in the sheet before the
     // ticket closes. Rejected tickets skip the charge entirely.
-    const saveReqType = (document.querySelector('#tw-form [name="Request Type"]')?.value || ltActiveTicket?.fields?.['Request Type'] || '').toString().trim();
     if (saveReqType === 'Agency Point Request' && /^done/i.test((statusSel?.value || '').trim()) && !twApIsCharged()) {
         const card = document.getElementById('twApGateCard');
         if (card) card.classList.add('twx-missing');
@@ -17991,6 +18218,39 @@ function twcRenderParts(parts) {
     }).join('');
 }
 
+const TWC_RX_EMOJI = {
+    THUMBSUP: '👍', THUMBSDOWN: '👎', SMILE: '😊', LAUGH: '😆', HEART: '❤️', LOVE: '❤️',
+    CLAP: '👏', THANKS: '🙏', OK: '👌', DONE: '✅', MUSCLE: '💪', JIAYI: '💪', FISTBUMP: '👊',
+    PARTY: '🎉', CELEBRATE: '🎉', CRY: '😢', ANGRY: '😡', WOW: '😮', THINKING: '🤔',
+    CONFUSED: '😕', SAD: '😢', FIRE: '🔥', ROCKET: '🚀', EYES: '👀', HANDSHAKE: '🤝',
+    HUNDRED: '💯', QUESTION: '❓', EXCLAMATION: '❗', STAR: '⭐', FLOWER: '🌹', COFFEE: '☕',
+    BEER: '🍺', CAKE: '🎂', GIFT: '🎁', BELL: '🔔', SUN: '☀️', MOON: '🌙', RAINBOW: '🌈'
+};
+function twcReactionEmoji(key) {
+    if (!key) return '👍';
+    const k = String(key).toUpperCase();
+    return TWC_RX_EMOJI[k] || ('🏷️' /* unknown key — show tag, tooltip carries the raw key */);
+}
+
+function twcRenderAvatarHtml(name, avatarUrl, cls) {
+    const c = cls || 'twc-avatar';
+    if (avatarUrl) {
+        return `<span class="${c}"><img src="${twcEsc(avatarUrl)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${twcEsc(twcInitials(name))}'"></span>`;
+    }
+    return `<span class="${c}">${twcEsc(twcInitials(name))}</span>`;
+}
+
+function twcRenderReactions(reactions) {
+    if (!reactions || !reactions.length) return '';
+    const chips = reactions.map(rx => {
+        const names = (rx.names || []).filter(Boolean);
+        const tip = names.length ? names.join(', ') : (rx.users || []).join(', ');
+        const cnt = rx.count > 1 ? `<b>${rx.count}</b>` : '';
+        return `<span class="twc-rx" title="${twcEsc(tip)}">${twcReactionEmoji(rx.key)}${cnt}</span>`;
+    }).join('');
+    return `<div class="twc-rx-row">${chips}</div>`;
+}
+
 function twcRenderList(comments) {
     const list = document.getElementById('twcList');
     if (!list) return;
@@ -18003,7 +18263,7 @@ function twcRenderList(comments) {
             `<img src="/api/comments/media/${encodeURIComponent(tok)}?${twcAuthQ()}" loading="lazy" alt="" onclick="twcZoom(this.src)">`
         ).join('');
         return `<div class="twc-item">
-            <span class="twc-avatar">${twcEsc(twcInitials(c.user_name))}</span>
+            ${twcRenderAvatarHtml(c.user_name, c.user_avatar)}
             <div class="twc-item-main">
                 <div class="twc-item-head">
                     <span class="twc-author">${twcEsc(c.user_name || '')}</span>
@@ -18012,6 +18272,7 @@ function twcRenderList(comments) {
                 </div>
                 <div class="twc-text">${twcRenderParts(c.parts)}</div>
                 ${imgs ? `<div class="twc-imgs">${imgs}</div>` : ''}
+                ${twcRenderReactions(c.reactions)}
             </div>
         </div>`;
     }).join('');
@@ -18215,8 +18476,30 @@ function cmnRender() {
         if (it.reply_count > 1) meta.push(`<span>💬 ${it.reply_count}</span>`);
         if (it.image_count) meta.push(`<span>🖼 ${it.image_count}</span>`);
         if (it.is_solved) meta.push('<span>✅ solved</span>');
+        if (it.kind === 'reaction') {
+            const emo = twcReactionEmoji(it.reaction_key);
+            const onWho = it.on_author ? ` <b>${twcEsc(it.on_author)}</b>'s comment` : ' a comment';
+            return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}">
+            <span class="cmn-dot"></span>
+            ${twcRenderAvatarHtml(it.author, it.author_avatar, 'cmn-avatar')}
+            <div class="cmn-item-main">
+                <div class="cmn-item-top">
+                    <span class="cmn-item-author">${twcEsc(it.author || '')}</span>
+                    <span class="cmn-item-rec">${rec}</span>
+                    <span class="cmn-item-time">${twcTimeAgo(it.time)}</span>
+                </div>
+                <div class="cmn-item-text"><span class="cmn-rx-verb">reacted ${emo} to${onWho}:</span> ${twcEsc(it.text || '')}</div>
+                ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
+            </div>
+        </div>`;
+        }
+        const rxChips = ((it.reactions || []).length)
+            ? `<div class="cmn-rx-line">${it.reactions.map(rx =>
+                `<span class="cmn-rx-chip" title="${twcEsc(rx.reactor_name || '')}">${twcReactionEmoji(rx.key)}</span>`).join('')}</div>`
+            : '';
         return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}">
             <span class="cmn-dot"></span>
+            ${twcRenderAvatarHtml(it.author, it.author_avatar, 'cmn-avatar')}
             <div class="cmn-item-main">
                 <div class="cmn-item-top">
                     <span class="cmn-item-author">${twcEsc(it.author || '')}</span>
@@ -18224,6 +18507,7 @@ function cmnRender() {
                     <span class="cmn-item-time">${twcTimeAgo(it.time)}</span>
                 </div>
                 <div class="cmn-item-text">${twcEsc(it.text || '')}</div>
+                ${rxChips}
                 ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
             </div>
         </div>`;
