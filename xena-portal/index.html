@@ -1719,6 +1719,81 @@
         .pic-tag:last-child{border-right:none;}
         .pic-tag:hover{color:var(--text,#fff);background:rgba(255,255,255,.06);}
         .pic-tag.active{background:var(--accent-cyan,#00d4ff);color:#00222b;}
+
+        /* ===== Phase 10.43: Feishu-synced ticket comments (twc-) + notifications bell/feed (cmn-) ===== */
+        #twcCard{margin-top:18px;border:1px solid var(--border,rgba(255,255,255,.12));border-radius:14px;background:var(--card-bg,rgba(255,255,255,.03));overflow:hidden;}
+        .twc-header{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;}
+        .twc-header:hover{background:rgba(255,255,255,.04);}
+        .twc-title{font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px;color:var(--text,#fff);}
+        #twcCount{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--accent-cyan,#00d4ff);color:#00222b;font-size:.68rem;font-weight:800;display:none;align-items:center;justify-content:center;}
+        #twcCount.show{display:inline-flex;}
+        #twcRefreshBtn{margin-left:auto;background:transparent;border:1px solid var(--border,rgba(255,255,255,.15));color:var(--text-muted,#8a8fa3);border-radius:8px;width:26px;height:26px;cursor:pointer;font-size:.8rem;line-height:1;font-family:inherit;}
+        #twcRefreshBtn:hover{color:var(--text,#fff);border-color:var(--accent-cyan,#00d4ff);}
+        #twcCaret{color:var(--text-muted,#8a8fa3);font-size:.75rem;transition:transform .2s;}
+        #twcCard.open #twcCaret{transform:rotate(180deg);}
+        #twcBody{display:none;border-top:1px solid var(--border,rgba(255,255,255,.08));}
+        #twcCard.open #twcBody{display:block;}
+        #twcList{max-height:380px;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;}
+        .twc-empty{color:var(--text-muted,#8a8fa3);font-size:.8rem;text-align:center;padding:18px 0;}
+        .twc-item{display:flex;gap:10px;}
+        .twc-avatar{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;}
+        .twc-item-main{flex:1;min-width:0;}
+        .twc-item-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+        .twc-author{font-size:.8rem;font-weight:700;color:var(--text,#fff);}
+        .twc-time{font-size:.68rem;color:var(--text-muted,#8a8fa3);}
+        .twc-solved-tag{font-size:.62rem;font-weight:700;color:#34d399;border:1px solid rgba(52,211,153,.4);border-radius:6px;padding:1px 6px;}
+        .twc-text{font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin-top:2px;color:var(--text,#fff);}
+        .twc-mention{color:var(--accent-cyan,#00d4ff);font-weight:700;background:rgba(0,212,255,.12);border-radius:5px;padding:0 4px;}
+        .twc-link{color:var(--accent-cyan,#00d4ff);word-break:break-all;}
+        .twc-imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+        .twc-imgs img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border,rgba(255,255,255,.15));cursor:zoom-in;}
+        .twc-composer{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border,rgba(255,255,255,.08));}
+        .twc-input-wrap{flex:1;position:relative;}
+        #twcInput{width:100%;min-height:38px;max-height:120px;resize:vertical;background:rgba(255,255,255,.05);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:10px;color:var(--text,#fff);font-size:.82rem;font-family:inherit;padding:9px 12px;box-sizing:border-box;}
+        #twcInput:focus{outline:none;border-color:var(--accent-cyan,#00d4ff);}
+        .twc-foot{font-size:.66rem;color:var(--text-muted,#8a8fa3);margin-top:5px;}
+        #twcSendBtn{flex:none;align-self:flex-end;background:var(--accent-cyan,#00d4ff);color:#00222b;border:none;border-radius:10px;font-weight:800;font-size:.78rem;padding:9px 16px;cursor:pointer;font-family:inherit;}
+        #twcSendBtn:disabled{opacity:.45;cursor:default;}
+        #twcMentionPop{position:absolute;left:0;right:0;bottom:calc(100% + 4px);background:var(--panel-bg,#16182a);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.45);max-height:180px;overflow-y:auto;display:none;z-index:50;}
+        #twcMentionPop.show{display:block;}
+        .twc-mention-opt{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:.8rem;color:var(--text,#fff);}
+        .twc-mention-opt:hover,.twc-mention-opt.active{background:rgba(0,212,255,.12);}
+        .twc-mention-opt img{width:22px;height:22px;border-radius:50%;flex:none;}
+        .twc-mention-opt .twc-mention-opt-ph{width:22px;height:22px;border-radius:50%;flex:none;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;}
+
+        #cmnBell{position:relative;}
+        #cmnBadge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f43f5e;color:#fff;font-size:.6rem;font-weight:800;display:none;align-items:center;justify-content:center;pointer-events:none;box-sizing:border-box;}
+        #cmnBadge.show{display:inline-flex;}
+        #cmnPanel{position:fixed;top:56px;right:16px;width:370px;max-width:calc(100vw - 24px);max-height:70vh;background:var(--panel-bg,#16182a);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.5);display:none;flex-direction:column;z-index:3000;overflow:hidden;}
+        #cmnPanel.show{display:flex;}
+        .cmn-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border,rgba(255,255,255,.1));flex:none;}
+        .cmn-title{font-weight:800;font-size:.85rem;color:var(--text,#fff);white-space:nowrap;}
+        .cmn-tabs{display:flex;gap:4px;margin-left:4px;}
+        .cmn-tab{background:transparent;border:1px solid transparent;color:var(--text-muted,#8a8fa3);font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;font-family:inherit;}
+        .cmn-tab.active{color:var(--accent-cyan,#00d4ff);border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.08);}
+        .cmn-markall{margin-left:auto;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.68rem;cursor:pointer;font-family:inherit;white-space:nowrap;}
+        .cmn-markall:hover{color:var(--accent-cyan,#00d4ff);}
+        .cmn-close{background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.95rem;cursor:pointer;line-height:1;padding:2px 4px;}
+        .cmn-close:hover{color:var(--text,#fff);}
+        #cmnList{overflow-y:auto;padding:6px;}
+        .cmn-item{display:flex;gap:10px;padding:10px;border-radius:10px;cursor:pointer;}
+        .cmn-item:hover{background:rgba(255,255,255,.05);}
+        .cmn-item.unread{background:rgba(0,212,255,.06);}
+        .cmn-item.unread:hover{background:rgba(0,212,255,.1);}
+        .cmn-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#f43f5e;margin-top:6px;visibility:hidden;}
+        .cmn-item.unread .cmn-dot{visibility:visible;}
+        .cmn-item-main{flex:1;min-width:0;}
+        .cmn-item-top{display:flex;align-items:baseline;gap:6px;}
+        .cmn-item-author{font-size:.78rem;font-weight:700;color:var(--text,#fff);}
+        .cmn-item-time{margin-left:auto;font-size:.64rem;color:var(--text-muted,#8a8fa3);flex:none;}
+        .cmn-item-rec{font-size:.66rem;color:var(--accent-cyan,#00d4ff);font-weight:700;}
+        .cmn-item-text{font-size:.76rem;color:var(--text,#fff);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+        .cmn-item-meta{font-size:.64rem;color:var(--text-muted,#8a8fa3);margin-top:3px;display:flex;gap:10px;}
+        .cmn-item-meta .cmn-atme{color:var(--accent-cyan,#00d4ff);font-weight:700;}
+        .cmn-empty{color:var(--text-muted,#8a8fa3);font-size:.78rem;text-align:center;padding:26px 0;}
+        @media (max-width:600px){
+            #cmnPanel{top:52px;right:8px;width:calc(100vw - 16px);}
+        }
     </style>
 </head>
 
@@ -2017,6 +2092,11 @@
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
                 </a>
 
+                <button class="utility-icon-btn" id="cmnBell" onclick="cmnToggle()" title="Comment notifications">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    <span id="cmnBadge"></span>
+                </button>
+
                 <button class="utility-icon-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">🌙</button>
                 
                 <select class="lang-select" id="langSelect" onchange="changeLanguage(this.value)">
@@ -2030,7 +2110,23 @@
                 </button>
             </div>
         </div>
-        
+
+        <!-- Phase 10.43: comment notifications feed — mirrors the Feishu Base
+             notification panel; fixed dropdown under the top bar, toggled by
+             the #cmnBell button. -->
+        <div id="cmnPanel">
+            <div class="cmn-head">
+                <span class="cmn-title">🔔 Comments</span>
+                <div class="cmn-tabs">
+                    <button type="button" class="cmn-tab active" id="cmnTabAll" onclick="cmnSetTab('all')">All</button>
+                    <button type="button" class="cmn-tab" id="cmnTabMentioned" onclick="cmnSetTab('mentioned')">@ Me</button>
+                </div>
+                <button type="button" class="cmn-markall" onclick="cmnMarkAllRead()">Mark all read</button>
+                <button type="button" class="cmn-close" onclick="cmnToggle(true)" title="Close">✕</button>
+            </div>
+            <div id="cmnList"></div>
+        </div>
+
         <div class="multi-tab-bar" id="multiTabBar">
             <!-- Tabs injected by JS -->
         </div>
@@ -3775,6 +3871,31 @@
                    </div>
                </form>
 
+               <!-- Phase 10.43: Feishu-synced comment thread for the open
+                    ticket. Lives INSIDE #twWsInstance, AFTER the form, so
+                    twCollectFields never collects it and it clones pristine
+                    with every workspace instance; per-ticket state lives in
+                    a WeakMap keyed by this card node (twcState). Hidden until
+                    a real ticket finishes filling (twcOnTicketFilled). -->
+               <div id="twcCard" style="display:none;">
+                   <div class="twc-header" onclick="twcToggle()">
+                       <span class="twc-title">💬 Comments <span id="twcCount"></span></span>
+                       <button type="button" id="twcRefreshBtn" onclick="event.stopPropagation();twcLoad(true)" title="Refresh comments">⟳</button>
+                       <span id="twcCaret">▼</span>
+                   </div>
+                   <div id="twcBody">
+                       <div id="twcList"></div>
+                       <div class="twc-composer">
+                           <div class="twc-input-wrap">
+                               <textarea id="twcInput" placeholder="Write a comment… @ to mention a teammate"></textarea>
+                               <div id="twcMentionPop"></div>
+                               <div class="twc-foot">Enter to send · Shift+Enter new line · @ to mention — synced with the Feishu Base thread</div>
+                           </div>
+                           <button type="button" id="twcSendBtn" onclick="twcSend()">Send</button>
+                       </div>
+                   </div>
+               </div>
+
                <!-- Phase 10.3: radar matches pop up in an audit-style bottom
                     drawer instead of rendering inline and shoving the form
                     down. Exact same shell, z-index and animation classes
@@ -4181,6 +4302,11 @@ function setActiveTab(page) {
         openInTab('ticket-workspace');
         return;
     }
+    // Phase 10.42: landing ON the workspace by any path (e.g. clicking the
+    // 🆕 New Ticket tab, which mounts the draft without a stash) means it is
+    // no longer parked -- clear a stale flag so the restore clause above
+    // can't hijack a later click on the origin tab.
+    if (page === 'ticket-workspace') twWsParked = false;
     activeTabId = page;
     renderTabs();
 
@@ -4203,7 +4329,11 @@ function closeTab(page, event) {
         // (renderTabs skips it), so fall back to the last entry that actually
         // OWNS a tab -- closing e.g. the Live Queue tab must never land on a
         // workspace page with NO tab in the bar (the ghost-workspace bug).
-        const ownsTab = p => !(p === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode));
+        // Phase 10.42: the draft's tab lives as long as the draft INSTANCE
+        // does (twWsTabs['create']), independent of the mounted workspace's
+        // twCreateMode flag.
+        const draftAlive = typeof twWsTabs !== 'undefined' && !!(twWsTabs['create'] && twWsTabs['create'].node);
+        const ownsTab = p => !(p === 'ticket-workspace' && !draftAlive);
         const candidates = openTabs.filter(ownsTab);
         activeTabId = candidates.length ? candidates[candidates.length - 1] : 'welcome';
     }
@@ -4217,6 +4347,15 @@ function renderTabs() {
     
     const titlesMap = currentLang === 'zh' ? zhPageTitlesMap : pageTitlesMap;
 
+    // Phase 10.42 (Ahmed): "if i open New Ticket tab and then open request on
+    // Under Investigation the new tab totally closed". ROOT CAUSE: this tab
+    // was gated on the MOUNTED workspace's twCreateMode flag -- opening a
+    // real ticket flips it false and the draft's tab vanished (the draft
+    // instance itself survived, just unreachable). The tab now belongs to
+    // the draft INSTANCE: it renders while twWsTabs['create'] is alive, no
+    // matter what is currently mounted.
+    const draftAlive = typeof twWsTabs !== 'undefined' && !!(twWsTabs['create'] && twWsTabs['create'].node);
+
     openTabs.forEach(page => {
         // Phase 10.33 (Ahmed): NO per-ticket tabs -- "return it as it was ...
         // no new tab". A real ticket's workspace opens UNDER the tab of the
@@ -4225,15 +4364,23 @@ function renderTabs() {
         // under investigated", never under Live Queue. Only the New-Ticket
         // DRAFT keeps its own tab (10.13.1) so the open draft is visible and
         // switchable like any other page.
-        if(page === 'ticket-workspace' && !(typeof twCreateMode !== 'undefined' && twCreateMode)) return;
+        if(page === 'ticket-workspace' && !draftAlive) return;
 
         const title = page === 'ticket-workspace' ? '🆕 New Ticket' : (titlesMap[page] || page);
-        const isActive = page === activeTabId ||
-            (activeTabId === 'ticket-workspace' && typeof twReturnTo !== 'undefined' && page === twReturnTo);
-        
+        // Phase 10.42: while a REAL ticket is mounted, the origin module's
+        // tab (twReturnTo) is the highlighted one -- the draft tab is only
+        // active when the draft instance itself is mounted.
+        const isActive = page === 'ticket-workspace'
+            ? (page === activeTabId && typeof twWsActiveKey !== 'undefined' && twWsActiveKey === 'create')
+            : (page === activeTabId ||
+               (activeTabId === 'ticket-workspace' && typeof twReturnTo !== 'undefined' && page === twReturnTo));
+
         const tabEl = document.createElement('div');
         tabEl.className = `tab-item ${isActive ? 'active' : ''}`;
-        tabEl.onclick = () => setActiveTab(page);
+        // Phase 10.42: clicking the draft tab REMOUNTS the draft instance
+        // (twOpenCreateWorkspace handles stash/mount) -- setActiveTab alone
+        // would show whatever workspace happens to be mounted.
+        tabEl.onclick = () => page === 'ticket-workspace' ? twOpenCreateWorkspace() : setActiveTab(page);
         tabEl.dataset.page = page;
 
         tabEl.draggable = true;
@@ -5055,10 +5202,22 @@ const IDLE_LIMIT_MS = 4 * 60 * 60 * 1000;     // 4 hours of no activity -> auto 
 // backgrounded past the timer, a phone that suspended the JS interval, or a
 // laptop that slept mid-session.
 function forceSessionExpiredLogout(message) {
+    // Phase 10.44: a logout must NEVER delete filled-in work again ("the info
+    // is deleted and i need to do it again"). Snapshot every open form (New
+    // Request, Audit, every open ticket workspace incl. stashed ones) into
+    // the per-email draft store FIRST, then carry the draft store + display
+    // prefs across the wipe. xdAutoRestore() puts everything back after the
+    // next login. loggedEmail is still set here -- xdStoreKey() needs it.
+    try { xdCaptureAll(); } catch (e) {}
+    const keep = {};
+    [xdStoreKey(), 'xenaTheme', 'sidebarCollapsed'].forEach(k => {
+        try { const v = localStorage.getItem(k); if (v !== null) keep[k] = v; } catch (e) {}
+    });
     localStorage.clear();
+    Object.keys(keep).forEach(k => { try { localStorage.setItem(k, keep[k]); } catch (e) {} });
     loggedUser = null;
     loggedUat = null;
-    ToastManager.show(message || 'Your session has expired. Please log in again.', 'warning', 8000);
+    ToastManager.show(message || 'Your session has expired. Please log in again — anything you filled in was saved and will be restored automatically.', 'warning', 9000);
     setTimeout(() => window.location.reload(), 1200);
 }
 
@@ -5084,7 +5243,7 @@ async function checkNewRequestSessionOnOpen() {
             let data = {};
             try { data = await res.json(); } catch (e) {}
             if (data.code === 'SESSION_EXPIRED') {
-                forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again.');
+                forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again — anything you filled in was saved and will be restored automatically.');
             }
         }
     } catch (e) { /* offline or unreachable -- don't force a logout over a network blip */ }
@@ -5162,6 +5321,257 @@ setInterval(checkAppVersion, 5 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { markActivity(); checkSessionExpiry(); checkAppVersion(); } });
 window.addEventListener('focus', () => { markActivity(); checkSessionExpiry(); checkAppVersion(); });
 // ------------------------------------------
+
+// ─── Phase 10.44: silent session renewal + unsent-work drafts ───
+// Ahmed: "the token is still expire after 3 hour ... still need to log out
+// and log in while iam working on tkt and the info is deleted and i need to
+// do it again and open the tkt and fill what i was filled before".
+// Two layers, together:
+//  1) renewSessionUat() keeps the browser's uat fresh from the server-side
+//     24h refresh chain (/api/auth/refresh-session) every 45 min, on tab
+//     refocus, and right before every submit -- so a mid-shift session stops
+//     dying with Feishu's ~2-3h token lifetime. Cost: one tiny server call
+//     (a Redis read, ZERO Feishu calls while the server cache is warm).
+//  2) The xd* draft store autosaves every open form as the agent types. If a
+//     logout still has to happen (12h cap, 4h idle, new deploy, truly dead
+//     chain), the next login restores every form exactly as it was, so "log
+//     out and log in" no longer means "fill it all again".
+let _renewInFlight = null, _lastRenewTry = 0;
+async function renewSessionUat(force) {
+    if (!loggedUser) return true;
+    if (_renewInFlight) return _renewInFlight;
+    if (!force && Date.now() - _lastRenewTry < 20 * 60000) return true;
+    _lastRenewTry = Date.now();
+    _renewInFlight = (async () => {
+        try {
+            const qs = new URLSearchParams({ user: loggedUser, email: loggedEmail, open_id: localStorage.getItem('xenaOpenId') || '' });
+            const res = await fetch(`/api/auth/refresh-session?${qs}`);
+            if (res.status === 401) {
+                let data = {}; try { data = await res.json(); } catch (e) {}
+                if (data.code === 'SESSION_EXPIRED') {
+                    // Verifiably dead chain (not a Redis blip -- the server
+                    // fails open for those): save drafts + re-login.
+                    forceSessionExpiredLogout(data.error || undefined);
+                    return false;
+                }
+                return true; // any other 401: don't kill a working session
+            }
+            if (!res.ok) return true; // transient server trouble -- keep working
+            const data = await res.json();
+            if (data && data.uat) {
+                loggedUat = data.uat;
+                try { localStorage.setItem('xenaUat', data.uat); } catch (e) {}
+            }
+            return true;
+        } catch (e) {
+            return true; // offline / unreachable -- never log out over a network blip
+        } finally { _renewInFlight = null; }
+    })();
+    return _renewInFlight;
+}
+// Ahmed (Phase 10.44 follow-up): interval set to 45 min to trim Vercel
+// invocations; Feishu's uat lives ~2h, so even one missed tick is safe, and
+// the forced renewal before every submit is the real safety net.
+setInterval(() => { if (!document.hidden) renewSessionUat(true); }, 45 * 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) renewSessionUat(false); });
+window.addEventListener('focus', () => renewSessionUat(false));
+
+// --- Unsent-work drafts (xd*) ---
+// Store shape per agent email: { newRequest: {values, ts}, audit: {...},
+// 'ws:<recordId>': {...}, 'wsCreate:<wsKey>': {...} }. Keyed by email so a
+// different agent on the same browser never sees someone else's drafts.
+const XD_TTL_MS = 24 * 3600 * 1000; // drafts are a logout-safety net, not long-term storage
+function xdStoreKey() { return `xenaDrafts:${String(loggedEmail || localStorage.getItem('xenaEmail') || 'unknown').toLowerCase()}`; }
+function xdLoadAll() { try { return JSON.parse(localStorage.getItem(xdStoreKey()) || '{}') || {}; } catch (e) { return {}; } }
+function xdSaveAll(d) { try { localStorage.setItem(xdStoreKey(), JSON.stringify(d)); } catch (e) {} }
+function xdClear(key) { const all = xdLoadAll(); if (all[key]) { delete all[key]; xdSaveAll(all); } }
+function xdClearPrefix(prefix) { const all = xdLoadAll(); let dirty = false; Object.keys(all).forEach(k => { if (k.startsWith(prefix)) { delete all[k]; dirty = true; } }); if (dirty) xdSaveAll(all); }
+function xdQ(name) { return String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
+function xdHasContent(values) {
+    return Object.keys(values).some(k => {
+        if (k.startsWith('__')) return false;
+        const v = values[k];
+        if (Array.isArray(v)) return v.length > 0;
+        return v !== '' && v !== false && v !== null && v !== undefined;
+    });
+}
+// Generic form snapshot: named text/number/select/textarea controls, checkbox
+// groups (multi -> array of values, single -> bool), radio groups (-> value),
+// and member pickers (data-user-field -> parsed selection). File inputs are
+// skipped -- browsers won't let JS restore picked files, everything else
+// comes back. Readonly/disabled/hidden controls are skipped, mirroring what
+// the save paths themselves collect.
+function xdSerializeForm(form) {
+    const values = {};
+    if (!form) return values;
+    form.querySelectorAll('input, textarea, select').forEach(el => {
+        if (!el.name || el.disabled || el.readOnly) return;
+        const t = (el.type || '').toLowerCase();
+        if (t === 'file' || t === 'button' || t === 'submit' || t === 'hidden' || t === 'checkbox' || t === 'radio') return;
+        if (el.tagName === 'SELECT' && el.multiple) {
+            values[el.name] = [...el.options].filter(o => o.selected).map(o => o.value);
+            return;
+        }
+        values[el.name] = el.value;
+    });
+    const groups = {};
+    form.querySelectorAll('input[type="checkbox"][name], input[type="radio"][name]').forEach(el => {
+        if (el.disabled) return;
+        (groups[el.name] = groups[el.name] || []).push(el);
+    });
+    Object.keys(groups).forEach(name => {
+        const els = groups[name];
+        if (els[0].type === 'radio') { const c = els.find(e => e.checked); values[name] = c ? c.value : ''; return; }
+        const isMulti = els.length > 1 || els[0].dataset.multi === 'true';
+        values[name] = isMulti ? els.filter(e => e.checked).map(e => e.value) : els[0].checked;
+    });
+    form.querySelectorAll('[data-user-field]').forEach(w => {
+        if (!w.dataset.userField) return;
+        try { values[w.dataset.userField] = w.dataset.userSelected ? JSON.parse(w.dataset.userSelected) : []; } catch (e) {}
+    });
+    return values;
+}
+// Puts a snapshot back. Two-phase: apply once, fire change events so dynamic
+// sections (Request Type / Region dependents) re-render, then apply again so
+// controls created by those renders also get their values.
+function xdApplyValues(form, values) {
+    if (!form || !values) return;
+    const applyOnce = () => {
+        Object.entries(values).forEach(([name, val]) => {
+            if (name.startsWith('__')) return;
+            const uWrap = form.querySelector(`[data-user-field="${xdQ(name)}"]`);
+            if (uWrap) {
+                if (Array.isArray(val)) {
+                    uWrap.dataset.userSelected = JSON.stringify(val);
+                    const label = uWrap.querySelector('label')?.outerHTML || '<label></label>';
+                    try { if (typeof twRenderMemberPicker === 'function') twRenderMemberPicker(uWrap, label, name, val.length ? val : null); } catch (e) {}
+                }
+                return;
+            }
+            const toggles = [...form.querySelectorAll(`input[type="checkbox"][name="${xdQ(name)}"], input[type="radio"][name="${xdQ(name)}"]`)];
+            if (toggles.length) {
+                if (toggles[0].type === 'radio') toggles.forEach(c => { c.checked = (c.value === val); });
+                else if (Array.isArray(val)) toggles.forEach(c => { c.checked = val.includes(c.value); });
+                else toggles[0].checked = !!val;
+                return;
+            }
+            const el = form.querySelector(`[name="${xdQ(name)}"]`);
+            if (!el || (el.type || '').toLowerCase() === 'file') return;
+            if (el.tagName === 'SELECT' && el.multiple && Array.isArray(val)) {
+                [...el.options].forEach(o => { o.selected = val.includes(o.value); });
+            } else {
+                el.value = (val === null || val === undefined) ? '' : val;
+            }
+        });
+    };
+    applyOnce();
+    form.querySelectorAll('select').forEach(el => { try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} });
+    setTimeout(() => {
+        applyOnce();
+        try { if (typeof twAutoGrowAll === 'function') twAutoGrowAll(form); } catch (e) {}
+    }, 400);
+}
+// Snapshot every surface that can hold unsent work right now: the standalone
+// New Request form, the Audit form, and EVERY ticket-workspace instance
+// (mounted or stashed -- each keeps its own DOM with values intact).
+function xdCaptureAll() {
+    if (!loggedUser && !localStorage.getItem('xenaUser')) return;
+    const all = xdLoadAll();
+    // prune expired drafts first
+    const now = Date.now();
+    Object.keys(all).forEach(k => { if (!all[k] || (now - (all[k].ts || 0)) >= XD_TTL_MS) delete all[k]; });
+    const grab = (key, form, extra) => {
+        if (!form) return;
+        const v = xdSerializeForm(form);
+        if (extra) Object.assign(v, extra);
+        if (xdHasContent(v)) all[key] = { values: v, ts: now };
+    };
+    const nrForm = document.getElementById('newRequestForm');
+    grab('newRequest', nrForm, { __reqType: document.getElementById('formRequestType')?.value || '' });
+    grab('audit', document.getElementById('auditRequestForm'));
+    try {
+        Object.values(twWsTabs || {}).forEach(st => {
+            if (!st || !st.node) return;
+            const f = st.node.querySelector('#tw-form');
+            if (!f) return;
+            grab(st.recordId && !st.createMode ? 'ws:' + st.recordId : 'wsCreate:' + st.key, f);
+        });
+    } catch (e) {}
+    // The active instance is always covered above, but grab it from the live
+    // DOM too in case the tab registry is mid-swap.
+    const liveF = document.getElementById('tw-form');
+    if (liveF) {
+        try {
+            const st = (twWsTabs || {})[twWsActiveKey];
+            grab(st && st.recordId && !st.createMode ? 'ws:' + st.recordId : 'wsCreate:' + (twWsActiveKey || 'create'), liveF);
+        } catch (e) { grab('wsCreate:create', liveF); }
+    }
+    xdSaveAll(all);
+}
+// Autosave as the agent types (capture-phase so every cloned workspace form
+// is covered; debounced 1.5s so typing never stalls).
+let _xdTimer = null;
+function xdScheduleCapture() {
+    if (!loggedUser) return;
+    clearTimeout(_xdTimer);
+    _xdTimer = setTimeout(() => { try { xdCaptureAll(); } catch (e) {} }, 1500);
+}
+document.addEventListener('input', xdScheduleCapture, true);
+document.addEventListener('change', xdScheduleCapture, true);
+// After a login (or any page load with a live session), put back whatever a
+// previous logout/crash parked. Restoring clears the draft, so this never
+// resurrects already-resubmitted work; successful submits also clear theirs.
+let _xdRestored = false;
+async function xdAutoRestore() {
+    if (_xdRestored || !loggedUser) return;
+    _xdRestored = true;
+    const all = xdLoadAll();
+    const now = Date.now();
+    const keys = Object.keys(all).filter(k => all[k] && all[k].values && xdHasContent(all[k].values) && (now - (all[k].ts || 0)) < XD_TTL_MS);
+    if (!keys.length) return;
+    const order = k => k === 'newRequest' ? 0 : k === 'audit' ? 1 : k.startsWith('wsCreate:') ? 2 : 3;
+    keys.sort((a, b) => order(a) - order(b));
+    let restored = 0;
+    for (const k of keys) {
+        try {
+            if (k === 'newRequest') {
+                if (typeof setActiveTab === 'function') setActiveTab('new-request');
+                await new Promise(r => setTimeout(r, 400));
+                const rt = all[k].values.__reqType;
+                if (rt) {
+                    const sel = document.getElementById('formRequestType');
+                    if (sel) { sel.value = rt; try { renderReqFormFields(); } catch (e) {} }
+                    await new Promise(r => setTimeout(r, 300));
+                }
+                xdApplyValues(document.getElementById('newRequestForm'), all[k].values);
+                xdClear(k); restored++;
+            } else if (k === 'audit') {
+                if (typeof setActiveTab === 'function') setActiveTab('audit');
+                await new Promise(r => setTimeout(r, 400));
+                xdApplyValues(document.getElementById('auditRequestForm'), all[k].values);
+                xdClear(k); restored++;
+            } else if (k.startsWith('wsCreate:')) {
+                if (typeof twOpenCreateWorkspace === 'function') {
+                    twOpenCreateWorkspace();
+                    await new Promise(r => setTimeout(r, 500));
+                    xdApplyValues(document.getElementById('tw-form'), all[k].values);
+                    xdClear(k); restored++;
+                }
+            } else if (k.startsWith('ws:')) {
+                const rid = k.slice(3);
+                if (rid && typeof twOpenWorkspace === 'function') {
+                    window.__xdPending = window.__xdPending || {};
+                    window.__xdPending[rid] = all[k].values;
+                    await twOpenWorkspace(rid); // the fill-end hook applies + clears
+                    restored++;
+                }
+            }
+        } catch (e) { console.warn('xd restore failed for', k, e); }
+    }
+    if (restored) ToastManager.show(`💾 Restored your unsent work (${restored} form${restored > 1 ? 's' : ''}) — pick up right where you left off.`, 'success', 9000);
+}
+if (loggedUser) setTimeout(() => { try { xdAutoRestore(); } catch (e) {} }, 1500);
+// ─── end Phase 10.44 ───
 
 // ─── Phase 10.21 (speed): open timing + backend keep-warm ───
 // Ahmed's screen recording showed ~15s click→open on a just-landed ticket
@@ -5401,7 +5811,16 @@ function playSamuraiIntro() {
 
 function logout() { 
     logFrontendAction("LOGOUT", "User Session");
-    localStorage.clear(); 
+    // Phase 10.44: a MANUAL logout is a deliberate exit -- don't snapshot the
+    // current forms (the agent chose to leave them), but DO carry any drafts
+    // parked by an earlier forced logout across the wipe so they can still be
+    // restored after the next login.
+    const keep = {};
+    [xdStoreKey(), 'xenaTheme', 'sidebarCollapsed'].forEach(k => {
+        try { const v = localStorage.getItem(k); if (v !== null) keep[k] = v; } catch (e) {}
+    });
+    localStorage.clear();
+    Object.keys(keep).forEach(k => { try { localStorage.setItem(k, keep[k]); } catch (e) {} });
     location.reload(); 
 }
 
@@ -8799,8 +9218,15 @@ async function tiSearch() {
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Search failed');
         const rows = data.results || [];
+        // Phase 10.42 (Ahmed): "arrange the tkts in under investgation based
+        // on numbering from old to new" -- sort ascending by 编号 (fall back
+        // to the record_id tail for rows with no numbering), oldest first.
+        rows.sort((a, b) => {
+            const num = r => parseInt(r.numbering) || parseInt(String(r.record_id).slice(-6)) || 0;
+            return num(a) - num(b);
+        });
         if (countEl) countEl.textContent = rows.length
-            ? `${rows.length} request${rows.length === 1 ? '' : 's'} under investigation — newest first.`
+            ? `${rows.length} request${rows.length === 1 ? '' : 's'} under investigation — oldest first.`
             : 'No requests under investigation right now. ✅';
         if (!rows.length) { if (emptyEl) emptyEl.style.display = ''; return; }
         resultsEl.innerHTML = tiTableHtml(rows);
@@ -9990,7 +10416,7 @@ const LT_FIELD_MAP = {
 };
 const LT_ALWAYS_SHOW = [["applier_note","Applier Note"]];
 
-const FIELD_SCHEMA = {"Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Rudra-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"]}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed"]}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )", "Golden Lion Package ( 50 Points )", "White Lion Package ( 50 Points )", "Pink Lion Package ( 50 Points )", "Green Warrior Package ( 50 Points )", "Lion King Package ( 50 Points )", "Pink Love Package ( 50 Points )", "Golden Lion Package ( 50 )"]}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name", "Agency manager in another ID"]}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty", "4family ", "Hawk", "Voiceparty", "SoHab", "Rizz Live", "WeStar", "MajaGo", "Boloup pro", "Dazz X", "hiya", "MIKA", "Leeski", "miloop", "Kalam", "Dream Party", "BunnyLive", "PKMega ", "Shawii", "WillChill", "Huna Lite", "LohaChat", "Huwaa", "Fadaa Live", "HaloLive", "BoloHi", "ZoyaCall", "Voku", "WM voice chat", "Zowa"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Rudra", "Ravikant", "Ansh", "Rocky", "BELLA"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "Link"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}};
+const FIELD_SCHEMA = {"Create Way": {"field_id": "fldltsJfiv", "ui_type": "SingleSelect", "options": ["Audit (Missing info)", "Manually", "Audit (with all info)"]}, "Whatsapp Number": {"field_id": "fldTIoJXnm", "ui_type": "Text"}, "Webhook Lookup": {"field_id": "fldApQplgC", "ui_type": "Lookup"}, "Reporter ID (1) (1)": {"field_id": "fldRIBlDGC", "ui_type": "Text"}, "Respondents": {"field_id": "fldAE3MeYy", "ui_type": "CreatedUser"}, "Created By": {"field_id": "fldhtJzyFh", "ui_type": "Formula"}, "Assigned Time": {"field_id": "fldYyrDCvU", "ui_type": "DateTime"}, "raw_text": {"field_id": "fld56zJDTG", "ui_type": "Text"}, "Mentioned Group": {"field_id": "fld9RClgRw", "ui_type": "SingleSelect", "options": ["South Asia Audition Group", "PK-Mubeen Group", "SA Agency CS & Audition group", "VIP CS SA & Audition", "South Asia - CS&Audition group", "PK-Usama-Audition group", "PK-Zohaib-Audition group", "PK-Farooq-Audition group", "PK-Hasseb-Audition group", "PK-Enzo-Audition group", "PK-Cruz-Audition group", "PK-Ehtisham-Audition group", "IN-Holy&Ritu-Audition group", "IN-Vihan-Audition group", "IN-Rudra-Audition group", "IN-Ansh-Audition group", "IN-Ravikant-Audition group", "PK-Sehar-Audition group", "usless", "PK-Hamza-Audition group", "PK-Nabeel-Audition group"]}, "Acm Name (PK)": {"field_id": "fldbX33lBQ", "ui_type": "SingleSelect", "options": ["nabeel", "Haseeb", "Enzo", "Farooq", "Mubeen", "Cruz", "Ehtisham", "Usama", "Sehar Ch", "Hamza Malik", "Zohaib", "Eagle", "Leo", "Berlin"]}, "Request Status": {"field_id": "fldE36n47k", "ui_type": "SingleSelect", "options": ["Pending", "In Progress", "Closed"]}, "Privilege": {"field_id": "fld3ZEdcQr", "ui_type": "SingleSelect", "options": ["30 Mics", "Dynamic Avatar", "Game room", "New User Welcome Room", "20 Mics "]}, "Applier real name": {"field_id": "fldd09wBeo", "ui_type": "Text"}, "New ID": {"field_id": "fldFAawZt3", "ui_type": "Text"}, "Region": {"field_id": "fldmSt3iOM", "ui_type": "SingleSelect", "options": ["PK", "IN"]}, "Record ID Text": {"field_id": "fldikLBOp3", "ui_type": "Formula"}, "Submitted on": {"field_id": "fldV5rIFQ0", "ui_type": "CreatedTime"}, "Host Number Before close the agency": {"field_id": "fldEltUYbt", "ui_type": "Number"}, "BD Nickname2": {"field_id": "fldBJ6lVn7", "ui_type": "Lookup"}, "Country": {"field_id": "fldoPEL7DO", "ui_type": "Text"}, "Closing Reason": {"field_id": "fldVcuo0sf", "ui_type": "SingleSelect", "options": ["User Request", "Duplicated Hosting", "Acm Request", "Opened by mistake"]}, "Lock Owner": {"field_id": "fldqLcq2xv", "ui_type": "User"}, "Ticket Details": {"field_id": "fld37xVGE6", "ui_type": "Formula"}, "Type of Action 2": {"field_id": "fldP8Rrwot", "ui_type": "SingleSelect", "options": ["Remove Games", "ADD Games"]}, "approve note": {"field_id": "fldPhzXnkL", "ui_type": "Text"}, "Request Type": {"field_id": "fldQ3nSTeh", "ui_type": "SingleSelect", "options": ["Agency Creation", "Agency applied already by ACM or BD link ( follow-up )", "Closing Agency", "BD Creation", "Remove BD ", "Agency Target Privilege", "Agency Point Request", "Change agency name ", "Change Agency Manger ID (with same owner)", "Change Agency Ownership ", "Merge agencies", "Add & Remove Host Sign", "Add & Remove games", "Add & Change Short ID", "Remove short ID (only by user approve )", "Welcome Package", "App Rating Reward", "Room Pinup (Only for the famous KOLS)", "Add Room Border"]}, "Agency Point Privilege": {"field_id": "fldkzZ3MjS", "ui_type": "MultiSelect", "options": ["Trend card ( 40 - 50 for others )", "Traffic card ( 30 - 40 for others )", "30 MIC 15 days ( 150 - 175 for others ) ", "30 MIC 30 days ( 300 - 350 for others) ", "Welcome Package 3 ( 80 )", "Welcome Package 2 ( 30 )", "Room Pin-Up ( 100 - 150 for others )", "Customized Short ID 30 days ( 1200 - 1800 for others )", "News banner ( 100 Points ) (No more than 5 days at one time)", "Live banner ( 150 Points ) (No more than 5 days at one time)", "Splash ( 1500 - 2000 for others )", "Golden Lion Package ( 50 Points )", "White Lion Package ( 50 Points )", "Pink Lion Package ( 50 Points )", "Green Warrior Package ( 50 Points )", "Lion King Package ( 50 Points )", "Pink Love Package ( 50 Points )", "Golden Lion Package ( 50 )"]}, "Submitted on Copy": {"field_id": "flduyaxTuT", "ui_type": "CreatedTime"}, "Reject Reason": {"field_id": "fldf3OhGJT", "ui_type": "MultiSelect", "options": ["Duplicate Device Authentication detected (System)", "Duplicate Device Authentication detected (Sheet)", "Duplicate NID (First time)", "Duplicate NID (Multiple time)", "Mico user ", "Old agency manger (Duplicated Hosting)", "Fake NID", "Fake otherapp", "Out of the ragion", "duplicate other app info", "Underage", "Host account or BD", "Old account", "Applied as walkin", "Applied with diffrenet information", "Duplicated, already opened", "Missing Information", "Wrong Xena ID", "wealth level >= 40", "Applied under another acm or bd", "Duplicated agency name", "Agency manager in another ID"]}, "Parenet sub agency": {"field_id": "fldFae7aYI", "ui_type": "Text"}, "Mentioned Person": {"field_id": "fldgOgBYX7", "ui_type": "User"}, "New agency name": {"field_id": "fldXedftmC", "ui_type": "Text"}, "Type of Action Host sign": {"field_id": "fldXvGRrte", "ui_type": "SingleSelect", "options": ["Add Host Sign", "Remove Host Sign"]}, "Audition note": {"field_id": "fldokzosGh", "ui_type": "Text"}, "Applier Note": {"field_id": "fldt1U8CzU", "ui_type": "Text"}, "Quantities Input": {"field_id": "fld5XAaDtY", "ui_type": "Text"}, "Ready to Archive": {"field_id": "fldzRX2EZp", "ui_type": "Checkbox"}, "Base Points": {"field_id": "fldWEgcmUX", "ui_type": "Formula"}, "Duplicated Check": {"field_id": "fldfCHFGMl", "ui_type": "Formula"}, "Wealth Level": {"field_id": "fldQW6gGEQ", "ui_type": "Text"}, "New agency owner Name": {"field_id": "fldSrqUxqe", "ui_type": "Text"}, "Email Adress": {"field_id": "fldpEQZb8x", "ui_type": "Text"}, "Counter": {"field_id": "fldr2I4nZJ", "ui_type": "Number"}, "Mention this Group": {"field_id": "fld8zx5yPb", "ui_type": "Lookup"}, "Agency Code": {"field_id": "fldDBcJHoA", "ui_type": "Text"}, "Reward": {"field_id": "fldMvKvYpI", "ui_type": "Checkbox"}, "Otherapp ID": {"field_id": "fldcKOTEZE", "ui_type": "Text"}, "Current agency manger name (same in NID )": {"field_id": "fldMcfwuFV", "ui_type": "Text"}, "Bot Message": {"field_id": "fldc1W5QiL", "ui_type": "Formula"}, "Robot Filter": {"field_id": "fldFE53089", "ui_type": "MultiSelect", "options": ["Welcome Package", "Add & Change Short ID", "Remove BD ", "Add & Remove Host Sign"]}, "Approval": {"field_id": "fldnmQC6FR", "ui_type": "Checkbox"}, "Vip Level": {"field_id": "fldbuB32v9", "ui_type": "Text"}, "BD Nickname": {"field_id": "fldQRdEgks", "ui_type": "Text"}, "Target Type": {"field_id": "fldM6kdeeC", "ui_type": "SingleSelect", "options": ["Same agency", "Others"]}, "Evidence Screen": {"field_id": "fldhBymdRS", "ui_type": "Attachment"}, "Bd Code": {"field_id": "fldtlPxC0H", "ui_type": "Text"}, "BD Hunted Agency Code": {"field_id": "fldYzbuOzw", "ui_type": "Text"}, "Bot Title": {"field_id": "fldjRDybDK", "ui_type": "Formula"}, "Otherapp Name": {"field_id": "fldp9YBGAh", "ui_type": "SingleSelect", "options": ["Yalla Ludo", "Songora", "Hello yo", "Likee", "Arza live", "Ayoba", "4Party", "Bigo ", "Ayome", "Hiya", "Poppo", "YoYo", "Yooy", "Facebook ", "viya", "Yari", "YoSo", "sky live", "Ahlan", "Yalla ", "Tami", "HiFami", "OYE TALK", "GameGala", "Chamet ", "TikTok", "Harunabad", "Party star", "Yaho ", "Faya Star", "Salam", "Waki Star", "Habi", "Oner", "RoStar", "Wafa", "Yoparti ", "Yobi ", "Starmaker", "Facebook", "Saya", "Pawa", "Migo", "WePlay", "Rina ", "Tikko", "Yudo ", "Farah", "Achat", "Tada", "Hayuki ", "Imo", "Hilo", "1Star", "Instgram", "Yoparti", "Islam", "Hapi", "Oichat", "Halo Star", "Funni", "PotaLive ", "Snapchat", "Ume", "Hago", "hala", "YoHoo Star", "7stars", "Ezzo", "HamiParty", "Spark live", "Halla ", "Taka ", "YallaChat", "StreamKar", "Snack Video", "Nawa ", "Fomi Party", "Meto", "Popo", "Kwai", "Fancy Live", "Coco ", "JACO ", "Hiiclub Pro", "Famy", "Vone", " Dimo chat ", "SK Lite", "Infriends", "yolo", "Ola Party ", "Awaz ", "TopVoice", "Miparty ", "HIBO ", "Waky Pro", "Joyo", "Crush live", "olamet", "hoho", "cocco ", "Dawa ", "Uouo", "Baat Live", "Heylla", "Falla", "Gamet ", "StarChat ", "WalaChat ", "Doli Live", "WeGo Party", "Yo2 ", "Lami", "Nita", "Faby Star", "Ligo Live", "ShareChat", "Heyo Chat", "MATE LIVE", "SeaU Chat", "Sawa ", "Ochat ", "Cat Live", "Sango ", "Ludo STAR", "Seeya Live", "PocoLive", "LotFun", "Gimme ", "Hooka", "Hichat ", "YaYa ", "bolo", "SayHi", "Yoki", "Yaahlan ", "Drago Live", "2chat", "Mr7ba", "Gomo", "Horo", "HOOB Live", "Zeep Live", "Songora ", "Upfun", "VoStar", "Asha Live", "Wyke", "Haza", "Hopi Star", "Niki Live", "Tayyb", "Kome ", "Naddy star", "4Fun", "Chatna", "LaYam ", "Mego", "HOLLA", "Vila", "Wyak ", "Yami ", "Lama", "HI FI", "Weso", "Okyi", "Halawa ", "Habbey Live", "Tomohi ", "MizMiz ", "Lihoo", "Youtube", "ELive ", "Vova", "Pami ", "LiveMe", "Boomlive ", "Gemgala", "HeroVoice ", "HiParty", "Sodfa Chat", "Fungo ", "YU", "Bingo Live", "Haya", "OurTalk", "BoBo", "Hati", "Waky ", "zs777", "Pencil", "LuvMug", "Wikoo", "LionsChat", "Yayya", "Alaab", "Junko", "NiuChat ", "BuzzChat ", "Azizi", "masti", "PartyYou", "Nahki", "Waho", "ayou", "Trendo", "DramaTalk ", "Tango", "sama", "yovi", "Catchii", "VoliStar", "Walla", "BestLive", "KoKo", "Sowa", "Glow Live", "Yoppo ", "HelloTalk", "Roka Live", "Hady", "", "Zilo Live", "Timo Club", "Chingari", "Lukee", "Fofoo", "Dana ", "SAHI", "Chatta ", "Yostar ", "Azal Live", "Elo TV", "EloElo", "Hayi", "RAVA Live", "Orii", "Maza", "Moj", "Bulala", "Oohla", "Hoby", "Toki", "Sohha", "Layaliya", "Chatrika ", "ZayChat", "Waka", "Zame", "Eparty ", "AloParty", "4family ", "Hawk", "Voiceparty", "SoHab", "Rizz Live", "WeStar", "MajaGo", "Boloup pro", "Dazz X", "hiya", "MIKA", "Leeski", "miloop", "Kalam", "Dream Party", "BunnyLive", "PKMega ", "Shawii", "WillChill", "Huna Lite", "LohaChat", "Huwaa", "Fadaa Live", "HaloLive", "BoloHi", "ZoyaCall", "Voku", "WM voice chat", "Zowa"]}, "Cleaned User ID": {"field_id": "fldHTBHhsU", "ui_type": "Formula"}, "chinese Note": {"field_id": "fldn6Nstyp", "ui_type": "Text"}, "Match ID": {"field_id": "fldHBb92bX", "ui_type": "Formula"}, "Formula": {"field_id": "fldsc0jlDq", "ui_type": "Formula"}, "New Short ID": {"field_id": "fldSZswqnT", "ui_type": "Text"}, "Reporter ID": {"field_id": "fldwnN9azP", "ui_type": "Text"}, "Assigned Member": {"field_id": "fldhucpcYh", "ui_type": "User"}, "New and old onwer National IDS (Both NID)": {"field_id": "fldKf2AtEJ", "ui_type": "Attachment"}, "Old ID (1) (1)": {"field_id": "fldCzAHzB2", "ui_type": "Text"}, "Last Retry Time": {"field_id": "fldWCtMg3A", "ui_type": "DateTime"}, "Reporter ID (1)": {"field_id": "fldm83GLly", "ui_type": "Text"}, "Numbering": {"field_id": "fldpo2EXtV", "ui_type": "AutoNumber"}, "Order Action": {"field_id": "fldlqeNLY7", "ui_type": "SingleSelect", "options": ["Preview Order", "Confirm & Charge"]}, "Point Balance": {"field_id": "fldUuwehBh", "ui_type": "Formula"}, "Transaction Receipt": {"field_id": "fldxZ1GBpE", "ui_type": "Text"}, "Agency Type": {"field_id": "fldDBDaM71", "ui_type": "SingleSelect", "options": ["Acm hunting", "BD hunting", "Walkin", "New BD Hunting", "Walkin sub-agency", "ACM hunting"]}, "Bot Color": {"field_id": "fldS5xSAH5", "ui_type": "Formula"}, "Evidence Screen 2": {"field_id": "fldBQzos6f", "ui_type": "Attachment"}, "User ID": {"field_id": "fld0XktTlv", "ui_type": "Text"}, "Rejected Ids": {"field_id": "fldnn1BxO4", "ui_type": "Text"}, "Done by": {"field_id": "fld1fFCCbr", "ui_type": "User"}, "Acm Name (IN)": {"field_id": "fldyyFdl5i", "ui_type": "SingleSelect", "options": ["Holy", "Vihan", "Rudra", "Ravikant", "Ansh", "Rocky", "BELLA"]}, "Parent items": {"field_id": "fldGLV94um", "ui_type": "Link"}, "Completion Time": {"field_id": "fldpGxNDzW", "ui_type": "DateTime"}, "Agency Name": {"field_id": "fldaYEvqqk", "ui_type": "Text"}, "NID Number": {"field_id": "fldpr1t2nE", "ui_type": "Text"}, "Target": {"field_id": "flds2e5ZIP", "ui_type": "Text"}, "Status": {"field_id": "fldSXOAJS6", "ui_type": "SingleSelect", "options": ["Done ", "Rejected", "Under Investigation"]}, "Agency to be merged and closed": {"field_id": "fldQpE8437", "ui_type": "Text"}, "New agency owner ID": {"field_id": "fldDP4rza5", "ui_type": "Text"}, "Target  Duplicated check": {"field_id": "fldl2iOV6T", "ui_type": "Text"}, "BD Nickname1": {"field_id": "fldLbYitIN", "ui_type": "Lookup"}, "NID & Otherapp Screen": {"field_id": "fldWEHdmZn", "ui_type": "Attachment"}, "Old ID (1)": {"field_id": "fldsKM53Ig", "ui_type": "Text"}, "time of the requests": {"field_id": "fldw6Lm5GI", "ui_type": "Formula"}, "Type of Action": {"field_id": "fldUBJ4f7Z", "ui_type": "SingleSelect", "options": ["Approved", "Not Approved", "Check with the Acm "]}, "Handle Time (Seconds)": {"field_id": "fldyVWdrPw", "ui_type": "Formula"}, "Old ID": {"field_id": "fldrhPnsSu", "ui_type": "Text"}, "Latest Usage Tracker": {"field_id": "fldzj5b7SU", "ui_type": "Text"}, "Border Type": {"field_id": "fldKLvNCG7", "ui_type": "SingleSelect", "options": ["Date", "Game", "Music", "PK", "Party", "Chat"]}, "Reason": {"field_id": "fldy7BFdTx", "ui_type": "SingleSelect", "options": ["Host", "Agency Manager", "BD", "VIP user"]}, "Possible BD ID": {"field_id": "fldVwYGdHt", "ui_type": "Text"}};
 
 // Exact per-Request-Type field layout for the ticket workspace's Dynamic Request
 // Section, sourced directly from the live Feishu form (keys match Feishu's
@@ -10000,6 +10426,9 @@ const TICKET_DYNAMIC_FIELDS = {
         "Region",
         "Agency Type",
         "Bd Code",
+        // Phase 10.45 (Ahmed 2026-10-14): rendered here but shown only while
+        // Agency Type is "New BD Hunting" (twSyncPossibleBdIdVisibility).
+        "Possible BD ID",
         "Agency Name",
         "User ID",
         "Applier real name",
@@ -10110,6 +10539,14 @@ const TICKET_DYNAMIC_FIELDS = {
         "User ID",
         "Agency Code",
         "Evidence Screen"
+    ],
+    // Phase 10.45 (Ahmed 2026-10-14): new Request Type -- fields exactly as
+    // his Feishu form screenshot (Region / User ID / Border Type / Reason).
+    "Add Room Border": [
+        "Region",
+        "User ID",
+        "Border Type",
+        "Reason"
     ],
     // ISSUE 3 FIX: these three keys must match the *exact* live "Request Type" option
     // strings from FIELD_SCHEMA above (which include trailing spaces baked into the
@@ -10756,7 +11193,17 @@ function twRenderSection2(ticket, reqTypeOverride) {
     // Phase 10.4 (Ahmed): Agency Creation tickets get three extra fields here,
     // moved out of the retired Duplicate Check card / Basic Information --
     // Parenet sub agency (right beside Agency Code), Create Way, Reject Reason.
-    if (reqType === 'Agency Creation') twRenderAgencyCreationExtras(sec2, ticket);
+    if (reqType === 'Agency Creation') {
+        twRenderAgencyCreationExtras(sec2, ticket);
+        // Phase 10.45: Possible BD ID stays visible only while Agency Type is
+        // "New BD Hunting"; re-sync on every Agency Type change too.
+        const atSel = document.querySelector('#tw-form [name="Agency Type"]');
+        if (atSel && !atSel.dataset.bdidHooked) {
+            atSel.dataset.bdidHooked = '1';
+            atSel.addEventListener('change', twSyncPossibleBdIdVisibility);
+        }
+        twSyncPossibleBdIdVisibility();
+    }
 
     // Phase 10.8: Agency Point tickets get the Confirm & Charge gate card.
     // Phase 10.13.3 (Ahmed): the gate renders in the New Ticket draft too --
@@ -11188,6 +11635,23 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
     });
 }
 
+// Phase 10.45 (Ahmed 2026-10-14): "Possible BD ID" belongs on Agency Creation
+// tickets ONLY while the Agency Type is "New BD Hunting" -- same rule the
+// sheet's own form and the New Request form (reqApplyAgencyTypeRules) apply.
+// The control stays in the DOM when hidden (never cleared), so a value saved
+// on the ticket can never be silently destroyed by a Save & Resolve; the
+// create-mode submit gate (twSubmitNewTicketCore) hard-requires it for
+// New BD Hunting filings.
+function twSyncPossibleBdIdVisibility() {
+    const form = document.getElementById('tw-form');
+    if (!form) return;
+    const bdInput = form.querySelector('[name="Possible BD ID"]');
+    if (!bdInput) return;
+    const wrap = bdInput.closest('.control-group');
+    const atVal = (form.querySelector('[name="Agency Type"]')?.value || '').trim().toLowerCase();
+    if (wrap) wrap.style.display = (atVal === 'new bd hunting') ? '' : 'none';
+}
+
 // ─── Phase 10.9: Agency Point Charge gate (Agency Point Request tickets) ───
 // The BACKEND does the charge now (one POST /api/agency-points/charge,
 // ~2-4s): the order details travel in the request body, the server reads the
@@ -11323,6 +11787,7 @@ function twApPaintGate(card, ticket) {
         <div class="apg-actions-foot">
             <span class="apg-state" id="apgState">${correcting ? 'The last charge is reversed first, then your corrected quantities are charged — limits and balance re-checked.' : (charged ? 'Type new quantities above and charge again — only the new items are deducted.' : 'Preview is instant — confirming deducts from the agency wallet in one click (a few seconds).')}</span>
             ${charged ? `<button type="button" class="apg-edit-btn" onclick="twApToggleCorrect()">${correcting ? '✕ Cancel edit' : '✏️ Edit last charge'}</button>` : ''}
+            ${charged && !correcting ? `<button type="button" class="apg-edit-btn" onclick="twApRecallLastCharge()">↩ Recall last deduct</button>` : ''}
         </div>
     </div>`;
 }
@@ -11338,6 +11803,22 @@ function twApToggleCorrect() {
         twApPaintGate(card, ltActiveTicket);
         twApRefreshPreview();
     }
+}
+
+// Phase 10.42 (Ahmed): "make second button next to edit to be recalled last
+// deduct". One-click FULL recall of the last charge -- enters correction
+// mode with a zeroed order and confirms immediately. The backend's
+// correct-charge always persists the reversal even when the corrected order
+// approves nothing, so the whole last charge lands back in the wallet and
+// nothing new is deducted. Same result as Edit -> zero every quantity ->
+// Apply Correction (which 10.42 also unblocked).
+async function twApRecallLastCharge() {
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only — charging is disabled.', 'warning'); return; }
+    if (!twApGate.charged || twApGate.charging) return;
+    if (!confirm('↩ Recall the last deduct?\n\nThe whole last charge goes back into the agency wallet and NOTHING new is charged.')) return;
+    twApGate.correcting = true;
+    twApGate.recallOnce = true;
+    await twApConfirmCharge();
 }
 
 // How many points the LAST charge on the receipt deducted — the amount the
@@ -11455,8 +11936,15 @@ function twApRefreshPreview() {
     rows.push(`<div class="apg-pv-sum total"><span>💰 TOTAL TO DEDUCT: ${total.toLocaleString()} pts</span></div>`);
     rows.push(`<div class="apg-pv-sum after"><span>💳 BALANCE AFTER: ${remaining.toLocaleString()} pts</span></div>`);
     rows.push(`<div class="apg-pv-note">📍 ${other ? 'Other agency rate' : 'Same agency rate'} · the server computes the final amounts at charge time${correcting ? ' · editing: the balance above includes the reversed last charge' : ''}</div>`);
+    // Phase 10.42 (Ahmed): "edit last recharge to be 0 it not accpting that"
+    // -- while CORRECTING, a 0-pt total is a legitimate FULL RECALL of the
+    // last charge (reversal only, nothing new charged), so the button must
+    // stay enabled and the note must say exactly what will happen.
+    if (correcting && total <= 0) {
+        rows.push(`<div class="apg-pv-note">↩ 0 pts — applying now recalls the whole last charge back into the wallet and charges nothing.</div>`);
+    }
     if (prev) prev.innerHTML = rows.join('');
-    if (btn) btn.disabled = total <= 0;
+    if (btn) btn.disabled = (total <= 0 && !correcting);
 }
 
 function twApSchedulePreview() {
@@ -11482,11 +11970,17 @@ async function twApConfirmCharge() {
     const state = document.getElementById('apgState');
     let recordId = document.getElementById('tw-record-id').value;
     const { privs } = twApOrderLines();
-    const qtyRaw = document.querySelector('#tw-sec-2 [name="Quantities Input"]')?.value || '';
+    let qtyRaw = document.querySelector('#tw-sec-2 [name="Quantities Input"]')?.value || '';
     const targetRaw = document.querySelector('#tw-sec-2 [name="Target Type"]')?.value || '';
     const agencyCode = document.querySelector('#tw-sec-2 [name="Agency Code"]')?.value?.trim()
         || feishuValueToString(ltActiveTicket?.fields?.['Agency Code']).trim();
     const correcting = !!twApGate.correcting;
+    // Phase 10.42: the ↩ Recall button zeroes the order -- the correction
+    // then reverses the last charge and approves nothing (pure recall).
+    // recallIntent also covers the manual path (Edit -> quantities all 0 ->
+    // Apply Correction), so both get the "recalled" success messaging.
+    if (twApGate.recallOnce) qtyRaw = privs.map(() => '0').join(', ');
+    const recallIntent = !!twApGate.recallOnce || (correcting && !/[1-9]/.test(String(qtyRaw)));
     // Phase 10.13.3 (Ahmed): hard block -- no Target Type, no charge. The
     // preview already locks the button; this is the second line of defense
     // (Enter key, stale DOM, scripted click).
@@ -11609,14 +12103,22 @@ async function twApConfirmCharge() {
             const prev = document.getElementById('apgPreview');
             if (prev) prev.innerHTML = twApFmtReceipt(data.receipt);
             const st2 = document.getElementById('apgState');
-            if (st2) st2.textContent = '⚠️ Nothing was approved — 0 pts deducted. Adjust the quantities / target type above and charge again.';
-            ToastManager.show('Nothing approved — 0 pts deducted. Adjust the order and retry.', 'warning', 6000);
+            // Phase 10.42: a pure recall is a SUCCESS, not a failed attempt --
+            // the reversal already landed server-side (data.corrected).
+            if (recallIntent && data.corrected) {
+                if (st2) st2.textContent = `↩ Last charge recalled — ${(data.reversed || 0).toLocaleString()} pts returned to the wallet. Nothing new was charged.`;
+                ToastManager.show(`↩ Last charge recalled — ${(data.reversed || 0).toLocaleString()} pts returned to the wallet.`, 'success', 7000);
+            } else {
+                if (st2) st2.textContent = '⚠️ Nothing was approved — 0 pts deducted. Adjust the quantities / target type above and charge again.';
+                ToastManager.show('Nothing approved — 0 pts deducted. Adjust the order and retry.', 'warning', 6000);
+            }
         }
     } catch (e) {
         ToastManager.show('Charge failed: ' + e.message, 'error');
         if (state) state.textContent = 'Charge failed — nothing was deducted. You can try again.';
     } finally {
         twApGate.charging = false;
+        twApGate.recallOnce = false; // Phase 10.42: one-shot flag
         if (btn && document.getElementById('twApChargeBtn') === btn) {
             btn.disabled = false;
             btn.classList.toggle('apg-correcting', !!twApGate.correcting);
@@ -12211,6 +12713,7 @@ async function twOpenWorkspace(recordId) {
 
         document.getElementById('tw-record-id').value = recordId;
         document.getElementById('tw-title').textContent = `#${ticket.fields['Numbering'] || recordId.slice(-6)}`;
+        try { twcOnTicketFilled(recordId); } catch (e) { console.warn('twc init failed', e); }
         const actualReqType = (ticket.fields['Request Type'] || '').toString().trim();
         twRenderHeadMeta(ticket);
 
@@ -12337,6 +12840,19 @@ async function twOpenWorkspace(recordId) {
         // scan itself is one batched request instead of three.
         twWorkspaceLoading = false;
         setTimeout(() => twRadarCheck({ auto: true }), 150);
+        // Phase 10.44: if a forced logout (or crash) parked unsent edits for
+        // THIS ticket, put them back on top of the fresh sheet data now that
+        // every control and member picker exists. The agent reviews and hits
+        // Save exactly like before the interruption.
+        try {
+            if (window.__xdPending && window.__xdPending[recordId]) {
+                const _xdv = window.__xdPending[recordId];
+                delete window.__xdPending[recordId];
+                xdApplyValues(document.getElementById('tw-form'), _xdv);
+                xdClear('ws:' + recordId);
+                ToastManager.show('💾 Restored the changes you had not sent yet.', 'info', 6000);
+            }
+        } catch (e) { console.warn('xd workspace restore failed', e); }
         // Phase 10.21 (speed): one console line + a window.__twPerfLog entry
         // per open -- the shell / record-source / render split that proves
         // where the wait went and keeps the 15s regression measurable.
@@ -12463,6 +12979,7 @@ async function twSubmitNewTicket() {
     const filed = await twSubmitNewTicketCore();
     if (filed && filed.record_id) {
         ToastManager.show('Request successfully submitted to Feishu!', 'success');
+        xdClearPrefix('wsCreate:'); // Phase 10.44: the draft is filed -- stop restoring it
         if (filed.created_via && String(filed.created_via).startsWith('tenant_token')) {
             ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
         }
@@ -12478,6 +12995,11 @@ async function twSubmitNewTicket() {
 // failure (it toasts the reason itself). Used by both the 🚀 Submit Request
 // button and the create-mode charge flow (Phase 10.13.3).
 async function twSubmitNewTicketCore() {
+    // Phase 10.44: swap in the server's freshest uat before filing -- a stale
+    // browser token is the classic mid-shift submit killer. Best-effort:
+    // network blips pass through (the server re-checks anyway); only a
+    // verifiably dead chain aborts, and drafts are already safe by then.
+    if (!(await renewSessionUat(true))) return null;
     const form = document.getElementById('tw-form');
     const reqType = (form.querySelector('[name="Request Type"]')?.value || '').trim();
     if (!reqType) {
@@ -12488,6 +13010,43 @@ async function twSubmitNewTicketCore() {
         }
         ToastManager.show('Please choose a Request Type first — the Dynamic Request Section follows your choice.', 'warning', 6000);
         return null;
+    }
+    // Phase 10.42 (Ahmed): "the request of agency creation to be not
+    // sumbitted unless the Create Way field to be choosen" -- hard block,
+    // same highlight + scroll pattern as the Request Type gate above. The
+    // twx-missing mark clears on the next change via the shared
+    // clear-on-change hook.
+    if (reqType === 'Agency Creation') {
+        const cw = form.querySelector('[name="Create Way"]');
+        if (!cw || !String(cw.value || '').trim()) {
+            cw?.closest('.control-group')?.classList.add('twx-missing');
+            // Clear the rose mark as soon as a way is picked (the ss wrapper
+            // dispatches a bubbling change on pick).
+            cw?.addEventListener('change', () => cw.closest('.control-group')?.classList.remove('twx-missing'), { once: true });
+            cw?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            ToastManager.show('🧭 Choose a Create Way first — Agency Creation requests can\'t be submitted without it.', 'warning', 6000);
+            return null;
+        }
+        // Phase 10.45 (Ahmed 2026-10-14): a New BD Hunting Agency Creation
+        // can't be filed without the Possible BD ID -- same highlight +
+        // scroll pattern as the Create Way gate above.
+        const atVal = (form.querySelector('[name="Agency Type"]')?.value || '').trim().toLowerCase();
+        if (atVal === 'new bd hunting') {
+            const bd = form.querySelector('[name="Possible BD ID"]');
+            if (!bd || !String(bd.value || '').trim()) {
+                const bdGroup = bd?.closest('.control-group');
+                if (bdGroup) {
+                    bdGroup.style.display = ''; // force-visible so the mark is seen
+                    bdGroup.classList.add('twx-missing');
+                }
+                if (bd) {
+                    bd.addEventListener('input', () => bd.closest('.control-group')?.classList.remove('twx-missing'), { once: true });
+                    bd.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                ToastManager.show('🆔 Possible BD ID is required when the Agency Type is New BD Hunting.', 'warning', 6000);
+                return null;
+            }
+        }
     }
 
     // twCollectFields gathers every named control (including the hidden
@@ -12521,7 +13080,7 @@ async function twSubmitNewTicketCore() {
         // Same session-expiry handling as submitReqForm: nothing was created,
         // so the draft stays filled for a resubmit right after re-login.
         if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
-            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
+            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit — everything you filled in was saved and will be restored automatically.');
             return null;
         }
         if (!res.ok) throw new Error(data.error || 'Submission failed');
@@ -13304,7 +13863,7 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
         <div style="position:relative;">
             ${key === 'Done by' ? `<div class="twup-quick audit-pick-row">${TW_DONE_BY_QUICK_PICKS.map(q => {
                 const isActive = current && (current.name || '').toLowerCase().includes(q.person.toLowerCase());
-                return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}')" title="Set Done by to ${escHtml(q.person)}">${escHtml(q.label)}</button>`;
+                return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}', this)" title="Set Done by to ${escHtml(q.person)}">${escHtml(q.label)}</button>`;
             }).join('')}</div>` : ''}
             <div id="${pickerId}-chip" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
                 <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initial}</span>
@@ -13342,7 +13901,11 @@ function twSyncQuickChips(pickerId, memberName) {
         b.classList.toggle('active', !!name && !!p && (name.includes(p) || p.includes(name)));
     });
 }
-async function twQuickPickDoneBy(pickerId, query) {
+async function twQuickPickDoneBy(pickerId, query, btnEl) {
+    // Phase 10.42 (Ahmed): "one click choose it another click on it remove
+    // the choose" -- tapping the ALREADY-ACTIVE chip clears the Done by pick
+    // instead of re-selecting the same person.
+    if (btnEl && btnEl.classList.contains('active')) { twClearUserPicker(pickerId); return; }
     try {
         const res = await fetch(`/api/members/search?q=${encodeURIComponent(query)}&uat=${encodeURIComponent(loggedUat)}`);
         const data = await res.json();
@@ -13912,6 +14475,10 @@ async function twSaveWorkspace() {
             throw err;
         }
         ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : 'Ticket saved successfully.', 'success');
+        // Phase 10.44: the unsent-work draft for this ticket is now on the
+        // sheet -- stop restoring it (only on a real save; "nothing changed"
+        // leaves the draft alone since the edits never landed).
+        if (!data.unchanged) xdClear('ws:' + document.getElementById('tw-record-id').value);
         // Phase 10.40 (Ahmed): the clear + re-set of Mentioned Group is the
         // LAST step — it runs only after the normal save has fully landed, so
         // the group bot re-posts against the ticket's final state.
@@ -14876,7 +15443,7 @@ const REQ_BRANCHES = {
     // Agency Type sits right after User ID (Ahmed 2026-09-30): the agent
     // picks it up front and the rest of the form reacts -- see
     // reqApplyAgencyTypeRules() (Acm hunting / Walkin hide the BD Code).
-    "Agency Creation": ["Region", "User ID", "Agency Type", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Bd Code", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "Agency Creation": ["Region", "User ID", "Agency Type", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Bd Code", "Possible BD ID", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
     "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", ACM_AUTO, "Applier Note", "Evidence Screen 2"],
     "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
     "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
@@ -14893,7 +15460,10 @@ const REQ_BRANCHES = {
     "Remove short ID (only by user approve )": ["Region", "User ID", "Applier Note", "Evidence Screen"],
     "Welcome Package": ["Region", "User ID", "Wealth Level", "Applier Note", "Evidence Screen 2"],
     "App Rating Reward": ["Region", "User ID", "Applier Note", "Evidence Screen"],
-    "Room Pinup (Only for the famous KOLS)": ["Region", "User ID", "Applier Note", "Evidence Screen 2"]
+    "Room Pinup (Only for the famous KOLS)": ["Region", "User ID", "Applier Note", "Evidence Screen 2"],
+    // Phase 10.45 (Ahmed 2026-10-14): new Request Type -- fields exactly as
+    // his Feishu form screenshot (Region / User ID / Border Type / Reason).
+    "Add Room Border": ["Region", "User ID", "Border Type", "Reason"]
 };
 
 const REQ_SUBCONDITIONS = {
@@ -14975,7 +15545,15 @@ const REQ_FIELD_DEFS = {
     "Type of Action 2": { type: "select", options: ["Remove Games","ADD Games"], req: true },
     "New Short ID": { type: "text", req: true },
     "Wealth Level": { type: "text", req: true },
-    "Vip Level": { type: "text", req: true }
+    "Vip Level": { type: "text", req: true },
+    // Phase 10.45 (Ahmed 2026-10-14): new sheet fields.
+    // "Add Room Border" request type (options = the sheet's exact lists):
+    "Border Type": { type: "select", options: ["Date","Game","Music","PK","Party","Chat"], req: true },
+    "Reason": { type: "select", options: ["Host","Agency Manager","BD","VIP user"], req: true },
+    // Agency Creation -- shows + is required ONLY when Agency Type is
+    // "New BD Hunting"; reqApplyAgencyTypeRules hides / un-requires / clears
+    // it for every other type, so it never blocks their submits.
+    "Possible BD ID": { type: "text", req: true }
 };
 
 function initReqFormOptions() {
@@ -15216,6 +15794,10 @@ function reqApplyAgencyTypeRules() {
     const otherappOptional = t === 'walkin';
     setOptionalRule('Otherapp Name', otherappOptional);
     setOptionalRule('Otherapp ID', otherappOptional);
+    // New BD Hunting (Ahmed 2026-10-14): Possible BD ID shows ONLY for this
+    // type and is mandatory there (applyRule restores def.req=true on show);
+    // every other type hides + clears + un-requires it.
+    applyRule('Possible BD ID', t !== 'new bd hunting');
 }
 
 function renderReqFormFields() {
@@ -15566,6 +16148,10 @@ async function submitReqForm(e) {
     const form = e.target;
     const branch = document.getElementById('formRequestType').value;
     if (!branch) return;
+    // Phase 10.44: refresh the uat before filing so a hours-old browser token
+    // can't kill the submit mid-shift (best-effort; only a verifiably dead
+    // chain aborts, with drafts already saved).
+    if (!(await renewSessionUat(true))) return;
 
     let multiValid = true;
     const multiFields = REQ_BRANCHES[branch].filter(f => REQ_FIELD_DEFS[f] && REQ_FIELD_DEFS[f].type === 'multiselect');
@@ -15653,7 +16239,7 @@ async function submitReqForm(e) {
         // so the agent's typed fields are left in the form to resubmit right
         // after logging back in (the form is intentionally NOT reset below).
         if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
-            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
+            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit — everything you filled in was saved and will be restored automatically.');
             btn.innerHTML = origTxt;
             btn.disabled = false;
             document.getElementById('loadingOverlay').style.display = 'none';
@@ -15663,6 +16249,7 @@ async function submitReqForm(e) {
         if (!res.ok) throw new Error(data.error || 'Submission failed');
 
         ToastManager.show(`Request successfully submitted to Feishu!`, 'success');
+        xdClear('newRequest'); // Phase 10.44: filed -- stop restoring this draft
 
         // Restored: if the backend had to fall back to the tenant/app token for
         // this one (not an expiry -- those are caught above -- but some other
@@ -16200,12 +16787,17 @@ function auditRenderPickButtons(wrap, selectId) {
     wrap.appendChild(row);
     row.querySelectorAll('.audit-pick-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            select.value = btn.dataset.val;
-            row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
+            // Phase 10.42 (Ahmed): "one click choose it another click on it
+            // remove the choose" -- tapping the ALREADY-ACTIVE button clears
+            // the pick (select back to blank) instead of re-setting it.
+            const wasActive = btn.classList.contains('active');
+            row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.remove('active'));
+            if (!wasActive) btn.classList.add('active');
+            select.value = wasActive ? '' : btn.dataset.val;
             auditUpdateReminders();
             // Phase 10.28: picking Rejected unfolds the compact Reject Reason
             // card under 📋 Ticket Text; any other status folds it back.
-            if (selectId === 'audfld_Status') awsRrTogglePicker(btn.dataset.val === 'Rejected');
+            if (selectId === 'audfld_Status') awsRrTogglePicker(!wasActive && btn.dataset.val === 'Rejected');
         });
     });
 }
@@ -16231,7 +16823,12 @@ function auditRenderDoneByPicker(wrap) {
     row.querySelectorAll('.audit-pick-btn').forEach((btn, idx) => {
         btn.addEventListener('click', async () => {
             const person = AUDIT_DONE_BY_PEOPLE[idx];
-            row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.toggle('active', b === btn));
+            // Phase 10.42 (Ahmed): tapping the ALREADY-ACTIVE button clears
+            // the Done by pick (same one-click-on / one-click-off as Status).
+            const wasActive = btn.classList.contains('active');
+            row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.remove('active'));
+            if (wasActive) { wrap.dataset.userSelected = ''; return; }
+            btn.classList.add('active');
 
             if (auditDoneByCache[person.name]) {
                 wrap.dataset.userSelected = JSON.stringify([{ id: auditDoneByCache[person.name].open_id }]);
@@ -16284,85 +16881,44 @@ function awsRrUpdateSummary() {
 }
 
 function awsRrTogglePicker(force) {
+    // Phase 10.42: the audit Reject Reason is now the workspace pp-picker
+    // (floating portaled panel) -- map the old show/hide calls onto its
+    // toggle. force=true/false pins the state; no argument flips it. The
+    // panel is portaled to <body> while open, so detect state globally
+    // (only one portaled pp panel can exist at a time).
     const host = document.getElementById('auditFieldsReject');
-    const btn = document.getElementById('awsRrToggle');
-    if (!host || !btn) return;
-    const show = (typeof force === 'boolean') ? force : (host.style.display === 'none');
-    host.style.display = show ? '' : 'none';
-    btn.textContent = show ? '⊟ Hide reasons' : '⊞ Show all reasons';
-    btn.classList.toggle('open', show);
+    if (!host) return;
+    const toggleBtn = host.querySelector('.pp-toggle');
+    if (!toggleBtn) return;
+    const isOpen = !!document.querySelector('.pp-all.pp-portaled');
+    const want = (typeof force === 'boolean') ? force : !isOpen;
+    if (want !== isOpen) toggleBtn.click();
 }
 
-// "Reject Reason" quick-picker: the raw field is a 21-option checkbox list,
-// which means endless up-and-down scrolling inside the Decision panel. This
-// swaps it (visually) for selected-chips on top, a filter box, and a
-// wrapping toggle cloud. The original checkboxes stay in the DOM (hidden)
-// and stay perfectly in sync, so submitAuditForm()'s collection logic and
-// the post-submit reset keep working exactly as before.
+// Phase 10.42 (Ahmed): "make the 🚫 Reject Reason that in audit tab to be
+// designed and look like the Reject Reason that in the work space" -- the
+// audit tab now uses the EXACT workspace picker: selected chips on top plus
+// the portaled floating card grid (rose variant), instead of the old inline
+// rr-cloud. The original checkboxes stay in the DOM (hidden) and stay
+// perfectly in sync, so submitAuditForm()'s collection logic and the
+// post-submit reset keep working exactly as before. The old compact card's
+// summary line and "Show all" button are hidden -- the picker brings its
+// own toggle, and awsRrTogglePicker() maps the Status=Rejected auto-open
+// onto it.
 function auditRenderRejectReasonPicker(wrap) {
-    const msel = wrap.querySelector('.msel-wrap');
-    if (!msel) return;
-    const boxes = Array.from(msel.querySelectorAll('input[type="checkbox"]'));
-    msel.style.display = 'none';
-
-    const picker = document.createElement('div');
-    picker.className = 'rr-picker';
-    picker.innerHTML = `
-        <div class="rr-selected"></div>
-        <input type="text" class="rr-filter" placeholder="🔍 Filter reasons…">
-        <div class="rr-cloud"></div>`;
-    wrap.appendChild(picker);
-
-    const selWrap = picker.querySelector('.rr-selected');
-    const cloud = picker.querySelector('.rr-cloud');
-    const filter = picker.querySelector('.rr-filter');
-
-    const sync = () => {
-        // The selected-chips row mirrors whichever checkboxes are on.
-        selWrap.innerHTML = boxes.filter(b => b.checked).map(b =>
-            `<span class="rr-sel-chip">${escHtml(b.value.trim())}<button type="button" data-val="${escHtml(b.value)}" aria-label="Remove ${escHtml(b.value)}">×</button></span>`).join('');
-        cloud.querySelectorAll('.rr-chip').forEach(c => {
-            const box = boxes.find(b => b.value === c.dataset.val);
-            c.classList.toggle('active', !!(box && box.checked));
-        });
-        awsRrUpdateSummary(); // Phase 10.28: keep the compact card's summary line in sync
-    };
-
-    cloud.innerHTML = boxes.map(b => `<button type="button" class="rr-chip" data-val="${escHtml(b.value)}">${escHtml(b.value.trim())}</button>`).join('');
-    cloud.querySelectorAll('.rr-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            const box = boxes.find(b => b.value === chip.dataset.val);
-            if (box) { box.checked = !box.checked; sync(); }
-        });
+    if (!wrap.querySelector('.msel-wrap')) return;
+    reqRenderPointPrivilegePicker(wrap, {
+        rose: true,
+        toggleShow: '⊞ Show all reasons',
+        toggleHide: '▾ Done — show selected only',
+        filterPh: '🔍 Filter reasons…'
     });
-    // Tapping × on a selected chip unchecks its checkbox too.
-    selWrap.addEventListener('click', e => {
-        const btn = e.target.closest('button[data-val]');
-        if (!btn) return;
-        const box = boxes.find(b => b.value === btn.dataset.val);
-        if (box) { box.checked = false; sync(); }
-    });
-    filter.addEventListener('input', () => {
-        const q = filter.value.trim().toLowerCase();
-        cloud.querySelectorAll('.rr-chip').forEach(c => {
-            c.style.display = !q || c.dataset.val.toLowerCase().includes(q) ? '' : 'none';
-        });
-    });
-    // A plain Enter inside the filter must never file the ticket.
-    filter.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault();
-    });
-
-    // After a successful filing the form resets -- re-sync from the (now
-    // cleared) checkboxes so no stale chips survive into the next ticket,
-    // and un-hide anything the filter box had filtered away.
-    const form = wrap.closest('form');
-    if (form) form.addEventListener('reset', () => setTimeout(() => {
-        cloud.querySelectorAll('.rr-chip').forEach(c => c.style.display = '');
-        sync();
-    }, 0));
-
-    sync();
+    const sum = document.getElementById('awsRrSummary');
+    if (sum) sum.style.display = 'none';
+    const tog = document.getElementById('awsRrToggle');
+    if (tog) tog.style.display = 'none';
+    const host = document.getElementById('auditFieldsReject');
+    if (host) host.style.display = ''; // was folded until "Show all" -- the pp picker folds itself
 }
 
 
@@ -16615,6 +17171,10 @@ function auditParseText(opts) {
 async function submitAuditForm(e) {
     e.preventDefault();
     if (previewMode) { ToastManager.show('👁 Preview mode is view-only — submitting is disabled.', 'warning'); return; } // Phase 10.13
+    // Phase 10.44: refresh the uat before filing so a hours-old browser token
+    // can't kill the submit mid-shift (best-effort; only a verifiably dead
+    // chain aborts, with drafts already saved).
+    if (!(await renewSessionUat(true))) return;
     const form = e.target;
 
     // Ahmed's hard gate (2026-09-30): an audit ticket may NOT be filed until
@@ -16703,7 +17263,7 @@ async function submitAuditForm(e) {
         try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response.'); }
 
         if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
-            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit this request.');
+            forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit — everything you filled in was saved and will be restored automatically.');
             btn.innerHTML = origTxt;
             btn.disabled = false;
             document.getElementById('loadingOverlay').style.display = 'none';
@@ -16713,6 +17273,7 @@ async function submitAuditForm(e) {
         if (!res.ok) throw new Error(data.error || 'Submission failed');
 
         ToastManager.show('Request successfully submitted to Feishu!', 'success');
+        xdClear('audit'); // Phase 10.44: filed -- stop restoring this draft
 
         if (data.created_via && String(data.created_via).startsWith('tenant_token')) {
             ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
@@ -17290,6 +17851,414 @@ async function attExportExcel() {
     XLSX.writeFile(wb, `agency_target_table.xlsx`);
     ToastManager.show('Excel exported successfully!', 'success');
 }
+</script>
+
+<script>
+/* ================= Phase 10.43: Feishu-synced ticket comments + notifications feed =================
+   twc-* = the comment thread card inside each workspace instance (#twcCard).
+   Per-ticket state lives in a WeakMap keyed by the card DOM node, so stash /
+   remount of a workspace instance preserves that ticket's own thread state.
+   cmn-* = the global bell + notifications feed (#cmnBell / #cmnPanel).
+   All listeners are document-level delegated because cloned instances lose
+   addEventListener bindings. */
+
+const twcState = new WeakMap();
+
+function twcCard() { return document.getElementById('twcCard'); }
+
+function twcSt() {
+    const card = twcCard();
+    if (!card) return null;
+    let st = twcState.get(card);
+    if (!st) {
+        st = { recordId: null, comments: [], loaded: false, loading: false, sending: false, mentions: {}, mentionList: [], mentionIdx: 0 };
+        twcState.set(card, st);
+    }
+    return st;
+}
+
+function twcAuthQ() {
+    return `user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}&uat=${encodeURIComponent(loggedUat || '')}`;
+}
+
+function twcEsc(s) { return escHtml(s); }
+
+function twcInitials(name) {
+    const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]);
+}
+
+function twcTimeAgo(ts) {
+    if (!ts) return '';
+    let ms = Number(ts);
+    if (!ms) return '';
+    if (ms < 1e12) ms *= 1000; // seconds -> ms
+    const diff = Date.now() - ms;
+    if (diff < 0) return 'just now';
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const d = Math.floor(h / 24);
+    if (d < 7) return d + 'd ago';
+    const dt = new Date(ms);
+    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function twcOnTicketFilled(recordId) {
+    const card = twcCard(); if (!card) return;
+    const st = twcSt(); if (!st) return;
+    if (st.recordId !== recordId) {
+        st.recordId = recordId; st.comments = []; st.loaded = false; st.loading = false;
+        st.mentions = {}; st.mentionList = []; st.mentionIdx = 0;
+        const inp = document.getElementById('twcInput'); if (inp) inp.value = '';
+        twcHideMentionPop();
+    }
+    card.style.display = '';
+    // deep-linked from the notifications feed -> auto-expand the thread
+    if (window.__twcAutoExpand === recordId) {
+        window.__twcAutoExpand = null;
+        twcSetOpen(true);
+    }
+    twcLoad(false); // eager load (collapsed) so the count badge is right
+}
+
+function twcSetOpen(open) {
+    const card = twcCard(); if (!card) return;
+    card.classList.toggle('open', !!open);
+    if (open) {
+        const st = twcSt();
+        if (st && !st.loaded) twcLoad(false);
+    }
+}
+
+function twcToggle() {
+    const card = twcCard(); if (!card) return;
+    twcSetOpen(!card.classList.contains('open'));
+}
+
+async function twcLoad(force) {
+    const st = twcSt(); const card = twcCard();
+    if (!st || !card || !st.recordId) return;
+    if (st.loading) return;
+    if (st.loaded && !force) { twcRenderList(st.comments); twcRenderCount(); return; }
+    st.loading = true;
+    if (card.classList.contains('open')) twcRenderLoading();
+    let err = null;
+    try {
+        const r = await fetch(`/api/comments?record_id=${encodeURIComponent(st.recordId)}&${twcAuthQ()}`);
+        const d = await r.json();
+        if (d && d.success) {
+            st.comments = d.comments || [];
+            st.loaded = true;
+        } else {
+            err = (d && (d.error || d.message)) || 'Failed to load comments';
+        }
+    } catch (e) {
+        err = 'Network error — comments unavailable';
+    }
+    st.loading = false;
+    if (err) { twcRenderError(err); return; }
+    twcRenderList(st.comments);
+    twcRenderCount();
+}
+
+function twcRenderCount() {
+    const st = twcSt(); const el = document.getElementById('twcCount');
+    if (!st || !el) return;
+    const n = st.loaded ? st.comments.length : 0;
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.classList.toggle('show', n > 0);
+}
+
+function twcRenderLoading() {
+    const list = document.getElementById('twcList');
+    if (list) list.innerHTML = '<div class="twc-empty">Loading comments…</div>';
+}
+
+function twcRenderError(msg) {
+    const list = document.getElementById('twcList');
+    if (list) list.innerHTML = `<div class="twc-empty">⚠️ ${twcEsc(msg)}</div>`;
+}
+
+function twcRenderParts(parts) {
+    return (parts || []).map(p => {
+        if (p.type === 'mention') return `<span class="twc-mention">@${twcEsc(p.name || p.user_id || '')}</span>`;
+        if (p.type === 'link') return `<a class="twc-link" href="${twcEsc(p.url)}" target="_blank" rel="noopener">${twcEsc(p.url)}</a>`;
+        return twcEsc(p.text || '');
+    }).join('');
+}
+
+function twcRenderList(comments) {
+    const list = document.getElementById('twcList');
+    if (!list) return;
+    if (!comments || !comments.length) {
+        list.innerHTML = '<div class="twc-empty">No comments yet — start the thread below.</div>';
+        return;
+    }
+    list.innerHTML = comments.map(c => {
+        const imgs = (c.images || []).map(tok =>
+            `<img src="/api/comments/media/${encodeURIComponent(tok)}?${twcAuthQ()}" loading="lazy" alt="" onclick="twcZoom(this.src)">`
+        ).join('');
+        return `<div class="twc-item">
+            <span class="twc-avatar">${twcEsc(twcInitials(c.user_name))}</span>
+            <div class="twc-item-main">
+                <div class="twc-item-head">
+                    <span class="twc-author">${twcEsc(c.user_name || '')}</span>
+                    <span class="twc-time">${twcTimeAgo(c.create_time)}</span>
+                    ${c.is_solved ? '<span class="twc-solved-tag">✅ solved</span>' : ''}
+                </div>
+                <div class="twc-text">${twcRenderParts(c.parts)}</div>
+                ${imgs ? `<div class="twc-imgs">${imgs}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+    list.scrollTop = list.scrollHeight;
+}
+
+function twcZoom(src) {
+    if (typeof openImageLightbox === 'function') {
+        try { openImageLightbox(src, 'comment image'); return; } catch (e) {}
+    }
+    window.open(src, '_blank', 'noopener');
+}
+
+async function twcSend() {
+    const st = twcSt();
+    if (!st || !st.recordId || st.sending) return;
+    const inp = document.getElementById('twcInput');
+    const btn = document.getElementById('twcSendBtn');
+    const text = ((inp && inp.value) || '').trim();
+    if (!text) return;
+    const mentions = Object.keys(st.mentions)
+        .filter(n => text.includes('@' + n))
+        .map(n => ({ name: n, user_id: st.mentions[n] }));
+    st.sending = true;
+    if (btn) btn.disabled = true;
+    let d = null, netErr = false;
+    try {
+        const r = await fetch('/api/comments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ record_id: st.recordId, text: text, mentions: mentions, user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+        });
+        d = await r.json();
+    } catch (e) { netErr = true; }
+    st.sending = false;
+    if (btn) btn.disabled = false;
+    if (netErr || !d || !d.success) {
+        ToastManager.show((d && d.error) || 'Network error — comment not posted', 'error');
+        return;
+    }
+    if (inp) inp.value = '';
+    st.mentions = {}; st.mentionList = [];
+    st.loaded = false;
+    await twcLoad(true);
+    twcSetOpen(true);
+    cmnRefresh(true);
+    ToastManager.show('Comment posted — synced to the Feishu Base', 'success');
+}
+
+/* ---- @mention autocomplete (delegated: clones lose addEventListener) ---- */
+let twcMentionTimer = null;
+
+async function twcSearchMentions(q) {
+    const st = twcSt(); if (!st) return;
+    try {
+        const r = await fetch(`/api/members/search?q=${encodeURIComponent(q)}&uat=${encodeURIComponent(loggedUat || '')}`);
+        const d = await r.json();
+        if (d && d.success) {
+            st.mentionList = d.results || [];
+            st.mentionIdx = 0;
+            twcShowMentionPop();
+        }
+    } catch (e) { /* keep the pop as-is on network errors */ }
+}
+
+function twcShowMentionPop() {
+    const st = twcSt(); const pop = document.getElementById('twcMentionPop');
+    if (!st || !pop) return;
+    if (!st.mentionList.length) { pop.classList.remove('show'); pop.innerHTML = ''; return; }
+    pop.innerHTML = st.mentionList.map((m, i) => {
+        const av = m.avatar_url
+            ? `<img src="${twcEsc(m.avatar_url)}" alt="">`
+            : `<span class="twc-mention-opt-ph">${twcEsc(twcInitials(m.name))}</span>`;
+        return `<div class="twc-mention-opt${i === st.mentionIdx ? ' active' : ''}" data-idx="${i}">${av}<span>${twcEsc(m.name)}</span></div>`;
+    }).join('');
+    pop.classList.add('show');
+}
+
+function twcHideMentionPop() {
+    const pop = document.getElementById('twcMentionPop');
+    if (pop) { pop.classList.remove('show'); pop.innerHTML = ''; }
+}
+
+function twcMoveMention(delta) {
+    const st = twcSt(); if (!st || !st.mentionList.length) return;
+    st.mentionIdx = (st.mentionIdx + delta + st.mentionList.length) % st.mentionList.length;
+    twcShowMentionPop();
+}
+
+function twcPickMention(idx) {
+    const st = twcSt(); const inp = document.getElementById('twcInput');
+    if (!st || !inp) return;
+    const m = st.mentionList[idx];
+    if (!m) return;
+    const pos = (inp.selectionStart != null) ? inp.selectionStart : inp.value.length;
+    const upto = inp.value.slice(0, pos);
+    const rest = inp.value.slice(pos);
+    const nu = upto.replace(/@[^\s@]{1,30}$/, '@' + m.name + ' ');
+    inp.value = nu + rest;
+    st.mentions[m.name] = m.open_id;
+    twcHideMentionPop();
+    inp.focus();
+    try { inp.selectionStart = inp.selectionEnd = nu.length; } catch (e) {}
+}
+
+document.addEventListener('input', function (e) {
+    if (!e.target || e.target.id !== 'twcInput') return;
+    const inp = e.target;
+    const pos = (inp.selectionStart != null) ? inp.selectionStart : inp.value.length;
+    const upto = inp.value.slice(0, pos);
+    const m = upto.match(/@([^\s@]{1,30})$/);
+    if (!m) { twcHideMentionPop(); return; }
+    const q = m[1];
+    clearTimeout(twcMentionTimer);
+    twcMentionTimer = setTimeout(() => twcSearchMentions(q), 250);
+});
+
+document.addEventListener('keydown', function (e) {
+    if (!e.target || e.target.id !== 'twcInput') return;
+    const pop = document.getElementById('twcMentionPop');
+    const popOpen = pop && pop.classList.contains('show');
+    if (popOpen) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); twcMoveMention(1); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); twcMoveMention(-1); return; }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const st = twcSt(); twcPickMention(st ? st.mentionIdx : 0); return; }
+        if (e.key === 'Escape') { e.preventDefault(); twcHideMentionPop(); return; }
+    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); twcSend(); }
+});
+
+/* ================= Notifications bell + feed ================= */
+
+const cmnState = { open: false, tab: 'all', items: [], loaded: false, loading: false };
+
+function cmnLastSeenKey() { return 'xenaCommentsLastSeen:' + (loggedEmail || ''); }
+function cmnGetLastSeen() {
+    const v = parseInt(localStorage.getItem(cmnLastSeenKey()) || '0', 10);
+    return isNaN(v) ? 0 : v;
+}
+function cmnSetLastSeen(ts) { localStorage.setItem(cmnLastSeenKey(), String(ts)); }
+
+function cmnToggle(forceClose) {
+    const p = document.getElementById('cmnPanel'); if (!p) return;
+    const wantOpen = (forceClose === true) ? false : !cmnState.open;
+    cmnState.open = wantOpen;
+    p.classList.toggle('show', wantOpen);
+    if (wantOpen) { cmnRender(); cmnRefresh(true); }
+}
+
+function cmnSetTab(tab) {
+    cmnState.tab = (tab === 'mentioned') ? 'mentioned' : 'all';
+    const a = document.getElementById('cmnTabAll'), m = document.getElementById('cmnTabMentioned');
+    if (a) a.classList.toggle('active', cmnState.tab === 'all');
+    if (m) m.classList.toggle('active', cmnState.tab === 'mentioned');
+    cmnRender();
+}
+
+function cmnMarkAllRead() {
+    cmnSetLastSeen(Date.now());
+    cmnUpdateBadge();
+    cmnRender();
+}
+
+async function cmnRefresh(silent) {
+    if (cmnState.loading) return;
+    cmnState.loading = true;
+    try {
+        const oid = localStorage.getItem('xenaOpenId') || '';
+        const r = await fetch(`/api/comments/feed?my_open_id=${encodeURIComponent(oid)}&${twcAuthQ()}`);
+        const d = await r.json();
+        if (d && d.success) { cmnState.items = d.items || []; cmnState.loaded = true; }
+    } catch (e) { /* badge just stays as-is on network errors */ }
+    cmnState.loading = false;
+    cmnUpdateBadge();
+    if (cmnState.open) cmnRender();
+}
+
+function cmnUpdateBadge() {
+    const b = document.getElementById('cmnBadge'); if (!b) return;
+    const ls = cmnGetLastSeen();
+    const n = cmnState.items.filter(it => (it.time || 0) > ls).length;
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.classList.toggle('show', n > 0);
+}
+
+function cmnRender() {
+    const list = document.getElementById('cmnList'); if (!list) return;
+    if (!cmnState.loaded) { list.innerHTML = '<div class="cmn-empty">Loading…</div>'; return; }
+    const ls = cmnGetLastSeen();
+    let items = cmnState.items;
+    if (cmnState.tab === 'mentioned') items = items.filter(it => it.mentions_me);
+    if (!items.length) {
+        list.innerHTML = `<div class="cmn-empty">${cmnState.tab === 'mentioned' ? 'No @mentions yet' : 'No comments yet'}</div>`;
+        return;
+    }
+    list.innerHTML = items.map(it => {
+        const unread = (it.time || 0) > ls;
+        const rec = it.numbering ? '#' + twcEsc(String(it.numbering)) : '#' + twcEsc(String(it.record_id || '').slice(-6));
+        const meta = [];
+        if (it.mentions_me) meta.push('<span class="cmn-atme">@ you</span>');
+        if (it.reply_count > 1) meta.push(`<span>💬 ${it.reply_count}</span>`);
+        if (it.image_count) meta.push(`<span>🖼 ${it.image_count}</span>`);
+        if (it.is_solved) meta.push('<span>✅ solved</span>');
+        return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}">
+            <span class="cmn-dot"></span>
+            <div class="cmn-item-main">
+                <div class="cmn-item-top">
+                    <span class="cmn-item-author">${twcEsc(it.author || '')}</span>
+                    <span class="cmn-item-rec">${rec}</span>
+                    <span class="cmn-item-time">${twcTimeAgo(it.time)}</span>
+                </div>
+                <div class="cmn-item-text">${twcEsc(it.text || '')}</div>
+                ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function cmnOpenTicket(recordId, time) {
+    if (!recordId) return;
+    cmnToggle(true);
+    if (time && time > cmnGetLastSeen()) { cmnSetLastSeen(time); cmnUpdateBadge(); }
+    window.__twcAutoExpand = recordId;
+    try { await twOpenWorkspace(recordId); } catch (e) { console.warn('cmnOpenTicket', e); }
+    // Instant-remount fast path (same ticket already mounted): the fill never
+    // runs, so twcOnTicketFilled never fires — expand manually instead.
+    setTimeout(() => {
+        const card = twcCard(); const st = twcSt();
+        if (!card || !st || st.recordId !== recordId || card.style.display === 'none') return;
+        if (window.__twcAutoExpand === recordId) window.__twcAutoExpand = null;
+        twcSetOpen(true);
+    }, 900);
+}
+
+document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    const opt = e.target.closest('.twc-mention-opt');
+    if (opt) { e.preventDefault(); twcPickMention(parseInt(opt.dataset.idx || '0', 10)); return; }
+    const item = e.target.closest('.cmn-item');
+    if (item && item.dataset.rid) { cmnOpenTicket(item.dataset.rid, parseInt(item.dataset.time || '0', 10)); return; }
+    if (!e.target.closest('.twc-input-wrap')) twcHideMentionPop();
+    if (cmnState.open && !e.target.closest('#cmnPanel') && !e.target.closest('#cmnBell')) cmnToggle(true);
+});
+
+/* Initial feed pull + a quiet 90s poll while the tab is visible. */
+setTimeout(() => { cmnRefresh(true); }, 1500);
+setInterval(() => { if (!document.hidden) cmnRefresh(true); }, 90000);
 </script>
 </body>
 </html>
