@@ -5457,7 +5457,13 @@ function xdSerializeForm(form) {
     });
     form.querySelectorAll('[data-user-field]').forEach(w => {
         if (!w.dataset.userField) return;
-        try { values[w.dataset.userField] = w.dataset.userSelected ? JSON.parse(w.dataset.userSelected) : []; } catch (e) {}
+        try {
+            const sel = w.dataset.userSelected ? JSON.parse(w.dataset.userSelected) : [];
+            // Phase 10.47: carry the display name too, so a restored draft
+            // re-renders the chip as "Noora" instead of a bare "?" bubble.
+            if (sel.length && !sel[0].name && w.dataset.userSelectedName) sel[0].name = w.dataset.userSelectedName;
+            values[w.dataset.userField] = sel;
+        } catch (e) {}
     });
     return values;
 }
@@ -5495,6 +5501,7 @@ function xdApplyValues(form, values) {
         });
     };
     applyOnce();
+    form.dataset.xdDirty = '1'; // a restored draft IS unsent work -- keep capturing it
     form.querySelectorAll('select').forEach(el => { try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} });
     setTimeout(() => {
         applyOnce();
@@ -5512,6 +5519,13 @@ function xdCaptureAll() {
     Object.keys(all).forEach(k => { if (!all[k] || (now - (all[k].ts || 0)) >= XD_TTL_MS) delete all[k]; });
     const grab = (key, form, extra) => {
         if (!form) return;
+        // Phase 10.47 (Ahmed): a draft must mean UNSENT WORK, not "I looked
+        // at a ticket". Workspace forms arrive pre-filled from the record, so
+        // without this guard merely OPENING a ticket parked a 'ws:' draft --
+        // which login-restore then re-opened as a pile of old, already-solved
+        // tickets. Only forms touched by a real user gesture (or a restored
+        // draft) are captured.
+        if (form.dataset.xdDirty !== '1') return;
         const v = xdSerializeForm(form);
         if (extra) Object.assign(v, extra);
         if (xdHasContent(v)) all[key] = { values: v, ts: now };
@@ -5538,6 +5552,7 @@ function xdCaptureAll() {
             ts: now,
             openTabs: (typeof openTabs !== 'undefined' ? [...openTabs] : []),
             activeTabId: (typeof activeTabId !== 'undefined' ? activeTabId : 'welcome'),
+            activeWsKey: (typeof twWsActiveKey !== 'undefined' ? twWsActiveKey : null),
             ws: wsList
         };
     } catch (e) {}
@@ -5562,6 +5577,16 @@ function xdScheduleCapture() {
 }
 document.addEventListener('input', xdScheduleCapture, true);
 document.addEventListener('change', xdScheduleCapture, true);
+// Phase 10.47: mark a form dirty only on GENUINE user gestures (isTrusted).
+// Programmatic change/input events fired while a workspace renders itself
+// from record data do NOT count -- that's what used to draft every viewed
+// ticket. Click and drop cover the member pickers, msel toggles and the
+// attachment dropzone, which never fire input/change on the form itself.
+['input', 'change', 'click', 'drop'].forEach(evt => document.addEventListener(evt, e => {
+    if (!e.isTrusted || !e.target || !e.target.closest) return;
+    const f = e.target.closest('#tw-form, #newRequestForm, #auditRequestForm');
+    if (f) f.dataset.xdDirty = '1';
+}, true));
 // After a login (or any page load with a live session), put back whatever a
 // previous logout/crash parked. Restoring clears the draft, so this never
 // resurrects already-resubmitted work; successful submits also clear theirs.
@@ -5571,81 +5596,86 @@ async function xdAutoRestore() {
     _xdRestored = true;
     const all = xdLoadAll();
     const now = Date.now();
-    const keys = Object.keys(all).filter(k => all[k] && all[k].values && xdHasContent(all[k].values) && (now - (all[k].ts || 0)) < XD_TTL_MS);
-    if (!keys.length) return;
-    const order = k => k === 'newRequest' ? 0 : k === 'audit' ? 1 : k.startsWith('wsCreate:') ? 2 : 3;
-    keys.sort((a, b) => order(a) - order(b));
+    Object.keys(all).forEach(k => { if (all[k] && (now - (all[k].ts || 0)) >= XD_TTL_MS) delete all[k]; });
+    const fresh = k => all[k] && all[k].values && xdHasContent(all[k].values);
+    // Phase 10.47 (Ahmed): restore ONLY the surface that was ACTIVE at
+    // logout -- "directly open the tab that was open and directly open the
+    // last request, no so much requests till you reach last one". The old
+    // loop re-opened EVERY parked draft (one server request per ticket),
+    // resurrecting a pile of old, already-solved tickets. Other drafts stay
+    // in storage untouched: they cost no requests, expire by TTL, and their
+    // work is still recoverable by re-opening that ticket normally.
+    const sess = all['__session'];
+    const want = sess && sess.activeTabId;
     let restored = 0;
-    for (const k of keys) {
-        try {
-            if (k === 'newRequest') {
+    try {
+        if (want === 'new-request' && fresh('newRequest')) {
+            if (typeof setActiveTab === 'function') setActiveTab('new-request');
+            await new Promise(r => setTimeout(r, 400));
+            const rt = all['newRequest'].values.__reqType;
+            if (rt) {
+                const sel = document.getElementById('formRequestType');
+                if (sel) { sel.value = rt; try { renderReqFormFields(); } catch (e) {} }
+                await new Promise(r => setTimeout(r, 300));
+            }
+            xdApplyValues(document.getElementById('newRequestForm'), all['newRequest'].values);
+            xdClear('newRequest'); restored++;
+        } else if (want === 'audit' && fresh('audit')) {
+            if (typeof setActiveTab === 'function') setActiveTab('audit');
+            await new Promise(r => setTimeout(r, 400));
+            xdApplyValues(document.getElementById('auditRequestForm'), all['audit'].values);
+            xdClear('audit'); restored++;
+        } else if (want === 'ticket-workspace' && sess.activeWsKey) {
+            const wsEntry = (sess.ws || []).find(w => w && w.key === sess.activeWsKey);
+            if (wsEntry && wsEntry.createMode) {
+                const dk = 'wsCreate:' + wsEntry.key;
+                if (typeof twOpenCreateWorkspace === 'function') {
+                    twOpenCreateWorkspace();
+                    await new Promise(r => setTimeout(r, 500));
+                    if (fresh(dk)) {
+                        xdApplyValues(document.getElementById('tw-form'), all[dk].values);
+                        xdClear(dk); restored++;
+                    }
+                }
+            } else if (wsEntry && wsEntry.recordId && typeof twOpenWorkspace === 'function') {
+                const dk = 'ws:' + wsEntry.recordId;
+                if (fresh(dk)) {
+                    window.__xdPending = window.__xdPending || {};
+                    window.__xdPending[wsEntry.recordId] = all[dk].values;
+                }
+                window.__xdRestoreKey = wsEntry.key;
+                await twOpenWorkspace(wsEntry.recordId); // ONE request, straight to the last ticket
+                restored++;
+            }
+        } else if (want && want !== 'welcome' && want !== 'ticket-workspace' && typeof setActiveTab === 'function') {
+            // A plain module page (Live Queue / Query / ...): just land on it.
+            try { setActiveTab(want); } catch (e) {}
+        }
+        // Legacy drafts (parked before __session existed): the standalone
+        // forms cost no server requests, so still bring them back even with
+        // no session layout on record; workspace drafts stay parked.
+        if (!restored && !sess) {
+            if (fresh('newRequest')) {
                 if (typeof setActiveTab === 'function') setActiveTab('new-request');
                 await new Promise(r => setTimeout(r, 400));
-                const rt = all[k].values.__reqType;
+                const rt = all['newRequest'].values.__reqType;
                 if (rt) {
                     const sel = document.getElementById('formRequestType');
                     if (sel) { sel.value = rt; try { renderReqFormFields(); } catch (e) {} }
                     await new Promise(r => setTimeout(r, 300));
                 }
-                xdApplyValues(document.getElementById('newRequestForm'), all[k].values);
-                xdClear(k); restored++;
-            } else if (k === 'audit') {
+                xdApplyValues(document.getElementById('newRequestForm'), all['newRequest'].values);
+                xdClear('newRequest'); restored++;
+            } else if (fresh('audit')) {
                 if (typeof setActiveTab === 'function') setActiveTab('audit');
                 await new Promise(r => setTimeout(r, 400));
-                xdApplyValues(document.getElementById('auditRequestForm'), all[k].values);
-                xdClear(k); restored++;
-            } else if (k.startsWith('wsCreate:')) {
-                if (typeof twOpenCreateWorkspace === 'function') {
-                    twOpenCreateWorkspace();
-                    await new Promise(r => setTimeout(r, 500));
-                    xdApplyValues(document.getElementById('tw-form'), all[k].values);
-                    xdClear(k); restored++;
-                }
-            } else if (k.startsWith('ws:')) {
-                const rid = k.slice(3);
-                if (rid && typeof twOpenWorkspace === 'function') {
-                    window.__xdPending = window.__xdPending || {};
-                    window.__xdPending[rid] = all[k].values;
-                    // Phase 10.46: re-open under the workspace's OWN saved
-                    // module key, so several restored tickets keep their own
-                    // instances instead of piling under one tab.
-                    window.__xdRestoreKey = all[k].values.__wsKey || null;
-                    await twOpenWorkspace(rid); // the fill-end hook applies + clears
-                    restored++;
-                }
+                xdApplyValues(document.getElementById('auditRequestForm'), all['audit'].values);
+                xdClear('audit'); restored++;
             }
-        } catch (e) { console.warn('xd restore failed for', k, e); }
-    }
-    // Phase 10.46 (video 4): put the TAB LAYOUT back as well -- Ahmed
-    // re-logged in with 4 tabs open and only one (New Ticket) came back.
-    // Module tabs reopen first (rule-A restore is suspended so opening a tab
-    // doesn't bounce into its workspace), then the saved active tab lands.
-    try {
-        const sess = all['__session'];
-        if (sess && (now - (sess.ts || 0)) < XD_TTL_MS) {
-            window.__xdRestoringLayout = true;
-            try {
-                (sess.openTabs || []).forEach(p => {
-                    if (!p || p === 'welcome' || p === 'ticket-workspace') return;
-                    if (typeof openTabs !== 'undefined' && !openTabs.includes(p) && typeof openInTab === 'function') {
-                        try { openInTab(p); } catch (e) {}
-                    }
-                });
-            } finally { window.__xdRestoringLayout = false; }
-            const want = sess.activeTabId;
-            if (want && want !== 'welcome' && typeof setActiveTab === 'function') {
-                if (want === 'ticket-workspace') {
-                    if (typeof twWsActiveKey !== 'undefined' && twWsActiveKey) {
-                        try { openInTab('ticket-workspace'); } catch (e) {}
-                    }
-                } else if (typeof openTabs !== 'undefined' && openTabs.includes(want)) {
-                    try { setActiveTab(want); } catch (e) {}
-                }
-            }
-            delete all['__session']; xdSaveAll(all);
         }
-    } catch (e) { console.warn('xd layout restore failed', e); }
-    if (restored) ToastManager.show(`💾 Restored your unsent work (${restored} form${restored > 1 ? 's' : ''}) — pick up right where you left off.`, 'success', 9000);
+    } catch (e) { console.warn('xd restore failed', e); }
+    if (sess) { delete all['__session']; xdSaveAll(all); }
+    if (restored) ToastManager.show('💾 Picked up right where you left off.', 'success', 7000);
 }
 if (loggedUser) setTimeout(() => { try { xdAutoRestore(); } catch (e) {} }, 1500);
 // ─── end Phase 10.44 ───
@@ -14052,6 +14082,7 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
     const current = currentArr && currentArr[0] ? { open_id: currentArr[0].id, name: currentArr[0].name } : null;
     wrap.dataset.userField = key;
     wrap.dataset.userSelected = current ? JSON.stringify([{ id: current.open_id }]) : '';
+    wrap.dataset.userSelectedName = current ? (current.name || '') : ''; // Phase 10.47: drafts need the display name
     const pickerId = 'twup-' + key.replace(/[^a-zA-Z0-9]/g, '') + '-' + Math.random().toString(36).slice(2, 8);
     const initial = current ? escHtml((current.name || '?').slice(0, 1).toUpperCase()) : '';
 
@@ -14166,6 +14197,7 @@ function twPickMember(pickerId, idx) {
     const wrap = inputEl ? inputEl.closest('.control-group') : null;
 
     if (wrap) wrap.dataset.userSelected = JSON.stringify([{ id: m.open_id }]);
+    if (wrap) wrap.dataset.userSelectedName = m.name || ''; // Phase 10.47: keep the name for drafts
     if (wrap) wrap.classList.remove('twx-missing'); // Phase 10.7: Done by picked -> save-gate highlight off
     twSyncQuickChips(pickerId, m.name);
     if (chip) {
@@ -14194,7 +14226,7 @@ function twClearUserPicker(pickerId) {
     const chip = document.getElementById(`${pickerId}-chip`);
     const wrap = inputEl ? inputEl.closest('.control-group') : null;
 
-    if (wrap) wrap.dataset.userSelected = '';
+    if (wrap) { wrap.dataset.userSelected = ''; wrap.dataset.userSelectedName = ''; }
     twSyncQuickChips(pickerId, '');
     if (chip) { chip.style.display = 'none'; chip.innerHTML = ''; delete chip.dataset.uid; delete chip.dataset.avDone; }
     if (inputEl) { inputEl.style.display = 'block'; inputEl.value = ''; inputEl.focus(); }
@@ -17042,6 +17074,7 @@ function auditRenderDoneByPicker(wrap) {
     wrap.innerHTML = '<label style="font-size:0.8rem;">Done by</label>';
     wrap.dataset.userField = 'Done by';
     wrap.dataset.userSelected = '';
+    wrap.dataset.userSelectedName = '';
     const row = document.createElement('div');
     row.className = 'audit-pick-row';
     row.innerHTML = AUDIT_DONE_BY_PEOPLE.map(p => `<button type="button" class="audit-pick-btn" data-person="${escHtml(p.name)}">${escHtml(p.name)}</button>`).join('');
@@ -17054,11 +17087,12 @@ function auditRenderDoneByPicker(wrap) {
             // the Done by pick (same one-click-on / one-click-off as Status).
             const wasActive = btn.classList.contains('active');
             row.querySelectorAll('.audit-pick-btn').forEach(b => b.classList.remove('active'));
-            if (wasActive) { wrap.dataset.userSelected = ''; return; }
+            if (wasActive) { wrap.dataset.userSelected = ''; wrap.dataset.userSelectedName = ''; return; }
             btn.classList.add('active');
 
             if (auditDoneByCache[person.name]) {
                 wrap.dataset.userSelected = JSON.stringify([{ id: auditDoneByCache[person.name].open_id }]);
+                wrap.dataset.userSelectedName = person.name;
                 return;
             }
             btn.disabled = true;
@@ -17079,6 +17113,7 @@ function auditRenderDoneByPicker(wrap) {
                 if (match) {
                     auditDoneByCache[person.name] = match;
                     wrap.dataset.userSelected = JSON.stringify([{ id: match.open_id }]);
+                    wrap.dataset.userSelectedName = match.name || person.name;
                 } else {
                     ToastManager.show(`Couldn't find "${person.name}" in Feishu -- pick manually if this keeps happening.`, 'warning', 6000);
                     btn.classList.remove('active');
