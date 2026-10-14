@@ -2930,16 +2930,36 @@ def audit_logs():
     filtered = [l for l in logs if _matches(l)]
     return jsonify(filtered[:limit])
 
+def _feishu_get(url, headers=None, params=None, timeout=20, tries=2, stream=False):
+    """GET against open.feishu.cn with one automatic retry on transient
+    network failures (ReadTimeout / ConnectionError). The Vercel -> Feishu-CN
+    cross-border link regularly spikes past 10s; a single 10s attempt turned
+    those spikes into hard user-facing failures ("Failed to open ticket ...
+    Read timed out"), so the ceiling is now 20s with a second attempt before
+    the error is allowed to surface. Only network-layer exceptions retry --
+    HTTP responses (even 4xx/5xx) come back to the caller unchanged."""
+    last = None
+    for attempt in range(tries):
+        try:
+            return feishu_session.get(url, headers=headers, params=params,
+                                      timeout=timeout, stream=stream)
+        except Exception as e:
+            last = e
+            logger.warning("feishu_get_retry", url=url[:90], attempt=attempt + 1, error=str(e))
+            if attempt + 1 < tries:
+                time.sleep(0.8 * (attempt + 1))
+    raise last
+
 @app.route('/api/requests/single', methods=['GET'])
 def get_single_request():
     record_id = sanitize_text(request.args.get('record_id',''))
     if not record_id:
         return jsonify({"success": False, "error": "Missing record_id"}), 400
-        
+
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     try:
-        resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, tries=2)
         data = resp.json()
         if data.get("code") == 0:
             return jsonify({"success": True, "record": data["data"]["record"]})
@@ -2973,7 +2993,7 @@ def get_request_pictures():
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     try:
-        resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, tries=2)
         data = resp.json()
         if data.get("code") != 0:
             return jsonify({"success": False, "error": data.get("msg")}), 400
@@ -6696,7 +6716,7 @@ def agency_target_formula_sync():
                f"/tables/{REQUESTS_TABLE_ID}/records/{record_id}")
 
     def _get_fields():
-        resp = feishu_session.get(rec_url, headers={"Authorization": f"Bearer {tat}"}, timeout=10)
+        resp = _feishu_get(rec_url, headers={"Authorization": f"Bearer {tat}"}, timeout=12, tries=2)
         data = resp.json()
         if data.get("code") != 0:
             raise RuntimeError(data.get("msg") or "record fetch failed")
@@ -7252,7 +7272,12 @@ def _fetch_all_comments(token):
         return cached, None
     items, page_token, pages = [], None, 0
     while pages < COMMENTS_SCAN_MAX_PAGES:
-        params = {"file_type": "bitable", "page_size": 100}
+        # need_reaction=true attaches each reply's emoji reactions
+        # ([{reaction_key, count, ahead_users:[open_id...]}]) so the portal
+        # can show them on comments and surface them in the bell feed --
+        # Ahmed: "when someone make reaction the notification appear in the
+        # sheet but not in the website".
+        params = {"file_type": "bitable", "page_size": 100, "need_reaction": "true"}
         if page_token:
             params["page_token"] = page_token
         try:
@@ -7278,9 +7303,14 @@ def _fetch_all_comments(token):
     return payload, None
 
 def _resolve_comment_names(user_ids, token):
-    """open_id -> display name, Redis-cached 24h; unknown ids fall back to a
-    short masked id so the UI never prints a raw open_id."""
-    names, missing = {}, []
+    """open_id -> {"name", "avatar"} -- real Lark display names AND profile
+    photos, Redis-cached 24h. Resolution chain per chunk: TENANT token first
+    (the app's own contact scope -- the caller's UAT usually lacks it, which
+    is why comment authors used to fall back to masked "user-xxxx"), then the
+    caller's UAT, then a masked short id so the UI never prints a raw open_id.
+    Cache entries store name+avatar together; an entry with only a name is
+    still valid (avatar may genuinely be empty)."""
+    found, missing = {}, []
     for uid in dict.fromkeys(u for u in user_ids if u):
         ck = f"xena:uname:{uid}"
         try:
@@ -7288,31 +7318,43 @@ def _resolve_comment_names(user_ids, token):
         except Exception:
             cached = None
         if isinstance(cached, dict) and cached.get("name"):
-            names[uid] = cached["name"]
+            found[uid] = {"name": cached["name"], "avatar": cached.get("avatar") or ""}
         else:
             missing.append(uid)
+    # Candidate tokens in priority order, de-duplicated, Nones dropped.
+    tokens = []
+    for t in (get_tenant_access_token(), token):
+        if t and t not in tokens:
+            tokens.append(t)
     for i in range(0, len(missing), 50):
         chunk = missing[i:i + 50]
-        try:
-            params = [("user_ids", u) for u in chunk]
-            params.append(("user_id_type", "open_id"))
-            resp = feishu_session.get(
-                "https://open.feishu.cn/open-apis/contact/v3/users/batch",
-                headers={"Authorization": f"Bearer {token}"}, params=params, timeout=10)
-            data = resp.json()
-        except Exception:
+        chunk_done = False
+        for tk in tokens:
+            try:
+                params = [("user_ids", u) for u in chunk]
+                params.append(("user_id_type", "open_id"))
+                resp = feishu_session.get(
+                    "https://open.feishu.cn/open-apis/contact/v3/users/batch",
+                    headers={"Authorization": f"Bearer {tk}"}, params=params, timeout=12)
+                data = resp.json()
+            except Exception:
+                continue
+            if data.get("code") != 0:
+                continue  # scope missing on this token -- try the next one
+            for u in ((data.get("data") or {}).get("items") or []):
+                oid, nm = u.get("open_id"), u.get("name")
+                av = (u.get("avatar") or {}).get("avatar_72") or ""
+                if oid and nm:
+                    found[oid] = {"name": nm, "avatar": av}
+                    redis_set_json(f"xena:uname:{oid}", {"name": nm, "avatar": av}, ttl=COMMENT_NAME_TTL)
+            chunk_done = True
             break
-        if data.get("code") != 0:
-            break  # scope missing (contact:user.base:readonly) etc. -- masked fallback
-        for u in ((data.get("data") or {}).get("items") or []):
-            oid, nm = u.get("open_id"), u.get("name")
-            if oid and nm:
-                names[oid] = nm
-                redis_set_json(f"xena:uname:{oid}", {"name": nm}, ttl=COMMENT_NAME_TTL)
+        if not chunk_done:
+            break  # every token failed -- masked fallback below
     for uid in missing:
-        if uid not in names:
-            names[uid] = "user-" + uid[-4:] if len(uid) >= 4 else uid
-    return names
+        if uid not in found:
+            found[uid] = {"name": ("user-" + uid[-4:] if len(uid) >= 4 else uid), "avatar": ""}
+    return found
 
 def _comments_caller():
     """Shared gate + identity for the comment endpoints. Returns
@@ -7329,12 +7371,25 @@ def _comments_caller():
     token = uat or get_tenant_access_token()
     return user, email, uat, token, None
 
+def _reply_reactions(reply):
+    """Normalize a reply's Feishu reaction list to
+    [{key, count, users:[open_id...]}] -- always a list, never None."""
+    out = []
+    for r in (reply.get("reactions") or []):
+        key = r.get("reaction_key")
+        if not key:
+            continue
+        out.append({"key": key,
+                    "count": int(r.get("count") or 0),
+                    "users": [u for u in (r.get("ahead_users") or []) if u]})
+    return out
+
 @app.route('/api/comments', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def list_ticket_comments():
     """The comment thread of ONE ticket record, oldest-first, each reply
-    flattened to {comment_id, reply_id, user_id, user_name, create_time,
-    parts, text, images, is_solved}."""
+    flattened to {comment_id, reply_id, user_id, user_name, user_avatar,
+    create_time, parts, text, images, is_solved, reactions}."""
     record_id = sanitize_text(request.args.get('record_id', ''))
     if not record_id:
         return jsonify({"success": False, "error": "Missing record_id"}), 400
@@ -7355,6 +7410,7 @@ def list_ticket_comments():
             continue
         for r in ((c.get("reply_list") or {}).get("replies") or []):
             parts, plain = _reply_parts(r)
+            reactions = _reply_reactions(r)
             item = {
                 "comment_id": c.get("comment_id"),
                 "reply_id": r.get("reply_id"),
@@ -7364,17 +7420,23 @@ def list_ticket_comments():
                 "text": plain,
                 "images": _reply_images(r),
                 "is_solved": bool(c.get("is_solved")),
+                "reactions": reactions,
             }
             out.append(item)
             ids.append(item["user_id"])
             ids.extend(p["user_id"] for p in parts if p["type"] == "mention")
+            for rx in reactions:
+                ids.extend(rx["users"])
     out.sort(key=lambda x: x.get("create_time") or 0)
-    names = _resolve_comment_names(ids, token)
+    people = _resolve_comment_names(ids, token)
     for item in out:
-        item["user_name"] = names.get(item["user_id"], item["user_id"])
+        item["user_name"] = people.get(item["user_id"], {}).get("name", item["user_id"])
+        item["user_avatar"] = people.get(item["user_id"], {}).get("avatar", "")
         for p in item["parts"]:
             if p["type"] == "mention":
-                p["name"] = names.get(p["user_id"], p["user_id"])
+                p["name"] = people.get(p["user_id"], {}).get("name", p["user_id"])
+        for rx in item["reactions"]:
+            rx["names"] = [people.get(u, {}).get("name", u) for u in rx["users"]]
     return jsonify({"success": True, "comments": out, "count": len(out),
                     "truncated": bool(scan.get("truncated"))})
 
@@ -7538,7 +7600,25 @@ def comments_feed():
                     mentions_me = True
                     break
         img_count = sum(len(_reply_images(r)) for r in replies)
+        # Every reaction on any reply of this thread, flattened. Each carries
+        # the reactor's open_id so the feed can say WHO reacted (Feishu gives
+        # no per-reaction timestamp -- the thread's update_time, which bumps
+        # when a reaction lands, is the closest honest clock).
+        thread_reactions = []
+        for r in replies:
+            _, r_plain = _reply_parts(r)
+            for rx in _reply_reactions(r):
+                for reactor in rx["users"]:
+                    thread_reactions.append({
+                        "key": rx["key"],
+                        "reactor_id": reactor,
+                        "on_user_id": r.get("user_id"),
+                        "on_text": (r_plain or "")[:120],
+                    })
+                    ids.append(reactor)
+                    ids.append(r.get("user_id"))
         items.append({
+            "kind": "comment",
             "comment_id": c.get("comment_id"),
             "record_id": anchor["record"],
             "author_id": last.get("user_id"),
@@ -7548,17 +7628,46 @@ def comments_feed():
             "reply_count": len(replies),
             "mentions_me": mentions_me,
             "is_solved": bool(c.get("is_solved")),
+            "reactions": thread_reactions,
         })
         ids.append(last.get("user_id"))
         ids.append(c.get("user_id"))
         rec_ids.append(anchor["record"])
+        # One EXTRA feed entry per reaction so a bare emoji on your comment
+        # shows up in the bell exactly like it does inside the Base. The
+        # entry's mentions_me flag means "they reacted to YOUR comment", so
+        # it also lands in the Mentioned tab where Ahmed looks for it.
+        bump_time = c.get("update_time") or last.get("create_time")
+        for rx in thread_reactions:
+            if not rx["reactor_id"]:
+                continue
+            items.append({
+                "kind": "reaction",
+                "comment_id": c.get("comment_id"),
+                "record_id": anchor["record"],
+                "author_id": rx["reactor_id"],   # the reactor
+                "reaction_key": rx["key"],
+                "on_user_id": rx["on_user_id"],
+                "time": bump_time,
+                "text": rx["on_text"],
+                "image_count": 0,
+                "reply_count": len(replies),
+                "mentions_me": bool(my_open_id) and rx["on_user_id"] == my_open_id and rx["reactor_id"] != my_open_id,
+                "is_solved": bool(c.get("is_solved")),
+            })
     items.sort(key=lambda x: x.get("time") or 0, reverse=True)
     items = items[:COMMENTS_FEED_MAX]
     nums = _resolve_record_numberings([it["record_id"] for it in items], token)
-    names = _resolve_comment_names(ids, token)
+    people = _resolve_comment_names(ids, token)
     for it in items:
         it["numbering"] = nums.get(it["record_id"])
-        it["author"] = names.get(it["author_id"], it["author_id"])
+        it["author"] = people.get(it["author_id"], {}).get("name", it["author_id"])
+        it["author_avatar"] = people.get(it["author_id"], {}).get("avatar", "")
+        if it.get("kind") == "reaction":
+            it["on_author"] = people.get(it.get("on_user_id"), {}).get("name", "")
+        else:
+            for rx in it.get("reactions") or []:
+                rx["reactor_name"] = people.get(rx["reactor_id"], {}).get("name", rx["reactor_id"])
     return jsonify({"success": True, "items": items, "count": len(items),
                     "truncated": bool(scan.get("truncated"))})
 
@@ -7590,6 +7699,92 @@ def proxy_comment_media(file_token):
             return response
         logger.error("comment_media_rejected", file_token=file_token, status=resp.status_code, body=resp.text[:200])
     return jsonify({"error": "Could not fetch comment image"}), 502
+
+SCHEMA_SYNC_CACHE_KEY = "xena:schema:fields:v1"
+SCHEMA_SYNC_TTL = 600  # the sheet's option lists change rarely; 10 min
+
+@app.route('/api/schema/fields', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def schema_fields():
+    """Live SingleSelect/MultiSelect option lists from the Grand Table's own
+    field metadata, so the portal's dropdowns always match the sheet (Ahmed:
+    "make the options field sync from the sheet to be sure it's updated").
+    Returns {field_name: {ui_type, options:[...]}} for select-type fields
+    only; Redis-cached SCHEMA_SYNC_TTL seconds; TAT-first with UAT fallback."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    uat   = sanitize_text(request.args.get('uat', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("modules") and not perms.get("is_super_admin"):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+    cached = redis_get_json(SCHEMA_SYNC_CACHE_KEY)
+    if isinstance(cached, dict) and cached.get("fields"):
+        return jsonify({"success": True, "fields": cached["fields"], "cached": True})
+    fields, page_token = {}, None
+    for tk in [get_tenant_access_token(), uat]:
+        if not tk:
+            continue
+        fields, page_token = {}, None
+        ok = True
+        for _ in range(20):
+            params = {"page_size": 100}
+            if page_token:
+                params["page_token"] = page_token
+            try:
+                resp = _feishu_get(
+                    f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/fields",
+                    headers={"Authorization": f"Bearer {tk}"}, params=params, timeout=15, tries=2)
+                data = resp.json()
+            except Exception as e:
+                logger.error("schema_fields_failed", error=str(e))
+                ok = False
+                break
+            if data.get("code") != 0:
+                logger.error("schema_fields_rejected", code=data.get("code"), msg=data.get("msg"))
+                ok = False
+                break
+            d = data.get("data") or {}
+            for f in (d.get("items") or []):
+                name, ui = f.get("field_name"), f.get("ui_type")
+                if ui not in ("SingleSelect", "MultiSelect"):
+                    continue
+                opts = [o.get("name") for o in ((f.get("property") or {}).get("options") or []) if o.get("name")]
+                if name:
+                    fields[name] = {"ui_type": ui, "options": opts}
+            if not d.get("has_more"):
+                page_token = None
+                break
+            page_token = d.get("page_token")
+            if not page_token:
+                break
+        if ok and fields:
+            break
+    if not fields:
+        return jsonify({"success": False, "error": "Could not read the sheet's field metadata"}), 502
+    redis_set_json(SCHEMA_SYNC_CACHE_KEY, {"fields": fields}, ttl=SCHEMA_SYNC_TTL)
+    return jsonify({"success": True, "fields": fields, "cached": False})
+
+@app.route('/api/users/lookup', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def users_lookup():
+    """open_id list -> {id: {name, avatar_url}} for the workspace's person
+    chips (Respondents / Lock Owner / Done by / Mentioned Person ...), which
+    arrive from the sheet with name+id but NO photo (Ahmed: "the pic is not
+    showing in the website"). Shares the comment-name resolver (tenant token
+    first, UAT fallback, 24h Redis cache) so repeated opens cost nothing."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    uat   = sanitize_text(request.args.get('uat', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("modules") and not perms.get("is_super_admin"):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+    ids = [s for s in (sanitize_text(x) for x in request.args.get('ids', '').split(',')) if s][:100]
+    if not ids:
+        return jsonify({"success": True, "users": {}})
+    people = _resolve_comment_names(ids, uat or get_tenant_access_token())
+    return jsonify({"success": True,
+                    "users": {uid: {"name": p.get("name", ""), "avatar_url": p.get("avatar", "")}
+                              for uid, p in people.items()}})
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
