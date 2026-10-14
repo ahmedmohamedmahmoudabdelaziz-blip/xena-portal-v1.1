@@ -2962,6 +2962,10 @@ def get_single_request():
         resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, tries=2)
         data = resp.json()
         if data.get("code") == 0:
+            # Phase 10.47: teach the name resolver the people on this ticket
+            # (person fields carry real display names) so comments/chips stop
+            # falling back to masked "user-xxxx" without any contact scope.
+            _harvest_person_names((data["data"]["record"] or {}).get("fields"))
             return jsonify({"success": True, "record": data["data"]["record"]})
         return jsonify({"success": False, "error": data.get("msg")}), 400
     except Exception as e:
@@ -7137,6 +7141,7 @@ def pull_assigned_ticket():
                 assigned_member = extract_field_text(it.get("fields", {}).get("Assigned Member", "")).lower()
                 if user_clean in assigned_member:
                     filtered_items.append(it)
+                    _harvest_person_names(it.get("fields", {}))  # Phase 10.47: free name-resolution seed
                     
             matches = []
             for it in filtered_items[:20]:
@@ -7302,14 +7307,50 @@ def _fetch_all_comments(token):
     redis_set_json(COMMENTS_SCAN_CACHE_KEY, payload, ttl=COMMENTS_SCAN_TTL)
     return payload, None
 
-def _resolve_comment_names(user_ids, token):
+def _harvest_person_names(obj):
+    """Walk a record's fields (any nesting) and Redis-cache every person
+    object {id: ou_..., name: ...} as xena:uname:{id}. Person field values
+    from the Bitable API carry the real display name even though this app
+    lacks contact-book READ scope (contact:user.base:readonly) -- so every
+    ticket the portal touches teaches the comment/avatar resolver a few more
+    teammates for free. Existing cached avatars are preserved."""
+    try:
+        if isinstance(obj, dict):
+            oid, nm = obj.get("id"), obj.get("name")
+            if isinstance(oid, str) and oid.startswith("ou_") and isinstance(nm, str) and nm.strip():
+                try:
+                    ck = f"xena:uname:{oid}"
+                    cached = redis_get_json(ck)
+                    has_full = isinstance(cached, dict) and cached.get("name") and cached.get("avatar")
+                    if not has_full:
+                        redis_set_json(ck, {"name": nm.strip(),
+                                            "avatar": (cached.get("avatar", "") if isinstance(cached, dict) else "")},
+                                       ttl=COMMENT_NAME_TTL)
+                except Exception:
+                    pass
+            for v in obj.values():
+                _harvest_person_names(v)
+        elif isinstance(obj, (list, tuple)):
+            for v in obj:
+                _harvest_person_names(v)
+    except Exception:
+        pass
+
+def _resolve_comment_names(user_ids, token, uat=None):
     """open_id -> {"name", "avatar"} -- real Lark display names AND profile
     photos, Redis-cached 24h. Resolution chain per chunk: TENANT token first
     (the app's own contact scope -- the caller's UAT usually lacks it, which
     is why comment authors used to fall back to masked "user-xxxx"), then the
     caller's UAT, then a masked short id so the UI never prints a raw open_id.
     Cache entries store name+avatar together; an entry with only a name is
-    still valid (avatar may genuinely be empty)."""
+    still valid (avatar may genuinely be empty).
+    Phase 10.47: the contact-batch API needs contact:user.base:readonly,
+    which this app does NOT have -- so both token legs usually fail and the
+    masked fallback fires. Two scope-free sources now fill the gap:
+    _harvest_person_names (names ride along in person fields of every record
+    the portal touches) and, for the avatar, Feishu's "Search users" API
+    (contact:user:search -- the scope the app DOES have), queried by the
+    known display name and matched back strictly by open_id."""
     found, missing = {}, []
     for uid in dict.fromkeys(u for u in user_ids if u):
         ck = f"xena:uname:{uid}"
@@ -7354,6 +7395,33 @@ def _resolve_comment_names(user_ids, token):
     for uid in missing:
         if uid not in found:
             found[uid] = {"name": ("user-" + uid[-4:] if len(uid) >= 4 else uid), "avatar": ""}
+    # Avatar backfill via Feishu's "Search users" API (contact:user:search --
+    # the scope this app DOES have). Only for entries that already have a real
+    # name (harvested from person fields / cached) but no photo yet; the hit
+    # is matched back strictly by open_id, so same-name teammates can't cross.
+    if uat:
+        for uid, entry in list(found.items()):
+            nm = (entry.get("name") or "").strip()
+            if entry.get("avatar") or not nm or nm.startswith("user-"):
+                continue
+            try:
+                resp = http_requests.get(
+                    "https://open.feishu.cn/open-apis/search/v1/user",
+                    headers={"Authorization": f"Bearer {uat}"},
+                    params={"query": nm, "page_size": 10}, timeout=8)
+                sdata = resp.json()
+                if sdata.get("code") != 0:
+                    continue
+                for u in ((sdata.get("data") or {}).get("users") or []):
+                    if u.get("open_id") == uid:
+                        av = (u.get("avatar") or {}).get("avatar_72") or ""
+                        if av:
+                            entry["avatar"] = av
+                            redis_set_json(f"xena:uname:{uid}", {"name": nm, "avatar": av},
+                                           ttl=COMMENT_NAME_TTL)
+                        break
+            except Exception:
+                continue
     return found
 
 def _comments_caller():
@@ -7428,7 +7496,7 @@ def list_ticket_comments():
             for rx in reactions:
                 ids.extend(rx["users"])
     out.sort(key=lambda x: x.get("create_time") or 0)
-    people = _resolve_comment_names(ids, token)
+    people = _resolve_comment_names(ids, token, uat=uat or None)
     for item in out:
         item["user_name"] = people.get(item["user_id"], {}).get("name", item["user_id"])
         item["user_avatar"] = people.get(item["user_id"], {}).get("avatar", "")
@@ -7658,7 +7726,7 @@ def comments_feed():
     items.sort(key=lambda x: x.get("time") or 0, reverse=True)
     items = items[:COMMENTS_FEED_MAX]
     nums = _resolve_record_numberings([it["record_id"] for it in items], token)
-    people = _resolve_comment_names(ids, token)
+    people = _resolve_comment_names(ids, token, uat=uat or None)
     for it in items:
         it["numbering"] = nums.get(it["record_id"])
         it["author"] = people.get(it["author_id"], {}).get("name", it["author_id"])
@@ -7781,7 +7849,7 @@ def users_lookup():
     ids = [s for s in (sanitize_text(x) for x in request.args.get('ids', '').split(',')) if s][:100]
     if not ids:
         return jsonify({"success": True, "users": {}})
-    people = _resolve_comment_names(ids, uat or get_tenant_access_token())
+    people = _resolve_comment_names(ids, uat or get_tenant_access_token(), uat=uat or None)
     return jsonify({"success": True,
                     "users": {uid: {"name": p.get("name", ""), "avatar_url": p.get("avatar", "")}
                               for uid, p in people.items()}})
