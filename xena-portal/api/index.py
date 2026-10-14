@@ -291,6 +291,29 @@ def get_app_access_token():
         _app_token_cache["expires_at"] = time.time() + int(resp.get("expire", 7200)) - 300
     return token
 _refresh_lock = threading.Lock()
+def _do_refresh_exchange(open_id, rt):
+    """One Feishu refresh_access_token round. Returns (new_uat, new_rt,
+    expires_in) or (None, None, None) on any failure."""
+    app_token = get_app_access_token()
+    if not app_token:
+        return None, None, None
+    try:
+        resp = http_requests.post(
+            "https://open.feishu.cn/open-apis/authen/v1/refresh_access_token",
+            headers={"Authorization": f"Bearer {app_token}", "Content-Type": "application/json"},
+            json={"grant_type": "refresh_token", "refresh_token": rt}, timeout=15).json()
+    except Exception as e:
+        logger.warn("uat_refresh_request_failed", open_id=open_id[-6:], error=str(e))
+        return None, None, None
+    data = resp.get("data") or {}
+    new_uat = data.get("access_token")
+    new_rt = data.get("refresh_token")
+    if not new_uat:
+        logger.warn("uat_refresh_rejected", open_id=open_id[-6:],
+                    code=resp.get("code"), msg=resp.get("msg"))
+        return None, None, None
+    return new_uat, new_rt, int(data.get("expires_in", 7200))
+
 def _refresh_user_token(open_id):
     """Exchange the stored OAuth refresh_token for a fresh user access token (uat).
     Keeps 'Respondents' stamped with the agent instead of the app on submits made
@@ -302,25 +325,28 @@ def _refresh_user_token(open_id):
         return None
     with _refresh_lock:
         rt = redis_cmd("GET", f"xena:refresh_token:{open_id}") or rt
-        app_token = get_app_access_token()
-        if not app_token:
-            return None
-        try:
-            resp = http_requests.post(
-                "https://open.feishu.cn/open-apis/authen/v1/refresh_access_token",
-                headers={"Authorization": f"Bearer {app_token}", "Content-Type": "application/json"},
-                json={"grant_type": "refresh_token", "refresh_token": rt}, timeout=15).json()
-        except Exception as e:
-            logger.warn("uat_refresh_request_failed", open_id=open_id[-6:], error=str(e))
-            return None
-        data = resp.get("data") or {}
-        new_uat = data.get("access_token")
-        new_rt = data.get("refresh_token")
+        new_uat, new_rt, expires_in = _do_refresh_exchange(open_id, rt)
         if not new_uat:
-            logger.warn("uat_refresh_rejected", open_id=open_id[-6:],
-                        code=resp.get("code"), msg=resp.get("msg"))
+            # Phase 10.44: CROSS-PROCESS RACE. Vercel runs many serverless
+            # invocations; two concurrent refreshes both read rt=A, the first
+            # rotates it to B and Feishu INVALIDATES A on the spot -- the
+            # second invocation's exchange then fails with invalid_grant and
+            # used to return None here, which the callers read as "session
+            # dead" and forced a mid-shift logout. If Redis now holds a
+            # DIFFERENT rt, another instance already refreshed: reuse the
+            # fresh uat it stored, or retry once with the newer rt.
+            latest_rt = redis_cmd("GET", f"xena:refresh_token:{open_id}")
+            if latest_rt and latest_rt != rt:
+                cached = redis_cmd("GET", f"xena:uat:{open_id}")
+                if cached:
+                    logger.info("uat_refresh_race_reuse", open_id=open_id[-6:])
+                    return cached
+                new_uat, new_rt, expires_in = _do_refresh_exchange(open_id, latest_rt)
+                if new_uat:
+                    logger.info("uat_refresh_race_retried", open_id=open_id[-6:])
+        if not new_uat:
             return None
-        uat_ttl = max(int(data.get("expires_in", 7200)) - 300, 60)
+        uat_ttl = max(expires_in - 300, 60)
         redis_cmd("SET", f"xena:uat:{open_id}", new_uat, "EX", uat_ttl)
         if new_rt:
             # Phase 10.14 (Ahmed): the refresh token used to be kept for only
@@ -331,6 +357,12 @@ def _refresh_user_token(open_id):
             # comfortably covers the 12h client-side session limit -- submits
             # hours into a shift refresh silently instead of dying.
             redis_cmd("SET", f"xena:refresh_token:{open_id}", new_rt, "EX", 24 * 3600)
+            # Phase 10.44: keep the open_id->email binding alive alongside the
+            # refresh chain so /api/auth/refresh-session can keep verifying
+            # the caller for as long as the chain itself lives.
+            em = redis_cmd("GET", f"xena:uid_email:{open_id}")
+            if em:
+                redis_cmd("SET", f"xena:uid_email:{open_id}", em, "EX", 24 * 3600)
         return new_uat
 def _get_cached_uat(open_id):
     """Freshest server-side user token for this agent, if we hold one (set at login
@@ -576,6 +608,17 @@ def mask_name(name):
     parts = name.strip().split()
     return " ".join(p[:1] + "***" if len(p) > 1 else p for p in parts)
 
+# Phase 10.44 (Ahmed: "the token is still expire after 3 hour ... while iam
+# working on tkt"): a Redis hiccup (Upstash quota, a cross-border timeout)
+# used to be indistinguishable from "session really dead" -- every failing
+# GET looked like an empty cache, so one bad minute forced a full logout and
+# destroyed half-filled forms. redis_cmd now tracks whether the store itself
+# is reachable: an EXCEPTION marks it down, any successful round-trip (even a
+# key miss, which returns result=None) marks it healthy. Session-enforcement
+# code checks redis_healthy() and FAILS OPEN while the store is unreachable
+# instead of logging agents out over infrastructure trouble.
+_redis_health = {"down_since": 0.0, "lock": threading.Lock()}
+
 def redis_cmd(*args, timeout=8):
     if not REDIS_ENABLED: return None
     try:
@@ -584,10 +627,22 @@ def redis_cmd(*args, timeout=8):
             headers={"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"},
             json=list(args), timeout=timeout
         )
-        return resp.json().get("result")
+        result = resp.json().get("result")
+        with _redis_health["lock"]:
+            _redis_health["down_since"] = 0.0
+        return result
     except Exception as e:
         logger.warn("redis_cmd_failed", cmd=args[0] if args else "?", error=str(e))
+        with _redis_health["lock"]:
+            if not _redis_health["down_since"]:
+                _redis_health["down_since"] = time.time()
         return None
+
+def redis_healthy():
+    """True while Redis calls are succeeding (a missing key is still a
+    successful round-trip -- only exceptions mark the store down)."""
+    with _redis_health["lock"]:
+        return _redis_health["down_since"] == 0.0
 
 def redis_get_json(key):
     raw = redis_cmd("GET", key)
@@ -2288,6 +2343,12 @@ def callback():
         if refresh_token and lark_open_id and REDIS_ENABLED:
             # Phase 10.14: 24h (was 4h) -- see _refresh_user_token for why.
             redis_cmd("SET", f"xena:refresh_token:{lark_open_id}", refresh_token, "EX", 24 * 3600)
+        if lark_open_id and lark_email and REDIS_ENABLED:
+            # Phase 10.44: open_id->email binding, used by /api/auth/refresh-session
+            # to verify the caller before handing back a fresh uat (open_id alone
+            # is not a secret). Renewed on every silent refresh alongside the
+            # refresh-token chain, so it lives exactly as long as the session can.
+            redis_cmd("SET", f"xena:uid_email:{lark_open_id}", lark_email, "EX", 24 * 3600)
         uat_expires_in = (token_resp.get("data") or {}).get("expires_in") or token_resp.get("expires_in") or 7200
         if lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
@@ -2331,11 +2392,72 @@ def check_session():
     if REDIS_ENABLED and not MOCK_MODE and open_id:
         uat = _get_cached_uat(open_id) or _refresh_user_token(open_id)
         if not uat:
+            if not redis_healthy():
+                # Phase 10.44: Redis itself is unreachable right now, so an
+                # empty cache PROVES NOTHING about the session. Fail open
+                # instead of force-logging the agent over an infrastructure
+                # blip -- submits still get the real check when Redis recovers.
+                logger.warn("check_session_redis_down_fail_open", user=user)
+                return jsonify({"valid": True, "degraded": True})
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "SESSION_EXPIRED_ON_OPEN", "Detected opening New Request", ip=ip, severity="Warning")
-            return jsonify({"error": "Your session has expired. Please log in again.", "code": "SESSION_EXPIRED"}), 401
+            return jsonify({"error": "Your session has expired. Please log in again — anything you already filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
 
     return jsonify({"valid": True})
+
+@app.route('/api/auth/refresh-session', methods=['GET'])
+def refresh_session():
+    """Silent session renewal (Phase 10.44). The browser's own uat copy dies
+    with Feishu's expires_in (~2-3h) even though the server-side refresh chain
+    lives 24h+ -- so the frontend calls this every ~30 min (and before every
+    submit/save) to swap in the server's freshest uat without any visible
+    login. Cost: one Redis read when the cache is warm (zero Feishu calls),
+    one Feishu refresh exchange when it's cold (~every 2h of activity).
+    Returns the fresh uat so the browser's copy stops going stale mid-form.
+    Security: hands the token back ONLY when the caller proves the email bound
+    to this open_id at login (open_id alone is not a secret). 401 with
+    SESSION_EXPIRED only when the chain is verifiably dead -- a Redis outage
+    answers degraded/success instead of killing the session."""
+    if MOCK_MODE:
+        return jsonify({"success": True, "uat": "mock_token_123", "expires_in": 7200})
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    open_id = sanitize_text(request.args.get('open_id', ''))
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 403
+    if REDIS_ENABLED and open_id:
+        bound_email = redis_cmd("GET", f"xena:uid_email:{open_id}")
+        if not bound_email:
+            # No binding on file. Two very different cases: (a) a session that
+            # predates this field but whose refresh chain is still alive --
+            # must NOT be logged out over a missing migration artifact, so it
+            # gets a degraded pass (no token handed out; the binding is
+            # created at the next real login); (b) genuinely nothing on file
+            # -- a verifiably dead chain.
+            if not redis_healthy():
+                return jsonify({"success": True, "degraded": True})
+            if redis_cmd("GET", f"xena:refresh_token:{open_id}") or redis_cmd("GET", f"xena:uat:{open_id}"):
+                return jsonify({"success": True, "degraded": True})
+            return jsonify({"error": "Your session has expired. Please log in again — anything you already filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
+        if not email or bound_email.strip().lower() != email.strip().lower():
+            # A live binding that the caller can't match = not the owner's
+            # browser -- refuse WITHOUT the SESSION_EXPIRED code so the
+            # frontend shows a plain error instead of nuking the session.
+            return jsonify({"error": "Session identity mismatch."}), 403
+        uat = _get_cached_uat(open_id) or _refresh_user_token(open_id)
+        if not uat:
+            if not redis_healthy():
+                logger.warn("refresh_session_redis_down_fail_open", user=user)
+                return jsonify({"success": True, "degraded": True})
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+            audit.log(user, "SESSION_EXPIRED_ON_RENEW", "Silent renewal found a dead chain", ip=ip, severity="Warning")
+            return jsonify({"error": "Your session has expired. Please log in again — anything you already filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
+        ttl = redis_cmd("TTL", f"xena:uat:{open_id}")
+        return jsonify({"success": True, "uat": uat,
+                        "expires_in": ttl if isinstance(ttl, int) and ttl > 0 else 6900})
+    # Nothing to verify server-side (Redis disabled / legacy session without
+    # open_id) -- keep the session running on the client-side timers alone.
+    return jsonify({"success": True, "degraded": True})
 
 @app.route('/api/auth/me', methods=['GET'])
 def check_auth():
@@ -3943,9 +4065,17 @@ def submit_request():
     # same as the original design.
     if REDIS_ENABLED and not MOCK_MODE and submitter_open_id:
         uat = _get_cached_uat(submitter_open_id) or _refresh_user_token(submitter_open_id)
+        if not uat and not redis_healthy():
+            # Phase 10.44: Redis is unreachable, so the empty cache above
+            # proves NOTHING -- fail open to the browser-sent uat (the
+            # pre-10.14 behavior) rather than force a logout over an
+            # infrastructure blip. A genuinely dead token is still caught by
+            # Feishu itself in the create call below (99991677 path).
+            logger.warn("submit_redis_down_fail_open", user=user)
+            uat = request.form.get('uat', '')
     if not uat:
         audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
-        return jsonify({"error": "Your session has expired. Please log out and log in again, then resubmit this request.", "code": "SESSION_EXPIRED"}), 401
+        return jsonify({"error": "Your session has expired. Please log in again, then resubmit this request — everything you filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
     api_token = uat
 
     final_fields = {}
@@ -4111,7 +4241,7 @@ def submit_request():
                 # of quietly filing the ticket under the app identity.
                 if data.get("code") != 0:
                     audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type} | feishu_code: {data.get('code')}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
-                    return jsonify({"error": "Your session has expired. Please log out and log in again, then resubmit this request.", "code": "SESSION_EXPIRED"}), 401
+                    return jsonify({"error": "Your session has expired. Please log in again, then resubmit this request — everything you filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
             else:
                 # NOT a dead-token error -- e.g. this agent's Lark account isn't a
                 # collaborator with edit rights on the Bitable itself, or some other
@@ -6763,6 +6893,9 @@ TICKET_FIELD_KEY_MAP = {
     "Otherapp Name": "otherapp_name", "Otherapp ID": "otherapp_id", "Country": "country",
     "Whatsapp Number": "whatsapp_number", "NID Number": "nid_number", "Agency Type": "agency_type",
     "Bd Code": "bd_code", "Acm Name (PK)": "acm", "Acm Name (IN)": "acm",
+    # Phase 10.45 (Ahmed 2026-10-14): new sheet fields -- carried in the
+    # ticket payload so feed cards / detail views can show them.
+    "Border Type": "border_type", "Reason": "reason", "Possible BD ID": "possible_bd_id",
     "Closing Reason": "closing_reason", "New ID": "new_id", "Old ID": "old_id",
     "Reporter ID": "reporter_id", "BD Nickname": "bd_nickname", "Email Adress": "email_address",
     "BD Hunted Agency Code": "bd_hunted_agency_code", "Target": "target", "Privilege": "privilege",
@@ -7033,6 +7166,430 @@ def health():
         "redis_enabled": REDIS_ENABLED,
         "mock_mode_active": MOCK_MODE,
     })
+
+# ============================================================================
+# Phase 10.43 (Ahmed, 2026-10-14): Grand Table record COMMENTS inside the
+# portal -- a per-ticket comment thread (view + reply + @mention) plus a
+# comment notifications feed, both synced 1:1 with the Base's native record
+# comments (one thread in Feishu Base AND the portal; a mention posted from
+# the portal triggers the normal Feishu notification, exactly like Farooq's
+# comment in Ahmed's screenshot). Wire formats verified live against the
+# Grand Table on 2026-10-14:
+#   LIST: GET /open-apis/drive/v1/files/{BASE_ID}/comments?file_type=bitable
+#         Oldest-first, page_size<=100, has_more/page_token. is_solved is
+#         OMITTED (= all statuses; that is lark-cli's "--solved-status all"
+#         wire shape). Every reply carries extra.notify_extra = {record,
+#         table, view} and extra.image_list = [file_token, ...]. This base's
+#         record_ids ARE the short rec+7 form (e.g. recW9LeWLX) that
+#         notify_extra uses, so record filtering is a straight == match
+#         (verified: record-list record_id_list vs comment anchors).
+#   ADD:  POST /open-apis/drive/v1/files/{BASE_ID}/new_comments
+#         {file_type:"bitable",
+#          anchor:{block_id:<table>, base_record_id:<record>,
+#                  base_view_id:<view>},
+#          reply_elements:[{type:"text", text:...},
+#                          {type:"mention_user", mention_user:"ou_..."}]}
+#         The write uses the caller's UAT so authorship = the logged-in agent.
+# ============================================================================
+REQUESTS_DEFAULT_VIEW_ID = "vewpHhuE1X"  # "Results" grid view -- the anchor view the Base itself stamps on record comments
+COMMENTS_SCAN_CACHE_KEY  = "xena:comments:scan:v1"
+COMMENTS_SCAN_TTL        = 30      # seconds; one base-wide scan shared by thread + feed
+COMMENTS_SCAN_MAX_PAGES  = 30      # hard cap: 30 x 100 = 3000 comment threads
+COMMENTS_FEED_MAX        = 100
+COMMENT_NAME_TTL         = 86400   # open_id -> display name, 24h
+COMMENT_RECNUM_TTL       = 7 * 86400  # record_id -> Numbering is immutable, 7d
+
+def _comment_record_anchor(comment):
+    """The {record, table, view} anchor of a comment thread (stamped on every
+    reply by Feishu as extra.notify_extra)."""
+    for r in ((comment.get("reply_list") or {}).get("replies") or []):
+        ne = (r.get("extra") or {}).get("notify_extra") or {}
+        if ne.get("record"):
+            return ne
+    return {}
+
+def _reply_parts(reply):
+    """Normalize a reply's content elements to a simple parts list the portal
+    renders directly, plus a plain-text version for feed snippets."""
+    parts, plain = [], []
+    for el in (((reply.get("content") or {}).get("elements")) or []):
+        t = el.get("type")
+        if t == "text_run":
+            txt = ((el.get("text_run") or {}).get("text")) or ""
+            parts.append({"type": "text", "text": txt})
+            plain.append(txt)
+        elif t == "person":
+            uid = (el.get("person") or {}).get("user_id") or ""
+            parts.append({"type": "mention", "user_id": uid})
+            plain.append("@")  # the name is filled in after user resolution
+        elif t == "docs_link":
+            url = (el.get("docs_link") or {}).get("url") or ""
+            if url:
+                parts.append({"type": "link", "url": url})
+                plain.append(url)
+    return parts, "".join(plain).strip()
+
+def _reply_images(reply):
+    imgs = (reply.get("extra") or {}).get("image_list") or []
+    out = []
+    for im in imgs:
+        if isinstance(im, str) and im:
+            out.append(im)
+        elif isinstance(im, dict):
+            tok = im.get("file_token") or im.get("token") or ""
+            if tok:
+                out.append(tok)
+    return out
+
+def _fetch_all_comments(token):
+    """Scan every comment thread on the Grand Table (oldest-first) and cache
+    the scan in Redis for COMMENTS_SCAN_TTL seconds so a ticket open and the
+    notifications bell share ONE scan instead of each paginating the base.
+    Returns (payload, error) where payload = {"items": [...], "truncated": bool}.
+    """
+    cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+    if isinstance(cached, dict) and "items" in cached:
+        return cached, None
+    items, page_token, pages = [], None, 0
+    while pages < COMMENTS_SCAN_MAX_PAGES:
+        params = {"file_type": "bitable", "page_size": 100}
+        if page_token:
+            params["page_token"] = page_token
+        try:
+            resp = feishu_session.get(
+                f"https://open.feishu.cn/open-apis/drive/v1/files/{BASE_ID}/comments",
+                headers={"Authorization": f"Bearer {token}"}, params=params, timeout=15)
+            data = resp.json()
+        except Exception as e:
+            return None, f"comment scan failed: {e}"
+        if data.get("code") != 0:
+            return None, f"{data.get('code')}: {data.get('msg')}"
+        d = data.get("data") or {}
+        items.extend(d.get("items") or [])
+        pages += 1
+        if not d.get("has_more"):
+            page_token = None
+            break
+        page_token = d.get("page_token")
+        if not page_token:
+            break
+    payload = {"items": items, "truncated": bool(page_token)}
+    redis_set_json(COMMENTS_SCAN_CACHE_KEY, payload, ttl=COMMENTS_SCAN_TTL)
+    return payload, None
+
+def _resolve_comment_names(user_ids, token):
+    """open_id -> display name, Redis-cached 24h; unknown ids fall back to a
+    short masked id so the UI never prints a raw open_id."""
+    names, missing = {}, []
+    for uid in dict.fromkeys(u for u in user_ids if u):
+        ck = f"xena:uname:{uid}"
+        try:
+            cached = redis_get_json(ck)
+        except Exception:
+            cached = None
+        if isinstance(cached, dict) and cached.get("name"):
+            names[uid] = cached["name"]
+        else:
+            missing.append(uid)
+    for i in range(0, len(missing), 50):
+        chunk = missing[i:i + 50]
+        try:
+            params = [("user_ids", u) for u in chunk]
+            params.append(("user_id_type", "open_id"))
+            resp = feishu_session.get(
+                "https://open.feishu.cn/open-apis/contact/v3/users/batch",
+                headers={"Authorization": f"Bearer {token}"}, params=params, timeout=10)
+            data = resp.json()
+        except Exception:
+            break
+        if data.get("code") != 0:
+            break  # scope missing (contact:user.base:readonly) etc. -- masked fallback
+        for u in ((data.get("data") or {}).get("items") or []):
+            oid, nm = u.get("open_id"), u.get("name")
+            if oid and nm:
+                names[oid] = nm
+                redis_set_json(f"xena:uname:{oid}", {"name": nm}, ttl=COMMENT_NAME_TTL)
+    for uid in missing:
+        if uid not in names:
+            names[uid] = "user-" + uid[-4:] if len(uid) >= 4 else uid
+    return names
+
+def _comments_caller():
+    """Shared gate + identity for the comment endpoints. Returns
+    (user, email, uat, token, error_response)."""
+    user  = sanitize_text(request.args.get('user', '') or (request.get_json(silent=True) or {}).get('user', ''))
+    email = sanitize_text(request.args.get('email', '') or (request.get_json(silent=True) or {}).get('email', ''))
+    uat   = sanitize_text(request.args.get('uat', '') or (request.get_json(silent=True) or {}).get('uat', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("modules") and not perms.get("is_super_admin"):
+        return user, email, uat, None, (jsonify({"success": False, "error": "Access denied"}), 403)
+    # Reads can ride the tenant token (the app is a collaborator on the base);
+    # the caller's UAT is preferred when present so read authorship checks and
+    # any user-scoped comment permissions behave exactly like the Base UI.
+    token = uat or get_tenant_access_token()
+    return user, email, uat, token, None
+
+@app.route('/api/comments', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def list_ticket_comments():
+    """The comment thread of ONE ticket record, oldest-first, each reply
+    flattened to {comment_id, reply_id, user_id, user_name, create_time,
+    parts, text, images, is_solved}."""
+    record_id = sanitize_text(request.args.get('record_id', ''))
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    user, email, uat, token, err = _comments_caller()
+    if err:
+        return err
+    scan, scan_err = _fetch_all_comments(token)
+    if scan is None and uat:
+        # expired/insufficient UAT -- reads fall back to the tenant token
+        scan, scan_err = _fetch_all_comments(get_tenant_access_token())
+    if scan is None:
+        status = 502 if "failed" in str(scan_err) else 400
+        return jsonify({"success": False, "error": scan_err}), status
+    out, ids = [], []
+    for c in scan["items"]:
+        anchor = _comment_record_anchor(c)
+        if anchor.get("table") != REQUESTS_TABLE_ID or anchor.get("record") != record_id:
+            continue
+        for r in ((c.get("reply_list") or {}).get("replies") or []):
+            parts, plain = _reply_parts(r)
+            item = {
+                "comment_id": c.get("comment_id"),
+                "reply_id": r.get("reply_id"),
+                "user_id": r.get("user_id"),
+                "create_time": r.get("create_time") or c.get("create_time"),
+                "parts": parts,
+                "text": plain,
+                "images": _reply_images(r),
+                "is_solved": bool(c.get("is_solved")),
+            }
+            out.append(item)
+            ids.append(item["user_id"])
+            ids.extend(p["user_id"] for p in parts if p["type"] == "mention")
+    out.sort(key=lambda x: x.get("create_time") or 0)
+    names = _resolve_comment_names(ids, token)
+    for item in out:
+        item["user_name"] = names.get(item["user_id"], item["user_id"])
+        for p in item["parts"]:
+            if p["type"] == "mention":
+                p["name"] = names.get(p["user_id"], p["user_id"])
+    return jsonify({"success": True, "comments": out, "count": len(out),
+                    "truncated": bool(scan.get("truncated"))})
+
+def _build_reply_elements(text, mentions):
+    """Splice @Name occurrences in the composer's plain text into Feishu
+    reply_elements ({type:text} / {type:mention_user}). Longest names first so
+    overlapping display names never half-match."""
+    mentions = [m for m in (mentions or []) if m.get("name") and m.get("user_id")]
+    mentions.sort(key=lambda m: len(m["name"]), reverse=True)
+    elements, buf, i = [], [], 0
+    while i < len(text):
+        hit = None
+        for m in mentions:
+            token_str = "@" + m["name"]
+            if text.startswith(token_str, i):
+                hit = (token_str, m)
+                break
+        if hit:
+            if buf:
+                elements.append({"type": "text", "text": "".join(buf)})
+                buf = []
+            elements.append({"type": "mention_user", "mention_user": hit[1]["user_id"]})
+            i += len(hit[0])
+        else:
+            buf.append(text[i])
+            i += 1
+    if buf:
+        elements.append({"type": "text", "text": "".join(buf)})
+    return [e for e in elements if e.get("type") != "text" or e.get("text", "").strip()]
+
+@app.route('/api/comments', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def add_ticket_comment():
+    """Post a comment onto a ticket record AS the logged-in agent (UAT).
+    Body: {record_id, text, mentions:[{name, user_id}], user, email, uat}.
+    The comment lands in the Base itself -- visible in Feishu too, and every
+    @mention triggers the normal Feishu notification."""
+    body = request.get_json(silent=True) or {}
+    record_id = sanitize_text(body.get('record_id', ''))
+    text = str(body.get('text') or '').strip()
+    if not record_id or not text:
+        return jsonify({"success": False, "error": "Missing record_id or text"}), 400
+    if len(text) > 3000:
+        return jsonify({"success": False, "error": "Comment too long (max 3000 chars)"}), 400
+    user, email, uat, token, err = _comments_caller()
+    if err:
+        return err
+    if not uat:
+        return jsonify({"success": False,
+                        "error": "Missing User Access Token -- please log out and back in, then retry."}), 400
+    elements = _build_reply_elements(text, body.get("mentions"))
+    if not elements:
+        return jsonify({"success": False, "error": "Empty comment"}), 400
+    payload = {
+        "file_type": "bitable",
+        "anchor": {
+            "block_id": REQUESTS_TABLE_ID,
+            "base_record_id": record_id,
+            "base_view_id": REQUESTS_DEFAULT_VIEW_ID,
+        },
+        "reply_elements": elements,
+    }
+    try:
+        resp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/drive/v1/files/{BASE_ID}/new_comments",
+            headers={"Authorization": f"Bearer {uat}",
+                     "Content-Type": "application/json; charset=utf-8"},
+            json=payload, timeout=15)
+        data = resp.json()
+    except Exception as e:
+        logger.error("comment_add_failed", record_id=record_id, error=str(e))
+        return jsonify({"success": False, "error": str(e)}), 502
+    if data.get("code") != 0:
+        logger.error("comment_add_rejected", record_id=record_id, code=data.get("code"), msg=data.get("msg"))
+        return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}"}), 400
+    redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)  # next read re-scans so the new comment shows immediately
+    return jsonify({"success": True})
+
+def _resolve_record_numberings(record_ids, token):
+    """record_id -> Numbering (immutable -> cached 7d). Unknown stays absent;
+    the feed UI falls back to the short record id."""
+    nums, missing = {}, []
+    for rid in dict.fromkeys(r for r in record_ids if r):
+        ck = f"xena:recnum:{rid}"
+        try:
+            cached = redis_get_json(ck)
+        except Exception:
+            cached = None
+        if isinstance(cached, dict) and cached.get("numbering"):
+            nums[rid] = cached["numbering"]
+        else:
+            missing.append(rid)
+    for i in range(0, len(missing), 100):
+        chunk = missing[i:i + 100]
+        body = {"record_ids": chunk, "automatic_fields": False,
+                "field_names": ["Numbering"]}
+        try:
+            resp = feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/batch_get",
+                headers={"Authorization": f"Bearer {token}",
+                         "Content-Type": "application/json; charset=utf-8"},
+                json=body, timeout=20)
+            data = resp.json()
+            if data.get("code") != 0 and "field_names" in body:
+                # older tenants may reject field_names on batch_get -- retry full-row
+                body.pop("field_names")
+                resp = feishu_session.post(
+                    f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/batch_get",
+                    headers={"Authorization": f"Bearer {token}",
+                             "Content-Type": "application/json; charset=utf-8"},
+                    json=body, timeout=20)
+                data = resp.json()
+        except Exception:
+            break
+        if data.get("code") != 0:
+            break
+        for rec in ((data.get("data") or {}).get("records") or []):
+            rid = rec.get("record_id")
+            num = (rec.get("fields") or {}).get("Numbering")
+            if isinstance(num, list):  # formula/auto-number shapes
+                num = "".join(str(x.get("text", x)) if isinstance(x, dict) else str(x) for x in num)
+            if rid and num not in (None, ""):
+                nums[rid] = str(num)
+                redis_set_json(f"xena:recnum:{rid}", {"numbering": str(num)}, ttl=COMMENT_RECNUM_TTL)
+    return nums
+
+@app.route('/api/comments/feed', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def comments_feed():
+    """The notifications feed (Ahmed's screenshot): newest comment threads on
+    Grand Table records first, each with the last reply's author/text/images,
+    the ticket's Numbering, and a mentions_me flag for the Mentioned tab.
+    Unread/read state is client-side (localStorage per user) -- this endpoint
+    is a pure read."""
+    my_open_id = sanitize_text(request.args.get('my_open_id', ''))
+    user, email, uat, token, err = _comments_caller()
+    if err:
+        return err
+    scan, scan_err = _fetch_all_comments(token)
+    if scan is None and uat:
+        # expired/insufficient UAT -- reads fall back to the tenant token
+        scan, scan_err = _fetch_all_comments(get_tenant_access_token())
+    if scan is None:
+        status = 502 if "failed" in str(scan_err) else 400
+        return jsonify({"success": False, "error": scan_err}), status
+    items, ids, rec_ids = [], [], []
+    for c in scan["items"]:
+        anchor = _comment_record_anchor(c)
+        if anchor.get("table") != REQUESTS_TABLE_ID or not anchor.get("record"):
+            continue
+        replies = ((c.get("reply_list") or {}).get("replies") or [])
+        if not replies:
+            continue
+        last = replies[-1]
+        parts, plain = _reply_parts(last)
+        mentions_me = False
+        if my_open_id:
+            for r in replies:
+                p_parts, _ = _reply_parts(r)
+                if any(p["type"] == "mention" and p["user_id"] == my_open_id for p in p_parts):
+                    mentions_me = True
+                    break
+        img_count = sum(len(_reply_images(r)) for r in replies)
+        items.append({
+            "comment_id": c.get("comment_id"),
+            "record_id": anchor["record"],
+            "author_id": last.get("user_id"),
+            "time": c.get("update_time") or last.get("create_time"),
+            "text": plain[:180],
+            "image_count": img_count,
+            "reply_count": len(replies),
+            "mentions_me": mentions_me,
+            "is_solved": bool(c.get("is_solved")),
+        })
+        ids.append(last.get("user_id"))
+        ids.append(c.get("user_id"))
+        rec_ids.append(anchor["record"])
+    items.sort(key=lambda x: x.get("time") or 0, reverse=True)
+    items = items[:COMMENTS_FEED_MAX]
+    nums = _resolve_record_numberings([it["record_id"] for it in items], token)
+    names = _resolve_comment_names(ids, token)
+    for it in items:
+        it["numbering"] = nums.get(it["record_id"])
+        it["author"] = names.get(it["author_id"], it["author_id"])
+    return jsonify({"success": True, "items": items, "count": len(items),
+                    "truncated": bool(scan.get("truncated"))})
+
+@app.route('/api/comments/media/<file_token>', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def proxy_comment_media(file_token):
+    """Streams an image attached to a comment (image_list token). TAT first
+    (the app collaborates on the base), the caller's UAT as fallback -- same
+    pattern as /api/attachments/<file_token> minus the bitable-cell extra."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("modules") and not perms.get("is_super_admin"):
+        return jsonify({"error": "Access denied"}), 403
+    url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
+    for token in [get_tenant_access_token(), sanitize_text(request.args.get('uat', ''))]:
+        if not token:
+            continue
+        try:
+            resp = feishu_session.get(url, headers={"Authorization": f"Bearer {token}"},
+                                      timeout=20, stream=True)
+        except Exception as e:
+            logger.error("comment_media_failed", file_token=file_token, error=str(e))
+            continue
+        if resp.status_code == 200:
+            response = Response(resp.content,
+                                content_type=resp.headers.get("Content-Type", "application/octet-stream"))
+            response.headers["Cache-Control"] = "private, max-age=86400, immutable"
+            return response
+        logger.error("comment_media_rejected", file_token=file_token, status=resp.status_code, body=resp.text[:200])
+    return jsonify({"error": "Could not fetch comment image"}), 502
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
