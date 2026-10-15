@@ -7263,6 +7263,16 @@ COMMENTS_SCAN_TTL        = 30      # seconds; one base-wide scan shared by threa
 COMMENTS_SCAN_MAX_PAGES  = 30      # hard cap: 30 x 100 = 3000 comment threads
 COMMENTS_FEED_MAX        = 100
 COMMENT_NAME_TTL         = 86400   # open_id -> display name, 24h
+# Phase 11.3: team-directory warm for comment/avatar resolution. The Access
+# Control table lists every portal member's login EMAIL; Feishu's "Search
+# users" API (contact:user:search — the scope this app HAS, UAT-only) turns
+# an email into open_id + name + avatar. This is the sheet-parity trick with
+# ZERO extra permissions: any teammate's open_id (comment author, @mention,
+# reaction user, respondent) resolves to their real name + photo.
+DIR_MEMBERS_KEY          = "xena:dir:members"   # cached access-table email list
+DIR_MEMBERS_TTL          = 21600     # 6h
+DIR_EMAIL_TTL            = 7 * 86400  # email -> open_id mapping is stable
+DIR_SEARCH_BUDGET        = 12        # max live user-searches per resolve call
 COMMENT_RECNUM_TTL       = 7 * 86400  # record_id -> Numbering is immutable, 7d
 
 def _comment_record_anchor(comment):
@@ -7373,6 +7383,14 @@ def _harvest_person_names(obj):
                     if not has_name or (av and not has_av):
                         redis_set_json(ck, {"name": nm.strip(), "avatar": (has_av or av or "")},
                                        ttl=COMMENT_NAME_TTL)
+                    # Phase 11.3: email -> open_id bridge (person dicts carry
+                    # email) so the directory warm can skip a live user-search
+                    # for anyone already seen in a person cell.
+                    em = (obj.get("email") or "").strip().lower()
+                    if em:
+                        ek = f"xena:uemail:{em}"
+                        if not redis_get_json(ek):
+                            redis_set_json(ek, oid, ttl=30 * 86400)
                 except Exception:
                     pass
             for v in obj.values():
@@ -7382,6 +7400,106 @@ def _harvest_person_names(obj):
                 _harvest_person_names(v)
     except Exception:
         pass
+
+def _directory_resolve_masked(masked, uat, found):
+    """Resolve still-masked open_ids (name == "user-xxxx") via the team
+    directory: the Access Control table holds every portal member's login
+    EMAIL, and Feishu's "Search users" API (contact:user:search — the scope
+    this app DOES have; UAT-only) maps an email to open_id + name + avatar.
+    This is how the portal matches the Base UI's names/photos with ZERO
+    extra permissions — verified live 2026-10-16 (query by email returns the
+    exact member). Costs: 1 access-table read per 6h (Redis-cached), plus at
+    most DIR_SEARCH_BUDGET live searches per call, each result cached 7d —
+    so after the first warm a whole day of comment reads does ~zero
+    searches. Entries resolved here land in the same xena:uname cache the
+    harvest writes, so every resolver consumer (comments thread, feed,
+    reactions, users/lookup, presence board) benefits at once."""
+    if not masked or not uat:
+        return
+    try:
+        members = redis_get_json(DIR_MEMBERS_KEY)
+    except Exception:
+        members = None
+    if not isinstance(members, list):
+        members = []
+        try:
+            resp = feishu_session.get(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records",
+                headers={"Authorization": f"Bearer {get_tenant_access_token()}"},
+                params={"page_size": 500}, timeout=15)
+            data = resp.json()
+            if data.get("code") == 0:
+                for it in ((data.get("data") or {}).get("items") or []):
+                    em = extract_field_text((it.get("fields") or {}).get("Email", "")).strip().lower()
+                    if em:
+                        members.append(em)
+        except Exception:
+            members = []
+        try:
+            redis_set_json(DIR_MEMBERS_KEY, members, ttl=DIR_MEMBERS_TTL)
+        except Exception:
+            pass
+    if not members:
+        return
+    still = set(masked)
+    searches = 0
+    for em in members:
+        if not still:
+            break
+        mk = f"xena:dirmail:{em}"
+        try:
+            m = redis_get_json(mk)
+        except Exception:
+            m = None
+        if m is None:
+            # Free bridge first: a person-field harvest may already have
+            # mapped this email to an open_id (roster / ticket person cells).
+            m = None
+            try:
+                bridged = redis_get_json(f"xena:uemail:{em}")
+            except Exception:
+                bridged = None
+            if isinstance(bridged, str) and bridged.startswith("ou_"):
+                cached = redis_get_json(f"xena:uname:{bridged}") or {}
+                m = {"open_id": bridged, "name": (cached.get("name") or ""),
+                     "avatar": (cached.get("avatar") or "")}
+            elif searches < DIR_SEARCH_BUDGET:
+                searches += 1
+                try:
+                    resp = http_requests.get(
+                        "https://open.feishu.cn/open-apis/search/v1/user",
+                        headers={"Authorization": f"Bearer {uat}"},
+                        params={"query": em, "page_size": 5}, timeout=8)
+                    sdata = resp.json()
+                except Exception:
+                    continue
+                if sdata.get("code") != 0:
+                    break  # UAT expired / scope gone -- further searches pointless
+                users = (sdata.get("data") or {}).get("users") or []
+                if users:
+                    u0 = users[0]
+                    m = {"open_id": u0.get("open_id") or "",
+                         "name": u0.get("name") or "",
+                         "avatar": (u0.get("avatar") or {}).get("avatar_72") or ""}
+                else:
+                    m = {"open_id": ""}  # negative-cache: no such member
+            else:
+                break  # search budget spent -- leave the rest masked
+            try:
+                redis_set_json(mk, m or {"open_id": ""}, ttl=DIR_EMAIL_TTL)
+            except Exception:
+                pass
+            if m and m.get("open_id") and m.get("name"):
+                try:
+                    redis_set_json(f"xena:uname:{m['open_id']}",
+                                   {"name": m["name"], "avatar": m.get("avatar") or ""},
+                                   ttl=COMMENT_NAME_TTL)
+                except Exception:
+                    pass
+        oid = (m or {}).get("open_id") or ""
+        if oid and oid in still and (m.get("name") or ""):
+            found[oid] = {"name": m["name"], "avatar": m.get("avatar") or ""}
+            still.discard(oid)
 
 def _resolve_comment_names(user_ids, token, uat=None):
     """open_id -> {"name", "avatar"} -- real Lark display names AND profile
@@ -7442,6 +7560,15 @@ def _resolve_comment_names(user_ids, token, uat=None):
     for uid in missing:
         if uid not in found:
             found[uid] = {"name": ("user-" + uid[-4:] if len(uid) >= 4 else uid), "avatar": ""}
+    # Phase 11.3: anyone still masked gets one shot through the team
+    # directory (access-table emails -> search/v1/user) — the scope-free way
+    # to match the Base UI's names/photos for EVERY teammate.
+    masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
+    if masked_now and uat:
+        try:
+            _directory_resolve_masked(masked_now, uat, found)
+        except Exception:
+            pass
     # Avatar backfill via Feishu's "Search users" API (contact:user:search --
     # the scope this app DOES have). Only for entries that already have a real
     # name (harvested from person fields / cached) but no photo yet; the hit
