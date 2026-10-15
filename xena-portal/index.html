@@ -6003,7 +6003,14 @@ function twPchipAv(u) {
 }
 function twHydrateAvatars(root) {
     const scope = (root && root.querySelectorAll) ? root : document;
-    const els = [...scope.querySelectorAll('[data-uid]:not([data-av-done])')].filter(el => el.dataset.uid);
+    // Phase 11.5: skip chips that ALREADY render a photo (twPchipAv put the
+    // <img> there at render time) — they were still joining the /api/users/lookup
+    // batch on every ticket open for zero visual effect.
+    const els = [...scope.querySelectorAll('[data-uid]:not([data-av-done])')].filter(el => {
+        if (!el.dataset.uid) return false;
+        const slot = el.querySelector('.tw-pchip-av') || el.querySelector('[data-av-slot]');
+        return !(slot && slot.querySelector('img'));
+    });
     if (!els.length) return;
     els.forEach(el => { el.dataset.avDone = '1'; });
     const applyAll = () => {
@@ -7700,6 +7707,11 @@ async function apFetchBoard(manual) {
             user: loggedUser || '', email: loggedEmail || '',
             open_id: localStorage.getItem('xenaOpenId') || '', uat: loggedUat || ''
         });
+        // Phase 11.5: a manual fetch (refresh button / right after a status
+        // change) must bypass the 10s server cache — Vercel's other instances
+        // may still hold the pre-change board ("updated in the sheet but not
+        // on the website").
+        if (manual) qs.set('fresh', '1');
         const r = await fetch('/api/presence/board?' + qs);
         const d = await r.json();
         if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
@@ -7783,7 +7795,7 @@ async function apSetStatus(status, target) {
         if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
         if (d.unchanged) ToastManager.show(`Already ${status} — nothing to change.`, 'warning', 3500);
         else ToastManager.show(`${d.agent && d.agent.name ? d.agent.name + ': ' : ''}${d.previous || '—'} → ${status} ✅ reflected on the Agent Roster`, 'success', 5000);
-        await apFetchBoard(); // backend invalidated the cache — this is fresh
+        await apFetchBoard(true); // bypass the 10s cache — other Vercel instances may still hold the old board
     } catch (e) {
         ToastManager.show('⚠️ ' + e.message, 'error', 9000);
     } finally {
@@ -18719,7 +18731,12 @@ function twcOnTicketFilled(recordId) {
         window.__twcAutoExpand = null;
         twcSetOpen(true);
     }
-    twcLoad(false); // eager load (collapsed) so the count badge is right
+    // Phase 11.5 (Ahmed: "need it only work when i open it"): NO eager load on
+    // ticket open — comments fetch ONLY when the panel is expanded (twcSetOpen,
+    // incl. the deep-link auto-expand above). Just re-render the badge from
+    // current state (already reset above when the ticket changed; preserved
+    // when the same ticket refills with a loaded thread).
+    twcRenderCount();
 }
 
 function twcSetOpen(open) {
