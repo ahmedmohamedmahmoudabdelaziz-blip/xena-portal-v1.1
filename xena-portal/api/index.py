@@ -7358,14 +7358,20 @@ def _harvest_person_names(obj):
     try:
         if isinstance(obj, dict):
             oid, nm = obj.get("id"), obj.get("name")
+            av = obj.get("avatar_url") or ""   # Phase 11.2: Bitable person
+            # dicts carry avatar_url (+email/en_name) — verified live on the
+            # Agent Roster. Cache it too so comment author / respondent /
+            # presence-board photos resolve with ZERO contact scopes.
             if isinstance(oid, str) and oid.startswith("ou_") and isinstance(nm, str) and nm.strip():
                 try:
                     ck = f"xena:uname:{oid}"
                     cached = redis_get_json(ck)
-                    has_full = isinstance(cached, dict) and cached.get("name") and cached.get("avatar")
-                    if not has_full:
-                        redis_set_json(ck, {"name": nm.strip(),
-                                            "avatar": (cached.get("avatar", "") if isinstance(cached, dict) else "")},
+                    has_name = isinstance(cached, dict) and cached.get("name")
+                    has_av = isinstance(cached, dict) and (cached.get("avatar") or "")
+                    # Write only when it adds something: first sighting, or an
+                    # avatar upgrade. Never downgrade a cached avatar to "".
+                    if not has_name or (av and not has_av):
+                        redis_set_json(ck, {"name": nm.strip(), "avatar": (has_av or av or "")},
                                        ttl=COMMENT_NAME_TTL)
                 except Exception:
                     pass
@@ -7943,7 +7949,17 @@ def _presence_fetch_roster(tat):
     data = resp.json()
     if data.get("code") != 0:
         raise RuntimeError(data.get("msg") or "Agent Roster read failed")
-    return (data.get("data") or {}).get("items") or []
+    items = (data.get("data") or {}).get("items") or []
+    # Phase 11.2: the roster's "Agent Name" person dicts carry name +
+    # avatar_url for EVERY agent — harvest them into the name/avatar cache
+    # so the presence board and the comment resolver get real photos for
+    # the whole team for free (no contact scope needed).
+    for _it in items:
+        try:
+            _harvest_person_names(_it.get("fields") or {})
+        except Exception:
+            pass
+    return items
 
 def _presence_row_identity(item):
     """record (Agent Roster) -> (record_id, open_id, name) from the Agent
@@ -8100,15 +8116,25 @@ def presence_set():
         return jsonify({"success": True, "unchanged": True, "status": new_status, "previous": old_status,
                         "agent": {"record_id": rid, "name": nm, "open_id": oid}})
     now_ms = cairo_epoch_ms(cairo_now())
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ROSTER_TABLE_ID}/records/batch_update"
-    payload = {"records": [{"record_id": rid, "fields": {
-        "Current Status": new_status,
+    # Phase 11.2: the OLD bitable v1 batch_update (PUT .../bitable/v1/...
+    # /records/batch_update) is BROKEN on this tenant — verified live
+    # 2026-10-16: it answers 99992402 "field validation failed" for ANY
+    # field on ANY table (a same-value no-op write fails identically),
+    # while single-record PUT and the v3 API both succeed. The v3 Base API
+    # (POST /open-apis/base/v3/.../records/batch_update, update_records map)
+    # works AND still fires the native workflows as "openAPIBatchUpdate"
+    # (verified live: a v3 status flip opened a Time Logs segment via
+    # Auto-Log wkfCXTVstBdVo63z within seconds). v3 CellValue shapes:
+    # select = ["Option"] array, datetime = epoch-ms integer.
+    url = f"https://open.feishu.cn/open-apis/base/v3/bases/{BASE_ID}/tables/{ROSTER_TABLE_ID}/records/batch_update"
+    payload = {"update_records": {rid: {
+        "Current Status": [new_status],
         "Status Change Time": now_ms,
-        "Memory": old_status or new_status}}]}
+        "Memory": [old_status or new_status]}}}
     try:
-        resp = feishu_session.put(url, headers={"Authorization": f"Bearer {get_tenant_access_token()}",
-                                                "Content-Type": "application/json"},
-                                  json=payload, timeout=15)
+        resp = feishu_session.post(url, headers={"Authorization": f"Bearer {get_tenant_access_token()}",
+                                                 "Content-Type": "application/json"},
+                                   json=payload, timeout=15)
         data = resp.json()
     except Exception as e:
         return jsonify({"success": False, "error": f"Status write failed: {e}"}), 502
