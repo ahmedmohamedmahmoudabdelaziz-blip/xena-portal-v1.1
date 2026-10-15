@@ -7611,13 +7611,17 @@ def _resolve_comment_names(user_ids, token, uat=None):
         else:
             missing.append(uid)
     # Candidate tokens in priority order, de-duplicated, Nones dropped.
+    # Phase 11.6: the caller's UAT is a FIRST-CLASS candidate here — it was
+    # missing before, so a data-restricted/scope-dead TAT ended the batch leg
+    # even when the UAT could see every user. The fall-through below now has
+    # something real to fall through TO.
     tokens = []
-    for t in (get_tenant_access_token(), token):
+    for t in (get_tenant_access_token(), token, uat):
         if t and t not in tokens:
             tokens.append(t)
     for i in range(0, len(missing), 50):
         chunk = missing[i:i + 50]
-        chunk_done = False
+        chunk_resolved = 0
         for tk in tokens:
             try:
                 params = [("user_ids", u) for u in chunk]
@@ -7633,13 +7637,19 @@ def _resolve_comment_names(user_ids, token, uat=None):
             for u in ((data.get("data") or {}).get("items") or []):
                 oid, nm = u.get("open_id"), u.get("name")
                 av = (u.get("avatar") or {}).get("avatar_72") or ""
-                if oid and nm:
+                if oid and nm and oid not in found:
                     found[oid] = {"name": nm, "avatar": av}
                     redis_set_json(f"xena:uname:{oid}", {"name": nm, "avatar": av}, ttl=COMMENT_NAME_TTL)
-            chunk_done = True
-            break
-        if not chunk_done:
-            break  # every token failed -- masked fallback below
+                    chunk_resolved += 1
+            # Phase 11.6 (Ahmed's scope-check: TAT returned code:0 but ZERO
+            # users — the app's 通讯录授权范围 hides those employees): a code:0
+            # with an empty/partial items list is NOT an answer. Only stop
+            # trying tokens once THIS chunk is fully resolved; otherwise fall
+            # through to the UAT, which sees everyone the caller can see.
+            if chunk_resolved >= len(chunk):
+                break
+        # all tokens tried (or chunk resolved) -- whatever is still missing
+        # falls through to the masked seed + directory/single-GET legs below
     for uid in missing:
         if uid not in found:
             found[uid] = {"name": ("user-" + uid[-4:] if len(uid) >= 4 else uid), "avatar": ""}
@@ -7688,7 +7698,11 @@ def _resolve_comment_names(user_ids, token, uat=None):
                 u = (data.get("data") or {}).get("user") or {}
                 nm = u.get("name") or ""
                 if not nm:
-                    break  # user genuinely gone (departed) — no point trying next token
+                    # Phase 11.6: code:0 with an EMPTY user object usually means
+                    # the app's 通讯录授权范围 hides this employee from the TENANT
+                    # token — not that the user is gone. Try the next token (the
+                    # UAT sees everyone the caller can see) before giving up.
+                    continue
                 av = (u.get("avatar") or {}).get("avatar_72") or ""
                 found[uid] = {"name": nm, "avatar": av}
                 resolved_ct += 1
@@ -8212,20 +8226,24 @@ def admin_scope_check():
         return jsonify({"success": False, "error": "No roster agent with an open_id to probe."}), 500
 
     def _probe_batch(tk):
+        # Phase 11.6: the batch endpoint is GET with repeated user_ids params —
+        # the earlier POST shape is what produced the "Extra data" JSON-parse
+        # ghost error Ahmed saw in his first scope-check output.
         try:
-            resp = feishu_session.post(
+            resp = feishu_session.get(
                 "https://open.feishu.cn/open-apis/contact/v3/users/batch",
-                headers={"Authorization": f"Bearer {tk}", "Content-Type": "application/json; charset=utf-8"},
-                params={"user_id_type": "open_id"}, json={"user_ids": [probe_oid]}, timeout=10)
+                headers={"Authorization": f"Bearer {tk}"},
+                params=[("user_ids", probe_oid), ("user_id_type", "open_id")], timeout=10)
             data = resp.json()
         except Exception as e:
             return {"ok": False, "err": f"request failed: {e}"}
         if data.get("code") != 0:
             return {"ok": False, "err": f"code {data.get('code')}: {data.get('msg', '')}"}
-        ul = ((data.get("data") or {}).get("user_list")) or []
-        if not ul:
-            return {"ok": True, "err": "200 but empty user_list", "name": "", "avatar": False}
-        u = ul[0]
+        items = ((data.get("data") or {}).get("items")) or []
+        if not items:
+            return {"ok": True, "err": "code 0 but EMPTY — user outside the app's contact visibility (通讯录授权范围)",
+                    "name": "", "avatar": False}
+        u = items[0]
         return {"ok": True, "err": "", "name": u.get("name", ""),
                 "avatar": bool((u.get("avatar") or {}).get("avatar_72"))}
 
@@ -8241,6 +8259,9 @@ def admin_scope_check():
         if data.get("code") != 0:
             return {"ok": False, "err": f"code {data.get('code')}: {data.get('msg', '')}"}
         u = (data.get("data") or {}).get("user") or {}
+        if not (u.get("name") or ""):
+            return {"ok": True, "err": "code 0 but EMPTY — user outside the app's contact visibility (通讯录授权范围)",
+                    "name": "", "avatar": False}
         return {"ok": True, "err": "", "name": u.get("name", ""),
                 "avatar": bool((u.get("avatar") or {}).get("avatar_72"))}
 
@@ -8251,13 +8272,25 @@ def admin_scope_check():
         "uat_single": (_probe_single(uat) if uat else {"ok": False, "err": "no login token on this request"}),
     }
     any_ok = any(l.get("ok") and l.get("name") for l in legs.values())
+    # Phase 11.6: a leg that answers code 0 with an EMPTY user is NOT a scope
+    # problem — the scope is live, the app's 通讯录授权范围 (developer console →
+    # 安全设置/通讯录授权范围) hides that employee. Widening it to 全部员工 makes
+    # the TAT legs resolve everyone with zero re-logins.
+    empty_ok = any(l.get("ok") and not l.get("name") and "EMPTY" in l.get("err", "")
+                   for l in legs.values())
+    if any_ok:
+        hint = "Contact legs are live — comment names/photos resolve for everyone."
+    elif empty_ok:
+        hint = ("The scope IS live (code 0) but the app cannot SEE this user — widen the app's "
+                "contact visibility (开发者后台 → 安全设置/通讯录授权范围 → 全部员工), publish, then "
+                "delete xena:tenant_access_token in Upstash. Meanwhile UAT legs carry the load "
+                "after each member logs out/in once.")
+    else:
+        hint = ("All contact legs rejected: the scope exists in the console but is NOT on the "
+                "tokens yet — every member must log out and back in once (UAT legs), and the "
+                "tenant scope must be 已开通 as 应用身份 for the TAT legs.")
     return jsonify({"success": True, "probe": {"open_id": probe_oid, "roster_name": probe_nm},
-                    "legs": legs, "resolver_can_resolve": any_ok,
-                    "hint": ("Contact legs are live — comment names/photos resolve for everyone."
-                             if any_ok else
-                             "All contact legs rejected: the scope exists in the console but is NOT on the "
-                             "tokens yet — every member must log out and back in once (UAT legs), and the "
-                             "tenant scope must be 已开通 as 应用身份 for the TAT legs.")})
+                    "legs": legs, "resolver_can_resolve": any_ok, "hint": hint})
 
 # ════════════════════════════════════════════════════════════════════
 # Phase 11 (Ahmed): AGENT PRESENCE SYSTEM — "Audition Status Management"
