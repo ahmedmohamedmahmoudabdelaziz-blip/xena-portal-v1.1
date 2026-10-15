@@ -7262,7 +7262,10 @@ COMMENTS_SCAN_CACHE_KEY  = "xena:comments:scan:v1"
 COMMENTS_SCAN_TTL        = 30      # seconds; one base-wide scan shared by thread + feed
 COMMENTS_SCAN_MAX_PAGES  = 30      # hard cap: 30 x 100 = 3000 comment threads
 COMMENTS_FEED_MAX        = 100
-COMMENT_NAME_TTL         = 86400   # open_id -> display name, 24h
+COMMENT_NAME_TTL         = 3600    # open_id -> display name from LIVE lookups, 1h
+                                   # (Phase 11.4, Ahmed: "not cached" — masked ids are
+                                   # never cached at all and retry live on every view;
+                                   # resolved names/photos refresh within the hour)
 # Phase 11.3: team-directory warm for comment/avatar resolution. The Access
 # Control table lists every portal member's login EMAIL; Feishu's "Search
 # users" API (contact:user:search — the scope this app HAS, UAT-only) turns
@@ -7270,9 +7273,17 @@ COMMENT_NAME_TTL         = 86400   # open_id -> display name, 24h
 # ZERO extra permissions: any teammate's open_id (comment author, @mention,
 # reaction user, respondent) resolves to their real name + photo.
 DIR_MEMBERS_KEY          = "xena:dir:members"   # cached access-table email list
-DIR_MEMBERS_TTL          = 21600     # 6h
-DIR_EMAIL_TTL            = 7 * 86400  # email -> open_id mapping is stable
+DIR_MEMBERS_TTL          = 1800      # 30 min (Phase 11.4: was 6h — new members appear fast)
+DIR_EMAIL_TTL            = 7 * 86400  # email -> open_id mapping is immutable, 7d
+DIR_NEG_TTL              = 3600      # negative email-lookup cache, 1h — failed lookups retry soon
 DIR_SEARCH_BUDGET        = 12        # max live user-searches per resolve call
+HARVEST_NAME_TTL         = 86400     # sheet-sourced person names (person fields / sweep), 24h
+# Phase 11.4: incremental full-table person sweep — the scope-free way to
+# resolve ANY teammate who ever touched a ticket, not just portal members.
+SWEEP_KEY                = "xena:dir:sweep"   # {"page_token","done","done_ts","run_ts"}
+SWEEP_PAGES_PER_RUN      = 3        # 3 x 500 records per run — bounded request-time cost
+SWEEP_THROTTLE           = 30       # seconds between runs (first full pass ~6 min)
+SWEEP_REARM_TTL          = 86400    # after a completed pass, wait 24h before re-sweeping
 COMMENT_RECNUM_TTL       = 7 * 86400  # record_id -> Numbering is immutable, 7d
 
 def _comment_record_anchor(comment):
@@ -7382,7 +7393,7 @@ def _harvest_person_names(obj):
                     # avatar upgrade. Never downgrade a cached avatar to "".
                     if not has_name or (av and not has_av):
                         redis_set_json(ck, {"name": nm.strip(), "avatar": (has_av or av or "")},
-                                       ttl=COMMENT_NAME_TTL)
+                                       ttl=HARVEST_NAME_TTL)
                     # Phase 11.3: email -> open_id bridge (person dicts carry
                     # email) so the directory warm can skip a live user-search
                     # for anyone already seen in a person cell.
@@ -7486,7 +7497,11 @@ def _directory_resolve_masked(masked, uat, found):
             else:
                 break  # search budget spent -- leave the rest masked
             try:
-                redis_set_json(mk, m or {"open_id": ""}, ttl=DIR_EMAIL_TTL)
+                # Positive mappings are immutable (7d); negative results use the
+                # short DIR_NEG_TTL so a failed lookup retries within the hour
+                # instead of sticking for a week (Phase 11.4).
+                redis_set_json(mk, m or {"open_id": ""},
+                               ttl=(DIR_EMAIL_TTL if (m or {}).get("open_id") else DIR_NEG_TTL))
             except Exception:
                 pass
             if m and m.get("open_id") and m.get("name"):
@@ -7501,9 +7516,77 @@ def _directory_resolve_masked(masked, uat, found):
             found[oid] = {"name": m["name"], "avatar": m.get("avatar") or ""}
             still.discard(oid)
 
+def _sweep_step(token):
+    """One incremental slice of the full-table person sweep (Phase 11.4 —
+    Ahmed: "i want it work for all people"). The Grand Table's own records
+    are the widest directory this app can read with its APPROVED scopes:
+    every person field (Assigned Member / Done by / Respondents / ...) plus
+    the created_by / last_modified_by envelopes carries the real display
+    name (+photo) of anyone who ever touched a ticket — and people who
+    comment on tickets are exactly the people who work them. A full pass
+    walks the whole table SWEEP_PAGES_PER_RUN pages at a time (cursor in
+    Redis), so no single request pays more than a couple of seconds; once a
+    pass completes it re-arms after SWEEP_REARM_TTL. Runs on the tenant
+    token — no UAT needed. Returns True if this call actually swept pages."""
+    now = time.time()
+    try:
+        st = redis_get_json(SWEEP_KEY)
+    except Exception:
+        st = None
+    if not isinstance(st, dict):
+        st = {}
+    if st.get("done") and (now - float(st.get("done_ts") or 0)) < SWEEP_REARM_TTL:
+        return False
+    if (now - float(st.get("run_ts") or 0)) < SWEEP_THROTTLE:
+        return False
+    st["run_ts"] = now
+    if st.get("done"):
+        st, page_token = {"run_ts": now}, None   # re-armed: fresh pass
+    else:
+        page_token = st.get("page_token") or None
+    try:
+        redis_set_json(SWEEP_KEY, st, ttl=SWEEP_REARM_TTL + 3600)
+    except Exception:
+        pass
+    tat = get_tenant_access_token() or token
+    if not tat:
+        return False
+    pages = 0
+    try:
+        while pages < SWEEP_PAGES_PER_RUN:
+            body = {"page_size": 500}
+            if page_token:
+                body["page_token"] = page_token
+            resp = feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true",
+                headers={"Authorization": f"Bearer {tat}"}, json=body, timeout=20)
+            data = resp.json()
+            if data.get("code") != 0:
+                break
+            d = data.get("data") or {}
+            for it in (d.get("items") or []):
+                _harvest_person_names(it)  # whole item: fields + created_by/last_modified_by
+            pages += 1
+            if not d.get("has_more") or not d.get("page_token"):
+                st = {"run_ts": st.get("run_ts"), "done": True, "done_ts": time.time()}
+                page_token = None
+                break
+            page_token = d.get("page_token")
+        if page_token:
+            st = {"run_ts": st.get("run_ts"), "done": False, "page_token": page_token}
+        try:
+            redis_set_json(SWEEP_KEY, st, ttl=SWEEP_REARM_TTL + 3600)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return pages > 0
+
 def _resolve_comment_names(user_ids, token, uat=None):
     """open_id -> {"name", "avatar"} -- real Lark display names AND profile
-    photos, Redis-cached 24h. Resolution chain per chunk: TENANT token first
+    photos. Caching (Phase 11.4): live lookups cached 1h, sheet-harvested
+    names 24h, masked ids NEVER cached (they retry on every call).
+    Resolution chain per chunk: TENANT token first
     (the app's own contact scope -- the caller's UAT usually lacks it, which
     is why comment authors used to fall back to masked "user-xxxx"), then the
     caller's UAT, then a masked short id so the UI never prints a raw open_id.
@@ -7567,6 +7650,73 @@ def _resolve_comment_names(user_ids, token, uat=None):
     if masked_now and uat:
         try:
             _directory_resolve_masked(masked_now, uat, found)
+        except Exception:
+            pass
+    # Phase 11.5: single-user contact GET — the app now HAS
+    # contact:user.base:readonly as a USER scope (verified in the developer
+    # console, Ahmed's video 2026-10-16) and contact:contact.base:readonly as
+    # a TENANT scope. The batch leg above needs its own scope combo, so this
+    # per-id GET is the second live leg: try the tenant token first (zero
+    # UAT dependency), then the caller's UAT (carries the user scope after a
+    # fresh login). Universal: resolves ANY open_id — portal member or not.
+    # Budgeted; a scope rejection on either token stops that token's leg
+    # immediately (no per-id waste).
+    masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
+    if masked_now:
+        contact_tokens = []
+        for t in (get_tenant_access_token(), uat):
+            if t and t not in contact_tokens:
+                contact_tokens.append(t)
+        dead, resolved_ct = set(), 0
+        for uid in list(masked_now):
+            if resolved_ct >= 8:
+                break
+            for tk in contact_tokens:
+                if tk in dead:
+                    continue
+                try:
+                    resp = feishu_session.get(
+                        f"https://open.feishu.cn/open-apis/contact/v3/users/{uid}",
+                        headers={"Authorization": f"Bearer {tk}"},
+                        params={"user_id_type": "open_id"}, timeout=8)
+                    data = resp.json()
+                except Exception:
+                    continue
+                if data.get("code") != 0:
+                    dead.add(tk)  # scope missing on this token — stop its leg
+                    continue
+                u = (data.get("data") or {}).get("user") or {}
+                nm = u.get("name") or ""
+                if not nm:
+                    break  # user genuinely gone (departed) — no point trying next token
+                av = (u.get("avatar") or {}).get("avatar_72") or ""
+                found[uid] = {"name": nm, "avatar": av}
+                resolved_ct += 1
+                try:
+                    redis_set_json(f"xena:uname:{uid}", {"name": nm, "avatar": av},
+                                   ttl=COMMENT_NAME_TTL)
+                    em = (u.get("email") or u.get("enterprise_email") or "").strip().lower()
+                    if em and not redis_get_json(f"xena:uemail:{em}"):
+                        redis_set_json(f"xena:uemail:{em}", uid, ttl=30 * 86400)
+                except Exception:
+                    pass
+                break
+    # Phase 11.4: still masked after the member directory? Sweep the Grand
+    # Table itself (incremental, throttled) — anyone who ever touched a
+    # ticket gets harvested straight from the sheet's own data, so coverage
+    # extends to the WHOLE team, not just portal members. Masked ids are
+    # never written to any cache: every comment load retries them live.
+    masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
+    if masked_now:
+        try:
+            if _sweep_step(token):
+                for uid in masked_now:
+                    try:
+                        cached = redis_get_json(f"xena:uname:{uid}")
+                    except Exception:
+                        cached = None
+                    if isinstance(cached, dict) and cached.get("name"):
+                        found[uid] = {"name": cached["name"], "avatar": cached.get("avatar") or ""}
         except Exception:
             pass
     # Avatar backfill via Feishu's "Search users" API (contact:user:search --
@@ -8028,6 +8178,87 @@ def users_lookup():
                     "users": {uid: {"name": p.get("name", ""), "avatar_url": p.get("avatar", "")}
                               for uid, p in people.items()}})
 
+@app.route('/api/admin/scope-check', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def admin_scope_check():
+    """Phase 11.5 (Ahmed: "i already has contact permissions so check if they
+    will help you in the comments thing"): LIVE probe of every contact-permission
+    leg the comment resolver can use, against one real open_id from the Agent
+    Roster. Four legs are tested and reported individually:
+      TAT batch   POST contact/v3/users/batch            (needs contact:contact.base:readonly as 应用身份)
+      TAT single  GET  contact/v3/users/{open_id}        (same, tenant identity)
+      UAT batch   POST contact/v3/users/batch as caller  (needs contact:user.base:readonly granted at LOGIN time)
+      UAT single  GET  contact/v3/users/{open_id}        (same, user identity)
+    The UAT legs only pass after the user has logged out + back in once, because
+    a login token carries only the scopes that existed when it was issued."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    uat   = sanitize_text(request.args.get('uat', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and "admin" not in perms.get("modules", []):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+    tat = get_tenant_access_token()
+    try:
+        items = _presence_fetch_roster(tat)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
+    probe_oid, probe_nm = "", ""
+    for it in items:
+        _, oid, nm = _presence_row_identity(it)
+        if oid:
+            probe_oid, probe_nm = oid, nm
+            break
+    if not probe_oid:
+        return jsonify({"success": False, "error": "No roster agent with an open_id to probe."}), 500
+
+    def _probe_batch(tk):
+        try:
+            resp = feishu_session.post(
+                "https://open.feishu.cn/open-apis/contact/v3/users/batch",
+                headers={"Authorization": f"Bearer {tk}", "Content-Type": "application/json; charset=utf-8"},
+                params={"user_id_type": "open_id"}, json={"user_ids": [probe_oid]}, timeout=10)
+            data = resp.json()
+        except Exception as e:
+            return {"ok": False, "err": f"request failed: {e}"}
+        if data.get("code") != 0:
+            return {"ok": False, "err": f"code {data.get('code')}: {data.get('msg', '')}"}
+        ul = ((data.get("data") or {}).get("user_list")) or []
+        if not ul:
+            return {"ok": True, "err": "200 but empty user_list", "name": "", "avatar": False}
+        u = ul[0]
+        return {"ok": True, "err": "", "name": u.get("name", ""),
+                "avatar": bool((u.get("avatar") or {}).get("avatar_72"))}
+
+    def _probe_single(tk):
+        try:
+            resp = feishu_session.get(
+                f"https://open.feishu.cn/open-apis/contact/v3/users/{probe_oid}",
+                headers={"Authorization": f"Bearer {tk}"},
+                params={"user_id_type": "open_id"}, timeout=10)
+            data = resp.json()
+        except Exception as e:
+            return {"ok": False, "err": f"request failed: {e}"}
+        if data.get("code") != 0:
+            return {"ok": False, "err": f"code {data.get('code')}: {data.get('msg', '')}"}
+        u = (data.get("data") or {}).get("user") or {}
+        return {"ok": True, "err": "", "name": u.get("name", ""),
+                "avatar": bool((u.get("avatar") or {}).get("avatar_72"))}
+
+    legs = {
+        "tat_batch":  _probe_batch(tat),
+        "tat_single": _probe_single(tat),
+        "uat_batch":  (_probe_batch(uat) if uat else {"ok": False, "err": "no login token on this request"}),
+        "uat_single": (_probe_single(uat) if uat else {"ok": False, "err": "no login token on this request"}),
+    }
+    any_ok = any(l.get("ok") and l.get("name") for l in legs.values())
+    return jsonify({"success": True, "probe": {"open_id": probe_oid, "roster_name": probe_nm},
+                    "legs": legs, "resolver_can_resolve": any_ok,
+                    "hint": ("Contact legs are live — comment names/photos resolve for everyone."
+                             if any_ok else
+                             "All contact legs rejected: the scope exists in the console but is NOT on the "
+                             "tokens yet — every member must log out and back in once (UAT legs), and the "
+                             "tenant scope must be 已开通 as 应用身份 for the TAT legs.")})
+
 # ════════════════════════════════════════════════════════════════════
 # Phase 11 (Ahmed): AGENT PRESENCE SYSTEM — "Audition Status Management"
 # "the audition member to be able to change the status from online and
@@ -8166,10 +8397,16 @@ def presence_board():
         now_ms = int(time.time() * 1000)
         return jsonify({"success": True, "server_time_ms": now_ms, "counts": counts,
                         "agents": agents, "statuses": PRESENCE_STATUSES, "cached": False})
+    # Phase 11.5: ?fresh=1 bypasses the 10s in-process cache READ (the cache is
+    # still rebuilt + rewritten). Needed because Vercel runs several instances:
+    # presence_set clears the cache on the instance that handled the write, but
+    # the follow-up refetch may land on a DIFFERENT instance still holding the
+    # old board for up to 10s -> "the sheet updated but the website didn't".
+    bypass_cache = (request.args.get('fresh', '') or '').strip() in ('1', 'true', 'yes')
     with _presence_board_lock:
         cached = _presence_board_cache.get("data")
         fresh = bool(cached) and (time.time() - _presence_board_cache["ts"] < PRESENCE_BOARD_TTL_S)
-        board = cached if fresh else None
+        board = cached if (fresh and not bypass_cache) else None
     if board is None:
         try:
             items = _presence_fetch_roster(get_tenant_access_token())
