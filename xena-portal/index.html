@@ -5991,6 +5991,16 @@ if (loggedUser) setTimeout(() => { try { xdAutoRestore(); } catch (e) {} }, 1500
 // the offline/permission fallback.
 const __twAvCache = new Map(); // open_id -> {name, avatar_url} | null
 let __twAvChain = null;
+// Phase 11.3 (Ahmed: "respondent pic don't appear like in the lark sheet"):
+// sheet person dicts ALREADY carry avatar_url -- render it directly (zero
+// API calls, exactly the photo the Base shows). Initials + twHydrateAvatars
+// stay as the fallback when a dict has no photo.
+function twPchipAv(u) {
+    const initial = (((u && u.name) || '?').trim().slice(0, 1).toUpperCase()) || '?';
+    const av = u && u.avatar_url;
+    if (av) return `<img src="${escHtml(av)}" alt="" loading="lazy" onerror="this.remove()">`;
+    return escHtml(initial);
+}
 function twHydrateAvatars(root) {
     const scope = (root && root.querySelectorAll) ? root : document;
     const els = [...scope.querySelectorAll('[data-uid]:not([data-av-done])')].filter(el => el.dataset.uid);
@@ -6087,7 +6097,7 @@ function twPerfLogOpen(entry) {
 let _lastKeepWarmAt = 0;
 async function twKeepWarm() {
     if (!localStorage.getItem('xenaUser')) return;
-    if (Date.now() - _lastKeepWarmAt < 3.5 * 60000) return;
+    if (Date.now() - _lastKeepWarmAt < 9.5 * 60000) return;
     _lastKeepWarmAt = Date.now();
     const t0 = twPerfNow();
     try {
@@ -6101,7 +6111,10 @@ async function twKeepWarm() {
         console.debug(`[tw-perf] keep-warm ping ${Math.round(twPerfNow() - t0)}ms`);
     } catch (e) { /* offline or unreachable -- ignore */ }
 }
-setInterval(twKeepWarm, 4 * 60000);
+// Phase 11.3 (Ahmed: "reduce the consume of requests from vercel quota"):
+// 4 min -> 10 min. Still keeps the function warm + stamps last-seen, but
+// costs 6 calls/hour per tab instead of 15.
+setInterval(twKeepWarm, 10 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) twKeepWarm(); });
 window.addEventListener('focus', twKeepWarm);
 // ------------------------------------------
@@ -7671,7 +7684,11 @@ function apOnOpen() {
     apFetchBoard();
     if (apTimersOn) return;
     apTimersOn = true;
-    setInterval(() => { if (activeTabId === 'audition-status' && !document.hidden) apFetchBoard(); }, 30000);
+    // Phase 11.3 (Ahmed: "make the check and refresh of status fast"):
+    // 30s -> 20s while the tab is open & visible. The server coalesces the
+    // actual Feishu reads behind its 10s cache, so the fresher cadence costs
+    // no extra Feishu quota — only lightweight cached responses.
+    setInterval(() => { if (activeTabId === 'audition-status' && !document.hidden) apFetchBoard(); }, 20000);
     setInterval(() => { if (activeTabId === 'audition-status') apRepaintElapsed(); }, 30000);
 }
 
@@ -12960,7 +12977,7 @@ function twRenderHeadMeta(ticket) {
     let respondentsHtml = '—';
     if (Array.isArray(respRaw) && respRaw.length && respRaw[0] && typeof respRaw[0] === 'object' && respRaw[0].name) {
         respondentsHtml = respRaw.map(u =>
-            `<span class="tw-pchip" data-uid="${escHtml(u.id)}"><span class="tw-pchip-av">${escHtml((u.name || '?').slice(0, 1).toUpperCase())}</span><span>${escHtml(u.name)}</span></span>`
+            `<span class="tw-pchip" data-uid="${escHtml(u.id)}"><span class="tw-pchip-av">${twPchipAv(u)}</span><span>${escHtml(u.name)}</span></span>`
         ).join('');
     } else if (respRaw) {
         respondentsHtml = escHtml(feishuValueToString(respRaw) || '—');
@@ -14790,7 +14807,7 @@ function createTwControl(key, value) {
         // the real Lark profile photo (hydrated from /api/users/lookup by
         // data-uid), not a flat readonly text box of names.
         const chips = value.map(v =>
-            `<span class="tw-pchip" data-uid="${escHtml(v.id)}"><span class="tw-pchip-av">${escHtml((v.name || '?').slice(0, 1).toUpperCase())}</span><span>${escHtml(v.name)}</span></span>`
+            `<span class="tw-pchip" data-uid="${escHtml(v.id)}"><span class="tw-pchip-av">${twPchipAv(v)}</span><span>${escHtml(v.name)}</span></span>`
         ).join('');
         wrap.innerHTML = label + `<div class="tw-pchips-row" style="padding:6px 8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;opacity:.85;">${chips}</div>`;
         return wrap;
@@ -19377,7 +19394,9 @@ document.addEventListener('click', function (e) {
 
 /* Initial feed pull + a quiet 90s poll while the tab is visible. */
 setTimeout(() => { cmnRefresh(true); }, 1500);
-setInterval(() => { if (!document.hidden) cmnRefresh(true); }, 90000);
+// Phase 11.3: 90s -> 180s background cadence (Vercel quota). Opening the
+// bell still force-refreshes instantly, so nothing feels staler in practice.
+setInterval(() => { if (!document.hidden) cmnRefresh(true); }, 180000);
 </script>
 </body>
 </html>
