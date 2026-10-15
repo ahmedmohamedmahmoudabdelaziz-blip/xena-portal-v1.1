@@ -967,6 +967,60 @@
            checkbox in the retired 💾 Global Settings card). */
         .admin-toggle:has(#mod_export_data){background:rgba(0,230,118,.08);border-color:rgba(0,230,118,.3)}
         .admin-toggle:has(#mod_export_data) h4{color:var(--accent-green)}
+        /* Phase 11: 🎧 Audition Status toggle (Agent Presence System). */
+        .admin-toggle:has(#mod_audition_status){background:rgba(0,230,118,.06);border-color:rgba(0,212,255,.3)}
+        .admin-toggle:has(#mod_audition_status) h4{color:var(--accent-cyan)}
+
+        /* ─── Phase 11 (Ahmed): AGENT PRESENCE — Audition Status Management ───
+           Live status board: My-Status buttons write straight to the Agent
+           Roster (one batched sheet write; the native Auto-Log / Smart Punch /
+           dispatcher workflows do the rest), counts + team board read back. */
+        .ap-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+        .ap-sync{font-size:.78rem;color:var(--text-muted)}
+        .ap-sync b{color:var(--accent-cyan)}
+        .ap-counts{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:16px 0}
+        @media (max-width:1100px){.ap-counts{grid-template-columns:repeat(3,1fr)}}
+        @media (max-width:640px){.ap-counts{grid-template-columns:repeat(2,1fr)}}
+        .ap-chip{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;transition:.2s}
+        .ap-chip .ap-dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
+        .ap-chip .ap-num{font-size:1.35rem;font-weight:800;line-height:1}
+        .ap-chip .ap-lbl{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+        .ap-my{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+        .ap-my-id{display:flex;align-items:center;gap:14px;min-width:230px}
+        .ap-avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex:none;background:var(--surface)}
+        .ap-avatar-lg{width:64px;height:64px}
+        .ap-ava-fallback{display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.3rem;color:var(--accent-cyan)}
+        .ap-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid currentColor}
+        .ap-pill .ap-dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+        .ap-since{font-size:.78rem;color:var(--text-muted)}
+        .ap-btns{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px;flex:1;min-width:280px}
+        @media (max-width:640px){.ap-btns{grid-template-columns:repeat(2,1fr)}}
+        .ap-btn{--sc:#90a4ae;display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-family:inherit;font-size:.88rem;font-weight:600;transition:all .18s;text-align:left}
+        .ap-btn .ap-dot{width:10px;height:10px;border-radius:50%;background:var(--sc);flex:none;box-shadow:0 0 7px var(--sc)}
+        .ap-btn:hover:not(:disabled){border-color:var(--sc);transform:translateY(-1px)}
+        .ap-btn.ap-active{border-color:var(--sc);background:color-mix(in srgb,var(--sc) 12%,transparent);color:var(--sc);box-shadow:0 0 0 1px var(--sc) inset}
+        .ap-btn:disabled{opacity:.45;cursor:not-allowed}
+        .ap-btn.ap-busy{animation:apPulse 1s ease infinite}
+        @keyframes apPulse{50%{opacity:.55}}
+        .ap-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px}
+        .ap-card{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:.2s}
+        .ap-card:hover{border-color:rgba(0,212,255,.35)}
+        .ap-card.ap-card-me{border-color:var(--accent-cyan);box-shadow:0 0 0 1px var(--accent-cyan) inset}
+        .ap-card-top{display:flex;align-items:center;gap:11px}
+        .ap-card-name{font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+        .ap-me-badge{font-size:.62rem;font-weight:800;background:var(--accent-cyan);color:#001018;padding:1px 7px;border-radius:10px;letter-spacing:.05em}
+        .ap-card-mid{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+        .ap-hours{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-top:1px solid var(--border);padding-top:9px}
+        .ap-hcell{text-align:center}
+        .ap-hcell .v{font-size:.82rem;font-weight:700}
+        .ap-hcell .k{font-size:.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+        .ap-queue{font-size:.72rem;color:var(--text-muted)}
+        .ap-tkt{font-size:.72rem;color:var(--accent-amber);font-weight:700}
+        .ap-admin-set{display:flex;gap:4px;flex-wrap:wrap;border-top:1px dashed var(--border);padding-top:8px}
+        .ap-mini{--sc:#90a4ae;border:1px solid var(--border);background:transparent;color:var(--text-muted);border-radius:8px;padding:3px 8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+        .ap-mini:hover{border-color:var(--sc);color:var(--sc)}
+        .ap-offline-card{opacity:.62}
+        .ap-empty{text-align:center;padding:40px 12px;color:var(--text-muted)}
         
         .user-list{display:flex;flex-direction:column;gap:10px}
         .user-row{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:.2s;flex-wrap:wrap;gap:8px}
@@ -2115,6 +2169,22 @@
                 </div>
             </div>
 
+            <!-- Phase 11 (Ahmed): Audition group -- home of the Agent Presence
+                 System. Gated by the 'audition_status' toggle in Manage Agents. -->
+            <div class="nav-group" id="navGrpAudition" style="display:none">
+                <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpAudition','navBodyAudition')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3v5zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3v5z"/></svg>
+                        <span data-i18n="audition">Audition</span>
+                    </span>
+                    <span class="nav-arr" id="navArrAudition">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyAudition">
+                    <div class="nav-item" id="nav-audition-status" onclick="openInTab('audition-status')"><span data-i18n="auditionStatusMgmt">Audition Status Management</span></div>
+                </div>
+            </div>
+
             <div class="nav-group" id="navGrpAdmin" style="display:none">
                 <div style="height:1px;background:rgba(255,255,255,0.05);margin:8px 16px 4px"></div>
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
@@ -2891,6 +2961,17 @@
                                 <span style="font-size:.8rem;color:var(--text-muted)">Lets this member download tables and reports as CSV / Excel files.</span>
                             </div>
                             <label class="switch"><input type="checkbox" id="mod_export_data" checked><span class="slider"></span></label>
+                        </div>
+                        <!-- Phase 11 (Ahmed): 🎧 Audition Status Management --
+                             opens the Audition group (live Agent Presence board);
+                             the member sets their own Online/Break/Offline status,
+                             written straight to the Agent Roster sheet. -->
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>🎧 Audition Status Management</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Shows the Audition group with the live team status board. The member can set their own status (Online / Break / Offline …), reflected immediately on the Agent Roster.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_audition_status"><span class="slider"></span></label>
                         </div>
                         </div>
                         <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
@@ -4061,6 +4142,52 @@
                 </div>
             </div>
 
+            <!-- Phase 11 (Ahmed): Audition Status Management — Agent Presence
+                 System. One batched write per status change to the Agent Roster
+                 (Current Status + Status Change Time + Memory); the native
+                 Auto-Log / Smart Punch / dispatcher workflows do the logging,
+                 punching and ticket assignment. Reads are coalesced server-side
+                 (10s cache) so quota stays flat. Gated by the 'audition_status'
+                 toggle in Manage Agents. -->
+            <div id="pg-audition-status" style="display:none">
+                <div class="card" style="margin-bottom:14px">
+                    <div class="ap-head">
+                        <div>
+                            <h3 style="margin-bottom:4px">🎧 Audition Status Management</h3>
+                            <p class="ap-sync" style="margin:0">Live team presence — every change lands <b>immediately</b> on the Agent Roster sheet. Last synced <b id="apSyncTime">—</b></p>
+                        </div>
+                        <button class="btn btn-secondary" id="apRefreshBtn" onclick="apFetchBoard(true)" style="flex:none">🔄 Refresh</button>
+                    </div>
+                    <div class="ap-counts" id="apCounts"></div>
+                </div>
+
+                <div class="card" id="apMyCard" style="display:none;margin-bottom:14px">
+                    <div class="ap-my">
+                        <div class="ap-my-id">
+                            <span id="apMyAvatar"></span>
+                            <div>
+                                <div style="font-weight:800;font-size:1.02rem" id="apMyName">—</div>
+                                <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+                                    <span id="apMyPill"></span>
+                                    <span class="ap-since" id="apMySince"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ap-btns" id="apBtns"></div>
+                    </div>
+                </div>
+
+                <div class="card" id="apNoRoster" style="display:none;margin-bottom:14px;text-align:center;padding:26px 14px">
+                    <div style="font-size:1.6rem;margin-bottom:6px">📋</div>
+                    <p style="margin:0;color:var(--text-muted)">Your account is not on the <b>Agent Roster</b> sheet yet, so you can't set a status. Ask an admin to add you to the roster. You can still watch the live team board below.</p>
+                </div>
+
+                <div class="card" style="margin:0">
+                    <h4 style="margin-bottom:12px">👥 Team Board <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">— hours are this month's totals from the sheet</span></h4>
+                    <div class="ap-board" id="apBoard"></div>
+                </div>
+            </div>
+
             <!-- Phase 10.13 (Ahmed): Preview Agent View -- the Lark Base
                  "Previewing as" idea. Pick a member, the portal re-renders with
                  exactly their access (view-only), a banner offers Exit. Gated
@@ -4255,6 +4382,8 @@ const translations = {
         auditQuickCreate: "Audit",
         createNewRequest: "Create New Request",
         accessManagement: "Access Management",
+        audition: "Audition",
+        auditionStatusMgmt: "Audition Status Management",
         manageAgents: "Manage Agents",
         auditLog: "Audit Log",
         logout: "Logout",
@@ -4286,6 +4415,8 @@ const translations = {
         auditQuickCreate: "审核提交",
         createNewRequest: "创建新请求",
         accessManagement: "权限管理",
+        audition: "审核组",
+        auditionStatusMgmt: "状态管理",
         manageAgents: "管理代理",
         auditLog: "审计日志",
         logout: "退出登录",
@@ -4336,7 +4467,8 @@ const pageTitlesMap = {
     'my-requests': 'My Recent Requests',
     'live-tickets': 'Live Ticket Queue',
     'tickets-pending': 'Under Investigation',
-    'admin-preview': 'Preview Agent View'
+    'admin-preview': 'Preview Agent View',
+    'audition-status': 'Audition Status'
 };
 
 const zhPageTitlesMap = {
@@ -4360,12 +4492,13 @@ const zhPageTitlesMap = {
     'my-requests': '我的最近请求',
     'live-tickets': '实时工单队列',
     'tickets-pending': '待调查请求',
-    'admin-preview': '预览成员视图'
+    'admin-preview': '预览成员视图',
+    'audition-status': '状态管理'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -4682,6 +4815,10 @@ function executePageLogic(page) {
         document.getElementById('pg-admin-preview').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
         pvOnOpen(); // Phase 10.27: idle state only — members load on first search, zero requests on open
+    } else if(page==='audition-status'){
+        document.getElementById('pg-audition-status').style.display='block';
+        _expandNavGroup('navBodyAudition','navArrAudition');
+        apOnOpen(); // Phase 11: live presence board (reads coalesced server-side)
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -7401,6 +7538,11 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
         if (cb) cb.checked = hasAccess;
     });
 
+    // Phase 11: audition_status is its own module key (like export_data) --
+    // 'audition' master must NOT imply it, so it stays out of the loop above.
+    const apCb=document.getElementById('mod_audition_status');
+    if (apCb) apCb.checked = m.split(',').map(s=>s.trim()).includes('audition_status') || m.includes('admin');
+
     const exportCb=document.getElementById('mod_export_data');
     if (exportCb) exportCb.checked = m.includes('export_data') || m.includes('admin');
 
@@ -7472,6 +7614,167 @@ function pvRepaintPresencePills() {
 // Offline transitions re-render every 30s from the cached stamps -- pure DOM,
 // no network traffic at all.
 setInterval(pvRepaintPresencePills, 30000);
+
+// ─── Phase 11 (Ahmed): AGENT PRESENCE — Audition Status Management ───
+// Live presence board on top of the Agent Roster sheet. ONE batched write
+// per status change (backend /api/presence/set) -> the native Auto-Log /
+// Smart Punch / ticket-pull workflows fire off it, so the sheet, the Time
+// Logs and the dispatcher all move together. Reads are coalesced server-
+// side (10s cache); the page auto-refreshes every 30s ONLY while the tab
+// is open and visible, so quota stays flat.
+const AP_STATUSES = ["Online", "On Task", "Working Ticket", "Meeting", "Break", "Offline"];
+const AP_META = {
+    "Online":         { c: '#00e676', i: '🟢' },
+    "On Task":        { c: '#00d4ff', i: '🎯' },
+    "Working Ticket": { c: '#b388ff', i: '🎫' },
+    "Meeting":        { c: '#ffab00', i: '📞' },
+    "Break":          { c: '#ff8a65', i: '☕' },
+    "Offline":        { c: '#90a4ae', i: '⚫' },
+};
+let apBoard = null;      // last /api/presence/board payload
+let apBoardAt = 0;       // client clock when server_time_ms was sampled
+let apBusy = false;      // a set-status write is in flight
+let apTimersOn = false;
+
+function apMeta(s) { return AP_META[s] || AP_META['Offline']; }
+
+function apAvatarHtml(a, cls) {
+    const nm = a.name || '?';
+    const init = escHtml(nm.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?');
+    const fb = `<span class="ap-avatar ap-ava-fallback ${cls || ''}" ${a.avatar_url ? 'style="display:none"' : ''}>${init}</span>`;
+    if (a.avatar_url) return `<img class="ap-avatar ${cls || ''}" src="${escHtml(a.avatar_url)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">${fb}`;
+    return fb;
+}
+
+function apElapsedTxt(sinceMs) {
+    if (!sinceMs || !apBoard) return '';
+    const nowSrv = apBoard.server_time_ms + (Date.now() - apBoardAt); // skew-immune
+    let mins = Math.max(0, Math.floor((nowSrv - sinceMs) / 60000));
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `for ${mins}m`;
+    const h = Math.floor(mins / 60); mins = mins % 60;
+    if (h < 24) return `for ${h}h ${mins}m`;
+    return `for ${Math.floor(h / 24)}d ${h % 24}h`;
+}
+
+function apRepaintElapsed() {
+    if (!apBoard) return;
+    document.querySelectorAll('#pg-audition-status [data-ap-since]').forEach(el => {
+        el.textContent = apElapsedTxt(+el.dataset.apSince);
+    });
+    const me = (apBoard.agents || []).find(a => a.is_me);
+    const mySince = document.getElementById('apMySince');
+    if (me && mySince) mySince.textContent = apElapsedTxt(me.since_ms);
+}
+
+function apOnOpen() {
+    apFetchBoard();
+    if (apTimersOn) return;
+    apTimersOn = true;
+    setInterval(() => { if (activeTabId === 'audition-status' && !document.hidden) apFetchBoard(); }, 30000);
+    setInterval(() => { if (activeTabId === 'audition-status') apRepaintElapsed(); }, 30000);
+}
+
+async function apFetchBoard(manual) {
+    const btn = document.getElementById('apRefreshBtn');
+    if (btn) btn.disabled = true;
+    try {
+        const qs = new URLSearchParams({
+            user: loggedUser || '', email: loggedEmail || '',
+            open_id: localStorage.getItem('xenaOpenId') || '', uat: loggedUat || ''
+        });
+        const r = await fetch('/api/presence/board?' + qs);
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        apBoard = d; apBoardAt = Date.now();
+        apRenderAll();
+    } catch (e) {
+        ToastManager.show('⚠️ Status board: ' + e.message, 'error', 8000);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function apRenderAll() {
+    if (!apBoard) return;
+    const syncEl = document.getElementById('apSyncTime');
+    if (syncEl) syncEl.textContent = new Date(apBoard.server_time_ms + (Date.now() - apBoardAt)).toLocaleTimeString();
+    const counts = apBoard.counts || {};
+    document.getElementById('apCounts').innerHTML = AP_STATUSES.map(s => {
+        const m = apMeta(s);
+        return `<div class="ap-chip" style="color:${m.c}"><span class="ap-dot" style="background:${m.c}"></span><span class="ap-num">${counts[s] || 0}</span><span class="ap-lbl">${s}</span></div>`;
+    }).join('');
+    const agents = apBoard.agents || [];
+    const me = agents.find(a => a.is_me);
+    const myCard = document.getElementById('apMyCard'), noR = document.getElementById('apNoRoster');
+    if (me) { myCard.style.display = 'block'; noR.style.display = 'none'; apRenderMe(me); }
+    else { myCard.style.display = 'none'; noR.style.display = 'block'; }
+    document.getElementById('apBoard').innerHTML = agents.length
+        ? agents.map(apCardHtml).join('')
+        : `<div class="ap-empty">No agents on the Agent Roster yet.</div>`;
+}
+
+function apRenderMe(me) {
+    const m = apMeta(me.status);
+    document.getElementById('apMyName').textContent = me.name || 'Me';
+    document.getElementById('apMyAvatar').innerHTML = apAvatarHtml(me, 'ap-avatar-lg');
+    document.getElementById('apMyPill').innerHTML = `<span class="ap-pill" style="color:${m.c}"><span class="ap-dot"></span>${m.i} ${escHtml(me.status)}</span>`;
+    document.getElementById('apBtns').innerHTML = AP_STATUSES.map(s => {
+        const mm = apMeta(s);
+        const active = s === me.status ? ' ap-active' : '';
+        return `<button class="ap-btn${active}" style="--sc:${mm.c}" data-ap-status="${escHtml(s)}" onclick="apSetStatus('${s}')" ${apBusy ? 'disabled' : ''}><span class="ap-dot"></span>${mm.i} ${s}</button>`;
+    }).join('');
+    apRepaintElapsed();
+}
+
+function apCardHtml(a) {
+    const m = apMeta(a.status);
+    const off = a.status === 'Offline' ? ' ap-offline-card' : '';
+    const meCls = a.is_me ? ' ap-card-me' : '';
+    const badge = a.is_me ? '<span class="ap-me-badge">YOU</span>' : '';
+    const adminSet = (isAdmin && !a.is_me)
+        ? `<div class="ap-admin-set">${AP_STATUSES.map(s => `<button class="ap-mini" style="--sc:${apMeta(s).c}" onclick="apSetStatus('${s}','${escHtml(a.record_id || '')}')" title="Set ${escHtml(a.name || 'agent')} → ${s}">${apMeta(s).i}</button>`).join('')}</div>`
+        : '';
+    return `<div class="ap-card${off}${meCls}" data-ap-rid="${escHtml(a.record_id || '')}">
+        <div class="ap-card-top">${apAvatarHtml(a)}<div class="ap-card-name">${escHtml(a.name || '—')} ${badge}</div></div>
+        <div class="ap-card-mid"><span class="ap-pill" style="color:${m.c}"><span class="ap-dot"></span>${m.i} ${escHtml(a.status)}</span><span class="ap-since" data-ap-since="${a.since_ms || 0}">${apElapsedTxt(a.since_ms)}</span></div>
+        <div class="ap-hours">
+            <div class="ap-hcell"><div class="v">${escHtml(a.online_hours || '0:00')}</div><div class="k">Online</div></div>
+            <div class="ap-hcell"><div class="v">${escHtml(a.task_hours || '0:00')}</div><div class="k">Task</div></div>
+            <div class="ap-hcell"><div class="v">${escHtml(a.break_hours || '0:00')}</div><div class="k">Break</div></div>
+            <div class="ap-hcell"><div class="v">${escHtml(a.meeting_hours || '0:00')}</div><div class="k">Meeting</div></div>
+        </div>
+        <div class="ap-card-mid"><span class="ap-queue">${escHtml(a.queue_status || '')}</span><span class="ap-tkt">${a.active_tickets ? ('🎫 ' + a.active_tickets + ' active') : ''}</span></div>
+        ${adminSet}
+    </div>`;
+}
+
+async function apSetStatus(status, target) {
+    if (apBusy) return;
+    apBusy = true;
+    document.querySelectorAll('#pg-audition-status .ap-btn, #pg-audition-status .ap-mini').forEach(b => { b.disabled = true; b.classList.add('ap-busy'); });
+    try {
+        const r = await fetch('/api/presence/set', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user: loggedUser || '', email: loggedEmail || '',
+                open_id: localStorage.getItem('xenaOpenId') || '',
+                status: status, target: target || ''
+            })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        if (d.unchanged) ToastManager.show(`Already ${status} — nothing to change.`, 'warning', 3500);
+        else ToastManager.show(`${d.agent && d.agent.name ? d.agent.name + ': ' : ''}${d.previous || '—'} → ${status} ✅ reflected on the Agent Roster`, 'success', 5000);
+        await apFetchBoard(); // backend invalidated the cache — this is fresh
+    } catch (e) {
+        ToastManager.show('⚠️ ' + e.message, 'error', 9000);
+    } finally {
+        apBusy = false;
+        apRenderAll(); // re-enable buttons even if the refetch failed
+    }
+}
+
 let latestAdminRoles = [];  // role presets only
 // Phase 10.34 (Ahmed): Manage Agents no longer auto-loads on open. The page
 // opens to an idle state with an explicit "Load agents" button; only a click
@@ -7669,7 +7972,7 @@ function resetAgentForm() {
     document.getElementById('modAdmin').checked = false;
     // Phase 10.13.1/10.14: these three live in admin-toggle switches now (not
     // inside .sub-opt-lbl), so the generic clear below doesn't reach them.
-    ['mod_audition_access','mod_preview_access','mod_export_data'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
@@ -7728,6 +8031,7 @@ async function confirmSaveRole() {
         if(cb && cb.checked) modules.push(m);
     });
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
+    if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
     // Roles never carry "admin" themselves -- admin is a person-level grant, not a
     // reusable role preset.
 
@@ -7837,6 +8141,7 @@ async function addAgent() {
     });
     if (document.getElementById('modAdmin').checked) modules.push('admin');
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
+    if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
     
     document.getElementById('adminBtnSubmit').innerText='Saving...';
 
@@ -7875,7 +8180,7 @@ async function addAgent() {
         ToastManager.show(identities.length > 1 ? `${successCount} agents saved successfully.` : 'Agent saved successfully.', 'success');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
-        ['mod_audition_access','mod_preview_access','mod_export_data'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
     }
     document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
@@ -10670,6 +10975,14 @@ function configureSidebarAndCards() {
     if (navAdminPreview) navAdminPreview.style.display = (isAdmin || hasExactMod('preview_access')) ? '' : 'none';
     const grpAdmin = document.getElementById('navGrpAdmin');
     if (grpAdmin) grpAdmin.style.display = [navAdminAgents, navAdminRequests, navAdminAudit, navAdminPreview].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    // Phase 11: Audition group — Agent Presence System. Holders of the
+    // 'audition_status' module (and admins) see the Audition Status
+    // Management page; the group follows its only child.
+    const navAuditionStatus = document.getElementById('nav-audition-status');
+    if (navAuditionStatus) navAuditionStatus.style.display = (isAdmin || hasExactMod('audition_status')) ? '' : 'none';
+    const grpAudition = document.getElementById('navGrpAudition');
+    if (grpAudition) grpAudition.style.display = (navAuditionStatus && navAuditionStatus.style.display !== 'none') ? '' : 'none';
 
     if (isAdmin) {
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
