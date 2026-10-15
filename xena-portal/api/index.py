@@ -37,7 +37,8 @@ BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
-AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")   
+ROSTER_TABLE_ID   = "tblvA2Y4Z4j7Jwbr"   # Agent Roster (Phase 11 presence system)
+AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 FORM_ID = os.environ.get("LARK_FORM_ID", "shrcnKiM5Nd35n4nP0IP2o1Y8Lb")
 ADMIN_USERS = ['ahmed samurai', 'ahmed samurai 1954']
 
@@ -3286,6 +3287,46 @@ def update_request():
         # audit_on_bad_submitted_by=False here since "Submitted By" isn't editable from
         # this workspace -- that specific alert only matters on the create path.
         fields = strip_invalid_user_fields(fields, field_types, actor=user, audit_on_bad_submitted_by=False)
+
+    # DEFENSIVE MERGE (Ahmed, 2026-10-15 -- ticket #30796 lost 2 images): a save
+    # that adds an image must NEVER wipe the images already on the record. The
+    # merge above relies on the browser sending the existing tokens inside the
+    # `fields` JSON -- but a stale cached frontend (or any client) that sends
+    # only the new file would still replace the whole cell, because Feishu
+    # Attachment writes are full-replace. So whenever an outgoing value is a
+    # list of file tokens (only Attachment fields ever look like that), fetch
+    # the record ONCE and union the tokens currently on the sheet into the
+    # write: sheet order first, then any new tokens, deduped by file_token.
+    # Attachments are append-only in this workspace (there is no removal UI),
+    # so the union can never fight a legitimate removal. Cost: one extra read,
+    # and only on saves that actually touch attachments. If that read fails we
+    # abort BEFORE the PUT (all-or-nothing, same contract as Phase 10.29) --
+    # a blind write is exactly how the images were lost.
+    def _is_token_list(v):
+        return isinstance(v, list) and len(v) > 0 and all(
+            isinstance(x, dict) and x.get("file_token") for x in v)
+    if any(_is_token_list(v) for v in fields.values()):
+        try:
+            cur_resp = feishu_session.get(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                headers={"Authorization": f"Bearer {tat}"}, timeout=15)
+            cur_data = cur_resp.json()
+            if cur_data.get("code") != 0:
+                raise Exception(cur_data.get("msg") or "record fetch failed")
+            cur_fields = ((cur_data.get("data") or {}).get("record") or {}).get("fields") or {}
+            for k in list(fields.keys()):
+                if not _is_token_list(fields[k]):
+                    continue
+                on_sheet = cur_fields.get(k)
+                sheet_tokens = [{"file_token": x["file_token"]} for x in on_sheet
+                                if isinstance(x, dict) and x.get("file_token")] \
+                               if isinstance(on_sheet, list) else []
+                seen = {t["file_token"] for t in sheet_tokens}
+                fields[k] = sheet_tokens + [t for t in fields[k] if t["file_token"] not in seen]
+        except Exception as e:
+            logger.error("attachment_defensive_merge_failed", record_id=record_id, error=str(e))
+            return jsonify({"success": False,
+                            "error": f"Could not verify the existing attachments before saving: {e}. Nothing was saved -- please hit Save again."}), 502
 
     # Phase 10.12 (fast save): the frontend now diffs against the opened record
     # and sends only fields that actually changed (attachment tokens only when
@@ -7853,6 +7894,236 @@ def users_lookup():
     return jsonify({"success": True,
                     "users": {uid: {"name": p.get("name", ""), "avatar_url": p.get("avatar", "")}
                               for uid, p in people.items()}})
+
+# ════════════════════════════════════════════════════════════════════
+# Phase 11 (Ahmed): AGENT PRESENCE SYSTEM — "Audition Status Management"
+# "the audition member to be able to change the status from online and
+# offline and so on, show them how many today online offline break on task
+# and so on, and this is reflect on the sheet on the Agent Roster table ...
+# fast action reflected immediately in the sheet as this matter the part
+# of the sec matter ... not consume so much from vercel quota".
+#
+# Architecture (the cheapest correct one — the sheet already owns the hard
+# parts): the portal does EXACTLY ONE Feishu write per status change — a
+# **batch_update** of the agent's Agent Roster row (Current Status +
+# Status Change Time + Memory). Three ENABLED native Base workflows watch
+# "Current Status" with trigger_control_list including "openAPIBatchUpdate"
+# (a single-record PUT would NOT fire them — batch is mandatory):
+#   • Auto-Log  (wkfCXTVstBdVo63z) → opens a Time Logs segment + stamps
+#     Active Log ID; Auto-Closer then closes the previous segment.
+#   • Smart Punch (wkfuNHH1KPZxLCVf) → maintains the Daily Logs shift row.
+#   • Agent Pulls Ticket JS Engine (wkfjJD8vw76fDU51) → wakes the ticket
+#     dispatcher the moment an agent goes Online ("the sec matter").
+# So the portal never touches Time Logs / Daily Logs / the queue itself —
+# one write, immediate sheet reflection, zero automation conflicts, minimal
+# quota. Reads are coalesced behind a short in-process cache (TTL below) so
+# N open dashboards cost ~1 Feishu read per TTL window, not N per refresh.
+# "Memory" (the previous status) is maintained for parity with what the
+# Loop Closer / dispatcher automations already do on that row.
+# ════════════════════════════════════════════════════════════════════
+PRESENCE_STATUSES = ["Online", "On Task", "Working Ticket", "Meeting", "Break", "Offline"]
+PRESENCE_BOARD_TTL_S = 10   # read coalescing window (seconds)
+_presence_board_cache = {"ts": 0.0, "data": None}
+_presence_board_lock = threading.Lock()
+
+def _presence_gate(email, user):
+    """Module key 'audition_status' (granted in Manage Agents) or admin --
+    same convention as every other module check in this file. Returns the
+    perms dict when allowed, None otherwise."""
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and not any(m in ("audition_status", "admin") for m in perms.get("modules", [])):
+        return None
+    return perms
+
+def _presence_fetch_roster(tat):
+    """ONE Feishu call: the whole Agent Roster (a handful of rows)."""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ROSTER_TABLE_ID}/records"
+    resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"},
+                              params={"page_size": 100}, timeout=15)
+    data = resp.json()
+    if data.get("code") != 0:
+        raise RuntimeError(data.get("msg") or "Agent Roster read failed")
+    return (data.get("data") or {}).get("items") or []
+
+def _presence_row_identity(item):
+    """record (Agent Roster) -> (record_id, open_id, name) from the Agent
+    Name user field."""
+    persons = (item.get("fields") or {}).get("Agent Name") or []
+    oid, nm = "", ""
+    if isinstance(persons, list) and persons and isinstance(persons[0], dict):
+        oid = persons[0].get("id", "") or ""
+        nm  = persons[0].get("name", "") or ""
+    return item.get("record_id", ""), oid, nm
+
+def _presence_build_board(items, uat=""):
+    """Roster records -> shared (caller-independent) board payload."""
+    open_ids = []
+    for it in items:
+        _, oid, _nm = _presence_row_identity(it)
+        if oid:
+            open_ids.append(oid)
+    # Avatars/names ride the 24h Redis-cached resolver -- ~zero marginal cost.
+    people = _resolve_comment_names(open_ids, get_tenant_access_token(), uat=uat or None) if open_ids else {}
+    agents, counts = [], {s: 0 for s in PRESENCE_STATUSES}
+    for it in items:
+        f = it.get("fields") or {}
+        rid, oid, nm = _presence_row_identity(it)
+        status = extract_field_text(f.get("Current Status", "")) or "Offline"
+        since_ms = _extract_epoch_ms(f.get("Status Change Time"))
+        p = people.get(oid, {})
+        if p.get("name") and not str(p["name"]).startswith("user-"):
+            nm = p["name"]
+        agents.append({
+            "record_id": rid, "open_id": oid, "name": nm,
+            "avatar_url": p.get("avatar", "") or "",
+            "status": status,
+            "since_ms": since_ms,
+            "memory": extract_field_text(f.get("Memory", "")) or "",
+            "online_hours":  extract_field_text(f.get("Online Hours", ""))  or "00:00",
+            "task_hours":    extract_field_text(f.get("Task Hours", ""))    or "00:00",
+            "break_hours":   extract_field_text(f.get("Break Hours", ""))   or "00:00",
+            "meeting_hours": extract_field_text(f.get("Meeting Hours", "")) or "00:00",
+            "queue_status":  extract_field_text(f.get("Queue Status", ""))  or "",
+            "active_tickets": _safe_int(extract_field_text(f.get("Active Tickets", "")), 0),
+        })
+        counts[status] = counts.get(status, 0) + 1
+    # Online-ish statuses first, then by name -- stable, readable board.
+    order = {s: i for i, s in enumerate(PRESENCE_STATUSES)}
+    agents.sort(key=lambda a: (order.get(a["status"], 99), (a["name"] or "").lower()))
+    return {"counts": counts, "agents": agents}
+
+@app.route('/api/presence/board', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def presence_board():
+    """Live team board for the Audition Status Management page: every roster
+    agent's current status + since-when + this-month hours, plus per-status
+    headcounts. Coalesced behind a 10s in-process cache (see header note)."""
+    user    = sanitize_text(request.args.get('user', ''))
+    email   = sanitize_text(request.args.get('email', ''))
+    uat     = sanitize_text(request.args.get('uat', ''))
+    open_id = sanitize_text(request.args.get('open_id', ''))
+    if not _presence_gate(email, user):
+        return jsonify({"success": False, "error": "Access denied: Audition Status module required."}), 403
+    if MOCK_MODE:
+        agents = [
+            {"record_id": "recMockA", "open_id": "ou_mock_ahmed", "name": "Ahmed Samurai", "avatar_url": "",
+             "status": "Online", "since_ms": int(time.time()*1000) - 5400000, "memory": "Offline",
+             "online_hours": "12:34", "task_hours": "01:21", "break_hours": "00:42",
+             "meeting_hours": "00:00", "queue_status": "⭐ NEXT", "active_tickets": 1},
+            {"record_id": "recMockB", "open_id": "ou_mock_mano", "name": "Mano", "avatar_url": "",
+             "status": "Break", "since_ms": int(time.time()*1000) - 900000, "memory": "Online",
+             "online_hours": "09:10", "task_hours": "00:33", "break_hours": "01:05",
+             "meeting_hours": "00:00", "queue_status": "💤 OFFLINE", "active_tickets": 0},
+        ]
+        counts = {s: 0 for s in PRESENCE_STATUSES}
+        for a in agents: counts[a["status"]] += 1
+        me_oid, me_nm = open_id.strip().lower(), (user or "").strip().lower()
+        for a in agents:
+            a["is_me"] = bool((me_oid and a["open_id"].lower() == me_oid) or (me_nm and a["name"].lower() == me_nm))
+        now_ms = int(time.time() * 1000)
+        return jsonify({"success": True, "server_time_ms": now_ms, "counts": counts,
+                        "agents": agents, "statuses": PRESENCE_STATUSES, "cached": False})
+    with _presence_board_lock:
+        cached = _presence_board_cache.get("data")
+        fresh = bool(cached) and (time.time() - _presence_board_cache["ts"] < PRESENCE_BOARD_TTL_S)
+        board = cached if fresh else None
+    if board is None:
+        try:
+            items = _presence_fetch_roster(get_tenant_access_token())
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
+        board = _presence_build_board(items, uat)
+        with _presence_board_lock:
+            _presence_board_cache["ts"] = time.time()
+            _presence_board_cache["data"] = board
+    # is_me is caller-specific -- layered per request on top of the shared board.
+    me_oid, me_nm = open_id.strip().lower(), (user or "").strip().lower()
+    agents = []
+    for a in board["agents"]:
+        aa = dict(a)
+        aa["is_me"] = bool((me_oid and aa["open_id"].lower() == me_oid) or
+                           (me_nm and aa["name"].lower() == me_nm))
+        agents.append(aa)
+    now_ms = int(time.time() * 1000)
+    return jsonify({"success": True, "server_time_ms": now_ms, "counts": board["counts"],
+                    "agents": agents, "statuses": PRESENCE_STATUSES, "cached": bool(board is cached and fresh)})
+
+@app.route('/api/presence/set', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def presence_set():
+    """THE status write. One batch_update to the caller's Agent Roster row
+    (Current Status + Status Change Time + Memory) -- batch, NOT single-record,
+    because the native Auto-Log / Smart Punch / ticket-pull workflows only
+    fire for 'openAPIBatchUpdate' (see the Phase 11 header note). Non-admins
+    can only move their OWN row (matched by open_id, then by exact Lark name);
+    admins may pass 'target' (record_id or open_id) to move anyone. Idempotent:
+    setting the status the row already has costs ZERO Feishu writes."""
+    body = request.get_json(silent=True) or {}
+    user      = sanitize_text(body.get('user', ''))
+    email     = sanitize_text(body.get('email', ''))
+    open_id   = sanitize_text(body.get('open_id', ''))
+    new_status = sanitize_text(body.get('status', ''))
+    target    = sanitize_text(body.get('target', ''))
+    if new_status not in PRESENCE_STATUSES:
+        return jsonify({"success": False, "error": f"Invalid status. Must be one of: {', '.join(PRESENCE_STATUSES)}"}), 400
+    perms = _presence_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition Status module required."}), 403
+    is_admin = bool(perms.get("is_super_admin") or "admin" in perms.get("modules", []))
+    if target and not is_admin:
+        return jsonify({"success": False, "error": "Only admins can set another member's status."}), 403
+    if MOCK_MODE:
+        return jsonify({"success": True, "status": new_status, "previous": "Offline",
+                        "changed_at": int(time.time()*1000), "unchanged": False,
+                        "agent": {"record_id": "recMockA", "name": user or "Mock Agent", "open_id": open_id}})
+    try:
+        items = _presence_fetch_roster(get_tenant_access_token())
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
+    me_oid, me_nm = open_id.strip().lower(), (user or "").strip().lower()
+    tgt_l = target.strip().lower()
+    row = None
+    for it in items:
+        rid, oid, nm = _presence_row_identity(it)
+        if is_admin and tgt_l:
+            if rid.lower() == tgt_l or oid.lower() == tgt_l:
+                row = it; break
+        else:
+            if (me_oid and oid.lower() == me_oid) or (me_nm and nm.lower() == me_nm):
+                row = it; break
+    if not row:
+        return jsonify({"success": False,
+                        "error": "You are not on the Agent Roster yet — ask an admin to add you there first."}), 404
+    rid, oid, nm = _presence_row_identity(row)
+    old_status = extract_field_text((row.get("fields") or {}).get("Current Status", "")) or ""
+    if old_status == new_status:
+        return jsonify({"success": True, "unchanged": True, "status": new_status, "previous": old_status,
+                        "agent": {"record_id": rid, "name": nm, "open_id": oid}})
+    now_ms = cairo_epoch_ms(cairo_now())
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ROSTER_TABLE_ID}/records/batch_update"
+    payload = {"records": [{"record_id": rid, "fields": {
+        "Current Status": new_status,
+        "Status Change Time": now_ms,
+        "Memory": old_status or new_status}}]}
+    try:
+        resp = feishu_session.put(url, headers={"Authorization": f"Bearer {get_tenant_access_token()}",
+                                                "Content-Type": "application/json"},
+                                  json=payload, timeout=15)
+        data = resp.json()
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Status write failed: {e}"}), 502
+    if data.get("code") != 0:
+        return jsonify({"success": False, "error": data.get("msg") or "Feishu rejected the status write"}), 502
+    # The board cache must reflect the change on the very next read (this
+    # instance at least) -- the actor's own UI refresh is the hot path.
+    with _presence_board_lock:
+        _presence_board_cache["ts"] = 0.0
+        _presence_board_cache["data"] = None
+    audit.log(user or email, "PRESENCE_SET", f"{nm}: {old_status or '—'} -> {new_status}",
+              ip=request.headers.get("X-Forwarded-For", ""), severity="Info")
+    return jsonify({"success": True, "unchanged": False, "status": new_status, "previous": old_status,
+                    "changed_at": now_ms,
+                    "agent": {"record_id": rid, "name": nm, "open_id": oid}})
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
