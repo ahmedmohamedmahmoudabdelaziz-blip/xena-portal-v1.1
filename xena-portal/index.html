@@ -11517,8 +11517,9 @@ function twRenderSection2(ticket, reqTypeOverride) {
         // EVERY Request Type (Ahmed) even though it's also in Basic Information
         // -- the two boxes stay mirrored (data-mirror sync below) and collect
         // as one value, so editing either updates both.
-        // Phase 10.46: 'Reject Reason' renders as its own card for EVERY type
-        // (twRenderRejectReasonCard below) -- never as a plain sec2 control.
+        // Phase 10.50: 'Reject Reason' renders as its own card for Agency
+        // Creation / follow-up only (twRenderRejectReasonCard below) --
+        // never as a plain sec2 control.
         dynamicKeys = explicitList.filter(k => (!LT_BASIC_KEYS.has(k) || k === 'User ID') && k !== 'Reject Reason');
         if (!dynamicKeys.includes('User ID')) dynamicKeys.unshift('User ID');
     } else {
@@ -11562,12 +11563,19 @@ function twRenderSection2(ticket, reqTypeOverride) {
         twSyncPossibleBdIdVisibility();
     }
 
-    // Phase 10.46 (Ahmed, video 3): the Reject Reason card renders for EVERY
-    // request type now (not just Agency Creation) -- a rejection on any
-    // ticket must carry at least one reason, enforced in twSaveWorkspace.
+    // Phase 10.50 (Ahmed): the Reject Reason card renders ONLY for Agency
+    // Creation and Agency applied already by ACM or BD link ( follow-up )
+    // -- "only make it appeare in request type Agency Creation, Agency
+    // applied already by ACM or BD link ( follow-up ), and make it mendtory
+    // only in them when the requests is rejected" (supersedes the 10.46
+    // render-for-every-type rule). The save gate in twSaveWorkspace keys off
+    // #twRejectGroup's existence, so the mandatory-when-Rejected rule now
+    // applies to exactly these two types and nowhere else.
     // The sweep at the top of this function already dropped any leftover
     // copy, so this always builds the card fresh from THIS ticket's values.
-    twRenderRejectReasonCard(ticket);
+    if (reqType === 'Agency Creation' || reqType === 'Agency applied already by ACM or BD link ( follow-up )') {
+        twRenderRejectReasonCard(ticket);
+    }
     // Phase 10.46: person chips rendered above (and in the rest of the fill,
     // which is synchronous) get their Lark photos swapped in right after.
     setTimeout(() => { try { twHydrateAvatars(); } catch (e) {} }, 0);
@@ -11965,17 +11973,19 @@ function twRenderAgencyCreationExtras(sec2, ticket) {
     cwWrap.innerHTML = `<label>Create Way</label><select name="Create Way" class="form-highlight-input"><option value="">-- Select --</option>${cwOpts}</select>`;
     sec2.appendChild(cwWrap);
     // Reject Reason moved OUT of the Agency-Creation-only extras in Phase
-    // 10.46 -- twRenderRejectReasonCard(ticket) renders it for EVERY request
-    // type (call site: twRenderSection2), so a rejection on any ticket can
-    // carry a reason and the save gate can require one uniformly.
+    // 10.46 -- twRenderRejectReasonCard(ticket) renders it as its own card
+    // (call site: twRenderSection2), gated in Phase 10.50 to Agency Creation
+    // and follow-up tickets only, mandatory only on a Rejected save.
 }
 
-// Phase 10.46 (Ahmed, video 3): the Reject Reason card is no longer an
-// Agency-Creation-only extra -- it renders for EVERY request type, parked
-// directly under Basic Information (left column), same hidden-checkbox
-// .msel-wrap markup the Agency Point Privilege wrap carries (the shared pp
-// card-grid picker skins it, rose variant). Save & Resolve refuses a
-// Rejected status with zero reasons picked (see twSaveWorkspace).
+// Phase 10.50 (Ahmed): the Reject Reason card renders ONLY for Agency
+// Creation and Agency applied already by ACM or BD link ( follow-up )
+// (call-site gate in twRenderSection2), parked directly under Basic
+// Information (left column), same hidden-checkbox .msel-wrap markup the
+// Agency Point Privilege wrap carries (the shared pp card-grid picker skins
+// it, rose variant). Save & Resolve refuses a Rejected status with zero
+// reasons picked (see twSaveWorkspace) -- only while this card exists, i.e.
+// only for those two request types.
 function twRenderRejectReasonCard(ticket) {
     if (document.getElementById('twRejectGroup')) return; // never double-render
     const rrMeta = FIELD_SCHEMA['Reject Reason'];
@@ -14814,8 +14824,9 @@ async function twSaveWorkspace() {
     // one toast names everything that's missing.
     // Phase 10.46 (Ahmed, videos 2+3): two more gates joined the list --
     // ・ Agency Creation may not save with Create Way still "-- Select --".
-    // ・ Status = Rejected requires AT LEAST ONE Reject Reason ticked, for
-    //   every request type (the card renders universally since 10.46).
+    // ・ Status = Rejected requires AT LEAST ONE Reject Reason ticked -- only
+    //   for Agency Creation / follow-up, the two types whose card renders
+    //   (Phase 10.50; #twRejectGroup exists only for them).
     const saveReqType = (document.querySelector('#tw-form [name="Request Type"]')?.value || ltActiveTicket?.fields?.['Request Type'] || '').toString().trim();
     const missing = [];
     const dbWrap = document.getElementById('tw-done-by-wrap');
