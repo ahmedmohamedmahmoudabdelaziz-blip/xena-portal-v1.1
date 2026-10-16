@@ -18761,20 +18761,34 @@ function twcToggle() {
     twcSetOpen(!card.classList.contains('open'));
 }
 
+function twcStoreMe(oid) {
+    // The backend resolves the caller's open_id server-side (me_open_id /
+    // actor_open_id) — keep localStorage.xenaOpenId in sync so reaction
+    // toggle detection (add vs remove) is always reliable.
+    if (oid && String(oid).startsWith('ou_') && localStorage.getItem('xenaOpenId') !== oid) {
+        try { localStorage.setItem('xenaOpenId', oid); } catch (e) {}
+    }
+}
+
 async function twcLoad(force) {
     const st = twcSt(); const card = twcCard();
     if (!st || !card || !st.recordId) return;
     if (st.loading) return;
     if (st.loaded && !force) { twcRenderList(st.comments); twcRenderCount(); return; }
     st.loading = true;
-    if (card.classList.contains('open')) twcRenderLoading();
-    let err = null;
+    // Phase 11.9: the backend now answers from a persistent shared scan
+    // (fast) and flags it stale when older than ~45s — so the spinner shows
+    // ONLY when there is genuinely nothing to display yet.
+    if (!st.loaded && card.classList.contains('open')) twcRenderLoading();
+    let err = null, stale = false;
     try {
         const r = await fetch(`/api/comments?record_id=${encodeURIComponent(st.recordId)}&${twcAuthQ()}`);
         const d = await r.json();
         if (d && d.success) {
             st.comments = d.comments || [];
             st.loaded = true;
+            stale = !!d.stale;
+            twcStoreMe(d.me_open_id);
         } else {
             err = (d && (d.error || d.message)) || 'Failed to load comments';
         }
@@ -18785,6 +18799,35 @@ async function twcLoad(force) {
     if (err) { twcRenderError(err); return; }
     twcRenderList(st.comments);
     twcRenderCount();
+    if (stale) twcRevalidate();
+}
+
+// Phase 11.9 stale-while-revalidate: the shared scan was served stale —
+// ask the backend to refresh it (lock-deduped; ~a few seconds, NOT blocking
+// the UI) then silently re-pull this thread. Throttled: at most one cycle
+// per 60s so a failing refresh can't ping-pong.
+let _twcRevalBusy = false, _twcRevalLast = 0;
+async function twcRevalidate() {
+    if (_twcRevalBusy || (Date.now() - _twcRevalLast < 60000)) return;
+    _twcRevalBusy = true; _twcRevalLast = Date.now();
+    try {
+        await fetch('/api/comments/scan-refresh', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+        });
+    } catch (e) {}
+    _twcRevalBusy = false;
+    const st = twcSt();
+    if (!st || !st.recordId || !st.loaded) return;
+    try {
+        const r = await fetch(`/api/comments?record_id=${encodeURIComponent(st.recordId)}&${twcAuthQ()}`);
+        const d = await r.json();
+        if (d && d.success) {
+            st.comments = d.comments || [];
+            twcRenderList(st.comments, true);  // silent update — keep scroll
+            twcRenderCount();
+        }
+    } catch (e) {}
 }
 
 function twcRenderCount() {
@@ -18876,10 +18919,13 @@ function twcRenderReactions(reactions, replyId) {
     return chips;
 }
 
-function twcRenderList(comments) {
+function twcRenderList(comments, keepScroll) {
     const list = document.getElementById('twcList');
     if (!list) return;
     const _pk = document.getElementById('twcPicker'); if (_pk) _pk.remove();
+    // keepScroll: optimistic reaction updates / silent revalidates re-render
+    // the SAME list — jumping to the bottom mid-read is jarring, so restore.
+    const prevScroll = keepScroll ? list.scrollTop : null;
     if (!comments || !comments.length) {
         list.innerHTML = '<div class="twc-empty">No comments yet — start the thread below.</div>';
         return;
@@ -18905,7 +18951,8 @@ function twcRenderList(comments) {
             </div>
         </div>`;
     }).join('');
-    list.scrollTop = list.scrollHeight;
+    if (prevScroll !== null) list.scrollTop = prevScroll;
+    else list.scrollTop = list.scrollHeight;
 }
 
 function twcZoom(src) {
@@ -18965,26 +19012,69 @@ function twcPickerOutside(e) {
 async function twcReact(replyId, key) {
     const st = twcSt();
     if (!st || !st.recordId) return;
+    // Phase 11.9 — sheet-like reactions (Ahmed: "when i made react take so
+    // much time to be done and even i select react it do another whole
+    // react"). Three rules:
+    //  1) OPTIMISTIC: the chip updates THIS instant, exactly like the Base;
+    //     the save happens in the background and only rolls back on failure.
+    //  2) NO RELOAD: the old flow re-fetched the whole thread (and the
+    //     backend busted the whole base scan) after every react = ~20s.
+    //  3) IN-FLIGHT GUARD: a second tap on the same chip while its save is
+    //     still flying is ignored — that repeat tap was the "another whole
+    //     react" duplicate.
+    st.reactPending = st.reactPending || {};
+    const pk = replyId + ':' + key;
+    if (st.reactPending[pk]) return;
     const c = (st.comments || []).find(x => x.reply_id === replyId);
     const me = localStorage.getItem('xenaOpenId') || '';
+    const myName = loggedUser || '';
     const rx = c && (c.reactions || []).find(r => r.key === key);
-    const mine = rx && me && (rx.users || []).includes(me);
+    const mine = !!(rx && me && (rx.users || []).includes(me));
+    const before = c ? JSON.stringify(c.reactions || []) : null;
+    if (c) {
+        c.reactions = c.reactions || [];
+        let target = c.reactions.find(r => r.key === key);
+        if (mine) {
+            const idx = (target.users || []).indexOf(me);
+            target.users = (target.users || []).filter(u => u !== me);
+            if (target.names && idx >= 0 && idx < target.names.length) target.names.splice(idx, 1);
+            target.count = Math.max(0, (target.count || 0) - 1);
+            if (!target.count) c.reactions = c.reactions.filter(r => r !== target);
+        } else {
+            if (!target) { target = { key: key, count: 0, users: [], names: [] }; c.reactions.push(target); }
+            target.count = (target.count || 0) + 1;
+            target.users = target.users || [];
+            if (me && !target.users.includes(me)) target.users.push(me);
+            target.names = target.names || [];
+            if (myName && !target.names.includes(myName)) target.names.push(myName);
+        }
+        twcRenderList(st.comments, true);   // instant chip, keep scroll
+    }
+    st.reactPending[pk] = true;
     let d = null, netErr = false;
     try {
         const r = await fetch('/api/comments/react', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reply_id: replyId, emoji: key, action: mine ? 'delete' : 'add',
-                                   user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+                                   user: loggedUser, email: loggedEmail, uat: loggedUat || '',
+                                   open_id: me })
         });
         d = await r.json();
     } catch (e) { netErr = true; }
+    delete st.reactPending[pk];
     if (netErr || !d || !d.success) {
+        if (c && before !== null) {
+            try { c.reactions = JSON.parse(before); } catch (e) {}
+            twcRenderList(st.comments, true);
+        }
         ToastManager.show((d && d.error) || 'Network error — reaction not saved', 'error');
         return;
     }
-    st.loaded = false;
-    await twcLoad(true);
+    if (d.actor_open_id) twcStoreMe(d.actor_open_id);
+    // success: nothing else to do — the chip already shows the change and the
+    // backend patched the shared scan cache, so everyone else's next read
+    // (and the sheet itself) shows it too.
 }
 
 async function twcSend() {
@@ -19137,18 +19227,37 @@ function cmnMarkAllRead() {
     cmnRender();
 }
 
-async function cmnRefresh(silent) {
+async function cmnRefresh(silent, _noReval) {
     if (cmnState.loading) return;
     cmnState.loading = true;
+    let stale = false;
     try {
         const oid = localStorage.getItem('xenaOpenId') || '';
         const r = await fetch(`/api/comments/feed?my_open_id=${encodeURIComponent(oid)}&${twcAuthQ()}`);
         const d = await r.json();
-        if (d && d.success) { cmnState.items = d.items || []; cmnState.loaded = true; }
+        if (d && d.success) { cmnState.items = d.items || []; cmnState.loaded = true; stale = !!d.stale; }
     } catch (e) { /* badge just stays as-is on network errors */ }
     cmnState.loading = false;
     cmnUpdateBadge();
     if (cmnState.open) cmnRender();
+    // Phase 11.9: the feed answered instantly from the shared scan but it's
+    // older than ~45s — refresh the scan in the background, then re-pull once
+    // (_noReval breaks the cycle so a still-stale answer can't loop).
+    if (stale && !_noReval) cmnRevalidate();
+}
+
+let _cmnRevalBusy = false, _cmnRevalLast = 0;
+async function cmnRevalidate() {
+    if (_cmnRevalBusy || (Date.now() - _cmnRevalLast < 60000)) return;
+    _cmnRevalBusy = true; _cmnRevalLast = Date.now();
+    try {
+        await fetch('/api/comments/scan-refresh', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+        });
+    } catch (e) {}
+    _cmnRevalBusy = false;
+    try { await cmnRefresh(true, true); } catch (e) {}
 }
 
 function cmnUpdateBadge() {
