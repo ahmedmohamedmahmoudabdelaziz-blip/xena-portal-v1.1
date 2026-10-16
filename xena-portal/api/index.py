@@ -7412,6 +7412,58 @@ def _harvest_person_names(obj):
     except Exception:
         pass
 
+# Phase 11.7 (Ahmed: "i has Respondents field that shows the submitters so
+# please check can we give it try and if it not cost so many"): the Grand
+# Table's person-ish fields whose inline dicts resolve an open_id WITHOUT
+# any contact scope. "Respondents" IS the created_by field — the SUBMITTER
+# (confirmed against the field list: fldAE3MeYy, type created_by). Verified
+# live on the Grand Table 2026-10-16: the `contains` operator matches
+# open_ids on BOTH user-type and created_by-type fields (Ahmed himself:
+# 6,163 Assigned-Member records, 2,002 Respondents records).
+BITABLE_PERSON_FIELDS  = ("Respondents", "Assigned Member", "Done by",
+                          "Mentioned Person", "Lock Owner")
+BITABLE_LOOKUP_MAX     = 8       # max targeted searches per resolve call
+BITABLE_LOOKUP_NEG_TTL = 3600    # ids with no person-field hit retry hourly
+
+def _person_lookup_via_bitable(open_id, tat):
+    """Phase 11.7: targeted, in-request open_id -> {name, avatar} resolution
+    via the Grand Table's own person fields — the scope-free directory,
+    instant instead of waiting for the background sweep cursor. ONE
+    records/search with an or-filter across all five person-ish fields;
+    person dicts ride inline (name + avatar_url + email), so a hit needs
+    ZERO contact scopes and ignores 通讯录授权范围 entirely. Returns
+    {"name","avatar"} or None. Cost: exactly one Bitable search per call."""
+    if not open_id or not tat:
+        return None
+    try:
+        resp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search",
+            headers={"Authorization": f"Bearer {tat}",
+                     "Content-Type": "application/json; charset=utf-8"},
+            json={"page_size": 3,
+                  "field_names": list(BITABLE_PERSON_FIELDS),
+                  "filter": {"conjunction": "or", "conditions": [
+                      {"field_name": f, "operator": "contains", "value": [open_id]}
+                      for f in BITABLE_PERSON_FIELDS]}},
+            timeout=8)
+        data = resp.json()
+    except Exception:
+        return None
+    if data.get("code") != 0:
+        return None
+    for item in ((data.get("data") or {}).get("items") or []):
+        fields = item.get("fields") or {}
+        for fname in BITABLE_PERSON_FIELDS:
+            values = fields.get(fname) or []
+            if isinstance(values, dict):
+                values = [values]
+            for v in values:
+                if (isinstance(v, dict) and v.get("id") == open_id
+                        and (v.get("name") or "").strip()):
+                    return {"name": v["name"].strip(),
+                            "avatar": v.get("avatar_url") or ""}
+    return None
+
 def _directory_resolve_masked(masked, uat, found):
     """Resolve still-masked open_ids (name == "user-xxxx") via the team
     directory: the Access Control table holds every portal member's login
@@ -7715,6 +7767,50 @@ def _resolve_comment_names(user_ids, token, uat=None):
                 except Exception:
                     pass
                 break
+    # Phase 11.7: targeted Bitable lookup for anyone still masked — instant,
+    # in-request, scope-free. Runs BEFORE the sweep so a hit resolves in
+    # ~100ms instead of waiting for the background cursor. Cost: ONE
+    # records/search per masked id (cap BITABLE_LOOKUP_MAX per call); a hit
+    # is cached 24h (HARVEST_NAME_TTL); a miss is negative-cached 1h so a
+    # genuinely-absent id costs at most one search per hour. Tenant token
+    # first (the app is a collaborator on the base), UAT fallback.
+    masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
+    if masked_now:
+        bitable_tokens = []
+        for t in (get_tenant_access_token(), uat):
+            if t and t not in bitable_tokens:
+                bitable_tokens.append(t)
+        lookups = 0
+        for uid in list(masked_now):
+            if lookups >= BITABLE_LOOKUP_MAX:
+                break
+            try:
+                if redis_get_json(f"xena:uname:neg:{uid}"):
+                    continue
+            except Exception:
+                pass
+            hit = None
+            for tk in bitable_tokens:
+                if lookups >= BITABLE_LOOKUP_MAX:
+                    break
+                lookups += 1
+                hit = _person_lookup_via_bitable(uid, tk)
+                if hit is not None:
+                    break
+            if hit and hit.get("name"):
+                found[uid] = hit
+                try:
+                    redis_set_json(f"xena:uname:{uid}",
+                                   {"name": hit["name"], "avatar": hit.get("avatar") or ""},
+                                   ttl=HARVEST_NAME_TTL)
+                except Exception:
+                    pass
+            else:
+                try:
+                    redis_set_json(f"xena:uname:neg:{uid}", {"ts": time.time()},
+                                   ttl=BITABLE_LOOKUP_NEG_TTL)
+                except Exception:
+                    pass
     # Phase 11.4: still masked after the member directory? Sweep the Grand
     # Table itself (incremental, throttled) — anyone who ever touched a
     # ticket gets harvested straight from the sheet's own data, so coverage
