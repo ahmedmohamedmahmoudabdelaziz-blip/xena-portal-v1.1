@@ -1793,8 +1793,16 @@
         .twc-avatar{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;}
 .twc-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
 .twc-rx-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
-.twc-rx{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:.72rem;line-height:1.5;cursor:default;}
+.twc-rx{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:.72rem;line-height:1.5;cursor:pointer;user-select:none;}
+.twc-rx:hover{background:rgba(255,255,255,.12);}
+.twc-rx.twc-rx-me{border-color:var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.14);}
 .twc-rx b{font-weight:700;color:var(--accent-cyan,#00d4ff);font-size:.7rem;}
+.twc-rx-add{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:transparent;border:1px dashed rgba(255,255,255,.22);font-size:.72rem;line-height:1.5;cursor:pointer;color:var(--text-muted,#8a8fa3);}
+.twc-rx-add:hover{border-color:var(--accent-cyan,#00d4ff);color:#fff;}
+.twc-picker{position:fixed;z-index:9999;display:flex;gap:2px;padding:6px 8px;border-radius:12px;background:#1c2030;border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.twc-picker button{background:transparent;border:none;font-size:1.05rem;padding:3px 4px;border-radius:8px;cursor:pointer;line-height:1;}
+.twc-picker button:hover{background:rgba(255,255,255,.12);}
+.twc-picker button.twc-pk-me{background:rgba(0,212,255,.18);outline:1px solid var(--accent-cyan,#00d4ff);}
         .twc-item-main{flex:1;min-width:0;}
         .twc-item-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
         .twc-author{font-size:.8rem;font-weight:700;color:var(--text,#fff);}
@@ -18810,7 +18818,7 @@ function twcRenderParts(parts) {
 // reaction in the Base rendered as an unknown-key placeholder here).
 const TWC_RX_EMOJI = {
     THUMBSUP: '👍', THUMBSDOWN: '👎', SMILE: '😊', LAUGH: '😆', HEART: '❤️', LOVE: '❤️',
-    CLAP: '👏', THANKS: '🙏', PRAY: '🙏', OK: '👌', DONE: '✅', MUSCLE: '💪', JIAYI: '💪', FISTBUMP: '👊',
+    CLAP: '👏', APPLAUSE: '👏', FINGERHEART: '🫰', THANKS: '🙏', PRAY: '🙏', OK: '👌', DONE: '✅', MUSCLE: '💪', JIAYI: '💪', FISTBUMP: '👊',
     PARTY: '🎉', CELEBRATE: '🎉', CRY: '😢', ANGRY: '😡', WOW: '😮', THINKING: '🤔',
     CONFUSED: '😕', SAD: '😢', FIRE: '🔥', ROCKET: '🚀', EYES: '👀', HANDSHAKE: '🤝',
     HUNDRED: '💯', QUESTION: '❓', EXCLAMATION: '❗', STAR: '⭐', FLOWER: '🌹', ROSE: '🌹', COFFEE: '☕',
@@ -18854,20 +18862,24 @@ function twcRenderAvatarHtml(name, avatarUrl, cls) {
     return `<span class="${c}">${twcEsc(twcInitials(name))}</span>`;
 }
 
-function twcRenderReactions(reactions) {
+function twcRenderReactions(reactions, replyId) {
     if (!reactions || !reactions.length) return '';
+    const me = localStorage.getItem('xenaOpenId') || '';
     const chips = reactions.map(rx => {
         const names = (rx.names || []).filter(Boolean);
         const tip = names.length ? names.join(', ') : (rx.users || []).join(', ');
         const cnt = rx.count > 1 ? `<b>${rx.count}</b>` : '';
-        return `<span class="twc-rx" title="${twcEsc(tip)}">${twcReactionEmoji(rx.key)}${cnt}</span>`;
+        const mine = me && (rx.users || []).includes(me);
+        const clk = (replyId && TWC_REACT_KEYS.includes(rx.key)) ? ` onclick="twcReact('${twcEsc(replyId)}','${twcEsc(rx.key)}')"` : '';
+        return `<span class="twc-rx${mine ? ' twc-rx-me' : ''}" title="${twcEsc(tip)}${mine ? ' (you — click to remove)' : ''}"${clk}>${twcReactionEmoji(rx.key)}${cnt}</span>`;
     }).join('');
-    return `<div class="twc-rx-row">${chips}</div>`;
+    return chips;
 }
 
 function twcRenderList(comments) {
     const list = document.getElementById('twcList');
     if (!list) return;
+    const _pk = document.getElementById('twcPicker'); if (_pk) _pk.remove();
     if (!comments || !comments.length) {
         list.innerHTML = '<div class="twc-empty">No comments yet — start the thread below.</div>';
         return;
@@ -18876,6 +18888,9 @@ function twcRenderList(comments) {
         const imgs = (c.images || []).map(tok =>
             `<img src="/api/comments/media/${encodeURIComponent(tok)}?${twcAuthQ()}" loading="lazy" alt="" onclick="twcZoom(this.src)">`
         ).join('');
+        const rxRow = c.reply_id
+            ? `<div class="twc-rx-row">${twcRenderReactions(c.reactions, c.reply_id)}<button type="button" class="twc-rx-add" title="Add a reaction" onclick="twcTogglePicker(event,'${twcEsc(c.reply_id)}')">😊+</button></div>`
+            : twcRenderReactions(c.reactions, '');
         return `<div class="twc-item">
             ${twcRenderAvatarHtml(c.user_name, c.user_avatar)}
             <div class="twc-item-main">
@@ -18886,7 +18901,7 @@ function twcRenderList(comments) {
                 </div>
                 <div class="twc-text">${twcRenderParts(c.parts)}</div>
                 ${imgs ? `<div class="twc-imgs">${imgs}</div>` : ''}
-                ${twcRenderReactions(c.reactions)}
+                ${rxRow}
             </div>
         </div>`;
     }).join('');
@@ -18898,6 +18913,78 @@ function twcZoom(src) {
         try { openImageLightbox(src, 'comment image'); return; } catch (e) {}
     }
     window.open(src, '_blank', 'noopener');
+}
+
+/* ---- reactions: picker + add/remove (Phase 11.8) ---- */
+const TWC_REACT_KEYS = ['THUMBSUP', 'HEART', 'DONE', 'LAUGH', 'APPLAUSE',
+                        'FINGERHEART', 'WOW', 'CRY', 'OK', 'JIAYI'];
+
+function twcTogglePicker(ev, replyId) {
+    ev.stopPropagation();
+    const existing = document.getElementById('twcPicker');
+    if (existing && existing.dataset.replyId === replyId) { existing.remove(); return; }
+    if (existing) existing.remove();
+    const st = twcSt();
+    const c = ((st && st.comments) || []).find(x => x.reply_id === replyId);
+    const me = localStorage.getItem('xenaOpenId') || '';
+    const picker = document.createElement('div');
+    picker.id = 'twcPicker';
+    picker.className = 'twc-picker';
+    picker.dataset.replyId = replyId;
+    picker.innerHTML = TWC_REACT_KEYS.map(k => {
+        const rx = c && (c.reactions || []).find(r => r.key === k);
+        const mine = rx && me && (rx.users || []).includes(me);
+        return `<button type="button" class="${mine ? 'twc-pk-me' : ''}" data-k="${k}" title="${mine ? 'Remove your reaction' : 'React'}">${twcReactionEmoji(k)}</button>`;
+    }).join('');
+    document.body.appendChild(picker);
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const pw = picker.offsetWidth, ph = picker.offsetHeight;
+    let left = Math.min(Math.max(8, rect.left), window.innerWidth - pw - 8);
+    let top = rect.top - ph - 6;
+    if (top < 8) top = rect.bottom + 6;
+    picker.style.left = left + 'px';
+    picker.style.top = top + 'px';
+    picker.addEventListener('click', e2 => {
+        const b = e2.target.closest('button[data-k]');
+        if (!b) return;
+        e2.stopPropagation();
+        picker.remove();
+        twcReact(replyId, b.dataset.k);
+    });
+    setTimeout(() => document.addEventListener('click', twcPickerOutside), 0);
+}
+
+function twcPickerOutside(e) {
+    const p = document.getElementById('twcPicker');
+    if (p && !p.contains(e.target)) {
+        p.remove();
+        document.removeEventListener('click', twcPickerOutside);
+    }
+}
+
+async function twcReact(replyId, key) {
+    const st = twcSt();
+    if (!st || !st.recordId) return;
+    const c = (st.comments || []).find(x => x.reply_id === replyId);
+    const me = localStorage.getItem('xenaOpenId') || '';
+    const rx = c && (c.reactions || []).find(r => r.key === key);
+    const mine = rx && me && (rx.users || []).includes(me);
+    let d = null, netErr = false;
+    try {
+        const r = await fetch('/api/comments/react', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reply_id: replyId, emoji: key, action: mine ? 'delete' : 'add',
+                                   user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+        });
+        d = await r.json();
+    } catch (e) { netErr = true; }
+    if (netErr || !d || !d.success) {
+        ToastManager.show((d && d.error) || 'Network error — reaction not saved', 'error');
+        return;
+    }
+    st.loaded = false;
+    await twcLoad(true);
 }
 
 async function twcSend() {
