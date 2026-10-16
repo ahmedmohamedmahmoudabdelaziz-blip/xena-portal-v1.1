@@ -2350,6 +2350,18 @@ def callback():
             # is not a secret). Renewed on every silent refresh alongside the
             # refresh-token chain, so it lives exactly as long as the session can.
             redis_cmd("SET", f"xena:uid_email:{lark_open_id}", lark_email, "EX", 24 * 3600)
+        if lark_open_id and lark_name and REDIS_ENABLED:
+            try:
+                # Phase 11.8: every login refreshes the resolver's name/avatar
+                # cache for THIS user — so a comment author who never appears
+                # in any sheet person field (never applied, never assigned)
+                # still resolves, straight from their own login. Zero extra
+                # Feishu calls: user_info was already fetched above.
+                redis_set_json(f"xena:uname:{lark_open_id}",
+                               {"name": lark_name, "avatar": avatar_url or ""},
+                               ttl=HARVEST_NAME_TTL)
+            except Exception:
+                pass
         uat_expires_in = (token_resp.get("data") or {}).get("expires_in") or token_resp.get("expires_in") or 7200
         if lark_open_id and REDIS_ENABLED:
             redis_cmd("SET", f"xena:uat:{lark_open_id}", uat, "EX", max(int(uat_expires_in) - 300, 60))
@@ -7425,6 +7437,11 @@ BITABLE_PERSON_FIELDS  = ("Respondents", "Assigned Member", "Done by",
 BITABLE_LOOKUP_MAX     = 8       # max targeted searches per resolve call
 BITABLE_LOOKUP_NEG_TTL = 3600    # ids with no person-field hit retry hourly
 
+# Phase 11.8: emoji whitelist for /api/comments/react — maps 1:1 to Feishu
+# drive v2 reaction_type values; the frontend picker shows the same set.
+COMMENT_REACT_EMOJIS = ("THUMBSUP", "HEART", "DONE", "LAUGH", "APPLAUSE",
+                        "FINGERHEART", "WOW", "CRY", "OK", "JIAYI")
+
 def _person_lookup_via_bitable(open_id, tat):
     """Phase 11.7: targeted, in-request open_id -> {name, avatar} resolution
     via the Grand Table's own person fields — the scope-free directory,
@@ -7714,103 +7731,129 @@ def _resolve_comment_names(user_ids, token, uat=None):
             _directory_resolve_masked(masked_now, uat, found)
         except Exception:
             pass
-    # Phase 11.5: single-user contact GET — the app now HAS
-    # contact:user.base:readonly as a USER scope (verified in the developer
-    # console, Ahmed's video 2026-10-16) and contact:contact.base:readonly as
-    # a TENANT scope. The batch leg above needs its own scope combo, so this
-    # per-id GET is the second live leg: try the tenant token first (zero
-    # UAT dependency), then the caller's UAT (carries the user scope after a
-    # fresh login). Universal: resolves ANY open_id — portal member or not.
-    # Budgeted; a scope rejection on either token stops that token's leg
-    # immediately (no per-id waste).
-    masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
-    if masked_now:
-        contact_tokens = []
-        for t in (get_tenant_access_token(), uat):
-            if t and t not in contact_tokens:
-                contact_tokens.append(t)
-        dead, resolved_ct = set(), 0
-        for uid in list(masked_now):
-            if resolved_ct >= 8:
-                break
-            for tk in contact_tokens:
-                if tk in dead:
-                    continue
-                try:
-                    resp = feishu_session.get(
-                        f"https://open.feishu.cn/open-apis/contact/v3/users/{uid}",
-                        headers={"Authorization": f"Bearer {tk}"},
-                        params={"user_id_type": "open_id"}, timeout=8)
-                    data = resp.json()
-                except Exception:
-                    continue
-                if data.get("code") != 0:
-                    dead.add(tk)  # scope missing on this token — stop its leg
-                    continue
-                u = (data.get("data") or {}).get("user") or {}
-                nm = u.get("name") or ""
-                if not nm:
-                    # Phase 11.6: code:0 with an EMPTY user object usually means
-                    # the app's 通讯录授权范围 hides this employee from the TENANT
-                    # token — not that the user is gone. Try the next token (the
-                    # UAT sees everyone the caller can see) before giving up.
-                    continue
-                av = (u.get("avatar") or {}).get("avatar_72") or ""
-                found[uid] = {"name": nm, "avatar": av}
-                resolved_ct += 1
-                try:
-                    redis_set_json(f"xena:uname:{uid}", {"name": nm, "avatar": av},
-                                   ttl=COMMENT_NAME_TTL)
-                    em = (u.get("email") or u.get("enterprise_email") or "").strip().lower()
-                    if em and not redis_get_json(f"xena:uemail:{em}"):
-                        redis_set_json(f"xena:uemail:{em}", uid, ttl=30 * 86400)
-                except Exception:
-                    pass
-                break
-    # Phase 11.7: targeted Bitable lookup for anyone still masked — instant,
-    # in-request, scope-free. Runs BEFORE the sweep so a hit resolves in
-    # ~100ms instead of waiting for the background cursor. Cost: ONE
-    # records/search per masked id (cap BITABLE_LOOKUP_MAX per call); a hit
-    # is cached 24h (HARVEST_NAME_TTL); a miss is negative-cached 1h so a
-    # genuinely-absent id costs at most one search per hour. Tenant token
-    # first (the app is a collaborator on the base), UAT fallback.
+    # Phase 11.8: the two per-id legs below are PARALLEL (ThreadPoolExecutor)
+    # and the scope-free Bitable leg now runs FIRST. The old sequential loops
+    # cost up to ~16 cross-border round trips (8-20s from Vercel) whenever
+    # several masked ids were pending — Ahmed's "comments load so so much"
+    # and the slow Audition Status board both traced to this. A bounded pool
+    # costs ~1 round trip per leg instead.
+
+    # Phase 11.7 (moved ahead of the contact leg in 11.8): targeted Bitable
+    # lookup — instant, in-request, needs ZERO contact scopes, so in tenants
+    # where 通讯录授权范围 hides everyone (ours, today) this is the leg that
+    # actually resolves. Cost: ONE records/search per masked id (cap
+    # BITABLE_LOOKUP_MAX per call); a hit is cached 24h (HARVEST_NAME_TTL);
+    # a miss is negative-cached 1h so a genuinely-absent id costs at most
+    # one search per hour. Tenant token first (the app is a collaborator on
+    # the base), UAT fallback.
     masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
     if masked_now:
         bitable_tokens = []
         for t in (get_tenant_access_token(), uat):
             if t and t not in bitable_tokens:
                 bitable_tokens.append(t)
-        lookups = 0
-        for uid in list(masked_now):
-            if lookups >= BITABLE_LOOKUP_MAX:
-                break
-            try:
-                if redis_get_json(f"xena:uname:neg:{uid}"):
-                    continue
-            except Exception:
-                pass
-            hit = None
-            for tk in bitable_tokens:
-                if lookups >= BITABLE_LOOKUP_MAX:
-                    break
-                lookups += 1
-                hit = _person_lookup_via_bitable(uid, tk)
-                if hit is not None:
-                    break
-            if hit and hit.get("name"):
-                found[uid] = hit
+        if bitable_tokens:
+            todo = []
+            for uid in masked_now:
                 try:
-                    redis_set_json(f"xena:uname:{uid}",
-                                   {"name": hit["name"], "avatar": hit.get("avatar") or ""},
-                                   ttl=HARVEST_NAME_TTL)
+                    if redis_get_json(f"xena:uname:neg:{uid}"):
+                        continue
                 except Exception:
                     pass
-            else:
+                todo.append(uid)
+            todo = todo[:BITABLE_LOOKUP_MAX]
+            def _bt_one(uid):
+                for tk in bitable_tokens:
+                    hit = _person_lookup_via_bitable(uid, tk)
+                    if hit is not None:
+                        return uid, hit
+                return uid, None
+            if todo:
+                with ThreadPoolExecutor(max_workers=min(6, len(todo))) as pool:
+                    for uid, hit in pool.map(_bt_one, todo):
+                        if hit and hit.get("name"):
+                            found[uid] = hit
+                            try:
+                                redis_set_json(f"xena:uname:{uid}",
+                                               {"name": hit["name"], "avatar": hit.get("avatar") or ""},
+                                               ttl=HARVEST_NAME_TTL)
+                            except Exception:
+                                pass
+                        else:
+                            try:
+                                redis_set_json(f"xena:uname:neg:{uid}", {"ts": time.time()},
+                                               ttl=BITABLE_LOOKUP_NEG_TTL)
+                            except Exception:
+                                pass
+    # Per-id contact GET — the second live leg (see the batch leg's note
+    # above): tenant token first (zero UAT dependency), then the caller's
+    # UAT (carries the user scope after a fresh login). Universal when the
+    # app's contact visibility allows it: resolves ANY open_id, portal
+    # member or not. Parallel + capped at 8 ids; a miss is negative-cached
+    # 1h (xena:uname:negc) so a data-restricted id stops costing round
+    # trips on every single comment load.
+    masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
+    if masked_now:
+        contact_tokens = []
+        for t in (get_tenant_access_token(), uat):
+            if t and t not in contact_tokens:
+                contact_tokens.append(t)
+        if contact_tokens:
+            todo = []
+            for uid in masked_now:
                 try:
-                    redis_set_json(f"xena:uname:neg:{uid}", {"ts": time.time()},
-                                   ttl=BITABLE_LOOKUP_NEG_TTL)
+                    if redis_get_json(f"xena:uname:negc:{uid}"):
+                        continue
                 except Exception:
                     pass
+                todo.append(uid)
+            todo = todo[:8]
+            dead = set()
+            def _cg_one(uid):
+                for tk in contact_tokens:
+                    if tk in dead:
+                        continue
+                    try:
+                        resp = feishu_session.get(
+                            f"https://open.feishu.cn/open-apis/contact/v3/users/{uid}",
+                            headers={"Authorization": f"Bearer {tk}"},
+                            params={"user_id_type": "open_id"}, timeout=8)
+                        data = resp.json()
+                    except Exception:
+                        continue
+                    if data.get("code") != 0:
+                        dead.add(tk)  # scope missing on this token — stop its leg
+                        continue
+                    u = (data.get("data") or {}).get("user") or {}
+                    if not (u.get("name") or ""):
+                        # Phase 11.6: code:0 with an EMPTY user object usually
+                        # means the app's 通讯录授权范围 hides this employee
+                        # from the token — not that the user is gone. Try the
+                        # next token before giving up.
+                        continue
+                    return uid, u
+                return uid, None
+            if todo:
+                with ThreadPoolExecutor(max_workers=min(6, len(todo))) as pool:
+                    for uid, u in pool.map(_cg_one, todo):
+                        if u:
+                            nm = u.get("name") or ""
+                            av = (u.get("avatar") or {}).get("avatar_72") or ""
+                            found[uid] = {"name": nm, "avatar": av}
+                            try:
+                                redis_set_json(f"xena:uname:{uid}", {"name": nm, "avatar": av},
+                                               ttl=COMMENT_NAME_TTL)
+                                em = (u.get("email") or u.get("enterprise_email") or "").strip().lower()
+                                if em and not redis_get_json(f"xena:uemail:{em}"):
+                                    redis_set_json(f"xena:uemail:{em}", uid, ttl=30 * 86400)
+                            except Exception:
+                                pass
+                        else:
+                            try:
+                                redis_set_json(f"xena:uname:negc:{uid}", {"ts": time.time()},
+                                               ttl=BITABLE_LOOKUP_NEG_TTL)
+                            except Exception:
+                                pass
     # Phase 11.4: still masked after the member directory? Sweep the Grand
     # Table itself (incremental, throttled) — anyone who ever touched a
     # ticket gets harvested straight from the sheet's own data, so coverage
@@ -8015,6 +8058,50 @@ def add_ticket_comment():
         logger.error("comment_add_rejected", record_id=record_id, code=data.get("code"), msg=data.get("msg"))
         return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}"}), 400
     redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)  # next read re-scans so the new comment shows immediately
+    return jsonify({"success": True})
+
+@app.route('/api/comments/react', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def react_ticket_comment():
+    """Add/remove an emoji reaction on a ticket comment (or one of its
+    replies) AS the logged-in agent (UAT). Feishu drive v2 comment-reaction
+    API with file_type=bitable — the SAME comment system the portal already
+    reads and posts to, so the chip shows up in the Base UI too.
+    Body: {reply_id, emoji, action:"add"|"delete", user, email, uat}.
+    Toggle semantics live in the frontend; this endpoint is idempotent per
+    (reply_id, emoji, user) on Feishu's side."""
+    body = request.get_json(silent=True) or {}
+    reply_id = sanitize_text(body.get('reply_id', ''))
+    emoji    = (body.get('emoji') or '').strip().upper()
+    action   = (body.get('action') or 'add').strip().lower()
+    if not reply_id or not emoji:
+        return jsonify({"success": False, "error": "Missing reply_id or emoji"}), 400
+    if emoji not in COMMENT_REACT_EMOJIS:
+        return jsonify({"success": False,
+                        "error": f"Unsupported emoji. Allowed: {', '.join(COMMENT_REACT_EMOJIS)}"}), 400
+    if action not in ("add", "delete"):
+        return jsonify({"success": False, "error": "action must be add or delete"}), 400
+    user, email, uat, token, err = _comments_caller()
+    if err:
+        return err
+    if not uat:
+        return jsonify({"success": False,
+                        "error": "Missing User Access Token -- please log out and back in, then retry."}), 400
+    try:
+        resp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/drive/v2/files/{BASE_ID}/comments/reaction?file_type=bitable",
+            headers={"Authorization": f"Bearer {uat}",
+                     "Content-Type": "application/json; charset=utf-8"},
+            json={"action": action, "reply_id": reply_id, "reaction_type": emoji},
+            timeout=10)
+        data = resp.json()
+    except Exception as e:
+        logger.error("comment_react_failed", reply_id=reply_id, error=str(e))
+        return jsonify({"success": False, "error": str(e)}), 502
+    if data.get("code") != 0:
+        logger.error("comment_react_rejected", reply_id=reply_id, code=data.get("code"), msg=data.get("msg"))
+        return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}"}), 400
+    redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)  # next read re-scans so the chip shows immediately
     return jsonify({"success": True})
 
 def _resolve_record_numberings(record_ids, token):
@@ -8460,13 +8547,32 @@ def _presence_row_identity(item):
 
 def _presence_build_board(items, uat=""):
     """Roster records -> shared (caller-independent) board payload."""
-    open_ids = []
+    # Phase 11.8: rows whose Agent Name person dict already carries BOTH name
+    # and avatar use it DIRECTLY — zero resolver rounds; a board rebuild is
+    # then exactly ONE roster read. Rows with a name but NO avatar go through
+    # the resolver too (avatar fill only, dict name wins) — the resolver's
+    # parallel legs + neg-caches keep that bounded. Only genuinely name-less
+    # rows rely on the resolver for the name.
+    people, need = {}, []
     for it in items:
-        _, oid, _nm = _presence_row_identity(it)
-        if oid:
-            open_ids.append(oid)
-    # Avatars/names ride the 24h Redis-cached resolver -- ~zero marginal cost.
-    people = _resolve_comment_names(open_ids, get_tenant_access_token(), uat=uat or None) if open_ids else {}
+        persons = (it.get("fields") or {}).get("Agent Name") or []
+        _, oid, nm = _presence_row_identity(it)
+        av = ""
+        if isinstance(persons, list) and persons and isinstance(persons[0], dict):
+            av = persons[0].get("avatar_url") or ""
+        if oid and nm:
+            people[oid] = {"name": nm, "avatar": av}
+            if not av:
+                need.append(oid)  # name known, avatar missing — resolver fills the avatar only
+        elif oid:
+            need.append(oid)
+    if need:
+        for oid, p in _resolve_comment_names(need, get_tenant_access_token(), uat=uat or None).items():
+            if oid in people:
+                if not people[oid].get("avatar") and p.get("avatar"):
+                    people[oid]["avatar"] = p["avatar"]  # merge: sheet name wins, resolver avatar fills
+            else:
+                people[oid] = p
     agents, counts = [], {s: 0 for s in PRESENCE_STATUSES}
     for it in items:
         f = it.get("fields") or {}
