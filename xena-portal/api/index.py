@@ -7271,8 +7271,21 @@ def health():
 # ============================================================================
 REQUESTS_DEFAULT_VIEW_ID = "vewpHhuE1X"  # "Results" grid view -- the anchor view the Base itself stamps on record comments
 COMMENTS_SCAN_CACHE_KEY  = "xena:comments:scan:v1"
-COMMENTS_SCAN_TTL        = 30      # seconds; one base-wide scan shared by thread + feed
+# Phase 11.9 (Ahmed: "check how long it take to load the comment ... i need it
+# same exctly like the sheet fast smoth"): the 30s self-expiring TTL made nearly
+# EVERY comment load a cold base-wide rescan (30 pages x cross-border ≈ 20-25s).
+# Now the scan is PERSISTENT in Redis and freshness is event-driven instead:
+# portal-made changes (new comment / reaction) are patched into the cached scan
+# in place (instant, exact), sheet-side changes are picked up by a lock-deduped
+# background revalidate the frontend triggers when a read reports stale.
+COMMENTS_SCAN_KEEP_TTL   = 7 * 86400  # cache never really expires (safety net)
+COMMENTS_SCAN_FRESH      = 45      # seconds; reads older than this are served
+                                   # instantly AND flagged stale so the
+                                   # frontend revalidates in the background
 COMMENTS_SCAN_MAX_PAGES  = 30      # hard cap: 30 x 100 = 3000 comment threads
+COMMENTS_SCAN_LOCK_KEY   = "xena:comments:scan:lock"  # one rescan at a time,
+                                   # across all concurrent requests/instances
+COMMENTS_SCAN_LOCK_MS    = 45000   # lock covers a worst-case full scan
 COMMENTS_FEED_MAX        = 100
 COMMENT_NAME_TTL         = 3600    # open_id -> display name from LIVE lookups, 1h
                                    # (Phase 11.4, Ahmed: "not cached" — masked ids are
@@ -7340,14 +7353,15 @@ def _reply_images(reply):
                 out.append(tok)
     return out
 
-def _fetch_all_comments(token):
-    """Scan every comment thread on the Grand Table (oldest-first) and cache
-    the scan in Redis for COMMENTS_SCAN_TTL seconds so a ticket open and the
-    notifications bell share ONE scan instead of each paginating the base.
-    Returns (payload, error) where payload = {"items": [...], "truncated": bool}.
-    """
+def _fetch_all_comments(token, force=False):
+    """Read the shared base-wide comment scan. The scan is PERSISTENT in Redis
+    (Phase 11.9): reads serve the cached copy regardless of age (the caller
+    reports staleness via _scan_is_stale and the frontend revalidates in the
+    background); only force=True — or an empty cache — paginates the base.
+    Returns (payload, error) where payload = {"items": [...], "truncated": bool,
+    "ts": epoch}."""
     cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
-    if isinstance(cached, dict) and "items" in cached:
+    if isinstance(cached, dict) and "items" in cached and not force:
         return cached, None
     items, page_token, pages = [], None, 0
     while pages < COMMENTS_SCAN_MAX_PAGES:
@@ -7377,9 +7391,154 @@ def _fetch_all_comments(token):
         page_token = d.get("page_token")
         if not page_token:
             break
-    payload = {"items": items, "truncated": bool(page_token)}
-    redis_set_json(COMMENTS_SCAN_CACHE_KEY, payload, ttl=COMMENTS_SCAN_TTL)
+    payload = {"items": items, "truncated": bool(page_token), "ts": int(time.time())}
+    redis_set_json(COMMENTS_SCAN_CACHE_KEY, payload, ttl=COMMENTS_SCAN_KEEP_TTL)
     return payload, None
+
+def _scan_is_stale(scan):
+    """True when the cached scan is older than COMMENTS_SCAN_FRESH (or carries
+    no timestamp — e.g. written before Phase 11.9)."""
+    ts = int((scan or {}).get("ts") or 0) if isinstance(scan, dict) else 0
+    return (time.time() - ts) > COMMENTS_SCAN_FRESH
+
+def _scan_refresh(token):
+    """Refresh the shared scan, de-duplicated across concurrent requests and
+    Vercel instances by a Redis lock: the lock holder rescans; everyone else
+    waits (max ~25s) for the holder's fresh copy instead of all paginating the
+    base at once. Returns (payload, error)."""
+    if not REDIS_ENABLED:
+        return _fetch_all_comments(token, force=True)
+    cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+    old_ts = int(cached.get("ts") or 0) if isinstance(cached, dict) else 0
+    try:
+        got = redis_cmd("SET", COMMENTS_SCAN_LOCK_KEY, str(time.time()),
+                        "NX", "PX", COMMENTS_SCAN_LOCK_MS)
+    except Exception:
+        got = None
+    if got:
+        try:
+            return _fetch_all_comments(token, force=True)
+        finally:
+            try:
+                redis_cmd("DEL", COMMENTS_SCAN_LOCK_KEY)
+            except Exception:
+                pass
+    # Another instance/request is refreshing right now — wait for its result.
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        time.sleep(1)
+        fresh = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+        if isinstance(fresh, dict) and "items" in fresh and int(fresh.get("ts") or 0) > old_ts:
+            return fresh, None
+    # The holder didn't land in time — serve whatever is cached rather than
+    # stampeding the base; scan inline only when there is NOTHING cached.
+    if isinstance(cached, dict) and "items" in cached:
+        return cached, None
+    return _fetch_all_comments(token, force=True)
+
+def _scan_save(cached):
+    """Write back a patched scan, preserving its original ts (a patch freshens
+    one thread, not the whole base — the freshness window still governs the
+    rest)."""
+    try:
+        redis_set_json(COMMENTS_SCAN_CACHE_KEY, cached, ttl=COMMENTS_SCAN_KEEP_TTL)
+    except Exception:
+        pass
+
+def _scan_upsert_comment(record_id, created):
+    """Patch a just-posted comment thread into the shared scan cache so the
+    poster's reload (and everyone's next read) sees it WITHOUT a base-wide
+    rescan. The new_comments response data IS the created comment object (same
+    shape as a scan item) but carries no record anchor — stamped here from the
+    request. Returns False when the payload doesn't look like a comment object
+    (the caller then falls back to busting the cache)."""
+    if not isinstance(created, dict) or not created.get("comment_id"):
+        return False
+    cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+    if not (isinstance(cached, dict) and isinstance(cached.get("items"), list)):
+        return False
+    anchor = {"record": record_id, "table": REQUESTS_TABLE_ID,
+              "view": REQUESTS_DEFAULT_VIEW_ID}
+    for r in ((created.get("reply_list") or {}).get("replies") or []):
+        extra = r.get("extra")
+        if not isinstance(extra, dict):
+            extra = {}
+            r["extra"] = extra
+        ne = extra.get("notify_extra")
+        if not isinstance(ne, dict):
+            ne = {}
+            extra["notify_extra"] = ne
+        ne.update(anchor)
+    items = cached["items"]
+    items[:] = [c for c in items if c.get("comment_id") != created["comment_id"]]
+    items.append(created)  # scan order is oldest-first; a new thread goes last
+    _scan_save(cached)
+    return True
+
+def _scan_patch_reaction(reply_id, emoji, action, actor_open_id):
+    """Apply a successful reaction to the shared scan cache in place — the
+    Phase 11.9 replacement for busting the whole cache (which forced a 20s
+    base-wide rescan after EVERY react, the 'react takes forever' Ahmed
+    reported). Mirrors Feishu's idempotency: add is a no-op when the actor is
+    already counted, delete is a no-op when they are not (actor unknown →
+    count-only best effort; the next scheduled rescan reconciles)."""
+    cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+    if not (isinstance(cached, dict) and isinstance(cached.get("items"), list)):
+        return False
+    hit = False
+    for c in cached["items"]:
+        for r in ((c.get("reply_list") or {}).get("replies") or []):
+            if r.get("reply_id") != reply_id:
+                continue
+            hit = True
+            rxs = r.get("reactions")
+            if not isinstance(rxs, list):
+                rxs = []
+                r["reactions"] = rxs
+            tgt = next((x for x in rxs if x.get("reaction_key") == emoji), None)
+            if action == "add":
+                if tgt is None:
+                    tgt = {"reaction_key": emoji, "count": 0, "ahead_users": []}
+                    rxs.append(tgt)
+                users = tgt.get("ahead_users")
+                if not isinstance(users, list):
+                    users = []
+                    tgt["ahead_users"] = users
+                if actor_open_id and actor_open_id in users:
+                    pass  # already counted — idempotent repeat
+                else:
+                    tgt["count"] = int(tgt.get("count") or 0) + 1
+                    if actor_open_id:
+                        users.append(actor_open_id)
+            else:  # delete
+                if tgt is not None:
+                    users = tgt.get("ahead_users")
+                    if not isinstance(users, list):
+                        users = []
+                    if actor_open_id and users and actor_open_id not in users:
+                        pass  # not counted under this id — idempotent repeat
+                    else:
+                        tgt["count"] = max(0, int(tgt.get("count") or 0) - 1)
+                        if actor_open_id:
+                            tgt["ahead_users"] = [u for u in users if u != actor_open_id]
+                    if int(tgt.get("count") or 0) <= 0:
+                        rxs.remove(tgt)
+    if hit:
+        _scan_save(cached)
+    return hit
+
+def _caller_open_id(email):
+    """The logged-in caller's open_id from the email->open_id bridge cache
+    (xena:uemail:*, written by person-field harvests / the directory warm).
+    '' when unknown — purely cosmetic uses (cache patches), never auth."""
+    em = (email or "").strip().lower()
+    if not em:
+        return ""
+    try:
+        v = redis_get_json(f"xena:uemail:{em}")
+        return v if isinstance(v, str) else ""
+    except Exception:
+        return ""
 
 def _harvest_person_names(obj):
     """Walk a record's fields (any nesting) and Redis-cache every person
@@ -7983,7 +8142,9 @@ def list_ticket_comments():
         for rx in item["reactions"]:
             rx["names"] = [people.get(u, {}).get("name", u) for u in rx["users"]]
     return jsonify({"success": True, "comments": out, "count": len(out),
-                    "truncated": bool(scan.get("truncated"))})
+                    "truncated": bool(scan.get("truncated")),
+                    "stale": _scan_is_stale(scan),
+                    "me_open_id": _caller_open_id(email)})
 
 def _build_reply_elements(text, mentions):
     """Splice @Name occurrences in the composer's plain text into Feishu
@@ -8057,8 +8218,31 @@ def add_ticket_comment():
     if data.get("code") != 0:
         logger.error("comment_add_rejected", record_id=record_id, code=data.get("code"), msg=data.get("msg"))
         return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}"}), 400
-    redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)  # next read re-scans so the new comment shows immediately
+    # Phase 11.9: patch the new thread into the shared scan in place instead
+    # of busting the whole cache (which forced the NEXT reader into a 20s
+    # base-wide rescan). Fallback: bust, only if the payload shape surprises us.
+    if not _scan_upsert_comment(record_id, data.get("data") or {}):
+        redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)
     return jsonify({"success": True})
+
+@app.route('/api/comments/scan-refresh', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def comments_scan_refresh():
+    """Frontend-triggered background revalidate (Phase 11.9 stale-while-
+    revalidate): when a read answers from a scan older than COMMENTS_SCAN_FRESH
+    it flags stale:true and the frontend calls this to bring the shared scan
+    up to date, then silently re-pulls. Lock-deduped — concurrent callers all
+    wait on the single in-flight rescan instead of stampeding the base."""
+    user, email, uat, token, err = _comments_caller()
+    if err:
+        return err
+    scan, scan_err = _scan_refresh(token)
+    if scan is None and uat:
+        scan, scan_err = _scan_refresh(get_tenant_access_token())
+    if scan is None:
+        return jsonify({"success": False, "error": scan_err}), 502
+    return jsonify({"success": True, "ts": int(scan.get("ts") or 0),
+                    "stale": _scan_is_stale(scan)})
 
 @app.route('/api/comments/react', methods=['POST'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -8101,8 +8285,18 @@ def react_ticket_comment():
     if data.get("code") != 0:
         logger.error("comment_react_rejected", reply_id=reply_id, code=data.get("code"), msg=data.get("msg"))
         return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}"}), 400
-    redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)  # next read re-scans so the chip shows immediately
-    return jsonify({"success": True})
+    # Phase 11.9: patch the reaction into the shared scan in place — busting
+    # the cache here made EVERY react trigger a 20s base-wide rescan on the
+    # next read ("react take so much time to be done"). The reactor's own UI
+    # is already updated optimistically; this keeps every other viewer
+    # consistent within the same freshness window.
+    actor = _caller_open_id(email)
+    if not actor:
+        cand = sanitize_text(body.get('open_id', '') or '')
+        if cand.startswith("ou_"):
+            actor = cand
+    _scan_patch_reaction(reply_id, emoji, action, actor)
+    return jsonify({"success": True, "actor_open_id": actor})
 
 def _resolve_record_numberings(record_ids, token):
     """record_id -> Numbering (immutable -> cached 7d). Unknown stays absent;
@@ -8258,7 +8452,8 @@ def comments_feed():
             for rx in it.get("reactions") or []:
                 rx["reactor_name"] = people.get(rx["reactor_id"], {}).get("name", rx["reactor_id"])
     return jsonify({"success": True, "items": items, "count": len(items),
-                    "truncated": bool(scan.get("truncated"))})
+                    "truncated": bool(scan.get("truncated")),
+                    "stale": _scan_is_stale(scan)})
 
 @app.route('/api/comments/media/<file_token>', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
