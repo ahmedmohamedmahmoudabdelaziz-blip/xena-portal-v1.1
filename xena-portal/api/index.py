@@ -1272,6 +1272,43 @@ def parse_granular_string(raw_str):
             if mod in res: res[mod] = val_list
     return res
 
+# Phase 12 (Ahmed: "One toggle per member covering everything: login access +
+# notifications"): a single Redis HASH holds every member's on/off state
+# (field = lowercased email OR Person name, value "1"/"0"; ABSENT = enabled).
+# When a member is toggled OFF, _get_user_permissions_raw returns zero
+# modules: the login flow lands on the access-denied / request-access page,
+# every /api endpoint denies, and the notification bell gets 403 and hides.
+# The hardcoded ADMIN_USERS super-admin early-return stays EXEMPT as a
+# failsafe so the team can never lock itself out. Fail-OPEN on Redis errors —
+# a store hiccup must never lock the whole team out either.
+ACCESS_TOGGLES_KEY = "xena:access:toggles"
+
+def _TOGGLED_OFF_PERMS():
+    return {"is_super_admin": False, "modules": [],
+            "permissions": {"acms": {}, "regions": {}}, "toggled_off": True}
+
+def _access_toggle_allows(ident):
+    ident = (ident or "").strip().lower()
+    if not ident:
+        return True
+    try:
+        v = redis_cmd("HGET", ACCESS_TOGGLES_KEY, ident)
+    except Exception:
+        return True
+    return v != "0"
+
+def _access_toggles_map():
+    """{ident: enabled_bool} for the admin users UI — one HGETALL total."""
+    try:
+        flat = redis_cmd("HGETALL", ACCESS_TOGGLES_KEY) or []
+    except Exception:
+        return {}
+    out = {}
+    if isinstance(flat, list):
+        for i in range(0, len(flat) - 1, 2):
+            out[str(flat[i])] = (str(flat[i + 1]) != "0")
+    return out
+
 def _get_user_permissions_raw(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
@@ -1295,7 +1332,13 @@ def _get_user_permissions_raw(email, name):
 
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
-    if cached: return cached
+    if cached:
+        # Phase 12: one Redis toggle per member covers EVERYTHING (login +
+        # notifications). Checked AFTER the cache read so a flip lands on the
+        # very next request — no cache busting, instant off AND instant on.
+        if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
+            return _TOGGLED_OFF_PERMS()
+        return cached
 
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
@@ -1314,6 +1357,11 @@ def _get_user_permissions_raw(email, name):
                 parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
                 result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
                 cache_set(cache_key, result, ttl=300)
+                # Phase 12: toggle check on the DB path too — the CACHE keeps
+                # the real permissions (so re-enabling is instant), the toggle
+                # only decides what this request gets.
+                if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
+                    return _TOGGLED_OFF_PERMS()
                 return result
     except Exception: pass
     
@@ -2558,6 +2606,14 @@ def manage_users():
         for u in users:
             p = pmap.get((u["email"] or "").lower()) or pmap.get((u.get("person") or "").lower())
             u["last_seen"] = (p or {}).get("ts")
+        # Phase 12: ride the per-member access toggle state along (ONE HGETALL
+        # for the whole list) so the admin UI can render each row's switch.
+        # Absent from the hash = enabled.
+        tmap = _access_toggles_map()
+        for u in users:
+            ident  = (u["email"] or "").lower()
+            pident = (u.get("person") or "").lower()
+            u["enabled"] = tmap.get(ident, tmap.get(pident, True))
         return jsonify(users)
 
     elif request.method == 'POST':
@@ -2614,6 +2670,77 @@ def manage_users():
         
         audit.log(admin_name, "DELETE_USER", record_id, ip=ip, severity="Warning")
         return jsonify({"success":True})
+
+def _require_admin_identity():
+    """Shared admin gate for the small Phase-12 admin endpoints (same rules
+    as /api/admin/users: hardcoded ADMIN_USERS by name, or is_super_admin
+    permissions). Returns (admin_name, admin_email, error_response|None)."""
+    admin_name  = sanitize_text(request.headers.get('X-User-Name','')).lower()
+    admin_email = sanitize_text(request.headers.get('X-User-Email','')).lower()
+    is_authorized = any(a == admin_name for a in ADMIN_USERS)
+    if not is_authorized:
+        perms = get_user_permissions(admin_email, admin_name)
+        if perms.get("is_super_admin"): is_authorized = True
+    if not is_authorized:
+        audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel",
+                  ip=request.headers.get("X-Forwarded-For",""), severity="Critical")
+        return admin_name, admin_email, (jsonify({"error": "Unauthorized"}), 403)
+    return admin_name, admin_email, None
+
+@app.route('/api/admin/member-toggle', methods=['POST'])
+@rate_limit(20, 300)
+def admin_member_toggle():
+    """Phase 12: THE one toggle per member — covers login access + comment
+    notifications + every module (Ahmed: "One toggle per member covering
+    everything: login access + notifications"). Body {email, enabled}.
+    Writes the Redis toggle hash; _get_user_permissions_raw reads it on every
+    request, so the flip takes effect immediately (no cache bust, no
+    re-login needed for the admin). The target's NEXT request is denied /
+    allowed. Toggling the hardcoded super-admins is accepted but harmless —
+    their failsafe path never checks the toggle."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    target = sanitize_text(data.get("email", "")).strip().lower()
+    if not target:
+        return jsonify({"success": False, "error": "email is required"}), 400
+    enabled = bool(data.get("enabled", True))
+    try:
+        redis_cmd("HSET", ACCESS_TOGGLES_KEY, target, "1" if enabled else "0")
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    audit.log(admin_name, "MEMBER_TOGGLE_ON" if enabled else "MEMBER_TOGGLE_OFF",
+              target, ip=request.headers.get("X-Forwarded-For",""),
+              severity="Warning" if not enabled else "Info")
+    return jsonify({"success": True, "email": target, "enabled": enabled})
+
+@app.route('/api/admin/harvest-names', methods=['POST'])
+@rate_limit(30, 300)   # the admin UI loops ~4-page calls until the pass completes
+def admin_harvest_names():
+    """Phase 12 (Ahmed: "find sol that the name that is not in the sheet not
+    appare and appare like user ... or you can make it"): admin-triggered bulk
+    walk of the Grand Table harvesting every person envelope into the
+    name/avatar cache — the scope-free directory that resolves teammates who
+    appear in the sheet but show as 'user-xxxx' in comments, WITHOUT the
+    contact-visibility admin access (Route A). Body {pages: N} (cap 20/call,
+    500 records/page); the frontend loops until done:true. Shares the
+    incremental sweep's cursor, so the background sweep continues from here."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    try:
+        pages = int(data.get("pages") or 10)
+    except Exception:
+        pages = 10
+    pages = max(1, min(20, pages))
+    result = _harvest_bulk(pages)
+    audit.log(admin_name, "HARVEST_NAMES", f"pages={result.get('pages')} harvested={result.get('harvested')} done={result.get('done')}",
+              ip=request.headers.get("X-Forwarded-For",""), severity="Info")
+    if result.get("error") and not result.get("pages"):
+        return jsonify({"success": False, **result}), 502
+    return jsonify({"success": True, **result})
 
 @app.route('/api/access-request', methods=['POST'])
 @rate_limit(5, 300)
@@ -7302,7 +7429,7 @@ DIR_MEMBERS_TTL          = 1800      # 30 min (Phase 11.4: was 6h — new member
 DIR_EMAIL_TTL            = 7 * 86400  # email -> open_id mapping is immutable, 7d
 DIR_NEG_TTL              = 3600      # negative email-lookup cache, 1h — failed lookups retry soon
 DIR_SEARCH_BUDGET        = 12        # max live user-searches per resolve call
-HARVEST_NAME_TTL         = 86400     # sheet-sourced person names (person fields / sweep), 24h
+HARVEST_NAME_TTL         = 7 * 86400  # sheet-sourced person names (person fields / sweep), 7d (Phase 12: was 24h — names vanished before the daily re-sweep could refresh them)
 # Phase 11.4: incremental full-table person sweep — the scope-free way to
 # resolve ANY teammate who ever touched a ticket, not just portal members.
 SWEEP_KEY                = "xena:dir:sweep"   # {"page_token","done","done_ts","run_ts"}
@@ -7417,12 +7544,21 @@ def _scan_refresh(token):
         got = None
     if got:
         try:
-            return _fetch_all_comments(token, force=True)
+            result = _fetch_all_comments(token, force=True)
         finally:
             try:
                 redis_cmd("DEL", COMMENTS_SCAN_LOCK_KEY)
             except Exception:
                 pass
+        # Phase 12: the person-name sweep moved OUT of interactive comment
+        # loads (it added 6-10s to user-facing requests) — this background
+        # revalidate path is the right home for it: throttled, incremental,
+        # and nobody is staring at a spinner while it runs.
+        try:
+            _sweep_step(token)
+        except Exception:
+            pass
+        return result
     # Another instance/request is refreshing right now — wait for its result.
     deadline = time.time() + 25
     while time.time() < deadline:
@@ -7547,6 +7683,10 @@ def _harvest_person_names(obj):
     lacks contact-book READ scope (contact:user.base:readonly) -- so every
     ticket the portal touches teaches the comment/avatar resolver a few more
     teammates for free. Existing cached avatars are preserved."""
+    # Returns how many person entries were NEWLY written this call (Phase 12:
+    # the admin bulk-harvest endpoint reports this as progress). Existing
+    # callers ignore the return value.
+    written = 0
     try:
         if isinstance(obj, dict):
             oid, nm = obj.get("id"), obj.get("name")
@@ -7565,6 +7705,7 @@ def _harvest_person_names(obj):
                     if not has_name or (av and not has_av):
                         redis_set_json(ck, {"name": nm.strip(), "avatar": (has_av or av or "")},
                                        ttl=HARVEST_NAME_TTL)
+                        written += 1
                     # Phase 11.3: email -> open_id bridge (person dicts carry
                     # email) so the directory warm can skip a live user-search
                     # for anyone already seen in a person cell.
@@ -7576,12 +7717,13 @@ def _harvest_person_names(obj):
                 except Exception:
                     pass
             for v in obj.values():
-                _harvest_person_names(v)
+                written += _harvest_person_names(v)
         elif isinstance(obj, (list, tuple)):
             for v in obj:
-                _harvest_person_names(v)
+                written += _harvest_person_names(v)
     except Exception:
         pass
+    return written
 
 # Phase 11.7 (Ahmed: "i has Respondents field that shows the submitters so
 # please check can we give it try and if it not cost so many"): the Grand
@@ -7595,11 +7737,43 @@ BITABLE_PERSON_FIELDS  = ("Respondents", "Assigned Member", "Done by",
                           "Mentioned Person", "Lock Owner")
 BITABLE_LOOKUP_MAX     = 8       # max targeted searches per resolve call
 BITABLE_LOOKUP_NEG_TTL = 3600    # ids with no person-field hit retry hourly
+AVATAR_LOOKUP_MAX      = 6       # max parallel avatar searches per resolve call (Phase 12)
+AVATAR_LOOKUP_NEG_TTL  = 21600   # ids with no avatar-search hit retry after 6h
 
-# Phase 11.8: emoji whitelist for /api/comments/react — maps 1:1 to Feishu
-# drive v2 reaction_type values; the frontend picker shows the same set.
-COMMENT_REACT_EMOJIS = ("THUMBSUP", "HEART", "DONE", "LAUGH", "APPLAUSE",
-                        "FINGERHEART", "WOW", "CRY", "OK", "JIAYI")
+# Phase 12: emoji whitelist for /api/comments/react — the COMPLETE official
+# Feishu drive v2 comment reaction_type enum (docs "Add/Cancel Emoji
+# Response", open.larkoffice.com .../drive-v2/comment_reaction/update_reaction,
+# fetched 2026-10-18). CASE-SENSITIVE: the tail entries are mixed-case on
+# Feishu's side ("ThumbsDown", "Fire", "CheckMark"...), so validation maps any
+# incoming casing to the canonical form below and sends THAT verbatim —
+# before this, .upper() silently corrupted the mixed-case types ("i do
+# something but appear another thing in the sheet").
+COMMENT_REACT_EMOJIS = (
+    "ANGRY", "APPLAUSE", "ATTENTION", "AWESOME", "BEAR", "BEER", "BETRAYED",
+    "BIGKISS", "BLACKFACE", "BLUBBER", "BLUSH", "BOMB", "CAKE", "CHUCKLE",
+    "CLAP", "CLEAVER", "COMFORT", "CRAZY", "CRY", "CUCUMBER", "DETERGENT",
+    "DIZZY", "DONE", "DONNOTGO", "DROOL", "DROWSY", "DULL", "DULLSTARE",
+    "EATING", "EMBARRASSED", "ENOUGH", "ERROR", "EYESCLOSED", "FACEPALM",
+    "FINGERHEART", "FISTBUMP", "FOLLOWME", "FROWN", "GIFT", "GLANCE",
+    "GOODJOB", "HAMMER", "HAUGHTY", "HEADSET", "HEART", "HEARTBROKEN",
+    "HIGHFIVE", "HUG", "HUSKY", "INNOCENTSMILE", "JIAYI", "JOYFUL", "KISS",
+    "LAUGH", "LIPS", "LOL", "LOOKDOWN", "LOVE", "MONEY", "MUSCLE", "NOSEPICK",
+    "OBSESSED", "OK", "PARTY", "PETRIFIED", "POOP", "PRAISE", "PROUD", "PUKE",
+    "RAINBOWPUKE", "ROSE", "SALUTE", "SCOWL", "SHAKE", "SHHH", "SHOCKED",
+    "SHOWOFF", "SHY", "SICK", "SILENT", "SKULL", "SLAP", "SLEEP", "SLIGHT",
+    "SMART", "SMILE", "SMIRK", "SMOOCH", "SMUG", "SOB", "SPEECHLESS",
+    "SPITBLOOD", "STRIVE", "SWEAT", "TEARS", "TEASE", "TERROR", "THANKS",
+    "THINKING", "THUMBSUP", "TOASTED", "TONGUE", "TRICK", "UPPERLEFT",
+    "WAIL", "WAVE", "WELLDONE", "WHAT", "WHIMPER", "WINK", "WITTY", "WOW",
+    "WRONGED", "XBLUSH", "YAWN", "YEAH", "FIREWORKS", "BULL", "CALF",
+    "AWESOMEN", "2021", "CANDIEDHAWS", "REDPACKET", "FORTUNE", "LUCK",
+    "FIRECRACKER", "Yes", "No", "Get", "LGTM", "Lemon", "EatingFood",
+    "Hundred", "MinusOne", "ThumbsDown", "Fire", "OKR", "Drumstick",
+    "BubbleTea", "Loudspeaker", "Pin", "Coffee", "Alarm", "Trophy", "Music",
+    "Typing", "Pepper", "CheckMark", "CrossMark",
+)
+# case-insensitive lookup -> canonical (exact-case) reaction_type
+COMMENT_REACT_CANON = {e.upper(): e for e in COMMENT_REACT_EMOJIS}
 
 def _person_lookup_via_bitable(open_id, tat):
     """Phase 11.7: targeted, in-request open_id -> {name, avatar} resolution
@@ -7810,7 +7984,63 @@ def _sweep_step(token):
         pass
     return pages > 0
 
-def _resolve_comment_names(user_ids, token, uat=None):
+def _harvest_bulk(pages_wanted, token=None):
+    """Phase 12 (Ahmed: "please please find sol that the name that is not in
+    the sheet not appare and appare like user ... or you can make it"): the
+    admin-triggered BULK harvest. Same machinery as _sweep_step — walk the
+    Grand Table feeding every person envelope (person fields + created_by /
+    last_modified_by) into _harvest_person_names — but N pages in ONE call,
+    no throttle, sharing the sweep cursor in SWEEP_KEY so the incremental
+    sweep simply continues wherever this stopped. This is the scope-free
+    directory: NO contact visibility / Route A needed for anyone who ever
+    touched a ticket. Returns {pages, harvested, done, error?}."""
+    try:
+        st = redis_get_json(SWEEP_KEY)
+    except Exception:
+        st = None
+    if not isinstance(st, dict):
+        st = {}
+    if st.get("done"):
+        return {"pages": 0, "harvested": 0, "done": True}
+    page_token = st.get("page_token") or None
+    tat = get_tenant_access_token() or token
+    if not tat:
+        return {"pages": 0, "harvested": 0, "done": False, "error": "no tenant token"}
+    pages, harvested, done = 0, 0, False
+    try:
+        while pages < max(1, int(pages_wanted or 1)):
+            body = {"page_size": 500}
+            if page_token:
+                body["page_token"] = page_token
+            resp = feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true",
+                headers={"Authorization": f"Bearer {tat}"}, json=body, timeout=20)
+            data = resp.json()
+            if data.get("code") != 0:
+                return {"pages": pages, "harvested": harvested, "done": False,
+                        "error": f"{data.get('code')}: {data.get('msg')}"}
+            d = data.get("data") or {}
+            for it in (d.get("items") or []):
+                harvested += _harvest_person_names(it)
+            pages += 1
+            if not d.get("has_more") or not d.get("page_token"):
+                done, page_token = True, None
+                break
+            page_token = d.get("page_token")
+    except Exception as e:
+        return {"pages": pages, "harvested": harvested, "done": False, "error": str(e)}
+    st = {"run_ts": time.time(), "done": done}
+    if done:
+        st["done_ts"] = time.time()
+    else:
+        st["page_token"] = page_token
+    try:
+        redis_set_json(SWEEP_KEY, st, ttl=SWEEP_REARM_TTL + 3600)
+    except Exception:
+        pass
+    return {"pages": pages, "harvested": harvested, "done": done}
+
+def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False):
     """open_id -> {"name", "avatar"} -- real Lark display names AND profile
     photos. Caching (Phase 11.4): live lookups cached 1h, sheet-harvested
     names 24h, masked ids NEVER cached (they retry on every call).
@@ -8018,46 +8248,86 @@ def _resolve_comment_names(user_ids, token, uat=None):
     # ticket gets harvested straight from the sheet's own data, so coverage
     # extends to the WHOLE team, not just portal members. Masked ids are
     # never written to any cache: every comment load retries them live.
+    # Phase 12: the sweep slice now runs ONLY when allow_sweep=True (the
+    # background scan-refresh path). Interactive comment/feed loads just
+    # re-check the caches — a 3-page cross-border sweep (6-10s) inside a
+    # user-facing request was one of the "30s to appear" contributors.
     masked_now = [uid for uid, e in found.items() if (e.get("name") or "").startswith("user-")]
     if masked_now:
-        try:
-            if _sweep_step(token):
-                for uid in masked_now:
-                    try:
-                        cached = redis_get_json(f"xena:uname:{uid}")
-                    except Exception:
-                        cached = None
-                    if isinstance(cached, dict) and cached.get("name"):
-                        found[uid] = {"name": cached["name"], "avatar": cached.get("avatar") or ""}
-        except Exception:
-            pass
+        swept = False
+        if allow_sweep:
+            try:
+                swept = bool(_sweep_step(token))
+            except Exception:
+                swept = False
+        if swept or not allow_sweep:
+            for uid in masked_now:
+                try:
+                    cached = redis_get_json(f"xena:uname:{uid}")
+                except Exception:
+                    cached = None
+                if isinstance(cached, dict) and cached.get("name"):
+                    found[uid] = {"name": cached["name"], "avatar": cached.get("avatar") or ""}
     # Avatar backfill via Feishu's "Search users" API (contact:user:search --
     # the scope this app DOES have). Only for entries that already have a real
     # name (harvested from person fields / cached) but no photo yet; the hit
     # is matched back strictly by open_id, so same-name teammates can't cross.
+    # Phase 12: this loop was UNBOUNDED and SEQUENTIAL with NO negative cache
+    # — N named-but-photoless people cost N back-to-back cross-border searches
+    # (~1-2s each) on EVERY comment/feed load. This was the main "30+ seconds
+    # to appear" bug. Now: parallel pool, capped per call, and a miss is
+    # negative-cached 6h so an unsearchable name stops costing round trips.
     if uat:
+        av_todo = []
         for uid, entry in list(found.items()):
             nm = (entry.get("name") or "").strip()
             if entry.get("avatar") or not nm or nm.startswith("user-"):
                 continue
+            try:
+                if redis_get_json(f"xena:uname:negav:{uid}"):
+                    continue
+            except Exception:
+                pass
+            av_todo.append((uid, nm))
+        av_todo = av_todo[:AVATAR_LOOKUP_MAX]
+        def _av_one(pair):
+            uid, nm = pair
             try:
                 resp = http_requests.get(
                     "https://open.feishu.cn/open-apis/search/v1/user",
                     headers={"Authorization": f"Bearer {uat}"},
                     params={"query": nm, "page_size": 10}, timeout=8)
                 sdata = resp.json()
-                if sdata.get("code") != 0:
-                    continue
-                for u in ((sdata.get("data") or {}).get("users") or []):
-                    if u.get("open_id") == uid:
-                        av = (u.get("avatar") or {}).get("avatar_72") or ""
-                        if av:
-                            entry["avatar"] = av
-                            redis_set_json(f"xena:uname:{uid}", {"name": nm, "avatar": av},
-                                           ttl=COMMENT_NAME_TTL)
-                        break
             except Exception:
-                continue
+                return uid, None
+            if sdata.get("code") != 0:
+                return uid, None
+            for u in ((sdata.get("data") or {}).get("users") or []):
+                if u.get("open_id") == uid:
+                    av = (u.get("avatar") or {}).get("avatar_72") or ""
+                    if av:
+                        return uid, av
+                    break
+            return uid, None
+        if av_todo:
+            with ThreadPoolExecutor(max_workers=min(6, len(av_todo))) as pool:
+                for uid, av in pool.map(_av_one, av_todo):
+                    if av:
+                        entry = found.get(uid)
+                        if entry is not None:
+                            entry["avatar"] = av
+                        try:
+                            redis_set_json(f"xena:uname:{uid}",
+                                           {"name": (entry or {}).get("name") or "", "avatar": av},
+                                           ttl=COMMENT_NAME_TTL)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            redis_set_json(f"xena:uname:negav:{uid}", {"ts": time.time()},
+                                           ttl=AVATAR_LOOKUP_NEG_TTL)
+                        except Exception:
+                            pass
     return found
 
 def _comments_caller():
@@ -8256,13 +8526,20 @@ def react_ticket_comment():
     (reply_id, emoji, user) on Feishu's side."""
     body = request.get_json(silent=True) or {}
     reply_id = sanitize_text(body.get('reply_id', ''))
-    emoji    = (body.get('emoji') or '').strip().upper()
+    # Phase 12 (Ahmed: "still the reacts not accurate i do somthing but
+    # appare another thing in the sheet"): the old code uppercased the emoji
+    # key and sent THAT to Feishu — but the official enum's tail entries are
+    # case-SENSITIVE mixed-case ("Yes", "Get", "OKR", "MinusOne", ...), so
+    # .upper() silently turned them into a different/invalid reaction_type
+    # and the sheet showed something else. Now we canonicalize ANY incoming
+    # casing to the exact official spelling and send it verbatim.
+    emoji    = COMMENT_REACT_CANON.get((body.get('emoji') or '').strip().upper())
     action   = (body.get('action') or 'add').strip().lower()
     if not reply_id or not emoji:
         return jsonify({"success": False, "error": "Missing reply_id or emoji"}), 400
     if emoji not in COMMENT_REACT_EMOJIS:
         return jsonify({"success": False,
-                        "error": f"Unsupported emoji. Allowed: {', '.join(COMMENT_REACT_EMOJIS)}"}), 400
+                        "error": "Unsupported emoji reaction type."}), 400
     if action not in ("add", "delete"):
         return jsonify({"success": False, "error": "action must be add or delete"}), 400
     user, email, uat, token, err = _comments_caller()
@@ -8352,8 +8629,9 @@ def comments_feed():
     """The notifications feed (Ahmed's screenshot): newest comment threads on
     Grand Table records first, each with the last reply's author/text/images,
     the ticket's Numbering, and a mentions_me flag for the Mentioned tab.
-    Unread/read state is client-side (localStorage per user) -- this endpoint
-    is a pure read."""
+    Phase 12: unread state is SERVER-side (per-email seen-set + mark-all
+    watermark in Redis, see _notif_load_seen/_notif_mark_read) — survives
+    logout and reaction time-bumps, killing the phantom 99+."""
     my_open_id = sanitize_text(request.args.get('my_open_id', ''))
     user, email, uat, token, err = _comments_caller()
     if err:
@@ -8403,6 +8681,7 @@ def comments_feed():
         items.append({
             "kind": "comment",
             "comment_id": c.get("comment_id"),
+            "last_reply_id": last.get("reply_id"),
             "record_id": anchor["record"],
             "author_id": last.get("user_id"),
             "time": c.get("update_time") or last.get("create_time"),
@@ -8451,9 +8730,90 @@ def comments_feed():
         else:
             for rx in it.get("reactions") or []:
                 rx["reactor_name"] = people.get(rx["reactor_id"], {}).get("name", rx["reactor_id"])
+    # Phase 12 (Ahmed: "99+ notifications they are all old and i make them
+    # readed but still after while show as unreaded"): read state moves from
+    # client-side localStorage (time > lastSeen — reaction bumps re-flagged
+    # OLD threads as new, and logging out wiped it entirely) to a SERVER-side
+    # per-email seen-set + mark-all watermark in Redis. Every entry carries a
+    # STABLE uid: a comment thread keys on its LAST reply (a genuinely new
+    # reply = a new uid = unread again, exactly like the Base bell), a
+    # reaction entry keys on (reactor, reaction key). unread = unseen AND
+    # newer than the watermark AND not authored by me — my own comments and
+    # my own reactions never notify me.
+    seen, wm = _notif_load_seen(email)
+    unread_n = 0
+    for it in items:
+        if it.get("kind") == "reaction":
+            it["uid"] = f"r:{it.get('comment_id')}:{it.get('author_id')}:{it.get('reaction_key')}"
+        else:
+            it["uid"] = f"c:{it.get('comment_id')}:{it.pop('last_reply_id', None) or ''}"
+        mine = bool(my_open_id) and it.get("author_id") == my_open_id
+        it["unread"] = (not mine) and (it["uid"] not in seen) and (float(it.get("time") or 0) > wm)
+        if it["unread"]:
+            unread_n += 1
     return jsonify({"success": True, "items": items, "count": len(items),
+                    "unread_count": unread_n,
                     "truncated": bool(scan.get("truncated")),
                     "stale": _scan_is_stale(scan)})
+
+
+NOTIF_SEEN_CAP = 3000          # per-email seen-uids kept (trimmed oldest-first)
+NOTIF_SEEN_TTL = 30 * 86400    # read state lives 30 days
+
+def _notif_load_seen(email):
+    """(set_of_seen_uids, mark_all_watermark_ts) for the caller's email."""
+    ek = (email or "").strip().lower()
+    if not ek:
+        return set(), 0.0
+    try:
+        lst = redis_get_json(f"xena:notif:seen:{ek}")
+        wm  = redis_get_json(f"xena:notif:wm:{ek}")
+    except Exception:
+        return set(), 0.0
+    return set(lst if isinstance(lst, list) else []), float(wm or 0)
+
+def _notif_mark_read(email, uids=None, mark_all=False):
+    """Persist read state server-side. uids are appended to the seen list
+    (deduped, trimmed to the newest NOTIF_SEEN_CAP); mark_all moves the
+    watermark to now so NOTHING currently in the feed can reappear unread —
+    only genuinely new activity (a new reply = new uid, a new reaction =
+    bumped time) can. Returns how many uids were newly added."""
+    ek = (email or "").strip().lower()
+    if not ek:
+        return 0
+    uids = [u for u in (uids or []) if isinstance(u, str) and u][:2000]
+    added = 0
+    try:
+        if uids:
+            lst = redis_get_json(f"xena:notif:seen:{ek}")
+            if not isinstance(lst, list):
+                lst = []
+            have = set(lst)
+            fresh = [u for u in uids if u not in have]
+            added = len(fresh)
+            lst = (lst + fresh)[-NOTIF_SEEN_CAP:]
+            redis_set_json(f"xena:notif:seen:{ek}", lst, ttl=NOTIF_SEEN_TTL)
+        if mark_all:
+            redis_set_json(f"xena:notif:wm:{ek}", time.time(), ttl=NOTIF_SEEN_TTL)
+    except Exception:
+        pass
+    return added
+
+@app.route('/api/comments/feed/read', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def comments_feed_read():
+    """Phase 12: server-side read state for the bell. Body {uids:[...]} marks
+    those entries read (sent when the user clicks one notification); {all:true}
+    moves the watermark to now (the 'mark all read' button). Survives logout,
+    device switches and reaction time-bumps — the phantom-99+ fix."""
+    body = request.get_json(silent=True) or {}
+    user, email, uat, token, err = _comments_caller()
+    if err:
+        return err
+    uids = body.get("uids") if isinstance(body.get("uids"), list) else []
+    mark_all = bool(body.get("all"))
+    marked = _notif_mark_read(email, uids=uids, mark_all=mark_all)
+    return jsonify({"success": True, "marked": marked, "all": mark_all})
 
 @app.route('/api/comments/media/<file_token>', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
