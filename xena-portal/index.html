@@ -1799,10 +1799,20 @@
 .twc-rx b{font-weight:700;color:var(--accent-cyan,#00d4ff);font-size:.7rem;}
 .twc-rx-add{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:transparent;border:1px dashed rgba(255,255,255,.22);font-size:.72rem;line-height:1.5;cursor:pointer;color:var(--text-muted,#8a8fa3);}
 .twc-rx-add:hover{border-color:var(--accent-cyan,#00d4ff);color:#fff;}
-.twc-picker{position:fixed;z-index:9999;display:flex;gap:2px;padding:6px 8px;border-radius:12px;background:#1c2030;border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.twc-picker{position:fixed;z-index:9999;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;border-radius:12px;background:#1c2030;border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px rgba(0,0,0,.5);width:320px;max-height:260px;overflow-y:auto;}
 .twc-picker button{background:transparent;border:none;font-size:1.05rem;padding:3px 4px;border-radius:8px;cursor:pointer;line-height:1;}
 .twc-picker button:hover{background:rgba(255,255,255,.12);}
 .twc-picker button.twc-pk-me{background:rgba(0,212,255,.18);outline:1px solid var(--accent-cyan,#00d4ff);}
+/* Phase 12: per-member access toggle switch on the admin agent cards — one
+   switch covering login access + comment notifications (writes
+   /api/admin/member-toggle). */
+.atoggle{position:relative;display:inline-block;width:38px;height:20px;flex:none;align-self:center;}
+.atoggle input{opacity:0;width:0;height:0;position:absolute;}
+.atoggle .atoggle-slider{position:absolute;inset:0;border-radius:20px;background:rgba(255,255,255,.18);transition:.2s;cursor:pointer;}
+.atoggle .atoggle-slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s;}
+.atoggle input:checked + .atoggle-slider{background:var(--accent-cyan,#00d4ff);}
+.atoggle input:checked + .atoggle-slider:before{transform:translateX(18px);}
+.atoggle input:disabled + .atoggle-slider{opacity:.35;cursor:not-allowed;}
         .twc-item-main{flex:1;min-width:0;}
         .twc-item-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
         .twc-author{font-size:.8rem;font-weight:700;color:var(--text,#fff);}
@@ -3105,7 +3115,10 @@
                     <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:10px">Roles are reusable presets (e.g. "CS Pakistan", "ACM India") — build one once via Quick Setup above, then apply it to any number of agents.</p>
                     <div class="user-list" id="adminRoleList"></div>
 
-                    <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">👥 Current Active Agents <span id="agentsCountBadge" class="agents-count-badge">0</span></h3>
+                    <h3 style="margin-bottom:12px;font-size:.95rem;color:var(--text-muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-top:24px">👥 Current Active Agents <span id="agentsCountBadge" class="agents-count-badge">0</span>
+                        <button type="button" id="harvestNamesBtn" class="edit-btn" style="margin-left:12px;font-size:.72rem;padding:4px 10px" title="Scan the whole Grand Table once to learn every teammate's real name + photo — fixes comments showing 'user-xxxx' for people missing from the portal's cache. No extra Feishu access needed." onclick="admHarvestNames()">🔤 Fix missing names</button>
+                        <span id="harvestNamesStatus" style="font-size:.72rem;color:var(--text-muted);margin-left:6px"></span>
+                    </h3>
                     <div class="agents-grid" id="adminUserList"></div>
                 </div>
             </div>
@@ -7947,6 +7960,10 @@ async function fetchAdminUsers() {
                 </div>
                 <div class="agent-mods">${modChips.length ? modChips.map(m => `<span class="agent-mod-chip">${escHtml(m)}</span>`).join('') : '<span class="agent-mod-chip chip-none">no modules</span>'}</div>
                 <div class="agent-card-foot">
+                    <label class="atoggle" title="${u.enabled===false ? 'Access OFF — this member cannot log in and gets no notifications. Click to re-enable.' : 'Access ON — this member can log in and gets notifications. Click to disable.'}">
+                        <input type="checkbox" ${u.enabled===false?'':'checked'} ${isOrphan?'disabled':''} onchange="admToggleMember('${safeEmail}', this.checked, this)">
+                        <span class="atoggle-slider"></span>
+                    </label>
                     <button class="edit-btn" onclick="editAgent('${safeEmail}','${safeModules}','${safeAcms}','${safeRegs}')" ${isOrphan?'disabled title="Cannot edit a row with no identity — remove it instead"':''}>✏️ Edit</button>
                     <button class="edit-btn" onclick="copyAccessFromAgent('${safeId}')" style="background:rgba(0,212,255,.1);color:var(--accent-cyan)">📋 Copy</button>
                     <button class="del-btn" onclick="deleteAgent('${safeId}')">🗑 Remove</button>
@@ -8002,6 +8019,58 @@ function copyAccessFromAgent(agentId) {
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
     ToastManager.show(`Copied ${agent.email}'s access. Enter the new agent's identity and save.`, 'success');
     document.getElementById('copyFromSelect').value = '';
+}
+
+/* ---- Phase 12: per-member access toggle (login + notifications in ONE) ---- */
+async function admToggleMember(email, enabled, inputEl) {
+    // Flips instantly server-side (Redis toggle hash, checked on every
+    // request); on failure the switch reverts so the UI never lies.
+    try {
+        const res = await fetch('/api/admin/member-toggle', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+            body: JSON.stringify({email: email, enabled: enabled})
+        });
+        const d = await res.json();
+        if (!res.ok || !d.success) throw new Error((d && d.error) || 'Toggle failed');
+        const u = (latestAdminUsers || []).find(x => (x.email || '').toLowerCase() === String(email).toLowerCase());
+        if (u) u.enabled = enabled;
+        ToastManager.show(`Access ${enabled ? 'enabled' : 'disabled'} for ${email}`, 'success');
+    } catch (e) {
+        if (inputEl) inputEl.checked = !enabled;
+        ToastManager.show(e.message || 'Toggle failed', 'error');
+    }
+}
+
+/* ---- Phase 12: bulk name harvest ("Fix missing names" button) ---- */
+async function admHarvestNames() {
+    // Walks the Grand Table (~500 records/page) caching every person's real
+    // name + photo, so comment authors stop showing as "user-xxxx" — this
+    // does NOT need the contact-visibility admin access. Loops small page
+    // batches until the whole table is scanned.
+    const btn = document.getElementById('harvestNamesBtn');
+    const status = document.getElementById('harvestNamesStatus');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    let pages = 0, harvested = 0, done = false, err = null;
+    try {
+        while (!done) {
+            const res = await fetch('/api/admin/harvest-names', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+                body: JSON.stringify({pages: 4})
+            });
+            const d = await res.json();
+            if (!res.ok || !d.success) { err = (d && d.error) || 'Harvest failed'; break; }
+            pages += d.pages || 0; harvested += d.harvested || 0; done = !!d.done;
+            if (status) status.textContent = `Scanning… ${pages} pages, ${harvested} new names`;
+            if (!d.pages && !d.done) break;   // no-progress guard
+        }
+    } catch (e) { err = e.message || 'Network error'; }
+    btn.disabled = false;
+    if (status) status.textContent = err ? `⚠ ${err}` : `✅ ${harvested} names/photos resolved (${pages} pages)`;
+    if (err) ToastManager.show(err, 'error');
+    else ToastManager.show(`Name harvest complete: ${harvested} new names/photos`, 'success');
 }
 
 function resetAgentForm() {
@@ -18893,7 +18962,12 @@ const TWC_RX_EMOJI = {
 };
 function twcReactionEmoji(key) {
     if (!key) return '👍';
-    const k = String(key).toUpperCase();
+    const raw = String(key);
+    // Phase 12: exact-case official keys first (the mixed-case tail like
+    // "Yes"/"Get"/"ThumbsDown" must NOT be uppercased into a wrong glyph),
+    // then the legacy uppercase map, then the tag fallback.
+    if (typeof TWC_RX_OFFICIAL !== 'undefined' && TWC_RX_OFFICIAL[raw]) return TWC_RX_OFFICIAL[raw];
+    const k = raw.toUpperCase();
     return TWC_RX_EMOJI[k] || ('🏷️' /* unknown key — show tag, tooltip carries the raw key */);
 }
 
@@ -18962,9 +19036,72 @@ function twcZoom(src) {
     window.open(src, '_blank', 'noopener');
 }
 
-/* ---- reactions: picker + add/remove (Phase 11.8) ---- */
-const TWC_REACT_KEYS = ['THUMBSUP', 'HEART', 'DONE', 'LAUGH', 'APPLAUSE',
-                        'FINGERHEART', 'WOW', 'CRY', 'OK', 'JIAYI'];
+/* ---- reactions: picker + add/remove (Phase 11.8, full palette Phase 12) ---- */
+// Phase 12 (Ahmed: "not has all the reaction same like the sheet"): the
+// COMPLETE official Feishu drive-v2 comment reaction enum — same list the
+// sheet's own reaction board offers. EXACT CASE MATTERS: the tail entries
+// ("Yes", "Get", "LGTM", "MinusOne", "ThumbsDown", "CheckMark"...) are
+// mixed-case on Feishu's side and must be sent verbatim; the backend
+// canonicalizes any casing to these spellings before calling Feishu.
+const TWC_REACT_KEYS = [
+    // most-used first (was the whole 11.8 whitelist), then the full board
+    'THUMBSUP', 'HEART', 'DONE', 'LAUGH', 'APPLAUSE', 'FINGERHEART', 'WOW',
+    'CRY', 'OK', 'JIAYI', 'Yes', 'No', 'Get', 'LGTM', 'CheckMark', 'CrossMark',
+    'Hundred', 'Fire', 'ThumbsDown', 'MinusOne', 'OKR', 'MUSCLE', 'THANKS',
+    'PARTY', 'SMILE', 'BLUSH', 'WINK', 'THINKING', 'FACEPALM', 'SALUTE',
+    'FISTBUMP', 'WAVE', 'CLAP', 'WELLDONE', 'GOODJOB', 'PRAISE', 'HIGHFIVE',
+    'HUG', 'ROSE', 'GIFT', 'Lemon', 'EatingFood', 'Drumstick', 'BubbleTea',
+    'Coffee', 'BEER', 'CAKE', 'Pin', 'Alarm', 'Trophy', 'Music', 'Typing',
+    'Pepper', 'Loudspeaker'
+].concat([
+    'ANGRY', 'ATTENTION', 'AWESOME', 'BEAR', 'BETRAYED', 'BIGKISS',
+    'BLACKFACE', 'BLUBBER', 'BOMB', 'CHUCKLE', 'CLEAVER', 'COMFORT', 'CRAZY',
+    'CUCUMBER', 'DETERGENT', 'DIZZY', 'DONNOTGO', 'DROOL', 'DROWSY', 'DULL',
+    'DULLSTARE', 'EATING', 'EMBARRASSED', 'ENOUGH', 'ERROR', 'EYESCLOSED',
+    'FOLLOWME', 'FROWN', 'GLANCE', 'HAMMER', 'HAUGHTY', 'HEADSET',
+    'HEARTBROKEN', 'HUSKY', 'INNOCENTSMILE', 'JOYFUL', 'KISS', 'LIPS', 'LOL',
+    'LOOKDOWN', 'LOVE', 'MONEY', 'NOSEPICK', 'OBSESSED', 'PETRIFIED', 'POOP',
+    'PROUD', 'PUKE', 'RAINBOWPUKE', 'SCOWL', 'SHAKE', 'SHHH', 'SHOCKED',
+    'SHOWOFF', 'SHY', 'SICK', 'SILENT', 'SKULL', 'SLAP', 'SLEEP', 'SLIGHT',
+    'SMART', 'SMIRK', 'SMOOCH', 'SMUG', 'SOB', 'SPEECHLESS', 'SPITBLOOD',
+    'STRIVE', 'SWEAT', 'TEARS', 'TEASE', 'TERROR', 'TOASTED', 'TONGUE',
+    'TRICK', 'UPPERLEFT', 'WAIL', 'WHAT', 'WHIMPER', 'WITTY', 'WRONGED',
+    'XBLUSH', 'YAWN', 'YEAH', 'FIREWORKS', 'BULL', 'CALF', 'AWESOMEN', '2021',
+    'CANDIEDHAWS', 'REDPACKET', 'FORTUNE', 'LUCK', 'FIRECRACKER'
+]);
+// Glyph for EVERY official key (exact-case lookup first, uppercase fallback
+// into TWC_RX_EMOJI for legacy keys, 🏷️ only for genuinely unknown ones).
+const TWC_RX_OFFICIAL = {
+    ANGRY:'😡', APPLAUSE:'👏', ATTENTION:'❗', AWESOME:'🤩', BEAR:'🐻',
+    BEER:'🍺', BETRAYED:'💔', BIGKISS:'😘', BLACKFACE:'🌚', BLUBBER:'😭',
+    BLUSH:'😊', BOMB:'💣', CAKE:'🎂', CHUCKLE:'🤭', CLAP:'👏', CLEAVER:'🔪',
+    COMFORT:'🤗', CRAZY:'🤪', CRY:'😢', CUCUMBER:'🥒', DETERGENT:'🧴',
+    DIZZY:'😵', DONE:'✅', DONNOTGO:'✋', DROOL:'🤤', DROWSY:'😪', DULL:'😑',
+    DULLSTARE:'😶', EATING:'😋', EMBARRASSED:'😳', ENOUGH:'🙅', ERROR:'❌',
+    EYESCLOSED:'😌', FACEPALM:'🤦', FINGERHEART:'🫰', FISTBUMP:'👊',
+    FOLLOWME:'👉', FROWN:'☹️', GIFT:'🎁', GLANCE:'👀', GOODJOB:'👍',
+    HAMMER:'🔨', HAUGHTY:'😤', HEADSET:'🎧', HEART:'❤️', HEARTBROKEN:'💔',
+    HIGHFIVE:'🙌', HUG:'🤗', HUSKY:'🐺', INNOCENTSMILE:'😇', JIAYI:'💪',
+    JOYFUL:'😄', KISS:'💋', LAUGH:'😆', LIPS:'👄', LOL:'🤣', LOOKDOWN:'🙄',
+    LOVE:'😍', MONEY:'💰', MUSCLE:'💪', NOSEPICK:'👃', OBSESSED:'😻',
+    OK:'👌', PARTY:'🎉', PETRIFIED:'😱', POOP:'💩', PRAISE:'🙌', PROUD:'😌',
+    PUKE:'🤮', RAINBOWPUKE:'🌈', ROSE:'🌹', SALUTE:'🫡', SCOWL:'😠',
+    SHAKE:'🤝', SHHH:'🤫', SHOCKED:'😲', SHOWOFF:'😎', SHY:'☺️', SICK:'🤒',
+    SILENT:'🤐', SKULL:'💀', SLAP:'👋', SLEEP:'😴', SLIGHT:'🙂', SMART:'🤓',
+    SMILE:'😊', SMIRK:'😏', SMOOCH:'😚', SMUG:'😏', SOB:'😭', SPEECHLESS:'😶',
+    SPITBLOOD:'🩸', STRIVE:'✊', SWEAT:'😅', TEARS:'😭', TEASE:'😜',
+    TERROR:'😨', THANKS:'🙏', THINKING:'🤔', THUMBSUP:'👍', TOASTED:'🍞',
+    TONGUE:'👅', TRICK:'🃏', UPPERLEFT:'↖️', WAIL:'😭', WAVE:'👋',
+    WELLDONE:'👏', WHAT:'❓', WHIMPER:'🥺', WINK:'😉', WITTY:'🧐', WOW:'😮',
+    WRONGED:'😣', XBLUSH:'😳', YAWN:'🥱', YEAH:'✌️', FIREWORKS:'🎆',
+    BULL:'🐂', CALF:'🐄', AWESOMEN:'🐮', '2021':'🗓️', CANDIEDHAWS:'🍡',
+    REDPACKET:'🧧', FORTUNE:'🍀', LUCK:'🍀', FIRECRACKER:'🧨',
+    Yes:'✅', No:'❌', Get:'📥', LGTM:'👍', Lemon:'🍋', EatingFood:'🍚',
+    Hundred:'💯', MinusOne:'➖', ThumbsDown:'👎', Fire:'🔥', OKR:'🎯',
+    Drumstick:'🍗', BubbleTea:'🧋', Loudspeaker:'📢', Pin:'📌', Coffee:'☕',
+    Alarm:'⏰', Trophy:'🏆', Music:'🎵', Typing:'⌨️', Pepper:'🌶️',
+    CheckMark:'✔️', CrossMark:'✖️'
+};
 
 function twcTogglePicker(ev, replyId) {
     ev.stopPropagation();
@@ -19196,7 +19333,10 @@ document.addEventListener('keydown', function (e) {
 
 /* ================= Notifications bell + feed ================= */
 
-const cmnState = { open: false, tab: 'all', items: [], loaded: false, loading: false };
+// Phase 12: unread state is SERVER-side now (Redis per email — survives
+// logout/devices, never phantom-reflags old threads). `denied` = the access
+// toggle is OFF for this member: the bell hides and the panel explains.
+const cmnState = { open: false, tab: 'all', items: [], loaded: false, loading: false, denied: false };
 
 function cmnLastSeenKey() { return 'xenaCommentsLastSeen:' + (loggedEmail || ''); }
 function cmnGetLastSeen() {
@@ -19222,9 +19362,28 @@ function cmnSetTab(tab) {
 }
 
 function cmnMarkAllRead() {
-    cmnSetLastSeen(Date.now());
+    // Phase 12: optimistic local flip + server watermark (the {all:true}
+    // POST). Old entries can NEVER phantom-return as unread after this —
+    // only genuinely new replies/reactions re-flag.
+    (cmnState.items || []).forEach(it => { it.unread = false; });
     cmnUpdateBadge();
     cmnRender();
+    fetch('/api/comments/feed/read', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+    }).catch(() => {});
+}
+
+function cmnMarkRead(uid) {
+    // Phase 12: one notification clicked -> mark THAT stable uid read on the
+    // server (and optimistically locally). Silent fire-and-forget.
+    if (!uid) return;
+    (cmnState.items || []).forEach(it => { if (it.uid === uid) it.unread = false; });
+    cmnUpdateBadge();
+    fetch('/api/comments/feed/read', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uids: [uid], user: loggedUser, email: loggedEmail, uat: loggedUat || '' })
+    }).catch(() => {});
 }
 
 async function cmnRefresh(silent, _noReval) {
@@ -19234,8 +19393,17 @@ async function cmnRefresh(silent, _noReval) {
     try {
         const oid = localStorage.getItem('xenaOpenId') || '';
         const r = await fetch(`/api/comments/feed?my_open_id=${encodeURIComponent(oid)}&${twcAuthQ()}`);
-        const d = await r.json();
-        if (d && d.success) { cmnState.items = d.items || []; cmnState.loaded = true; stale = !!d.stale; }
+        // Phase 12: access toggle OFF -> every /api denies with 403. Hide the
+        // bell (badge + panel state) instead of spinning forever.
+        if (r.status === 403) {
+            cmnState.denied = true; cmnState.items = []; cmnState.loaded = true;
+        } else {
+            const d = await r.json();
+            if (d && d.success) {
+                cmnState.denied = false;
+                cmnState.items = d.items || []; cmnState.loaded = true; stale = !!d.stale;
+            }
+        }
     } catch (e) { /* badge just stays as-is on network errors */ }
     cmnState.loading = false;
     cmnUpdateBadge();
@@ -19243,7 +19411,7 @@ async function cmnRefresh(silent, _noReval) {
     // Phase 11.9: the feed answered instantly from the shared scan but it's
     // older than ~45s — refresh the scan in the background, then re-pull once
     // (_noReval breaks the cycle so a still-stale answer can't loop).
-    if (stale && !_noReval) cmnRevalidate();
+    if (stale && !_noReval && !cmnState.denied) cmnRevalidate();
 }
 
 let _cmnRevalBusy = false, _cmnRevalLast = 0;
@@ -19262,16 +19430,19 @@ async function cmnRevalidate() {
 
 function cmnUpdateBadge() {
     const b = document.getElementById('cmnBadge'); if (!b) return;
-    const ls = cmnGetLastSeen();
-    const n = cmnState.items.filter(it => (it.time || 0) > ls).length;
+    // Phase 12: unread comes from the SERVER's per-item flag (stable uids +
+    // watermark), not from a localStorage timestamp — this is the end of the
+    // phantom "99+ old notifications" after every logout.
+    if (cmnState.denied) { b.classList.remove('show'); return; }
+    const n = cmnState.items.filter(it => !!it.unread).length;
     b.textContent = n > 99 ? '99+' : String(n);
     b.classList.toggle('show', n > 0);
 }
 
 function cmnRender() {
     const list = document.getElementById('cmnList'); if (!list) return;
+    if (cmnState.denied) { list.innerHTML = '<div class="cmn-empty">Notifications are turned off for your account</div>'; return; }
     if (!cmnState.loaded) { list.innerHTML = '<div class="cmn-empty">Loading…</div>'; return; }
-    const ls = cmnGetLastSeen();
     let items = cmnState.items;
     if (cmnState.tab === 'mentioned') items = items.filter(it => it.mentions_me);
     if (!items.length) {
@@ -19279,7 +19450,7 @@ function cmnRender() {
         return;
     }
     list.innerHTML = items.map(it => {
-        const unread = (it.time || 0) > ls;
+        const unread = !!it.unread;
         const rec = it.numbering ? '#' + twcEsc(String(it.numbering)) : '#' + twcEsc(String(it.record_id || '').slice(-6));
         const meta = [];
         if (it.mentions_me) meta.push('<span class="cmn-atme">@ you</span>');
@@ -19289,7 +19460,7 @@ function cmnRender() {
         if (it.kind === 'reaction') {
             const emo = twcReactionEmoji(it.reaction_key);
             const onWho = it.on_author ? ` <b>${twcEsc(it.on_author)}</b>'s comment` : ' a comment';
-            return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}">
+            return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}" data-uid="${twcEsc(it.uid || '')}">
             <span class="cmn-dot"></span>
             ${twcRenderAvatarHtml(it.author, it.author_avatar, 'cmn-avatar')}
             <div class="cmn-item-main">
@@ -19308,7 +19479,7 @@ function cmnRender() {
             ? `<div class="cmn-rx-line">${it.reactions.map(rx =>
                 `<span class="cmn-rx-chip" title="${twcEsc(rx.reactor_name || '')}">${twcReactionEmoji(rx.key)}</span>`).join('')}</div>`
             : '';
-        return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}">
+        return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}" data-uid="${twcEsc(it.uid || '')}">
             <span class="cmn-dot"></span>
             ${twcRenderAvatarHtml(it.author, it.author_avatar, 'cmn-avatar')}
             <div class="cmn-item-main">
@@ -19329,7 +19500,8 @@ function cmnRender() {
 async function cmnOpenTicket(recordId, time) {
     if (!recordId) return;
     cmnToggle(true);
-    if (time && time > cmnGetLastSeen()) { cmnSetLastSeen(time); cmnUpdateBadge(); }
+    // Phase 12: read-marking happens at the notification click via
+    // cmnMarkRead(uid) — no more localStorage timestamps here.
     window.__twcAutoExpand = recordId;
     try { await twOpenWorkspace(recordId); } catch (e) { console.warn('cmnOpenTicket', e); }
     // Instant-remount fast path (same ticket already mounted): the fill never
@@ -19418,8 +19590,8 @@ const cmtMentionStore = { mentions: {}, list: [], idx: 0 };
 
 function cmtOpen(recordId, time) {
     if (!recordId) return;
-    // Same read-marking the old direct ticket jump used to do.
-    if (time && time > cmnGetLastSeen()) { cmnSetLastSeen(time); cmnUpdateBadge(); }
+    // Phase 12: read-marking happens at the notification click via
+    // cmnMarkRead(uid) — stable server-side uids, no localStorage timestamps.
     const feedItem = (cmnState.items || []).find(x => x.record_id === recordId);
     cmtState.open = true;
     cmtState.recordId = recordId;
@@ -19600,7 +19772,7 @@ document.addEventListener('click', function (e) {
     // THREAD modal first ("only open the comment thread with option to open
     // the tkt if we need to check or make action on the tkt") -- the ticket
     // workspace is one "Open Ticket ↗" click away inside the modal.
-    if (item && item.dataset.rid) { cmtOpen(item.dataset.rid, parseInt(item.dataset.time || '0', 10)); return; }
+    if (item && item.dataset.rid) { cmnMarkRead(item.dataset.uid); cmtOpen(item.dataset.rid, parseInt(item.dataset.time || '0', 10)); return; }
     if (!e.target.closest('.twc-input-wrap')) twcHideMentionPop();
     if (cmnState.open && !e.target.closest('#cmnPanel') && !e.target.closest('#cmnBell')) cmnToggle(true);
 });
