@@ -8040,6 +8040,16 @@ def _harvest_bulk(pages_wanted, token=None):
         pass
     return {"pages": pages, "harvested": harvested, "done": done}
 
+# Phase 13 (Ahmed 2026-10-19 — "stop this stupid name check, it consumes the
+# website"): all live name lookups are DISABLED by default. The resolver is
+# cache-only: names come from the sheet harvest (Admin → Fix missing names)
+# and the login self-cache; anything uncached shows the masked id instantly.
+# Zero Feishu calls on any comment/feed/presence request. The legacy network
+# legs stay below (COMMENT_NAME_LIVE_LOOKUP=True re-enables them) so the
+# historical test suites keep exercising them.
+COMMENT_NAME_LIVE_LOOKUP = False
+
+
 def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False):
     """open_id -> {"name", "avatar"} -- real Lark display names AND profile
     photos. Caching (Phase 11.4): live lookups cached 1h, sheet-harvested
@@ -8068,6 +8078,13 @@ def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False):
             found[uid] = {"name": cached["name"], "avatar": cached.get("avatar") or ""}
         else:
             missing.append(uid)
+    if not COMMENT_NAME_LIVE_LOOKUP:
+        # Phase 13: cache-only — masked seed, no contact batch, no directory
+        # leg, no Bitable leg, no avatar pool. This is what makes every
+        # comment / feed / presence request instant and free.
+        for uid in missing:
+            found[uid] = {"name": ("user-" + uid[-4:] if len(uid) >= 4 else uid), "avatar": ""}
+        return found
     # Candidate tokens in priority order, de-duplicated, Nones dropped.
     # Phase 11.6: the caller's UAT is a FIRST-CLASS candidate here — it was
     # missing before, so a data-restricted/scope-dead TAT ended the batch leg
@@ -8339,6 +8356,12 @@ def _comments_caller():
     perms = get_user_permissions(email, user)
     if not perms.get("modules") and not perms.get("is_super_admin"):
         return user, email, uat, None, (jsonify({"success": False, "error": "Access denied"}), 403)
+    # Phase 13 (Ahmed): comments are their own module now — admins grant the
+    # 💬 Comments & Notifications toggle per member, exactly like 💾 Data
+    # Export. Super-admins always pass.
+    if not perms.get("is_super_admin") and "comments" not in perms.get("modules", []):
+        return user, email, uat, None, (jsonify({"success": False,
+            "error": "Comments access denied. Ask your admin to enable the 💬 Comments module for you."}), 403)
     # Reads can ride the tenant token (the app is a collaborator on the base);
     # the caller's UAT is preferred when present so read authorship checks and
     # any user-scoped comment permissions behave exactly like the Base UI.
