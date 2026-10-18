@@ -2991,6 +2991,17 @@
                             </div>
                             <label class="switch"><input type="checkbox" id="mod_audition_status"><span class="slider"></span></label>
                         </div>
+                        <!-- Phase 13 (Ahmed): 💬 Comments & Notifications --
+                             same toggle pattern as 💾 Data Export: only members
+                             granted this module can read/write ticket comments,
+                             react, and see the notifications bell. -->
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>💬 Comments &amp; Notifications</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Lets this member read and write ticket comments, react, and see the notifications bell.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_comments"><span class="slider"></span></label>
+                        </div>
                         </div>
                         <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
                         <div class="admin-modules-grid">
@@ -7587,6 +7598,9 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     const exportCb=document.getElementById('mod_export_data');
     if (exportCb) exportCb.checked = m.includes('export_data') || m.includes('admin');
 
+    const cmtCb=document.getElementById('mod_comments');
+    if (cmtCb) cmtCb.checked = m.includes('comments') || m.includes('admin'); // Phase 13
+
     document.getElementById('modAdmin').checked=m.includes('admin');
 
     pTargetAcm.setValues(parseGranular(acmsRaw,'target'));
@@ -8078,7 +8092,7 @@ function resetAgentForm() {
     document.getElementById('modAdmin').checked = false;
     // Phase 10.13.1/10.14: these three live in admin-toggle switches now (not
     // inside .sub-opt-lbl), so the generic clear below doesn't reach them.
-    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
@@ -8138,6 +8152,7 @@ async function confirmSaveRole() {
     });
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
     if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
+    if (document.getElementById('mod_comments')?.checked) modules.push('comments'); // Phase 13
     // Roles never carry "admin" themselves -- admin is a person-level grant, not a
     // reusable role preset.
 
@@ -8248,6 +8263,7 @@ async function addAgent() {
     if (document.getElementById('modAdmin').checked) modules.push('admin');
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
     if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
+    if (document.getElementById('mod_comments')?.checked) modules.push('comments'); // Phase 13
     
     document.getElementById('adminBtnSubmit').innerText='Saving...';
 
@@ -8286,7 +8302,7 @@ async function addAgent() {
         ToastManager.show(identities.length > 1 ? `${successCount} agents saved successfully.` : 'Agent saved successfully.', 'success');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
-        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
     }
     document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
