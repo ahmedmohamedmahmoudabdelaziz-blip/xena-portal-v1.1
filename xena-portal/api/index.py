@@ -626,38 +626,105 @@ def mask_name(name):
 # key miss, which returns result=None) marks it healthy. Session-enforcement
 # code checks redis_healthy() and FAILS OPEN while the store is unreachable
 # instead of logging agents out over infrastructure trouble.
-_redis_health = {"down_since": 0.0, "lock": threading.Lock()}
+_redis_health = {"down_since": 0.0, "lock": threading.Lock(),
+                 "last_error": "", "last_error_ts": 0.0}
+REDIS_RETRY_AFTER = 30   # seconds before a known-down store gets one probe call
+
+def _redis_mark_down(err, now):
+    with _redis_health["lock"]:
+        if not _redis_health["down_since"]:
+            _redis_health["down_since"] = now
+        _redis_health["last_error"] = str(err)[:300]
+        _redis_health["last_error_ts"] = now
 
 def redis_cmd(*args, timeout=8):
     if not REDIS_ENABLED: return None
+    now = time.time()
+    with _redis_health["lock"]:
+        down = _redis_health["down_since"]
+        # While the store is known-down, calls are skipped outright (the
+        # caller's fallback covers the functionality) -- one probe is allowed
+        # through every REDIS_RETRY_AFTER so recovery is picked up.
+        if down and (now - down) < REDIS_RETRY_AFTER:
+            return None
     try:
         resp = http_requests.post(
             UPSTASH_REDIS_REST_URL,
             headers={"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"},
             json=list(args), timeout=timeout
         )
-        result = resp.json().get("result")
+        data = resp.json()
+        result = data.get("result")
+        # Phase 17: an Upstash RESPONSE-level error (daily quota exceeded, bad
+        # args -- {"result": null, "error": "..."}) used to be
+        # indistinguishable from a key miss, so a dead store failed silently
+        # forever (the production outage behind Ahmed's "no names, 15s loads,
+        # empty mirror table" report). Note: SET-NX declining a held lock also
+        # returns result=None but carries NO error field -- not a failure.
+        if result is None and data.get("error"):
+            _redis_mark_down(data.get("error"), now)
+            logger.warn("redis_cmd_error", cmd=args[0] if args else "?",
+                        error=str(data.get("error"))[:300])
+            return None
         with _redis_health["lock"]:
             _redis_health["down_since"] = 0.0
+            _redis_health["last_error"] = ""
+            _redis_health["last_error_ts"] = 0.0
         return result
     except Exception as e:
         logger.warn("redis_cmd_failed", cmd=args[0] if args else "?", error=str(e))
-        with _redis_health["lock"]:
-            if not _redis_health["down_since"]:
-                _redis_health["down_since"] = time.time()
+        _redis_mark_down(e, now)
         return None
 
 def redis_healthy():
     """True while Redis calls are succeeding (a missing key is still a
-    successful round-trip -- only exceptions mark the store down)."""
+    successful round-trip -- only exceptions/response errors mark it down)."""
+    if not REDIS_ENABLED: return False
     with _redis_health["lock"]:
         return _redis_health["down_since"] == 0.0
 
+# ─── Phase 17: in-process fallback store (Redis-optional comments) ────────
+# Ahmed's 2026-10-19 production outage (Vercel deployment with Redis
+# unreachable): every Redis-backed cache silently died -- the name cache
+# (masked "user-xxxx" everywhere), the scan cache (15s cold base scans on
+# EVERY read) and the scan-refresh lock (so the mirror sync chain NEVER ran
+# and the Portal Comments table stayed empty). The fix has two halves: the
+# mirror table is the durable store for comments (Miaoda's architecture --
+# reads are plain Bitable queries needing no Redis at all), and this small
+# per-instance memory store keeps every other Redis-backed cache working
+# inside a warm instance while the store is disabled or down.
+_MEM_STORE_MAX = 4000
+_mem_store = {}   # key -> (expires_epoch_or_0, json_string); insertion-ordered
+
+def _mem_get(key):
+    ent = _mem_store.get(key)
+    if not ent: return None
+    exp, raw = ent
+    if exp and time.time() > exp:
+        _mem_store.pop(key, None)
+        return None
+    return raw
+
+def _mem_set(key, raw, ttl=None):
+    if len(_mem_store) >= _MEM_STORE_MAX and key not in _mem_store:
+        for k in list(_mem_store.keys())[: _MEM_STORE_MAX // 10 or 1]:
+            _mem_store.pop(k, None)
+    _mem_store[key] = (time.time() + ttl if ttl else 0, raw)
+
 def redis_get_json(key):
     raw = redis_cmd("GET", key)
-    if not raw: return None
-    try: return json.loads(raw)
-    except Exception: return None
+    if raw:
+        try: return json.loads(raw)
+        except Exception: return None
+    # Phase 17: per-instance fallback while the store is disabled/down (a
+    # genuine key miss on a HEALTHY store must NOT read the fallback -- a key
+    # deleted upstream would otherwise resurrect from memory).
+    if not redis_healthy():
+        raw = _mem_get(key)
+        if raw:
+            try: return json.loads(raw)
+            except Exception: return None
+    return None
 
 def redis_set_json(key, value, ttl=None):
     try:
@@ -668,6 +735,9 @@ def redis_set_json(key, value, ttl=None):
     if len(payload) > REDIS_MAX_VALUE_BYTES:
         logger.warn("redis_value_too_large", key=key, size_bytes=len(payload))
         return False
+    if not redis_healthy():
+        _mem_set(key, payload, ttl)   # Phase 17: instance-local fallback
+        return True
     if ttl: redis_cmd("SET", key, payload, "EX", int(ttl))
     else:   redis_cmd("SET", key, payload)
     return True
@@ -7421,6 +7491,15 @@ COMMENTS_SCAN_MAX_PAGES  = 30      # hard cap: 30 x 100 = 3000 comment threads
 COMMENTS_SCAN_LOCK_KEY   = "xena:comments:scan:lock"  # one rescan at a time,
                                    # across all concurrent requests/instances
 COMMENTS_SCAN_LOCK_MS    = 45000   # lock covers a worst-case full scan
+# Phase 16 (Ahmed: "can you make it once every 30 min? + a refresh button"):
+# automatic (stale-driven) scan-refresh — and with it the mirror sync pass and
+# the name backfill, which both ride on the same background pass — runs at
+# most once per SCAN_AUTO_MIN_GAP across ALL viewers. The bell panel's manual
+# refresh button posts force:true to bypass the gap (the NX lock inside
+# _scan_refresh still dedupes simultaneous clickers), and any successful pass
+# (auto or forced) resets the clock.
+SCAN_AUTO_MIN_GAP        = 1800    # 30 min between automatic refreshes
+SCAN_AUTO_TS_KEY         = "xena:comments:scan_auto_ts"
 COMMENTS_FEED_MAX        = 100
 COMMENT_NAME_TTL         = 3600    # open_id -> display name from LIVE lookups, 1h
                                    # (Phase 11.4, Ahmed: "not cached" — masked ids are
@@ -7622,52 +7701,94 @@ def _scan_backfill_names(payload, token):
     except Exception:
         pass
 
+# Phase 17: background-stage error ledger. The mirror/backfill chain used to
+# swallow every failure into a silent `except: pass` — which is exactly why
+# Ahmed's production mirror sat EMPTY for a day with zero trace. Stages still
+# never raise (a broken mirror must never break a comment read), but every
+# failure is recorded here and surfaced by /api/comments/health.
+_BG_ERRORS = []
+def _bg_error(stage, err):
+    try:
+        _BG_ERRORS.append({"stage": stage, "error": str(err)[:300],
+                           "ts": int(time.time())})
+        del _BG_ERRORS[:-20]
+        logger.warn("bg_stage_failed", stage=stage, error=str(err)[:300])
+    except Exception:
+        pass
+
+def _scan_chain(token):
+    """The refresh-holder body: rescan + the background maintenance chain.
+    Phase 12: the person-name sweep moved OUT of interactive comment loads
+    (it added 6-10s to user-facing requests) — this background path is the
+    right home: throttled, incremental, nobody staring at a spinner.
+    Phase 14: _scan_backfill_names auto-saves every person the scan has ever
+    seen so names fill up with no admin button pressed.
+    Phase 15: _mirror_sync_pass keeps the Portal Comments table in sync
+    (diff-based, unchanged threads cost zero upserts)."""
+    result = _fetch_all_comments(token, force=True)
+    try:
+        _sweep_step(token)
+    except Exception as e:
+        _bg_error("sweep", e)
+    try:
+        _scan_backfill_names(result[0] if isinstance(result, tuple) else None, token)
+    except Exception as e:
+        _bg_error("backfill", e)
+    try:
+        _mirror_sync_pass(result[0] if isinstance(result, tuple) else None, token)
+    except Exception as e:
+        _bg_error("mirror", e)
+    return result
+
+_SCAN_LOCAL_LOCK = threading.Lock()
+
+def _scan_refresh_local(token):
+    """Redis-free refresh (Phase 17): deduped per instance by a threading
+    lock — the holder runs the FULL chain (without this the mirror sync and
+    name backfill silently never happen when Redis is down, the root cause of
+    Ahmed's empty Portal Comments table + masked names), waiters serve the
+    fresh cache the holder leaves behind."""
+    if _SCAN_LOCAL_LOCK.acquire(blocking=False):
+        try:
+            return _scan_chain(token)
+        finally:
+            _SCAN_LOCAL_LOCK.release()
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        time.sleep(1)
+        fresh = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+        if isinstance(fresh, dict) and "items" in fresh:
+            return fresh, None
+    return _fetch_all_comments(token, force=True)
+
 def _scan_refresh(token):
     """Refresh the shared scan, de-duplicated across concurrent requests and
     Vercel instances by a Redis lock: the lock holder rescans; everyone else
     waits (max ~25s) for the holder's fresh copy instead of all paginating the
-    base at once. Returns (payload, error)."""
+    base at once. Returns (payload, error).
+    Phase 17: with Redis disabled OR down (lock call skipped/failed), the
+    per-instance local path runs instead — including the whole maintenance
+    chain — instead of the old early return that skipped it, or the old 25s
+    dead wait on a store that would never answer."""
     if not REDIS_ENABLED:
-        return _fetch_all_comments(token, force=True)
+        return _scan_refresh_local(token)
     cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
     old_ts = int(cached.get("ts") or 0) if isinstance(cached, dict) else 0
-    try:
-        got = redis_cmd("SET", COMMENTS_SCAN_LOCK_KEY, str(time.time()),
-                        "NX", "PX", COMMENTS_SCAN_LOCK_MS)
-    except Exception:
-        got = None
+    got = redis_cmd("SET", COMMENTS_SCAN_LOCK_KEY, str(time.time()),
+                    "NX", "PX", COMMENTS_SCAN_LOCK_MS)
     if got:
         try:
-            result = _fetch_all_comments(token, force=True)
+            result = _scan_chain(token)
         finally:
             try:
                 redis_cmd("DEL", COMMENTS_SCAN_LOCK_KEY)
             except Exception:
                 pass
-        # Phase 12: the person-name sweep moved OUT of interactive comment
-        # loads (it added 6-10s to user-facing requests) — this background
-        # revalidate path is the right home for it: throttled, incremental,
-        # and nobody is staring at a spinner while it runs.
-        try:
-            _sweep_step(token)
-        except Exception:
-            pass
-        # Phase 14: auto-save every person the scan has ever seen — comment
-        # authors, repliers, mentionees, reactors — so names fill up with no
-        # admin button pressed. Background-only (see _scan_backfill_names).
-        try:
-            _scan_backfill_names(result[0] if isinstance(result, tuple) else None, token)
-        except Exception:
-            pass
-        # Phase 15 (Miaoda mirror): keep the Portal Comments table in sync on
-        # the same background pass — upserts ONLY threads whose update_time
-        # changed (or whose payload still shows masked names), capped. This
-        # is what keeps the 5s/3s mirror reads fresh for SHEET-side changes.
-        try:
-            _mirror_sync_pass(result[0] if isinstance(result, tuple) else None, token)
-        except Exception:
-            pass
         return result
+    if not redis_healthy():
+        # The lock call was skipped/failed because the store is down — take
+        # the local path rather than waiting 25s for a holder that can't land.
+        return _scan_refresh_local(token)
     # Another instance/request is refreshing right now — wait for its result.
     deadline = time.time() + 25
     while time.time() < deadline:
@@ -7799,15 +7920,19 @@ def _mirror_search(body, token, pages=MIRROR_READ_PAGES_MAX):
     rows, page_token, n = [], None, 0
     while n < max(1, pages):
         b = dict(body or {})
-        b["page_size"] = b.get("page_size") or MIRROR_PAGE
+        # Phase 17: page_size / page_token are QUERY params on records/search —
+        # in the POST body Feishu silently ignores them (default 20-row pages,
+        # pagination never advancing). Verified against the live table
+        # 2026-10-19: body params don't error, they're just dropped.
+        params = {"page_size": b.pop("page_size", None) or MIRROR_PAGE}
         if page_token:
-            b["page_token"] = page_token
+            params["page_token"] = page_token
         try:
             resp = feishu_session.post(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/search",
                 headers={"Authorization": f"Bearer {token}",
                          "Content-Type": "application/json; charset=utf-8"},
-                json=b, timeout=15)
+                params=params, json=b, timeout=15)
             data = resp.json()
         except Exception as e:
             return rows, f"mirror search failed: {e}"
@@ -7981,25 +8106,43 @@ def _mirror_upsert(payloads, token):
             updates.append({"record_id": have[cid], "fields": f})
         else:
             creates.append({"fields": f})
+    # Phase 17: the batch calls used to ignore even the RESPONSE code — a
+    # permission/shape rejection looked exactly like success (another way the
+    # production mirror stayed silently empty). Non-zero codes and request
+    # failures now land in _BG_ERRORS / _MIRROR_STATS, and the returned counts
+    # reflect what the table actually accepted.
+    done_u, done_c = 0, 0
     for i in range(0, len(updates), MIRROR_BATCH):
+        chunk = updates[i:i + MIRROR_BATCH]
         try:
-            feishu_session.post(
+            resp = feishu_session.post(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/batch_update",
                 headers={"Authorization": f"Bearer {token}",
                          "Content-Type": "application/json; charset=utf-8"},
-                json={"records": updates[i:i + MIRROR_BATCH]}, timeout=20)
-        except Exception:
-            pass
+                json={"records": chunk}, timeout=20)
+            data = resp.json()
+            if data.get("code") == 0:
+                done_u += len(chunk)
+            else:
+                _bg_error("mirror_upsert", f"batch_update {data.get('code')}: {data.get('msg')}")
+        except Exception as e:
+            _bg_error("mirror_upsert", f"batch_update failed: {e}")
     for i in range(0, len(creates), MIRROR_BATCH):
+        chunk = creates[i:i + MIRROR_BATCH]
         try:
-            feishu_session.post(
+            resp = feishu_session.post(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/batch_create",
                 headers={"Authorization": f"Bearer {token}",
                          "Content-Type": "application/json; charset=utf-8"},
-                json={"records": creates[i:i + MIRROR_BATCH]}, timeout=20)
-        except Exception:
-            pass
-    return len(updates), len(creates)
+                json={"records": chunk}, timeout=20)
+            data = resp.json()
+            if data.get("code") == 0:
+                done_c += len(chunk)
+            else:
+                _bg_error("mirror_upsert", f"batch_create {data.get('code')}: {data.get('msg')}")
+        except Exception as e:
+            _bg_error("mirror_upsert", f"batch_create failed: {e}")
+    return done_u, done_c
 
 def _mirror_thread_ids(c):
     """Every open_id the payload builder will ask names for."""
@@ -8065,6 +8208,11 @@ def _mirror_refresh_thread(token, record_id=None, comment_id=None, reply_id=None
         pass
     return True
 
+# Phase 17: last-pass stats, surfaced by /api/comments/health so an empty or
+# stale mirror is explainable at a glance instead of invisible.
+_MIRROR_STATS = {"last_run": 0, "candidates": 0, "updated": 0, "created": 0,
+                 "last_error": ""}
+
 def _mirror_sync_pass(scan, token):
     """Background sync of the mirror table — called ONLY on the scan-refresh
     lock holder, right after the Phase 14 name backfill (so the name cache is
@@ -8079,6 +8227,8 @@ def _mirror_sync_pass(scan, token):
         {"sort": [{"field_name": "Update Time", "desc": True}],
          "page_size": MIRROR_PAGE}, token, pages=MIRROR_READ_PAGES_MAX)
     if err:
+        _MIRROR_STATS["last_error"] = err
+        _bg_error("mirror_search", err)
         return
     have = {}
     for row in rows:
@@ -8102,6 +8252,8 @@ def _mirror_sync_pass(scan, token):
             continue  # unchanged AND fully named — free
         todo.append((c, anchor["record"]))
     if not todo:
+        _MIRROR_STATS.update({"last_run": int(time.time()), "candidates": 0,
+                              "updated": 0, "created": 0, "last_error": ""})
         return
     todo.sort(key=lambda x: int(x[0].get("update_time") or 0), reverse=True)
     todo = todo[:MIRROR_STORE_MAX]
@@ -8112,17 +8264,22 @@ def _mirror_sync_pass(scan, token):
     nums = {}
     try:
         people = _resolve_comment_names(todo_ids, token, uat=None)
-    except Exception:
+    except Exception as e:
+        _bg_error("mirror_names", e)
         people = {}
     try:
         nums = _resolve_record_numberings(list(rec_ids), token)
-    except Exception:
+    except Exception as e:
+        _bg_error("mirror_numbering", e)
         nums = {}
     payloads = [_mirror_thread_payload(c, rid, people, nums.get(rid)) for c, rid in todo]
     try:
-        _mirror_upsert(payloads, token)
-    except Exception:
-        pass
+        done_u, done_c = _mirror_upsert(payloads, token)
+        _MIRROR_STATS.update({"last_run": int(time.time()), "candidates": len(todo),
+                              "updated": done_u, "created": done_c, "last_error": ""})
+    except Exception as e:
+        _MIRROR_STATS["last_error"] = str(e)[:300]
+        _bg_error("mirror", e)
 
 def _scan_has_record(scan, record_id):
     """True when the shared scan holds at least one thread for this record —
@@ -9036,17 +9193,98 @@ def comments_scan_refresh():
     revalidate): when a read answers from a scan older than COMMENTS_SCAN_FRESH
     it flags stale:true and the frontend calls this to bring the shared scan
     up to date, then silently re-pulls. Lock-deduped — concurrent callers all
-    wait on the single in-flight rescan instead of stampeding the base."""
+    wait on the single in-flight rescan instead of stampeding the base.
+    Phase 16: automatic (stale-driven) calls run at most once per
+    SCAN_AUTO_MIN_GAP across all viewers; the bell panel's refresh button
+    posts force:true to bypass that gap (still lock-deduped), and any
+    successful pass resets the auto clock."""
     user, email, uat, token, err = _comments_caller()
     if err:
         return err
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+    if not force:
+        # Phase 17: via redis_get/set_json so the 30-min auto clock also runs
+        # on the per-instance memory fallback when Redis is down — raw
+        # redis_cmd GETs would read None forever and every stale-driven call
+        # would trigger a full 15-20s base rescan.
+        try:
+            last_auto = float(redis_get_json(SCAN_AUTO_TS_KEY) or 0)
+        except Exception:
+            last_auto = 0
+        if time.time() - last_auto < SCAN_AUTO_MIN_GAP:
+            cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+            return jsonify({
+                "success": True, "skipped": "auto_gap",
+                "ts": int(cached.get("ts") or 0) if isinstance(cached, dict) else 0,
+                "stale": _scan_is_stale(cached) if isinstance(cached, dict) else True})
     scan, scan_err = _scan_refresh(token)
     if scan is None and uat:
         scan, scan_err = _scan_refresh(get_tenant_access_token())
     if scan is None:
         return jsonify({"success": False, "error": scan_err}), 502
+    try:
+        redis_set_json(SCAN_AUTO_TS_KEY, time.time())
+    except Exception:
+        pass
     return jsonify({"success": True, "ts": int(scan.get("ts") or 0),
                     "stale": _scan_is_stale(scan)})
+
+@app.route('/api/comments/health', methods=['GET'])
+@rate_limit(*RATE_LIMIT_COMMENTS)
+def comments_health():
+    """Phase 17 observability (Ahmed: "the table you made has nothing on it
+    please check the mioade back end how it was work"). One admin-only GET
+    that answers, with numbers, the questions that used to be invisible:
+    is Redis reachable from this instance, is the shared scan cache warm,
+    is the Portal Comments mirror table filling, and what did the background
+    chain last fail on. Replaces the old silent try/excepts — every stage
+    now records into _BG_ERRORS / _MIRROR_STATS / _redis_health."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not perms.get("is_super_admin") and "admin" not in perms.get("modules", []):
+        return jsonify({"success": False, "error": "Access denied"}), 403
+    now = time.time()
+    with _redis_health["lock"]:
+        last_err, last_err_ts = _redis_health["last_error"], _redis_health["last_error_ts"]
+    cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+    scan_items = 0
+    if isinstance(cached, dict):
+        scan_items = len(cached.get("items") or [])
+    mirror = {"enabled": MIRROR_ENABLE, "rows": None, "error": "",
+              "stats": dict(_MIRROR_STATS)}
+    if MIRROR_ENABLE:
+        try:
+            resp = feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/search",
+                headers={"Authorization": f"Bearer {get_tenant_access_token()}",
+                         "Content-Type": "application/json; charset=utf-8"},
+                params={"page_size": 1}, json={}, timeout=15)
+            data = resp.json()
+            if data.get("code") == 0:
+                mirror["rows"] = (data.get("data") or {}).get("total")
+            else:
+                mirror["error"] = f"{data.get('code')}: {data.get('msg')}"
+        except Exception as e:
+            mirror["error"] = str(e)
+    try:
+        last_auto = float(redis_get_json(SCAN_AUTO_TS_KEY) or 0)
+    except Exception:
+        last_auto = 0
+    return jsonify({
+        "success": True,
+        "redis": {"enabled": REDIS_ENABLED, "healthy": redis_healthy(),
+                  "last_error": last_err,
+                  "last_error_age_s": int(now - last_err_ts) if last_err_ts else None,
+                  "mem_fallback_keys": len(_mem_store)},
+        "scan_cache": {"present": isinstance(cached, dict), "items": scan_items,
+                       "age_s": int(now - cached.get("ts", 0)) if isinstance(cached, dict) else None},
+        "mirror": mirror,
+        "auto_refresh": {"min_gap_s": SCAN_AUTO_MIN_GAP,
+                         "last_auto_age_s": int(now - last_auto) if last_auto else None},
+        "bg_errors": list(_BG_ERRORS[-10:]),
+    })
 
 @app.route('/api/comments/react', methods=['POST'])
 @rate_limit(*RATE_LIMIT_COMMENTS)
