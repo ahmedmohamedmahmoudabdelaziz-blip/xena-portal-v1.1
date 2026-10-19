@@ -66,6 +66,14 @@ CACHE_TTL_HISTORICAL = 3600
 RATE_LIMIT_SEARCH    = (50, 60)
 RATE_LIMIT_ANALYTICS = (30, 60)
 RATE_LIMIT_RECORDS   = (50, 60)
+# Phase 15 (Ahmed: "make it live and fast and cheap ... do not make it consume
+# my plan"): the bell now polls every 5s and an open thread every 3s (Miaoda's
+# Option-A live feel) — the comment routes read the Portal Comments mirror
+# table (ONE indexed Feishu records/search, names pre-resolved inside the row
+# payload) instead of touching Redis name caches per id, so each poll costs
+# ~1-3 Redis commands TOTAL. A dedicated limiter keeps the faster cadence from
+# tripping the 50/min records budget shared with the rest of the portal.
+RATE_LIMIT_COMMENTS  = (150, 60)
 
 COINS_MULTIPLIER = 100000
 
@@ -7438,6 +7446,42 @@ SWEEP_THROTTLE           = 30       # seconds between runs (first full pass ~6 m
 SWEEP_REARM_TTL          = 86400    # after a completed pass, wait 24h before re-sweeping
 COMMENT_RECNUM_TTL       = 7 * 86400  # record_id -> Numbering is immutable, 7d
 
+# ============================================================================
+# Phase 15 — Portal Comments MIRROR (Ahmed: "this is miaoda answer for how it
+# built instant live comment system — make it — live and fast and cheap").
+#
+# Miaoda's trick, adapted without losing the two-way sheet sync:
+#   * READS  stop depending on the base-wide drive-comment scan and hit the
+#     "Portal Comments" Bitable table instead — ONE indexed records/search
+#     per view, exactly like Miaoda's comment table. Each row carries the
+#     thread's FULLY FLATTENED payload (replies with names/avatars already
+#     resolved + the ready-made feed row), so a read needs ZERO per-id name
+#     lookups — the expensive part of every previous read. The Bitable API
+#     is unmetered Feishu quota; per-view cost drops to ~1-3 Redis commands
+#     (scan staleness flag + per-user read state), so a 5s bell / 3s open
+#     thread poll stays comfortably inside the free-tier plan.
+#   * WRITES still go to NATIVE Feishu record comments (UAT) — the sheet
+#     stays the single source of truth, @mentions keep notifying in Lark,
+#     comments typed in the Base keep flowing back. After a successful
+#     native write the matching mirror row is refreshed immediately (1-2
+#     extra calls per human-paced action, never per poll).
+#   * SYNC   runs on the scan-refresh lock holder (the existing background
+#     revalidate): it upserts ONLY threads whose update_time changed (or
+#     whose payload still carries masked names), capped per pass. Sheet-
+#     side changes therefore surface within the same ~45s window the scan
+#     already had; portal-side changes are instant via the write patch.
+#   * FAIL-OPEN: every mirror call is try/except — table error, empty
+#     table, or MIRROR_ENABLE=False all fall back to the scan path below,
+#     which is byte-for-byte the Phase 14 behavior.
+# ============================================================================
+MIRROR_TABLE_ID        = "tblUhfs2d43hxy3u"  # "Portal Comments" (created 2026-10-19)
+MIRROR_ENABLE          = True
+MIRROR_PAGE            = 200    # rows per records/search page (one call)
+MIRROR_READ_PAGES_MAX  = 5      # sync pass reads at most 1000 newest rows
+MIRROR_FEED_ROWS       = 200    # feed fast path: newest 200 thread rows, 1 call
+MIRROR_STORE_MAX       = 200    # rows upserted per background sync pass
+MIRROR_BATCH           = 100    # records per batch_create / batch_update call
+
 def _comment_record_anchor(comment):
     """The {record, table, view} anchor of a comment thread (stamped on every
     reply by Feishu as extra.notify_extra)."""
@@ -7528,6 +7572,56 @@ def _scan_is_stale(scan):
     ts = int((scan or {}).get("ts") or 0) if isinstance(scan, dict) else 0
     return (time.time() - ts) > COMMENTS_SCAN_FRESH
 
+# Phase 14: per-pass cap on how many distinct user ids one background
+# backfill will try to resolve (the resolver's own throttles still apply on
+# top — BITABLE_LOOKUP_MAX per call, 1h negative caches for misses).
+BG_NAME_BACKFILL_MAX = 200
+
+def _scan_backfill_names(payload, token):
+    """Phase 14 (Ahmed: "find easy way to save all who made ever reply or
+    have access on the sheet instead of missing names button"): the shared
+    comment scan payload already carries EVERY open_id that ever appeared in
+    a ticket comment — comment authors, every replier, every mentionee,
+    every reaction. This runs ONLY on the scan-refresh lock holder (the
+    background revalidate path — nobody is waiting on it) and hands the
+    still-uncached ids to _resolve_comment_names(force_live=True): hits are
+    saved to xena:uname:{uid} for 7d, misses land in the resolver's 1h
+    negative caches so an unresolvable id costs at most one retry per hour,
+    in the background. Interactive comment/feed loads stay cache-only and
+    instant (Phase 13 contract) — this is what quietly fills the cache so
+    the "Fix missing names" button becomes a rarely-needed fallback."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        return
+    ids, seen = [], set()
+    def _add(u):
+        if u and u not in seen:
+            seen.add(u)
+            ids.append(u)
+    for c in payload["items"]:
+        if not isinstance(c, dict):
+            continue
+        _add(c.get("user_id"))
+        for r in ((c.get("reply_list") or {}).get("replies") or []):
+            if not isinstance(r, dict):
+                continue
+            _add(r.get("user_id"))
+            for p in _reply_parts(r)[0]:
+                if isinstance(p, dict) and p.get("type") == "mention":
+                    _add(p.get("user_id"))
+            for rx in _reply_reactions(r):
+                for u in (rx.get("users") or []):
+                    _add(u)
+        for rx in (c.get("reaction_list") or []):
+            for u in ((rx or {}).get("ahead_users") or []):
+                _add(u)
+    if not ids:
+        return
+    try:
+        _resolve_comment_names(ids[:BG_NAME_BACKFILL_MAX], token, uat=None,
+                                force_live=True)
+    except Exception:
+        pass
+
 def _scan_refresh(token):
     """Refresh the shared scan, de-duplicated across concurrent requests and
     Vercel instances by a Redis lock: the lock holder rescans; everyone else
@@ -7556,6 +7650,21 @@ def _scan_refresh(token):
         # and nobody is staring at a spinner while it runs.
         try:
             _sweep_step(token)
+        except Exception:
+            pass
+        # Phase 14: auto-save every person the scan has ever seen — comment
+        # authors, repliers, mentionees, reactors — so names fill up with no
+        # admin button pressed. Background-only (see _scan_backfill_names).
+        try:
+            _scan_backfill_names(result[0] if isinstance(result, tuple) else None, token)
+        except Exception:
+            pass
+        # Phase 15 (Miaoda mirror): keep the Portal Comments table in sync on
+        # the same background pass — upserts ONLY threads whose update_time
+        # changed (or whose payload still shows masked names), capped. This
+        # is what keeps the 5s/3s mirror reads fresh for SHEET-side changes.
+        try:
+            _mirror_sync_pass(result[0] if isinstance(result, tuple) else None, token)
         except Exception:
             pass
         return result
@@ -7662,6 +7771,366 @@ def _scan_patch_reaction(reply_id, emoji, action, actor_open_id):
     if hit:
         _scan_save(cached)
     return hit
+
+# ============================================================================
+# Phase 15 mirror helpers — all fail-open (MIRROR_ENABLE / try-expect guards
+# at the call sites; nothing here may break a comment read or write).
+# ============================================================================
+
+def _mirror_cell_text(v):
+    """Normalize a text field read back from the API: plain str, rich-text
+    segment list, or number."""
+    if isinstance(v, list):
+        return "".join(str(x.get("text", x)) if isinstance(x, dict) else str(x) for x in v)
+    if v in (None, False):
+        return ""
+    return str(v)
+
+def _mirror_cell_num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+def _mirror_search(body, token, pages=MIRROR_READ_PAGES_MAX):
+    """records/search on the Portal Comments table. Returns (rows, error):
+    rows = list of raw {record_id, fields} rows, newest-first when a sort is
+    supplied in body; error = str when the table answered non-zero."""
+    rows, page_token, n = [], None, 0
+    while n < max(1, pages):
+        b = dict(body or {})
+        b["page_size"] = b.get("page_size") or MIRROR_PAGE
+        if page_token:
+            b["page_token"] = page_token
+        try:
+            resp = feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/search",
+                headers={"Authorization": f"Bearer {token}",
+                         "Content-Type": "application/json; charset=utf-8"},
+                json=b, timeout=15)
+            data = resp.json()
+        except Exception as e:
+            return rows, f"mirror search failed: {e}"
+        if data.get("code") != 0:
+            return rows, f"mirror {data.get('code')}: {data.get('msg')}"
+        d = data.get("data") or {}
+        rows.extend(d.get("items") or [])
+        n += 1
+        if not d.get("has_more"):
+            break
+        page_token = d.get("page_token")
+        if not page_token:
+            break
+    return rows, None
+
+def _mirror_row_payloads(rows):
+    """Extract the stored payload JSONs from raw mirror rows (sorted by the
+    row's Update Time, newest-first). Rows with unreadable payloads are
+    skipped; duplicate Comment IDs (a create/create race) collapse to the
+    newest row."""
+    out, seen = {}, {}
+    for row in rows:
+        f = row.get("fields") or {}
+        cid = _mirror_cell_text(f.get("Comment ID"))
+        try:
+            payload = json.loads(_mirror_cell_text(f.get("Payload")) or "{}")
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        payload.setdefault("comment_id", cid)
+        payload["_update_time"] = _mirror_cell_num(f.get("Update Time"))
+        if cid and cid in seen:      # dup rows: keep the newer Update Time
+            if payload["_update_time"] < out[cid]["_update_time"]:
+                continue
+        if cid:
+            seen[cid] = True
+        out[cid or f"row{len(out)}"] = payload
+    return list(out.values())
+
+def _mirror_lookup_record(record_id, token):
+    """Miaoda read #1: every comment thread of ONE ticket. Single indexed
+    records/search filtered on Record ID. Returns the stored payload list
+    (possibly empty), or None when the table errored (caller falls back)."""
+    body = {"filter": {"conjunction": "and", "conditions": [
+                {"field_name": "Record ID", "operator": "is", "value": [record_id]}]}}
+    rows, err = _mirror_search(body, token, pages=2)
+    if err:
+        return None
+    return _mirror_row_payloads(rows)
+
+def _mirror_lookup_feed(token):
+    """Miaoda read #2: the newest thread rows for the bell feed — one call,
+    sorted by Update Time desc. Returns payloads (possibly empty) or None on
+    table error."""
+    body = {"sort": [{"field_name": "Update Time", "desc": True}],
+            "page_size": min(MIRROR_FEED_ROWS, MIRROR_PAGE)}
+    rows, err = _mirror_search(body, token, pages=1)
+    if err:
+        return None
+    return _mirror_row_payloads(rows)
+
+def _mirror_thread_payload(c, record_id, people, numbering):
+    """The full mirror Payload for one scan thread: replies flattened EXACTLY
+    like the GET /api/comments response but with names/avatars pre-resolved
+    (Miaoda stores author_name on the record — so do we), plus the ready-made
+    feed row for the bell. Reading it back later needs zero name lookups."""
+    replies = (c.get("reply_list") or {}).get("replies") or []
+    def _p(uid):
+        e = people.get(uid) or {}
+        return {"name": e.get("name") or (uid or ""), "avatar": e.get("avatar") or ""}
+    out_replies, mention_ids, thread_reactions, img_count = [], [], [], 0
+    for r in replies:
+        parts, plain = _reply_parts(r)
+        reactions = _reply_reactions(r)
+        uid = r.get("user_id")
+        item = {
+            "comment_id": c.get("comment_id"),
+            "reply_id": r.get("reply_id"),
+            "user_id": uid,
+            "user_name": _p(uid)["name"],
+            "user_avatar": _p(uid)["avatar"],
+            "create_time": r.get("create_time") or c.get("create_time"),
+            "parts": parts,
+            "text": plain,
+            "images": _reply_images(r),
+            "is_solved": bool(c.get("is_solved")),
+            "reactions": reactions,
+        }
+        for p in item["parts"]:
+            if p.get("type") == "mention":
+                p["name"] = _p(p.get("user_id"))["name"]
+                if p.get("user_id"):
+                    mention_ids.append(p["user_id"])
+        for rx in item["reactions"]:
+            rx["names"] = [_p(u)["name"] for u in rx["users"]]
+        out_replies.append(item)
+        img_count += len(item["images"])
+        _, r_plain = _reply_parts(r)
+        for rx in reactions:
+            for reactor in rx["users"]:
+                thread_reactions.append({
+                    "key": rx["key"], "reactor_id": reactor,
+                    "reactor_name": _p(reactor)["name"],
+                    "reactor_avatar": _p(reactor)["avatar"],
+                    "on_user_id": uid, "on_name": _p(uid)["name"],
+                    "on_text": (r_plain or "")[:120],
+                })
+    last = replies[-1] if replies else {}
+    _, last_plain = _reply_parts(last)
+    feed = {
+        "comment_id": c.get("comment_id"),
+        "last_reply_id": last.get("reply_id"),
+        "record_id": record_id,
+        "author_id": last.get("user_id"),
+        "author_name": _p(last.get("user_id"))["name"],
+        "author_avatar": _p(last.get("user_id"))["avatar"],
+        "time": c.get("update_time") or last.get("create_time"),
+        "text": (last_plain or "")[:180],
+        "image_count": img_count,
+        "reply_count": len(replies),
+        "mention_ids": sorted(set(mention_ids)),
+        "is_solved": bool(c.get("is_solved")),
+        "reactions": thread_reactions,
+        "numbering": numbering,
+    }
+    return {"v": 1,
+            "comment_id": c.get("comment_id"), "record_id": record_id,
+            "update_time": int(c.get("update_time") or 0),
+            "is_solved": bool(c.get("is_solved")),
+            "user_id": c.get("user_id"),
+            "replies": out_replies, "feed": feed}
+
+def _mirror_row_fields(payload):
+    """The Bitable field dict for one mirror row."""
+    fd = payload.get("feed") or {}
+    return {
+        "Comment ID":  payload.get("comment_id") or "",
+        "Record ID":   payload.get("record_id") or fd.get("record_id") or "",
+        "Numbering":   fd.get("numbering") or "",
+        "Update Time": int(payload.get("update_time") or 0),
+        "Reply Count": int(fd.get("reply_count") or 0),
+        "Solved":      bool(payload.get("is_solved")),
+        "Payload":     json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+    }
+
+def _mirror_upsert(payloads, token):
+    """Upsert mirror rows by Comment ID: one targeted search to find existing
+    rows, then batch_update them / batch_create the missing ones (chunks of
+    MIRROR_BATCH). Never raises on API errors — returns (updated, created)."""
+    if not payloads:
+        return 0, 0
+    cids = [p.get("comment_id") for p in payloads if p.get("comment_id")]
+    have = {}
+    if cids:
+        for i in range(0, len(cids), MIRROR_PAGE):
+            body = {"filter": {"conjunction": "and", "conditions": [
+                        {"field_name": "Comment ID", "operator": "is", "value": cids[i:i + MIRROR_PAGE]}]}}
+            rows, err = _mirror_search(body, token, pages=2)
+            if err:
+                return 0, 0
+            for row in rows:
+                cid = _mirror_cell_text((row.get("fields") or {}).get("Comment ID"))
+                if cid:
+                    have[cid] = row.get("record_id")
+    updates, creates = [], []
+    for p in payloads:
+        cid = p.get("comment_id")
+        f = _mirror_row_fields(p)
+        if cid and cid in have:
+            updates.append({"record_id": have[cid], "fields": f})
+        else:
+            creates.append({"fields": f})
+    for i in range(0, len(updates), MIRROR_BATCH):
+        try:
+            feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/batch_update",
+                headers={"Authorization": f"Bearer {token}",
+                         "Content-Type": "application/json; charset=utf-8"},
+                json={"records": updates[i:i + MIRROR_BATCH]}, timeout=20)
+        except Exception:
+            pass
+    for i in range(0, len(creates), MIRROR_BATCH):
+        try:
+            feishu_session.post(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/batch_create",
+                headers={"Authorization": f"Bearer {token}",
+                         "Content-Type": "application/json; charset=utf-8"},
+                json={"records": creates[i:i + MIRROR_BATCH]}, timeout=20)
+        except Exception:
+            pass
+    return len(updates), len(creates)
+
+def _mirror_thread_ids(c):
+    """Every open_id the payload builder will ask names for."""
+    ids = [c.get("user_id")]
+    for r in ((c.get("reply_list") or {}).get("replies") or []):
+        ids.append(r.get("user_id"))
+        for p in _reply_parts(r)[0]:
+            if p.get("type") == "mention":
+                ids.append(p.get("user_id"))
+        for rx in _reply_reactions(r):
+            ids.extend(rx["users"])
+    return [i for i in ids if i]
+
+def _mirror_scan_thread(scan, record_id=None, comment_id=None, reply_id=None):
+    """Locate one thread in the shared scan cache by record, comment id or
+    reply id. Returns the raw scan item or None."""
+    if not (isinstance(scan, dict) and isinstance(scan.get("items"), list)):
+        return None
+    for c in scan["items"]:
+        if record_id is not None:
+            if _comment_record_anchor(c).get("record") != record_id:
+                continue
+        if comment_id is not None and c.get("comment_id") != comment_id:
+            continue
+        if reply_id is not None:
+            if not any(r.get("reply_id") == reply_id
+                       for r in ((c.get("reply_list") or {}).get("replies") or [])):
+                continue
+        return c
+    return None
+
+def _mirror_refresh_thread(token, record_id=None, comment_id=None, reply_id=None):
+    """Rebuild + upsert ONE thread's mirror row right after a portal-side
+    comment/reaction landed (the write patch that makes portal changes instant
+    for every 3-5s poll). Names resolve cache-only — the author/reactor is
+    the logged-in user and their name is warm."""
+    if not MIRROR_ENABLE:
+        return False
+    try:
+        scan = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+    except Exception:
+        scan = None
+    c = _mirror_scan_thread(scan, record_id=record_id,
+                            comment_id=comment_id, reply_id=reply_id)
+    if c is None:
+        return False
+    rid = _comment_record_anchor(c).get("record") or ""
+    people = {}
+    try:
+        people = _resolve_comment_names(_mirror_thread_ids(c), token, uat=None)
+    except Exception:
+        people = {}
+    numbering = None
+    if rid:
+        try:
+            numbering = _resolve_record_numberings([rid], token).get(rid)
+        except Exception:
+            numbering = None
+    payload = _mirror_thread_payload(c, rid, people, numbering)
+    try:
+        _mirror_upsert([payload], token)
+    except Exception:
+        pass
+    return True
+
+def _mirror_sync_pass(scan, token):
+    """Background sync of the mirror table — called ONLY on the scan-refresh
+    lock holder, right after the Phase 14 name backfill (so the name cache is
+    warm). Reads the newest mirror rows once, then upserts ONLY threads whose
+    update_time moved (or whose payload still shows masked names), capped at
+    MIRROR_STORE_MAX. Unchanged threads cost nothing."""
+    if not MIRROR_ENABLE:
+        return
+    if not (isinstance(scan, dict) and isinstance(scan.get("items"), list)):
+        return
+    rows, err = _mirror_search(
+        {"sort": [{"field_name": "Update Time", "desc": True}],
+         "page_size": MIRROR_PAGE}, token, pages=MIRROR_READ_PAGES_MAX)
+    if err:
+        return
+    have = {}
+    for row in rows:
+        f = row.get("fields") or {}
+        cid = _mirror_cell_text(f.get("Comment ID"))
+        if cid:
+            have[cid] = (_mirror_cell_num(f.get("Update Time")),
+                         _mirror_cell_text(f.get("Payload")),
+                         row.get("record_id"))
+    todo, todo_ids, rec_ids = [], [], set()
+    for c in scan["items"]:
+        anchor = _comment_record_anchor(c)
+        if anchor.get("table") != REQUESTS_TABLE_ID or not anchor.get("record"):
+            continue
+        cid = c.get("comment_id")
+        if not cid:
+            continue
+        uts = int(c.get("update_time") or 0)
+        cur = have.get(cid)
+        if cur and cur[0] >= uts and '"user-' not in cur[1]:
+            continue  # unchanged AND fully named — free
+        todo.append((c, anchor["record"]))
+    if not todo:
+        return
+    todo.sort(key=lambda x: int(x[0].get("update_time") or 0), reverse=True)
+    todo = todo[:MIRROR_STORE_MAX]
+    for c, rid in todo:
+        todo_ids.extend(_mirror_thread_ids(c))
+        rec_ids.add(rid)
+    people = {}
+    nums = {}
+    try:
+        people = _resolve_comment_names(todo_ids, token, uat=None)
+    except Exception:
+        people = {}
+    try:
+        nums = _resolve_record_numberings(list(rec_ids), token)
+    except Exception:
+        nums = {}
+    payloads = [_mirror_thread_payload(c, rid, people, nums.get(rid)) for c, rid in todo]
+    try:
+        _mirror_upsert(payloads, token)
+    except Exception:
+        pass
+
+def _scan_has_record(scan, record_id):
+    """True when the shared scan holds at least one thread for this record —
+    used to detect "mirror is empty because the sync hasn't reached it yet"
+    and fall back to the scan path instead of serving an empty thread."""
+    if not (isinstance(scan, dict) and isinstance(scan.get("items"), list)):
+        return False
+    return any(_comment_record_anchor(c).get("record") == record_id for c in scan["items"])
 
 def _caller_open_id(email):
     """The logged-in caller's open_id from the email->open_id bridge cache
@@ -8050,7 +8519,7 @@ def _harvest_bulk(pages_wanted, token=None):
 COMMENT_NAME_LIVE_LOOKUP = False
 
 
-def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False):
+def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False, force_live=False):
     """open_id -> {"name", "avatar"} -- real Lark display names AND profile
     photos. Caching (Phase 11.4): live lookups cached 1h, sheet-harvested
     names 24h, masked ids NEVER cached (they retry on every call).
@@ -8078,10 +8547,14 @@ def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False):
             found[uid] = {"name": cached["name"], "avatar": cached.get("avatar") or ""}
         else:
             missing.append(uid)
-    if not COMMENT_NAME_LIVE_LOOKUP:
+    if not COMMENT_NAME_LIVE_LOOKUP and not force_live:
         # Phase 13: cache-only — masked seed, no contact batch, no directory
         # leg, no Bitable leg, no avatar pool. This is what makes every
         # comment / feed / presence request instant and free.
+        # Phase 14 force_live: the BACKGROUND scan-refresh backfill
+        # (_scan_backfill_names) re-enables the legs below for one capped
+        # pass — user-facing requests never pass force_live, so they stay
+        # instant; the legs only ever run out-of-band.
         for uid in missing:
             found[uid] = {"name": ("user-" + uid[-4:] if len(uid) >= 4 else uid), "avatar": ""}
         return found
@@ -8382,7 +8855,7 @@ def _reply_reactions(reply):
     return out
 
 @app.route('/api/comments', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def list_ticket_comments():
     """The comment thread of ONE ticket record, oldest-first, each reply
     flattened to {comment_id, reply_id, user_id, user_name, user_avatar,
@@ -8393,6 +8866,34 @@ def list_ticket_comments():
     user, email, uat, token, err = _comments_caller()
     if err:
         return err
+    # Phase 15 (Miaoda mirror) fast path: ONE indexed records/search on the
+    # Portal Comments table; names/avatars are already inside the row payload
+    # (zero per-id lookups — the read that used to cost 10-40 Redis GETs now
+    # costs one Feishu call + the scan staleness GET). Falls back to the scan
+    # path when the table errors, or when it has no rows for this record but
+    # the shared scan does (the background sync hasn't reached this thread
+    # yet — e.g. right after deploy).
+    if MIRROR_ENABLE:
+        mirror = None
+        try:
+            mirror = _mirror_lookup_record(record_id, token)
+        except Exception:
+            mirror = None
+        if mirror is not None:
+            try:
+                scan_c = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+            except Exception:
+                scan_c = None
+            if mirror or (isinstance(scan_c, dict) and not _scan_has_record(scan_c, record_id)):
+                out = []
+                for p in mirror:
+                    out.extend(p.get("replies") or [])
+                out.sort(key=lambda x: x.get("create_time") or 0)
+                return jsonify({"success": True, "comments": out, "count": len(out),
+                                "truncated": bool((scan_c or {}).get("truncated")),
+                                "stale": _scan_is_stale(scan_c),
+                                "fast_path": True,
+                                "me_open_id": _caller_open_id(email)})
     scan, scan_err = _fetch_all_comments(token)
     if scan is None and uat:
         # expired/insufficient UAT -- reads fall back to the tenant token
@@ -8467,7 +8968,7 @@ def _build_reply_elements(text, mentions):
     return [e for e in elements if e.get("type") != "text" or e.get("text", "").strip()]
 
 @app.route('/api/comments', methods=['POST'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def add_ticket_comment():
     """Post a comment onto a ticket record AS the logged-in agent (UAT).
     Body: {record_id, text, mentions:[{name, user_id}], user, email, uat}.
@@ -8514,12 +9015,22 @@ def add_ticket_comment():
     # Phase 11.9: patch the new thread into the shared scan in place instead
     # of busting the whole cache (which forced the NEXT reader into a 20s
     # base-wide rescan). Fallback: bust, only if the payload shape surprises us.
-    if not _scan_upsert_comment(record_id, data.get("data") or {}):
+    created_ok = _scan_upsert_comment(record_id, data.get("data") or {})
+    if not created_ok:
         redis_cmd("DEL", COMMENTS_SCAN_CACHE_KEY)
+    # Phase 15 (Miaoda mirror): refresh this thread's mirror row immediately —
+    # one human-paced action, so 1-2 extra Bitable calls here are the price of
+    # every viewer's NEXT 3-5s poll seeing the new comment instantly, with no
+    # per-poll rescan and no per-id name lookups.
+    if created_ok:
+        try:
+            _mirror_refresh_thread(token, comment_id=(data.get("data") or {}).get("comment_id"))
+        except Exception:
+            pass
     return jsonify({"success": True})
 
 @app.route('/api/comments/scan-refresh', methods=['POST'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def comments_scan_refresh():
     """Frontend-triggered background revalidate (Phase 11.9 stale-while-
     revalidate): when a read answers from a scan older than COMMENTS_SCAN_FRESH
@@ -8538,7 +9049,7 @@ def comments_scan_refresh():
                     "stale": _scan_is_stale(scan)})
 
 @app.route('/api/comments/react', methods=['POST'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def react_ticket_comment():
     """Add/remove an emoji reaction on a ticket comment (or one of its
     replies) AS the logged-in agent (UAT). Feishu drive v2 comment-reaction
@@ -8596,6 +9107,13 @@ def react_ticket_comment():
         if cand.startswith("ou_"):
             actor = cand
     _scan_patch_reaction(reply_id, emoji, action, actor)
+    # Phase 15 (Miaoda mirror): rewrite the owning thread's mirror row so the
+    # reaction shows up in every viewer's next 3-5s poll instantly (their own
+    # chip is already optimistic; this keeps the OTHER viewers consistent).
+    try:
+        _mirror_refresh_thread(token, reply_id=reply_id)
+    except Exception:
+        pass
     return jsonify({"success": True, "actor_open_id": actor})
 
 def _resolve_record_numberings(record_ids, token):
@@ -8647,7 +9165,7 @@ def _resolve_record_numberings(record_ids, token):
     return nums
 
 @app.route('/api/comments/feed', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def comments_feed():
     """The notifications feed (Ahmed's screenshot): newest comment threads on
     Grand Table records first, each with the last reply's author/text/images,
@@ -8659,6 +9177,88 @@ def comments_feed():
     user, email, uat, token, err = _comments_caller()
     if err:
         return err
+    # Phase 15 (Miaoda mirror) fast path: the bell feed from the newest
+    # Portal Comments rows — one sorted records/search, feed rows and
+    # names/avatars pre-resolved inside the payload. Per-poll cost: 1 Feishu
+    # call + this user's read-state (2 Redis GETs). Falls back to the scan
+    # path when the table errors or the mirror hasn't been synced yet.
+    if MIRROR_ENABLE:
+        mirror = None
+        try:
+            mirror = _mirror_lookup_feed(token)
+        except Exception:
+            mirror = None
+        if mirror is not None:
+            try:
+                scan_c = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
+            except Exception:
+                scan_c = None
+            if mirror or (isinstance(scan_c, dict) and not scan_c.get("items")):
+                items = []
+                for p in mirror[:COMMENTS_FEED_MAX]:
+                    fd = (p.get("feed") or {})
+                    if not fd.get("comment_id"):
+                        continue
+                    items.append({
+                        "kind": "comment",
+                        "comment_id": fd.get("comment_id"),
+                        "last_reply_id": fd.get("last_reply_id"),
+                        "record_id": fd.get("record_id"),
+                        "author_id": fd.get("author_id"),
+                        "author": fd.get("author_name") or fd.get("author_id") or "",
+                        "author_avatar": fd.get("author_avatar") or "",
+                        "time": fd.get("time"),
+                        "text": fd.get("text") or "",
+                        "image_count": fd.get("image_count") or 0,
+                        "reply_count": fd.get("reply_count") or 0,
+                        "mentions_me": bool(my_open_id) and my_open_id in (fd.get("mention_ids") or []),
+                        "is_solved": bool(fd.get("is_solved")),
+                        "reactions": [{"key": rx.get("key"), "reactor_id": rx.get("reactor_id"),
+                                       "reactor_name": rx.get("reactor_name"),
+                                       "on_user_id": rx.get("on_user_id"), "on_text": rx.get("on_text")}
+                                      for rx in (fd.get("reactions") or [])],
+                        "numbering": fd.get("numbering"),
+                    })
+                    for rx in (fd.get("reactions") or []):
+                        if not rx.get("reactor_id"):
+                            continue
+                        items.append({
+                            "kind": "reaction",
+                            "comment_id": fd.get("comment_id"),
+                            "record_id": fd.get("record_id"),
+                            "author_id": rx.get("reactor_id"),
+                            "author": rx.get("reactor_name") or rx.get("reactor_id"),
+                            "author_avatar": rx.get("reactor_avatar") or "",
+                            "reaction_key": rx.get("key"),
+                            "on_user_id": rx.get("on_user_id"),
+                            "on_author": rx.get("on_name") or "",
+                            "time": fd.get("time"),
+                            "text": rx.get("on_text") or "",
+                            "image_count": 0,
+                            "reply_count": fd.get("reply_count") or 0,
+                            "mentions_me": bool(my_open_id) and rx.get("on_user_id") == my_open_id
+                                           and rx.get("reactor_id") != my_open_id,
+                            "is_solved": bool(fd.get("is_solved")),
+                            "numbering": fd.get("numbering"),
+                        })
+                items.sort(key=lambda x: x.get("time") or 0, reverse=True)
+                items = items[:COMMENTS_FEED_MAX]
+                seen, wm = _notif_load_seen(email)
+                unread_n = 0
+                for it in items:
+                    if it.get("kind") == "reaction":
+                        it["uid"] = f"r:{it.get('comment_id')}:{it.get('author_id')}:{it.get('reaction_key')}"
+                    else:
+                        it["uid"] = f"c:{it.get('comment_id')}:{it.pop('last_reply_id', None) or ''}"
+                    mine = bool(my_open_id) and it.get("author_id") == my_open_id
+                    it["unread"] = (not mine) and (it["uid"] not in seen) and (float(it.get("time") or 0) > wm)
+                    if it["unread"]:
+                        unread_n += 1
+                return jsonify({"success": True, "items": items, "count": len(items),
+                                "unread_count": unread_n,
+                                "truncated": bool((scan_c or {}).get("truncated")),
+                                "stale": _scan_is_stale(scan_c),
+                                "fast_path": True})
     scan, scan_err = _fetch_all_comments(token)
     if scan is None and uat:
         # expired/insufficient UAT -- reads fall back to the tenant token
@@ -8823,7 +9423,7 @@ def _notif_mark_read(email, uids=None, mark_all=False):
     return added
 
 @app.route('/api/comments/feed/read', methods=['POST'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def comments_feed_read():
     """Phase 12: server-side read state for the bell. Body {uids:[...]} marks
     those entries read (sent when the user clicks one notification); {all:true}
@@ -8839,7 +9439,7 @@ def comments_feed_read():
     return jsonify({"success": True, "marked": marked, "all": mark_all})
 
 @app.route('/api/comments/media/<file_token>', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
+@rate_limit(*RATE_LIMIT_COMMENTS)
 def proxy_comment_media(file_token):
     """Streams an image attached to a comment (image_list token). TAT first
     (the app collaborates on the base), the caller's UAT as fallback -- same
