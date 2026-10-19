@@ -1852,6 +1852,10 @@
         .cmn-live{display:inline-flex;align-items:center;gap:5px;font-size:.56rem;font-weight:800;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.28);padding:2px 8px;border-radius:999px;letter-spacing:.08em;flex:none;}
         .cmn-live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:cmnLivePulse 1.8s ease-in-out infinite;}
         @keyframes cmnLivePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(52,211,153,.5);}50%{opacity:.55;box-shadow:0 0 0 4px rgba(52,211,153,0);}}
+        .cmn-refresh{flex:none;width:24px;height:24px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#9fd8ff;font-size:.85rem;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;transition:border-color .15s,background .15s;}
+        .cmn-refresh:hover{border-color:rgba(0,212,255,.5);background:rgba(0,212,255,.12);}
+        .cmn-refresh.spin{animation:cmnSpin 1s linear infinite;border-color:rgba(0,212,255,.5);background:rgba(0,212,255,.12);}
+        @keyframes cmnSpin{to{transform:rotate(360deg);}}
         .cmn-tabs{display:flex;gap:4px;margin-left:2px;}
         .cmn-tab{background:transparent;border:1px solid transparent;color:var(--text-muted,#8a8fa3);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;font-family:inherit;transition:color .15s,background .15s;}
         .cmn-tab.active{color:var(--accent-cyan,#00d4ff);border-color:rgba(0,212,255,.35);background:rgba(0,212,255,.09);}
@@ -2298,7 +2302,8 @@
         <div id="cmnPanel">
             <div class="cmn-head">
                 <span class="cmn-title">Sheet notifications</span>
-                <span class="cmn-live"><span class="cmn-live-dot"></span>LIVE</span>
+                <span class="cmn-live" title="Auto-refreshes every 30 minutes — hit the refresh button to sync now"><span class="cmn-live-dot"></span>AUTO 30M</span>
+                <button type="button" class="cmn-refresh" id="cmnRefreshBtn" onclick="cmnRefreshNow()" title="Refresh now — pulls the latest comments from the sheet immediately">⟳</button>
                 <div class="cmn-tabs">
                     <button type="button" class="cmn-tab active" id="cmnTabAll" onclick="cmnSetTab('all')">All</button>
                     <button type="button" class="cmn-tab" id="cmnTabMentioned" onclick="cmnSetTab('mentioned')">@ Me</button>
@@ -13640,6 +13645,11 @@ async function twOpenWorkspace(recordId) {
             const dbArr = (Array.isArray(dbVal) && dbVal.length > 0 && dbVal[0] && typeof dbVal[0] === 'object' && dbVal[0].id && dbVal[0].name) ? dbVal : null;
             twRenderMemberPicker(dbWrap, '<label>Done by</label>', 'Done by', dbArr);
         }
+        // Phase 17: hydrate every [data-uid] chip this workspace just rendered
+        // (Done by / Mentioned Person pickers + readonly person chips) whose
+        // sheet dict had no avatar_url -- one batched /api/users/lookup per
+        // open, initials stay as the fallback. Scoped to the workspace modal.
+        setTimeout(() => { try { twHydrateAvatars(document.getElementById('pg-ticket-workspace') || document); } catch (e) {} }, 0);
 
         document.getElementById('tw-audition-approval').checked = ticket.fields['Approval'] || false;
         // Phase 10.4: snap the sheet's Status onto the exact option value --
@@ -14732,12 +14742,20 @@ const EDITABLE_USER_FIELDS = new Set(['Done by', 'Mentioned Person']);
 window.__twMemberResults = window.__twMemberResults || {};
 
 function twRenderMemberPicker(wrap, label, key, currentArr) {
-    const current = currentArr && currentArr[0] ? { open_id: currentArr[0].id, name: currentArr[0].name } : null;
+    // Phase 17 (Ahmed: "the avatar in done by field not shown"): sheet person
+    // dicts already carry avatar_url -- the picker used to drop it, so the
+    // Done by chip always fell back to an initial letter. Keep it on `current`
+    // and render the photo immediately (zero API calls, same as twPchipAv);
+    // the initial + twHydrateAvatars stay as the fallback.
+    const current = currentArr && currentArr[0] ? { open_id: currentArr[0].id, name: currentArr[0].name, avatar_url: currentArr[0].avatar_url || '' } : null;
     wrap.dataset.userField = key;
     wrap.dataset.userSelected = current ? JSON.stringify([{ id: current.open_id }]) : '';
     wrap.dataset.userSelectedName = current ? (current.name || '') : ''; // Phase 10.47: drafts need the display name
     const pickerId = 'twup-' + key.replace(/[^a-zA-Z0-9]/g, '') + '-' + Math.random().toString(36).slice(2, 8);
     const initial = current ? escHtml((current.name || '?').slice(0, 1).toUpperCase()) : '';
+    const avInner = (current && current.avatar_url)
+        ? `<img src="${escHtml(current.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.remove()">`
+        : initial;
 
     wrap.innerHTML = `
         ${label}
@@ -14747,7 +14765,7 @@ function twRenderMemberPicker(wrap, label, key, currentArr) {
                 return `<button type="button" class="audit-pick-btn ${isActive ? 'active' : ''}" data-person="${escHtml(q.person)}" onclick="twQuickPickDoneBy('${pickerId}', '${q.query}', this)" title="Set Done by to ${escHtml(q.person)}">${escHtml(q.label)}</button>`;
             }).join('')}</div>` : ''}
             <div id="${pickerId}-chip" data-uid="${current ? escHtml(current.open_id) : ''}" style="display:${current ? 'flex' : 'none'};align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
-                <span data-av-slot style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${initial}</span>
+                <span data-av-slot style="width:22px;height:22px;border-radius:50%;background:var(--accent-cyan);color:#000;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${avInner}</span>
                 <span style="flex:1;font-size:.85rem;">${current ? escHtml(current.name) : ''}</span>
                 <button type="button" onclick="twClearUserPicker('${pickerId}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0 4px;" title="Clear">✕</button>
             </div>
@@ -18918,11 +18936,12 @@ async function twcLoad(force) {
 
 // Phase 11.9 stale-while-revalidate: the shared scan was served stale —
 // ask the backend to refresh it (lock-deduped; ~a few seconds, NOT blocking
-// the UI) then silently re-pull this thread. Throttled: at most one cycle
-// per 60s so a failing refresh can't ping-pong.
+// the UI) then silently re-pull this thread. Phase 16: throttled to one cycle
+// per 30 min, matching the backend's SCAN_AUTO_MIN_GAP — stale-driven syncs
+// are rare by design; the bell panel's ⟳ button is the refresh-now path.
 let _twcRevalBusy = false, _twcRevalLast = 0;
 async function twcRevalidate() {
-    if (_twcRevalBusy || (Date.now() - _twcRevalLast < 60000)) return;
+    if (_twcRevalBusy || (Date.now() - _twcRevalLast < 1800000)) return;
     _twcRevalBusy = true; _twcRevalLast = Date.now();
     try {
         await fetch('/api/comments/scan-refresh', {
@@ -19461,7 +19480,9 @@ async function cmnRefresh(silent, _noReval) {
 
 let _cmnRevalBusy = false, _cmnRevalLast = 0;
 async function cmnRevalidate() {
-    if (_cmnRevalBusy || (Date.now() - _cmnRevalLast < 60000)) return;
+    // Phase 16: matches the backend's 30-min auto gap (SCAN_AUTO_MIN_GAP) —
+    // stale-driven revalidates are rare by design; the ⟳ button is the fast path.
+    if (_cmnRevalBusy || (Date.now() - _cmnRevalLast < 1800000)) return;
     _cmnRevalBusy = true; _cmnRevalLast = Date.now();
     try {
         await fetch('/api/comments/scan-refresh', {
@@ -19471,6 +19492,28 @@ async function cmnRevalidate() {
     } catch (e) {}
     _cmnRevalBusy = false;
     try { await cmnRefresh(true, true); } catch (e) {}
+}
+
+let _cmnManualBusy = false;
+async function cmnRefreshNow() {
+    // Phase 16 manual refresh (bell panel ⟳): FORCE an immediate backend
+    // rescan + mirror sync — bypasses the 30-min auto gap server-side and is
+    // still lock-deduped, so rapid clicks / several viewers can't stampede
+    // the base. The scan can take ~20s cross-border; the button spins until
+    // the re-pull lands.
+    if (_cmnManualBusy || !loggedEmail || cmnState.denied) return;
+    _cmnManualBusy = true;
+    const btn = document.getElementById('cmnRefreshBtn');
+    if (btn) btn.classList.add('spin');
+    try {
+        await fetch('/api/comments/scan-refresh', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, uat: loggedUat || '', force: true })
+        });
+    } catch (e) {}
+    try { await cmnRefresh(true, true); } catch (e) {}
+    if (btn) btn.classList.remove('spin');
+    _cmnManualBusy = false;
 }
 
 function cmnUpdateBadge() {
@@ -19913,33 +19956,21 @@ document.addEventListener('click', function (e) {
 
 /* Initial feed pull. */
 setTimeout(() => { cmnRefresh(true); }, 1500);
-// Phase 15 (Ahmed: "make it live and fast and cheap — like Miaoda's instant
-// live comment system"): the feed endpoint now answers from the Portal
-// Comments mirror table — ONE indexed Feishu query with names pre-resolved
-// inside the row payload, ~1-3 Redis commands total — so the poll tightens
-// from 20s to 5s for the same live feel as the sheet's notification center,
-// without consuming the plan: hidden tabs never poll, a quick-reply composer
-// pauses the re-render so a live pull can never eat someone's draft, and a
-// stale flag still drives the lock-deduped background scan-refresh (the only
-// path that ever rescans, shared by every viewer).
-// ADAPTIVE (Ahmed: "so you will make request every 5 s????" — live AND cheap):
-// 5s only while you're ENGAGED — recent mouse/keyboard/touch activity, the
-// panel open, or unread items pending. An open-but-idle tab backs off to 30s
-// (720 polls/hour -> 120, an ~83% cut on exactly the traffic nobody watches),
-// and any activity or new unread snaps it straight back to 5s.
-let cmnLastFetch = 0;
-let cmnLastActivity = Date.now();
-['mousemove', 'mousedown', 'keydown', 'touchstart'].forEach(ev =>
-    document.addEventListener(ev, () => { cmnLastActivity = Date.now(); }, { passive: true }));
+// Phase 16 (Ahmed: "can you make it once every 30 min? and make button to
+// refresh so if i want to refresh now and not wait"): auto-refresh drops to
+// ONE pull every 30 minutes per visible tab (2 requests/hour instead of up to
+// 720). Hidden tabs still never poll; the quick-reply guard stays so a live
+// pull can't eat a draft. When you don't want to wait: the ⟳ button in the
+// panel header (cmnRefreshNow) FORCEs an immediate backend rescan + mirror
+// sync — bypassing the 30-min auto gap, still lock-deduped against other
+// clickers — then re-pulls. The backend's background sync (scan + mirror +
+// name backfill) inherits the same 30-min cadence; a manual click resets
+// that clock.
 setInterval(() => {
     if (document.hidden || !loggedEmail || cmnState.denied) return;
     if (document.querySelector('#cmnList .cmn-quick-reply')) return;
-    const engaged = (Date.now() - cmnLastActivity < 90000) || cmnState.open ||
-        (cmnState.items || []).some(it => !!it.unread);
-    if (Date.now() - cmnLastFetch < (engaged ? 5000 : 30000)) return;
-    cmnLastFetch = Date.now();
     cmnRefresh(true);
-}, 5000);
+}, 1800000);
 // Live thread: while the comment modal is open, silently re-pull the thread
 // every 3s — replies posted from the sheet or by teammates appear in place,
 // draft and scroll position preserved (cmtLoadThreadLive). The mirror-backed
