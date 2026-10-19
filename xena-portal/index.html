@@ -1840,33 +1840,43 @@
         #cmnBell{position:relative;}
         #cmnBadge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f43f5e;color:#fff;font-size:.6rem;font-weight:800;display:none;align-items:center;justify-content:center;pointer-events:none;box-sizing:border-box;}
         #cmnBadge.show{display:inline-flex;}
-        #cmnPanel{position:fixed;top:56px;right:16px;width:370px;max-width:calc(100vw - 24px);max-height:70vh;background:var(--panel-bg,#16182a);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.5);display:none;flex-direction:column;z-index:3000;overflow:hidden;}
-        #cmnPanel.show{display:flex;}
-        .cmn-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border,rgba(255,255,255,.1));flex:none;}
-        .cmn-title{font-weight:800;font-size:.85rem;color:var(--text,#fff);white-space:nowrap;}
-        .cmn-tabs{display:flex;gap:4px;margin-left:4px;}
-        .cmn-tab{background:transparent;border:1px solid transparent;color:var(--text-muted,#8a8fa3);font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;font-family:inherit;}
-        .cmn-tab.active{color:var(--accent-cyan,#00d4ff);border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.08);}
-        .cmn-markall{margin-left:auto;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.68rem;cursor:pointer;font-family:inherit;white-space:nowrap;}
+        /* Phase 14 restyle — "SHEET NOTIFICATIONS" look (Ahmed's friend's
+           monitor site as reference): glassy dark card, gradient header
+           rule, card-like rows with a left accent bar for unread, live pill. */
+        #cmnPanel{position:fixed;top:56px;right:16px;width:380px;max-width:calc(100vw - 24px);max-height:72vh;background:linear-gradient(180deg,rgba(22,26,44,.98),rgba(15,17,31,.98));border:1px solid rgba(255,255,255,.09);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 0 1px rgba(0,212,255,.04);display:none;flex-direction:column;z-index:3000;overflow:hidden;backdrop-filter:blur(10px);}
+        #cmnPanel.show{display:flex;animation:cmnPanelIn .16s ease-out;}
+        @keyframes cmnPanelIn{from{transform:translateY(-6px);opacity:0;}to{transform:none;opacity:1;}}
+        .cmn-head{display:flex;align-items:center;gap:8px;padding:13px 14px 12px;border-bottom:1px solid rgba(255,255,255,.07);flex:none;position:relative;}
+        .cmn-head::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,#00d4ff,#7c3aed 60%,transparent 95%);opacity:.55;border-radius:2px;}
+        .cmn-title{font-weight:800;font-size:.8rem;color:var(--text,#fff);white-space:nowrap;letter-spacing:.01em;}
+        .cmn-live{display:inline-flex;align-items:center;gap:5px;font-size:.56rem;font-weight:800;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.28);padding:2px 8px;border-radius:999px;letter-spacing:.08em;flex:none;}
+        .cmn-live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:cmnLivePulse 1.8s ease-in-out infinite;}
+        @keyframes cmnLivePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(52,211,153,.5);}50%{opacity:.55;box-shadow:0 0 0 4px rgba(52,211,153,0);}}
+        .cmn-tabs{display:flex;gap:4px;margin-left:2px;}
+        .cmn-tab{background:transparent;border:1px solid transparent;color:var(--text-muted,#8a8fa3);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:8px;cursor:pointer;font-family:inherit;transition:color .15s,background .15s;}
+        .cmn-tab.active{color:var(--accent-cyan,#00d4ff);border-color:rgba(0,212,255,.35);background:rgba(0,212,255,.09);}
+        .cmn-markall{margin-left:auto;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.66rem;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s;}
         .cmn-markall:hover{color:var(--accent-cyan,#00d4ff);}
-        .cmn-close{background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.95rem;cursor:pointer;line-height:1;padding:2px 4px;}
-        .cmn-close:hover{color:var(--text,#fff);}
-        #cmnList{overflow-y:auto;padding:6px;}
-        .cmn-item{display:flex;gap:10px;padding:10px;border-radius:10px;cursor:pointer;}
-        .cmn-item:hover{background:rgba(255,255,255,.05);}
-        .cmn-item.unread{background:rgba(0,212,255,.06);}
-        .cmn-item.unread:hover{background:rgba(0,212,255,.1);}
-        .cmn-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#f43f5e;margin-top:6px;visibility:hidden;}
-        .cmn-item.unread .cmn-dot{visibility:visible;}
+        .cmn-close{background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.95rem;cursor:pointer;line-height:1;padding:2px 4px;border-radius:6px;transition:color .15s,background .15s;}
+        .cmn-close:hover{color:var(--text,#fff);background:rgba(255,255,255,.08);}
+        #cmnList{overflow-y:auto;padding:8px;}
+        #cmnList::-webkit-scrollbar{width:6px;}
+        #cmnList::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px;}
+        .cmn-item{position:relative;display:flex;gap:10px;padding:10px 10px 10px 13px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.05);margin-bottom:6px;transition:background .15s,border-color .15s,transform .15s;}
+        .cmn-item:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);}
+        .cmn-item.unread{background:rgba(0,212,255,.055);border-color:rgba(0,212,255,.16);}
+        .cmn-item.unread:hover{background:rgba(0,212,255,.09);}
+        .cmn-item.unread::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:linear-gradient(180deg,#00d4ff,#7c3aed);}
+        .cmn-dot{display:none;}
         .cmn-item-main{flex:1;min-width:0;}
         .cmn-item-top{display:flex;align-items:baseline;gap:6px;}
         .cmn-item-author{font-size:.78rem;font-weight:700;color:var(--text,#fff);}
-        .cmn-item-time{margin-left:auto;font-size:.64rem;color:var(--text-muted,#8a8fa3);flex:none;}
-        .cmn-item-rec{font-size:.66rem;color:var(--accent-cyan,#00d4ff);font-weight:700;}
-        .cmn-item-text{font-size:.76rem;color:var(--text,#fff);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-        .cmn-item-meta{font-size:.64rem;color:var(--text-muted,#8a8fa3);margin-top:3px;display:flex;gap:10px;}
+        .cmn-item-time{margin-left:auto;font-size:.62rem;color:var(--text-muted,#8a8fa3);flex:none;}
+        .cmn-item-rec{flex:none;font-size:.62rem;font-weight:800;color:var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.22);padding:1px 7px;border-radius:999px;}
+        .cmn-item-text{font-size:.75rem;color:rgba(255,255,255,.86);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45;}
+        .cmn-item-meta{font-size:.63rem;color:var(--text-muted,#8a8fa3);margin-top:4px;display:flex;gap:10px;}
         .cmn-item-meta .cmn-atme{color:var(--accent-cyan,#00d4ff);font-weight:700;}
-        .cmn-avatar{flex:none;width:24px;height:24px;border-radius:50%;background:rgba(0,212,255,.18);color:var(--accent-cyan,#00d4ff);font-size:.56rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;margin-top:1px;}
+        .cmn-avatar{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.16);color:var(--accent-cyan,#00d4ff);font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;margin-top:2px;border:1px solid rgba(255,255,255,.12);}
         .cmn-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
         .cmn-rx-chip{display:inline-flex;align-items:center;gap:2px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:.64rem;line-height:1.6;}
         .cmn-rx-line{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
@@ -1877,9 +1887,14 @@
         .tw-pchips-row{display:flex;flex-wrap:wrap;align-items:center;}
         .cmn-empty{color:var(--text-muted,#8a8fa3);font-size:.78rem;text-align:center;padding:26px 0;}
         /* Phase 10.48: per-notification quick reply + comment-thread modal */
-        .cmn-item-actions{display:flex;gap:8px;margin-top:5px;}
-        .cmn-reply-btn{background:transparent;border:1px solid rgba(0,212,255,.25);color:var(--accent-cyan,#00d4ff);font-size:.64rem;font-weight:700;padding:2px 10px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:.75;transition:opacity .15s,background .15s;}
-        .cmn-reply-btn:hover{opacity:1;background:rgba(0,212,255,.1);}
+        .cmn-item-actions{display:flex;gap:8px;margin-top:6px;}
+        .cmn-reply-btn{background:transparent;border:1px solid rgba(0,212,255,.25);color:var(--accent-cyan,#00d4ff);font-size:.64rem;font-weight:700;padding:2px 10px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:.75;transition:opacity .15s,background .15s,border-color .15s;}
+        .cmn-reply-btn:hover{opacity:1;background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.45);}
+        /* Phase 14: one-click mention button (Ahmed: "add button when click
+           on it mention this person who made this comment instead of typing
+           @ and their name") — violet accent so it reads apart from Reply. */
+        .cmn-mention-btn{background:transparent;border:1px solid rgba(124,58,237,.35);color:#a78bfa;font-size:.64rem;font-weight:700;padding:2px 10px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:.75;transition:opacity .15s,background .15s,border-color .15s;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
+        .cmn-mention-btn:hover{opacity:1;background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.55);}
         .cmn-quick-reply{margin-top:7px;display:flex;flex-direction:column;gap:6px;position:relative;}
         .cmn-quick-reply textarea{width:100%;min-height:52px;resize:vertical;background:rgba(255,255,255,.05);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:8px;color:var(--text,#fff);font-family:inherit;font-size:.74rem;padding:7px 9px;box-sizing:border-box;outline:none;}
         .cmn-quick-reply textarea:focus{border-color:rgba(0,212,255,.5);}
@@ -1888,23 +1903,29 @@
         .cmn-qr-send:disabled{opacity:.5;cursor:default;}
         .cmn-qr-cancel{background:transparent;border:1px solid var(--border,rgba(255,255,255,.15));color:var(--text-muted,#8a8fa3);font-size:.66rem;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;font-family:inherit;}
         .cmn-qr-cancel:hover{color:var(--text,#fff);}
-        /* comment-thread modal */
-        #cmtOverlay{position:fixed;inset:0;background:rgba(4,6,18,.62);backdrop-filter:blur(3px);z-index:4000;display:none;align-items:center;justify-content:center;padding:18px;}
+        /* comment-thread modal — Phase 14 restyle to match the SHEET
+           NOTIFICATIONS look: chat bubbles, gradient head tile, glow focus */
+        #cmtOverlay{position:fixed;inset:0;background:rgba(4,6,18,.66);backdrop-filter:blur(4px);z-index:4000;display:none;align-items:center;justify-content:center;padding:18px;}
         #cmtOverlay.show{display:flex;}
-        #cmtModal{width:520px;max-width:100%;max-height:82vh;display:flex;flex-direction:column;background:var(--panel-bg,#16182a);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;animation:cmtPop .18s ease-out;}
+        #cmtModal{width:560px;max-width:100%;max-height:82vh;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(22,26,44,.99),rgba(15,17,31,.99));border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 28px 72px rgba(0,0,0,.65),0 0 0 1px rgba(0,212,255,.05);overflow:hidden;animation:cmtPop .18s ease-out;}
         @keyframes cmtPop{from{transform:translateY(10px) scale(.98);opacity:0;}to{transform:none;opacity:1;}}
-        .cmt-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border,rgba(255,255,255,.1));flex:none;background:rgba(255,255,255,.02);}
-        .cmt-head-icon{flex:none;width:30px;height:30px;border-radius:9px;background:rgba(0,212,255,.12);display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+        .cmt-head{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);flex:none;background:rgba(255,255,255,.02);position:relative;}
+        .cmt-head::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,#00d4ff,#7c3aed 60%,transparent 95%);opacity:.5;border-radius:2px;}
+        .cmt-head-icon{flex:none;width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(124,58,237,.25));border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:.9rem;}
         .cmt-head-main{flex:1;min-width:0;}
         .cmt-title{font-weight:800;font-size:.86rem;color:var(--text,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-        .cmt-sub{font-size:.66rem;color:var(--text-muted,#8a8fa3);margin-top:1px;}
-        .cmt-open-tkt{flex:none;background:linear-gradient(135deg,#00c6ff,#0072ff);border:none;color:#fff;font-size:.68rem;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;}
-        .cmt-open-tkt:hover{filter:brightness(1.12);}
-        .cmt-close{flex:none;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:1rem;cursor:pointer;line-height:1;padding:4px 6px;}
-        .cmt-close:hover{color:var(--text,#fff);}
-        #cmtList{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:14px;min-height:120px;}
+        .cmt-sub{font-size:.66rem;color:var(--text-muted,#8a8fa3);margin-top:2px;display:flex;align-items:center;gap:6px;}
+        .cmt-live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:cmnLivePulse 1.8s ease-in-out infinite;flex:none;}
+        .cmt-open-tkt{flex:none;background:linear-gradient(135deg,#00c6ff,#0072ff);border:none;color:#fff;font-size:.68rem;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 4px 14px rgba(0,114,255,.35);transition:filter .15s,transform .15s;}
+        .cmt-open-tkt:hover{filter:brightness(1.12);transform:translateY(-1px);}
+        .cmt-close{flex:none;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:1rem;cursor:pointer;line-height:1;padding:4px 6px;border-radius:6px;transition:color .15s,background .15s;}
+        .cmt-close:hover{color:var(--text,#fff);background:rgba(255,255,255,.08);}
+        #cmtList{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-height:120px;}
+        #cmtList::-webkit-scrollbar{width:6px;}
+        #cmtList::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px;}
         .cmt-item{display:flex;gap:10px;}
-        .cmt-item-main{flex:1;min-width:0;}
+        .cmt-item-main{flex:1;min-width:0;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:14px;border-top-left-radius:4px;padding:9px 12px;transition:background .15s,border-color .15s;}
+        .cmt-item-main:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.1);}
         .cmt-item-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
         .cmt-author{font-size:.78rem;font-weight:700;color:var(--text,#fff);}
         .cmt-time{font-size:.64rem;color:var(--text-muted,#8a8fa3);}
@@ -1913,11 +1934,18 @@
         .cmt-imgs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
         .cmt-imgs img{max-width:120px;max-height:120px;border-radius:8px;cursor:zoom-in;border:1px solid rgba(255,255,255,.1);}
         .cmt-empty{color:var(--text-muted,#8a8fa3);font-size:.78rem;text-align:center;padding:30px 0;}
-        .cmt-composer{flex:none;border-top:1px solid var(--border,rgba(255,255,255,.1));padding:10px 14px;background:rgba(255,255,255,.02);position:relative;}
+        /* Phase 14: one-click mention chip on each thread comment — click to
+           drop @Author into the composer without typing the name. */
+        .cmt-mention-btn{flex:none;align-self:center;background:transparent;border:1px solid rgba(124,58,237,.35);color:#a78bfa;font-size:.62rem;font-weight:800;padding:1px 8px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:0;transition:opacity .15s,background .15s,border-color .15s;}
+        .cmt-item:hover .cmt-mention-btn{opacity:.85;}
+        .cmt-mention-btn:hover{opacity:1 !important;background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.6);}
+        @media (hover:none){.cmt-mention-btn{opacity:.75;}}
+        .cmt-composer{flex:none;border-top:1px solid rgba(255,255,255,.07);padding:10px 14px;background:rgba(255,255,255,.02);position:relative;}
         .cmt-input-wrap{display:flex;gap:8px;align-items:flex-end;}
-        #cmtInput{flex:1;min-height:38px;max-height:120px;resize:vertical;background:rgba(255,255,255,.05);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:10px;color:var(--text,#fff);font-family:inherit;font-size:.78rem;padding:9px 11px;outline:none;box-sizing:border-box;}
-        #cmtInput:focus{border-color:rgba(0,212,255,.5);}
-        #cmtSendBtn{flex:none;background:linear-gradient(135deg,#00c6ff,#0072ff);border:none;color:#fff;font-size:.72rem;font-weight:800;padding:10px 18px;border-radius:10px;cursor:pointer;font-family:inherit;}
+        #cmtInput{flex:1;min-height:38px;max-height:120px;resize:vertical;background:rgba(255,255,255,.05);border:1px solid var(--border,rgba(255,255,255,.15));border-radius:11px;color:var(--text,#fff);font-family:inherit;font-size:.78rem;padding:9px 11px;outline:none;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;}
+        #cmtInput:focus{border-color:rgba(0,212,255,.55);box-shadow:0 0 0 3px rgba(0,212,255,.08);}
+        #cmtSendBtn{flex:none;background:linear-gradient(135deg,#00c6ff,#0072ff);border:none;color:#fff;font-size:.72rem;font-weight:800;padding:10px 18px;border-radius:11px;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(0,114,255,.3);transition:filter .15s;}
+        #cmtSendBtn:hover{filter:brightness(1.12);}
         #cmtSendBtn:disabled{opacity:.5;cursor:default;}
         .cmt-hint{font-size:.6rem;color:var(--text-muted,#8a8fa3);margin-top:5px;}
         .cmt-mention-pop{position:absolute;left:14px;bottom:calc(100% - 4px);min-width:220px;max-height:180px;overflow-y:auto;background:#1d2036;border:1px solid var(--border,rgba(255,255,255,.18));border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.5);display:none;z-index:10;}
@@ -2269,7 +2297,8 @@
              the #cmnBell button. -->
         <div id="cmnPanel">
             <div class="cmn-head">
-                <span class="cmn-title">🔔 Comments</span>
+                <span class="cmn-title">Sheet notifications</span>
+                <span class="cmn-live"><span class="cmn-live-dot"></span>LIVE</span>
                 <div class="cmn-tabs">
                     <button type="button" class="cmn-tab active" id="cmnTabAll" onclick="cmnSetTab('all')">All</button>
                     <button type="button" class="cmn-tab" id="cmnTabMentioned" onclick="cmnSetTab('mentioned')">@ Me</button>
@@ -19455,6 +19484,30 @@ function cmnUpdateBadge() {
     b.classList.toggle('show', n > 0);
 }
 
+/* Phase 14: one-click mention helper — renders the "@ Author" chip on a bell
+   item. Hidden for masked ids (a name the cache hasn't filled yet) so the
+   button never mentions "user-ab12". */
+function cmnMentionBtnHtml(name, oid) {
+    if (!name || /^(user-|ou_)/.test(name)) return '';
+    return `<button type="button" class="cmn-mention-btn" data-name="${twcEsc(name)}" data-oid="${twcEsc(oid || '')}" title="Mention ${twcEsc(name)} in your reply">@ ${twcEsc(name)}</button>`;
+}
+
+/* Phase 14: one-click mention into the MODAL composer — inserts "@Name " at
+   the caret and registers the author's open_id so the reply carries a real
+   mention, exactly like picking from the @ autocomplete (which stays). */
+function cmtInsertMention(name, oid) {
+    const inp = document.getElementById('cmtInput');
+    if (!inp || !name) return;
+    const pos = (inp.selectionStart != null) ? inp.selectionStart : inp.value.length;
+    const upto = inp.value.slice(0, pos), rest = inp.value.slice(pos);
+    const pad = (upto && !/\s$/.test(upto)) ? ' ' : '';
+    const nu = upto + pad + '@' + name + ' ';
+    inp.value = nu + rest;
+    if (oid) cmtMentionStore.mentions[name] = oid;
+    inp.focus();
+    try { inp.selectionStart = inp.selectionEnd = nu.length; } catch (e) {}
+}
+
 function cmnRender() {
     const list = document.getElementById('cmnList'); if (!list) return;
     if (cmnState.denied) { list.innerHTML = '<div class="cmn-empty">Notifications are turned off for your account</div>'; return; }
@@ -19487,7 +19540,7 @@ function cmnRender() {
                 </div>
                 <div class="cmn-item-text"><span class="cmn-rx-verb">reacted ${emo} to${onWho}:</span> ${twcEsc(it.text || '')}</div>
                 ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
-                <div class="cmn-item-actions"><button type="button" class="cmn-reply-btn">↩ Reply</button></div>
+                <div class="cmn-item-actions">${cmnMentionBtnHtml(it.author, it.author_id)}<button type="button" class="cmn-reply-btn">↩ Reply</button></div>
             </div>
         </div>`;
         }
@@ -19507,7 +19560,7 @@ function cmnRender() {
                 <div class="cmn-item-text">${twcEsc(it.text || '')}</div>
                 ${rxChips}
                 ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
-                <div class="cmn-item-actions"><button type="button" class="cmn-reply-btn">↩ Reply</button></div>
+                <div class="cmn-item-actions">${cmnMentionBtnHtml(it.author, it.author_id)}<button type="button" class="cmn-reply-btn">↩ Reply</button></div>
             </div>
         </div>`;
     }).join('');
@@ -19616,7 +19669,7 @@ function cmtOpen(recordId, time) {
     cmtMentionStore.mentions = {}; cmtMentionStore.list = []; cmtMentionStore.idx = 0;
     document.getElementById('cmtTitle').textContent =
         'Comments · ' + (cmtState.numbering ? '#' + cmtState.numbering : '#' + String(recordId).slice(-6));
-    document.getElementById('cmtSub').textContent = 'Ticket thread — synced live with the Feishu Base';
+    document.getElementById('cmtSub').innerHTML = '<span class="cmt-live-dot"></span>Live thread — synced with the Feishu Base';
     const inp = document.getElementById('cmtInput'); if (inp) inp.value = '';
     document.getElementById('cmtMentionPop').classList.remove('show');
     document.getElementById('cmtOverlay').classList.add('show');
@@ -19648,6 +19701,34 @@ async function cmtLoadThread() {
     cmtRenderThread();
 }
 
+/* Phase 14 (Ahmed: "to be live like the sheet"): silent live refresh of an
+   OPEN thread — no spinner, no read-state side effects; the draft in the
+   composer and the scroll position are preserved, and the DOM is left
+   completely untouched when nothing changed. Runs off the 15s interval. */
+async function cmtLoadThreadLive() {
+    if (!cmtState.recordId || cmtState.loading || cmtState.sending) return;
+    cmtState.loading = true;
+    let d = null;
+    try {
+        const r = await fetch(`/api/comments?record_id=${encodeURIComponent(cmtState.recordId)}&${twcAuthQ()}`);
+        d = await r.json();
+    } catch (e) { cmtState.loading = false; return; }
+    cmtState.loading = false;
+    if (!cmtState.open || !d || !d.success) return;
+    const next = d.comments || [];
+    if (JSON.stringify(next) === JSON.stringify(cmtState.comments)) return; // nothing new
+    const inp = document.getElementById('cmtInput');
+    const draft = (inp && inp.value) || '';
+    const list = document.getElementById('cmtList');
+    const atBottom = !list || (list.scrollHeight - list.scrollTop - list.clientHeight < 48);
+    const keepScroll = list ? list.scrollTop : 0;
+    cmtState.comments = next; cmtState.loaded = true;
+    cmtRenderThread();
+    if (draft && inp) inp.value = draft;      // never eat a half-typed reply
+    if (!atBottom && list) list.scrollTop = keepScroll;  // don't yank someone mid-read
+    try { cmnRefresh(true); } catch (e) {}    // badge catches up with the new replies
+}
+
 function cmtRenderThread() {
     const list = document.getElementById('cmtList'); if (!list) return;
     if (!cmtState.comments.length) {
@@ -19658,6 +19739,10 @@ function cmtRenderThread() {
         const imgs = (c.images || []).map(tok =>
             `<img src="/api/comments/media/${encodeURIComponent(tok)}?${twcAuthQ()}" loading="lazy" alt="" onclick="twcZoom(this.src)">`
         ).join('');
+        // Phase 14: one-click mention chip — only for real (unmasked) names.
+        const menChip = (c.user_name && !/^(user-|ou_)/.test(c.user_name))
+            ? `<button type="button" class="cmt-mention-btn" data-name="${twcEsc(c.user_name)}" data-oid="${twcEsc(c.user_id || '')}" title="Mention ${twcEsc(c.user_name)} in your reply">@</button>`
+            : '';
         return `<div class="cmt-item">
             ${twcRenderAvatarHtml(c.user_name, c.user_avatar)}
             <div class="cmt-item-main">
@@ -19665,6 +19750,7 @@ function cmtRenderThread() {
                     <span class="cmt-author">${twcEsc(c.user_name || '')}</span>
                     <span class="cmt-time">${twcTimeAgo(c.create_time)}</span>
                     ${c.is_solved ? '<span class="cmt-solved-tag">✅ solved</span>' : ''}
+                    ${menChip}
                 </div>
                 <div class="cmt-text">${twcRenderParts(c.parts)}</div>
                 ${imgs ? `<div class="cmt-imgs">${imgs}</div>` : ''}
@@ -19700,11 +19786,25 @@ async function cmtSend() {
 }
 
 /* ---- per-notification quick reply (no modal, no ticket opening) ---- */
-function cmnQuickReplyToggle(itemEl) {
+function cmnQuickReplyToggle(itemEl, mentionName, mentionOid) {
     const main = itemEl.querySelector('.cmn-item-main');
     if (!main) return;
     const existing = main.querySelector('.cmn-quick-reply');
-    if (existing) { existing.remove(); return; }
+    if (existing) {
+        // Phase 14: clicking "@ Author" while the composer is already open
+        // APPENDS the mention instead of toggling the composer away.
+        if (mentionName) {
+            const ta = existing.querySelector('textarea');
+            if (ta) {
+                ta.value = ((ta.value && !/\s$/.test(ta.value)) ? ta.value + ' ' : ta.value) + '@' + mentionName + ' ';
+                ta.focus();
+            }
+            const st = existing.__qrStore;
+            if (st && mentionOid) st.mentions[mentionName] = mentionOid;
+            return;
+        }
+        existing.remove(); return;
+    }
     const zone = document.createElement('div');
     zone.className = 'cmn-quick-reply';
     zone.innerHTML = `<textarea placeholder="Reply to this thread… (@ to mention)"></textarea>
@@ -19720,6 +19820,12 @@ function cmnQuickReplyToggle(itemEl) {
     zone.appendChild(pop);
     const store = { mentions: {}, list: [], idx: 0 };
     cmtWireMentions(ta, pop, store);
+    zone.__qrStore = store;
+    // Phase 14: opened via the "@ Author" chip — prefill the mention.
+    if (mentionName) {
+        ta.value = '@' + mentionName + ' ';
+        if (mentionOid) store.mentions[mentionName] = mentionOid;
+    }
     const rid = itemEl.dataset.rid;
     const doSend = async () => {
         const text = (ta.value || '').trim();
@@ -19776,6 +19882,18 @@ document.addEventListener('click', function (e) {
     if (opt) { e.preventDefault(); twcPickMention(parseInt(opt.dataset.idx || '0', 10)); return; }
     // Phase 10.48: typing inside a quick-reply composer never triggers the item
     if (e.target.closest('.cmn-quick-reply')) return;
+    // Phase 14: one-click mention — a thread comment's "@" chip drops the
+    // author into the MODAL composer; a bell item's "@ Author" chip opens the
+    // quick reply pre-mentioning that person (typing @ still works too).
+    const cmtMenBtn = e.target.closest('.cmt-mention-btn');
+    if (cmtMenBtn) { e.preventDefault(); cmtInsertMention(cmtMenBtn.dataset.name, cmtMenBtn.dataset.oid); return; }
+    const cmnMenBtn = e.target.closest('.cmn-mention-btn');
+    if (cmnMenBtn) {
+        e.preventDefault();
+        const host = cmnMenBtn.closest('.cmn-item');
+        if (host && host.dataset.rid) cmnQuickReplyToggle(host, cmnMenBtn.dataset.name, cmnMenBtn.dataset.oid);
+        return;
+    }
     const replyBtn = e.target.closest('.cmn-reply-btn');
     if (replyBtn) {
         e.preventDefault();
@@ -19793,11 +19911,44 @@ document.addEventListener('click', function (e) {
     if (cmnState.open && !e.target.closest('#cmnPanel') && !e.target.closest('#cmnBell')) cmnToggle(true);
 });
 
-/* Initial feed pull + a quiet 90s poll while the tab is visible. */
+/* Initial feed pull. */
 setTimeout(() => { cmnRefresh(true); }, 1500);
-// Phase 11.3: 90s -> 180s background cadence (Vercel quota). Opening the
-// bell still force-refreshes instantly, so nothing feels staler in practice.
-setInterval(() => { if (!document.hidden) cmnRefresh(true); }, 180000);
+// Phase 15 (Ahmed: "make it live and fast and cheap — like Miaoda's instant
+// live comment system"): the feed endpoint now answers from the Portal
+// Comments mirror table — ONE indexed Feishu query with names pre-resolved
+// inside the row payload, ~1-3 Redis commands total — so the poll tightens
+// from 20s to 5s for the same live feel as the sheet's notification center,
+// without consuming the plan: hidden tabs never poll, a quick-reply composer
+// pauses the re-render so a live pull can never eat someone's draft, and a
+// stale flag still drives the lock-deduped background scan-refresh (the only
+// path that ever rescans, shared by every viewer).
+// ADAPTIVE (Ahmed: "so you will make request every 5 s????" — live AND cheap):
+// 5s only while you're ENGAGED — recent mouse/keyboard/touch activity, the
+// panel open, or unread items pending. An open-but-idle tab backs off to 30s
+// (720 polls/hour -> 120, an ~83% cut on exactly the traffic nobody watches),
+// and any activity or new unread snaps it straight back to 5s.
+let cmnLastFetch = 0;
+let cmnLastActivity = Date.now();
+['mousemove', 'mousedown', 'keydown', 'touchstart'].forEach(ev =>
+    document.addEventListener(ev, () => { cmnLastActivity = Date.now(); }, { passive: true }));
+setInterval(() => {
+    if (document.hidden || !loggedEmail || cmnState.denied) return;
+    if (document.querySelector('#cmnList .cmn-quick-reply')) return;
+    const engaged = (Date.now() - cmnLastActivity < 90000) || cmnState.open ||
+        (cmnState.items || []).some(it => !!it.unread);
+    if (Date.now() - cmnLastFetch < (engaged ? 5000 : 30000)) return;
+    cmnLastFetch = Date.now();
+    cmnRefresh(true);
+}, 5000);
+// Live thread: while the comment modal is open, silently re-pull the thread
+// every 3s — replies posted from the sheet or by teammates appear in place,
+// draft and scroll position preserved (cmtLoadThreadLive). The mirror-backed
+// read is one indexed query, so 3s is safe for the plan budget.
+setInterval(() => {
+    if (document.hidden || !cmtState.open || cmtState.loading || cmtState.sending) return;
+    cmtLoadThreadLive();
+}, 3000);
+
 </script>
 </body>
 </html>
