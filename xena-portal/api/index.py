@@ -7654,7 +7654,13 @@ def _scan_is_stale(scan):
 # Phase 14: per-pass cap on how many distinct user ids one background
 # backfill will try to resolve (the resolver's own throttles still apply on
 # top — BITABLE_LOOKUP_MAX per call, 1h negative caches for misses).
-BG_NAME_BACKFILL_MAX = 200
+# Phase 18: 200 -> 60. A 200-id force_live pass (contact batch + directory +
+# bitable + per-id GET legs, cross-border) was the stage that blew the whole
+# chain past Vercel's execution limit — the mirror sync behind it NEVER ran,
+# which is why Ahmed's Portal Comments table sat at 1 row and his bell
+# froze on that one thread. 60 ids/pass still drains the backlog in a few
+# passes and leaves budget for the mirror stage that now runs FIRST.
+BG_NAME_BACKFILL_MAX = 60
 
 def _scan_backfill_names(payload, token):
     """Phase 14 (Ahmed: "find easy way to save all who made ever reply or
@@ -7716,6 +7722,16 @@ def _bg_error(stage, err):
     except Exception:
         pass
 
+# Phase 18: total time budget for one background chain pass. Vercel kills
+# the function at its own limit no matter what — before this, the stages ran
+# in an order (fetch -> sweep -> 200-id backfill -> mirror) that let the slow
+# middle stages eat the whole budget, so the MIRROR stage (last) never ran
+# in production: the Portal Comments table sat at 1 row and the bell froze
+# on that thread. The chain now runs the mirror FIRST and skips whatever no
+# longer fits the budget — a slow stage can never starve the ones behind it
+# again, and skipped stages just run on the next pass.
+CHAIN_BUDGET_S = 45
+
 def _scan_chain(token):
     """The refresh-holder body: rescan + the background maintenance chain.
     Phase 12: the person-name sweep moved OUT of interactive comment loads
@@ -7724,20 +7740,29 @@ def _scan_chain(token):
     Phase 14: _scan_backfill_names auto-saves every person the scan has ever
     seen so names fill up with no admin button pressed.
     Phase 15: _mirror_sync_pass keeps the Portal Comments table in sync
-    (diff-based, unchanged threads cost zero upserts)."""
+    (diff-based, unchanged threads cost zero upserts).
+    Phase 18: stage order is now mirror -> backfill -> sweep with a shared
+    CHAIN_BUDGET_S stop-line (see above)."""
+    started = time.time()
     result = _fetch_all_comments(token, force=True)
-    try:
-        _sweep_step(token)
-    except Exception as e:
-        _bg_error("sweep", e)
-    try:
-        _scan_backfill_names(result[0] if isinstance(result, tuple) else None, token)
-    except Exception as e:
-        _bg_error("backfill", e)
-    try:
-        _mirror_sync_pass(result[0] if isinstance(result, tuple) else None, token)
-    except Exception as e:
-        _bg_error("mirror", e)
+    scan_payload = result[0] if isinstance(result, tuple) else None
+    def _over_budget():
+        return (time.time() - started) > CHAIN_BUDGET_S
+    if not _over_budget():
+        try:
+            _mirror_sync_pass(scan_payload, token)
+        except Exception as e:
+            _bg_error("mirror", e)
+    if not _over_budget():
+        try:
+            _scan_backfill_names(scan_payload, token)
+        except Exception as e:
+            _bg_error("backfill", e)
+    if not _over_budget():
+        try:
+            _sweep_step(token)
+        except Exception as e:
+            _bg_error("sweep", e)
     return result
 
 _SCAN_LOCAL_LOCK = threading.Lock()
@@ -8042,7 +8067,23 @@ def _mirror_thread_payload(c, record_id, people, numbering):
                     "on_text": (r_plain or "")[:120],
                 })
     last = replies[-1] if replies else {}
-    _, last_plain = _reply_parts(last)
+    last_parts, last_plain = _reply_parts(last)
+    # Phase 18: the bell line shows "@Name" like the Base notification panel
+    # instead of a bare "@", and carries typed text_parts so the frontend can
+    # render the mention as a highlighted chip.
+    feed_text_parts, feed_text = [], []
+    for p in last_parts:
+        if p.get("type") == "mention":
+            nm = _p(p.get("user_id"))["name"]
+            feed_text_parts.append({"type": "mention", "user_id": p.get("user_id"), "name": nm})
+            feed_text.append("@" + nm)
+        elif p.get("type") == "link":
+            feed_text_parts.append({"type": "text", "text": p.get("url") or ""})
+            feed_text.append(p.get("url") or "")
+        else:
+            feed_text_parts.append({"type": "text", "text": p.get("text") or ""})
+            feed_text.append(p.get("text") or "")
+    feed_text = "".join(feed_text).strip()
     feed = {
         "comment_id": c.get("comment_id"),
         "last_reply_id": last.get("reply_id"),
@@ -8051,7 +8092,8 @@ def _mirror_thread_payload(c, record_id, people, numbering):
         "author_name": _p(last.get("user_id"))["name"],
         "author_avatar": _p(last.get("user_id"))["avatar"],
         "time": c.get("update_time") or last.get("create_time"),
-        "text": (last_plain or "")[:180],
+        "text": (feed_text or last_plain or "")[:180],
+        "text_parts": feed_text_parts,
         "image_count": img_count,
         "reply_count": len(replies),
         "mention_ids": sorted(set(mention_ids)),
@@ -8059,7 +8101,7 @@ def _mirror_thread_payload(c, record_id, people, numbering):
         "reactions": thread_reactions,
         "numbering": numbering,
     }
-    return {"v": 1,
+    return {"v": 2,
             "comment_id": c.get("comment_id"), "record_id": record_id,
             "update_time": int(c.get("update_time") or 0),
             "is_solved": bool(c.get("is_solved")),
@@ -8248,8 +8290,11 @@ def _mirror_sync_pass(scan, token):
             continue
         uts = int(c.get("update_time") or 0)
         cur = have.get(cid)
-        if cur and cur[0] >= uts and '"user-' not in cur[1]:
-            continue  # unchanged AND fully named — free
+        # Phase 18: '"v":2' — v1 payloads (bare "@" bell text, no text_parts)
+        # re-sync once even when unchanged, so the Base-style mention-named
+        # bell lines roll out without waiting for a thread update.
+        if cur and cur[0] >= uts and '"user-' not in cur[1] and '"v":2' in cur[1]:
+            continue  # unchanged AND fully named AND current version — free
         todo.append((c, anchor["record"]))
     if not todo:
         _MIRROR_STATS.update({"last_run": int(time.time()), "candidates": 0,
@@ -8977,6 +9022,38 @@ def _resolve_comment_names(user_ids, token, uat=None, allow_sweep=False, force_l
                             pass
     return found
 
+# Phase 18 (Ahmed: "the names not appare and the avatar ... even i refreshed
+# sevral time and wait 2 hour"): interactive comment/feed loads are
+# cache-only by design (Phase 13), and the background backfill that fills
+# the cache can starve for days when the chain dies early or Redis is down —
+# that's why 'user-xxxx' names never healed for him. The fix that works
+# regardless of background health: heal the FEW masked names the caller is
+# literally looking at, inline, right now — bounded to INLINE_RESOLVE_MAX
+# ids per request so the instant-load contract survives (the resolver's own
+# negative caches bound repeat probes to ~1/id/hour).
+INLINE_RESOLVE_MAX = 6
+
+def _resolve_inline_masked(ids, token, uat, people):
+    """Patch `people` in place: any id still masked after the cache-only
+    pass gets ONE bounded live-resolution attempt (≤ INLINE_RESOLVE_MAX ids,
+    first-seen order = the newest/most-visible entries). Resolved entries
+    land in the shared name cache, so the next view — and the background
+    mirror sync — inherit them. Never raises; on any failure `people` is
+    returned unchanged."""
+    masked = [u for u in dict.fromkeys(ids)
+              if u and (people.get(u, {}).get("name") or "").startswith("user-")]
+    if not masked:
+        return people
+    try:
+        live = _resolve_comment_names(masked[:INLINE_RESOLVE_MAX], token,
+                                      uat=uat, force_live=True)
+    except Exception:
+        return people
+    for u, e in (live or {}).items():
+        if e and (e.get("name") or "") and not e["name"].startswith("user-"):
+            people[u] = e
+    return people
+
 def _comments_caller():
     """Shared gate + identity for the comment endpoints. Returns
     (user, email, uat, token, error_response)."""
@@ -9046,6 +9123,33 @@ def list_ticket_comments():
                 for p in mirror:
                     out.extend(p.get("replies") or [])
                 out.sort(key=lambda x: x.get("create_time") or 0)
+                # Phase 18: masked names stored in the mirror payload heal
+                # INLINE for the person looking at them (bounded) — no more
+                # waiting days for a starving background backfill.
+                m_ids = []
+                for item in out:
+                    if (item.get("user_name") or "").startswith("user-"):
+                        m_ids.append(item.get("user_id"))
+                    for ppart in (item.get("parts") or []):
+                        if ppart.get("type") == "mention" and (ppart.get("name") or "").startswith("user-"):
+                            m_ids.append(ppart.get("user_id"))
+                if m_ids:
+                    healed = _resolve_inline_masked(
+                        m_ids, token, uat or None,
+                        {u: {"name": "user-" + u[-4:], "avatar": ""} for u in m_ids if u})
+                    for item in out:
+                        h = healed.get(item.get("user_id")) or {}
+                        if h.get("name") and not h["name"].startswith("user-"):
+                            item["user_name"] = h["name"]
+                            item["user_avatar"] = h.get("avatar") or item.get("user_avatar") or ""
+                        for ppart in (item.get("parts") or []):
+                            if ppart.get("type") == "mention":
+                                h = healed.get(ppart.get("user_id")) or {}
+                                if h.get("name") and not h["name"].startswith("user-"):
+                                    ppart["name"] = h["name"]
+                        for rx in (item.get("reactions") or []):
+                            rx["names"] = [(healed.get(u) or {}).get("name") or n
+                                           for u, n in zip(rx.get("users") or [], rx.get("names") or [])]
                 return jsonify({"success": True, "comments": out, "count": len(out),
                                 "truncated": bool((scan_c or {}).get("truncated")),
                                 "stale": _scan_is_stale(scan_c),
@@ -9084,6 +9188,9 @@ def list_ticket_comments():
                 ids.extend(rx["users"])
     out.sort(key=lambda x: x.get("create_time") or 0)
     people = _resolve_comment_names(ids, token, uat=uat or None)
+    # Phase 18: heal the masked names on THIS thread inline (bounded) — the
+    # background backfill alone left them masked for days.
+    _resolve_inline_masked(ids, token, uat or None, people)
     for item in out:
         item["user_name"] = people.get(item["user_id"], {}).get("name", item["user_id"])
         item["user_avatar"] = people.get(item["user_id"], {}).get("avatar", "")
@@ -9249,21 +9356,35 @@ def comments_health():
     with _redis_health["lock"]:
         last_err, last_err_ts = _redis_health["last_error"], _redis_health["last_error_ts"]
     cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
-    scan_items = 0
+    scan_items, scan_newest = 0, 0
     if isinstance(cached, dict):
         scan_items = len(cached.get("items") or [])
+        # Phase 18: newest anchored thread in the scan — compared against the
+        # mirror's newest row, this one pair of numbers explains a frozen
+        # bell at a glance (mirror newest < scan newest = sync behind).
+        for c in (cached.get("items") or []):
+            a = _comment_record_anchor(c)
+            if a.get("table") == REQUESTS_TABLE_ID and a.get("record"):
+                uts = int(c.get("update_time") or 0)
+                if uts > scan_newest:
+                    scan_newest = uts
     mirror = {"enabled": MIRROR_ENABLE, "rows": None, "error": "",
-              "stats": dict(_MIRROR_STATS)}
+              "stats": dict(_MIRROR_STATS), "newest_update_time": 0}
     if MIRROR_ENABLE:
         try:
             resp = feishu_session.post(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/search",
                 headers={"Authorization": f"Bearer {get_tenant_access_token()}",
                          "Content-Type": "application/json; charset=utf-8"},
-                params={"page_size": 1}, json={}, timeout=15)
+                params={"page_size": 1},
+                json={"sort": [{"field_name": "Update Time", "desc": True}]}, timeout=15)
             data = resp.json()
             if data.get("code") == 0:
                 mirror["rows"] = (data.get("data") or {}).get("total")
+                rows0 = (data.get("data") or {}).get("items") or []
+                if rows0:
+                    mirror["newest_update_time"] = int(_mirror_cell_num(
+                        (rows0[0].get("fields") or {}).get("Update Time")))
             else:
                 mirror["error"] = f"{data.get('code')}: {data.get('msg')}"
         except Exception as e:
@@ -9279,7 +9400,8 @@ def comments_health():
                   "last_error_age_s": int(now - last_err_ts) if last_err_ts else None,
                   "mem_fallback_keys": len(_mem_store)},
         "scan_cache": {"present": isinstance(cached, dict), "items": scan_items,
-                       "age_s": int(now - cached.get("ts", 0)) if isinstance(cached, dict) else None},
+                       "age_s": int(now - cached.get("ts", 0)) if isinstance(cached, dict) else None,
+                       "newest_update_time": scan_newest},
         "mirror": mirror,
         "auto_refresh": {"min_gap_s": SCAN_AUTO_MIN_GAP,
                          "last_auto_age_s": int(now - last_auto) if last_auto else None},
@@ -9431,7 +9553,57 @@ def comments_feed():
                 scan_c = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
             except Exception:
                 scan_c = None
-            if mirror or (isinstance(scan_c, dict) and not scan_c.get("items")):
+            # Phase 18 anti-freeze (Ahmed: "the new comments even i refreshed
+            # sevral time and wait 2 hour ... not appared"): a NON-EMPTY but
+            # STALE mirror must not hide newer threads — his production table
+            # sat at 1 row (one portal write-patch) while the background sync
+            # never landed, and the old "mirror non-empty => serve mirror"
+            # rule froze the bell on that single thread for days. Now the
+            # fast path serves only when the mirror's newest row is at least
+            # as fresh as the scan's newest anchored thread; anything older
+            # falls through to the scan path below.
+            serve_mirror = False
+            if mirror:
+                serve_mirror = True
+                if isinstance(scan_c, dict) and scan_c.get("items"):
+                    m_new = max([int(p.get("update_time") or 0) for p in mirror] or [0])
+                    s_new = 0
+                    for c in scan_c["items"]:
+                        a = _comment_record_anchor(c)
+                        if a.get("table") != REQUESTS_TABLE_ID or not a.get("record"):
+                            continue
+                        uts = int(c.get("update_time") or 0)
+                        if uts > s_new:
+                            s_new = uts
+                    if s_new and m_new < s_new:
+                        serve_mirror = False
+            elif isinstance(scan_c, dict) and not scan_c.get("items"):
+                serve_mirror = True
+            if serve_mirror:
+                # Phase 18: heal masked author/reactor names inline (bounded)
+                # so the bell stops showing 'user-xxxx' while the background
+                # backfill is still catching up.
+                f_ids = []
+                for p in mirror[:COMMENTS_FEED_MAX]:
+                    fd = (p.get("feed") or {})
+                    if (fd.get("author_name") or "").startswith("user-"):
+                        f_ids.append(fd.get("author_id"))
+                    for rx in (fd.get("reactions") or []):
+                        if (rx.get("reactor_name") or "").startswith("user-"):
+                            f_ids.append(rx.get("reactor_id"))
+                        if (rx.get("on_name") or "").startswith("user-"):
+                            f_ids.append(rx.get("on_user_id"))
+                healed = {}
+                if f_ids:
+                    healed = _resolve_inline_masked(
+                        f_ids, token, uat or None,
+                        {u: {"name": "user-" + u[-4:], "avatar": ""} for u in f_ids if u})
+                def _hn(uid, cur):
+                    h = healed.get(uid) or {}
+                    return h.get("name") if h.get("name") and not h["name"].startswith("user-") else cur
+                def _ha(uid, cur):
+                    h = healed.get(uid) or {}
+                    return h.get("avatar") or cur
                 items = []
                 for p in mirror[:COMMENTS_FEED_MAX]:
                     fd = (p.get("feed") or {})
@@ -9443,17 +9615,21 @@ def comments_feed():
                         "last_reply_id": fd.get("last_reply_id"),
                         "record_id": fd.get("record_id"),
                         "author_id": fd.get("author_id"),
-                        "author": fd.get("author_name") or fd.get("author_id") or "",
-                        "author_avatar": fd.get("author_avatar") or "",
+                        "author": _hn(fd.get("author_id"), fd.get("author_name") or fd.get("author_id") or ""),
+                        "author_avatar": _ha(fd.get("author_id"), fd.get("author_avatar") or ""),
                         "time": fd.get("time"),
                         "text": fd.get("text") or "",
+                        "text_parts": fd.get("text_parts") or [],
                         "image_count": fd.get("image_count") or 0,
                         "reply_count": fd.get("reply_count") or 0,
                         "mentions_me": bool(my_open_id) and my_open_id in (fd.get("mention_ids") or []),
                         "is_solved": bool(fd.get("is_solved")),
                         "reactions": [{"key": rx.get("key"), "reactor_id": rx.get("reactor_id"),
-                                       "reactor_name": rx.get("reactor_name"),
-                                       "on_user_id": rx.get("on_user_id"), "on_text": rx.get("on_text")}
+                                       "reactor_name": _hn(rx.get("reactor_id"), rx.get("reactor_name")),
+                                       "reactor_avatar": _ha(rx.get("reactor_id"), rx.get("reactor_avatar") or ""),
+                                       "on_user_id": rx.get("on_user_id"),
+                                       "on_name": _hn(rx.get("on_user_id"), rx.get("on_name") or ""),
+                                       "on_text": rx.get("on_text")}
                                       for rx in (fd.get("reactions") or [])],
                         "numbering": fd.get("numbering"),
                     })
@@ -9465,11 +9641,11 @@ def comments_feed():
                             "comment_id": fd.get("comment_id"),
                             "record_id": fd.get("record_id"),
                             "author_id": rx.get("reactor_id"),
-                            "author": rx.get("reactor_name") or rx.get("reactor_id"),
-                            "author_avatar": rx.get("reactor_avatar") or "",
+                            "author": _hn(rx.get("reactor_id"), rx.get("reactor_name") or rx.get("reactor_id")),
+                            "author_avatar": _ha(rx.get("reactor_id"), rx.get("reactor_avatar") or ""),
                             "reaction_key": rx.get("key"),
                             "on_user_id": rx.get("on_user_id"),
-                            "on_author": rx.get("on_name") or "",
+                            "on_author": _hn(rx.get("on_user_id"), rx.get("on_name") or ""),
                             "time": fd.get("time"),
                             "text": rx.get("on_text") or "",
                             "image_count": 0,
@@ -9487,7 +9663,10 @@ def comments_feed():
                     if it.get("kind") == "reaction":
                         it["uid"] = f"r:{it.get('comment_id')}:{it.get('author_id')}:{it.get('reaction_key')}"
                     else:
-                        it["uid"] = f"c:{it.get('comment_id')}:{it.pop('last_reply_id', None) or ''}"
+                        # Phase 18: keep last_reply_id on the item (the bell's
+                        # quick-reaction button targets it) — only READ it for
+                        # the uid instead of popping it away.
+                        it["uid"] = f"c:{it.get('comment_id')}:{it.get('last_reply_id') or ''}"
                     mine = bool(my_open_id) and it.get("author_id") == my_open_id
                     it["unread"] = (not mine) and (it["uid"] not in seen) and (float(it.get("time") or 0) > wm)
                     if it["unread"]:
@@ -9547,6 +9726,8 @@ def comments_feed():
             "author_id": last.get("user_id"),
             "time": c.get("update_time") or last.get("create_time"),
             "text": plain[:180],
+            "_last_parts": parts,   # Phase 18: rebuilt into text/text_parts
+                                    # with mention NAMES once people resolve
             "image_count": img_count,
             "reply_count": len(replies),
             "mentions_me": mentions_me,
@@ -9582,6 +9763,10 @@ def comments_feed():
     items = items[:COMMENTS_FEED_MAX]
     nums = _resolve_record_numberings([it["record_id"] for it in items], token)
     people = _resolve_comment_names(ids, token, uat=uat or None)
+    # Phase 18: heal the bell's visible masked names inline (bounded) — the
+    # same fix as the thread endpoint, so the notification panel stops
+    # showing 'user-xxxx' while the background backfill catches up.
+    _resolve_inline_masked(ids, token, uat or None, people)
     for it in items:
         it["numbering"] = nums.get(it["record_id"])
         it["author"] = people.get(it["author_id"], {}).get("name", it["author_id"])
@@ -9591,6 +9776,27 @@ def comments_feed():
         else:
             for rx in it.get("reactions") or []:
                 rx["reactor_name"] = people.get(rx["reactor_id"], {}).get("name", rx["reactor_id"])
+            # Phase 18: Base-style bell line — "@Name" instead of a bare "@",
+            # plus typed text_parts so the frontend can highlight mentions.
+            parts = it.pop("_last_parts", None) or []
+            tp, tx = [], []
+            for p in parts:
+                if p.get("type") == "mention":
+                    nm = people.get(p.get("user_id"), {}).get("name", p.get("user_id") or "")
+                    tp.append({"type": "mention", "user_id": p.get("user_id"), "name": nm})
+                    tx.append("@" + nm)
+                elif p.get("type") == "link":
+                    tp.append({"type": "text", "text": p.get("url") or ""})
+                    tx.append(p.get("url") or "")
+                else:
+                    tp.append({"type": "text", "text": p.get("text") or ""})
+                    tx.append(p.get("text") or "")
+            tx = "".join(tx).strip()
+            if tx:
+                it["text"] = tx[:180]
+            it["text_parts"] = tp
+    for it in items:
+        it.pop("_last_parts", None)  # reaction entries never carried parts
     # Phase 12 (Ahmed: "99+ notifications they are all old and i make them
     # readed but still after while show as unreaded"): read state moves from
     # client-side localStorage (time > lastSeen — reaction bumps re-flagged
@@ -9607,7 +9813,8 @@ def comments_feed():
         if it.get("kind") == "reaction":
             it["uid"] = f"r:{it.get('comment_id')}:{it.get('author_id')}:{it.get('reaction_key')}"
         else:
-            it["uid"] = f"c:{it.get('comment_id')}:{it.pop('last_reply_id', None) or ''}"
+            # Phase 18: keep last_reply_id (bell quick-reaction target).
+            it["uid"] = f"c:{it.get('comment_id')}:{it.get('last_reply_id') or ''}"
         mine = bool(my_open_id) and it.get("author_id") == my_open_id
         it["unread"] = (not mine) and (it["uid"] not in seen) and (float(it.get("time") or 0) > wm)
         if it["unread"]:
