@@ -1846,7 +1846,8 @@
         #cmnPanel{position:fixed;top:56px;right:16px;width:380px;max-width:calc(100vw - 24px);max-height:72vh;background:linear-gradient(180deg,rgba(22,26,44,.98),rgba(15,17,31,.98));border:1px solid rgba(255,255,255,.09);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 0 1px rgba(0,212,255,.04);display:none;flex-direction:column;z-index:3000;overflow:hidden;backdrop-filter:blur(10px);}
         #cmnPanel.show{display:flex;animation:cmnPanelIn .16s ease-out;}
         @keyframes cmnPanelIn{from{transform:translateY(-6px);opacity:0;}to{transform:none;opacity:1;}}
-        .cmn-head{display:flex;align-items:center;gap:8px;padding:13px 14px 12px;border-bottom:1px solid rgba(255,255,255,.07);flex:none;position:relative;}
+        .cmn-head{display:flex;align-items:center;gap:8px;padding:13px 14px 12px;border-bottom:1px solid rgba(255,255,255,.07);flex:none;position:relative;flex-wrap:wrap;row-gap:8px;}
+        .cmn-head-row2{display:flex;align-items:center;width:100%;}
         .cmn-head::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,#00d4ff,#7c3aed 60%,transparent 95%);opacity:.55;border-radius:2px;}
         .cmn-title{font-weight:800;font-size:.8rem;color:var(--text,#fff);white-space:nowrap;letter-spacing:.01em;}
         .cmn-live{display:inline-flex;align-items:center;gap:5px;font-size:.56rem;font-weight:800;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.28);padding:2px 8px;border-radius:999px;letter-spacing:.08em;flex:none;}
@@ -1861,7 +1862,7 @@
         .cmn-tab.active{color:var(--accent-cyan,#00d4ff);border-color:rgba(0,212,255,.35);background:rgba(0,212,255,.09);}
         .cmn-markall{margin-left:auto;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.66rem;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s;}
         .cmn-markall:hover{color:var(--accent-cyan,#00d4ff);}
-        .cmn-close{background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.95rem;cursor:pointer;line-height:1;padding:2px 4px;border-radius:6px;transition:color .15s,background .15s;}
+        .cmn-close{margin-left:auto;background:transparent;border:none;color:var(--text-muted,#8a8fa3);font-size:.95rem;cursor:pointer;line-height:1;padding:2px 4px;border-radius:6px;transition:color .15s,background .15s;}
         .cmn-close:hover{color:var(--text,#fff);background:rgba(255,255,255,.08);}
         #cmnList{overflow-y:auto;padding:8px;}
         #cmnList::-webkit-scrollbar{width:6px;}
@@ -1875,20 +1876,12 @@
         .cmn-item-main{flex:1;min-width:0;}
         .cmn-item-top{display:flex;align-items:baseline;gap:6px;}
         .cmn-item-author{font-size:.78rem;font-weight:700;color:var(--text,#fff);}
-        .cmn-item-verb{font-size:.68rem;color:var(--text-muted,#8a8fa3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
         .cmn-item-time{margin-left:auto;font-size:.62rem;color:var(--text-muted,#8a8fa3);flex:none;}
-        .cmn-item-recline{margin-top:3px;display:flex;}
         .cmn-item-rec{flex:none;font-size:.62rem;font-weight:800;color:var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.22);padding:1px 7px;border-radius:999px;}
-        .cmn-item-text{font-size:.75rem;color:rgba(255,255,255,.86);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45;}
-        .cmn-mention-hl{color:var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.13);border-radius:4px;padding:0 3px;font-weight:700;}
-        .cmn-react-btn{background:transparent;border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.75);font-size:.64rem;font-weight:700;padding:2px 9px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:.8;transition:opacity .15s,background .15s,border-color .15s;}
-        .cmn-react-btn:hover{opacity:1;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.32);}
-        .cmn-rx-chip[data-lrid]{cursor:pointer;transition:background .15s,border-color .15s;}
-        .cmn-rx-chip[data-lrid]:hover{background:rgba(0,212,255,.12);border-color:rgba(0,212,255,.4);}
-        .cmn-rx-chip.cmn-rx-me{border-color:rgba(0,212,255,.55);background:rgba(0,212,255,.14);}
+        .cmn-item-text{font-size:.75rem;color:rgba(255,255,255,.86);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45;}
         .cmn-item-meta{font-size:.63rem;color:var(--text-muted,#8a8fa3);margin-top:4px;display:flex;gap:10px;}
         .cmn-item-meta .cmn-atme{color:var(--accent-cyan,#00d4ff);font-weight:700;}
-        .cmn-avatar{flex:none;width:36px;height:36px;border-radius:50%;background:rgba(0,212,255,.16);color:var(--accent-cyan,#00d4ff);font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;margin-top:2px;border:1px solid rgba(255,255,255,.12);}
+        .cmn-avatar{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.16);color:var(--accent-cyan,#00d4ff);font-size:.6rem;font-weight:800;display:flex;align-items:center;justify-content:center;text-transform:uppercase;overflow:hidden;margin-top:2px;border:1px solid rgba(255,255,255,.12);}
         .cmn-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
         .cmn-rx-chip{display:inline-flex;align-items:center;gap:2px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);font-size:.64rem;line-height:1.6;}
         .cmn-rx-line{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
@@ -2312,12 +2305,14 @@
                 <span class="cmn-title">Sheet notifications</span>
                 <span class="cmn-live" title="Auto-refreshes every 30 minutes — hit the refresh button to sync now"><span class="cmn-live-dot"></span>AUTO 30M</span>
                 <button type="button" class="cmn-refresh" id="cmnRefreshBtn" onclick="cmnRefreshNow()" title="Refresh now — pulls the latest comments from the sheet immediately">⟳</button>
-                <div class="cmn-tabs">
-                    <button type="button" class="cmn-tab active" id="cmnTabAll" onclick="cmnSetTab('all')">All</button>
-                    <button type="button" class="cmn-tab" id="cmnTabMentioned" onclick="cmnSetTab('mentioned')">@ Me</button>
-                </div>
-                <button type="button" class="cmn-markall" onclick="cmnMarkAllRead()">Mark all read</button>
                 <button type="button" class="cmn-close" onclick="cmnToggle(true)" title="Close">✕</button>
+                <div class="cmn-head-row2">
+                    <div class="cmn-tabs">
+                        <button type="button" class="cmn-tab active" id="cmnTabAll" onclick="cmnSetTab('all')">All</button>
+                        <button type="button" class="cmn-tab" id="cmnTabMentioned" onclick="cmnSetTab('mentioned')">@ Me</button>
+                    </div>
+                    <button type="button" class="cmn-markall" onclick="cmnMarkAllRead()">Mark all read</button>
+                </div>
             </div>
             <div id="cmnList"></div>
         </div>
@@ -19051,16 +19046,15 @@ function twcRenderAvatarHtml(name, avatarUrl, cls) {
     return `<span class="${c}">${twcEsc(twcInitials(name))}</span>`;
 }
 
-function twcRenderReactions(reactions, replyId, handler) {
+function twcRenderReactions(reactions, replyId) {
     if (!reactions || !reactions.length) return '';
-    const fn = handler || 'twcReact';  // Phase 18: the modal passes 'cmtReact'
     const me = localStorage.getItem('xenaOpenId') || '';
     const chips = reactions.map(rx => {
         const names = (rx.names || []).filter(Boolean);
         const tip = names.length ? names.join(', ') : (rx.users || []).join(', ');
         const cnt = rx.count > 1 ? `<b>${rx.count}</b>` : '';
         const mine = me && (rx.users || []).includes(me);
-        const clk = (replyId && TWC_REACT_KEYS.includes(rx.key)) ? ` onclick="${fn}('${twcEsc(replyId)}','${twcEsc(rx.key)}')"` : '';
+        const clk = (replyId && TWC_REACT_KEYS.includes(rx.key)) ? ` onclick="twcReact('${twcEsc(replyId)}','${twcEsc(rx.key)}')"` : '';
         return `<span class="twc-rx${mine ? ' twc-rx-me' : ''}" title="${twcEsc(tip)}${mine ? ' (you — click to remove)' : ''}"${clk}>${twcReactionEmoji(rx.key)}${cnt}</span>`;
     }).join('');
     return chips;
@@ -19540,149 +19534,8 @@ function cmnUpdateBadge() {
    item. Hidden for masked ids (a name the cache hasn't filled yet) so the
    button never mentions "user-ab12". */
 function cmnMentionBtnHtml(name, oid) {
-    // Phase 18 (Ahmed: "the mention button that i need to replay to the
-    // comment so click the mention and then it do @the commentor name"):
-    // show the chip whenever we have SOMEONE to mention — the open_id is what
-    // makes a real mention; the name is just the label. (Was: hidden for
-    // masked 'user-xxxx' names, which is exactly when Ahmed needed it most.)
-    if (!oid && !name) return '';
-    const label = name || 'author';
-    return `<button type="button" class="cmn-mention-btn" data-name="${twcEsc(label)}" data-oid="${twcEsc(oid || '')}" title="Mention ${twcEsc(label)} in your reply">@ ${twcEsc(label)}</button>`;
-}
-
-/* Phase 18: the bell line renders typed text_parts (backend v2 payloads +
-   scan path) with mentions as highlighted chips, Base-notification style.
-   Falls back to the plain escaped text for older payloads. */
-function cmnTextHtml(it) {
-    const parts = it && it.text_parts;
-    if (Array.isArray(parts) && parts.length) {
-        return parts.map(p => (p && p.type === 'mention')
-            ? `<span class="cmn-mention-hl">@${twcEsc(p.name || '')}</span>`
-            : twcEsc((p && p.text) || '')).join('');
-    }
-    return twcEsc((it && it.text) || '');
-}
-
-/* Phase 18 (Ahmed: "i can addemojy also from this no need to open the tkt"):
-   the bell item's reaction row — chips grouped by emoji key, clickable to
-   toggle YOUR reaction on the thread's last reply (the reply whose text the
-   item shows), plus the 😊+ picker button. Rendered in-place on react so a
-   full bell re-render never eats an open quick-reply composer. */
-function cmnRxLineHtml(it) {
-    const me = localStorage.getItem('xenaOpenId') || '';
-    const groups = {};
-    (it.reactions || []).forEach(rx => {
-        if (!rx || !rx.key) return;
-        const g = groups[rx.key] = groups[rx.key] || { key: rx.key, count: 0, names: [], mine: false };
-        g.count++;
-        if (rx.reactor_name) g.names.push(rx.reactor_name);
-        if (me && rx.reactor_id === me) g.mine = true;
-    });
-    const lrid = it.last_reply_id || '';
-    const chips = Object.keys(groups).map(k => {
-        const g = groups[k];
-        const clk = (lrid && TWC_REACT_KEYS.includes(k))
-            ? ` data-lrid="${twcEsc(lrid)}" data-k="${twcEsc(k)}"` : '';
-        const cnt = g.count > 1 ? `<b>${g.count}</b>` : '';
-        return `<span class="cmn-rx-chip${g.mine ? ' cmn-rx-me' : ''}" title="${twcEsc(g.names.join(', '))}${g.mine ? ' (you — click to remove)' : ''}"${clk}>${twcReactionEmoji(k)}${cnt}</span>`;
-    }).join('');
-    const addBtn = lrid
-        ? `<button type="button" class="cmn-react-btn" data-lrid="${twcEsc(lrid)}" title="Add a reaction">😊+</button>` : '';
-    if (!chips && !addBtn) return '';
-    return `<div class="cmn-rx-line">${chips}${addBtn}</div>`;
-}
-
-function cmnRefreshItemRxLine(itemEl, it) {
-    const old = itemEl.querySelector('.cmn-rx-line');
-    const html = cmnRxLineHtml(it);
-    if (old) { old.outerHTML = html; }
-    else if (html) {
-        const host = itemEl.querySelector('.cmn-item-actions') || itemEl.querySelector('.cmn-item-main');
-        if (host) host.insertAdjacentHTML('beforebegin', html);
-    }
-}
-
-function cmnToggleReactPicker(ev, btn) {
-    ev.stopPropagation();
-    const replyId = btn.dataset.lrid; if (!replyId) return;
-    const itemEl = btn.closest('.cmn-item');
-    const existing = document.getElementById('twcPicker');
-    if (existing && existing.dataset.cmnLrid === replyId) { existing.remove(); return; }
-    if (existing) existing.remove();
-    const it = itemEl && (cmnState.items || []).find(x => x.uid === itemEl.dataset.uid);
-    const me = localStorage.getItem('xenaOpenId') || '';
-    const picker = document.createElement('div');
-    picker.id = 'twcPicker'; picker.className = 'twc-picker';
-    picker.dataset.cmnLrid = replyId;
-    picker.innerHTML = TWC_REACT_KEYS.map(k => {
-        const mine = it && me && (it.reactions || []).some(rx => rx.key === k && rx.reactor_id === me);
-        return `<button type="button" class="${mine ? 'twc-pk-me' : ''}" data-k="${k}" title="${mine ? 'Remove your reaction' : 'React'}">${twcReactionEmoji(k)}</button>`;
-    }).join('');
-    document.body.appendChild(picker);
-    const rect = btn.getBoundingClientRect();
-    const pw = picker.offsetWidth, ph = picker.offsetHeight;
-    let left = Math.min(Math.max(8, rect.left), window.innerWidth - pw - 8);
-    let top = rect.top - ph - 6;
-    if (top < 8) top = rect.bottom + 6;
-    picker.style.left = left + 'px';
-    picker.style.top = top + 'px';
-    picker.addEventListener('click', e2 => {
-        const b = e2.target.closest('button[data-k]');
-        if (!b) return;
-        e2.stopPropagation();
-        picker.remove();
-        if (itemEl) cmnReact(itemEl, replyId, b.dataset.k);
-    });
-    setTimeout(() => document.addEventListener('click', twcPickerOutside), 0);
-}
-
-async function cmnReact(itemEl, replyId, key) {
-    // Same three rules as twcReact (Phase 11.9): optimistic chip, no reload,
-    // in-flight guard — but state lives in the bell feed (cmnState.items) and
-    // only the item's reaction row re-renders (a composer may be open).
-    cmnState.reactPending = cmnState.reactPending || {};
-    const pk = replyId + ':' + key;
-    if (cmnState.reactPending[pk]) return;
-    const uid = itemEl.dataset.uid;
-    const it = (cmnState.items || []).find(x => x.uid === uid);
-    const me = localStorage.getItem('xenaOpenId') || '';
-    const myName = loggedUser || '';
-    const rxs = (it && it.reactions) || [];
-    const mine = me && rxs.some(rx => rx.key === key && rx.reactor_id === me);
-    const before = it ? JSON.stringify(it.reactions || []) : null;
-    if (it) {
-        it.reactions = it.reactions || [];
-        if (mine) {
-            const idx = it.reactions.findIndex(rx => rx.key === key && rx.reactor_id === me);
-            if (idx >= 0) it.reactions.splice(idx, 1);
-        } else {
-            it.reactions.push({ key: key, reactor_id: me, reactor_name: myName,
-                                on_user_id: it.author_id, on_name: it.author });
-        }
-        cmnRefreshItemRxLine(itemEl, it);
-    }
-    cmnState.reactPending[pk] = true;
-    let d = null, netErr = false;
-    try {
-        const r = await fetch('/api/comments/react', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply_id: replyId, emoji: key, action: mine ? 'delete' : 'add',
-                                   user: loggedUser, email: loggedEmail, uat: loggedUat || '',
-                                   open_id: me })
-        });
-        d = await r.json();
-    } catch (e) { netErr = true; }
-    delete cmnState.reactPending[pk];
-    if (netErr || !d || !d.success) {
-        if (it && before !== null) {
-            try { it.reactions = JSON.parse(before); } catch (e) {}
-            if (itemEl.isConnected) cmnRefreshItemRxLine(itemEl, it);
-        }
-        ToastManager.show((d && d.error) || 'Network error — reaction not saved', 'error');
-        return;
-    }
-    if (d.actor_open_id) twcStoreMe(d.actor_open_id);
+    if (!name || /^(user-|ou_)/.test(name)) return '';
+    return `<button type="button" class="cmn-mention-btn" data-name="${twcEsc(name)}" data-oid="${twcEsc(oid || '')}" title="Mention ${twcEsc(name)} in your reply">@ ${twcEsc(name)}</button>`;
 }
 
 /* Phase 14: one-click mention into the MODAL composer — inserts "@Name " at
@@ -19728,31 +19581,30 @@ function cmnRender() {
             <div class="cmn-item-main">
                 <div class="cmn-item-top">
                     <span class="cmn-item-author">${twcEsc(it.author || '')}</span>
-                    <span class="cmn-item-verb">reacted ${emo}</span>
+                    <span class="cmn-item-rec">${rec}</span>
                     <span class="cmn-item-time">${twcTimeAgo(it.time)}</span>
                 </div>
-                <div class="cmn-item-recline"><span class="cmn-item-rec">${rec}</span></div>
-                <div class="cmn-item-text"><span class="cmn-rx-verb">to${onWho}:</span> ${cmnTextHtml(it)}</div>
+                <div class="cmn-item-text"><span class="cmn-rx-verb">reacted ${emo} to${onWho}:</span> ${twcEsc(it.text || '')}</div>
                 ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
                 <div class="cmn-item-actions">${cmnMentionBtnHtml(it.author, it.author_id)}<button type="button" class="cmn-reply-btn">↩ Reply</button></div>
             </div>
         </div>`;
         }
-        // Phase 18: Base-notification layout — author + verb + time on top,
-        // the record badge on its own line, the quoted text with highlighted
-        // mention chips (text_parts), then the clickable reaction row.
-        return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}" data-uid="${twcEsc(it.uid || '')}" data-lrid="${twcEsc(it.last_reply_id || '')}">
+        const rxChips = ((it.reactions || []).length)
+            ? `<div class="cmn-rx-line">${it.reactions.map(rx =>
+                `<span class="cmn-rx-chip" title="${twcEsc(rx.reactor_name || '')}">${twcReactionEmoji(rx.key)}</span>`).join('')}</div>`
+            : '';
+        return `<div class="cmn-item${unread ? ' unread' : ''}" data-rid="${twcEsc(it.record_id || '')}" data-time="${it.time || 0}" data-uid="${twcEsc(it.uid || '')}">
             <span class="cmn-dot"></span>
             ${twcRenderAvatarHtml(it.author, it.author_avatar, 'cmn-avatar')}
             <div class="cmn-item-main">
                 <div class="cmn-item-top">
                     <span class="cmn-item-author">${twcEsc(it.author || '')}</span>
-                    <span class="cmn-item-verb">commented</span>
+                    <span class="cmn-item-rec">${rec}</span>
                     <span class="cmn-item-time">${twcTimeAgo(it.time)}</span>
                 </div>
-                <div class="cmn-item-recline"><span class="cmn-item-rec">${rec}</span></div>
-                <div class="cmn-item-text">${cmnTextHtml(it)}</div>
-                ${cmnRxLineHtml(it)}
+                <div class="cmn-item-text">${twcEsc(it.text || '')}</div>
+                ${rxChips}
                 ${meta.length ? `<div class="cmn-item-meta">${meta.join('')}</div>` : ''}
                 <div class="cmn-item-actions">${cmnMentionBtnHtml(it.author, it.author_id)}<button type="button" class="cmn-reply-btn">↩ Reply</button></div>
             </div>
@@ -19923,11 +19775,8 @@ async function cmtLoadThreadLive() {
     try { cmnRefresh(true); } catch (e) {}    // badge catches up with the new replies
 }
 
-function cmtRenderThread(keepScroll) {
+function cmtRenderThread() {
     const list = document.getElementById('cmtList'); if (!list) return;
-    // keepScroll: optimistic reaction updates re-render the SAME list —
-    // restore the scroll offset instead of jumping to the bottom mid-read.
-    const prevScroll = keepScroll ? list.scrollTop : null;
     if (!cmtState.comments.length) {
         list.innerHTML = '<div class="cmt-empty">No comments yet — start the thread below.</div>';
         return;
@@ -19936,19 +19785,10 @@ function cmtRenderThread(keepScroll) {
         const imgs = (c.images || []).map(tok =>
             `<img src="/api/comments/media/${encodeURIComponent(tok)}?${twcAuthQ()}" loading="lazy" alt="" onclick="twcZoom(this.src)">`
         ).join('');
-        // Phase 18: one-click mention chip — whenever there is SOMEONE to
-        // mention (the open_id makes the real mention; was: unmasked names
-        // only, which hid the chip exactly when names hadn't healed yet).
-        const menChip = (c.user_id || c.user_name)
-            ? `<button type="button" class="cmt-mention-btn" data-name="${twcEsc(c.user_name || '')}" data-oid="${twcEsc(c.user_id || '')}" title="Mention ${twcEsc(c.user_name || 'author')} in your reply">@</button>`
+        // Phase 14: one-click mention chip — only for real (unmasked) names.
+        const menChip = (c.user_name && !/^(user-|ou_)/.test(c.user_name))
+            ? `<button type="button" class="cmt-mention-btn" data-name="${twcEsc(c.user_name)}" data-oid="${twcEsc(c.user_id || '')}" title="Mention ${twcEsc(c.user_name)} in your reply">@</button>`
             : '';
-        // Phase 18 (Ahmed: "allow as in fourth pic that i can addemojy also
-        // from this"): the modal thread's reaction chips are now CLICKABLE
-        // and every comment gets the 😊+ picker — same sheet palette, no
-        // need to open the ticket workspace.
-        const rxRow = c.reply_id
-            ? `<div class="twc-rx-row">${twcRenderReactions(c.reactions, c.reply_id, 'cmtReact')}<button type="button" class="twc-rx-add" title="Add a reaction" onclick="cmtTogglePicker(event,'${twcEsc(c.reply_id)}')">😊+</button></div>`
-            : twcRenderReactions(c.reactions, '', 'cmtReact');
         return `<div class="cmt-item">
             ${twcRenderAvatarHtml(c.user_name, c.user_avatar)}
             <div class="cmt-item-main">
@@ -19960,103 +19800,11 @@ function cmtRenderThread(keepScroll) {
                 </div>
                 <div class="cmt-text">${twcRenderParts(c.parts)}</div>
                 ${imgs ? `<div class="cmt-imgs">${imgs}</div>` : ''}
-                ${rxRow}
+                ${twcRenderReactions(c.reactions)}
             </div>
         </div>`;
     }).join('');
-    if (prevScroll !== null) list.scrollTop = prevScroll;
-    else list.scrollTop = list.scrollHeight;
-}
-
-/* Phase 18: the modal thread's own reaction picker + toggle — same logic as
-   twcTogglePicker/twcReact but state lives in cmtState and the thread
-   re-renders with the scroll preserved. */
-function cmtTogglePicker(ev, replyId) {
-    ev.stopPropagation();
-    const existing = document.getElementById('twcPicker');
-    if (existing && existing.dataset.replyId === replyId) { existing.remove(); return; }
-    if (existing) existing.remove();
-    const c = (cmtState.comments || []).find(x => x.reply_id === replyId);
-    const me = localStorage.getItem('xenaOpenId') || '';
-    const picker = document.createElement('div');
-    picker.id = 'twcPicker';
-    picker.className = 'twc-picker';
-    picker.dataset.replyId = replyId;
-    picker.innerHTML = TWC_REACT_KEYS.map(k => {
-        const rx = c && (c.reactions || []).find(r => r.key === k);
-        const mine = rx && me && (rx.users || []).includes(me);
-        return `<button type="button" class="${mine ? 'twc-pk-me' : ''}" data-k="${k}" title="${mine ? 'Remove your reaction' : 'React'}">${twcReactionEmoji(k)}</button>`;
-    }).join('');
-    document.body.appendChild(picker);
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const pw = picker.offsetWidth, ph = picker.offsetHeight;
-    let left = Math.min(Math.max(8, rect.left), window.innerWidth - pw - 8);
-    let top = rect.top - ph - 6;
-    if (top < 8) top = rect.bottom + 6;
-    picker.style.left = left + 'px';
-    picker.style.top = top + 'px';
-    picker.addEventListener('click', e2 => {
-        const b = e2.target.closest('button[data-k]');
-        if (!b) return;
-        e2.stopPropagation();
-        picker.remove();
-        cmtReact(replyId, b.dataset.k);
-    });
-    setTimeout(() => document.addEventListener('click', twcPickerOutside), 0);
-}
-
-async function cmtReact(replyId, key) {
-    if (!cmtState.recordId) return;
-    cmtState.reactPending = cmtState.reactPending || {};
-    const pk = replyId + ':' + key;
-    if (cmtState.reactPending[pk]) return;
-    const c = (cmtState.comments || []).find(x => x.reply_id === replyId);
-    const me = localStorage.getItem('xenaOpenId') || '';
-    const myName = loggedUser || '';
-    const rx = c && (c.reactions || []).find(r => r.key === key);
-    const mine = !!(rx && me && (rx.users || []).includes(me));
-    const before = c ? JSON.stringify(c.reactions || []) : null;
-    if (c) {
-        c.reactions = c.reactions || [];
-        let target = c.reactions.find(r => r.key === key);
-        if (mine) {
-            const idx = (target.users || []).indexOf(me);
-            target.users = (target.users || []).filter(u => u !== me);
-            if (target.names && idx >= 0 && idx < target.names.length) target.names.splice(idx, 1);
-            target.count = Math.max(0, (target.count || 0) - 1);
-            if (!target.count) c.reactions = c.reactions.filter(r => r !== target);
-        } else {
-            if (!target) { target = { key: key, count: 0, users: [], names: [] }; c.reactions.push(target); }
-            target.count = (target.count || 0) + 1;
-            target.users = target.users || [];
-            if (me && !target.users.includes(me)) target.users.push(me);
-            target.names = target.names || [];
-            if (myName && !target.names.includes(myName)) target.names.push(myName);
-        }
-        cmtRenderThread(true);   // instant chip, keep scroll
-    }
-    cmtState.reactPending[pk] = true;
-    let d = null, netErr = false;
-    try {
-        const r = await fetch('/api/comments/react', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply_id: replyId, emoji: key, action: mine ? 'delete' : 'add',
-                                   user: loggedUser, email: loggedEmail, uat: loggedUat || '',
-                                   open_id: me })
-        });
-        d = await r.json();
-    } catch (e) { netErr = true; }
-    delete cmtState.reactPending[pk];
-    if (netErr || !d || !d.success) {
-        if (c && before !== null) {
-            try { c.reactions = JSON.parse(before); } catch (e) {}
-            cmtRenderThread(true);
-        }
-        ToastManager.show((d && d.error) || 'Network error — reaction not saved', 'error');
-        return;
-    }
-    if (d.actor_open_id) twcStoreMe(d.actor_open_id);
+    list.scrollTop = list.scrollHeight;
 }
 
 async function cmtSend() {
@@ -20197,18 +19945,6 @@ document.addEventListener('click', function (e) {
         e.preventDefault();
         const host = replyBtn.closest('.cmn-item');
         if (host && host.dataset.rid) cmnQuickReplyToggle(host);
-        return;
-    }
-    // Phase 18: react from the bell — the 😊+ button opens the picker, a
-    // reaction chip toggles YOUR reaction; both target the thread's last
-    // reply and never open the ticket/modal.
-    const cmnRxBtn = e.target.closest('.cmn-react-btn');
-    if (cmnRxBtn) { e.preventDefault(); cmnToggleReactPicker(e, cmnRxBtn); return; }
-    const cmnRxChip = e.target.closest('.cmn-rx-chip[data-lrid]');
-    if (cmnRxChip) {
-        e.preventDefault();
-        const host = cmnRxChip.closest('.cmn-item');
-        if (host) cmnReact(host, cmnRxChip.dataset.lrid, cmnRxChip.dataset.k);
         return;
     }
     const item = e.target.closest('.cmn-item');
