@@ -138,7 +138,8 @@ REDIS_KEY_EXCHANGE_LAST_SNAPSHOT  = "xena:exchange:last_snapshot_date"
 REDIS_KEY_WATCHLIST_PREFIX        = "xena:exchange:watchlist:"
 
 MONTHLY_ALLOCATOR_LIMITS = {
-    "trend card": 10, "traffic card": 50, "30 mic 15 days": 999, "30 mic 30 days": 999,
+    "trend card": 10, "traffic card": 50, "sayhi card": 999,
+    "30 mic 15 days": 999, "30 mic 30 days": 999,
     "normal short id ( 2 levels above ) 15 days": 999, "normal short id ( 2 levels above ) 30 days": 999,
     "customized short id 15 days": 999, "customized short id 30 days": 999,
     "room pin-up": 999, "welcome package 3": 15, "welcome package 2": 50,
@@ -155,6 +156,9 @@ ORDER_TYPE_LIMITS = {
 POINT_PRICE_DB = [
     {"key": "trend card", "same": 40, "other": 50, "limit": 10},
     {"key": "traffic card", "same": 30, "other": 40, "limit": 50},
+    # Phase 19 (Ahmed 2026-10-22): new sheet option "SayHi card ( 40 - 50 for
+    # others )" -- priced from its own label, same shape as Trend card.
+    {"key": "sayhi card", "same": 40, "other": 50, "limit": 999},
     {"key": "30 mic 15 days", "same": 150, "other": 175, "limit": 999},
     {"key": "30 mic 30 days", "same": 300, "other": 350, "limit": 999},
     {"key": "normal short id ( 2 levels above ) 15 days", "same": 120, "other": 180, "limit": 999},
