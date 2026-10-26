@@ -1055,33 +1055,51 @@
         .pv-avatar{position:relative;overflow:hidden}
         .pv-avatar-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
 
-        /* ===== Phase 22: Audition Schedule ===== */
-        .sch-weeknav{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+        /* ===== Phase 22/23: Audition Schedule ===== */
+        .sch-weeknav{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
         .sch-navbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--text);border-radius:10px;padding:6px 14px;cursor:pointer;font-size:1rem;font-weight:700;transition:all .15s}
         .sch-navbtn:hover{background:rgba(0,212,255,.12);border-color:rgba(0,212,255,.35)}
         .sch-todaybtn{font-size:.8rem;font-weight:600}
-        .sch-weeklabel{font-weight:800;font-size:.95rem;min-width:220px;text-align:center}
-        .sch-viewtoggle{display:flex;background:rgba(255,255,255,.05);border-radius:12px;padding:3px;gap:3px}
+        .sch-weeklabel{font-weight:800;font-size:1.02rem;min-width:230px;text-align:center;letter-spacing:.2px}
+        .sch-viewtoggle{display:flex;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:3px;gap:3px}
         .sch-vt-btn{background:transparent;border:0;color:var(--text-muted);padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.8rem;font-weight:700;transition:all .15s}
         .sch-vt-btn.active{background:linear-gradient(135deg,rgba(0,212,255,.25),rgba(123,97,255,.25));color:#fff}
         .sch-grid-wrap{overflow-x:auto}
-        .sch-grid{border-collapse:separate;border-spacing:6px;width:100%;min-width:820px}
+        .sch-grid{border-collapse:separate;border-spacing:6px;width:100%;min-width:860px}
         .sch-grid th{color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;padding:4px 6px;text-align:center}
         .sch-grid th.sch-todayh{color:var(--accent-cyan)}
         .sch-grid td{vertical-align:top}
-        .sch-agentcell{display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:12px;min-width:172px}
+        .sch-agentcell{display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:12px;min-width:186px}
         .sch-agentcell img,.sch-agentcell .sch-avfb{width:30px;height:30px;border-radius:50%;flex:0 0 auto}
         .sch-avfb{display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff;background:linear-gradient(135deg,#00d4ff,#7b61ff)}
         .sch-agentcell .nm{font-size:.8rem;font-weight:700;line-height:1.15}
         .sch-agentcell .em{font-size:.66rem;color:var(--text-muted)}
-        .sch-cell{min-width:98px;min-height:62px;border-radius:12px;padding:7px 8px;cursor:pointer;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);transition:transform .12s,box-shadow .12s}
+        .sch-noemail{font-size:.6rem;background:rgba(255,77,109,.16);color:#ff4d6d;border-radius:6px;padding:1px 6px;font-weight:800;letter-spacing:.3px}
+        .sch-cell{min-width:104px;min-height:64px;border-radius:12px;padding:7px 8px;cursor:pointer;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);transition:transform .12s,box-shadow .12s;position:relative}
         .sch-cell:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.3);border-color:rgba(0,212,255,.3)}
         .sch-cell .tp{font-size:.72rem;font-weight:800}
         .sch-cell .tm{font-size:.72rem;color:var(--text-muted);margin-top:2px}
         .sch-cell .nt{font-size:.66rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+        .sch-cell .sch-add{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:300;color:var(--accent-cyan);opacity:0;transition:opacity .15s;pointer-events:none}
+        .sch-cell:hover .sch-add{opacity:.95}
+        .sch-cell.sch-noedit{cursor:not-allowed;opacity:.55}
+        .sch-cell.sch-noedit:hover{transform:none;box-shadow:none;border-color:rgba(255,255,255,.07)}
         .sch-cell.sch-todayc{outline:2px solid rgba(0,212,255,.5)}
         .sch-t-OnSite{color:#00d4ff}.sch-t-WorkFromHome{color:#b388ff}.sch-t-Off{color:#90a4ae}.sch-t-AnnualLeave{color:#ffab00}.sch-t-SickLeave{color:#ff4d6d}
         .sch-bg-OnSite{background:rgba(0,212,255,.08)}.sch-bg-WorkFromHome{background:rgba(179,136,255,.1)}.sch-bg-Off{background:rgba(144,164,174,.08)}.sch-bg-AnnualLeave{background:rgba(255,171,0,.1)}.sch-bg-SickLeave{background:rgba(255,77,109,.1)}
+        /* month calendar */
+        .sch-mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;min-width:780px}
+        .sch-mdow{color:var(--text-muted);font-size:.68rem;text-transform:uppercase;letter-spacing:1px;text-align:center;padding:2px 0 4px;font-weight:700}
+        .sch-mcell{min-height:104px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);padding:8px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+        .sch-mcell:hover{border-color:rgba(0,212,255,.35);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+        .sch-mcell.sch-m-out{opacity:.35;background:transparent}
+        .sch-mcell.sch-todayc{border-color:rgba(0,212,255,.55);box-shadow:0 0 0 1px rgba(0,212,255,.2)}
+        .sch-mdnum{font-weight:800;font-size:.85rem;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+        .sch-mchip{display:flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;padding:2px 6px;border-radius:7px;margin-bottom:3px;background:rgba(255,255,255,.05);white-space:nowrap}
+        .sch-mdot{width:7px;height:7px;border-radius:50%;flex:none}
+        .sch-mmore{font-size:.64rem;color:var(--text-muted);text-align:center;padding:1px 0}
+        /* my week cards */
         .sch-myweek{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
         .sch-day{border-radius:16px;padding:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);position:relative;overflow:hidden;transition:transform .15s}
         .sch-day:hover{transform:translateY(-2px)}
@@ -1106,6 +1124,42 @@
         .sch-dow{display:flex;gap:6px;flex-wrap:wrap}
         .sch-dow label{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border-radius:9px;padding:6px 10px;font-size:.76rem;cursor:pointer}
         .sch-empty{color:var(--text-muted);text-align:center;padding:18px;font-size:.85rem}
+        /* Phase 23: elegant request / day-detail modals */
+        .sch-reqpop{max-width:520px;padding:24px}
+        .sch-reqpop-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:4px}
+        .sch-reqpop-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;background:linear-gradient(135deg,rgba(0,212,255,.22),rgba(123,97,255,.22));flex:none}
+        .sch-reqpop-sub{font-size:.78rem;color:var(--text-muted);margin-top:3px}
+        .sch-x{margin-left:auto;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:var(--text-muted);border-radius:9px;width:30px;height:30px;cursor:pointer;flex:none;font-size:.8rem}
+        .sch-x:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+        .sch-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+        .sch-segbtn{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);cursor:pointer;text-align:left;transition:all .15s;color:var(--text);font-family:inherit}
+        .sch-segbtn:hover{border-color:rgba(255,255,255,.28);transform:translateY(-1px)}
+        .sch-segbtn.active{border-color:var(--seg-c,#00d4ff);background:var(--seg-bg,rgba(0,212,255,.12));box-shadow:0 4px 14px rgba(0,0,0,.25)}
+        .sch-segbtn .si{font-size:1.2rem;flex:none}
+        .sch-segbtn .sl{font-size:.8rem;font-weight:800;line-height:1.2}
+        .sch-segbtn .sd{font-size:.66rem;color:var(--text-muted)}
+        .sch-dategrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .sch-datein{font-size:.95rem;padding:11px 12px;color-scheme:dark}
+        .sch-quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+        .sch-qchip{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text-muted);border-radius:999px;padding:5px 12px;font-size:.72rem;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
+        .sch-qchip:hover{color:var(--accent-cyan);border-color:rgba(0,212,255,.4)}
+        .sch-reqsum{margin-top:12px;padding:10px 14px;border-radius:12px;background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.18);font-size:.8rem;font-weight:700;color:var(--accent-cyan)}
+        .sch-reqsend{width:100%;margin-top:16px;padding:12px;font-size:.95rem;font-weight:800}
+        .sch-linkbtn{display:block;width:100%;margin-top:6px;background:none;border:0;color:var(--text-muted);cursor:pointer;font-size:.8rem;padding:6px;font-family:inherit}
+        .sch-linkbtn:hover{color:#fff}
+        .sch-dayrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.07);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.03)}
+        .sch-dayrow img,.sch-dayrow .sch-avfb{width:28px;height:28px;border-radius:50%;flex:none}
+        .sch-dayrow .sch-avfb{font-size:.62rem}
+        /* scoped fix: the portal's global .btn{width:100%} (and missing .btn-secondary rule)
+           stretched every schedule button full-width and rendered secondary buttons as raw
+           white blocks. Scope them back to compact, dark-theme buttons inside this page. */
+        #pg-audition-schedule .btn,.sch-pop-overlay .btn{width:auto}
+        #pg-audition-schedule .btn-secondary,.sch-pop-overlay .btn-secondary{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--text);padding:10px 18px;font-size:.85rem}
+        #pg-audition-schedule .btn-secondary:hover,.sch-pop-overlay .btn-secondary:hover{border-color:rgba(0,212,255,.45);color:var(--accent-cyan);background:rgba(0,212,255,.08)}
+        .btn-primary.sch-reqsend{width:100%}
+        #schDayList .btn-secondary,#schReqList .btn-secondary,#schReqList .btn-primary{padding:6px 14px;font-size:.78rem}
+        #schCellPop .btn-secondary,#schRangePop .btn-secondary{padding:9px 16px;font-size:.82rem}
+
         .agent-admin-crown{position:absolute;top:-9px;right:-7px;font-size:1rem;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
         .agent-id-block{min-width:0;flex:1}
         .agent-name{font-weight:700;font-size:1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -4350,6 +4404,10 @@
                                 <button type="button" id="schViewTeamBtn" class="sch-vt-btn" onclick="schSetView('team')">👥 Team editor</button>
                                 <button type="button" id="schViewMyBtn" class="sch-vt-btn" onclick="schSetView('my')">🙋 My schedule</button>
                             </div>
+                            <div class="sch-viewtoggle">
+                                <button type="button" id="schModeWeekBtn" class="sch-vt-btn active" onclick="schSetRangeMode('week')">Week</button>
+                                <button type="button" id="schModeMonthBtn" class="sch-vt-btn" onclick="schSetRangeMode('month')">Month</button>
+                            </div>
                             <button class="btn btn-secondary" onclick="schLoad(true)" style="flex:none">🔄 Refresh</button>
                         </div>
                     </div>
@@ -4357,7 +4415,7 @@
                         <button type="button" class="sch-navbtn" onclick="schWeekShift(-1)">‹</button>
                         <div class="sch-weeklabel" id="schWeekLabel">—</div>
                         <button type="button" class="sch-navbtn" onclick="schWeekShift(1)">›</button>
-                        <button type="button" class="sch-navbtn sch-todaybtn" onclick="schWeekToday()">This week</button>
+                        <button type="button" class="sch-navbtn sch-todaybtn" onclick="schWeekToday()">Today</button>
                     </div>
                 </div>
 
@@ -4367,22 +4425,27 @@
                     <div id="schReqList"></div>
                 </div>
 
-                <!-- Admin: team grid -->
+                <!-- Admin: team editor (week table + month calendar) -->
                 <div class="card" id="schTeamCard" style="display:none;margin-bottom:14px">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-                        <h4 style="margin:0">👥 Team week</h4>
+                        <div>
+                            <h4 style="margin:0" id="schTeamTitle">👥 Team week</h4>
+                            <div style="font-size:.74rem;color:var(--text-muted);margin-top:3px" id="schTeamHint">Click any day cell to add or edit a shift.</div>
+                        </div>
                         <div style="display:flex;gap:8px">
-                            <button type="button" class="btn btn-secondary" onclick="schCopyWeek()">📋 Copy → next week</button>
+                            <button type="button" class="btn btn-secondary" id="schCopyBtn" onclick="schCopyWeek()">📋 Copy → next week</button>
                             <button type="button" class="btn btn-primary" onclick="schRangeOpen()">🗓 Range apply…</button>
                         </div>
                     </div>
-                    <div class="sch-grid-wrap"><table class="sch-grid" id="schGrid"></table></div>
+                    <div class="sch-grid-wrap" id="schTeamWeekWrap"><table class="sch-grid" id="schGrid"></table></div>
+                    <div class="sch-grid-wrap" id="schTeamMonthWrap" style="display:none"><div class="sch-mgrid" id="schMonthGrid"></div></div>
                 </div>
 
-                <!-- Agent: my week + my requests -->
+                <!-- Agent: my schedule (week cards + month calendar) + my requests -->
                 <div id="schMyWrap">
                     <div class="card" style="margin-bottom:14px">
                         <div class="sch-myweek" id="schMyWeek"></div>
+                        <div class="sch-grid-wrap" id="schMyMonthWrap" style="display:none"><div class="sch-mgrid" id="schMyMonthGrid"></div></div>
                     </div>
                     <div class="card" style="margin-bottom:14px">
                         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
@@ -4414,6 +4477,25 @@
                 </div>
             </div>
 
+            <!-- Phase 23 schedule: month-view day detail modal -->
+            <div class="sch-pop-overlay" id="schDayPop" style="display:none" onclick="if(event.target===this)schDayClose()">
+                <div class="sch-pop" style="max-width:540px">
+                    <div class="sch-reqpop-head">
+                        <div class="sch-reqpop-ico">🗓</div>
+                        <div>
+                            <div class="sch-pop-title" style="margin:0" id="schDayTitle">Day</div>
+                            <div class="sch-reqpop-sub" id="schDaySub"></div>
+                        </div>
+                        <button type="button" class="sch-x" onclick="schDayClose()">✕</button>
+                    </div>
+                    <div id="schDayList" style="margin-top:10px"></div>
+                    <div id="schDayAddWrap" style="margin-top:12px;display:flex;gap:8px">
+                        <select id="schDayAddAgent" class="form-highlight-input" style="flex:1"></select>
+                        <button type="button" class="btn btn-primary" style="flex:none" onclick="schDayAdd()">＋ Add shift</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Phase 22 schedule: range apply modal -->
             <div class="sch-pop-overlay" id="schRangePop" style="display:none" onclick="if(event.target===this)schRangeClose()">
                 <div class="sch-pop" style="max-width:560px">
@@ -4421,8 +4503,8 @@
                     <label class="sch-lbl">Agents</label>
                     <div class="sch-agentpick" id="schRangeAgents"></div>
                     <div style="display:flex;gap:8px">
-                        <div style="flex:1"><label class="sch-lbl">From</label><input type="date" id="schRangeFrom" class="form-highlight-input"></div>
-                        <div style="flex:1"><label class="sch-lbl">To</label><input type="date" id="schRangeTo" class="form-highlight-input"></div>
+                        <div style="flex:1"><label class="sch-lbl">From</label><input type="date" id="schRangeFrom" class="form-highlight-input sch-datein"></div>
+                        <div style="flex:1"><label class="sch-lbl">To</label><input type="date" id="schRangeTo" class="form-highlight-input sch-datein"></div>
                     </div>
                     <label class="sch-lbl">Days of week</label>
                     <div class="sch-dow" id="schRangeDow"></div>
@@ -4441,29 +4523,36 @@
                 </div>
             </div>
 
-            <!-- Phase 22 schedule: agent request modal -->
+            <!-- Phase 23 schedule: agent request modal (redesigned) -->
             <div class="sch-pop-overlay" id="schReqPop" style="display:none" onclick="if(event.target===this)schReqClose()">
-                <div class="sch-pop">
-                    <div class="sch-pop-title">✉️ New schedule request</div>
-                    <label class="sch-lbl">Type</label>
-                    <select id="schReqType" class="form-highlight-input">
-                        <option>Change Off</option>
-                        <option>Annual Leave</option>
-                        <option>Sick Leave</option>
-                        <option>Work From Home</option>
-                    </select>
-                    <div style="display:flex;gap:8px">
-                        <div style="flex:1"><label class="sch-lbl">From</label><input type="date" id="schReqFrom" class="form-highlight-input"></div>
-                        <div style="flex:1"><label class="sch-lbl">To</label><input type="date" id="schReqTo" class="form-highlight-input"></div>
+                <div class="sch-pop sch-reqpop">
+                    <div class="sch-reqpop-head">
+                        <div class="sch-reqpop-ico">✉️</div>
+                        <div>
+                            <div class="sch-pop-title" style="margin:0">New schedule request</div>
+                            <div class="sch-reqpop-sub">Ask the admin for an off-day change, leave or a work-from-home day.</div>
+                        </div>
+                        <button type="button" class="sch-x" onclick="schReqClose()">✕</button>
                     </div>
-                    <label class="sch-lbl">Reason</label>
+                    <div class="sch-seg" id="schReqSeg"></div>
+                    <div class="sch-dategrid" style="margin-top:14px">
+                        <div><label class="sch-lbl" style="margin-top:0">From</label><input type="date" id="schReqFrom" class="form-highlight-input sch-datein" onchange="schReqSumUp()"></div>
+                        <div><label class="sch-lbl" style="margin-top:0">To</label><input type="date" id="schReqTo" class="form-highlight-input sch-datein" onchange="schReqSumUp()"></div>
+                    </div>
+                    <div class="sch-quick">
+                        <button type="button" class="sch-qchip" onclick="schReqQuick('today')">Today</button>
+                        <button type="button" class="sch-qchip" onclick="schReqQuick('tomorrow')">Tomorrow</button>
+                        <button type="button" class="sch-qchip" onclick="schReqQuick('weekend')">This weekend</button>
+                        <button type="button" class="sch-qchip" onclick="schReqQuick('nextweek')">Next week (Mon–Fri)</button>
+                    </div>
+                    <div class="sch-reqsum" id="schReqSum"></div>
+                    <label class="sch-lbl">Reason <span style="opacity:.55;text-transform:none;letter-spacing:0">(optional)</span></label>
                     <textarea id="schReqReason" class="form-highlight-input" rows="3" placeholder="Tell the admin why…"></textarea>
-                    <div style="display:flex;gap:8px;margin-top:14px">
-                        <button type="button" class="btn btn-primary" style="flex:1" onclick="schReqSubmit()">📨 Send request</button>
-                        <button type="button" class="btn btn-secondary" onclick="schReqClose()">Cancel</button>
-                    </div>
+                    <button type="button" class="btn btn-primary sch-reqsend" onclick="schReqSubmit()">📨 Send request</button>
+                    <button type="button" class="sch-linkbtn" onclick="schReqClose()">Cancel</button>
                 </div>
             </div>
+
 
             <!-- Phase 10.13 (Ahmed): Preview Agent View -- the Lark Base
                  "Previewing as" idea. Pick a member, the portal re-renders with
@@ -8076,6 +8165,26 @@ async function apSetStatus(status, target) {
         if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
         if (d.unchanged) ToastManager.show(`Already ${status} — nothing to change.`, 'warning', 3500);
         else ToastManager.show(`${d.agent && d.agent.name ? d.agent.name + ': ' : ''}${d.previous || '—'} → ${status} ✅ reflected on the Agent Roster`, 'success', 5000);
+        // Phase 23: optimistic flip — patch the local board NOW so the UI
+        // reacts instantly; the refetch below then confirms from the server
+        // (cheap: the backend patched its shared roster cache write-through).
+        if (!d.unchanged && apBoard && Array.isArray(apBoard.agents)) {
+            const tl = (target || '').toLowerCase();
+            const me = apBoard.agents.find(x => tl
+                ? ((x.record_id || '').toLowerCase() === tl || (x.open_id || '').toLowerCase() === tl)
+                : x.is_me);
+            if (me) {
+                me.status = status;
+                me.since_ms = Date.now();
+                me.memory = d.previous || me.memory || '';
+                const counts = {};
+                Object.keys(apBoard.counts || {}).forEach(k => { counts[k] = 0; });
+                for (const a of apBoard.agents) counts[a.status] = (counts[a.status] || 0) + 1;
+                apBoard.counts = counts;
+                apBoard.server_time_ms = Date.now(); apBoardAt = Date.now();
+                apRenderAll();
+            }
+        }
         await apFetchBoard(true); // bypass the 10s cache — other Vercel instances may still hold the old board
     } catch (e) {
         ToastManager.show('⚠️ ' + e.message, 'error', 9000);
@@ -8098,13 +8207,23 @@ const SCH_META = {
     'Annual Leave':   { i: '🏖️', c: '#ffab00', cls: 'AnnualLeave' },
     'Sick Leave':     { i: '🤒', c: '#ff4d6d', cls: 'SickLeave' },
 };
-let schWeekStart = null;   // Date (local midnight) of the displayed Monday
+const SCH_REQ_META = {
+    'Change Off':     { i: '🔄', c: '#00d4ff', d: 'Move your weekly off day' },
+    'Annual Leave':   { i: '🏖️', c: '#ffab00', d: 'Paid time off' },
+    'Sick Leave':     { i: '🤒', c: '#ff4d6d', d: 'Unwell / medical' },
+    'Work From Home': { i: '🏠', c: '#b388ff', d: 'Work remotely that day' },
+};
+let schWeekStart = null;   // week mode: Monday of the week; month mode: any day in the month
 let schRows = [];          // last /api/audition/schedule rows (already scoped server-side)
-let schAgents = [];        // admin picklist (Agent Roster)
+let schAgents = [];        // admin picklist (Agent Roster ⋈ Access Management email)
+let schAgentsErr = '';     // last agents-fetch error (surfaced in the empty state)
 let schReqs = [];          // requests (admin: all; agent: own)
 let schView = 'my';        // 'team' | 'my'
+let schRangeMode = 'week'; // 'week' | 'month'
 let schLoading = false;
-let schCellCtx = null;     // {ai, day} while the cell popover is open
+let schCellCtx = null;     // {email, day} while the cell popover is open
+let schDayCtx = 0;         // day int while the day-detail modal is open
+let schReqTypeSel = 'Change Off';
 
 function schDowMon(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
 function schDayInt(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
@@ -8112,6 +8231,18 @@ function schDateFromInt(n) { return new Date(Math.floor(n / 10000), Math.floor(n
 function schFmtDateInput(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function schParseDateInput(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
 function schDayLabel(n) { return schDateFromInt(n).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function schMonthCells(anchor) {
+    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const d = schDowMon(first);
+    const out = [];
+    for (let i = 0; i < 42; i++) { out.push(new Date(d)); d.setDate(d.getDate() + 1); }
+    return out;
+}
+function schRangeBounds() {
+    if (schRangeMode === 'month') { const c = schMonthCells(schWeekStart); return [c[0], c[41]]; }
+    const e = new Date(schWeekStart); e.setDate(e.getDate() + 6);
+    return [new Date(schWeekStart), e];
+}
 
 function schOnOpen() {
     if (!schWeekStart) schWeekStart = schDowMon(new Date());
@@ -8119,6 +8250,7 @@ function schOnOpen() {
     if (tg) tg.style.display = isAdmin ? 'flex' : 'none';
     if (!isAdmin) schView = 'my';
     schSetView(schView, true);
+    schSetRangeMode(schRangeMode, true);
     schLoad();
 }
 
@@ -8131,23 +8263,52 @@ function schSetView(v, keep) {
     if (team) team.style.display = (schView === 'team') ? 'block' : 'none';
     if (reqC) reqC.style.display = (schView === 'team' && isAdmin) ? 'block' : 'none';
     if (my) my.style.display = (schView === 'my') ? 'block' : 'none';
-    const sub = document.getElementById('schSub');
-    if (sub) sub.innerHTML = schView === 'team'
-        ? 'Admin editor — click any day cell to set a shift or off. Synced with the <b>Audition Schedule</b> sheet.'
-        : 'Your week at a glance — off days, shifts and leave, synced with the <b>Audition Schedule</b> sheet.';
     if (!keep) schRenderAll();
 }
 
-function schWeekShift(n) { if (!schWeekStart) return; schWeekStart.setDate(schWeekStart.getDate() + n * 7); schLoad(); }
-function schWeekToday() { schWeekStart = schDowMon(new Date()); schLoad(); }
+function schSetRangeMode(m, keep) {
+    schRangeMode = (m === 'month') ? 'month' : 'week';
+    const wb = document.getElementById('schModeWeekBtn'), mb = document.getElementById('schModeMonthBtn');
+    if (wb) wb.classList.toggle('active', schRangeMode === 'week');
+    if (mb) mb.classList.toggle('active', schRangeMode === 'month');
+    if (schWeekStart) schWeekStart = schRangeMode === 'month'
+        ? new Date(schWeekStart.getFullYear(), schWeekStart.getMonth(), 1)
+        : schDowMon(schWeekStart);
+    const tw = document.getElementById('schTeamWeekWrap'), tm = document.getElementById('schTeamMonthWrap');
+    if (tw) tw.style.display = schRangeMode === 'week' ? 'block' : 'none';
+    if (tm) tm.style.display = schRangeMode === 'month' ? 'block' : 'none';
+    const mw = document.getElementById('schMyWeek'), mm = document.getElementById('schMyMonthWrap');
+    if (mw) mw.style.display = schRangeMode === 'week' ? 'grid' : 'none';
+    if (mm) mm.style.display = schRangeMode === 'month' ? 'block' : 'none';
+    const cb = document.getElementById('schCopyBtn');
+    if (cb) cb.style.display = schRangeMode === 'week' ? '' : 'none';
+    const tt = document.getElementById('schTeamTitle');
+    if (tt) tt.textContent = schRangeMode === 'week' ? '👥 Team week' : '👥 Team month';
+    const th = document.getElementById('schTeamHint');
+    if (th) th.textContent = schRangeMode === 'week'
+        ? 'Click any day cell to add or edit a shift.'
+        : 'Click a day to see everyone on it, edit entries or add a shift.';
+    if (!keep) schLoad();
+}
+
+function schWeekShift(n) {
+    if (!schWeekStart) return;
+    if (schRangeMode === 'month') schWeekStart = new Date(schWeekStart.getFullYear(), schWeekStart.getMonth() + n, 1);
+    else schWeekStart.setDate(schWeekStart.getDate() + n * 7);
+    schLoad();
+}
+function schWeekToday() {
+    const now = new Date();
+    schWeekStart = schRangeMode === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1) : schDowMon(now);
+    schLoad();
+}
 
 async function schLoad(manual) {
     if (schLoading) return;
     schLoading = true;
     try {
-        const from = schDayInt(schWeekStart);
-        const endD = new Date(schWeekStart); endD.setDate(endD.getDate() + 6);
-        const qs = new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '', from: from, to: schDayInt(endD) });
+        const [b0, b1] = schRangeBounds();
+        const qs = new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '', from: schDayInt(b0), to: schDayInt(b1) });
         const r = await fetch('/api/audition/schedule?' + qs);
         const d = await r.json();
         if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
@@ -8155,7 +8316,10 @@ async function schLoad(manual) {
         const jobs = [];
         if (isAdmin && !schAgents.length) {
             jobs.push(fetch('/api/audition/schedule/agents?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
-                .then(x => x.json()).then(x => { if (x && x.success) schAgents = x.agents || []; }).catch(() => {}));
+                .then(x => x.json()).then(x => {
+                    if (x && x.success) { schAgents = x.agents || []; schAgentsErr = ''; }
+                    else schAgentsErr = (x && x.error) || 'Could not load the agents.';
+                }).catch(e => { schAgentsErr = String(e); }));
         }
         jobs.push(fetch('/api/audition/requests?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
             .then(x => x.json()).then(x => { if (x && x.success) schReqs = x.requests || []; }).catch(() => {}));
@@ -8168,14 +8332,33 @@ async function schLoad(manual) {
 
 function schRenderAll() {
     if (!schWeekStart) return;
-    const endD = new Date(schWeekStart); endD.setDate(endD.getDate() + 6);
+    const [b0, b1] = schRangeBounds();
     const lbl = document.getElementById('schWeekLabel');
-    if (lbl) lbl.textContent = schWeekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) + ' → ' + endD.toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
-    const days = [];
-    for (let i = 0; i < 7; i++) { const d = new Date(schWeekStart); d.setDate(d.getDate() + i); days.push(d); }
+    if (lbl) lbl.textContent = schRangeMode === 'month'
+        ? schWeekStart.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+        : b0.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) + ' → ' + b1.toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
+    const sub = document.getElementById('schSub');
+    if (sub) sub.innerHTML = schView === 'team'
+        ? 'Admin editor — click any day cell to set a shift or off. Synced with the <b>Audition Schedule</b> sheet.'
+        : (schRangeMode === 'month'
+            ? 'Your month at a glance — tap any day to request a change for it. Synced with the <b>Audition Schedule</b> sheet.'
+            : 'Your week at a glance — off days, shifts and leave, synced with the <b>Audition Schedule</b> sheet.');
     const todayInt = schDayInt(new Date());
-    if (schView === 'team' && isAdmin) { schRenderGrid(days, todayInt); schRenderReqInbox(); }
-    else { schRenderMyWeek(days, todayInt); schRenderMyReqs(); }
+    if (schView === 'team' && isAdmin) {
+        if (schRangeMode === 'week') {
+            const days = [];
+            for (let i = 0; i < 7; i++) { const d = new Date(schWeekStart); d.setDate(d.getDate() + i); days.push(d); }
+            schRenderGrid(days, todayInt);
+        } else schRenderMonthTeam(todayInt);
+        schRenderReqInbox();
+    } else {
+        if (schRangeMode === 'week') {
+            const days = [];
+            for (let i = 0; i < 7; i++) { const d = new Date(schWeekStart); d.setDate(d.getDate() + i); days.push(d); }
+            schRenderMyWeek(days, todayInt);
+        } else schRenderMonthMy(todayInt);
+        schRenderMyReqs();
+    }
 }
 
 function schRowFor(email, dayInt) {
@@ -8186,38 +8369,115 @@ function schTypeChip(t) {
     const m = SCH_META[t] || SCH_META['On Site'];
     return `<span class="sch-t-${m.cls}">${m.i} ${escHtml(t)}</span>`;
 }
+function schAgentsEmptyHtml() {
+    return `<div class="sch-empty">${schAgentsErr
+        ? '⚠️ Could not load the agents: ' + escHtml(schAgentsErr)
+        : 'No agents on the <b>Agent Roster</b> sheet yet. Add the audition agents there (and make sure their work email is in <b>Access Management</b>) — they appear here automatically.'}</div>`;
+}
 
+/* ---- admin: week table ---- */
 function schRenderGrid(days, todayInt) {
     const g = document.getElementById('schGrid'); if (!g) return;
-    if (!schAgents.length) { g.innerHTML = '<div class="sch-empty">No agents on the Agent Roster yet.</div>'; return; }
+    if (!schAgents.length) { g.innerHTML = schAgentsEmptyHtml(); return; }
     const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const head = '<tr><th></th>' + days.map(d => {
         const di = schDayInt(d);
         return `<th class="${di === todayInt ? 'sch-todayh' : ''}">${DOW[(d.getDay() + 6) % 7]}<br>${d.getDate()}</th>`;
     }).join('') + '</tr>';
-    const body = schAgents.map((a, ai) => {
+    const body = schAgents.map((a) => {
         const init = escHtml((a.name || '?').trim().slice(0, 2).toUpperCase());
         const avHtml = a.avatar
             ? `<img src="${escHtml(a.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="sch-avfb" style="display:none">${init}</span>`
             : `<span class="sch-avfb">${init}</span>`;
+        const nameBlock = a.no_email
+            ? `<div class="nm">${escHtml(a.name)} <span class="sch-noemail">NO EMAIL</span></div><div class="em">add it in Access Management</div>`
+            : `<div class="nm">${escHtml(a.name)}</div><div class="em">${escHtml(a.email)}</div>`;
         const cells = days.map(d => {
             const di = schDayInt(d);
-            const r = schRowFor(a.email, di);
+            const r = a.no_email ? null : schRowFor(a.email, di);
             const m = r ? (SCH_META[r.type] || SCH_META['On Site']) : null;
             const inner = r
                 ? `<div class="tp">${schTypeChip(r.type)}</div>${(r.start || r.end) ? `<div class="tm">${escHtml(r.start || '')}${r.end ? '–' + escHtml(r.end) : ''}</div>` : ''}${r.note ? `<div class="nt">${escHtml(r.note)}</div>` : ''}`
                 : '<div class="tm" style="opacity:.45">—</div>';
-            return `<td><div class="sch-cell ${m ? 'sch-bg-' + m.cls : ''} ${di === todayInt ? 'sch-todayc' : ''}" onclick="schCellOpen(${ai},${di})">${inner}</div></td>`;
+            const add = (!r && !a.no_email) ? '<div class="sch-add">＋</div>' : '';
+            const clk = a.no_email ? '' : ` onclick='schCellOpen(${JSON.stringify(a.email)},${di})'`;
+            return `<td><div class="sch-cell ${m ? 'sch-bg-' + m.cls : ''} ${di === todayInt ? 'sch-todayc' : ''} ${a.no_email ? 'sch-noedit' : ''}"${clk}>${inner}${add}</div></td>`;
         }).join('');
-        return `<tr><td><div class="sch-agentcell">${avHtml}<div><div class="nm">${escHtml(a.name)}</div><div class="em">${escHtml(a.email)}</div></div></div></td>${cells}</tr>`;
+        return `<tr><td><div class="sch-agentcell">${avHtml}<div>${nameBlock}</div></div></td>${cells}</tr>`;
     }).join('');
     g.innerHTML = head + body;
 }
 
+/* ---- admin: month calendar ---- */
+function schRenderMonthTeam(todayInt) {
+    const host = document.getElementById('schMonthGrid'); if (!host) return;
+    if (!schAgents.length) { host.innerHTML = schAgentsEmptyHtml(); return; }
+    const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const cells = schMonthCells(schWeekStart);
+    const month = schWeekStart.getMonth();
+    const byDay = {};
+    for (const r of schRows) { (byDay[r.day] = byDay[r.day] || []).push(r); }
+    host.innerHTML = DOW.map(d => `<div class="sch-mdow">${d}</div>`).join('') + cells.map(d => {
+        const di = schDayInt(d);
+        const rows = (byDay[di] || []).slice().sort((x, y) => String(x.name || x.email).localeCompare(String(y.name || y.email)));
+        const chips = rows.slice(0, 4).map(r => {
+            const m = SCH_META[r.type] || SCH_META['On Site'];
+            return `<div class="sch-mchip"><span class="sch-mdot" style="background:${m.c}"></span><span style="overflow:hidden;text-overflow:ellipsis">${escHtml((r.name || r.email || '?').split(' ')[0])}</span><span style="color:${m.c};flex:none">${m.i}</span></div>`;
+        }).join('');
+        const more = rows.length > 4 ? `<div class="sch-mmore">+${rows.length - 4} more</div>` : '';
+        return `<div class="sch-mcell ${d.getMonth() !== month ? 'sch-m-out' : ''} ${di === todayInt ? 'sch-todayc' : ''}" onclick="schDayOpen(${di})">
+            <div class="sch-mdnum"><span>${d.getDate()}</span>${di === todayInt ? '<span style="color:var(--accent-cyan);font-size:.6rem;font-weight:800">TODAY</span>' : ''}</div>
+            ${chips}${more}</div>`;
+    }).join('');
+}
+
+/* ---- admin: day detail (from month view) ---- */
+function schDayOpen(di) {
+    if (!isAdmin) return;
+    schDayCtx = di;
+    const rows = schRows.filter(r => r.day === di).sort((x, y) => String(x.name || x.email).localeCompare(String(y.name || y.email)));
+    document.getElementById('schDayTitle').textContent = schDateFromInt(di).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('schDaySub').textContent = rows.length
+        ? `${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} — edit one, or add a shift below.`
+        : 'Nothing scheduled — add a shift below.';
+    const list = document.getElementById('schDayList');
+    list.innerHTML = rows.length ? rows.map(r => {
+        const a = schAgents.find(x => (x.email || '').toLowerCase() === (r.email || '').toLowerCase());
+        const m = SCH_META[r.type] || SCH_META['On Site'];
+        const nm = r.name || (a && a.name) || r.email || '?';
+        const init = escHtml(nm.trim().slice(0, 2).toUpperCase());
+        const av = (a && a.avatar)
+            ? `<img src="${escHtml(a.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="sch-avfb" style="display:none">${init}</span>`
+            : `<span class="sch-avfb">${init}</span>`;
+        const det = `${m.i} ${escHtml(r.type)}${(r.start || r.end) ? ` · ${escHtml(r.start || '')}${r.end ? '–' + escHtml(r.end) : ''}` : ''}${r.note ? ` · ${escHtml(r.note)}` : ''}`;
+        return `<div class="sch-dayrow">${av}<div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:.85rem">${escHtml(nm)}</div>
+            <div style="font-size:.72rem;color:${m.c};font-weight:700">${det}</div></div>
+            <button type="button" class="btn btn-secondary" style="padding:5px 12px;font-size:.75rem;flex:none" onclick='schDayClose();schCellOpen(${JSON.stringify(r.email || '')},${di})'>✏️ Edit</button></div>`;
+    }).join('') : '<div class="sch-empty">No shifts on this day yet.</div>';
+    const wrap = document.getElementById('schDayAddWrap');
+    const sel = document.getElementById('schDayAddAgent');
+    const have = new Set(rows.map(r => (r.email || '').toLowerCase()));
+    const avail = schAgents.filter(a => !a.no_email && !have.has((a.email || '').toLowerCase()));
+    if (avail.length) {
+        wrap.style.display = 'flex';
+        sel.innerHTML = avail.map(a => `<option value="${escHtml(a.email)}">${escHtml(a.name)}</option>`).join('');
+    } else wrap.style.display = 'none';
+    document.getElementById('schDayPop').style.display = 'flex';
+}
+function schDayClose() { document.getElementById('schDayPop').style.display = 'none'; }
+function schDayAdd() {
+    const em = document.getElementById('schDayAddAgent').value;
+    if (!em) return;
+    schDayClose();
+    schCellOpen(em, schDayCtx);
+}
+
 /* ---- cell popover ---- */
-function schCellOpen(ai, day) {
-    const a = schAgents[ai]; if (!a) return;
-    schCellCtx = { ai: ai, day: day };
+function schCellOpen(email, day) {
+    const a = schAgents.find(x => (x.email || '') === email); if (!a) return;
+    if (a.no_email) { ToastManager.show('This agent has no email in Access Management — add it there first.', 'warning', 4500); return; }
+    schCellCtx = { email: a.email, day: day };
     const r = schRowFor(a.email, day);
     document.getElementById('schCellTitle').textContent = `${a.name} — ${schDayLabel(day)}`;
     document.getElementById('schCellType').innerHTML = SCH_TYPES.map(t => `<option${r && r.type === t ? ' selected' : ''}>${t}</option>`).join('');
@@ -8240,7 +8500,8 @@ async function schSaveEntries(entries, deleteKeys) {
 
 async function schCellSave() {
     if (!schCellCtx) return;
-    const a = schAgents[schCellCtx.ai];
+    const a = schAgents.find(x => (x.email || '') === schCellCtx.email);
+    if (!a) return;
     try {
         await schSaveEntries([{ email: a.email, name: a.name, day: schCellCtx.day,
             type: document.getElementById('schCellType').value,
@@ -8255,9 +8516,8 @@ async function schCellSave() {
 
 async function schCellClear() {
     if (!schCellCtx) return;
-    const a = schAgents[schCellCtx.ai];
     try {
-        await schSaveEntries([], [(a.email || '').toLowerCase() + '|' + schCellCtx.day]);
+        await schSaveEntries([], [(schCellCtx.email || '').toLowerCase() + '|' + schCellCtx.day]);
         ToastManager.show('🗑 Day cleared.', 'success', 3000);
         schCellClose();
         schLoad();
@@ -8280,16 +8540,17 @@ async function schCopyWeek() {
 
 /* ---- range apply ---- */
 function schRangeOpen() {
-    if (!schAgents.length) { ToastManager.show('Agents still loading…', 'warning', 2500); return; }
-    document.getElementById('schRangeAgents').innerHTML = schAgents.map((a, i) =>
+    const writable = schAgents.filter(a => !a.no_email);
+    if (!writable.length) { ToastManager.show('Agents still loading…', 'warning', 2500); return; }
+    document.getElementById('schRangeAgents').innerHTML = writable.map((a, i) =>
         `<label><input type="checkbox" class="sch-rag" value="${i}" checked> ${escHtml(a.name)}</label>`).join('');
     const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     document.getElementById('schRangeDow').innerHTML = DOW.map((d, i) =>
         `<label><input type="checkbox" class="sch-rdow" value="${i}" ${i < 5 ? 'checked' : ''}> ${d}</label>`).join('');
     document.getElementById('schRangeType').innerHTML = SCH_TYPES.map(t => `<option>${t}</option>`).join('');
-    document.getElementById('schRangeFrom').value = schFmtDateInput(schWeekStart);
-    const e = new Date(schWeekStart); e.setDate(e.getDate() + 6);
-    document.getElementById('schRangeTo').value = schFmtDateInput(e);
+    const [b0, b1] = schRangeBounds();
+    document.getElementById('schRangeFrom').value = schFmtDateInput(b0);
+    document.getElementById('schRangeTo').value = schFmtDateInput(b1);
     document.getElementById('schRangePop').style.display = 'flex';
 }
 function schRangeClose() { document.getElementById('schRangePop').style.display = 'none'; }
@@ -8300,6 +8561,7 @@ async function schRangeApply() {
     if (!from || !to || to < from) { ToastManager.show('Pick a valid from/to range.', 'warning', 3500); return; }
     const spanDays = Math.round((to - from) / 86400000) + 1;
     if (spanDays > 62) { ToastManager.show('Max 62 days per apply.', 'warning', 3500); return; }
+    const writable = schAgents.filter(a => !a.no_email);
     const ais = Array.from(document.querySelectorAll('.sch-rag:checked')).map(x => +x.value);
     const dows = new Set(Array.from(document.querySelectorAll('.sch-rdow:checked')).map(x => +x.value));
     if (!ais.length || !dows.size) { ToastManager.show('Pick at least one agent and one weekday.', 'warning', 3500); return; }
@@ -8309,7 +8571,7 @@ async function schRangeApply() {
     const note = document.getElementById('schRangeNote').value;
     const entries = [];
     for (const ai of ais) {
-        const a = schAgents[ai];
+        const a = writable[ai];
         const d = new Date(from);
         while (d <= to) {
             if (dows.has((d.getDay() + 6) % 7)) entries.push({ email: a.email, name: a.name, day: schDayInt(d), type: type, start: start, end: end, note: note });
@@ -8326,7 +8588,7 @@ async function schRangeApply() {
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
-/* ---- requests ---- */
+/* ---- requests inbox (admin) ---- */
 function schRenderReqInbox() {
     const list = document.getElementById('schReqList'); if (!list) return;
     const pend = schReqs.filter(r => r.status === 'Pending');
@@ -8365,11 +8627,19 @@ async function schDecide(rid, decision) {
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
+/* My-schedule views: the backend scopes rows to the caller ONLY for non-admins;
+   an admin's "My schedule" still receives everyone, so filter to me client-side. */
+function schMyRows() {
+    const em = (loggedEmail || '').toLowerCase(), nm = (loggedUser || '').trim().toLowerCase();
+    return schRows.filter(x => (em && (x.email || '').toLowerCase() === em) || (nm && (x.name || '').trim().toLowerCase() === nm));
+}
+
+/* ---- agent: my week cards ---- */
 function schRenderMyWeek(days, todayInt) {
     const host = document.getElementById('schMyWeek'); if (!host) return;
     host.innerHTML = days.map(d => {
         const di = schDayInt(d);
-        const r = schRows.find(x => x.day === di); // the backend already scoped schRows to me
+        const r = schMyRows().find(x => x.day === di);
         const m = r ? (SCH_META[r.type] || SCH_META['On Site']) : null;
         const isOff = r && (r.type === 'Off' || r.type === 'Annual Leave' || r.type === 'Sick Leave');
         return `<div class="sch-day ${di === todayInt ? 'sch-todayc' : ''} ${isOff ? 'sch-offd' : ''}" style="--sch-accent:${m ? m.c : 'rgba(255,255,255,.15)'}">
@@ -8383,10 +8653,34 @@ function schRenderMyWeek(days, todayInt) {
     }).join('');
 }
 
+/* ---- agent: my month calendar ---- */
+function schRenderMonthMy(todayInt) {
+    const host = document.getElementById('schMyMonthGrid'); if (!host) return;
+    const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const cells = schMonthCells(schWeekStart);
+    const month = schWeekStart.getMonth();
+    const byDay = {};
+    for (const r of schMyRows()) byDay[r.day] = r;
+    host.innerHTML = DOW.map(d => `<div class="sch-mdow">${d}</div>`).join('') + cells.map(d => {
+        const di = schDayInt(d);
+        const r = byDay[di];
+        const m = r ? (SCH_META[r.type] || SCH_META['On Site']) : null;
+        const inner = r
+            ? `<div class="sch-mchip" style="background:${m.c}22;color:${m.c};font-weight:800"><span>${m.i}</span><span style="overflow:hidden;text-overflow:ellipsis">${escHtml(r.type)}</span></div>
+               ${(r.start || r.end) ? `<div style="font-size:.64rem;color:var(--text-muted);margin-top:2px">${escHtml(r.start || '')}${r.end ? '–' + escHtml(r.end) : ''}</div>` : ''}`
+            : '';
+        return `<div class="sch-mcell ${d.getMonth() !== month ? 'sch-m-out' : ''} ${di === todayInt ? 'sch-todayc' : ''}" onclick="schReqOpen(${di})" title="Tap to request a change for this day">
+            <div class="sch-mdnum"><span>${d.getDate()}</span>${di === todayInt ? '<span style="color:var(--accent-cyan);font-size:.6rem;font-weight:800">TODAY</span>' : ''}</div>
+            ${inner}</div>`;
+    }).join('');
+}
+
 function schRenderMyReqs() {
     const host = document.getElementById('schMyReqs'); if (!host) return;
-    if (!schReqs.length) { host.innerHTML = '<div class="sch-empty">No requests yet — tap ✉️ New request to ask for an off change, leave or a WFH day.</div>'; return; }
-    host.innerHTML = schReqs.map(r => `<div class="sch-reqrow">
+    const em = (loggedEmail || '').toLowerCase();
+    const mine = schReqs.filter(r => !em || (r.email || '').toLowerCase() === em);
+    if (!mine.length) { host.innerHTML = '<div class="sch-empty">No requests yet — tap ✉️ New request to ask for an off change, leave or a WFH day.</div>'; return; }
+    host.innerHTML = mine.map(r => `<div class="sch-reqrow">
         <div class="grow"><b>${escHtml(r.type)}</b>
             <div style="font-size:.76rem;color:var(--text-muted)">${schDayLabel(r.from_day)} → ${schDayLabel(r.to_day)}${r.reason ? ' · “' + escHtml(r.reason) + '”' : ''}</div>
             ${r.admin_note ? `<div style="font-size:.74rem;color:var(--text-muted)">Admin note: ${escHtml(r.admin_note)}</div>` : ''}
@@ -8395,10 +8689,46 @@ function schRenderMyReqs() {
     </div>`).join('');
 }
 
-function schReqOpen() {
-    document.getElementById('schReqFrom').value = schFmtDateInput(new Date());
-    document.getElementById('schReqTo').value = schFmtDateInput(new Date());
+/* ---- agent: new-request modal (Phase 23 redesign) ---- */
+function schReqSegRender() {
+    const host = document.getElementById('schReqSeg'); if (!host) return;
+    host.innerHTML = Object.keys(SCH_REQ_META).map(t => {
+        const m = SCH_REQ_META[t];
+        return `<button type="button" class="sch-segbtn ${t === schReqTypeSel ? 'active' : ''}" style="--seg-c:${m.c};--seg-bg:${m.c}1f" data-type="${escHtml(t)}" onclick="schReqTypePick('${t}')">
+            <span class="si">${m.i}</span><span><span class="sl">${t}</span><br><span class="sd">${m.d}</span></span></button>`;
+    }).join('');
+}
+function schReqTypePick(t) { schReqTypeSel = t; schReqSegRender(); }
+
+function schReqQuick(kind) {
+    const now = new Date();
+    let f = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let t = new Date(f);
+    if (kind === 'tomorrow') { f.setDate(f.getDate() + 1); t = new Date(f); }
+    else if (kind === 'weekend') { const toSat = (5 - (now.getDay() + 6) % 7 + 7) % 7; f.setDate(f.getDate() + toSat); t = new Date(f); t.setDate(t.getDate() + 1); }
+    else if (kind === 'nextweek') { f = schDowMon(now); f.setDate(f.getDate() + 7); t = new Date(f); t.setDate(t.getDate() + 4); }
+    document.getElementById('schReqFrom').value = schFmtDateInput(f);
+    document.getElementById('schReqTo').value = schFmtDateInput(t);
+    schReqSumUp();
+}
+
+function schReqSumUp() {
+    const el = document.getElementById('schReqSum'); if (!el) return;
+    const f = schParseDateInput(document.getElementById('schReqFrom').value);
+    const t = schParseDateInput(document.getElementById('schReqTo').value);
+    if (!f || !t || t < f) { el.textContent = '⚠️ Pick a valid from/to range.'; return; }
+    const n = Math.round((t - f) / 86400000) + 1;
+    el.textContent = `📆 ${n} day${n > 1 ? 's' : ''} · ${f.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} → ${t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
+
+function schReqOpen(dayInt) {
+    schReqTypeSel = 'Change Off';
+    schReqSegRender();
+    const base = dayInt ? schDateFromInt(dayInt) : new Date();
+    document.getElementById('schReqFrom').value = schFmtDateInput(base);
+    document.getElementById('schReqTo').value = schFmtDateInput(base);
     document.getElementById('schReqReason').value = '';
+    schReqSumUp();
     document.getElementById('schReqPop').style.display = 'flex';
 }
 function schReqClose() { document.getElementById('schReqPop').style.display = 'none'; }
@@ -8411,7 +8741,7 @@ async function schReqSubmit() {
         const r = await fetch('/api/audition/requests', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user: loggedUser, email: loggedEmail,
-                type: document.getElementById('schReqType').value,
+                type: schReqTypeSel,
                 from_day: schDayInt(from), to_day: schDayInt(to),
                 reason: document.getElementById('schReqReason').value })
         });
@@ -8422,6 +8752,7 @@ async function schReqSubmit() {
         schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
+
 
 let latestAdminRoles = [];  // role presets only
 // Phase 10.34 (Ahmed): Manage Agents no longer auto-loads on open. The page
