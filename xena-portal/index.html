@@ -1048,6 +1048,64 @@
         .agent-card.agent-orphan{border-color:rgba(255,77,109,.5)}
         .agent-card-head{display:flex;align-items:center;gap:14px}
         .agent-avatar{position:relative;flex:0 0 auto;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:#fff;letter-spacing:.5px;background:var(--agent-avatar-bg,linear-gradient(135deg,#00d4ff,#7b61ff));box-shadow:0 4px 14px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.15);text-transform:uppercase}
+        /* Phase 22: real member photos overlay the initials (cache-fed, zero
+           extra requests); the img removes itself on error -> initials stay. */
+        .agent-avatar{overflow:hidden}
+        .agent-avatar-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+        .pv-avatar{position:relative;overflow:hidden}
+        .pv-avatar-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+        /* ===== Phase 22: Audition Schedule ===== */
+        .sch-weeknav{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+        .sch-navbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--text);border-radius:10px;padding:6px 14px;cursor:pointer;font-size:1rem;font-weight:700;transition:all .15s}
+        .sch-navbtn:hover{background:rgba(0,212,255,.12);border-color:rgba(0,212,255,.35)}
+        .sch-todaybtn{font-size:.8rem;font-weight:600}
+        .sch-weeklabel{font-weight:800;font-size:.95rem;min-width:220px;text-align:center}
+        .sch-viewtoggle{display:flex;background:rgba(255,255,255,.05);border-radius:12px;padding:3px;gap:3px}
+        .sch-vt-btn{background:transparent;border:0;color:var(--text-muted);padding:6px 12px;border-radius:9px;cursor:pointer;font-size:.8rem;font-weight:700;transition:all .15s}
+        .sch-vt-btn.active{background:linear-gradient(135deg,rgba(0,212,255,.25),rgba(123,97,255,.25));color:#fff}
+        .sch-grid-wrap{overflow-x:auto}
+        .sch-grid{border-collapse:separate;border-spacing:6px;width:100%;min-width:820px}
+        .sch-grid th{color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;padding:4px 6px;text-align:center}
+        .sch-grid th.sch-todayh{color:var(--accent-cyan)}
+        .sch-grid td{vertical-align:top}
+        .sch-agentcell{display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:12px;min-width:172px}
+        .sch-agentcell img,.sch-agentcell .sch-avfb{width:30px;height:30px;border-radius:50%;flex:0 0 auto}
+        .sch-avfb{display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff;background:linear-gradient(135deg,#00d4ff,#7b61ff)}
+        .sch-agentcell .nm{font-size:.8rem;font-weight:700;line-height:1.15}
+        .sch-agentcell .em{font-size:.66rem;color:var(--text-muted)}
+        .sch-cell{min-width:98px;min-height:62px;border-radius:12px;padding:7px 8px;cursor:pointer;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);transition:transform .12s,box-shadow .12s}
+        .sch-cell:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.3);border-color:rgba(0,212,255,.3)}
+        .sch-cell .tp{font-size:.72rem;font-weight:800}
+        .sch-cell .tm{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+        .sch-cell .nt{font-size:.66rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+        .sch-cell.sch-todayc{outline:2px solid rgba(0,212,255,.5)}
+        .sch-t-OnSite{color:#00d4ff}.sch-t-WorkFromHome{color:#b388ff}.sch-t-Off{color:#90a4ae}.sch-t-AnnualLeave{color:#ffab00}.sch-t-SickLeave{color:#ff4d6d}
+        .sch-bg-OnSite{background:rgba(0,212,255,.08)}.sch-bg-WorkFromHome{background:rgba(179,136,255,.1)}.sch-bg-Off{background:rgba(144,164,174,.08)}.sch-bg-AnnualLeave{background:rgba(255,171,0,.1)}.sch-bg-SickLeave{background:rgba(255,77,109,.1)}
+        .sch-myweek{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+        .sch-day{border-radius:16px;padding:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);position:relative;overflow:hidden;transition:transform .15s}
+        .sch-day:hover{transform:translateY(-2px)}
+        .sch-day::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--sch-accent,rgba(255,255,255,.15))}
+        .sch-day .dow{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+        .sch-day .dnum{font-size:1.5rem;font-weight:800;margin:2px 0 8px}
+        .sch-day .chip{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:.8rem;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.06)}
+        .sch-day .tm{display:block;margin-top:8px;font-size:.8rem;color:var(--text-muted)}
+        .sch-day .nt{display:block;margin-top:4px;font-size:.72rem;color:var(--text-muted)}
+        .sch-day.sch-todayc{border-color:rgba(0,212,255,.5);box-shadow:0 0 0 1px rgba(0,212,255,.25),0 8px 22px rgba(0,0,0,.3)}
+        .sch-day.sch-offd{opacity:.85}
+        .sch-pill{display:inline-block;background:rgba(0,212,255,.15);color:var(--accent-cyan);border-radius:999px;padding:2px 10px;font-size:.72rem;font-weight:800}
+        .sch-reqrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.07);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.03);flex-wrap:wrap}
+        .sch-reqrow .grow{flex:1;min-width:200px}
+        .sch-status-Pending{color:#ffab00}.sch-status-Approved{color:#22c55e}.sch-status-Rejected{color:#ff4d6d}
+        .sch-pop-overlay{position:fixed;inset:0;background:rgba(4,8,18,.72);backdrop-filter:blur(4px);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px}
+        .sch-pop{background:#141b2e;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+        .sch-pop-title{font-weight:800;font-size:1.02rem;margin-bottom:12px}
+        .sch-lbl{display:block;font-size:.72rem;color:var(--text-muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+        .sch-agentpick{max-height:180px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px}
+        .sch-agentpick label{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border-radius:999px;padding:5px 10px;font-size:.78rem;cursor:pointer}
+        .sch-dow{display:flex;gap:6px;flex-wrap:wrap}
+        .sch-dow label{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border-radius:9px;padding:6px 10px;font-size:.76rem;cursor:pointer}
+        .sch-empty{color:var(--text-muted);text-align:center;padding:18px;font-size:.85rem}
         .agent-admin-crown{position:absolute;top:-9px;right:-7px;font-size:1rem;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
         .agent-id-block{min-width:0;flex:1}
         .agent-name{font-weight:700;font-size:1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2252,6 +2310,7 @@
                 </div>
                 <div class="nav-group-body" id="navBodyAudition">
                     <div class="nav-item" id="nav-audition-status" onclick="openInTab('audition-status')"><span data-i18n="auditionStatusMgmt">Audition Status Management</span></div>
+                    <div class="nav-item" id="nav-audition-schedule" onclick="openInTab('audition-schedule')"><span data-i18n="auditionSchedule">Audition Schedule</span></div>
                 </div>
             </div>
 
@@ -2347,7 +2406,7 @@
                         <div class="cmt-title" id="cmtTitle">Comments</div>
                         <div class="cmt-sub" id="cmtSub"></div>
                     </div>
-                    <button type="button" class="cmt-open-tkt" id="cmtOpenTktBtn">Open Ticket ↗</button>
+                    <button type="button" class="cmt-open-tkt" id="cmtOpenTktBtn">Open Ticket</button>
                     <button type="button" class="cmt-close" id="cmtCloseBtn" title="Close">✕</button>
                 </div>
                 <div id="cmtList"></div>
@@ -4258,7 +4317,6 @@
                                 <div style="font-weight:800;font-size:1.02rem" id="apMyName">—</div>
                                 <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
                                     <span id="apMyPill"></span>
-                                    <span class="ap-since" id="apMySince"></span>
                                 </div>
                             </div>
                         </div>
@@ -4272,8 +4330,138 @@
                 </div>
 
                 <div class="card" style="margin:0">
-                    <h4 style="margin-bottom:12px">👥 Team Board <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">— hours are this month's totals from the sheet</span></h4>
+                    <h4 style="margin-bottom:12px">👥 Team Board</h4>
                     <div class="ap-board" id="apBoard"></div>
+                </div>
+            </div>
+
+            <!-- Phase 22 (Ahmed): Audition Schedule — admin shift/off editor
+                 + agent self view with leave/off requests. Reads are cached
+                 server-side (60s, versioned); NO polling — manual refresh. -->
+            <div id="pg-audition-schedule" style="display:none">
+                <div class="card" style="margin-bottom:14px">
+                    <div class="ap-head">
+                        <div>
+                            <h3 style="margin-bottom:4px">📅 Audition Schedule</h3>
+                            <p class="ap-sync" style="margin:0" id="schSub">Shifts & off days — synced with the Audition Schedule sheet.</p>
+                        </div>
+                        <div style="display:flex;gap:8px;flex:none;align-items:center;flex-wrap:wrap">
+                            <div class="sch-viewtoggle" id="schViewToggle" style="display:none">
+                                <button type="button" id="schViewTeamBtn" class="sch-vt-btn" onclick="schSetView('team')">👥 Team editor</button>
+                                <button type="button" id="schViewMyBtn" class="sch-vt-btn" onclick="schSetView('my')">🙋 My schedule</button>
+                            </div>
+                            <button class="btn btn-secondary" onclick="schLoad(true)" style="flex:none">🔄 Refresh</button>
+                        </div>
+                    </div>
+                    <div class="sch-weeknav">
+                        <button type="button" class="sch-navbtn" onclick="schWeekShift(-1)">‹</button>
+                        <div class="sch-weeklabel" id="schWeekLabel">—</div>
+                        <button type="button" class="sch-navbtn" onclick="schWeekShift(1)">›</button>
+                        <button type="button" class="sch-navbtn sch-todaybtn" onclick="schWeekToday()">This week</button>
+                    </div>
+                </div>
+
+                <!-- Admin: requests inbox -->
+                <div class="card" id="schReqCard" style="display:none;margin-bottom:14px">
+                    <h4 style="margin-bottom:10px">📨 Schedule Requests <span class="sch-pill" id="schReqCount"></span></h4>
+                    <div id="schReqList"></div>
+                </div>
+
+                <!-- Admin: team grid -->
+                <div class="card" id="schTeamCard" style="display:none;margin-bottom:14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                        <h4 style="margin:0">👥 Team week</h4>
+                        <div style="display:flex;gap:8px">
+                            <button type="button" class="btn btn-secondary" onclick="schCopyWeek()">📋 Copy → next week</button>
+                            <button type="button" class="btn btn-primary" onclick="schRangeOpen()">🗓 Range apply…</button>
+                        </div>
+                    </div>
+                    <div class="sch-grid-wrap"><table class="sch-grid" id="schGrid"></table></div>
+                </div>
+
+                <!-- Agent: my week + my requests -->
+                <div id="schMyWrap">
+                    <div class="card" style="margin-bottom:14px">
+                        <div class="sch-myweek" id="schMyWeek"></div>
+                    </div>
+                    <div class="card" style="margin-bottom:14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                            <h4 style="margin:0">🙋 My requests</h4>
+                            <button type="button" class="btn btn-primary" onclick="schReqOpen()">✉️ New request</button>
+                        </div>
+                        <div id="schMyReqs"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 22 schedule: cell editor popover -->
+            <div class="sch-pop-overlay" id="schCellPop" style="display:none" onclick="if(event.target===this)schCellClose()">
+                <div class="sch-pop">
+                    <div class="sch-pop-title" id="schCellTitle">Edit day</div>
+                    <label class="sch-lbl">Type</label>
+                    <select id="schCellType" class="form-highlight-input"></select>
+                    <div style="display:flex;gap:8px">
+                        <div style="flex:1"><label class="sch-lbl">Start</label><input type="time" id="schCellStart" class="form-highlight-input"></div>
+                        <div style="flex:1"><label class="sch-lbl">End</label><input type="time" id="schCellEnd" class="form-highlight-input"></div>
+                    </div>
+                    <label class="sch-lbl">Note</label>
+                    <input type="text" id="schCellNote" class="form-highlight-input" placeholder="optional">
+                    <div style="display:flex;gap:8px;margin-top:14px">
+                        <button type="button" class="btn btn-primary" style="flex:1" onclick="schCellSave()">💾 Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="schCellClear()">🗑 Clear</button>
+                        <button type="button" class="btn btn-secondary" onclick="schCellClose()">✕</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 22 schedule: range apply modal -->
+            <div class="sch-pop-overlay" id="schRangePop" style="display:none" onclick="if(event.target===this)schRangeClose()">
+                <div class="sch-pop" style="max-width:560px">
+                    <div class="sch-pop-title">🗓 Apply shifts / offs over a range</div>
+                    <label class="sch-lbl">Agents</label>
+                    <div class="sch-agentpick" id="schRangeAgents"></div>
+                    <div style="display:flex;gap:8px">
+                        <div style="flex:1"><label class="sch-lbl">From</label><input type="date" id="schRangeFrom" class="form-highlight-input"></div>
+                        <div style="flex:1"><label class="sch-lbl">To</label><input type="date" id="schRangeTo" class="form-highlight-input"></div>
+                    </div>
+                    <label class="sch-lbl">Days of week</label>
+                    <div class="sch-dow" id="schRangeDow"></div>
+                    <label class="sch-lbl">Type</label>
+                    <select id="schRangeType" class="form-highlight-input"></select>
+                    <div style="display:flex;gap:8px">
+                        <div style="flex:1"><label class="sch-lbl">Start</label><input type="time" id="schRangeStart" class="form-highlight-input"></div>
+                        <div style="flex:1"><label class="sch-lbl">End</label><input type="time" id="schRangeEnd" class="form-highlight-input"></div>
+                    </div>
+                    <label class="sch-lbl">Note</label>
+                    <input type="text" id="schRangeNote" class="form-highlight-input" placeholder="optional">
+                    <div style="display:flex;gap:8px;margin-top:14px">
+                        <button type="button" class="btn btn-primary" style="flex:1" onclick="schRangeApply()">✅ Apply</button>
+                        <button type="button" class="btn btn-secondary" onclick="schRangeClose()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 22 schedule: agent request modal -->
+            <div class="sch-pop-overlay" id="schReqPop" style="display:none" onclick="if(event.target===this)schReqClose()">
+                <div class="sch-pop">
+                    <div class="sch-pop-title">✉️ New schedule request</div>
+                    <label class="sch-lbl">Type</label>
+                    <select id="schReqType" class="form-highlight-input">
+                        <option>Change Off</option>
+                        <option>Annual Leave</option>
+                        <option>Sick Leave</option>
+                        <option>Work From Home</option>
+                    </select>
+                    <div style="display:flex;gap:8px">
+                        <div style="flex:1"><label class="sch-lbl">From</label><input type="date" id="schReqFrom" class="form-highlight-input"></div>
+                        <div style="flex:1"><label class="sch-lbl">To</label><input type="date" id="schReqTo" class="form-highlight-input"></div>
+                    </div>
+                    <label class="sch-lbl">Reason</label>
+                    <textarea id="schReqReason" class="form-highlight-input" rows="3" placeholder="Tell the admin why…"></textarea>
+                    <div style="display:flex;gap:8px;margin-top:14px">
+                        <button type="button" class="btn btn-primary" style="flex:1" onclick="schReqSubmit()">📨 Send request</button>
+                        <button type="button" class="btn btn-secondary" onclick="schReqClose()">Cancel</button>
+                    </div>
                 </div>
             </div>
 
@@ -4472,6 +4660,7 @@ const translations = {
         createNewRequest: "Create New Request",
         accessManagement: "Access Management",
         audition: "Audition",
+        auditionSchedule: "Audition Schedule",
         auditionStatusMgmt: "Audition Status Management",
         manageAgents: "Manage Agents",
         auditLog: "Audit Log",
@@ -4506,6 +4695,7 @@ const translations = {
         accessManagement: "权限管理",
         audition: "审核组",
         auditionStatusMgmt: "状态管理",
+        auditionSchedule: "排班",
         manageAgents: "管理代理",
         auditLog: "审计日志",
         logout: "退出登录",
@@ -4557,7 +4747,8 @@ const pageTitlesMap = {
     'live-tickets': 'Live Ticket Queue',
     'tickets-pending': 'Under Investigation',
     'admin-preview': 'Preview Agent View',
-    'audition-status': 'Audition Status'
+    'audition-status': 'Audition Status',
+    'audition-schedule': 'Audition Schedule'
 };
 
 const zhPageTitlesMap = {
@@ -4582,12 +4773,13 @@ const zhPageTitlesMap = {
     'live-tickets': '实时工单队列',
     'tickets-pending': '待调查请求',
     'admin-preview': '预览成员视图',
-    'audition-status': '状态管理'
+    'audition-status': '状态管理',
+    'audition-schedule': '审核排班'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status'];
+const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -4908,6 +5100,10 @@ function executePageLogic(page) {
         document.getElementById('pg-audition-status').style.display='block';
         _expandNavGroup('navBodyAudition','navArrAudition');
         apOnOpen(); // Phase 11: live presence board (reads coalesced server-side)
+    } else if(page==='audition-schedule'){
+        document.getElementById('pg-audition-schedule').style.display='block';
+        _expandNavGroup('navBodyAudition','navArrAudition');
+        schOnOpen(); // Phase 22: schedule grid (60s cached reads, NO polling)
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -7788,7 +7984,8 @@ function apOnOpen() {
     // actual Feishu reads behind its 10s cache, so the fresher cadence costs
     // no extra Feishu quota — only lightweight cached responses.
     setInterval(() => { if (activeTabId === 'audition-status' && !document.hidden) apFetchBoard(); }, 20000);
-    setInterval(() => { if (activeTabId === 'audition-status') apRepaintElapsed(); }, 30000);
+    // Phase 22: no elapsed/hours repaint timer anymore — the page is
+    // status-only now (durations move to the Schedule tabs).
 }
 
 async function apFetchBoard(manual) {
@@ -7845,7 +8042,6 @@ function apRenderMe(me) {
         const active = s === me.status ? ' ap-active' : '';
         return `<button class="ap-btn${active}" style="--sc:${mm.c}" data-ap-status="${escHtml(s)}" onclick="apSetStatus('${s}')" ${apBusy ? 'disabled' : ''}><span class="ap-dot"></span>${mm.i} ${s}</button>`;
     }).join('');
-    apRepaintElapsed();
 }
 
 function apCardHtml(a) {
@@ -7858,14 +8054,7 @@ function apCardHtml(a) {
         : '';
     return `<div class="ap-card${off}${meCls}" data-ap-rid="${escHtml(a.record_id || '')}">
         <div class="ap-card-top">${apAvatarHtml(a)}<div class="ap-card-name">${escHtml(a.name || '—')} ${badge}</div></div>
-        <div class="ap-card-mid"><span class="ap-pill" style="color:${m.c}"><span class="ap-dot"></span>${m.i} ${escHtml(a.status)}</span><span class="ap-since" data-ap-since="${a.since_ms || 0}">${apElapsedTxt(a.since_ms)}</span></div>
-        <div class="ap-hours">
-            <div class="ap-hcell"><div class="v">${escHtml(a.online_hours || '0:00')}</div><div class="k">Online</div></div>
-            <div class="ap-hcell"><div class="v">${escHtml(a.task_hours || '0:00')}</div><div class="k">Task</div></div>
-            <div class="ap-hcell"><div class="v">${escHtml(a.break_hours || '0:00')}</div><div class="k">Break</div></div>
-            <div class="ap-hcell"><div class="v">${escHtml(a.meeting_hours || '0:00')}</div><div class="k">Meeting</div></div>
-        </div>
-        <div class="ap-card-mid"><span class="ap-queue">${escHtml(a.queue_status || '')}</span><span class="ap-tkt">${a.active_tickets ? ('🎫 ' + a.active_tickets + ' active') : ''}</span></div>
+        <div class="ap-card-mid"><span class="ap-pill" style="color:${m.c}"><span class="ap-dot"></span>${m.i} ${escHtml(a.status)}</span></div>
         ${adminSet}
     </div>`;
 }
@@ -7894,6 +8083,344 @@ async function apSetStatus(status, target) {
         apBusy = false;
         apRenderAll(); // re-enable buttons even if the refetch failed
     }
+}
+
+/* ==================== Phase 22: Audition Schedule ====================
+   Admin view: weekly team grid editor (cell popover, copy-week, range apply,
+   requests inbox with approve->auto-write). Agent view: own week cards +
+   request composer. Reads are 60s-cached + versioned server-side; there is
+   NO polling on this page — a manual 🔄 Refresh only. */
+const SCH_TYPES = ['On Site', 'Work From Home', 'Off', 'Annual Leave', 'Sick Leave'];
+const SCH_META = {
+    'On Site':        { i: '🏢', c: '#00d4ff', cls: 'OnSite' },
+    'Work From Home': { i: '🏠', c: '#b388ff', cls: 'WorkFromHome' },
+    'Off':            { i: '🌙', c: '#90a4ae', cls: 'Off' },
+    'Annual Leave':   { i: '🏖️', c: '#ffab00', cls: 'AnnualLeave' },
+    'Sick Leave':     { i: '🤒', c: '#ff4d6d', cls: 'SickLeave' },
+};
+let schWeekStart = null;   // Date (local midnight) of the displayed Monday
+let schRows = [];          // last /api/audition/schedule rows (already scoped server-side)
+let schAgents = [];        // admin picklist (Agent Roster)
+let schReqs = [];          // requests (admin: all; agent: own)
+let schView = 'my';        // 'team' | 'my'
+let schLoading = false;
+let schCellCtx = null;     // {ai, day} while the cell popover is open
+
+function schDowMon(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; }
+function schDayInt(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+function schDateFromInt(n) { return new Date(Math.floor(n / 10000), Math.floor(n / 100) % 100 - 1, n % 100); }
+function schFmtDateInput(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function schParseDateInput(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function schDayLabel(n) { return schDateFromInt(n).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
+
+function schOnOpen() {
+    if (!schWeekStart) schWeekStart = schDowMon(new Date());
+    const tg = document.getElementById('schViewToggle');
+    if (tg) tg.style.display = isAdmin ? 'flex' : 'none';
+    if (!isAdmin) schView = 'my';
+    schSetView(schView, true);
+    schLoad();
+}
+
+function schSetView(v, keep) {
+    schView = (v === 'team' && isAdmin) ? 'team' : 'my';
+    const tb = document.getElementById('schViewTeamBtn'), mb = document.getElementById('schViewMyBtn');
+    if (tb) tb.classList.toggle('active', schView === 'team');
+    if (mb) mb.classList.toggle('active', schView === 'my');
+    const team = document.getElementById('schTeamCard'), reqC = document.getElementById('schReqCard'), my = document.getElementById('schMyWrap');
+    if (team) team.style.display = (schView === 'team') ? 'block' : 'none';
+    if (reqC) reqC.style.display = (schView === 'team' && isAdmin) ? 'block' : 'none';
+    if (my) my.style.display = (schView === 'my') ? 'block' : 'none';
+    const sub = document.getElementById('schSub');
+    if (sub) sub.innerHTML = schView === 'team'
+        ? 'Admin editor — click any day cell to set a shift or off. Synced with the <b>Audition Schedule</b> sheet.'
+        : 'Your week at a glance — off days, shifts and leave, synced with the <b>Audition Schedule</b> sheet.';
+    if (!keep) schRenderAll();
+}
+
+function schWeekShift(n) { if (!schWeekStart) return; schWeekStart.setDate(schWeekStart.getDate() + n * 7); schLoad(); }
+function schWeekToday() { schWeekStart = schDowMon(new Date()); schLoad(); }
+
+async function schLoad(manual) {
+    if (schLoading) return;
+    schLoading = true;
+    try {
+        const from = schDayInt(schWeekStart);
+        const endD = new Date(schWeekStart); endD.setDate(endD.getDate() + 6);
+        const qs = new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '', from: from, to: schDayInt(endD) });
+        const r = await fetch('/api/audition/schedule?' + qs);
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        schRows = d.rows || [];
+        const jobs = [];
+        if (isAdmin && !schAgents.length) {
+            jobs.push(fetch('/api/audition/schedule/agents?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
+                .then(x => x.json()).then(x => { if (x && x.success) schAgents = x.agents || []; }).catch(() => {}));
+        }
+        jobs.push(fetch('/api/audition/requests?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
+            .then(x => x.json()).then(x => { if (x && x.success) schReqs = x.requests || []; }).catch(() => {}));
+        await Promise.all(jobs);
+        schRenderAll();
+    } catch (e) {
+        ToastManager.show('⚠️ Schedule: ' + e.message, 'error', 8000);
+    } finally { schLoading = false; }
+}
+
+function schRenderAll() {
+    if (!schWeekStart) return;
+    const endD = new Date(schWeekStart); endD.setDate(endD.getDate() + 6);
+    const lbl = document.getElementById('schWeekLabel');
+    if (lbl) lbl.textContent = schWeekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) + ' → ' + endD.toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
+    const days = [];
+    for (let i = 0; i < 7; i++) { const d = new Date(schWeekStart); d.setDate(d.getDate() + i); days.push(d); }
+    const todayInt = schDayInt(new Date());
+    if (schView === 'team' && isAdmin) { schRenderGrid(days, todayInt); schRenderReqInbox(); }
+    else { schRenderMyWeek(days, todayInt); schRenderMyReqs(); }
+}
+
+function schRowFor(email, dayInt) {
+    const em = (email || '').toLowerCase();
+    return schRows.find(r => (r.email || '').toLowerCase() === em && r.day === dayInt) || null;
+}
+function schTypeChip(t) {
+    const m = SCH_META[t] || SCH_META['On Site'];
+    return `<span class="sch-t-${m.cls}">${m.i} ${escHtml(t)}</span>`;
+}
+
+function schRenderGrid(days, todayInt) {
+    const g = document.getElementById('schGrid'); if (!g) return;
+    if (!schAgents.length) { g.innerHTML = '<div class="sch-empty">No agents on the Agent Roster yet.</div>'; return; }
+    const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const head = '<tr><th></th>' + days.map(d => {
+        const di = schDayInt(d);
+        return `<th class="${di === todayInt ? 'sch-todayh' : ''}">${DOW[(d.getDay() + 6) % 7]}<br>${d.getDate()}</th>`;
+    }).join('') + '</tr>';
+    const body = schAgents.map((a, ai) => {
+        const init = escHtml((a.name || '?').trim().slice(0, 2).toUpperCase());
+        const avHtml = a.avatar
+            ? `<img src="${escHtml(a.avatar)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="sch-avfb" style="display:none">${init}</span>`
+            : `<span class="sch-avfb">${init}</span>`;
+        const cells = days.map(d => {
+            const di = schDayInt(d);
+            const r = schRowFor(a.email, di);
+            const m = r ? (SCH_META[r.type] || SCH_META['On Site']) : null;
+            const inner = r
+                ? `<div class="tp">${schTypeChip(r.type)}</div>${(r.start || r.end) ? `<div class="tm">${escHtml(r.start || '')}${r.end ? '–' + escHtml(r.end) : ''}</div>` : ''}${r.note ? `<div class="nt">${escHtml(r.note)}</div>` : ''}`
+                : '<div class="tm" style="opacity:.45">—</div>';
+            return `<td><div class="sch-cell ${m ? 'sch-bg-' + m.cls : ''} ${di === todayInt ? 'sch-todayc' : ''}" onclick="schCellOpen(${ai},${di})">${inner}</div></td>`;
+        }).join('');
+        return `<tr><td><div class="sch-agentcell">${avHtml}<div><div class="nm">${escHtml(a.name)}</div><div class="em">${escHtml(a.email)}</div></div></div></td>${cells}</tr>`;
+    }).join('');
+    g.innerHTML = head + body;
+}
+
+/* ---- cell popover ---- */
+function schCellOpen(ai, day) {
+    const a = schAgents[ai]; if (!a) return;
+    schCellCtx = { ai: ai, day: day };
+    const r = schRowFor(a.email, day);
+    document.getElementById('schCellTitle').textContent = `${a.name} — ${schDayLabel(day)}`;
+    document.getElementById('schCellType').innerHTML = SCH_TYPES.map(t => `<option${r && r.type === t ? ' selected' : ''}>${t}</option>`).join('');
+    document.getElementById('schCellStart').value = (r && r.start) || '';
+    document.getElementById('schCellEnd').value = (r && r.end) || '';
+    document.getElementById('schCellNote').value = (r && r.note) || '';
+    document.getElementById('schCellPop').style.display = 'flex';
+}
+function schCellClose() { document.getElementById('schCellPop').style.display = 'none'; schCellCtx = null; }
+
+async function schSaveEntries(entries, deleteKeys) {
+    const r = await fetch('/api/audition/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: loggedUser, email: loggedEmail, entries: entries || [], delete_keys: deleteKeys || [] })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.success) throw new Error((d.errors && d.errors[0]) || d.error || ('HTTP ' + r.status));
+    return d;
+}
+
+async function schCellSave() {
+    if (!schCellCtx) return;
+    const a = schAgents[schCellCtx.ai];
+    try {
+        await schSaveEntries([{ email: a.email, name: a.name, day: schCellCtx.day,
+            type: document.getElementById('schCellType').value,
+            start: document.getElementById('schCellStart').value,
+            end: document.getElementById('schCellEnd').value,
+            note: document.getElementById('schCellNote').value }]);
+        ToastManager.show('💾 Saved — the sheet has it too.', 'success', 3500);
+        schCellClose();
+        schLoad();
+    } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
+}
+
+async function schCellClear() {
+    if (!schCellCtx) return;
+    const a = schAgents[schCellCtx.ai];
+    try {
+        await schSaveEntries([], [(a.email || '').toLowerCase() + '|' + schCellCtx.day]);
+        ToastManager.show('🗑 Day cleared.', 'success', 3000);
+        schCellClose();
+        schLoad();
+    } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
+}
+
+async function schCopyWeek() {
+    if (!schRows.length) { ToastManager.show('This week is empty — nothing to copy.', 'warning', 3500); return; }
+    const entries = schRows.map(r => {
+        const nd = schDateFromInt(r.day); nd.setDate(nd.getDate() + 7); // calendar-safe (+7 days, DST-proof)
+        return { email: r.email, name: r.name, day: schDayInt(nd), type: r.type, start: r.start, end: r.end, note: r.note };
+    });
+    if (!confirm(`Copy ${entries.length} day-entries to next week? Existing cells there are overwritten.`)) return;
+    try {
+        const d = await schSaveEntries(entries);
+        ToastManager.show(`📋 Copied to next week (${(d.created || 0) + (d.updated || 0)} days).`, 'success', 4000);
+        schWeekShift(1);
+    } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
+}
+
+/* ---- range apply ---- */
+function schRangeOpen() {
+    if (!schAgents.length) { ToastManager.show('Agents still loading…', 'warning', 2500); return; }
+    document.getElementById('schRangeAgents').innerHTML = schAgents.map((a, i) =>
+        `<label><input type="checkbox" class="sch-rag" value="${i}" checked> ${escHtml(a.name)}</label>`).join('');
+    const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    document.getElementById('schRangeDow').innerHTML = DOW.map((d, i) =>
+        `<label><input type="checkbox" class="sch-rdow" value="${i}" ${i < 5 ? 'checked' : ''}> ${d}</label>`).join('');
+    document.getElementById('schRangeType').innerHTML = SCH_TYPES.map(t => `<option>${t}</option>`).join('');
+    document.getElementById('schRangeFrom').value = schFmtDateInput(schWeekStart);
+    const e = new Date(schWeekStart); e.setDate(e.getDate() + 6);
+    document.getElementById('schRangeTo').value = schFmtDateInput(e);
+    document.getElementById('schRangePop').style.display = 'flex';
+}
+function schRangeClose() { document.getElementById('schRangePop').style.display = 'none'; }
+
+async function schRangeApply() {
+    const from = schParseDateInput(document.getElementById('schRangeFrom').value);
+    const to = schParseDateInput(document.getElementById('schRangeTo').value);
+    if (!from || !to || to < from) { ToastManager.show('Pick a valid from/to range.', 'warning', 3500); return; }
+    const spanDays = Math.round((to - from) / 86400000) + 1;
+    if (spanDays > 62) { ToastManager.show('Max 62 days per apply.', 'warning', 3500); return; }
+    const ais = Array.from(document.querySelectorAll('.sch-rag:checked')).map(x => +x.value);
+    const dows = new Set(Array.from(document.querySelectorAll('.sch-rdow:checked')).map(x => +x.value));
+    if (!ais.length || !dows.size) { ToastManager.show('Pick at least one agent and one weekday.', 'warning', 3500); return; }
+    const type = document.getElementById('schRangeType').value;
+    const start = document.getElementById('schRangeStart').value;
+    const end = document.getElementById('schRangeEnd').value;
+    const note = document.getElementById('schRangeNote').value;
+    const entries = [];
+    for (const ai of ais) {
+        const a = schAgents[ai];
+        const d = new Date(from);
+        while (d <= to) {
+            if (dows.has((d.getDay() + 6) % 7)) entries.push({ email: a.email, name: a.name, day: schDayInt(d), type: type, start: start, end: end, note: note });
+            d.setDate(d.getDate() + 1);
+        }
+    }
+    if (!entries.length) { ToastManager.show('No days matched that selection.', 'warning', 3000); return; }
+    if (!confirm(`Write ${entries.length} day-entries (${ais.length} agent(s) × matching days)? Existing cells are overwritten.`)) return;
+    try {
+        const d = await schSaveEntries(entries);
+        ToastManager.show(`✅ Applied — ${(d.created || 0) + (d.updated || 0)} days written.`, 'success', 4500);
+        schRangeClose();
+        schLoad();
+    } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
+}
+
+/* ---- requests ---- */
+function schRenderReqInbox() {
+    const list = document.getElementById('schReqList'); if (!list) return;
+    const pend = schReqs.filter(r => r.status === 'Pending');
+    const past = schReqs.filter(r => r.status !== 'Pending').slice(0, 10);
+    const cnt = document.getElementById('schReqCount');
+    if (cnt) cnt.textContent = pend.length ? `${pend.length} pending` : 'inbox zero ✨';
+    const row = (r, actions) => `<div class="sch-reqrow">
+        <div class="grow"><b>${escHtml(r.name || r.email)}</b> — ${escHtml(r.type)}
+            <div style="font-size:.76rem;color:var(--text-muted)">${schDayLabel(r.from_day)} → ${schDayLabel(r.to_day)}${r.reason ? ' · “' + escHtml(r.reason) + '”' : ''}</div>
+            ${r.admin_note ? `<div style="font-size:.74rem;color:var(--text-muted)">Admin: ${escHtml(r.admin_note)}${r.decided_by ? ' — ' + escHtml(r.decided_by) : ''}</div>` : ''}
+        </div>
+        <span class="sch-status-${escHtml(r.status)}" style="font-weight:800;font-size:.78rem">${r.status === 'Pending' ? '⏳' : r.status === 'Approved' ? '✅' : '⛔'} ${escHtml(r.status)}</span>
+        ${actions}</div>`;
+    list.innerHTML =
+        (pend.length
+            ? pend.map(r => row(r, `<button type="button" class="btn btn-primary" style="padding:6px 12px" onclick="schDecide('${r.record_id}','Approved')">✅ Approve</button><button type="button" class="btn btn-secondary" style="padding:6px 12px" onclick="schDecide('${r.record_id}','Rejected')">⛔ Reject</button>`)).join('')
+            : '<div class="sch-empty">No pending requests.</div>')
+        + (past.length
+            ? '<div style="margin:10px 0 6px;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.5px">Recent decisions</div>' + past.map(r => row(r, '')).join('')
+            : '');
+}
+
+async function schDecide(rid, decision) {
+    const note = decision === 'Rejected' ? (prompt('Note for the agent (optional):') || '') : '';
+    try {
+        const r = await fetch('/api/audition/requests/decide', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, record_id: rid, decision: decision, admin_note: note })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        ToastManager.show(decision === 'Approved'
+            ? `✅ Approved — ${d.schedule_rows_written || 0} schedule day(s) written automatically.`
+            : '⛔ Rejected.', 'success', 4500);
+        schLoad();
+    } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
+}
+
+function schRenderMyWeek(days, todayInt) {
+    const host = document.getElementById('schMyWeek'); if (!host) return;
+    host.innerHTML = days.map(d => {
+        const di = schDayInt(d);
+        const r = schRows.find(x => x.day === di); // the backend already scoped schRows to me
+        const m = r ? (SCH_META[r.type] || SCH_META['On Site']) : null;
+        const isOff = r && (r.type === 'Off' || r.type === 'Annual Leave' || r.type === 'Sick Leave');
+        return `<div class="sch-day ${di === todayInt ? 'sch-todayc' : ''} ${isOff ? 'sch-offd' : ''}" style="--sch-accent:${m ? m.c : 'rgba(255,255,255,.15)'}">
+            <div class="dow">${d.toLocaleDateString('en-GB', { weekday: 'short' })}</div>
+            <div class="dnum">${d.getDate()}</div>
+            ${r ? `<span class="chip" style="color:${m.c}">${m.i} ${escHtml(r.type)}</span>
+                  ${(r.start || r.end) ? `<span class="tm">🕒 ${escHtml(r.start || '')}${r.end ? ' – ' + escHtml(r.end) : ''}</span>` : ''}
+                  ${r.note ? `<span class="nt">${escHtml(r.note)}</span>` : ''}`
+                : '<span class="chip" style="color:var(--text-muted)">— not set</span>'}
+        </div>`;
+    }).join('');
+}
+
+function schRenderMyReqs() {
+    const host = document.getElementById('schMyReqs'); if (!host) return;
+    if (!schReqs.length) { host.innerHTML = '<div class="sch-empty">No requests yet — tap ✉️ New request to ask for an off change, leave or a WFH day.</div>'; return; }
+    host.innerHTML = schReqs.map(r => `<div class="sch-reqrow">
+        <div class="grow"><b>${escHtml(r.type)}</b>
+            <div style="font-size:.76rem;color:var(--text-muted)">${schDayLabel(r.from_day)} → ${schDayLabel(r.to_day)}${r.reason ? ' · “' + escHtml(r.reason) + '”' : ''}</div>
+            ${r.admin_note ? `<div style="font-size:.74rem;color:var(--text-muted)">Admin note: ${escHtml(r.admin_note)}</div>` : ''}
+        </div>
+        <span class="sch-status-${escHtml(r.status)}" style="font-weight:800;font-size:.78rem">${r.status === 'Pending' ? '⏳ Pending' : r.status === 'Approved' ? '✅ Approved' : '⛔ Rejected'}</span>
+    </div>`).join('');
+}
+
+function schReqOpen() {
+    document.getElementById('schReqFrom').value = schFmtDateInput(new Date());
+    document.getElementById('schReqTo').value = schFmtDateInput(new Date());
+    document.getElementById('schReqReason').value = '';
+    document.getElementById('schReqPop').style.display = 'flex';
+}
+function schReqClose() { document.getElementById('schReqPop').style.display = 'none'; }
+
+async function schReqSubmit() {
+    const from = schParseDateInput(document.getElementById('schReqFrom').value);
+    const to = schParseDateInput(document.getElementById('schReqTo').value);
+    if (!from || !to || to < from) { ToastManager.show('Pick a valid from/to.', 'warning', 3000); return; }
+    try {
+        const r = await fetch('/api/audition/requests', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail,
+                type: document.getElementById('schReqType').value,
+                from_day: schDayInt(from), to_day: schDayInt(to),
+                reason: document.getElementById('schReqReason').value })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        ToastManager.show('📨 Request sent — the admin sees it in the Schedule inbox.', 'success', 4500);
+        schReqClose();
+        schLoad();
+    } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
 let latestAdminRoles = [];  // role presets only
@@ -8022,7 +8549,7 @@ async function fetchAdminUsers() {
 
             card.innerHTML=`
                 <div class="agent-card-head">
-                    <div class="agent-avatar">${escHtml(initials)}${isAdminAgent?'<span class="agent-admin-crown" title="Admin privileges">👑</span>':''}</div>
+                    <div class="agent-avatar">${escHtml(initials)}${u.avatar_url?`<img class="agent-avatar-img" src="${escHtml(u.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`:''}${isAdminAgent?'<span class="agent-admin-crown" title="Admin privileges">👑</span>':''}</div>
                     <div class="agent-id-block">
                         <div class="agent-name">${isOrphan ? '<em style="color:var(--text-muted)">(no identity set)</em>' : escHtml(dispName)}${isAdminAgent?'<span class="agent-admin-chip">ADMIN</span>':''}${isOrphan?'<span class="agent-orphan-chip" title="This row has no email/identity attached — it cannot be edited by identity. Safe to remove.">⚠ NO IDENTITY</span>':''}</div>
                         <div class="agent-email">${isOrphan ? '&nbsp;' : escHtml(dispEmail)}</div>
@@ -8985,11 +9512,13 @@ function generateInsights(data) {
     const list = document.getElementById('insightsList');
 
     // Access gate: Executive Intelligence is its own grantable sub-feature
-    // (mod_analytics_exec_insights in Manage Agents). Anyone with full
-    // Analytics access still sees it automatically via hasSubFeature's
-    // hasMod('analytics') fallback -- this only lets an admin grant/revoke
-    // just this one panel without touching the rest of Analytics.
-    if (!hasSubFeature('analytics_exec_insights')) {
+    // (mod_analytics_exec_insights in Manage Agents). Phase 22 STRICT: exact
+    // grants only — hasSubFeature's hasNs('analytics') fallback prefix-matched
+    // 'analytics_report' and leaked this panel to anyone with just "Analytics
+    // Report" (Ahmed: "why the 🧠 Executive Intelligence panel show to the
+    // agent while i didn't give him in his access"). Full-analytics holders
+    // and admins still see it via hasExactMod('analytics') / isAdmin.
+    if (!hasExactMod('analytics_exec_insights') && !hasExactMod('analytics')) {
         panel.style.display = 'none';
         return;
     }
@@ -10290,7 +10819,7 @@ function pvRenderList() {
         const isAdminAgent = mods.some(m => m.toLowerCase() === 'admin');
         return `<div class="pv-card" style="--pv-avatar-bg:linear-gradient(135deg,${c1},${c2});--pv-accent:linear-gradient(90deg,${c1},${c2});">
             <div class="pv-card-head">
-                <div class="pv-avatar">${initials}</div>
+                <div class="pv-avatar">${initials}${a.avatar_url?`<img class="pv-avatar-img" src="${escHtml(a.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`:''}</div>
                 <div style="min-width:0">
                     <div class="pv-name">${name}${isAdminAgent ? ' <span style="font-size:.62rem;font-weight:800;color:var(--accent-purple);vertical-align:middle">👑 ADMIN</span>' : ''}</div>
                     <div class="pv-email">${mail}</div>
@@ -11161,8 +11690,13 @@ function configureSidebarAndCards() {
     // Management page; the group follows its only child.
     const navAuditionStatus = document.getElementById('nav-audition-status');
     if (navAuditionStatus) navAuditionStatus.style.display = (isAdmin || hasExactMod('audition_status')) ? '' : 'none';
+    // Phase 22: Schedule tab — 🎧 audition_status holders get it (admins see
+    // the editor), and 🎭 audition_access holders get the read-only
+    // "my schedule + requests" view.
+    const navAuditionSchedule = document.getElementById('nav-audition-schedule');
+    if (navAuditionSchedule) navAuditionSchedule.style.display = (isAdmin || hasExactMod('audition_status') || hasExactMod('audition_access')) ? '' : 'none';
     const grpAudition = document.getElementById('navGrpAudition');
-    if (grpAudition) grpAudition.style.display = (navAuditionStatus && navAuditionStatus.style.display !== 'none') ? '' : 'none';
+    if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     if (isAdmin) {
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
@@ -19465,7 +19999,7 @@ document.addEventListener('keydown', function (e) {
 // Phase 12: unread state is SERVER-side now (Redis per email — survives
 // logout/devices, never phantom-reflags old threads). `denied` = the access
 // toggle is OFF for this member: the bell hides and the panel explains.
-const cmnState = { open: false, tab: 'all', items: [], loaded: false, loading: false, denied: false };
+const cmnState = { open: false, tab: 'all', items: [], loaded: false, loading: false, denied: false, stale: false };
 
 function cmnLastSeenKey() { return 'xenaCommentsLastSeen:' + (loggedEmail || ''); }
 function cmnGetLastSeen() {
@@ -19474,12 +20008,37 @@ function cmnGetLastSeen() {
 }
 function cmnSetLastSeen(ts) { localStorage.setItem(cmnLastSeenKey(), String(ts)); }
 
+// Phase 22: unit-safe timestamp — Feishu comment clocks are ms (~1.7e12),
+// legacy/legacy-mixed values may be seconds (~1.7e9); normalize so sorts and
+// comparisons never mix units (the "random order" + phantom badge fixes).
+function cmnMs(v) { const n = parseFloat(v) || 0; return (n > 0 && n < 1e12) ? n * 1000 : n; }
+
 function cmnToggle(forceClose) {
     const p = document.getElementById('cmnPanel'); if (!p) return;
     const wantOpen = (forceClose === true) ? false : !cmnState.open;
     cmnState.open = wantOpen;
     p.classList.toggle('show', wantOpen);
-    if (wantOpen) { cmnRender(); cmnRefresh(true); }
+    if (wantOpen) { cmnRender(); cmnRefresh(true); cmnOpenFreshScan(); }
+}
+
+let _cmnOpenScanLast = 0;
+async function cmnOpenFreshScan() {
+    /* Phase 22 (Ahmed: "it not show last notifications but it show it
+       random"): opening the bell against a STALE feed fires ONE forced
+       backend rescan (lock-deduped server-side) then re-pulls, so the
+       latest Base comments land within seconds of opening. Gated to once
+       per 5 minutes per tab so it can't run costs up; fresh feeds skip it
+       entirely. */
+    if (!cmnState.stale || cmnState.denied || !loggedEmail) return;
+    if (Date.now() - _cmnOpenScanLast < 300000) return;
+    _cmnOpenScanLast = Date.now();
+    try {
+        await fetch('/api/comments/scan-refresh', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, uat: loggedUat || '', force: true })
+        });
+    } catch (e) {}
+    try { await cmnRefresh(true, true); } catch (e) {}
 }
 
 /* Phase 20 (Ahmed: "prepare as we will have new 2 tab to add"): bell tabs are
@@ -19493,7 +20052,7 @@ const CMN_TABS = [
 function cmnRenderTabs() {
     const host = document.getElementById('cmnTabs'); if (!host) return;
     host.innerHTML = CMN_TABS.map(t =>
-        `<button type="button" class="cmn-tab${cmnState.tab === t.key ? ' active' : ''}" data-tab="${twcEsc(t.key)}" onclick="cmnSetTab('${twcEsc(t.key)}')">${twcEsc(t.label)}</button>`
+        `<button type="button" class="cmn-tab${cmnState.tab === t.key ? ' active' : ''}" data-tab="${twcEsc(t.key)}" onclick="event.stopPropagation();cmnSetTab('${twcEsc(t.key)}')">${twcEsc(t.label)}</button>`
     ).join('');
 }
 function cmnSetTab(tab) {
@@ -19542,7 +20101,11 @@ async function cmnRefresh(silent, _noReval) {
             const d = await r.json();
             if (d && d.success) {
                 cmnState.denied = false;
-                cmnState.items = d.items || []; cmnState.loaded = true; stale = !!d.stale;
+                // Phase 22: belt-and-braces client sort — newest first by a
+                // unit-safe clock, so the bell ALWAYS shows the latest on top
+                // regardless of which backend path served it.
+                cmnState.items = (d.items || []).slice().sort((a, b) => cmnMs(b.time) - cmnMs(a.time));
+                cmnState.loaded = true; stale = !!d.stale; cmnState.stale = stale;
             }
         }
     } catch (e) { /* badge just stays as-is on network errors */ }
@@ -19949,6 +20512,23 @@ function cmtOpen(recordId, time) {
     // silent live re-pull then patches any new replies in place.
     cmtState.comments = (cached && cached.comments) ? cached.comments : [];
     cmtState.loaded = !!(cached && cached.comments);
+    // Phase 22 (Ahmed: "when open the comment it take time to load the
+    // comments"): no cache? Paint a PROVISIONAL bubble from the bell item
+    // instantly (author/avatar/text we already have) instead of a bare
+    // "Loading…" — the silent live pull replaces it within a second or two.
+    // Provisional threads are NEVER written to cmtThreadCache (complete-only).
+    if (!cmtState.loaded && feedItem) {
+        cmtState.comments = [{
+            comment_id: feedItem.comment_id || '', reply_id: '',
+            user_id: feedItem.author_id || '',
+            user_name: feedItem.author || '', user_avatar: feedItem.author_avatar || '',
+            create_time: feedItem.act_time || feedItem.time || 0,
+            parts: (feedItem.text_parts && feedItem.text_parts.length) ? feedItem.text_parts : [{ type: 'text', text: feedItem.text || '' }],
+            text: feedItem.text || '', images: [],
+            is_solved: !!feedItem.is_solved, reactions: [], _provisional: true,
+        }];
+        cmtState.loaded = true;
+    }
     cmtState.loading = false;
     cmtMentionStore.mentions = {}; cmtMentionStore.list = []; cmtMentionStore.idx = 0;
     document.getElementById('cmtTitle').textContent =
@@ -20250,16 +20830,16 @@ document.getElementById('cmtCloseBtn').addEventListener('click', cmtClose);
 document.getElementById('cmtOpenTktBtn').addEventListener('click', () => {
     const rid = cmtState.recordId;
     if (!rid) return;
-    // Phase 21 (Ahmed): the ticket opens in a NEW BROWSER TAB via the
-    // ?ticket= deep link — the tab he stands on (and this comment thread)
-    // stays exactly as he left it. The login session is shared through
-    // localStorage, so the new tab opens the ticket straight away, no
-    // re-login.
-    const u = new URL(window.location.href);
-    u.hash = '';
-    u.search = '';
-    u.searchParams.set('ticket', rid);
-    window.open(u.toString(), '_blank', 'noopener');
+    // Phase 22b (Ahmed: "i was mean the tab in the website", video
+    // 20261027001357_rec_.mp4): NOT a new browser tab — that dropped him on
+    // the login splash. Open the ticket in the portal's OWN tab bar via
+    // cmnOpenTicket -> twOpenWorkspace: the current module tabs stay alive
+    // (keep-alive), the ticket opens as the internal Ticket Workspace tab
+    // with its comment thread auto-expanded, and closing it returns to the
+    // page he was on (twReturnTo). The ?ticket= deep link stays supported
+    // for shared links only.
+    cmtClose();
+    cmnOpenTicket(rid);
 });
 document.getElementById('cmtOverlay').addEventListener('click', (e) => {
     if (e.target && e.target.id === 'cmtOverlay') cmtClose();
@@ -20319,6 +20899,10 @@ document.addEventListener('click', function (e) {
     // workspace is one "Open Ticket ↗" click away inside the modal.
     if (item && item.dataset.rid) { cmnMarkRead(item.dataset.uid); cmtOpen(item.dataset.rid, parseInt(item.dataset.time || '0', 10)); return; }
     if (!e.target.closest('.twc-input-wrap')) twcHideMentionPop();
+    // Phase 22: a click whose target was DETACHED mid-event (the bell tab
+    // buttons re-render via innerHTML inside their own onclick) must never
+    // count as an outside click — that closed the panel on every tab switch.
+    if (!e.target.isConnected) return;
     if (cmnState.open && !e.target.closest('#cmnPanel') && !e.target.closest('#cmnBell')) cmnToggle(true);
 });
 
