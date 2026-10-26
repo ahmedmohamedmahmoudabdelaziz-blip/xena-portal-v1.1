@@ -7664,7 +7664,12 @@ def _scan_is_stale(scan):
 # Phase 14: per-pass cap on how many distinct user ids one background
 # backfill will try to resolve (the resolver's own throttles still apply on
 # top — BITABLE_LOOKUP_MAX per call, 1h negative caches for misses).
-BG_NAME_BACKFILL_MAX = 200
+# Phase 20: 200 -> 60. One Vercel invocation lives ~60s; the scan fetch alone
+# eats ~10-20s of it, and every live contact batch costs ~1-2s. A 200-id
+# backfill NEVER finished inside the budget — it died mid-call and took the
+# whole chain down with it (that is why Ahmed's mirror/names never caught
+# up). 60 ids per pass still drains the backlog within a few passes.
+BG_NAME_BACKFILL_MAX = 60
 
 def _scan_backfill_names(payload, token):
     """Phase 14 (Ahmed: "find easy way to save all who made ever reply or
@@ -7726,6 +7731,17 @@ def _bg_error(stage, err):
     except Exception:
         pass
 
+# Phase 20: hard time budget for the background chain. A Vercel function is
+# killed at ~60s; the scan fetch uses ~10-20s of that. Each later stage
+# checks _over_budget() and bows out cleanly instead of being SIGKILLed
+# mid-write (which used to leave the mirror half-synced and names half-cached
+# with zero trace — Ahmed's "names flip back to user-xxxx" mystery).
+CHAIN_BUDGET_S = 45
+_CHAIN_T0 = [0.0]
+
+def _over_budget():
+    return (time.time() - _CHAIN_T0[0]) > CHAIN_BUDGET_S
+
 def _scan_chain(token):
     """The refresh-holder body: rescan + the background maintenance chain.
     Phase 12: the person-name sweep moved OUT of interactive comment loads
@@ -7734,25 +7750,28 @@ def _scan_chain(token):
     Phase 14: _scan_backfill_names auto-saves every person the scan has ever
     seen so names fill up with no admin button pressed.
     Phase 15: _mirror_sync_pass keeps the Portal Comments table in sync
-    (diff-based, unchanged threads cost zero upserts)."""
+    (diff-based, unchanged threads cost zero upserts).
+    Phase 20: order is mirror -> backfill -> sweep under a 45s budget —
+    the mirror is what users SEE (bell + threads), so it goes first; the
+    sweep is the least urgent and goes last."""
+    _CHAIN_T0[0] = time.time()
     result = _fetch_all_comments(token, force=True)
-    try:
-        _sweep_step(token)
-    except Exception as e:
-        _bg_error("sweep", e)
-    # Phase 18: mirror sync runs BEFORE the name backfill now. Backfill is the
-    # slowest stage (live contact lookups for up to 200 ids) and the least
-    # time-critical; on a serverless instance that dies at the timeout it ate
-    # the mirror's time budget every single pass — one more way the Portal
-    # Comments table stayed at ~3 rows in production.
-    try:
-        _mirror_sync_pass(result[0] if isinstance(result, tuple) else None, token)
-    except Exception as e:
-        _bg_error("mirror", e)
-    try:
-        _scan_backfill_names(result[0] if isinstance(result, tuple) else None, token)
-    except Exception as e:
-        _bg_error("backfill", e)
+    scan_payload = result[0] if isinstance(result, tuple) else None
+    if not _over_budget():
+        try:
+            _mirror_sync_pass(scan_payload, token)
+        except Exception as e:
+            _bg_error("mirror", e)
+    if not _over_budget():
+        try:
+            _scan_backfill_names(scan_payload, token)
+        except Exception as e:
+            _bg_error("backfill", e)
+    if not _over_budget():
+        try:
+            _sweep_step(token)
+        except Exception as e:
+            _bg_error("sweep", e)
     return result
 
 _SCAN_LOCAL_LOCK = threading.Lock()
@@ -8010,6 +8029,182 @@ def _mirror_lookup_feed(token):
         return None
     return _mirror_row_payloads(rows)
 
+# Phase 20 (Ahmed, video 2026-10-27): a thread showed "Mubeen" on first open
+# and "user-311b" for the SAME comment on reopen. Two-sided fix:
+#  (a) WRITE side — a fresh payload build whose name cache is momentarily
+#      cold must NEVER overwrite real names the mirror row already had
+#      (_payload_carry_names, applied inside _mirror_upsert);
+#  (b) READ side — any masked name that still reaches a response is healed
+#      live, bounded to INLINE_RESOLVE_MAX ids per request
+#      (_resolve_inline_masked), and the healed mirror payload is written
+#      back in the background so the NEXT read is instantly clean.
+def _is_masked_name(nm):
+    nm = str(nm or "")
+    return (not nm) or nm.startswith("user-") or nm.startswith("ou_")
+
+def _payload_name_map(payload):
+    """uid -> resolved {name, avatar} harvested from one mirror payload."""
+    m = {}
+    def _keep(uid, name, avatar=""):
+        if uid and not _is_masked_name(name) and uid not in m:
+            m[uid] = {"name": name, "avatar": avatar or ""}
+    if not isinstance(payload, dict):
+        return m
+    fd = payload.get("feed") or {}
+    _keep(fd.get("author_id"), fd.get("author_name"), fd.get("author_avatar"))
+    for rx in (fd.get("reactions") or []):
+        if isinstance(rx, dict):
+            _keep(rx.get("reactor_id"), rx.get("reactor_name"), rx.get("reactor_avatar"))
+            _keep(rx.get("on_user_id"), rx.get("on_name"))
+    for r in (payload.get("replies") or []):
+        if not isinstance(r, dict):
+            continue
+        _keep(r.get("user_id"), r.get("user_name"), r.get("user_avatar"))
+        for p in (r.get("parts") or []):
+            if isinstance(p, dict) and p.get("type") == "mention":
+                _keep(p.get("user_id"), p.get("name"))
+        for rx in (r.get("reactions") or []):
+            if isinstance(rx, dict):
+                for u, n in zip(rx.get("users") or [], rx.get("names") or []):
+                    _keep(u, n)
+    return m
+
+def _payload_apply_names(payload, good):
+    """Rewrite every masked name/empty avatar in a payload from good
+    (uid -> {name, avatar}). Mutates and returns payload."""
+    if not good or not isinstance(payload, dict):
+        return payload
+    def _nm(uid, cur):
+        e = good.get(uid)
+        return e["name"] if (e and _is_masked_name(cur)) else cur
+    def _av(uid, cur):
+        e = good.get(uid)
+        return (e.get("avatar") or "") if (e and not cur) else cur
+    fd = payload.get("feed") or {}
+    if fd:
+        fd["author_name"] = _nm(fd.get("author_id"), fd.get("author_name"))
+        fd["author_avatar"] = _av(fd.get("author_id"), fd.get("author_avatar"))
+        for rx in (fd.get("reactions") or []):
+            if isinstance(rx, dict):
+                rx["reactor_name"] = _nm(rx.get("reactor_id"), rx.get("reactor_name"))
+                rx["reactor_avatar"] = _av(rx.get("reactor_id"), rx.get("reactor_avatar"))
+                rx["on_name"] = _nm(rx.get("on_user_id"), rx.get("on_name"))
+    for r in (payload.get("replies") or []):
+        if not isinstance(r, dict):
+            continue
+        r["user_name"] = _nm(r.get("user_id"), r.get("user_name"))
+        r["user_avatar"] = _av(r.get("user_id"), r.get("user_avatar"))
+        for p in (r.get("parts") or []):
+            if isinstance(p, dict) and p.get("type") == "mention":
+                p["name"] = _nm(p.get("user_id"), p.get("name"))
+        for rx in (r.get("reactions") or []):
+            if isinstance(rx, dict) and rx.get("users") and rx.get("names"):
+                rx["names"] = [_nm(u, n) for u, n in zip(rx["users"], rx["names"])]
+    return payload
+
+def _payload_carry_names(payload, old_json):
+    """Never let a masked name overwrite a resolved one the mirror row
+    already carries (write-side flip-flop guard)."""
+    if not old_json:
+        return payload
+    try:
+        old = json.loads(old_json)
+    except Exception:
+        return payload
+    return _payload_apply_names(payload, _payload_name_map(old))
+
+INLINE_RESOLVE_MAX = 6
+
+def _resolve_inline_masked(objs, token, uat=None):
+    """Heal masked names in a response about to be served, live but BOUNDED
+    (max INLINE_RESOLVE_MAX ids, one force_live resolver call). Handles both
+    flattened thread items (user_name / parts[].mention.name /
+    reactions[].names) and feed items (author / reactions[].reactor_name,
+    on_author). Returns True when anything changed."""
+    masked, seen = [], set()
+    def _need(uid, nm):
+        if uid and _is_masked_name(nm) and uid not in seen:
+            seen.add(uid)
+            masked.append(uid)
+    for o in (objs or []):
+        if not isinstance(o, dict):
+            continue
+        _need(o.get("user_id"), o.get("user_name"))
+        _need(o.get("author_id"), o.get("author") or o.get("author_name"))
+        for p in (o.get("parts") or []):
+            if isinstance(p, dict) and p.get("type") == "mention":
+                _need(p.get("user_id"), p.get("name"))
+        for rx in (o.get("reactions") or []):
+            if not isinstance(rx, dict):
+                continue
+            _need(rx.get("reactor_id"), rx.get("reactor_name"))
+            _need(rx.get("on_user_id"), rx.get("on_name") or rx.get("on_author"))
+            for u, n in zip(rx.get("users") or [], rx.get("names") or []):
+                _need(u, n)
+        if len(masked) >= INLINE_RESOLVE_MAX * 2:
+            break
+    if not masked:
+        return False
+    try:
+        got = _resolve_comment_names(masked[:INLINE_RESOLVE_MAX], token,
+                                     uat=uat or None, force_live=True)
+    except Exception:
+        return False
+    good = {u: e for u, e in (got or {}).items()
+            if e and not _is_masked_name(e.get("name"))}
+    if not good:
+        return False
+    changed = False
+    for o in objs:
+        if not isinstance(o, dict):
+            continue
+        e = good.get(o.get("user_id"))
+        if e and _is_masked_name(o.get("user_name")):
+            o["user_name"] = e["name"]; changed = True
+            if not o.get("user_avatar"):
+                o["user_avatar"] = e.get("avatar") or ""
+        e = good.get(o.get("author_id"))
+        if e and _is_masked_name(o.get("author")):
+            o["author"] = e["name"]; changed = True
+            if not o.get("author_avatar"):
+                o["author_avatar"] = e.get("avatar") or ""
+        if e and _is_masked_name(o.get("author_name")):
+            o["author_name"] = e["name"]; changed = True
+            if not o.get("author_avatar"):
+                o["author_avatar"] = e.get("avatar") or ""
+        for p in (o.get("parts") or []):
+            if isinstance(p, dict) and p.get("type") == "mention":
+                e = good.get(p.get("user_id"))
+                if e and _is_masked_name(p.get("name")):
+                    p["name"] = e["name"]; changed = True
+        for rx in (o.get("reactions") or []):
+            if not isinstance(rx, dict):
+                continue
+            e = good.get(rx.get("reactor_id"))
+            if e and _is_masked_name(rx.get("reactor_name")):
+                rx["reactor_name"] = e["name"]; changed = True
+            e = good.get(rx.get("on_user_id"))
+            if e:
+                if _is_masked_name(rx.get("on_name")):
+                    rx["on_name"] = e["name"]; changed = True
+                if _is_masked_name(rx.get("on_author")):
+                    rx["on_author"] = e["name"]; changed = True
+            if rx.get("users") and rx.get("names"):
+                nn = [good.get(u, {}).get("name") if _is_masked_name(n) and u in good else n
+                      for u, n in zip(rx["users"], rx["names"])]
+                if nn != rx["names"]:
+                    rx["names"] = nn; changed = True
+    return changed
+
+def _mirror_writeback(payloads, token):
+    """Persist inline-healed mirror payloads in the BACKGROUND (daemon thread
+    calls this) — after a read heals names live, the next read of the same
+    thread/feed is instantly clean. Never raises; failures land in the ledger."""
+    try:
+        _mirror_upsert(payloads, token)
+    except Exception as e:
+        _bg_error("mirror_writeback", e)
+
 def _mirror_thread_payload(c, record_id, people, numbering):
     """The full mirror Payload for one scan thread: replies flattened EXACTLY
     like the GET /api/comments response but with names/avatars pre-resolved
@@ -8057,7 +8252,18 @@ def _mirror_thread_payload(c, record_id, people, numbering):
                     "on_text": (r_plain or "")[:120],
                 })
     last = replies[-1] if replies else {}
-    _, last_plain = _reply_parts(last)
+    last_parts, last_plain = _reply_parts(last)
+    # Phase 20: the bell renders @mentions as highlighted chips — it needs the
+    # last reply's parts WITH resolved names, not just the flattened text.
+    feed_text_parts = []
+    for p in last_parts:
+        if not isinstance(p, dict):
+            continue
+        if p.get("type") == "mention":
+            feed_text_parts.append({"type": "mention", "user_id": p.get("user_id"),
+                                    "name": _p(p.get("user_id"))["name"]})
+        elif p.get("text"):
+            feed_text_parts.append({"type": "text", "text": p.get("text")})
     feed = {
         "comment_id": c.get("comment_id"),
         "last_reply_id": last.get("reply_id"),
@@ -8072,6 +8278,7 @@ def _mirror_thread_payload(c, record_id, people, numbering):
         # phantom red badge); the reaction still notifies via its own entry.
         "act_time": last.get("create_time") or c.get("update_time"),
         "text": (last_plain or "")[:180],
+        "text_parts": feed_text_parts,
         "image_count": img_count,
         "reply_count": len(replies),
         "mention_ids": sorted(set(mention_ids)),
@@ -8115,17 +8322,23 @@ def _mirror_upsert(payloads, token):
             if err:
                 return 0, 0
             for row in rows:
-                cid = _mirror_cell_text((row.get("fields") or {}).get("Comment ID"))
+                rf = row.get("fields") or {}
+                cid = _mirror_cell_text(rf.get("Comment ID"))
                 if cid:
-                    have[cid] = row.get("record_id")
+                    have[cid] = (row.get("record_id"),
+                                 _mirror_cell_text(rf.get("Payload")))
     updates, creates = [], []
     for p in payloads:
         cid = p.get("comment_id")
-        f = _mirror_row_fields(p)
         if cid and cid in have:
-            updates.append({"record_id": have[cid], "fields": f})
+            # Phase 20: carry forward any name the existing row already has
+            # resolved — a cold-cache rebuild must never REGRESS a real name
+            # back to "user-xxxx" (Ahmed's Mubeen -> user-311b flip-flop).
+            p = _payload_carry_names(p, have[cid][1])
+            updates.append({"record_id": have[cid][0],
+                            "fields": _mirror_row_fields(p)})
         else:
-            creates.append({"fields": f})
+            creates.append({"fields": _mirror_row_fields(p)})
     # Phase 17: the batch calls used to ignore even the RESPONSE code — a
     # permission/shape rejection looked exactly like success (another way the
     # production mirror stayed silently empty). Non-zero codes and request
@@ -9094,6 +9307,16 @@ def list_ticket_comments():
                 for p in mirror:
                     out.extend(p.get("replies") or [])
                 out.sort(key=lambda x: x.get("create_time") or 0)
+                # Phase 20: heal any masked name LIVE (bounded, one resolver
+                # call) — the reply dicts are the same objects inside the
+                # mirror payloads, so a heal persists back in the background
+                # and the next open of this thread is instantly clean.
+                try:
+                    if _resolve_inline_masked(out, token, uat=uat or None):
+                        threading.Thread(target=_mirror_writeback,
+                                         args=(mirror, token), daemon=True).start()
+                except Exception:
+                    pass
                 return jsonify({"success": True, "comments": out, "count": len(out),
                                 "truncated": bool((scan_c or {}).get("truncated")),
                                 "stale": _scan_is_stale(scan_c),
@@ -9140,6 +9363,12 @@ def list_ticket_comments():
                 p["name"] = people.get(p["user_id"], {}).get("name", p["user_id"])
         for rx in item["reactions"]:
             rx["names"] = [people.get(u, {}).get("name", u) for u in rx["users"]]
+    # Phase 20: anyone STILL masked after the cache-only pass gets one bounded
+    # live heal (INLINE_RESOLVE_MAX ids) so the thread opens with real names.
+    try:
+        _resolve_inline_masked(out, token, uat=uat or None)
+    except Exception:
+        pass
     return jsonify({"success": True, "comments": out, "count": len(out),
                     "truncated": bool(scan.get("truncated")),
                     "stale": _scan_is_stale(scan),
@@ -9297,21 +9526,28 @@ def comments_health():
     with _redis_health["lock"]:
         last_err, last_err_ts = _redis_health["last_error"], _redis_health["last_error_ts"]
     cached = redis_get_json(COMMENTS_SCAN_CACHE_KEY)
-    scan_items = 0
+    scan_items, scan_newest = 0, 0
     if isinstance(cached, dict):
         scan_items = len(cached.get("items") or [])
+        scan_newest = max([int(c.get("update_time") or 0)
+                           for c in (cached.get("items") or [])] or [0])
     mirror = {"enabled": MIRROR_ENABLE, "rows": None, "error": "",
-              "stats": dict(_MIRROR_STATS)}
+              "stats": dict(_MIRROR_STATS), "newest_update_time": None}
     if MIRROR_ENABLE:
         try:
             resp = feishu_session.post(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{MIRROR_TABLE_ID}/records/search",
                 headers={"Authorization": f"Bearer {get_tenant_access_token()}",
                          "Content-Type": "application/json; charset=utf-8"},
-                params={"page_size": 1}, json={}, timeout=15)
+                params={"page_size": 1},
+                json={"sort": [{"field_name": "Update Time", "desc": True}],
+                      "field_names": ["Update Time"]}, timeout=15)
             data = resp.json()
             if data.get("code") == 0:
                 mirror["rows"] = (data.get("data") or {}).get("total")
+                top = ((data.get("data") or {}).get("items") or [{}])[0]
+                mirror["newest_update_time"] = _mirror_cell_num(
+                    (top.get("fields") or {}).get("Update Time"))
             else:
                 mirror["error"] = f"{data.get('code')}: {data.get('msg')}"
         except Exception as e:
@@ -9327,7 +9563,8 @@ def comments_health():
                   "last_error_age_s": int(now - last_err_ts) if last_err_ts else None,
                   "mem_fallback_keys": len(_mem_store)},
         "scan_cache": {"present": isinstance(cached, dict), "items": scan_items,
-                       "age_s": int(now - cached.get("ts", 0)) if isinstance(cached, dict) else None},
+                       "age_s": int(now - cached.get("ts", 0)) if isinstance(cached, dict) else None,
+                       "newest_update_time": scan_newest},
         "mirror": mirror,
         "auto_refresh": {"min_gap_s": SCAN_AUTO_MIN_GAP,
                          "last_auto_age_s": int(now - last_auto) if last_auto else None},
@@ -9491,6 +9728,18 @@ def comments_feed():
             elif isinstance(scan_c, dict) and not scan_c.get("items"):
                 serve_mirror = True
             if serve_mirror:
+                # Phase 20: heal masked names in the payload feed dicts LIVE
+                # (bounded) — these are the same objects as the mirror rows,
+                # so a heal persists back in the background and the next bell
+                # poll is instantly clean.
+                try:
+                    feeds = [p.get("feed") for p in mirror[:COMMENTS_FEED_MAX]
+                             if isinstance(p.get("feed"), dict)]
+                    if _resolve_inline_masked(feeds, token, uat=uat or None):
+                        threading.Thread(target=_mirror_writeback,
+                                         args=(mirror, token), daemon=True).start()
+                except Exception:
+                    pass
                 items = []
                 for p in mirror[:COMMENTS_FEED_MAX]:
                     fd = (p.get("feed") or {})
@@ -9507,6 +9756,7 @@ def comments_feed():
                         "time": fd.get("time"),
                         "act_time": fd.get("act_time") or fd.get("time"),
                         "text": fd.get("text") or "",
+                        "text_parts": fd.get("text_parts") or [],
                         "image_count": fd.get("image_count") or 0,
                         "reply_count": fd.get("reply_count") or 0,
                         "mentions_me": bool(my_open_id) and my_open_id in (fd.get("mention_ids") or []),
@@ -9615,6 +9865,8 @@ def comments_feed():
             # bumps on reactions and re-flagged read threads — the phantom badge).
             "act_time": last.get("create_time") or c.get("update_time"),
             "text": plain[:180],
+            # Phase 20: mention parts for the bell's highlighted @chips
+            "text_parts": [p for p in parts if isinstance(p, dict)],
             "image_count": img_count,
             "reply_count": len(replies),
             "mentions_me": mentions_me,
@@ -9659,6 +9911,15 @@ def comments_feed():
         else:
             for rx in it.get("reactions") or []:
                 rx["reactor_name"] = people.get(rx["reactor_id"], {}).get("name", rx["reactor_id"])
+            for p in it.get("text_parts") or []:
+                if p.get("type") == "mention":
+                    p["name"] = people.get(p.get("user_id"), {}).get("name", p.get("user_id"))
+    # Phase 20: bounded live heal for anyone still masked after the
+    # cache-only pass — the bell shows real names on first paint.
+    try:
+        _resolve_inline_masked(items, token, uat=uat or None)
+    except Exception:
+        pass
     # Phase 12 (Ahmed: "99+ notifications they are all old and i make them
     # readed but still after while show as unreaded"): read state moves from
     # client-side localStorage (time > lastSeen — reaction bumps re-flagged
