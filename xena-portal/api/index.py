@@ -2639,6 +2639,29 @@ def search():
     else:
         return jsonify(data), 404
 
+def _attach_cached_avatars(rows):
+    """Phase 22 (Ahmed: "why it not show the member pic???"): fill avatar_url
+    on access-table rows from the person cache — ZERO live Feishu calls.
+    Chain: email -> xena:uemail:{email} (open_id bridge written by
+    _harvest_person_names whenever any Bitable person dict carrying an email
+    is seen — the Agent Roster board warms it for the whole team) ->
+    xena:uname:{oid} -> {name, avatar}. Misses keep the initials fallback."""
+    for u in rows or []:
+        try:
+            if not isinstance(u, dict) or u.get("avatar_url"):
+                continue
+            em = (u.get("email") or "").strip().lower()
+            if not em or em.startswith("__role__::") or "@" not in em:
+                continue
+            oid = redis_get_json(f"xena:uemail:{em}")
+            if not oid:
+                continue
+            ent = redis_get_json(f"xena:uname:{oid}")
+            if isinstance(ent, dict) and ent.get("avatar"):
+                u["avatar_url"] = ent["avatar"]
+        except Exception:
+            continue
+
 @app.route('/api/admin/users', methods=['GET','POST','DELETE'])
 def manage_users():
     # BUG FIX: see the matching comment in audit_logs() -- this must check by email
@@ -2696,6 +2719,7 @@ def manage_users():
             ident  = (u["email"] or "").lower()
             pident = (u.get("person") or "").lower()
             u["enabled"] = tmap.get(ident, tmap.get(pident, True))
+        _attach_cached_avatars(users)  # Phase 22: real member photos, cache-only
         return jsonify(users)
 
     elif request.method == 'POST':
@@ -2987,6 +3011,7 @@ def preview_targets():
             agents.append({"email": display_email,
                            "modules": [m.strip() for m in modules_raw.split(",") if m.strip()]})
         agents.sort(key=lambda a: a["email"].lower())
+        _attach_cached_avatars(agents)  # Phase 22: real member photos, cache-only
         return jsonify({"success": True, "agents": agents})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -5841,7 +5866,15 @@ def analytics():
             }
         except Exception as e: stats["comparison_error"] = str(e)
 
-    stats["executive_insights"] = generate_executive_insights(stats, cmp_stats)
+    # Phase 22 (Ahmed: an agent with ONLY "Analytics Report" could see the
+    # 🧠 Executive Intelligence panel): the insights ride this shared
+    # response, so gate them SERVER-side too — full analytics or the
+    # dedicated sub-feature only. Namespace prefix matching leaked them to
+    # analytics_report holders ("analytics" prefixes "analytics_report").
+    if perms.get("is_super_admin") or any(m in ("analytics", "analytics_exec_insights") for m in perms.get("modules", [])):
+        stats["executive_insights"] = generate_executive_insights(stats, cmp_stats)
+    else:
+        stats["executive_insights"] = []
 
     duration_ms = int((time.time() - start) * 1000)
     logger.info("analytics_complete", region=region_filter, acm=acm_filter, rows=stats["scanned_rows"], duration_ms=duration_ms)
@@ -9687,6 +9720,494 @@ def _resolve_record_numberings(record_ids, token):
                 redis_set_json(f"xena:recnum:{rid}", {"numbering": str(num)}, ttl=COMMENT_RECNUM_TTL)
     return nums
 
+# ==================== Phase 22: Audition Schedule ====================
+# Ahmed (2026-10-27): new AUDITION "Schedule" tab. Admin view: per-agent
+# shifts / off days (weekly grid, range apply, copy-week, requests inbox);
+# agent view: own week + leave/off-change requests. Storage = two tables in
+# the Grand Table base (created 2026-10-27, TAT-shared like Portal Comments):
+#   "Audition Schedule"  tblfB8sUlmDV9KtD — one row per agent-day:
+#     Key "email|yyyymmdd" (primary text), Agent Email, Agent Name,
+#     Day (number yyyymmdd), Type select, Start/End text "HH:MM", Note,
+#     Updated By, Updated At (epoch s)
+#   "Audition Requests"  tbldJqbfy3APXIdA — one row per request:
+#     Key "rq_<hex>", Agent Email/Name, Type select, From Day/To Day
+#     (number yyyymmdd), Reason, Status select, Admin Note, Created At,
+#     Decided By, Decided At
+# Day granularity = yyyymmdd INTEGERS: no timezone math, exact range filters.
+SCHED_TABLE_ID     = "tblfB8sUlmDV9KtD"
+SCHED_REQ_TABLE_ID = "tbldJqbfy3APXIdA"
+SCHED_TYPES        = ("On Site", "Work From Home", "Off", "Annual Leave", "Sick Leave")
+SCHED_REQ_TYPES    = ("Change Off", "Annual Leave", "Sick Leave", "Work From Home")
+SCHED_REQ_TO_TYPE  = {"Change Off": "Off", "Annual Leave": "Annual Leave",
+                      "Sick Leave": "Sick Leave", "Work From Home": "Work From Home"}
+SCHED_READ_TTL     = 60      # s — schedule GET cache (versioned by xena:sched:v)
+SCHED_AGENTS_TTL   = 300     # s — roster picklist cache
+SCHED_MAX_SPAN     = 62      # days — one request approval / range apply
+
+def _sched_day_ok(d):
+    try:
+        d = int(d)
+    except Exception:
+        return None
+    return d if 20000101 <= d <= 21001231 else None
+
+def _sched_day_add(d, n):
+    dt = datetime.strptime(str(int(d)), "%Y%m%d") + timedelta(days=int(n))
+    return int(dt.strftime("%Y%m%d"))
+
+def _sched_day_range(a, b, cap=SCHED_MAX_SPAN):
+    out, d = [], int(a)
+    while d <= int(b) and len(out) < cap:
+        out.append(d)
+        d = _sched_day_add(d, 1)
+    return out
+
+def _sched_version():
+    try:
+        return int(redis_get_json("xena:sched:v") or 0)
+    except Exception:
+        return 0
+
+def _sched_bump():
+    try:
+        redis_set_json("xena:sched:v", int(time.time() * 1000), ttl=86400 * 365)
+    except Exception:
+        pass
+
+def _audition_sched_gate(email, user):
+    """audition_status / audition_access holders + admins."""
+    perms = get_user_permissions(email, user)
+    mods = perms.get("modules", [])
+    if not perms.get("is_super_admin") and not any(m in ("admin", "audition_status", "audition_access") for m in mods):
+        return None
+    return perms
+
+def _sched_is_admin(perms):
+    return bool(perms.get("is_super_admin") or "admin" in perms.get("modules", []))
+
+def _sched_search_range(from_day, to_day, token, field_names=None):
+    """All schedule rows with Day in [from_day, to_day] (paginated, 4 pages max)."""
+    rows, page_token, pages = [], None, 0
+    body = {"filter": {"conjunction": "and", "conditions": [
+                {"field_name": "Day", "operator": "isGreaterEqual", "value": [str(int(from_day))]},
+                {"field_name": "Day", "operator": "isLessEqual", "value": [str(int(to_day))]}]},
+            "field_names": field_names or ["Key", "Agent Email", "Agent Name", "Day", "Type", "Start", "End", "Note"],
+            "automatic_fields": False}
+    while pages < 4:
+        params = {"page_size": 500}
+        if page_token:
+            params["page_token"] = page_token
+        resp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_TABLE_ID}/records/search",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"},
+            params=params, json=body, timeout=15)
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"schedule read: {data.get('code')}: {data.get('msg')}")
+        d = data.get("data") or {}
+        rows.extend(d.get("items") or [])
+        pages += 1
+        if not d.get("has_more"):
+            break
+        page_token = d.get("page_token")
+        if not page_token:
+            break
+    return rows
+
+def _sched_row_out(item):
+    f = item.get("fields") or {}
+    return {"record_id": item.get("record_id"),
+            "key": _mirror_cell_text(f.get("Key")),
+            "email": _mirror_cell_text(f.get("Agent Email")),
+            "name": _mirror_cell_text(f.get("Agent Name")),
+            "day": int(_mirror_cell_num(f.get("Day")) or 0),
+            "type": _mirror_cell_text(f.get("Type")) or "On Site",
+            "start": _mirror_cell_text(f.get("Start")),
+            "end": _mirror_cell_text(f.get("End")),
+            "note": _mirror_cell_text(f.get("Note"))}
+
+def _sched_fields(email, name, day, stype, start, end, note, by):
+    return {"Key": f"{(email or '').strip().lower()}|{int(day)}",
+            "Agent Email": (email or "").strip().lower(),
+            "Agent Name": name or "",
+            "Day": int(day),
+            "Type": stype,
+            "Start": start or "",
+            "End": end or "",
+            "Note": note or "",
+            "Updated By": by or "",
+            "Updated At": int(time.time())}
+
+@app.route('/api/audition/schedule', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_get():
+    """Week grid data. Admins get everyone in [from,to]; everyone else gets
+    ONLY their own rows (email match, then exact Lark name) — one shared
+    range search serves both, cached SCHED_READ_TTL and versioned so any
+    write invalidates instantly (reads = 1 Feishu call/min worst case)."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    from_day = _sched_day_ok(request.args.get('from', ''))
+    to_day   = _sched_day_ok(request.args.get('to', ''))
+    if not from_day or not to_day:
+        return jsonify({"success": False, "error": "Need from/to as yyyymmdd."}), 400
+    try:
+        span = (datetime.strptime(str(to_day), "%Y%m%d") - datetime.strptime(str(from_day), "%Y%m%d")).days
+    except Exception:
+        return jsonify({"success": False, "error": "Need from/to as yyyymmdd."}), 400
+    if span < 0 or span > SCHED_MAX_SPAN * 2:
+        return jsonify({"success": False, "error": f"Range must be 0..{SCHED_MAX_SPAN * 2} days."}), 400
+    token = get_tenant_access_token()
+    is_admin = _sched_is_admin(perms)
+    ver = _sched_version()
+    ck = f"xena:sched:range:{from_day}:{to_day}"
+    rows = None
+    try:
+        cached = redis_get_json(ck)
+        if isinstance(cached, dict) and cached.get("v") == ver:
+            rows = cached.get("rows")
+    except Exception:
+        rows = None
+    if rows is None:
+        try:
+            rows = [_sched_row_out(it) for it in _sched_search_range(from_day, to_day, token)]
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 502
+        try:
+            redis_set_json(ck, {"v": ver, "rows": rows}, ttl=SCHED_READ_TTL)
+        except Exception:
+            pass
+    if not is_admin:
+        em, nm = (email or "").strip().lower(), (user or "").strip().lower()
+        rows = [r for r in rows if (em and (r.get("email") or "").lower() == em)
+                or (nm and (r.get("name") or "").strip().lower() == nm)]
+    return jsonify({"success": True, "from": from_day, "to": to_day,
+                    "types": list(SCHED_TYPES), "rows": rows,
+                    "server_time_ms": int(time.time() * 1000),
+                    "admin": is_admin})
+
+@app.route('/api/audition/schedule', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_save():
+    """Admin upsert: {entries:[{email,name,day,type,start,end,note}]} keyed by
+    email|day (existing rows single-PUT — verified working on this tenant;
+    new rows batch_create in chunks of 400). {delete_keys:[...]} removes rows.
+    Every write bumps xena:sched:v so cached ranges die at once."""
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    token = get_tenant_access_token()
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_TABLE_ID}/records"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    entries = body.get("entries") if isinstance(body.get("entries"), list) else []
+    delete_keys = [str(k) for k in (body.get("delete_keys") or []) if k][:500]
+    if not entries and not delete_keys:
+        return jsonify({"success": False, "error": "Nothing to do."}), 400
+    days = []
+    for e in entries[:500]:
+        if not isinstance(e, dict):
+            return jsonify({"success": False, "error": "Bad entry shape."}), 400
+        d = _sched_day_ok(e.get("day"))
+        if not d:
+            return jsonify({"success": False, "error": f"Bad day: {e.get('day')}"}), 400
+        if e.get("type") not in SCHED_TYPES:
+            return jsonify({"success": False, "error": f"Bad type: {e.get('type')} — must be one of {', '.join(SCHED_TYPES)}"}), 400
+        if not (e.get("email") or "").strip():
+            return jsonify({"success": False, "error": "Entry missing agent email."}), 400
+        days.append(d)
+    for k in delete_keys:
+        try:
+            days.append(int(str(k).rsplit("|", 1)[1]))
+        except Exception:
+            pass
+    if not days:
+        return jsonify({"success": False, "error": "No valid day found in the request."}), 400
+    lo, hi = min(days), max(days)
+    existing = {}
+    try:
+        for it in _sched_search_range(lo, hi, token, field_names=["Key"]):
+            k = _mirror_cell_text((it.get("fields") or {}).get("Key"))
+            if k:
+                existing[k] = it.get("record_id")
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    by = user or email
+    creates, updates, deleted, errs = [], 0, 0, []
+    for e in entries[:500]:
+        em = (e.get("email") or "").strip().lower()
+        fields = _sched_fields(em, e.get("name") or em, e["day"], e["type"],
+                               sanitize_text(str(e.get("start") or ""), max_length=8),
+                               sanitize_text(str(e.get("end") or ""), max_length=8),
+                               sanitize_text(str(e.get("note") or ""), max_length=200), by)
+        rid = existing.get(fields["Key"])
+        if rid:
+            try:
+                r = feishu_session.put(f"{base_url}/{rid}", headers=headers,
+                                       json={"fields": fields}, timeout=15).json()
+                if r.get("code") == 0:
+                    updates += 1
+                else:
+                    errs.append(f"{fields['Key']}: {r.get('msg')}")
+            except Exception as ex:
+                errs.append(f"{fields['Key']}: {ex}")
+        else:
+            creates.append({"fields": fields})
+    created_n = 0
+    for i in range(0, len(creates), 400):
+        chunk = creates[i:i + 400]
+        try:
+            r = feishu_session.post(f"{base_url}/batch_create", headers=headers,
+                                    json={"records": chunk}, timeout=30).json()
+            if r.get("code") == 0:
+                created_n += len(chunk)
+            else:
+                errs.append(f"batch_create: {r.get('code')}: {r.get('msg')}")
+        except Exception as ex:
+            errs.append(f"batch_create: {ex}")
+    if delete_keys:
+        rids = [existing[k] for k in delete_keys if k in existing]
+        for i in range(0, len(rids), 400):
+            try:
+                r = feishu_session.post(f"{base_url}/batch_delete", headers=headers,
+                                        json={"records": rids[i:i + 400]}, timeout=30).json()
+                if r.get("code") == 0:
+                    deleted += len(rids[i:i + 400])
+                else:
+                    errs.append(f"batch_delete: {r.get('code')}: {r.get('msg')}")
+            except Exception as ex:
+                errs.append(f"batch_delete: {ex}")
+    _sched_bump()
+    try:
+        audit.log(user, "AUDITION_SCHEDULE_SAVE", f"+{created_n}/~{updates}/-{deleted}", severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": not errs, "created": created_n,
+                    "updated": updates, "deleted": deleted, "errors": errs[:10]})
+
+@app.route('/api/audition/schedule/agents', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_agents():
+    """Admin picklist for the editor: the Agent Roster as {email,name,avatar}
+    (the same table the status board reads — cached 5 min, zero extra cost)."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    try:
+        cached = redis_get_json("xena:sched:agents")
+        if isinstance(cached, list):
+            return jsonify({"success": True, "agents": cached, "cached": True})
+    except Exception:
+        pass
+    try:
+        items = _presence_fetch_roster(get_tenant_access_token())
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
+    agents = []
+    for it in items:
+        persons = (it.get("fields") or {}).get("Agent Name") or []
+        if not (isinstance(persons, list) and persons and isinstance(persons[0], dict)):
+            continue
+        p = persons[0]
+        em = (p.get("email") or "").strip().lower()
+        if not em:
+            continue
+        agents.append({"email": em, "name": p.get("name") or em,
+                       "avatar": p.get("avatar_url") or ""})
+    agents.sort(key=lambda a: (a["name"] or "").lower())
+    try:
+        redis_set_json("xena:sched:agents", agents, ttl=SCHED_AGENTS_TTL)
+    except Exception:
+        pass
+    return jsonify({"success": True, "agents": agents, "cached": False})
+
+def _sched_req_out(item):
+    f = item.get("fields") or {}
+    return {"record_id": item.get("record_id"),
+            "key": _mirror_cell_text(f.get("Key")),
+            "email": _mirror_cell_text(f.get("Agent Email")),
+            "name": _mirror_cell_text(f.get("Agent Name")),
+            "type": _mirror_cell_text(f.get("Type")),
+            "from_day": int(_mirror_cell_num(f.get("From Day")) or 0),
+            "to_day": int(_mirror_cell_num(f.get("To Day")) or 0),
+            "reason": _mirror_cell_text(f.get("Reason")),
+            "status": _mirror_cell_text(f.get("Status")) or "Pending",
+            "admin_note": _mirror_cell_text(f.get("Admin Note")),
+            "created_at": int(_mirror_cell_num(f.get("Created At")) or 0),
+            "decided_by": _mirror_cell_text(f.get("Decided By"))}
+
+@app.route('/api/audition/requests', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_requests_list():
+    """Admin: all requests (?status=Pending filters). Agent: ONLY their own."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    token = get_tenant_access_token()
+    conds = []
+    status = sanitize_text(request.args.get('status', ''))
+    is_admin = _sched_is_admin(perms)
+    if status in ("Pending", "Approved", "Rejected"):
+        conds.append({"field_name": "Status", "operator": "is", "value": [status]})
+    if not is_admin:
+        em = (email or "").strip().lower()
+        if not em:
+            return jsonify({"success": True, "requests": [], "admin": False})
+        conds.append({"field_name": "Agent Email", "operator": "is", "value": [em]})
+    body = {"field_names": ["Key", "Agent Email", "Agent Name", "Type", "From Day", "To Day",
+                            "Reason", "Status", "Admin Note", "Created At", "Decided By"]}
+    if conds:
+        body["filter"] = {"conjunction": "and", "conditions": conds}
+    try:
+        resp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_REQ_TABLE_ID}/records/search",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"},
+            params={"page_size": 200}, json=body, timeout=15)
+        data = resp.json()
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    if data.get("code") != 0:
+        return jsonify({"success": False, "error": f"{data.get('code')}: {data.get('msg')}"}), 502
+    reqs = [_sched_req_out(it) for it in ((data.get("data") or {}).get("items") or [])]
+    reqs.sort(key=lambda r: r["created_at"], reverse=True)
+    return jsonify({"success": True, "requests": reqs, "admin": is_admin})
+
+@app.route('/api/audition/requests', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_requests_create():
+    """Agent files a Change-Off / Annual / Sick / WFH request (Pending)."""
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    em = (email or "").strip().lower()
+    if not em:
+        return jsonify({"success": False, "error": "No email on your session."}), 400
+    rtype = sanitize_text(body.get('type', ''))
+    if rtype not in SCHED_REQ_TYPES:
+        return jsonify({"success": False, "error": f"Type must be one of: {', '.join(SCHED_REQ_TYPES)}"}), 400
+    fd, td = _sched_day_ok(body.get('from_day')), _sched_day_ok(body.get('to_day'))
+    if not fd or not td or td < fd:
+        return jsonify({"success": False, "error": "Need valid from/to dates."}), 400
+    if len(_sched_day_range(fd, td, cap=SCHED_MAX_SPAN + 1)) > SCHED_MAX_SPAN:
+        return jsonify({"success": False, "error": f"One request covers at most {SCHED_MAX_SPAN} days."}), 400
+    reason = sanitize_text(str(body.get('reason') or ''), max_length=500)
+    fields = {"Key": "rq_" + uuid.uuid4().hex[:12],
+              "Agent Email": em, "Agent Name": user or em,
+              "Type": rtype, "From Day": fd, "To Day": td,
+              "Reason": reason, "Status": "Pending",
+              "Created At": int(time.time())}
+    try:
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_REQ_TABLE_ID}/records",
+            headers={"Authorization": f"Bearer {get_tenant_access_token()}",
+                     "Content-Type": "application/json; charset=utf-8"},
+            json={"fields": fields}, timeout=15).json()
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    if r.get("code") != 0:
+        return jsonify({"success": False, "error": f"{r.get('code')}: {r.get('msg')}"}), 502
+    try:
+        audit.log(user, "AUDITION_REQUEST_CREATE", f"{rtype} {fd}->{td}", severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": True, "key": fields["Key"]})
+
+@app.route('/api/audition/requests/decide', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_requests_decide():
+    """Admin approves/rejects. APPROVE auto-writes the schedule rows
+    (Change Off -> Off; leave/WFH types map to the same-named schedule type)
+    so the grid and the request never disagree."""
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    decision = sanitize_text(body.get('decision', ''))
+    if decision not in ("Approved", "Rejected"):
+        return jsonify({"success": False, "error": "decision must be Approved or Rejected"}), 400
+    rid = sanitize_text(body.get('record_id', ''))
+    if not rid:
+        return jsonify({"success": False, "error": "record_id required"}), 400
+    token = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    req_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_REQ_TABLE_ID}/records/{rid}"
+    try:
+        cur = feishu_session.get(req_url, headers=headers, timeout=15).json()
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    if cur.get("code") != 0:
+        return jsonify({"success": False, "error": f"{cur.get('code')}: {cur.get('msg')}"}), 502
+    rq = _sched_req_out((cur.get("data") or {}).get("record") or {})
+    if not rq.get("record_id") and not rq.get("key"):
+        return jsonify({"success": False, "error": "Request not found."}), 404
+    if rq["status"] != "Pending":
+        return jsonify({"success": False, "error": f"Already {rq['status']}."}), 409
+    wrote = 0
+    if decision == "Approved":
+        stype = SCHED_REQ_TO_TYPE.get(rq["type"])
+        days = _sched_day_range(rq["from_day"], rq["to_day"]) if (rq["from_day"] and rq["to_day"]) else []
+        if stype and days and rq["email"]:
+            existing = {}
+            try:
+                for it in _sched_search_range(days[0], days[-1], token, field_names=["Key"]):
+                    k = _mirror_cell_text((it.get("fields") or {}).get("Key"))
+                    if k:
+                        existing[k] = it.get("record_id")
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 502
+            sched_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_TABLE_ID}/records"
+            creates = []
+            for d in days:
+                f2 = _sched_fields(rq["email"], rq["name"], d, stype, "", "", f"Request {rq['key']}", user or email)
+                erid = existing.get(f2["Key"])
+                if erid:
+                    try:
+                        r1 = feishu_session.put(f"{sched_url}/{erid}", headers=headers, json={"fields": f2}, timeout=15).json()
+                        if r1.get("code") == 0:
+                            wrote += 1
+                    except Exception:
+                        pass
+                else:
+                    creates.append({"fields": f2})
+            for i in range(0, len(creates), 400):
+                try:
+                    r2 = feishu_session.post(f"{sched_url}/batch_create", headers=headers,
+                                             json={"records": creates[i:i + 400]}, timeout=30).json()
+                    if r2.get("code") == 0:
+                        wrote += len(creates[i:i + 400])
+                except Exception:
+                    pass
+            _sched_bump()
+    note = sanitize_text(str(body.get('admin_note') or ''), max_length=300)
+    try:
+        r = feishu_session.put(req_url, headers=headers, json={"fields": {
+            "Status": decision, "Admin Note": note,
+            "Decided By": user or email, "Decided At": int(time.time())}}, timeout=15).json()
+        if r.get("code") != 0:
+            return jsonify({"success": False, "error": f"{r.get('code')}: {r.get('msg')}"}), 502
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    try:
+        audit.log(user, "AUDITION_REQUEST_DECIDE", f"{rq['key']} -> {decision} ({wrote} schedule rows)", severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": True, "decision": decision, "schedule_rows_written": wrote})
+
+
 @app.route('/api/comments/feed', methods=['GET'])
 @rate_limit(*RATE_LIMIT_COMMENTS)
 def comments_feed():
@@ -9789,7 +10310,7 @@ def comments_feed():
                             "is_solved": bool(fd.get("is_solved")),
                             "numbering": fd.get("numbering"),
                         })
-                items.sort(key=lambda x: x.get("time") or 0, reverse=True)
+                items.sort(key=lambda x: _notif_ms(x.get("time")), reverse=True)
                 items = items[:COMMENTS_FEED_MAX]
                 seen, wm = _notif_load_seen(email, token)
                 unread_n = 0
@@ -9804,7 +10325,7 @@ def comments_feed():
                     # thread as "new comment"; reaction-kind entries keep the
                     # bump clock (that IS the new event).
                     clk = it.get("time") if it.get("kind") == "reaction" else (it.get("act_time") or it.get("time"))
-                    it["unread"] = (not mine) and (it["uid"] not in seen) and (float(clk or 0) > wm)
+                    it["unread"] = (not mine) and (it["uid"] not in seen) and (_notif_ms(clk) > wm)
                     if it["unread"]:
                         unread_n += 1
                 return jsonify({"success": True, "items": items, "count": len(items),
@@ -9898,7 +10419,7 @@ def comments_feed():
                 "mentions_me": bool(my_open_id) and rx["on_user_id"] == my_open_id and rx["reactor_id"] != my_open_id,
                 "is_solved": bool(c.get("is_solved")),
             })
-    items.sort(key=lambda x: x.get("time") or 0, reverse=True)
+    items.sort(key=lambda x: _notif_ms(x.get("time")), reverse=True)
     items = items[:COMMENTS_FEED_MAX]
     nums = _resolve_record_numberings([it["record_id"] for it in items], token)
     people = _resolve_comment_names(ids, token, uat=uat or None)
@@ -9942,7 +10463,7 @@ def comments_feed():
         # so a bare reaction no longer re-flags a read thread as "new comment";
         # reaction-kind entries keep the bump clock (that IS the new event).
         clk = it.get("time") if it.get("kind") == "reaction" else (it.get("act_time") or it.get("time"))
-        it["unread"] = (not mine) and (it["uid"] not in seen) and (float(clk or 0) > wm)
+        it["unread"] = (not mine) and (it["uid"] not in seen) and (_notif_ms(clk) > wm)
         if it["unread"]:
             unread_n += 1
     return jsonify({"success": True, "items": items, "count": len(items),
@@ -9955,6 +10476,21 @@ NOTIF_SEEN_CAP = 3000          # per-email seen-uids kept (trimmed oldest-first)
 NOTIF_SEEN_TTL = 30 * 86400    # read state lives 30 days
 NOTIF_STATE_TABLE_ID = "tblPwjiJI6fb7v6p"  # "Portal Notif State" (created 2026-10-21)
 NOTIF_STATE_SYNC_TTL = 120     # seconds between per-instance durable re-reads
+
+def _notif_ms(v):
+    """Phase 22: normalize a comment/read-state clock to MILLISECONDS. Feishu
+    comment create_time/update_time arrive as ms strings (~1.7e12) while the
+    mark-all watermark used to be written in SECONDS (time.time(), ~1.7e9) —
+    so `clk > wm` was ALWAYS true and every cleared notification re-flagged
+    unread on the next load (Ahmed: "every time it load the comments it show
+    me the red alert unread comments"). Anything < 1e12 is a legacy seconds
+    value -> x1000 (also heals old Redis rows and Portal Notif State
+    Watermark cells the moment they are read)."""
+    try:
+        f = float(v or 0)
+    except Exception:
+        return 0.0
+    return f * 1000.0 if 0 < f < 1e12 else f
 
 def _notif_state_load_base(ek, token):
     """(seen_list, watermark) from the Portal Notif State table; None on any
@@ -10055,7 +10591,7 @@ def _notif_load_seen(email, token=None):
     except Exception:
         lst, wm = None, None
     seen = set(lst if isinstance(lst, list) else [])
-    wm = float(wm or 0)
+    wm = _notif_ms(wm)  # Phase 22: heal legacy seconds watermarks on read
     if token:
         try:
             last_sync = float(redis_get_json(f"xena:notif:sync:{ek}") or 0)
@@ -10067,7 +10603,7 @@ def _notif_load_seen(email, token=None):
             if base_state is not None:
                 b_seen, b_wm = base_state
                 merged = seen | set(b_seen or [])
-                new_wm = max(wm, float(b_wm or 0))
+                new_wm = max(wm, _notif_ms(b_wm))  # Phase 22: durable row may hold legacy seconds
                 if merged != seen:
                     redis_set_json(f"xena:notif:seen:{ek}", list(merged)[-NOTIF_SEEN_CAP:], ttl=NOTIF_SEEN_TTL)
                 if new_wm > wm:
@@ -10097,7 +10633,9 @@ def _notif_mark_read(email, uids=None, mark_all=False, token=None):
             lst = (lst + fresh)[-NOTIF_SEEN_CAP:]
             redis_set_json(f"xena:notif:seen:{ek}", lst, ttl=NOTIF_SEEN_TTL)
         if mark_all:
-            redis_set_json(f"xena:notif:wm:{ek}", time.time(), ttl=NOTIF_SEEN_TTL)
+            # Phase 22: watermark in MS — comment clocks are ms; a seconds
+            # watermark never suppressed anything (the phantom badge bug).
+            redis_set_json(f"xena:notif:wm:{ek}", time.time() * 1000.0, ttl=NOTIF_SEEN_TTL)
     except Exception:
         pass
     # Phase 18: persist the merged state durably so a fresh instance (or a
