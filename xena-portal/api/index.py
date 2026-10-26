@@ -746,6 +746,15 @@ def redis_set_json(key, value, ttl=None):
     else:   redis_cmd("SET", key, payload)
     return True
 
+def redis_del_json(key):
+    """Delete that also clears the per-instance fallback when the shared
+    store is disabled/down (a plain redis_cmd DEL can't reach _mem_store)."""
+    _mem_store.pop(key, None)
+    try:
+        redis_cmd("DEL", key)
+    except Exception:
+        pass
+
 _cache: dict = {}
 _cache_lock = threading.Lock()
 
@@ -10007,21 +10016,26 @@ def audition_schedule_agents():
     except Exception:
         pass
     try:
-        items = _presence_fetch_roster(get_tenant_access_token())
+        items = _roster_items(get_tenant_access_token())
     except Exception as e:
         return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
+    # Phase 23: the app sees the roster's person dicts WITHOUT email (no
+    # contact scope), which used to filter EVERY agent out -> empty editor.
+    # Join roster names against Access Management's Email field instead;
+    # agents with no email match stay visible (no_email) so nobody vanishes.
+    amap = _access_name_email_map()
     agents = []
     for it in items:
         persons = (it.get("fields") or {}).get("Agent Name") or []
         if not (isinstance(persons, list) and persons and isinstance(persons[0], dict)):
             continue
         p = persons[0]
-        em = (p.get("email") or "").strip().lower()
-        if not em:
-            continue
-        agents.append({"email": em, "name": p.get("name") or em,
-                       "avatar": p.get("avatar_url") or ""})
-    agents.sort(key=lambda a: (a["name"] or "").lower())
+        nm = (p.get("name") or "").strip()
+        em = (p.get("email") or "").strip().lower() or amap.get(nm.lower(), "")
+        agents.append({"email": em, "name": nm or em,
+                       "avatar": p.get("avatar_url") or "",
+                       "no_email": not bool(em)})
+    agents.sort(key=lambda a: (a.get("no_email"), (a["name"] or "").lower()))
     try:
         redis_set_json("xena:sched:agents", agents, ttl=SCHED_AGENTS_TTL)
     except Exception:
@@ -10942,6 +10956,100 @@ def _presence_fetch_roster(tat):
             pass
     return items
 
+# ── Phase 23: cross-instance roster cache ─────────────────────────
+# Vercel runs several stateless instances, so the old 10s in-process board
+# cache never coalesced anything: EVERY board read / status write re-pulled
+# the whole Agent Roster from Feishu (~5-10s cold). The roster is a handful
+# of rows that change rarely — cache the raw items in Redis (2 min) with a
+# 10s in-process L1, and let presence_set PATCH the cached row write-through
+# so the follow-up board rebuild costs ZERO Feishu reads (~1s end to end).
+ROSTER_CACHE_KEY      = "xena:roster:items"
+ROSTER_CACHE_TTL_S    = 120
+PRESENCE_BOARD_RKEY   = "xena:presence:board"
+PRESENCE_BOARD_RTTL_S = 30
+_roster_mem = {"ts": 0.0, "items": None}
+
+def _roster_items(tat):
+    """Agent Roster rows: 10s in-process -> 120s Redis -> one Feishu read."""
+    now = time.time()
+    if _roster_mem["items"] is not None and now - _roster_mem["ts"] < 10:
+        return _roster_mem["items"]
+    try:
+        cached = redis_get_json(ROSTER_CACHE_KEY)
+        if isinstance(cached, list) and cached:
+            _roster_mem["ts"] = now
+            _roster_mem["items"] = cached
+            return cached
+    except Exception:
+        pass
+    items = _presence_fetch_roster(tat)
+    _roster_mem["ts"] = time.time()
+    _roster_mem["items"] = items
+    try:
+        redis_set_json(ROSTER_CACHE_KEY, items, ttl=ROSTER_CACHE_TTL_S)
+    except Exception:
+        pass
+    return items
+
+def _roster_patch_item(rid, fields_patch):
+    """Write-through: fold a successful status write into the cached roster
+    row so the next board build is served entirely from cache."""
+    try:
+        items = _roster_mem.get("items")
+        if not items:
+            c = redis_get_json(ROSTER_CACHE_KEY)
+            items = c if isinstance(c, list) else None
+        if not items:
+            return
+        for it in items:
+            if it.get("record_id") == rid:
+                (it.setdefault("fields", {})).update(fields_patch)
+        _roster_mem["ts"] = time.time()
+        _roster_mem["items"] = items
+        redis_set_json(ROSTER_CACHE_KEY, items, ttl=ROSTER_CACHE_TTL_S)
+    except Exception:
+        pass
+
+def _access_name_email_map():
+    """name(lower) -> work email, from Access Management (the ONE table that
+    has emails: its Email text field, with the Person user dict as fallback).
+    Cached 5 min — the roster's person dicts carry no email for this app, so
+    the schedule editor joins roster names against this map."""
+    try:
+        cached = redis_get_json("xena:access:namemail")
+        if isinstance(cached, dict) and cached:
+            return cached
+    except Exception:
+        pass
+    m = {}
+    try:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
+        res = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"},
+                                 params={"page_size": 500}, timeout=15).json()
+        for item in (res.get("data") or {}).get("items") or []:
+            f = item.get("fields") or {}
+            em = extract_field_text(f.get("Email", "")).lower().strip()
+            persons = f.get("Person")
+            nm = ""
+            if isinstance(persons, list) and persons and isinstance(persons[0], dict):
+                nm = (persons[0].get("name") or "").strip()
+                if not em:
+                    em = (persons[0].get("email") or "").lower().strip()
+            else:
+                nm = extract_field_text(persons).strip()
+            if nm:
+                m.setdefault(nm.lower(), em)
+            if em:
+                m.setdefault(em, em)
+    except Exception:
+        pass
+    try:
+        redis_set_json("xena:access:namemail", m, ttl=300)
+    except Exception:
+        pass
+    return m
+
 def _presence_row_identity(item):
     """record (Agent Roster) -> (record_id, open_id, name) from the Agent
     Name user field."""
@@ -11049,15 +11157,30 @@ def presence_board():
         cached = _presence_board_cache.get("data")
         fresh = bool(cached) and (time.time() - _presence_board_cache["ts"] < PRESENCE_BOARD_TTL_S)
         board = cached if (fresh and not bypass_cache) else None
+    if board is None and not bypass_cache:
+        # Phase 23: cross-instance L2 — a board built by ANY Vercel instance
+        # serves all of them for 30s (writes DEL it, see presence_set).
+        try:
+            rb = redis_get_json(PRESENCE_BOARD_RKEY)
+            if isinstance(rb, dict) and isinstance(rb.get("data"), dict) \
+                    and time.time() - float(rb.get("ts") or 0) < PRESENCE_BOARD_RTTL_S:
+                board = rb["data"]
+        except Exception:
+            pass
     if board is None:
         try:
-            items = _presence_fetch_roster(get_tenant_access_token())
+            items = _roster_items(get_tenant_access_token())
         except Exception as e:
             return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
         board = _presence_build_board(items, uat)
         with _presence_board_lock:
             _presence_board_cache["ts"] = time.time()
             _presence_board_cache["data"] = board
+        try:
+            redis_set_json(PRESENCE_BOARD_RKEY, {"ts": time.time(), "data": board},
+                           ttl=PRESENCE_BOARD_RTTL_S * 2)
+        except Exception:
+            pass
     # is_me is caller-specific -- layered per request on top of the shared board.
     me_oid, me_nm = open_id.strip().lower(), (user or "").strip().lower()
     agents = []
@@ -11099,7 +11222,7 @@ def presence_set():
                         "changed_at": int(time.time()*1000), "unchanged": False,
                         "agent": {"record_id": "recMockA", "name": user or "Mock Agent", "open_id": open_id}})
     try:
-        items = _presence_fetch_roster(get_tenant_access_token())
+        items = _roster_items(get_tenant_access_token())
     except Exception as e:
         return jsonify({"success": False, "error": f"Could not read the Agent Roster: {e}"}), 502
     me_oid, me_nm = open_id.strip().lower(), (user or "").strip().lower()
@@ -11146,11 +11269,16 @@ def presence_set():
         return jsonify({"success": False, "error": f"Status write failed: {e}"}), 502
     if data.get("code") != 0:
         return jsonify({"success": False, "error": data.get("msg") or "Feishu rejected the status write"}), 502
-    # The board cache must reflect the change on the very next read (this
-    # instance at least) -- the actor's own UI refresh is the hot path.
+    # The board caches must reflect the change on the very next read.
+    # Phase 23: patch the SHARED roster cache write-through (the refetch then
+    # rebuilds from cache = zero Feishu reads), and drop both board caches.
+    _roster_patch_item(rid, {"Current Status": [new_status],
+                             "Status Change Time": now_ms,
+                             "Memory": [old_status or new_status]})
     with _presence_board_lock:
         _presence_board_cache["ts"] = 0.0
         _presence_board_cache["data"] = None
+    redis_del_json(PRESENCE_BOARD_RKEY)
     audit.log(user or email, "PRESENCE_SET", f"{nm}: {old_status or '—'} -> {new_status}",
               ip=request.headers.get("X-Forwarded-For", ""), severity="Info")
     return jsonify({"success": True, "unchanged": False, "status": new_status, "previous": old_status,
