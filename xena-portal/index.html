@@ -22,22 +22,22 @@
     <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait&v=2">
     <style>
         :root {
-            --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
-            --border:#2a2c3f;--border-hover:#3d4059;
-            --text:#e0e0e0;--text-muted:#8b8fa3;
-            --accent-cyan:#00d4ff;--accent-green:#00e676;
-            --accent-rose:#ff4d6d;--accent-amber:#ffb800;--accent-purple:#b967ff;
-            --shadow:0 8px 32px rgba(0,0,0,.4);--radius:16px;
-            --sidebar-bg: #101623;
+            --bg:#17121f;--surface:#231d2e;--surface-hover:#2e2740;
+            --border:#3b3350;--border-hover:#5a4e78;
+            --text:#ece6f4;--text-muted:#b3a8c7;
+            --accent-cyan:#82d9ec;--accent-green:#92e2b4;
+            --accent-rose:#f6a9be;--accent-amber:#f2cf83;--accent-purple:#cbb5f7;
+            --shadow:0 8px 28px rgba(8,4,18,.5);--radius:18px;
+            --sidebar-bg: #201a2b;
         }
         [data-theme="light"] {
-            --bg:#f0f2f8;--surface:#fff;--surface-hover:#f5f7ff;
-            --border:#dde1f0;--border-hover:#b8bfe8;
-            --text:#1a1c2e;--text-muted:#5a6080;
-            --accent-cyan:#0099cc;--accent-green:#00b84a;
-            --accent-rose:#d63050;--accent-amber:#c88a00;--accent-purple:#8a44cc;
-            --shadow:0 4px 20px rgba(0,0,0,.08);
-            --sidebar-bg: #1d232e;
+            --bg:#faf8fe;--surface:#ffffff;--surface-hover:#f3edfc;
+            --border:#e3daef;--border-hover:#bfaddd;
+            --text:#251e35;--text-muted:#6a5f80;
+            --accent-cyan:#0b7d9b;--accent-green:#1d7a4b;
+            --accent-rose:#c04260;--accent-amber:#8f6300;--accent-purple:#6a4fc4;
+            --shadow:0 6px 24px rgba(76,52,140,.10);
+            --sidebar-bg: #f0eaf8;
         }
         
         *{margin:0;padding:0;box-sizing:border-box}
@@ -769,7 +769,7 @@
            the moon/silhouette. */
         .sam-grade{position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(ellipse at 50% 42%,transparent 45%,var(--surface-inset) 100%);mix-blend-mode:multiply;opacity:0;transition:opacity 1.5s ease}
         #samuraiIntro.st-in .sam-grade{opacity:1}
-        #samuraiIntro.st-letters .sam-grade,#samuraiIntro.st-hold .sam-grade,#samuraiIntro.st-vanish .sam-grade{opacity:1;background:radial-gradient(ellipse at 50% 46%,var(--surface-inset) 30%,var(--surface-inset) 100%)}
+        #samuraiIntro.st-letters .sam-grade,#samuraiIntro.st-hold .sam-grade,#samuraiIntro.st-vanish .sam-grade{opacity:1;background:radial-gradient(ellipse at 50% 46%,transparent 30%,var(--surface-inset) 92%)}
 
         .sam-grain{position:absolute;inset:-20%;z-index:8;pointer-events:none;opacity:.035;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");animation:samGrainShift 1.1s steps(4) infinite}
         @keyframes samGrainShift{0%{transform:translate(0,0)}25%{transform:translate(-2%,1%)}50%{transform:translate(1%,-2%)}75%{transform:translate(-1%,-1%)}100%{transform:translate(0,0)}}
@@ -1484,6 +1484,8 @@
         .tw-head-chip.chip-purple .tw-head-chip-label{color:var(--accent-purple);}
         .tw-head-chip.chip-amber{background:rgba(255,184,0,0.10);border-color:rgba(255,184,0,0.40);}
         .tw-head-chip.chip-amber .tw-head-chip-label{color:var(--accent-amber);}
+        /* Phase 27: ticket's own-group chip echoed beside the Mentioned Group picker */
+        .tw-mg-own{margin-top:6px;align-self:flex-start;white-space:normal;}
 
         /* ═══════════════ Phase 10: Live Ticket Queue + Ticket Workspace redesign ═══════════════ */
         /* Queue hero header */
@@ -1868,8 +1870,11 @@
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
         }
         /* ISSUE 2 FIX: image lightbox/modal (replaces target="_blank" attachment links) */
+        /* Phase 27 (Ahmed): translucent blurred backdrop instead of a solid
+           screen, so the page behind the open image stays visible. */
         .img-lightbox-overlay{
-            display:none;position:fixed;inset:0;z-index:9999;background:var(--surface);
+            display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,6,14,.72);
+            -webkit-backdrop-filter:blur(18px) saturate(1.2);backdrop-filter:blur(18px) saturate(1.2);
             align-items:center;justify-content:center;flex-direction:column;
         }
         .img-lightbox-overlay.active{display:flex}
@@ -2159,8 +2164,83 @@
     </style>
 <style id="unified-theme-planner">
 /* Shared theme contract: every app surface follows the same palette. */
-:root,[data-theme="dark"]{--native-scheme:dark;color-scheme:dark;--bg:#111820;--surface:#1a2430;--surface-hover:#243141;--surface-inset:#151e28;--sidebar-bg:#151e28;--text:#e4eaf1;--text-muted:#a6b4c4;--border:#344354;--border-hover:#62758b;--accent-cyan:#73c8e2;--accent-green:#7bd4a3;--accent-purple:#bca7ed;--accent-amber:#e7bf6b;--accent-rose:#f29aac;--ink-rgb:225,234,242;--shadow:0 5px 20px rgba(0,0,0,.16);--radius:14px;--primary:#246b82;--on-primary:#fff}
-[data-theme="light"]{--native-scheme:light;color-scheme:light;--bg:#e9edf0;--surface:#f6f7f6;--surface-hover:#e7edf1;--surface-inset:#edf0f2;--sidebar-bg:#edf0f2;--text:#223344;--text-muted:#526475;--border:#c7d1d9;--border-hover:#8295a6;--accent-cyan:#17627c;--accent-green:#246d47;--accent-purple:#6943a1;--accent-amber:#865a0c;--accent-rose:#b13753;--ink-rgb:34,51,68;--shadow:0 4px 16px rgba(36,49,63,.06);--primary:#246b82;--on-primary:#fff}
+:root,[data-theme="dark"]{--native-scheme:dark;color-scheme:dark;--bg:#17121f;--surface:#231d2e;--surface-hover:#2e2740;--surface-inset:#1c1726;--sidebar-bg:#201a2b;--text:#ece6f4;--text-muted:#b3a8c7;--border:#3b3350;--border-hover:#5a4e78;--accent-cyan:#82d9ec;--accent-green:#92e2b4;--accent-purple:#cbb5f7;--accent-amber:#f2cf83;--accent-rose:#f6a9be;--ink-rgb:236,230,244;--shadow:0 8px 28px rgba(8,4,18,.5);--radius:18px;--primary:#a78bfa;--on-primary:#2a1d4d}
+[data-theme="light"]{--native-scheme:light;color-scheme:light;--bg:#faf8fe;--surface:#ffffff;--surface-hover:#f3edfc;--surface-inset:#f2ecf9;--sidebar-bg:#f0eaf8;--text:#251e35;--text-muted:#6a5f80;--border:#e3daef;--border-hover:#bfaddd;--accent-cyan:#0b7d9b;--accent-green:#1d7a4b;--accent-purple:#6a4fc4;--accent-amber:#8f6300;--accent-rose:#c04260;--ink-rgb:37,30,53;--shadow:0 6px 24px rgba(76,52,140,.10);--primary:#6750a4;--on-primary:#ffffff}
+
+/* ===== Phase 26: Soft Material component pass ======================
+   Pill buttons, tinted active nav, rounder inputs, soft focus rings —
+   everything rides the theme contract vars, so both themes follow. */
+body .btn{border-radius:999px}
+body input[type="text"],body input[type="number"],body input[type="email"],body input[type="password"],body input[type="date"],body input[type="time"],body input[type="search"],body textarea,body select{border-radius:12px}
+body .nav-item{border-radius:0 999px 999px 0;margin-right:10px}
+body .nav-item:hover{background:var(--surface-hover)}
+body .nav-item.active,body .nav-item.active-nav{color:var(--primary)!important;border-left-color:var(--primary);background:rgba(124,99,196,.16);font-weight:600}
+body :focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+body ::-webkit-scrollbar{width:10px;height:10px}
+body ::-webkit-scrollbar-track{background:transparent}
+body ::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px;border:2px solid var(--bg)}
+body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
+
+/* Phase 26: global search (top bar) */
+.gls-wrap{flex:1;max-width:480px;margin:0 16px;position:relative}
+.gls-input{width:100%;padding:9px 16px;border-radius:999px;border:1px solid var(--border);background:var(--surface-inset);color:var(--text);font-size:.85rem;outline:none;transition:border-color .2s;font-family:inherit}
+.gls-input:focus{border-color:var(--primary)}
+.gls-drop{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);max-height:380px;overflow-y:auto;z-index:10005;padding:6px}
+.gls-group{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:8px 12px 4px}
+.gls-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;cursor:pointer}
+.gls-row:hover{background:var(--surface-hover)}
+.gls-row-t{font-size:.85rem;font-weight:600}
+.gls-row-s{font-size:.74rem;color:var(--text-muted)}
+.gls-hint{padding:14px;font-size:.8rem;color:var(--text-muted);text-align:center}
+.gls-av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.gls-av-fallback{display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:var(--on-primary);font-weight:800;font-size:.8rem}
+@media (max-width:820px){.gls-wrap{max-width:170px;margin:0 8px}.gls-input{font-size:.78rem;padding:8px 12px}}
+
+/* Phase 26: save-state pill */
+.save-state-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:.74rem;font-weight:700;border:1px solid var(--border);background:var(--surface-inset);color:var(--text-muted);white-space:nowrap}
+.save-state-pill.ss-saving{color:var(--accent-amber);border-color:var(--accent-amber)}
+.save-state-pill.ss-saved{color:var(--accent-green);border-color:var(--accent-green)}
+.save-state-pill.ss-failed{color:var(--accent-rose);border-color:var(--accent-rose)}
+
+/* Phase 26: My Work page */
+.mw-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.mw-head h2{margin:0}
+.mw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+.mw-card{margin-bottom:0}
+.mw-card-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:.95rem;margin-bottom:12px}
+.mw-count{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:2px 10px;font-size:.74rem;font-weight:800}
+.mw-count:empty{display:none}
+.mw-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto}
+.mw-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:var(--surface-inset);border:1px solid var(--border)}
+.mw-row-main{display:flex;flex-direction:column;min-width:0}
+.mw-row-title{font-size:.85rem;font-weight:600}
+.mw-row-sub{font-size:.74rem;color:var(--text-muted)}
+.mw-empty{color:var(--text-muted);font-size:.82rem;padding:10px 4px;text-align:center}
+.mw-quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mw-quick button{padding:14px 10px;border-radius:14px;border:1px solid var(--border);background:var(--surface-inset);color:var(--text);font-size:.84rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit}
+.mw-quick button:hover{border-color:var(--primary);color:var(--primary);background:rgba(124,99,196,.1)}
+.mw-open{padding:7px 14px!important;width:auto!important;font-size:.76rem;white-space:nowrap}
+.nav-item-top{padding-left:18px!important;font-weight:700}
+
+/* Phase 26: guided request steps (ticket workspace) */
+.twx-steps{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.twx-step{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface-inset);color:var(--text-muted);font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+.twx-step:hover{border-color:var(--border-hover);color:var(--text)}
+.twx-step.done{background:rgba(52,168,113,.13);border-color:rgba(52,168,113,.4);color:var(--accent-green)}
+.twx-step.done .twx-step-dot{background:var(--accent-green);color:#fff}
+.twx-step.current{border-color:var(--primary);color:var(--primary);background:rgba(124,99,196,.12)}
+.twx-step.current .twx-step-dot{background:var(--primary);color:var(--on-primary)}
+.twx-step-dot{width:18px;height:18px;border-radius:50%;background:var(--border);color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;flex-shrink:0}
+@keyframes twxPulse{0%{box-shadow:0 0 0 0 rgba(124,99,196,.5)}100%{box-shadow:0 0 0 14px rgba(124,99,196,0)}}
+.twx-pulse{animation:twxPulse .8s ease-out 2;border-radius:12px}
+
+/* Phase 26: draft save feedback + restore chips */
+.drf-badge{position:fixed;bottom:18px;right:18px;z-index:10003;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);padding:7px 14px;border-radius:999px;font-size:.76rem;box-shadow:var(--shadow);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.drf-badge.show{opacity:1;transform:translateY(0)}
+.drf-restore{display:flex;align-items:center;gap:8px;margin:6px 0;padding:7px 12px;border-radius:999px;background:rgba(124,99,196,.1);border:1px dashed var(--primary);font-size:.76rem;color:var(--text);flex-wrap:wrap}
+.drf-r-btn,.drf-d-btn{border:none;border-radius:999px;padding:3px 10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit}
+.drf-r-btn{background:var(--primary);color:var(--on-primary)}
+.drf-d-btn{background:transparent;color:var(--text-muted);border:1px solid var(--border)}
 body{background:var(--bg);color:var(--text)}
 .sidebar,.sidebar-logo,.sidebar-search-area{border-color:var(--border)}
 .sidebar *{color:var(--text-muted)}
@@ -2212,6 +2292,51 @@ option{background:var(--surface);color:var(--text)}
 .sch-pop-overlay .btn-primary,#pg-audition-schedule .btn-primary{color:var(--on-primary);background:var(--primary)}
 @media print{body.sch-print .tab-bar,body.sch-print .top-navbar{display:none!important}body.sch-print .page-content-wrapper{overflow:visible!important;max-height:none!important;padding:0!important}body.sch-print #schAgenda{border:none}}
 @media print{body.sch-print .page-top-bar,body.sch-print .multi-tab-bar,body.sch-print #sheetNotifPanel,body.sch-print #cmtPanel{display:none!important}}
+
+/* ═══════════════ Phase 28 (Ahmed): mobile layout layer ═══════════════
+   The portal already had scattered mobile rules; this pass fixes the real
+   pain points seen on a 390px phone: the floating radar dock covering the
+   top bar, iOS auto-zooming on small inputs, fingertip-sized targets, and
+   wide grids with no scroll hint. Desktop is untouched (all rules ≤900px). */
+@media (max-width:900px){
+    /* Floating 📡/preview dock sat at top:16px — right on top of the top
+       bar's theme/language icons on a phone. Drop it below the bar. */
+    .twx-dock{top:64px;left:50%;gap:8px;}
+    /* Comfortable fingertip targets (Apple HIG ~44px) for the chrome. */
+    .utility-icon-btn,.hamburger{min-width:38px;min-height:38px;display:inline-flex;align-items:center;justify-content:center;}
+    .multi-tab-bar{padding:6px 10px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+    .multi-tab-bar::-webkit-scrollbar{display:none;}
+    /* Workspace floating top bar: tighter padding so title + actions fit. */
+    .twx-topbar-wrapper .twx-topbar{top:64px;padding:14px 16px;gap:10px;}
+    /* Ticket-workspace head chips wrap instead of forcing sideways scroll. */
+    #tw-head-meta{display:flex;flex-wrap:wrap;gap:6px;}
+    /* Smooth momentum scrolling on every horizontal scroller. */
+    .sch-grid-wrap,.table-wrap,.aws-table-wrap{-webkit-overflow-scrolling:touch;}
+}
+@media (max-width:600px){
+    /* iOS Safari zooms the page whenever a focused input is <16px — that
+       "the layout jumps when I type" feeling. 16px kills the auto-zoom.
+       !important needed to out-rank .control-group input[type=...] etc. */
+    .page-content-wrapper input,.page-content-wrapper select,.page-content-wrapper textarea,
+    .twx-topbar input,.twx-topbar select,.img-lightbox-overlay input,
+    .control-group input,.control-group select,.control-group textarea{font-size:16px!important;}
+    /* Top bar: tighter gaps, compact language picker, everything on one row. */
+    .page-top-bar{padding:8px 10px;gap:6px;}
+    .top-bar-right{gap:4px;}
+    .lang-select{max-width:86px;padding:6px 4px;font-size:.78rem;}
+    /* Cards/forms breathe on a small screen. */
+    .page-content-wrapper{padding:10px;}
+    /* Schedule stat cards: 2 per row is readable, 1 would waste height. */
+    .sch-overview{grid-template-columns:repeat(2,minmax(0,1fr));}
+    /* Image lightbox nav: smaller thumbs-friendly controls. */
+    .img-lightbox-nav{width:38px;height:38px;font-size:18px;}
+    .img-lightbox-nav-prev{left:8px}
+    .img-lightbox-nav-next{right:8px}
+    /* Login card: the nowrap 1.75rem title clipped ("Audition Dashbc…") on
+       a 390px phone -- shrink padding + let the title wrap. */
+    .login-card{padding:40px 22px;}
+    .login-card h1{font-size:1.45rem;white-space:normal;}
+}
 </style>
 </head>
 
@@ -2350,6 +2475,7 @@ option{background:var(--surface);color:var(--text)}
         </div>
 
         <nav class="sidebar-nav">
+            <div class="nav-item nav-item-top" id="nav-my-work" onclick="openInTab('my-work')"><span>🏠 My Work</span></div>
             <div class="nav-group" id="navGrpAnalytics">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAnalytics','navBodyAnalytics')">
                     <span>
@@ -2519,7 +2645,12 @@ option{background:var(--surface);color:var(--text)}
                 <button type="button" id="sidebarCollapseBtn" class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse / expand sidebar">⟨⟨</button>
             </div>
             
+            <div class="gls-wrap" id="glsWrap">
+                <input type="text" id="glsInput" class="gls-input" placeholder="🔍 Search: ticket #, user ID, agency code, teammate…" autocomplete="off" oninput="glsOnInput()" onkeydown="if(event.key==='Escape')glsHide()">
+                <div class="gls-drop" id="glsDrop" style="display:none"></div>
+            </div>
             <div class="top-bar-right">
+                <span id="saveStatePill" class="save-state-pill" style="display:none"></span>
                 <a class="utility-icon-btn" href="https://micoworld.feishu.cn/base/C9zFb52m4abhtHsX5LjcBywbnze?from=from_copylink" target="_blank" rel="noopener" title="Open Feishu Sheet" style="text-decoration:none">
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                 </a>
@@ -2611,6 +2742,41 @@ option{background:var(--surface);color:var(--text)}
                     <p style="color:var(--text-muted);margin-bottom:32px" data-i18n="portalSub">Agency Privilege &amp; Operational Analytics</p>
                 </div>
                 <div class="welcome-cards" id="welcomeCards"></div>
+            </div>
+
+            <!-- Phase 26: My Work — personal home: my queue, my shifts, my
+                 schedule requests, quick actions. 60s session cache. -->
+            <div id="pg-my-work" style="display:none">
+                <div class="card mw-head">
+                    <div>
+                        <h2 id="mwGreeting">My Work</h2>
+                        <p id="mwDateLine" style="color:var(--text-muted);font-size:.85rem;margin:4px 0 0"></p>
+                    </div>
+                    <button type="button" class="btn btn-outline" style="width:auto" id="mwRefreshBtn" onclick="mwLoad(true)">↻ Refresh</button>
+                </div>
+                <div class="mw-grid">
+                    <div class="card mw-card">
+                        <div class="mw-card-head"><span>🎫 My Active Tickets</span><span class="mw-count" id="mwTicketCount"></span></div>
+                        <div id="mwTickets" class="mw-list"><div class="mw-empty">Loading…</div></div>
+                    </div>
+                    <div class="card mw-card">
+                        <div class="mw-card-head"><span>📅 My Shifts — Next 7 Days</span><span class="mw-count" id="mwShiftCount"></span></div>
+                        <div id="mwShifts" class="mw-list"><div class="mw-empty">Loading…</div></div>
+                    </div>
+                    <div class="card mw-card">
+                        <div class="mw-card-head"><span>📨 My Schedule Requests</span><span class="mw-count" id="mwReqCount"></span></div>
+                        <div id="mwReqs" class="mw-list"><div class="mw-empty">Loading…</div></div>
+                    </div>
+                    <div class="card mw-card">
+                        <div class="mw-card-head"><span>⚡ Quick Actions</span></div>
+                        <div class="mw-quick">
+                            <button type="button" onclick="openInTab('live-tickets')">🎫 Live Queue</button>
+                            <button type="button" onclick="openInTab('new-request')">➕ New Request</button>
+                            <button type="button" onclick="openInTab('audition-schedule')">📅 Schedule</button>
+                            <button type="button" onclick="openInTab('query')">🔍 Universal Query</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- ... Compare Page ... -->
@@ -4126,6 +4292,17 @@ option{background:var(--surface);color:var(--text)}
                  preview panel, form, radar drawer) so each open ticket's whole
                  workspace can be detached/reattached as one keep-alive tab node. -->
             <div id="twWsInstance">
+               <!-- Phase 26: guided request steps -- Review -> Duplicates ->
+                    Done by -> Status & Group -> Save. States recompute on every
+                    change inside the workspace; clicking a step scrolls to the
+                    exact card and pulses it. -->
+               <div class="twx-steps" id="twSteps" aria-label="Guided request steps">
+                   <button type="button" class="twx-step" data-twxstep="1" onclick="twStepGo(1)"><span class="twx-step-dot">1</span><span class="twx-step-label">Review</span></button>
+                   <button type="button" class="twx-step" data-twxstep="2" onclick="twStepGo(2)"><span class="twx-step-dot">2</span><span class="twx-step-label">Duplicates</span></button>
+                   <button type="button" class="twx-step" data-twxstep="3" onclick="twStepGo(3)"><span class="twx-step-dot">3</span><span class="twx-step-label">Done by</span></button>
+                   <button type="button" class="twx-step" data-twxstep="4" onclick="twStepGo(4)"><span class="twx-step-dot">4</span><span class="twx-step-label">Status &amp; Group</span></button>
+                   <button type="button" class="twx-step" data-twxstep="5" onclick="twStepGo(5)"><span class="twx-step-dot">5</span><span class="twx-step-label">Save</span></button>
+               </div>
                <!-- Floating DOCK (Phase 10.4): three chat-style floating circles
                     pinned top-CENTER of the content area -- [⚡ Topbar] left,
                     [📝 Note] middle, [📡 Duplicate Radar] right. z-index 10002
@@ -4169,7 +4346,7 @@ option{background:var(--surface);color:var(--text)}
                        <span class="twn-title">📝 Scratch Note</span>
                        <button type="button" class="twn-close" onclick="twToggleNote(false)" title="Close note">✕</button>
                    </div>
-                   <textarea id="twNoteText" placeholder="Copy details from screenshots here, then type them into the fields below…"></textarea>
+                   <textarea id="twNoteText" data-drf="twNoteText" placeholder="Copy details from screenshots here, then type them into the fields below…"></textarea>
                    <div class="twn-foot">Drag ⠿ to move · floats above opened pictures · cleared when the request is submitted</div>
                </div>
                
@@ -4346,6 +4523,12 @@ option{background:var(--surface);color:var(--text)}
                                <select id="tw-mentioned-group" name="Mentioned Group" data-feishu-field="Mentioned Group" class="form-highlight-input">
                                    <option value="">-- Select --</option>
                                </select>
+                               <!-- Phase 27 (Ahmed): the ticket's OWN group (Mention this
+                                    Group) echoed right beside the Mentioned Group picker,
+                                    so the agent sees both groups in one glance while
+                                    choosing -- populated by twRenderHeadMeta, hidden when
+                                    the ticket has no group yet. -->
+                               <span class="tw-head-chip chip-cyan tw-mg-own" id="twMgOwnChip" style="display:none"></span>
                            </div>
                            <!-- Approve Note (Phase 10, Ahmed): writes straight to the
                                 sheet's "approve note" field, same pattern as Audition
@@ -4378,7 +4561,7 @@ option{background:var(--surface);color:var(--text)}
                        <div id="twcList"></div>
                        <div class="twc-composer">
                            <div class="twc-input-wrap">
-                               <textarea id="twcInput" placeholder="Write a comment… @ to mention a teammate"></textarea>
+                               <textarea id="twcInput" data-drf="twcInput" placeholder="Write a comment… @ to mention a teammate"></textarea>
                                <div id="twcMentionPop"></div>
                                <div class="twc-foot">Enter to send · Shift+Enter new line · @ to mention — synced with the Feishu Base thread</div>
                            </div>
@@ -4628,7 +4811,7 @@ option{background:var(--surface);color:var(--text)}
                     </div>
                     <div class="sch-time-drop" id="schTimeDropCell" style="display:none"></div>
                     <label class="sch-lbl" style="margin-top:12px">Note</label>
-                    <input type="text" id="schCellNote" class="form-highlight-input" placeholder="optional">
+                    <input type="text" id="schCellNote" data-drf="schCellNote" class="form-highlight-input" placeholder="optional">
                     <div class="sch-editpop-actions">
                         <button type="button" class="btn btn-primary sch-editpop-save" onclick="schCellSave()">💾 Save shift</button>
                         <button type="button" class="btn btn-secondary" onclick="schCellClear()">🗑 Clear day</button>
@@ -4683,7 +4866,7 @@ option{background:var(--surface);color:var(--text)}
                     </div>
                     <div class="sch-time-drop" id="schTimeDropRange" style="display:none"></div>
                     <label class="sch-lbl">Note</label>
-                    <input type="text" id="schRangeNote" class="form-highlight-input" placeholder="optional">
+                    <input type="text" id="schRangeNote" data-drf="schRangeNote" class="form-highlight-input" placeholder="optional">
                     <div style="display:flex;gap:8px;margin-top:14px">
                         <button type="button" class="btn btn-primary" style="flex:1" onclick="schRangeApply()">✅ Apply</button>
                         <button type="button" class="btn btn-secondary" onclick="schRangeClose()">Cancel</button>
@@ -4716,7 +4899,7 @@ option{background:var(--surface);color:var(--text)}
                     </div>
                     <div class="sch-reqsum" id="schReqSum"></div>
                     <label class="sch-lbl">Reason <span style="opacity:.55;text-transform:none;letter-spacing:0">(optional)</span></label>
-                    <textarea id="schReqReason" class="form-highlight-input" rows="3" placeholder="Tell the admin why…"></textarea>
+                    <textarea id="schReqReason" data-drf="schReqReason" class="form-highlight-input" rows="3" placeholder="Tell the admin why…"></textarea>
                     <button type="button" class="btn btn-primary sch-reqsend" onclick="schReqSubmit()">📨 Send request</button>
                     <button type="button" class="sch-linkbtn" onclick="schReqClose()">Cancel</button>
                 </div>
@@ -4791,7 +4974,7 @@ option{background:var(--surface);color:var(--text)}
                                 <span class="aws-panel-title">📋 Ticket Text</span>
                                 <button type="button" class="aws-parse-btn" onclick="auditParseText()">✨ Parse &amp; Fill</button>
                             </div>
-                            <textarea id="audRawText" class="aws-rawtext" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)"></textarea>
+                            <textarea id="audRawText" data-drf="audRawText" class="aws-rawtext" placeholder="Paste the raw ticket text here, e.g.:&#10;Region: PK&#10;Applier ID: 123456&#10;Agency Name: ...&#10;Agency Type: BD Hunting (ACM: Enzo)"></textarea>
                             <div class="aws-left-foot">Auto-parses the moment you paste · the ticket stays in view while you work</div>
                             <!-- Phase 10.28 (Ahmed, pic 2): Reject Reason leaves the
                                  bottom bar for this compact collapsed card under the
@@ -4985,6 +5168,7 @@ function changeLanguage(lang) {
 
 const pageTitlesMap = {
     'welcome': 'Welcome',
+    'my-work': 'My Work',
     'analytics': 'Analytics Report',
     'compare': 'Compare Module',
     'exchange': 'Agency Exchange',
@@ -5011,6 +5195,7 @@ const pageTitlesMap = {
 
 const zhPageTitlesMap = {
     'welcome': '欢迎',
+    'my-work': '我的工作',
     'analytics': '分析报告',
     'compare': '比较模块',
     'exchange': '代理交易所',
@@ -5037,7 +5222,7 @@ const zhPageTitlesMap = {
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule'];
+const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -5376,6 +5561,10 @@ function executePageLogic(page) {
     } else if(page==='ticket-workspace'){
         document.getElementById('pg-ticket-workspace').style.display='block';
         _expandNavGroup('navBodyTickets','navArrTickets');
+        if (typeof twStepsRefresh === 'function') setTimeout(twStepsRefresh, 80); // Phase 26
+    } else if(page==='my-work'){
+        document.getElementById('pg-my-work').style.display='block';
+        if (typeof mwLoad === 'function') mwLoad(false); // Phase 26
     } else {
         document.getElementById('pg-welcome').style.display='block';
     }
@@ -8989,6 +9178,29 @@ async function schSaveEntries(entries, deleteKeys) {
     entries=entries||[];deleteKeys=deleteKeys||[];
     if(entries.length>500||deleteKeys.length>500)throw new Error('Maximum 500 day entries per save. Choose a smaller range.');
     for(const e of entries){if(SCH_WORK_TYPES.includes(e.type)&&(schMinutes(e.start)===null||schMinutes(e.end)===null||e.start===e.end))throw new Error('Working shifts need valid, different start and end times. Overnight shifts are supported.');}
+    // Phase 26 (conflict protection): re-read the affected days and compare
+    // against the loaded snapshot -- if someone else edited those cells since
+    // the grid loaded, warn before overwriting. Fail-open on any hiccup.
+    try{
+        const affDays=[...entries.map(e=>Number(e.day)),...deleteKeys.map(k=>Number(String(k).split('|')[1]))].filter(n=>isFinite(n));
+        if(affDays.length){
+            const cf=Math.min(...affDays), ct=Math.max(...affDays);
+            const cr=await fetch('/api/audition/schedule?'+new URLSearchParams({user:loggedUser||'',email:loggedEmail||'',from:String(cf),to:String(ct)}));
+            const cd=await cr.json();
+            if(cr.ok&&cd&&cd.success&&Array.isArray(cd.rows)){
+                const cur={},snap={};
+                cd.rows.forEach(r=>{cur[(r.email||'').toLowerCase()+'|'+r.day]=r;});
+                schRows.forEach(r=>{snap[(r.email||'').toLowerCase()+'|'+r.day]=r;});
+                const keys=new Set([...entries.map(e=>(e.email||'').toLowerCase()+'|'+e.day),...deleteKeys]);
+                let diff=0;
+                keys.forEach(k=>{const a=cur[k],b=snap[k];const sa=a?JSON.stringify([a.type,a.start,a.end,a.note||'']):'';const sb=b?JSON.stringify([b.type,b.start,b.end,b.note||'']):'';if(sa!==sb)diff++;});
+                if(diff>0&&!confirm('⚠️ '+diff+' day(s) you are saving were changed in the sheet since this grid loaded.\n\nOK = overwrite with your version\nCancel = stop; the grid refreshes so you can review')){
+                    await schLoad();
+                    throw new Error('Save cancelled — the grid was refreshed with the latest sheet data.');
+                }
+            }
+        }
+    }catch(e){ if(e&&/cancelled/.test(e.message||''))throw e; }
     schSaving=true;
     try{
         const r=await fetch('/api/audition/schedule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:loggedUser,email:loggedEmail,entries,delete_keys:deleteKeys})});
@@ -9009,6 +9221,7 @@ async function schCellSave() {
             end: schCellState.end,
             note: document.getElementById('schCellNote').value }]);
         ToastManager.show('💾 Saved — the sheet has it too.', 'success', 3500);
+        if (typeof drfClear === 'function') drfClear('schCellNote'); // Phase 26
         schCellClose();
         schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
@@ -9087,6 +9300,7 @@ async function schRangeApply() {
     try {
         const d = await schSaveEntries(entries);
         ToastManager.show(`✅ Applied — ${(d.created || 0) + (d.updated || 0)} days written.`, 'success', 4500);
+        if (typeof drfClear === 'function') drfClear('schRangeNote'); // Phase 26
         schRangeClose();
         schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
@@ -9253,6 +9467,7 @@ async function schReqSubmit() {
         const d = await r.json();
         if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
         ToastManager.show('📨 Request sent — the admin sees it in the Schedule inbox.', 'success', 4500);
+        if (typeof drfClear === 'function') drfClear('schReqReason'); // Phase 26
         schReqClose();
         schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
@@ -12919,6 +13134,10 @@ let ltActiveTicket = null;
 // be a SEPARATE snapshot (not ltActiveTicket) because twApAdoptCharged()
 // mutates ltActiveTicket.fields after a charge.
 let twOrigFields = null;
+// Phase 26 (conflict protection): Date.now() when the open workspace record
+// was filled; re-armed after every successful save. twSaveWorkspace warns
+// before overwriting a sheet version newer than this baseline.
+let twOpenedAt = 0;
 let ltPusherInstance = null;
 let ltInitialized = false;
 let ltLastPullAt = 0; // Phase 10: last successful (or attempted) queue sync, for auto-pull throttling
@@ -14520,6 +14739,17 @@ function twRenderHeadMeta(ticket) {
         <span class="tw-head-chip chip-purple"><span class="tw-head-chip-label">Submitted</span>${escHtml(submittedVal)}</span>
         <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Respondents</span>${respondentsHtml}</span>
     `;
+    // Phase 27 (Ahmed): mirror the ticket's own group next to the Mentioned
+    // Group select too (see twMgOwnChip markup) so both groups sit together.
+    const mgOwn = document.getElementById('twMgOwnChip');
+    if (mgOwn) {
+        if (groupVal && groupVal !== '—') {
+            mgOwn.innerHTML = `<span class="tw-head-chip-label">Group</span>${escHtml(groupVal)}`;
+            mgOwn.style.display = '';
+        } else {
+            mgOwn.style.display = 'none';
+        }
+    }
     setTimeout(() => { try { twHydrateAvatars(metaEl); } catch (e) {} }, 0);
 }
 
@@ -14978,6 +15208,8 @@ async function twOpenWorkspace(recordId) {
         // that newer state owns the workspace now, so this open stops here.
         if (seq !== twOpenSeq) return;
         ltActiveTicket = ticket;
+        twOpenedAt = Date.now(); // Phase 26: conflict-check baseline
+        if (typeof twStepsRefresh === 'function') setTimeout(twStepsRefresh, 120); // Phase 26
         twOrigFields = JSON.parse(JSON.stringify(ticket.fields || {})); // fast-save diff base
         twManualReqType = null; // reset any manual tab pick from a previously-viewed ticket
         // Phase 10.13: opening a REAL ticket always leaves New-Ticket draft
@@ -16783,6 +17015,25 @@ async function twSaveWorkspace() {
         }
     }
 
+    // Phase 26 (conflict protection): the sheet row may have been edited by
+    // someone else AFTER this workspace was opened. Re-read just the record's
+    // last_modified_time and warn before overwriting a newer version.
+    // Fail-open: any fetch/parse hiccup never blocks a save.
+    try {
+        const cfRid = document.getElementById('tw-record-id') && document.getElementById('tw-record-id').value;
+        if (cfRid && twOpenedAt) {
+            const cfRes = await fetch('/api/requests/single?record_id=' + encodeURIComponent(cfRid));
+            const cfData = await cfRes.json();
+            const cfMtime = cfData && cfData.record && Number(cfData.record.last_modified_time || 0);
+            if (cfMtime && cfMtime > twOpenedAt + 5000) {
+                const cfWhen = new Date(cfMtime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                if (!confirm('⚠️ Heads-up: this ticket was updated in the sheet AFTER you opened it (last change: ' + cfWhen + ').\n\nOK = overwrite with your version anyway\nCancel = stop, so you can close and reopen it fresh first')) {
+                    return;
+                }
+            }
+        }
+    } catch (cfErr) { /* fail-open: never block a save on a check error */ }
+
     const finalData = new FormData();
 
     finalData.append('user', loggedUser);
@@ -16819,6 +17070,14 @@ async function twSaveWorkspace() {
         // sheet -- stop restoring it (only on a real save; "nothing changed"
         // leaves the draft alone since the edits never landed).
         if (!data.unchanged) xdClear('ws:' + document.getElementById('tw-record-id').value);
+        // Phase 26: after a real save the sheet's mtime now matches OUR write --
+        // re-arm the conflict baseline so the next save doesn't warn about our
+        // own edit, and drop the covered drafts (comment box + scratch note).
+        twOpenedAt = Date.now();
+        if (typeof drfClear === 'function') {
+            drfClear('twc:' + document.getElementById('tw-record-id').value);
+            drfClear('twNoteText');
+        }
         // Phase 10.40 (Ahmed): the clear + re-set of Mentioned Group is the
         // LAST step — it runs only after the normal save has fully landed, so
         // the group bot re-posts against the ticket's final state.
@@ -16853,10 +17112,12 @@ async function twSaveWorkspace() {
         
         const rid = document.getElementById('tw-record-id').value;
         ltQueue = ltQueue.filter(t => (t.record_id||t.id) !== rid);
-        
+
         twCloseWorkspace();
+        return true; // Phase 26: tell the save-state wrapper this save landed
     } catch (e) {
         ToastManager.show('Failed to save: ' + e.message, e.isUploadAbort ? 'warning' : 'error', e.isUploadAbort ? 9000 : 5000);
+        return false; // Phase 26: save-state wrapper shows Failed, not Saved
     } finally {
         btns.forEach(b => { b.disabled = false; b.textContent = '💾 Save & Resolve'; });
     }
@@ -16989,7 +17250,7 @@ async function dupRadarQueryFields(fieldsToCheck) {
             body: JSON.stringify({
                 user: loggedUser || '',
                 email: loggedEmail || '',
-                queries: fieldsToCheck.map(([field, value]) => ({ field, value }))
+                queries: fieldsToCheck.map(([field, value]) => ({ field, value, exact: true }))
             })
         });
         if (res.ok) {
@@ -17000,7 +17261,7 @@ async function dupRadarQueryFields(fieldsToCheck) {
         }
     } catch (err) { /* fall through to the per-field path below */ }
     return Promise.all(fieldsToCheck.map(([field, value]) =>
-        fetch(`/api/query?${new URLSearchParams({ field, value, user: loggedUser || '', email: loggedEmail || '' })}`)
+        fetch(`/api/query?${new URLSearchParams({ field, value, exact: '1', user: loggedUser || '', email: loggedEmail || '' })}`)
             .then(r => r.json().then(data => ({ ok: r.ok, data })))
             .catch(err => ({ ok: false, data: { error: err.message } }))
     ));
@@ -19679,6 +19940,7 @@ function auditClearWorkstation(silent) {
         if (dt) ssSyncDisplay(sel, dt);
     });
     document.getElementById('audRawText').value = '';
+    if (typeof drfClear === 'function') drfClear('audRawText'); // Phase 26
     // Phase 10.13.2: auto-grown textareas keep their stretched height after a
     // reset -- let them shrink back to their natural rows height.
     form.querySelectorAll('textarea.tw-txt-auto').forEach(t => { t.style.height = ''; t.style.overflowY = ''; });
@@ -20741,6 +21003,7 @@ async function twcSend() {
         return;
     }
     if (inp) inp.value = '';
+    if (typeof drfClear === 'function') drfClear('twc:' + (st.recordId || 'create')); // Phase 26
     st.mentions = {}; st.mentionList = [];
     st.loaded = false;
     await twcLoad(true);
@@ -21804,6 +22067,316 @@ function schToggleAgenda(){const el=document.getElementById('schAgenda');el.hidd
 function schPrint(){document.body.classList.add('sch-print');window.print();}
 window.addEventListener('afterprint',()=>document.body.classList.remove('sch-print'));
 
+</script>
+<script>
+/* ================= Phase 26: portal-wide workflow package =================
+   My Work page, guided request steps, visible auto-drafts, conflict
+   warnings, global search, save-state indicators. All frontend-only. */
+
+/* ---- guided request steps ---- */
+function twStepsCompute() {
+    const rec = document.getElementById('tw-record-id');
+    const loaded = !!(rec && rec.value) || (typeof twCreateMode !== 'undefined' && !!twCreateMode);
+    // "Duplicates reviewed" = the auto radar scan finished: the verdict
+    // bubble has content and is no longer scanning. The sheet's Duplicated
+    // Check is a Formula (never a form input), so it can't be the signal.
+    const radarMsg = document.getElementById('twRadarMsg');
+    const dupDone = !!(radarMsg && radarMsg.textContent.trim() && !radarMsg.classList.contains('scanning'));
+    const dbWrap = document.getElementById('tw-done-by-wrap');
+    let dbDone = false;
+    try { dbDone = (JSON.parse((dbWrap && dbWrap.dataset.userSelected) || '[]') || []).length > 0; } catch (e) {}
+    const st = document.getElementById('tw-audition-status');
+    const mg = document.getElementById('tw-mentioned-group');
+    const stDone = !!(st && String(st.value || '').trim()) && !!(mg && String(mg.value || '').trim());
+    return [loaded, dupDone, dbDone, stDone, dbDone && stDone];
+}
+function twStepsRefresh() {
+    const root = document.getElementById('twSteps');
+    if (!root) return;
+    let st;
+    try { st = twStepsCompute(); } catch (e) { return; }
+    const firstTodo = st.findIndex(x => !x);
+    root.querySelectorAll('.twx-step').forEach(b => {
+        const i = (+b.dataset.twxstep) - 1;
+        b.classList.toggle('done', !!st[i]);
+        b.classList.toggle('current', i === firstTodo || (firstTodo === -1 && i === 4));
+        const dot = b.querySelector('.twx-step-dot');
+        if (dot) dot.textContent = st[i] ? '✓' : String(i + 1);
+    });
+}
+function twStepGo(n) {
+    let target = null;
+    if (n === 1) target = document.querySelector('#tw-form .twx-card');
+    else if (n === 2) { if (typeof twRadarFabClick === 'function') { try { twRadarFabClick(); } catch (e) {} } target = document.getElementById('btnTwRadar'); }
+    else if (n === 3) target = document.getElementById('tw-done-by-wrap');
+    else if (n === 4) target = document.getElementById('tw-audition-status');
+    else if (n === 5) { if (typeof twSaveWorkspace === 'function') twSaveWorkspace(); return; }
+    if (target && target.scrollIntoView) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('twx-pulse');
+        setTimeout(() => target.classList.remove('twx-pulse'), 1700);
+    }
+}
+document.addEventListener('change', e => { if (e.target && e.target.closest && e.target.closest('#twWsInstance')) twStepsRefresh(); }, true);
+document.addEventListener('input', e => { if (e.target && e.target.closest && e.target.closest('#twWsInstance')) twStepsRefresh(); }, true);
+document.addEventListener('click', e => { if (e.target && e.target.closest && e.target.closest('#twWsInstance')) setTimeout(twStepsRefresh, 60); }, true);
+
+/* ---- visible auto-drafts (fields the xd* form snapshots don't cover) ---- */
+const DRF_PREFIX = 'xena:drf:' + String(typeof loggedEmail !== 'undefined' ? loggedEmail : 'unknown').toLowerCase() + ':';
+const drfTimers = {};
+function drfKey(el) {
+    const base = el.dataset.drf;
+    if (!base) return null;
+    if (base === 'twcInput') {
+        const root = el.closest('#twWsInstance');
+        const rid = root ? ((root.querySelector('#tw-record-id') || {}).value || '') : '';
+        return 'twc:' + (rid || 'create');
+    }
+    return base;
+}
+function drfBadge() {
+    let b = document.getElementById('drfBadge');
+    if (!b) { b = document.createElement('div'); b.id = 'drfBadge'; b.className = 'drf-badge'; document.body.appendChild(b); }
+    return b;
+}
+function drfSave(el) {
+    const k = drfKey(el); if (!k) return;
+    clearTimeout(drfTimers[k]);
+    drfTimers[k] = setTimeout(() => {
+        const v = el.value || '';
+        try {
+            if (!v.trim()) localStorage.removeItem(DRF_PREFIX + k);
+            else localStorage.setItem(DRF_PREFIX + k, JSON.stringify({ v: v, ts: Date.now() }));
+        } catch (e) {}
+        if (v.trim()) {
+            const b = drfBadge();
+            b.textContent = '💾 Draft saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            b.classList.add('show');
+            clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('show'), 1800);
+        }
+    }, 700);
+}
+function drfClear(key) { try { localStorage.removeItem(DRF_PREFIX + key); } catch (e) {} }
+function drfOffer(el) {
+    const k = drfKey(el); if (!k) return;
+    let raw = null;
+    try { raw = localStorage.getItem(DRF_PREFIX + k); } catch (e) {}
+    if (!raw) return;
+    let d = null;
+    try { d = JSON.parse(raw); } catch (e) {}
+    if (!d || !d.v || !String(d.v).trim()) return;
+    if (String(el.value || '') === String(d.v)) return;
+    if (el._drfChip && el._drfChip.isConnected) return;
+    const chip = document.createElement('div');
+    chip.className = 'drf-restore';
+    const when = d.ts ? new Date(d.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    chip.innerHTML = '<span>📝 Unsent draft from ' + when + '</span><button type="button" class="drf-r-btn">Restore</button><button type="button" class="drf-d-btn">Dismiss</button>';
+    chip.querySelector('.drf-r-btn').onclick = () => { el.value = d.v; el.dispatchEvent(new Event('input', { bubbles: true })); chip.remove(); };
+    chip.querySelector('.drf-d-btn').onclick = () => { drfClear(k); chip.remove(); };
+    el.insertAdjacentElement('afterend', chip);
+    el._drfChip = chip;
+}
+document.addEventListener('input', e => { const t = e.target; if (t && t.dataset && t.dataset.drf) drfSave(t); }, true);
+document.addEventListener('focusin', e => { const t = e.target; if (t && t.dataset && t.dataset.drf) drfOffer(t); }, true);
+
+/* ---- My Work page ---- */
+let mwCache = { ts: 0, data: null };
+function mwEsc(s) { return (typeof escHtml === 'function') ? escHtml(String(s == null ? '' : s)) : String(s == null ? '' : s); }
+async function mwLoad(force) {
+    const greet = document.getElementById('mwGreeting');
+    if (greet) {
+        const h = new Date().getHours();
+        const part = h < 12 ? 'morning' : (h < 18 ? 'afternoon' : 'evening');
+        greet.textContent = 'Good ' + part + ', ' + (typeof loggedUser !== 'undefined' && loggedUser ? loggedUser : 'there');
+        const dl = document.getElementById('mwDateLine');
+        if (dl) dl.textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    if (!force && mwCache.data && Date.now() - mwCache.ts < 60000) { mwRender(mwCache.data); return; }
+    ['mwTickets', 'mwShifts', 'mwReqs'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<div class="mw-empty">Loading…</div>'; });
+    const u = (typeof loggedUser !== 'undefined' && loggedUser) || '';
+    const em = (typeof loggedEmail !== 'undefined' && loggedEmail) || '';
+    const data = { tickets: [], shifts: [], reqs: [], errs: {} };
+    const jobs = [];
+    jobs.push(fetch('/api/live-queue?user=' + encodeURIComponent(u))
+        .then(r => r.json()).then(d => { if (d && d.success) data.tickets = d.tickets || []; else data.errs.tickets = (d && d.error) || 'Could not load'; })
+        .catch(e => { data.errs.tickets = String(e && e.message || e); }));
+    const t0 = new Date(), t1 = new Date(); t1.setDate(t1.getDate() + 6);
+    jobs.push(fetch('/api/audition/schedule?' + new URLSearchParams({ user: u, email: em, from: String(schDayInt(t0)), to: String(schDayInt(t1)) }))
+        .then(r => r.json()).then(d => {
+            if (d && d.success) data.shifts = (d.rows || []).filter(r2 => (r2.email || '').toLowerCase() === em.toLowerCase());
+            else data.errs.shifts = (d && d.error) || 'Could not load';
+        }).catch(e => { data.errs.shifts = String(e && e.message || e); }));
+    jobs.push(fetch('/api/audition/requests?' + new URLSearchParams({ user: u, email: em }))
+        .then(r => r.json()).then(d => { if (d && d.success) data.reqs = (d.requests || []).filter(q => q.status === 'Pending'); else data.errs.reqs = (d && d.error) || 'Could not load'; })
+        .catch(e => { data.errs.reqs = String(e && e.message || e); }));
+    await Promise.all(jobs);
+    mwCache = { ts: Date.now(), data };
+    mwRender(data);
+}
+function mwRender(data) {
+    const tEl = document.getElementById('mwTickets');
+    const tCount = document.getElementById('mwTicketCount');
+    if (tCount) tCount.textContent = data.tickets.length ? String(data.tickets.length) : '';
+    if (tEl) {
+        if (data.errs.tickets) tEl.innerHTML = '<div class="mw-empty">' + mwEsc(data.errs.tickets) + '</div>';
+        else if (!data.tickets.length) tEl.innerHTML = '<div class="mw-empty">🎉 Nothing in progress — your queue is clear.</div>';
+        else tEl.innerHTML = data.tickets.map(t =>
+            '<div class="mw-row"><div class="mw-row-main"><span class="mw-row-title">#' + mwEsc(t.numbering || '—') + ' · ' + mwEsc(t.request_type || 'Request') + '</span><span class="mw-row-sub">' +
+            (t.agency_code ? 'Agency ' + mwEsc(t.agency_code) : '') + (t.user_id ? (t.agency_code ? ' · ' : '') + 'User ' + mwEsc(t.user_id) : '') + '</span></div>' +
+            '<button type="button" class="btn btn-primary mw-open" onclick="mwOpenTicket(\'' + String(t.record_id || '').replace(/'/g, '') + '\')">Open →</button></div>').join('');
+    }
+    const sEl = document.getElementById('mwShifts');
+    const sCount = document.getElementById('mwShiftCount');
+    if (sCount) sCount.textContent = data.shifts.length ? String(data.shifts.length) : '';
+    if (sEl) {
+        if (data.errs.shifts) sEl.innerHTML = '<div class="mw-empty">' + mwEsc(data.errs.shifts) + '</div>';
+        else if (!data.shifts.length) sEl.innerHTML = '<div class="mw-empty">No shifts scheduled for you in the next 7 days.</div>';
+        else sEl.innerHTML = data.shifts.map(r => {
+            const d = schDateFromInt(Number(r.day));
+            const wd = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            const isWork = (typeof SCH_WORK_TYPES !== 'undefined' && SCH_WORK_TYPES.indexOf(r.type) !== -1);
+            const time = isWork && r.start && r.end ? ' · ' + r.start + '–' + r.end : '';
+            return '<div class="mw-row"><div class="mw-row-main"><span class="mw-row-title">' + mwEsc(wd + ' — ' + (r.type || '') + time) + '</span>' + (r.note ? '<span class="mw-row-sub">' + mwEsc(r.note) + '</span>' : '') + '</div></div>';
+        }).join('');
+    }
+    const rEl = document.getElementById('mwReqs');
+    const rCount = document.getElementById('mwReqCount');
+    if (rCount) rCount.textContent = data.reqs.length ? String(data.reqs.length) : '';
+    if (rEl) {
+        if (data.errs.reqs) rEl.innerHTML = '<div class="mw-empty">' + mwEsc(data.errs.reqs) + '</div>';
+        else if (!data.reqs.length) rEl.innerHTML = '<div class="mw-empty">No pending schedule requests.</div>';
+        else rEl.innerHTML = data.reqs.map(r =>
+            '<div class="mw-row"><div class="mw-row-main"><span class="mw-row-title">' + mwEsc(r.type || 'Request') + (r.name ? ' — ' + mwEsc(r.name) : '') + '</span><span class="mw-row-sub">' +
+            schDayLabel(r.from_day) + ' → ' + schDayLabel(r.to_day) + '</span></div>' +
+            '<button type="button" class="btn btn-primary mw-open" onclick="openInTab(\'audition-schedule\')">Review →</button></div>').join('');
+    }
+}
+function mwOpenTicket(rid) {
+    if (!rid) return;
+    if (typeof twOpenWorkspace === 'function') twOpenWorkspace(rid);
+    else ToastManager.show('Ticket workspace is not available for your access.', 'warning');
+}
+
+/* ---- global search (top bar) ---- */
+let glsTimer = null, glsSeq = 0;
+const glsLastTickets = {};
+function glsOnInput() {
+    const el = document.getElementById('glsInput');
+    clearTimeout(glsTimer);
+    const q = ((el && el.value) || '').trim();
+    if (q.length < 3) { glsHide(); return; }
+    glsTimer = setTimeout(() => glsRun(q), 300);
+}
+function glsHide() { const d = document.getElementById('glsDrop'); if (d) { d.style.display = 'none'; d.innerHTML = ''; } }
+async function glsRun(q) {
+    const seq = ++glsSeq;
+    const drop = document.getElementById('glsDrop');
+    if (!drop) return;
+    drop.style.display = 'block';
+    drop.innerHTML = '<div class="gls-hint">Searching…</div>';
+    const out = { tickets: [], members: [] };
+    const u = (typeof loggedUser !== 'undefined' && loggedUser) || '';
+    const em = (typeof loggedEmail !== 'undefined' && loggedEmail) || '';
+    const jobs = [];
+    if (/^\d+$/.test(q)) {
+        jobs.push(fetch('/api/query/batch', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: u, email: em, queries: [{ field: 'numbering', value: q }, { field: 'user_id', value: q }, { field: 'agency_code', value: q }] })
+        }).then(r => r.json()).then(d => {
+            const seen = new Set();
+            ((d && d.responses) || []).forEach(resp => {
+                ((resp && resp.results) || []).forEach(r2 => {
+                    const rid = r2.record_id;
+                    if (rid && !seen.has(rid)) { seen.add(rid); out.tickets.push(r2); if (r2.full_fields) glsLastTickets[rid] = r2.full_fields; }
+                });
+            });
+        }).catch(() => {}));
+    }
+    jobs.push(fetch('/api/members/search?q=' + encodeURIComponent(q) + '&uat=' + encodeURIComponent(typeof loggedUat !== 'undefined' ? loggedUat : ''))
+        .then(r => r.json()).then(d => { if (d && d.success) out.members = (d.results || d.members || []).slice(0, 4); })
+        .catch(() => {}));
+    await Promise.all(jobs);
+    if (seq !== glsSeq) return; // a newer search owns the dropdown
+    glsRender(out, q);
+}
+function glsRender(out, q) {
+    const drop = document.getElementById('glsDrop');
+    if (!drop) return;
+    let html = '';
+    if (out.tickets.length) {
+        html += '<div class="gls-group">🎫 Tickets</div>' + out.tickets.slice(0, 6).map(r => {
+            const rid = String(r.record_id || '').replace(/'/g, '');
+            return '<div class="gls-row" onclick="glsOpenTicket(\'' + rid + '\')"><div style="min-width:0"><div class="gls-row-t">#' + mwEsc(r.numbering || '?') + ' · ' + mwEsc(r.request_type || 'Request') + '</div><div class="gls-row-s">' +
+                (r.agency_code ? 'Agency ' + mwEsc(r.agency_code) + ' · ' : '') + (r.user_id ? 'User ' + mwEsc(r.user_id) + ' · ' : '') + mwEsc(r.status || '') + '</div></div></div>';
+        }).join('');
+    }
+    if (out.members.length) {
+        html += '<div class="gls-group">👥 Teammates</div>' + out.members.map(m => {
+            const nm = String(m.name || '').replace(/'/g, '');
+            return '<div class="gls-row" onclick="glsOpenMember(\'' + mwEsc(nm) + '\')">' +
+                (m.avatar_url ? '<img class="gls-av" src="' + mwEsc(m.avatar_url) + '" alt="">' : '<span class="gls-av gls-av-fallback">' + mwEsc((m.name || '?')[0]) + '</span>') +
+                '<div><div class="gls-row-t">' + mwEsc(m.name) + '</div></div></div>';
+        }).join('');
+    }
+    if (!html) html = '<div class="gls-hint">No matches for “' + mwEsc(q) + '”.<br>Numbers search tickets (ticket #, user ID, agency code); text searches teammates.</div>';
+    drop.innerHTML = html;
+    drop.style.display = 'block';
+}
+function glsOpenTicket(rid) {
+    glsHide();
+    const inp = document.getElementById('glsInput'); if (inp) inp.value = '';
+    const ff = glsLastTickets[rid];
+    if (ff && typeof twSeedTicketFromList === 'function') { try { twSeedTicketFromList(rid, ff, 'search'); } catch (e) {} }
+    if (typeof twOpenWorkspace === 'function') twOpenWorkspace(rid);
+}
+function glsOpenMember(name) {
+    glsHide();
+    if (typeof isAdmin !== 'undefined' && isAdmin) { openInTab('admin-agents'); ToastManager.show('Search for ' + name + ' in Manage Agents.', 'info', 3500); }
+    else ToastManager.show('👤 ' + name + ' — ask an admin to view member details.', 'info', 3500);
+}
+document.addEventListener('click', e => { const w = document.getElementById('glsWrap'); if (w && !w.contains(e.target)) glsHide(); });
+
+/* ---- save-state pill (Saving… / Saved ✓ / Failed) ---- */
+let xdSaveStateTimer = null;
+function xdSaveState(st) {
+    const p = document.getElementById('saveStatePill');
+    if (!p) return;
+    clearTimeout(xdSaveStateTimer);
+    if (st === 'idle') { p.style.display = 'none'; return; }
+    p.style.display = 'inline-flex';
+    p.className = 'save-state-pill ss-' + st;
+    if (st === 'saving') p.textContent = '⏳ Saving…';
+    else if (st === 'saved') { p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
+    else if (st === 'failed') p.textContent = '⚠️ Save failed — retry';
+}
+// Wrap the two save paths with a POST-spy: the pill only flips to Saved /
+// Failed when the request actually reached the network save call -- the
+// workspace's pre-save gates (missing fields etc.) reset it to idle instead.
+function xdWrapSave(name, re) {
+    const orig = window[name];
+    if (typeof orig !== 'function') return;
+    window[name] = async function () {
+        let hit = false;
+        const of = window.fetch;
+        window.fetch = function (u2, o) {
+            try { if (o && String(o.method || 'GET').toUpperCase() === 'POST' && re.test(String(typeof u2 === 'string' ? u2 : (u2 && u2.url) || ''))) hit = true; } catch (_) {}
+            return of.apply(this, arguments);
+        };
+        xdSaveState('saving');
+        try {
+            const r = await orig.apply(this, arguments);
+            // twSaveWorkspace toasts-and-returns false on failure instead of
+            // throwing -- honour that signal so the pill never lies.
+            xdSaveState(hit ? (r === false ? 'failed' : 'saved') : 'idle');
+            return r;
+        } catch (e) {
+            xdSaveState(hit ? 'failed' : 'idle');
+            throw e;
+        } finally { window.fetch = of; }
+    };
+}
+xdWrapSave('twSaveWorkspace', /requests\/(update|submit)/);
+xdWrapSave('schSaveEntries', /audition\/schedule/);
 </script>
 </body>
 </html>
