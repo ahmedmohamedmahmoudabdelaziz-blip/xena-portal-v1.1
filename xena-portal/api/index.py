@@ -4961,6 +4961,20 @@ def _query_local_match(fields, field, op, value):
         return txt.isdigit() and int(txt) == int(value)
     return False
 
+def _query_local_exact(fields, field, value):
+    """Phase 27 (Ahmed): the duplicate radar must match the EXACT value only
+    -- searching "19" returns the request whose Otherapp ID IS "19", never
+    one whose ID merely CONTAINS "19" (e.g. 16047919). Stray spaces before/
+    after either side are ignored; anything else must be identical. Fetching
+    stays broad (contains) so no candidate is ever missed on the wire -- the
+    exactness is applied when hits are sorted into per-field slots."""
+    txt = ""
+    for alias in QUERY_FIELD_ALIASES[field]:
+        txt = extract_field_text(get_field_local(fields, alias))
+        if txt:
+            break
+    return bool(txt) and txt.strip() == value
+
 def _query_try_or_search(search_url, headers, conditions, projection):
     """Fires ONE /records/search whose filter ORs every field's condition,
     following pagination (up to 3 pages = 1,500 records, matching the old
@@ -5081,12 +5095,15 @@ def query_records_batch():
     # Validate up front; bad entries become error slots so the response list
     # ALWAYS mirrors the request list 1:1 (the frontend merges by index).
     normalized = []
+    exact_flags = []  # Phase 27: per-query "exact match only" (duplicate radar)
     for q in raw_queries[:5]:  # sanity bound -- the radar never asks for more than 3
         if not isinstance(q, dict):
             normalized.append(('', '', 'Invalid query entry.'))
+            exact_flags.append(False)
             continue
         field = sanitize_text(str(q.get('field', ''))).strip().lower()
         value = sanitize_text(str(q.get('value', '')), 200).strip()
+        exact_flags.append(bool(q.get('exact')))
         if field not in QUERY_FIELD_ALIASES:
             normalized.append((field, value, 'Invalid search field.'))
         elif not value:
@@ -5125,10 +5142,10 @@ def query_records_batch():
     tat = get_tenant_access_token()
     search_url, headers = _query_search_url_and_headers(tat)
 
-    jobs = []       # (response_index, field, value) for valid entries
+    jobs = []       # (response_index, field, value, exact) for valid entries
     for idx, (field, value, err) in enumerate(normalized):
         if not err:
-            jobs.append((idx, field, value))
+            jobs.append((idx, field, value, exact_flags[idx]))
 
     responses = [None] * len(normalized)
     for idx, (field, value, err) in enumerate(normalized):
@@ -5141,10 +5158,10 @@ def query_records_batch():
     # an exact reproduction of Feishu's own per-condition decision. Any
     # non-digit value takes the legacy probe below instead -- zero accuracy
     # risk either way.
-    if jobs and all(value.isdigit() for _, _, value in jobs):
+    if jobs and all(value.isdigit() for _, _, value, _exact in jobs):
         combo_map = _query_combo_map_get()
         conditions, chosen = [], {}
-        for _, field, value in jobs:
+        for _, field, value, _exact in jobs:
             alias, op = (combo_map.get(field) or [QUERY_FIELD_ALIASES[field][0], "contains"])
             chosen[field] = (alias, op)
             conditions.append({"field_name": alias, "operator": op,
@@ -5157,10 +5174,16 @@ def query_records_batch():
                 projection.append(alias)
         or_res = _query_try_or_search(search_url, headers, conditions, projection)
         if or_res.get("ok"):
-            for idx, field, value in jobs:
+            for idx, field, value, exact in jobs:
                 alias, op = chosen[field]
                 slot_items = [it for it in or_res["items"]
                               if _query_local_match(it.get("fields", {}) or {}, field, op, value)]
+                if exact:
+                    # Phase 27: keep only rows whose field value IS the
+                    # searched value (stray spaces ignored) -- never rows
+                    # that merely contain it as a substring.
+                    slot_items = [it for it in slot_items
+                                  if _query_local_exact(it.get("fields", {}) or {}, field, value)]
                 results = _query_format_results(slot_items, allowed_acms_set, allowed_regs_set)
                 responses[idx] = {"results": results, "count": len(results), "field": field, "value": value,
                                   "fetch_complete": or_res["complete"],
@@ -5186,10 +5209,10 @@ def query_records_batch():
     # worker ceiling stays at 9 (the per-request ceiling /api/query always
     # had), so this is actually GENTLER on Feishu's QPS than 3 parallel calls.
     all_combos = []
-    legacy_jobs = []  # (response_index, combos)
-    for idx, field, value in jobs:
+    legacy_jobs = []  # (response_index, field, value, exact, combos)
+    for idx, field, value, exact in jobs:
         combos = _query_combos_for_field(field, value)
-        legacy_jobs.append((idx, combos))
+        legacy_jobs.append((idx, field, value, exact, combos))
         all_combos.extend(combos)
 
     combo_results = {}
@@ -5199,14 +5222,17 @@ def query_records_batch():
                 combo_results[res["combo"]] = res
 
     learned = {}
-    for idx, combos in legacy_jobs:
-        field, value, _ = normalized[idx]
+    for idx, field, value, exact, combos in legacy_jobs:
         results_by_combo = {c: combo_results.get(c) for c in combos}
         all_items, fetch_complete, stop_reason, success = _query_pick_first_ok(combos, results_by_combo)
         if not success:
             responses[idx] = {"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}",
                               "field": field, "value": value}
             continue
+        if exact:
+            # Phase 27: same exact-only rule on the legacy probe path.
+            all_items = [it for it in all_items
+                         if _query_local_exact(it.get("fields", {}) or {}, field, value)]
         winner = next((c for c in combos if (results_by_combo.get(c) or {}).get("ok")), None)
         if winner:
             learned[field] = [winner[0], winner[1]]
@@ -5230,6 +5256,7 @@ def query_records():
     email = sanitize_text(request.args.get('email',''))
     field = sanitize_text(request.args.get('field','')).strip().lower()
     value = sanitize_text(request.args.get('value',''), 200).strip()
+    exact = request.args.get('exact', '') in ('1', 'true', 'True')  # Phase 27: duplicate radar exact-match
     ip    = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     if field not in QUERY_FIELD_ALIASES: return jsonify({"error": "Invalid search field."}), 400
@@ -5272,6 +5299,11 @@ def query_records():
         all_items, fetch_complete, stop_reason, success = _query_pick_first_ok(combos, results_by_combo)
 
         if not success: return jsonify({"error": f"Data fetch failed: Feishu API Error: {stop_reason or 'Invalid Filter.'}"}), 502
+
+        if exact:
+            # Phase 27: exact value only (spaces before/after ignored).
+            all_items = [it for it in all_items
+                         if _query_local_exact(it.get("fields", {}) or {}, field, value)]
 
     results = _query_format_results(all_items, allowed_acms_set, allowed_regs_set)
 
