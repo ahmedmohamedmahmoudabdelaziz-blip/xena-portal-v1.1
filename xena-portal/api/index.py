@@ -9745,6 +9745,14 @@ def _resolve_record_numberings(record_ids, token):
 # Day granularity = yyyymmdd INTEGERS: no timezone math, exact range filters.
 SCHED_TABLE_ID     = "tblfB8sUlmDV9KtD"
 SCHED_REQ_TABLE_ID = "tbldJqbfy3APXIdA"
+SCHED_PRESET_TABLE_ID = "tblATopUf6WlqKAY"
+SCHED_PRESET_TTL      = 300
+SCHED_PRESET_MAX      = 30
+SCHED_PRESET_SEED     = [("Day shift", "On Site", "09:00", "17:00", 1),
+                         ("Evening shift", "On Site", "14:00", "22:00", 2),
+                         ("Night shift", "On Site", "22:00", "06:00", 3),
+                         ("WFH day", "Work From Home", "09:00", "17:00", 4),
+                         ("Weekly off", "Off", "", "", 5)]
 SCHED_TYPES        = ("On Site", "Work From Home", "Off", "Annual Leave", "Sick Leave")
 SCHED_REQ_TYPES    = ("Change Off", "Annual Leave", "Sick Leave", "Work From Home")
 SCHED_REQ_TO_TYPE  = {"Change Off": "Off", "Annual Leave": "Annual Leave",
@@ -9758,7 +9766,13 @@ def _sched_day_ok(d):
         d = int(d)
     except Exception:
         return None
-    return d if 20000101 <= d <= 21001231 else None
+    if not 20000101 <= d <= 21001231:
+        return None
+    try:
+        datetime.strptime(str(d), "%Y%m%d")
+    except ValueError:
+        return None
+    return d
 
 def _sched_day_add(d, n):
     dt = datetime.strptime(str(int(d)), "%Y%m%d") + timedelta(days=int(n))
@@ -9820,7 +9834,9 @@ def _sched_search_range(from_day, to_day, token, field_names=None):
             break
         page_token = d.get("page_token")
         if not page_token:
-            break
+            raise RuntimeError("Schedule pagination incomplete. Please retry.")
+    if d.get("has_more"):
+        raise RuntimeError("Schedule range exceeds 2,000 rows. Please choose a shorter range.")
     return rows
 
 def _sched_row_out(item):
@@ -9915,7 +9931,15 @@ def audition_schedule_save():
     base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_TABLE_ID}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
     entries = body.get("entries") if isinstance(body.get("entries"), list) else []
-    delete_keys = [str(k) for k in (body.get("delete_keys") or []) if k][:500]
+    raw_deletes = body.get("delete_keys") or []
+    if not isinstance(raw_deletes, list) or len(entries) > 500 or len(raw_deletes) > 500:
+        return jsonify({"success": False, "error": "Maximum 500 entries or delete keys per request."}), 400
+    delete_keys = list(dict.fromkeys(str(k) for k in raw_deletes if k))
+    seen_keys = set()
+    for key in delete_keys:
+        parts = key.rsplit("|", 1)
+        if len(parts) != 2 or not parts[0].strip() or not _sched_day_ok(parts[1]):
+            return jsonify({"success": False, "error": "Invalid delete key."}), 400
     if not entries and not delete_keys:
         return jsonify({"success": False, "error": "Nothing to do."}), 400
     days = []
@@ -9927,8 +9951,18 @@ def audition_schedule_save():
             return jsonify({"success": False, "error": f"Bad day: {e.get('day')}"}), 400
         if e.get("type") not in SCHED_TYPES:
             return jsonify({"success": False, "error": f"Bad type: {e.get('type')} — must be one of {', '.join(SCHED_TYPES)}"}), 400
-        if not (e.get("email") or "").strip():
+        if not isinstance(e.get("email"), str) or not e["email"].strip():
             return jsonify({"success": False, "error": "Entry missing agent email."}), 400
+        em = str(e.get("email") or "").strip().lower()
+        key = f"{em}|{d}"
+        if key in seen_keys or key in delete_keys:
+            return jsonify({"success": False, "error": "Duplicate or conflicting agent/day entry."}), 400
+        seen_keys.add(key)
+        if e.get("type") in ("On Site", "Work From Home"):
+            start, end = str(e.get("start") or ""), str(e.get("end") or "")
+            if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", start) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", end) or start == end:
+                return jsonify({"success": False, "error": "Working shifts require valid, different HH:MM start and end times."}), 400
+        e["day"] = d
         days.append(d)
     for k in delete_keys:
         try:
@@ -10041,6 +10075,166 @@ def audition_schedule_agents():
     except Exception:
         pass
     return jsonify({"success": True, "agents": agents, "cached": False})
+
+_SCHED_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+def _sched_preset_out(item):
+    f = item.get("fields") or {}
+    return {"record_id": item.get("record_id"),
+            "name": _mirror_cell_text(f.get("Name")),
+            "type": _mirror_cell_text(f.get("Type")) or "On Site",
+            "start": _mirror_cell_text(f.get("Start")),
+            "end": _mirror_cell_text(f.get("End")),
+            "sort": _mirror_cell_num(f.get("Sort")) or 0}
+
+def _sched_presets_fetch(token):
+    """All preset rows (the table is tiny — 2 pages is generous)."""
+    rows, page_token, pages = [], None, 0
+    while pages < 2:
+        params = {"page_size": 200}
+        if page_token:
+            params["page_token"] = page_token
+        resp = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_PRESET_TABLE_ID}/records/search",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"},
+            params=params,
+            json={"field_names": ["Name", "Type", "Start", "End", "Sort"], "automatic_fields": False},
+            timeout=15)
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"preset read: {data.get('code')}: {data.get('msg')}")
+        d = data.get("data") or {}
+        rows.extend(d.get("items") or [])
+        pages += 1
+        if not d.get("has_more"):
+            break
+        page_token = d.get("page_token")
+        if not page_token:
+            break
+    return rows
+
+def _sched_presets_public(items):
+    out = [_sched_preset_out(it) for it in items]
+    out.sort(key=lambda p: (p.get("sort") or 99, (p.get("name") or "").lower()))
+    return out
+
+def _sched_presets_bust():
+    try:
+        redis_del_json("xena:sched:presets")
+    except Exception:
+        pass
+
+def _sched_preset_seed(token):
+    """First run: create sensible defaults so the feature demos itself."""
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    recs = [{"fields": {"Name": n, "Type": t, "Start": s, "End": e, "Sort": o}}
+            for n, t, s, e, o in SCHED_PRESET_SEED]
+    try:
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_PRESET_TABLE_ID}/records/batch_create",
+            headers=headers, json={"records": recs}, timeout=20).json()
+        if r.get("code") != 0:
+            return []
+        return (r.get("data") or {}).get("records") or []
+    except Exception:
+        return []
+
+@app.route('/api/audition/shift-presets', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_shift_presets_get():
+    """Saved shifts for the admin editors (cell popover + range apply). Cached
+    5 min; the first-ever call seeds 5 sensible defaults. Admin only."""
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    try:
+        cached = redis_get_json("xena:sched:presets")
+        if isinstance(cached, list):
+            return jsonify({"success": True, "presets": cached, "cached": True})
+    except Exception:
+        pass
+    token = get_tenant_access_token()
+    try:
+        items = _sched_presets_fetch(token)
+        if not items:
+            items = _sched_preset_seed(token)
+        presets = _sched_presets_public(items)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    try:
+        redis_set_json("xena:sched:presets", presets, ttl=SCHED_PRESET_TTL)
+    except Exception:
+        pass
+    return jsonify({"success": True, "presets": presets, "cached": False})
+
+@app.route('/api/audition/shift-presets', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_shift_presets_add():
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    name  = sanitize_text(str(body.get('name') or ''), max_length=40).strip()
+    ptype = body.get('type')
+    start = sanitize_text(str(body.get('start') or ''), max_length=5).strip()
+    end   = sanitize_text(str(body.get('end') or ''), max_length=5).strip()
+    if not name:
+        return jsonify({"success": False, "error": "Preset needs a name."}), 400
+    if ptype not in SCHED_TYPES:
+        return jsonify({"success": False, "error": f"Bad type: {ptype}"}), 400
+    for lbl, v in (("start", start), ("end", end)):
+        if v and not _SCHED_TIME_RE.match(v):
+            return jsonify({"success": False, "error": f"Bad {lbl} time — use HH:MM (24h)."}), 400
+    token = get_tenant_access_token()
+    try:
+        existing = _sched_presets_fetch(token)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    if len(existing) >= SCHED_PRESET_MAX:
+        return jsonify({"success": False, "error": f"Max {SCHED_PRESET_MAX} presets — delete one first."}), 400
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    try:
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_PRESET_TABLE_ID}/records",
+            headers=headers,
+            json={"fields": {"Name": name, "Type": ptype, "Start": start, "End": end,
+                             "Sort": len(existing) + 1}},
+            timeout=15).json()
+        if r.get("code") != 0:
+            return jsonify({"success": False, "error": f"preset create: {r.get('code')}: {r.get('msg')}"}), 502
+        rec = (r.get("data") or {}).get("record") or {}
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    _sched_presets_bust()
+    return jsonify({"success": True, "preset": _sched_preset_out(rec)})
+
+@app.route('/api/audition/shift-presets/delete', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_shift_presets_delete():
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    rid = sanitize_text(str(body.get('record_id') or ''), max_length=64).strip()
+    if not rid:
+        return jsonify({"success": False, "error": "Need record_id."}), 400
+    token = get_tenant_access_token()
+    try:
+        r = feishu_session.delete(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_PRESET_TABLE_ID}/records/{rid}",
+            headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
+        if r.get("code") != 0:
+            return jsonify({"success": False, "error": f"preset delete: {r.get('code')}: {r.get('msg')}"}), 502
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    _sched_presets_bust()
+    return jsonify({"success": True, "deleted": rid})
 
 def _sched_req_out(item):
     f = item.get("fields") or {}
