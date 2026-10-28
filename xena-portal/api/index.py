@@ -269,7 +269,11 @@ def get_tenant_access_token():
             return cached["token"]
 
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
-    resp = http_requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10).json()
+    # Phase 34d: this uncached cold-start call was the last single-10s-attempt
+    # hole on the charge/save path (Ahmed's exact "read timeout=10"). Retried
+    # now -- the auth POST is idempotent. feishu_session also adds keep-alive.
+    resp = _post_json_retry(url, headers=None, payload={"app_id": APP_ID, "app_secret": APP_SECRET},
+                            timeout=8, retry_timeout=12)
     token = resp.get("tenant_access_token")
     expire = resp.get("expire", 7200)
     expires_at = time.time() + max(expire - 300, 60)
@@ -292,9 +296,11 @@ def get_app_access_token():
     with _app_token_cache["lock"]:
         if _app_token_cache["token"] and time.time() < _app_token_cache["expires_at"]:
             return _app_token_cache["token"]
-    resp = http_requests.post(
+    # Phase 34d: retried like the tenant token (idempotent auth POST).
+    resp = _post_json_retry(
         "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal",
-        json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=15).json()
+        headers=None, payload={"app_id": APP_ID, "app_secret": APP_SECRET},
+        timeout=8, retry_timeout=12)
     token = resp.get("app_access_token")
     if not token:
         logger.error("app_token_fetch_failed", resp=resp)
@@ -3348,6 +3354,24 @@ def _post_json_retry(url, headers, payload, timeout=8, tries=2, retry_timeout=10
             if attempt + 1 < tries:
                 time.sleep(0.8 * (attempt + 1))
     raise last
+
+_TOKEN_WARMED = False
+@app.before_request
+def _warm_tenant_token_once():
+    """Phase 34d: on the first request hitting a cold Vercel instance, warm the
+    tenant-token cache in a background thread so the user's own call chain
+    (ticket read, wallet fetch, ...) doesn't queue behind the auth round trip.
+    Fires once per process; MOCK_MODE skips it entirely (test harness)."""
+    global _TOKEN_WARMED
+    if _TOKEN_WARMED or MOCK_MODE:
+        return
+    _TOKEN_WARMED = True
+    def _w():
+        try:
+            get_tenant_access_token()
+        except Exception:
+            pass
+    threading.Thread(target=_w, daemon=True).start()
 
 def _wallet_search(headers, code):
     """Live Agency Points table search by exact Agency Code (read-only, so a
