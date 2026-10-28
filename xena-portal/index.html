@@ -2207,7 +2207,97 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .gls-hint{padding:14px;font-size:.8rem;color:var(--text-muted);text-align:center}
 .gls-av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0}
 .gls-av-fallback{display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:var(--on-primary);font-weight:800;font-size:.8rem}
-@media (max-width:820px){.gls-wrap{max-width:170px;margin:0 8px}.gls-input{font-size:.78rem;padding:8px 12px}}
+/* Phase 33: Change-Off swap explainer */
+.sch-swap-note{margin-top:10px;padding:10px 12px;border-radius:12px;border:1px dashed rgba(0,212,255,.4);background:rgba(0,212,255,.07);font-size:.78rem;line-height:1.45;color:var(--text);}
+
+/* ===== Phase 33 (Ahmed): Attendance Monitor ===== */
+.atm-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.atm-tools label{font-size:.74rem;color:var(--text-sec);display:flex;gap:8px;align-items:center}
+.atm-tools input{margin:0}
+.atm-legend{display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1;min-width:220px}
+.atm-lg{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;color:var(--text-sec)}
+.atm-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.atm-agent{margin-bottom:14px}
+.atm-agent-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.atm-name{font-weight:700;font-size:.92rem}
+.atm-live{font-size:.68rem;padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:var(--surface-inset);flex:none}
+.atm-live.on{color:#00e676;border-color:rgba(0,230,118,.45)}
+.atm-live.dim{color:var(--text-sec)}
+.atm-sum{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.atm-sum b{font-size:.68rem;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.08);color:var(--text-sec)}
+.atm-sum b.alert{color:#ffb800;border-color:rgba(255,184,0,.4)}
+.atm-sum b.bad{color:#ff4d6d;border-color:rgba(255,77,109,.4)}
+.atm-scale{display:grid;grid-template-columns:118px 1fr;gap:10px;align-items:center;margin-bottom:2px}
+.atm-scale-label{font-size:.62rem;color:var(--text-sec)}
+.atm-scale-bar{position:relative;height:13px;font-size:.6rem;color:var(--text-sec)}
+.atm-day{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:6px 0;border-top:1px dashed rgba(255,255,255,.06);align-items:center}
+.atm-day:hover{background:rgba(255,255,255,.02)}
+.atm-day-label{font-size:.72rem;color:var(--text-sec);line-height:1.35}
+.atm-day-label b{color:var(--text);font-size:.74rem}
+.atm-day-label span{display:block;font-size:.62rem;opacity:.8}
+.atm-strip{position:relative;height:34px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px}
+.atm-seg{position:absolute;top:3px;height:12px;border-radius:3px;opacity:.95;min-width:1px}
+.atm-shiftwin{position:absolute;top:1px;height:30px;border:1px dashed rgba(0,212,255,.55);border-radius:6px;background:rgba(0,212,255,.05);pointer-events:none}
+.atm-gap{position:absolute;bottom:3px;height:8px;background:#ff4d6d;border-radius:3px;box-shadow:0 0 6px rgba(255,77,109,.55)}
+.atm-gaplbl{position:absolute;bottom:12px;font-size:.58rem;font-weight:700;color:#ff8fa3;white-space:nowrap;transform:translateX(-50%)}
+.atm-tick{position:absolute;top:0;height:100%;width:1px;background:rgba(255,255,255,.06)}
+.atm-nextday{position:absolute;top:0;height:100%;width:1px;background:rgba(0,212,255,.35)}
+.atm-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.atm-flag{font-size:.62rem;padding:2px 8px;border-radius:999px;font-weight:600}
+.atm-flag.late{background:rgba(255,184,0,.14);color:#ffb800;border:1px solid rgba(255,184,0,.35)}
+.atm-flag.gap{background:rgba(255,77,109,.14);color:#ff4d6d;border:1px solid rgba(255,77,109,.4)}
+.atm-flag.missing{background:rgba(255,138,0,.13);color:#ff8a00;border:1px solid rgba(255,138,0,.35)}
+.atm-flag.early{background:rgba(0,212,255,.12);color:#00d4ff;border:1px solid rgba(0,212,255,.35)}
+.atm-flag.no_show{background:rgba(255,77,109,.16);color:#ff4d6d;border:1px solid rgba(255,77,109,.5)}
+.atm-empty{font-size:.78rem;color:var(--text-sec);padding:10px 2px}
+.atm-warn-item{display:flex;gap:8px;align-items:baseline;padding:7px 0;border-top:1px dashed rgba(255,255,255,.06);font-size:.78rem}
+.atm-warn-item:first-child{border-top:none}
+.atm-warn-day{color:var(--text-sec);font-size:.7rem;flex:none;min-width:88px}
+.atm-warn-kind{flex:none;font-weight:700;font-size:.66rem;padding:2px 8px;border-radius:999px}
+@media(max-width:720px){
+  .atm-day,.atm-scale{grid-template-columns:88px 1fr}
+  .atm-sum{margin-left:0;width:100%}
+  .atm-tools{gap:8px}
+}
+
+/* ===== Phase 33 (Ahmed): mobile fixes — full-width search, action-bar
+   ✖ Close never clipped, smaller fields/icons on phones ===== */
+@media(max-width:1024px){
+  /* the workspace action bar wrapped but overflow:hidden clipped the ✖ --
+     stack it in columns instead so nothing is cut off */
+  .twx-topbar-wrapper .twx-topbar{flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px;}
+  .twx-topbar .twx-actions{flex-wrap:wrap;justify-content:flex-end;gap:8px}
+  .twx-topbar .twx-head-center{width:100%}
+}
+
+@media(max-width:600px){
+  /* Ahmed: "make the size of the things, the fields, icons and so on
+     smaller in mobile view" */
+  .gls-input{font-size:.8rem;padding:8px 12px}
+  .control-group label{font-size:.72rem}
+  .control-group input,.control-group select,.control-group textarea{font-size:.82rem;padding:8px 10px}
+  .btn{padding:8px 12px;font-size:.8rem}
+  .ap-head{flex-direction:column;align-items:flex-start;gap:8px}
+  .sch-navbtn,.sch-vt-btn{padding:6px 10px;font-size:.74rem}
+  .twx-collapse-btn,.twx-preview-btn{padding:6px 10px;font-size:.7rem}
+  .twx-topbar .twx-save{padding:8px 12px;font-size:.8rem}
+  .card{padding:14px}
+}
+
+/* ===== Phase 33 (Ahmed): in-app confirm/prompt modal ===== */
+.ui-modal-back{position:fixed;inset:0;z-index:10060;background:rgba(4,6,12,.62);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:18px;}
+.ui-modal{width:100%;max-width:420px;background:var(--surface);border:1px solid rgba(0,212,255,.28);border-radius:18px;padding:22px 22px 18px;box-shadow:0 24px 70px rgba(0,0,0,.55), 0 0 0 1px rgba(0,212,255,.08);animation:uiModalIn .18s cubic-bezier(.2,.9,.3,1.15);}
+@keyframes uiModalIn{from{transform:translateY(14px) scale(.96);opacity:0;}to{transform:none;opacity:1;}}
+.ui-modal-ico{font-size:1.7rem;margin-bottom:8px;}
+.ui-modal-msg{font-size:.92rem;line-height:1.55;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-bottom:16px;font-weight:600;}
+.ui-modal-input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface-inset);color:var(--text);font-size:.9rem;outline:none;margin-bottom:16px;font-family:inherit;transition:border-color .15s;}
+.ui-modal-input:focus{border-color:var(--primary);}
+.ui-modal-btns{display:flex;gap:10px;justify-content:flex-end;}
+.ui-modal-btns .btn{padding:9px 18px;font-size:.85rem;}
+@media (max-width:820px){.gls-input{font-size:.78rem;padding:8px 12px}}
+/* Phase 33 (Ahmed): phones — the global search gets its own full-width
+   row instead of a sliver, so input + results stay readable */
+@media (max-width:600px){.page-top-bar{flex-wrap:wrap;row-gap:8px}.gls-wrap{max-width:none;flex:1 1 100%;order:9;margin:0}.gls-drop{left:-12px;right:-12px}}
 
 /* Phase 26: save-state pill */
 .save-state-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:.74rem;font-weight:700;border:1px solid var(--border);background:var(--surface-inset);color:var(--text-muted);white-space:nowrap}
@@ -2362,6 +2452,9 @@ option{background:var(--surface);color:var(--text)}
 .rw-badge{background:rgba(0,212,255,.14);color:var(--primary);border-radius:999px;padding:2px 11px;font-size:.78rem;font-weight:800;}
 .rw-apply{margin-left:auto;padding:8px 16px;font-size:.8rem;}
 .rw-apply:disabled{opacity:.45;cursor:not-allowed;}
+.rw-copy{padding:8px 14px;font-size:.8rem;flex:none;}
+.rw-copy:disabled{opacity:.45;cursor:not-allowed;}
+.rw-copy.copied{background:rgba(0,230,118,.18);color:#00e676;border-color:#00e676;}
 .rw-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .rw-table{width:100%;border-collapse:collapse;font-size:.88rem;}
 .rw-table th{background:var(--surface-inset);color:var(--text-muted);text-transform:uppercase;font-size:.66rem;letter-spacing:.6px;font-weight:700;text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
@@ -2449,6 +2542,22 @@ option{background:var(--surface);color:var(--text)}
 </svg>
 
 <div id="toastContainer"></div>
+
+<!-- Phase 33 (Ahmed): in-app confirm/prompt modal — replaces every browser
+     confirm()/prompt() dialog ("why it show confirm message from browser not
+     within the website"). Same async ergonomics: await uiConfirm(msg) /
+     await uiPrompt(msg, def). -->
+<div class="ui-modal-back" id="uiModalBack" style="display:none">
+    <div class="ui-modal" role="dialog" aria-modal="true">
+        <div class="ui-modal-ico" id="uiModalIco">⚠️</div>
+        <div class="ui-modal-msg" id="uiModalMsg"></div>
+        <input class="ui-modal-input" id="uiModalInput" type="text" autocomplete="off" spellcheck="false" style="display:none">
+        <div class="ui-modal-btns">
+            <button type="button" class="btn btn-secondary" id="uiModalCancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="uiModalOk">OK</button>
+        </div>
+    </div>
+</div>
 
 <!-- ISSUE 2 FIX: image lightbox/modal, replaces target="_blank" attachment links -->
 <div id="imgLightboxOverlay" class="img-lightbox-overlay" onclick="if(event.target===this) closeImageLightbox()">
@@ -2693,6 +2802,7 @@ option{background:var(--surface);color:var(--text)}
                 <div class="nav-group-body" id="navBodyAudition">
                     <div class="nav-item" id="nav-audition-status" onclick="openInTab('audition-status')"><span data-i18n="auditionStatusMgmt">Audition Status Management</span></div>
                     <div class="nav-item" id="nav-audition-schedule" onclick="openInTab('audition-schedule')"><span data-i18n="auditionSchedule">Audition Schedule</span></div>
+                    <div class="nav-item" id="nav-audition-attendance" onclick="openInTab('audition-attendance')"><span data-i18n="auditionAttendance">Attendance Monitor</span></div>
                 </div>
             </div>
 
@@ -4995,9 +5105,10 @@ option{background:var(--surface);color:var(--text)}
                     </div>
                     <div class="sch-seg" id="schReqSeg"></div>
                     <div class="sch-dategrid" style="margin-top:14px">
-                        <div><label class="sch-lbl" style="margin-top:0">From</label><input type="date" id="schReqFrom" class="form-highlight-input sch-datein" onchange="schReqSumUp()"></div>
-                        <div><label class="sch-lbl" style="margin-top:0">To</label><input type="date" id="schReqTo" class="form-highlight-input sch-datein" onchange="schReqSumUp()"></div>
+                        <div><label class="sch-lbl" style="margin-top:0" id="schReqFromLbl">From</label><input type="date" id="schReqFrom" class="form-highlight-input sch-datein" onchange="schReqSumUp()"></div>
+                        <div><label class="sch-lbl" style="margin-top:0" id="schReqToLbl">To</label><input type="date" id="schReqTo" class="form-highlight-input sch-datein" onchange="schReqSumUp()"></div>
                     </div>
+                    <div class="sch-swap-note" id="schSwapNote" style="display:none"></div>
                     <div class="sch-quick">
                         <button type="button" class="sch-qchip" onclick="schReqQuick('today')">Today</button>
                         <button type="button" class="sch-qchip" onclick="schReqQuick('tomorrow')">Tomorrow</button>
@@ -5012,6 +5123,41 @@ option{background:var(--surface);color:var(--text)}
                 </div>
             </div>
 
+
+            <!-- Phase 33 (Ahmed): Attendance Monitor -- per-agent online /
+                 break / meeting timeline strips (Time Logs), punches (Daily
+                 Logs) and shift windows (Schedule sheet). In-shift OFFLINE =
+                 red bars with the duration printed on the strip. One cached
+                 GET per range (60s server-side), no polling. -->
+            <div id="pg-audition-attendance" style="display:none">
+                <div class="card" style="margin-bottom:14px">
+                    <div class="ap-head">
+                        <div>
+                            <h3 style="margin:0 0 4px">⏱ Attendance Monitor</h3>
+                            <p class="ap-sync" style="margin:0" id="atmSub">Agent online timeline — login, break, meeting &amp; offline gaps vs shift.</p>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:none">
+                            <div class="sch-viewtoggle">
+                                <button type="button" id="atmModeWeekBtn" class="sch-vt-btn active" onclick="atmSetMode('week')">Week</button>
+                                <button type="button" id="atmModeMonthBtn" class="sch-vt-btn" onclick="atmSetMode('month')">Month</button>
+                            </div>
+                            <button class="btn btn-secondary" onclick="atmLoad(true)" style="flex:none">🔄 Refresh</button>
+                        </div>
+                    </div>
+                    <div class="sch-weeknav">
+                        <button type="button" class="sch-navbtn" onclick="atmShift(-1)">‹</button>
+                        <div class="sch-weeklabel" id="atmRangeLabel">—</div>
+                        <button type="button" class="sch-navbtn" onclick="atmShift(1)">›</button>
+                        <button type="button" class="sch-navbtn sch-todaybtn" onclick="atmToday()">This week</button>
+                    </div>
+                    <div class="atm-tools">
+                        <label>Find an agent<input id="atmSearch" type="search" placeholder="Name or email" oninput="atmRender()"></label>
+                        <div class="atm-legend" id="atmLegend"></div>
+                    </div>
+                </div>
+                <div id="atmWarnCard" class="card" style="display:none;margin-bottom:14px"></div>
+                <div id="atmHost">⏳ Loading…</div>
+            </div>
 
             <!-- Phase 10.13 (Ahmed): Preview Agent View -- the Lark Base
                  "Previewing as" idea. Pick a member, the portal re-renders with
@@ -5209,6 +5355,7 @@ const translations = {
         accessManagement: "Access Management",
         audition: "Audition",
         auditionSchedule: "Audition Schedule",
+        auditionAttendance: "Attendance Monitor",
         auditionStatusMgmt: "Audition Status Management",
         manageAgents: "Manage Agents",
         auditLog: "Audit Log",
@@ -5244,6 +5391,7 @@ const translations = {
         audition: "审核组",
         auditionStatusMgmt: "状态管理",
         auditionSchedule: "排班",
+        auditionAttendance: "考勤监控",
         manageAgents: "管理代理",
         auditLog: "审计日志",
         logout: "退出登录",
@@ -5661,6 +5809,10 @@ function executePageLogic(page) {
         document.getElementById('pg-audition-schedule').style.display='block';
         _expandNavGroup('navBodyAudition','navArrAudition');
         schOnOpen(); // Phase 22: schedule grid (60s cached reads, NO polling)
+    } else if(page==='audition-attendance'){
+        document.getElementById('pg-audition-attendance').style.display='block';
+        _expandNavGroup('navBodyAudition','navArrAudition');
+        atmOnOpen(); // Phase 33: attendance monitor (60s cached read, NO polling)
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -5736,6 +5888,62 @@ function playNotifySound() {
         osc.stop(ctx.currentTime + 0.15);
     } catch(e){}
 }
+
+/* ===== Phase 33 (Ahmed): in-app confirm/prompt =====
+   Browser confirm()/prompt() dialogs are replaced everywhere — they block the
+   tab, look foreign on mobile and can't be styled. Same ergonomics:
+   const ok = await uiConfirm('Sure?'); const name = await uiPrompt('Name', 'x'); */
+const uiModal = (() => {
+    let resolver = null, isPrompt = false;
+    const back = () => document.getElementById('uiModalBack');
+    const input = () => document.getElementById('uiModalInput');
+    function settle(val) {
+        const b = back(); if (!b) return;
+        b.style.display = 'none';
+        document.getElementById('uiModalInput').style.display = 'none';
+        const r = resolver; resolver = null;
+        if (r) r(val);
+    }
+    function open(msg, opts) {
+        opts = opts || {};
+        return new Promise(res => {
+            if (resolver) resolver(false); // one at a time — auto-dismiss the old one
+            resolver = res; isPrompt = !!opts.prompt;
+            const b = back();
+            document.getElementById('uiModalIco').textContent = opts.icon || (opts.danger ? '⚠️' : '🔔');
+            document.getElementById('uiModalMsg').textContent = msg;
+            const inp = input();
+            document.getElementById('uiModalOk').textContent = opts.okText || 'OK';
+            document.getElementById('uiModalCancel').textContent = opts.cancelText || 'Cancel';
+            document.getElementById('uiModalCancel').style.display = opts.noCancel ? 'none' : '';
+            if (opts.prompt) {
+                inp.style.display = '';
+                inp.value = opts.value || '';
+                inp.placeholder = opts.placeholder || '';
+                setTimeout(() => { inp.focus(); inp.select(); }, 30);
+            } else {
+                inp.style.display = 'none';
+                setTimeout(() => { document.getElementById('uiModalOk').focus(); }, 30);
+            }
+            b.style.display = 'flex';
+        });
+    }
+    document.addEventListener('keydown', e => {
+        if (!resolver) return;
+        if (e.key === 'Escape') settle(isPrompt ? null : false);
+        else if (e.key === 'Enter') settle(isPrompt ? (input().value || '') : true);
+    });
+    back().addEventListener('mousedown', e => { if (e.target === back()) settle(isPrompt ? null : false); });
+    document.getElementById('uiModalOk').addEventListener('click', () => settle(isPrompt ? (input().value || '') : true));
+    document.getElementById('uiModalCancel').addEventListener('click', () => settle(isPrompt ? null : false));
+    return {
+        confirm: (msg, opts) => open(msg, opts).then(v => !!v),
+        prompt: (msg, def, opts) => open(msg, Object.assign({ prompt: true, value: def }, opts || {})),
+        alert: (msg, opts) => open(msg, Object.assign({ noCancel: true, icon: 'ℹ️', okText: 'Got it' }, opts || {}))
+    };
+})();
+const uiConfirm = (msg, opts) => uiModal.confirm(msg, opts);
+const uiPrompt = (msg, def, opts) => uiModal.prompt(msg, def, opts);
 
 const ToastManager = {
     show(msg, type='info', duration=5000) {
@@ -8331,9 +8539,9 @@ function updateAcmDropdown() {
     container.style.opacity = '1';
 }
 
-function saveFilterPreset() {
-    const name=prompt("Name for this filter preset:");
-    if (!name) return;
+async function saveFilterPreset() {
+    const name = await uiPrompt("Name for this filter preset:", "");
+    if (!name || !name.trim()) return;
     const presets=JSON.parse(localStorage.getItem(`xena_presets_${loggedUser}`)||'{}');
     presets[name]={
         preset:document.getElementById('anaDatePreset').value,
@@ -8784,12 +8992,118 @@ function schWeekToday() {
     schLoad();
 }
 
+/* Phase 33 (Ahmed): instant week switching + optimistic saves.
+   schWeekCache keeps every visited/prefetched range for 3 minutes, so
+   flipping weeks paints immediately with ZERO network. Adjacent weeks are
+   preloaded in the background. After a save the local rows + caches are
+   patched in place (schApplyLocal) instead of refetching everything. */
+const SCH_CACHE_TTL = 180000;
+const schWeekCache = {};
+let schReqsCache = { ts: 0, data: [] };
+
+function schCacheKey(s0, s1) {
+    const lookback = new Date(s0); lookback.setDate(lookback.getDate() - 1);
+    return schDayInt(lookback) + '-' + schDayInt(s1);
+}
+
+function schCachePut(key, rows) {
+    schWeekCache[key] = { rows: rows || [], ts: Date.now() };
+    const ks = Object.keys(schWeekCache);
+    if (ks.length > 14) { // keep the newest 14 ranges
+        ks.sort((a, b) => schWeekCache[a].ts - schWeekCache[b].ts)
+           .slice(0, ks.length - 14).forEach(k => delete schWeekCache[k]);
+    }
+}
+
+function schRangeForShift(n) {
+    const [b0, b1] = schRangeBounds();
+    if (schRangeMode === 'month') {
+        const s0 = new Date(b0.getFullYear(), b0.getMonth() + n, 1);
+        return [s0, new Date(s0.getFullYear(), s0.getMonth() + 1, 0)];
+    }
+    const s0 = new Date(b0); s0.setDate(s0.getDate() + n * 7);
+    const s1 = new Date(s0); s1.setDate(s1.getDate() + 6);
+    return [s0, s1];
+}
+
+async function schPrefetchRange(s0, s1) {
+    const key = schCacheKey(s0, s1);
+    if (schWeekCache[key] && Date.now() - schWeekCache[key].ts < SCH_CACHE_TTL) return;
+    try {
+        const lookback = new Date(s0); lookback.setDate(lookback.getDate() - 1);
+        const qs = new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '', from: schDayInt(lookback), to: schDayInt(s1) });
+        const r = await fetch('/api/audition/schedule?' + qs);
+        const d = await r.json();
+        if (r.ok && d && d.success) schCachePut(key, d.rows || []);
+    } catch (e) { /* prefetch is best-effort only */ }
+}
+
+function schPrefetchAround() {
+    setTimeout(() => {
+        const [p0, p1] = schRangeForShift(-1);
+        const [n0, n1] = schRangeForShift(1);
+        schPrefetchRange(p0, p1); schPrefetchRange(n0, n1);
+    }, 600);
+}
+
+function schInvalAllCaches() {
+    Object.keys(schWeekCache).forEach(k => delete schWeekCache[k]);
+    schReqsCache = { ts: 0, data: [] };
+}
+
+/* merge a just-saved batch into schRows AND every overlapping cached range —
+   this is what makes saves feel instant (no reload round-trip). */
+function schApplyLocal(entries, deleteKeys) {
+    entries = entries || []; deleteKeys = deleteKeys || [];
+    deleteKeys.forEach(k => {
+        const bits = String(k).split('|'), em = (bits[0] || '').toLowerCase(), day = bits[1];
+        schRows = schRows.filter(r => !((r.email || '').toLowerCase() === em && String(r.day) === String(day)));
+    });
+    entries.forEach(e => {
+        const em = (e.email || '').toLowerCase();
+        const i = schRows.findIndex(r => (r.email || '').toLowerCase() === em && Number(r.day) === Number(e.day));
+        const row = { email: e.email, name: e.name || (i >= 0 ? schRows[i].name : ''), day: e.day, type: e.type, start: e.start || '', end: e.end || '', note: e.note || '' };
+        if (i >= 0) schRows[i] = row; else schRows.push(row);
+    });
+    // patch every cached range that overlaps the affected days (e.g. copy-week)
+    const days = [...entries.map(e => Number(e.day)),
+                  ...deleteKeys.map(k => Number(String(k).split('|')[1]))].filter(Number.isFinite);
+    if (days.length) {
+        Object.keys(schWeekCache).forEach(k => {
+            const [f, t] = k.split('-').map(Number);
+            if (!days.some(d => d >= f && d <= t)) return;
+            let rows = schWeekCache[k].rows.slice();
+            deleteKeys.forEach(dk => {
+                const bits = String(dk).split('|'), em = (bits[0] || '').toLowerCase(), day = bits[1];
+                rows = rows.filter(r => !((r.email || '').toLowerCase() === em && String(r.day) === String(day)));
+            });
+            entries.forEach(e => {
+                const em = (e.email || '').toLowerCase();
+                const i = rows.findIndex(r => (r.email || '').toLowerCase() === em && Number(r.day) === Number(e.day));
+                const row = { email: e.email, name: e.name || (i >= 0 ? rows[i].name : ''), day: e.day, type: e.type, start: e.start || '', end: e.end || '', note: e.note || '' };
+                if (i >= 0) rows[i] = row; else rows.push(row);
+            });
+            schWeekCache[k] = { rows, ts: Date.now() };
+        });
+    }
+}
+
 async function schLoad(manual) {
     if (schLoading) { schLoadQueued = true; return; }
     schLoading = true;
     document.getElementById("pg-audition-schedule").setAttribute("aria-busy","true");
     try {
         const [b0, b1] = schRangeBounds();
+        const key = schCacheKey(b0, b1);
+        const hit = schWeekCache[key];
+        if (!manual && hit && (Date.now() - hit.ts) < SCH_CACHE_TTL) {
+            schRows = hit.rows;
+            schLastSync = new Date(hit.ts);
+            if (schReqsCache.data && Date.now() - schReqsCache.ts < SCH_CACHE_TTL) schReqs = schReqsCache.data;
+            schRenderAll();
+            schPrefetchAround();
+            return;
+        }
         const lookback=new Date(b0);lookback.setDate(lookback.getDate()-1);
         const qs = new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '', from: schDayInt(lookback), to: schDayInt(b1) });
         const r = await fetch('/api/audition/schedule?' + qs);
@@ -8804,14 +9118,20 @@ async function schLoad(manual) {
                     else schAgentsErr = (x && x.error) || 'Could not load the agents.';
                 }).catch(e => { schAgentsErr = String(e); }));
         }
-        jobs.push(fetch('/api/audition/requests?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
-            .then(x => x.json()).then(x => { if (x && x.success) schReqs = x.requests || []; }).catch(() => {}));
+        if (schReqsCache.data && Date.now() - schReqsCache.ts < SCH_CACHE_TTL) {
+            schReqs = schReqsCache.data;
+        } else {
+            jobs.push(fetch('/api/audition/requests?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
+                .then(x => x.json()).then(x => { if (x && x.success) { schReqs = x.requests || []; schReqsCache = { ts: Date.now(), data: schReqs }; } }).catch(() => {}));
+        }
         await Promise.all(jobs);
         const [current0,current1]=schRangeBounds();
         if(schDayInt(current0)!==schDayInt(b0)||schDayInt(current1)!==schDayInt(b1))return;
         schRows=d.rows||[];
+        schCachePut(key, schRows);
         schLastSync=new Date();
         schRenderAll();
+        schPrefetchAround();
     } catch (e) {
         schRows=[];schLastSync=null;schRenderAll();
         document.getElementById('schSync').textContent='Load failed · Refresh to retry';
@@ -9013,6 +9333,15 @@ function schHeatRender() {
 
 /* ---- drag-and-drop rescheduling (team week grid) ---- */
 let schDragCtx = null; // {email, day} while dragging
+/* Phase 33 (Ahmed): drag a saved preset straight onto any day cell —
+   "make the saved shift drag and can added to the agent day". */
+function schPresetDragStart(e, rid) {
+    const p = schPresets.find(x => x.record_id === rid);
+    if (!p) return;
+    schDragCtx = { preset: p };
+    e.dataTransfer.effectAllowed = 'copy';
+    try { e.dataTransfer.setData('text/plain', 'preset:' + rid); } catch (x) {}
+}
 function schDragStart(e) {
     const c = e.currentTarget;
     schDragCtx = { email: c.getAttribute('data-em'), day: +c.getAttribute('data-day') };
@@ -9029,13 +9358,20 @@ function schDragOver(e) {
     if (!schDragCtx) return;
     const c = e.currentTarget;
     const em = c.getAttribute('data-em'), day = +(c.getAttribute('data-day') || 0);
+    if (schDragCtx.preset) {
+        if (!em) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        c.classList.add('sch-dropok');
+        return;
+    }
     if (!em || (em === schDragCtx.email && day === schDragCtx.day)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = em === schDragCtx.email ? 'move' : 'copy';
     c.classList.add('sch-dropok');
 }
 function schDragLeave(e) { e.currentTarget.classList.remove('sch-dropok'); }
-function schDrop(e) {
+async function schDrop(e) {
     e.preventDefault();
     const c = e.currentTarget;
     c.classList.remove('sch-dropok');
@@ -9044,7 +9380,21 @@ function schDrop(e) {
     const ctx = schDragCtx;
     schDragCtx = null;
     document.querySelectorAll('.sch-cell.sch-dragging').forEach(x => x.classList.remove('sch-dragging'));
-    if (!em || (em === ctx.email && day === ctx.day)) return;
+    if (!em) return;
+    if (ctx.preset) {
+        // preset dropped on a cell: write it there instantly (optimistic)
+        const p = ctx.preset;
+        const a = schAgents.find(x => (x.email || '') === em);
+        const entry = { email: em, name: (a || {}).name || '', day: day, type: p.type, start: p.start || '', end: p.end || '', note: '' };
+        try {
+            await schSaveEntries([entry]);
+            schApplyLocal([entry], []);
+            schRenderAll();
+            ToastManager.show(`⚡ ${p.name} written to ${schDayLabel(day)}.`, 'success', 2500);
+        } catch (err) { ToastManager.show('⚠️ ' + err.message, 'error', 7000); }
+        return;
+    }
+    if (em === ctx.email && day === ctx.day) return;
     schMoveShift(ctx.email, ctx.day, em, day);
 }
 async function schMoveShift(fromEmail, fromDay, toEmail, toDay) {
@@ -9056,13 +9406,16 @@ async function schMoveShift(fromEmail, fromDay, toEmail, toDay) {
     const msg = isCopy
         ? `Copy ${srcRow.name}\u2019s ${what} on ${schDayLabel(fromDay)} \u2192 ${toName} on ${schDayLabel(toDay)}?`
         : `Move ${srcRow.name}\u2019s ${what} from ${schDayLabel(fromDay)} \u2192 ${schDayLabel(toDay)}?`;
-    if (!confirm(msg)) return;
+    if (!(await uiConfirm(msg))) return;
     try {
         await schSaveEntries(
             [{ email: toEmail, name: toName, day: toDay, type: srcRow.type, start: srcRow.start, end: srcRow.end, note: srcRow.note }],
             isCopy ? [] : [(fromEmail || '').toLowerCase() + '|' + fromDay]);
+        schApplyLocal(
+            [{ email: toEmail, name: toName, day: toDay, type: srcRow.type, start: srcRow.start, end: srcRow.end, note: srcRow.note }],
+            isCopy ? [] : [(fromEmail || '').toLowerCase() + '|' + fromDay]);
+        schRenderAll();
         ToastManager.show(isCopy ? '\ud83d\udcc4 Shift copied.' : '\u2194\ufe0f Shift moved.', 'success', 3500);
-        schLoad();
     } catch (e) { ToastManager.show('\u26a0\ufe0f ' + e.message, 'error', 8000); }
 }
 
@@ -9226,7 +9579,7 @@ function schPresetsRender(scope) {
     el.innerHTML = schPresets.map(p => {
         const m = SCH_META[p.type] || { c: 'var(--accent-cyan)' };
         const tm = p.start && p.end ? p.start + '\u2013' + p.end : (p.start || '');
-        return `<button type="button" class="sch-preset" style="--pc:${m.c}" title="${escHtml(p.type)}${tm ? ' \u00b7 ' + tm : ''}" onclick="schPresetApply('${scope}','${p.record_id}')"><span class="sch-pdot"></span>${escHtml(p.name)}${tm ? `<span class="sch-ptime">${tm}</span>` : ''}<span class="sch-pdel" onclick="event.stopPropagation();schPresetDelete('${scope}','${p.record_id}')">\u2715</span></button>`;
+        return `<button type="button" class="sch-preset" style="--pc:${m.c}" title="${escHtml(p.type)}${tm ? ' \u00b7 ' + tm : ''} — drag it onto any day cell to write it there" draggable="true" ondragstart="schPresetDragStart(event,'${p.record_id}')" onclick="schPresetApply('${scope}','${p.record_id}')"><span class="sch-pdot"></span>${escHtml(p.name)}${tm ? `<span class="sch-ptime">${tm}</span>` : ''}<span class="sch-pdel" onclick="event.stopPropagation();schPresetDelete('${scope}','${p.record_id}')">\u2715</span></button>`;
     }).join('');
 }
 function schPresetApply(scope, rid) {
@@ -9240,7 +9593,7 @@ function schPresetApply(scope, rid) {
 }
 async function schPresetDelete(scope, rid) {
     const p = schPresets.find(x => x.record_id === rid);
-    if (!confirm('Delete preset "' + (p ? p.name : '') + '"?')) return;
+    if (!(await uiConfirm('Delete preset "' + (p ? p.name : '') + '"?'))) return;
     try {
         const r = await fetch('/api/audition/shift-presets/delete', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -9255,7 +9608,7 @@ async function schPresetDelete(scope, rid) {
 }
 async function schPresetSaveCurrent(scope) {
     const st = schStateFor(scope);
-    const name = (prompt('Name this preset (e.g. "Evening shift"):', '') || '').trim();
+    const name = ((await uiPrompt('Name this preset (e.g. "Evening shift"):', '')) || '').trim();
     if (!name) return;
     try {
         const r = await fetch('/api/audition/shift-presets', {
@@ -9308,7 +9661,7 @@ async function schSaveEntries(entries, deleteKeys) {
                 const keys=new Set([...entries.map(e=>(e.email||'').toLowerCase()+'|'+e.day),...deleteKeys]);
                 let diff=0;
                 keys.forEach(k=>{const a=cur[k],b=snap[k];const sa=a?JSON.stringify([a.type,a.start,a.end,a.note||'']):'';const sb=b?JSON.stringify([b.type,b.start,b.end,b.note||'']):'';if(sa!==sb)diff++;});
-                if(diff>0&&!confirm('⚠️ '+diff+' day(s) you are saving were changed in the sheet since this grid loaded.\n\nOK = overwrite with your version\nCancel = stop; the grid refreshes so you can review')){
+                if(diff>0&&!(await uiConfirm('⚠️ '+diff+' day(s) you are saving were changed in the sheet since this grid loaded.\n\nOK = overwrite with your version\nCancel = stop; the grid refreshes so you can review')) ){
                     await schLoad();
                     throw new Error('Save cancelled — the grid was refreshed with the latest sheet data.');
                 }
@@ -9334,10 +9687,15 @@ async function schCellSave() {
             start: schCellState.start,
             end: schCellState.end,
             note: document.getElementById('schCellNote').value }]);
+        schApplyLocal([{ email: a.email, name: a.name, day: schCellCtx.day,
+            type: schCellState.type,
+            start: schCellState.start,
+            end: schCellState.end,
+            note: document.getElementById('schCellNote').value }]);
+        schRenderAll();
         ToastManager.show('💾 Saved — the sheet has it too.', 'success', 3500);
         if (typeof drfClear === 'function') drfClear('schCellNote'); // Phase 26
         schCellClose();
-        schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
@@ -9345,9 +9703,10 @@ async function schCellClear() {
     if (!schCellCtx) return;
     try {
         await schSaveEntries([], [(schCellCtx.email || '').toLowerCase() + '|' + schCellCtx.day]);
+        schApplyLocal([], [(schCellCtx.email || '').toLowerCase() + '|' + schCellCtx.day]);
+        schRenderAll();
         ToastManager.show('🗑 Day cleared.', 'success', 3000);
         schCellClose();
-        schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
@@ -9357,9 +9716,10 @@ async function schCopyWeek() {
         const nd = schDateFromInt(r.day); nd.setDate(nd.getDate() + 7); // calendar-safe (+7 days, DST-proof)
         return { email: r.email, name: r.name, day: schDayInt(nd), type: r.type, start: r.start, end: r.end, note: r.note };
     });
-    if (!confirm(`Copy ${entries.length} day-entries to next week? Existing cells there are overwritten.`)) return;
+    if (!(await uiConfirm(`Copy ${entries.length} day-entries to next week? Existing cells there are overwritten.`))) return;
     try {
         const d = await schSaveEntries(entries);
+        schApplyLocal(entries, []);
         ToastManager.show(`📋 Copied to next week (${(d.created || 0) + (d.updated || 0)} days).`, 'success', 4000);
         schWeekShift(1);
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
@@ -9410,13 +9770,14 @@ async function schRangeApply() {
         }
     }
     if (!entries.length) { ToastManager.show('No days matched that selection.', 'warning', 3000); return; }
-    if (!confirm(`Write ${entries.length} day-entries (${ais.length} agent(s) × matching days)? Existing cells are overwritten.`)) return;
+    if (!(await uiConfirm(`Write ${entries.length} day-entries (${ais.length} agent(s) × matching days)? Existing cells are overwritten.`))) return;
     try {
         const d = await schSaveEntries(entries);
+        schApplyLocal(entries, []);
+        schRenderAll();
         ToastManager.show(`✅ Applied — ${(d.created || 0) + (d.updated || 0)} days written.`, 'success', 4500);
         if (typeof drfClear === 'function') drfClear('schRangeNote'); // Phase 26
         schRangeClose();
-        schLoad();
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
@@ -9427,13 +9788,18 @@ function schRenderReqInbox() {
     const past = schReqs.filter(r => r.status !== 'Pending').slice(0, 10);
     const cnt = document.getElementById('schReqCount');
     if (cnt) cnt.textContent = pend.length ? `${pend.length} pending` : 'inbox zero ✨';
-    const row = (r, actions) => `<div class="sch-reqrow">
+    const row = (r, actions) => {
+        const when = r.type === 'Change Off'
+            ? `🔁 takes <b>${schDayLabel(r.to_day)} OFF</b> → works <b>${schDayLabel(r.from_day)}</b> instead`
+            : `${schDayLabel(r.from_day)} → ${schDayLabel(r.to_day)}`;
+        return `<div class="sch-reqrow">
         <div class="grow"><b>${escHtml(r.name || r.email)}</b> — ${escHtml(r.type)}
-            <div style="font-size:.76rem;color:var(--text-muted)">${schDayLabel(r.from_day)} → ${schDayLabel(r.to_day)}${r.reason ? ' · “' + escHtml(r.reason) + '”' : ''}</div>
+            <div style="font-size:.76rem;color:var(--text-muted)">${when}${r.reason ? ' · “' + escHtml(r.reason) + '”' : ''}</div>
             ${r.admin_note ? `<div style="font-size:.74rem;color:var(--text-muted)">Admin: ${escHtml(r.admin_note)}${r.decided_by ? ' — ' + escHtml(r.decided_by) : ''}</div>` : ''}
         </div>
         <span class="sch-status-${escHtml(r.status)}" style="font-weight:800;font-size:.78rem">${r.status === 'Pending' ? '⏳' : r.status === 'Approved' ? '✅' : '⛔'} ${escHtml(r.status)}</span>
         ${actions}</div>`;
+    };
     list.innerHTML =
         (pend.length
             ? pend.map(r => row(r, `<button type="button" class="btn btn-primary" style="padding:6px 12px" onclick="schDecide('${r.record_id}','Approved')">✅ Approve</button><button type="button" class="btn btn-secondary" style="padding:6px 12px" onclick="schDecide('${r.record_id}','Rejected')">⛔ Reject</button>`)).join('')
@@ -9444,7 +9810,7 @@ function schRenderReqInbox() {
 }
 
 async function schDecide(rid, decision) {
-    const note = decision === 'Rejected' ? prompt('Note for the agent (optional):') : '';
+    const note = decision === 'Rejected' ? (await uiPrompt('Note for the agent (optional):', '')) : '';
     if(note===null)return;
     try {
         const r = await fetch('/api/audition/requests/decide', {
@@ -9456,7 +9822,8 @@ async function schDecide(rid, decision) {
         ToastManager.show(decision === 'Approved'
             ? `✅ Approved — ${d.schedule_rows_written || 0} schedule day(s) written automatically.`
             : '⛔ Rejected.', 'success', 4500);
-        schLoad();
+        schInvalAllCaches();
+        schLoad(true);
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
@@ -9531,7 +9898,26 @@ function schReqSegRender() {
             <span class="si">${m.i}</span><span><span class="sl">${t}</span><br><span class="sd">${m.d}</span></span></button>`;
     }).join('');
 }
-function schReqTypePick(t) { schReqTypeSel = t; schReqSegRender(); }
+function schReqTypePick(t) { schReqTypeSel = t; schReqSegRender(); schReqLabelsSync(); schReqSumUp(); }
+
+/* Phase 33 (Ahmed): Change Off is now a REAL day-swap — "the off day is swap
+   day off to another working day". Pick the working day you want OFF and the
+   off day you'll WORK instead; approval moves your shift to the old off day. */
+function schReqLabelsSync() {
+    const fl = document.getElementById('schReqFromLbl');
+    const tl = document.getElementById('schReqToLbl');
+    const sn = document.getElementById('schSwapNote');
+    if (!fl || !tl) return;
+    if (schReqTypeSel === 'Change Off') {
+        tl.textContent = 'The day I want OFF';
+        fl.textContent = "I'll work THIS day instead";
+        if (sn) { sn.style.display = ''; sn.innerHTML = '🔁 <b>Swap preview:</b> approving moves your shift to the off day you pick here — so the week keeps the same working days, just rearranged.'; }
+    } else {
+        fl.textContent = 'From';
+        tl.textContent = 'To';
+        if (sn) sn.style.display = 'none';
+    }
+}
 
 function schReqQuick(kind) {
     const now = new Date();
@@ -9549,7 +9935,14 @@ function schReqSumUp() {
     const el = document.getElementById('schReqSum'); if (!el) return;
     const f = schParseDateInput(document.getElementById('schReqFrom').value);
     const t = schParseDateInput(document.getElementById('schReqTo').value);
-    if (!f || !t || t < f) { el.textContent = '⚠️ Pick a valid from/to range.'; return; }
+    if (!f || !t) { el.textContent = '⚠️ Pick both days.'; return; }
+    if (schReqTypeSel === 'Change Off') {
+        if (t < f) { el.textContent = '⚠️ "The day I want OFF" should be the later field — swap them around.'; return; }
+        if (schDayInt(f) === schDayInt(t)) { el.textContent = '⚠️ A Change Off swap needs TWO different days — the day you take off and the off day you work instead.'; return; }
+        el.textContent = `🔁 Take ${t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} OFF → work ${f.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} instead`;
+        return;
+    }
+    if (t < f) { el.textContent = '⚠️ Pick a valid from/to range.'; return; }
     const n = Math.round((t - f) / 86400000) + 1;
     el.textContent = `📆 ${n} day${n > 1 ? 's' : ''} · ${f.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} → ${t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
@@ -9557,6 +9950,7 @@ function schReqSumUp() {
 function schReqOpen(dayInt) {
     schReqTypeSel = 'Change Off';
     schReqSegRender();
+    schReqLabelsSync();
     const base = dayInt ? schDateFromInt(dayInt) : new Date();
     document.getElementById('schReqFrom').value = schFmtDateInput(base);
     document.getElementById('schReqTo').value = schFmtDateInput(base);
@@ -9567,9 +9961,13 @@ function schReqOpen(dayInt) {
 function schReqClose() { document.getElementById('schReqPop').style.display = 'none'; }
 
 async function schReqSubmit() {
-    const from = schParseDateInput(document.getElementById('schReqFrom').value);
-    const to = schParseDateInput(document.getElementById('schReqTo').value);
-    if (!from || !to || to < from) { ToastManager.show('Pick a valid from/to.', 'warning', 3000); return; }
+    let from = schParseDateInput(document.getElementById('schReqFrom').value);
+    let to = schParseDateInput(document.getElementById('schReqTo').value);
+    if (!from || !to) { ToastManager.show('Pick both days.', 'warning', 3000); return; }
+    if (schReqTypeSel === 'Change Off') {
+        if (to < from) { const tmp = from; from = to; to = tmp; } // order: work-day first, off-day second
+        if (schDayInt(from) === schDayInt(to)) { ToastManager.show('A swap needs two different days.', 'warning', 3000); return; }
+    } else if (to < from) { ToastManager.show('Pick a valid from/to.', 'warning', 3000); return; }
     try {
         const r = await fetch('/api/audition/requests', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -9583,7 +9981,8 @@ async function schReqSubmit() {
         ToastManager.show('📨 Request sent — the admin sees it in the Schedule inbox.', 'success', 4500);
         if (typeof drfClear === 'function') drfClear('schReqReason'); // Phase 26
         schReqClose();
-        schLoad();
+        schReqsCache = { ts: 0, data: [] };
+        schLoad(true);
     } catch (e) { ToastManager.show('⚠️ ' + e.message, 'error', 8000); }
 }
 
@@ -10059,7 +10458,7 @@ async function addAgent() {
 }
 
 async function deleteAgent(recordId) {
-    if (!confirm("Remove this agent's access?")) return;
+    if (!(await uiConfirm("Remove this agent's access?", {icon: "⚠️"}))) return;
     try {
         await fetch(`/api/admin/users?id=${recordId}`,{method:'DELETE',headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}});
         ToastManager.show('Agent removed.','success');
@@ -11888,6 +12287,7 @@ function rwTableHtml(g, rows) {
     return `<div class="card rw-card" id="rwCard-${g.key}">
         <div class="rw-head">
             <div class="rw-title">${g.flag} ${g.title} <span class="rw-badge" id="rwBadge-${g.key}">${rows.length}</span></div>
+            <button type="button" class="btn btn-outline rw-copy" id="rwCopy-${g.key}" disabled onclick="rwCopyIds('${g.key}')" title="Copy the checked User IDs so you can send the reward, then come back and mark them">⧉ Copy IDs</button>
             <button type="button" class="btn btn-primary rw-apply" id="rwApply-${g.key}" disabled onclick="rwMark('${g.key}')">✓ Mark Rewarded</button>
         </div>
         ${table}
@@ -11919,6 +12319,44 @@ function rwRefreshHead(key) {
         btn.disabled = n === 0;
         btn.textContent = n ? `✓ Mark Rewarded (${n})` : '✓ Mark Rewarded';
     }
+    const cp = document.getElementById(`rwCopy-${key}`);
+    if (cp) {
+        cp.disabled = n === 0;
+        cp.textContent = n ? `⧉ Copy IDs (${n})` : '⧉ Copy IDs';
+        cp.classList.remove('copied');
+    }
+}
+
+function rwCopyIds(key) {
+    const boxes = [...document.querySelectorAll(`#rwCard-${key} tbody .rw-ck`)].filter(b => b.checked);
+    const ids = boxes.map(b => {
+        const tr = b.closest('tr');
+        const td = tr && tr.querySelector('td');
+        return td ? (td.getAttribute('title') || td.textContent.trim()) : '';
+    }).filter(Boolean);
+    if (!ids.length) return;
+    const text = ids.join('\n');
+    const done = () => {
+        const cp = document.getElementById(`rwCopy-${key}`);
+        if (cp) { cp.classList.add('copied'); cp.textContent = `✓ Copied ${ids.length}`; }
+        ToastManager.show(`✅ ${ids.length} User ID${ids.length === 1 ? '' : 's'} copied — paste them wherever you send the reward, then come back and click Mark Rewarded.`, 'success');
+        setTimeout(() => rwRefreshHead(key), 2500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { ToastManager.show('Copy failed — please select and copy manually.', 'error'); }
+            ta.remove();
+        });
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { ToastManager.show('Copy failed — please select and copy manually.', 'error'); }
+        ta.remove();
+    }
 }
 
 async function rwMark(key) {
@@ -11932,7 +12370,7 @@ async function rwMark(key) {
         const res = await fetch('/api/rewards/mark', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: loggedUser, email: loggedEmail, record_ids: ids })
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, record_ids: ids, uat: (typeof loggedUat !== 'undefined' ? loggedUat : (localStorage.getItem('xenaUat') || '')) })
         });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || 'Mark failed');
@@ -11954,7 +12392,10 @@ async function rwMark(key) {
         ToastManager.show(removed
             ? `✅ ${removed} request${removed === 1 ? '' : 's'} marked as rewarded on the sheet.`
             : 'Nothing was marked.', removed ? 'success' : 'warning');
-        if (failedIds.size) ToastManager.show(`⚠️ ${failedIds.size} record(s) failed — they stay listed, just mark them again.`, 'error');
+        if (failedIds.size) {
+            const errs = [...new Set((data.failures || []).map(f => f.error).filter(Boolean))].join(' | ');
+            ToastManager.show(`⚠️ ${failedIds.size} record(s) failed${errs ? ': ' + errs : ' — they stay listed, just mark them again.'}`, 'error', 6000);
+        }
         const countEl = document.getElementById('rwCount');
         if (countEl) {
             const totalLeft = document.querySelectorAll('#rwResults tbody tr').length;
@@ -13010,8 +13451,12 @@ function configureSidebarAndCards() {
     // "my schedule + requests" view.
     const navAuditionSchedule = document.getElementById('nav-audition-schedule');
     if (navAuditionSchedule) navAuditionSchedule.style.display = (isAdmin || hasExactMod('audition_status') || hasExactMod('audition_access')) ? '' : 'none';
+    // Phase 33: Attendance Monitor -- same gate as Schedule (admins see every
+    // agent's timeline, agents see only themselves, matched server-side).
+    const navAuditionAttendance = document.getElementById('nav-audition-attendance');
+    if (navAuditionAttendance) navAuditionAttendance.style.display = (isAdmin || hasExactMod('audition_status') || hasExactMod('audition_access')) ? '' : 'none';
     const grpAudition = document.getElementById('navGrpAudition');
-    if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule].some(el => el && el.style.display !== 'none') ? '' : 'none';
+    if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule, navAuditionAttendance].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     if (isAdmin) {
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
@@ -14547,7 +14992,7 @@ function twApToggleCorrect() {
 async function twApRecallLastCharge() {
     if (previewMode) { ToastManager.show('👁 Preview mode is view-only — charging is disabled.', 'warning'); return; }
     if (!twApGate.charged || twApGate.charging) return;
-    if (!confirm('↩ Recall the last deduct?\n\nThe whole last charge goes back into the agency wallet and NOTHING new is charged.')) return;
+    if (!(await uiConfirm('↩ Recall the last deduct?\n\nThe whole last charge goes back into the agency wallet and NOTHING new is charged.'))) return;
     twApGate.correcting = true;
     twApGate.recallOnce = true;
     await twApConfirmCharge();
@@ -17286,12 +17731,20 @@ async function twSaveWorkspace() {
     try {
         const cfRid = document.getElementById('tw-record-id') && document.getElementById('tw-record-id').value;
         if (cfRid && twOpenedAt) {
-            const cfRes = await fetch('/api/requests/single?record_id=' + encodeURIComponent(cfRid));
+            // Phase 34: cap the pre-save conflict check (fail-open: on any
+            // error, including this abort, the save proceeds). Phase 34b:
+            // 12s -> 5s -- the check is a nice-to-have warning, it must never
+            // dominate save latency.
+            const cfCtl = new AbortController();
+            const cfTimer = setTimeout(() => cfCtl.abort(), 5000);
+            let cfRes;
+            try { cfRes = await fetch('/api/requests/single?record_id=' + encodeURIComponent(cfRid), { signal: cfCtl.signal }); }
+            finally { clearTimeout(cfTimer); }
             const cfData = await cfRes.json();
             const cfMtime = cfData && cfData.record && Number(cfData.record.last_modified_time || 0);
             if (cfMtime && cfMtime > twOpenedAt + 5000) {
                 const cfWhen = new Date(cfMtime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                if (!confirm('⚠️ Heads-up: this ticket was updated in the sheet AFTER you opened it (last change: ' + cfWhen + ').\n\nOK = overwrite with your version anyway\nCancel = stop, so you can close and reopen it fresh first')) {
+                if (!(await uiConfirm('⚠️ Heads-up: this ticket was updated in the sheet AFTER you opened it (last change: ' + cfWhen + ').\n\nOK = overwrite with your version anyway\nCancel = stop, so you can close and reopen it fresh first'))) {
                     return;
                 }
             }
@@ -17329,7 +17782,7 @@ async function twSaveWorkspace() {
             err.isUploadAbort = !!(data.failed_files && data.failed_files.length);
             throw err;
         }
-        ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : 'Ticket saved successfully.', 'success');
+        ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : (data.slow_confirm ? 'Ticket saved — the network was slow, but the sheet confirms your changes landed.' : 'Ticket saved successfully.'), 'success');
         // Phase 10.44: the unsent-work draft for this ticket is now on the
         // sheet -- stop restoring it (only on a real save; "nothing changed"
         // leaves the draft alone since the edits never landed).
@@ -22641,6 +23094,189 @@ function xdWrapSave(name, re) {
 }
 xdWrapSave('twSaveWorkspace', /requests\/(update|submit)/);
 xdWrapSave('schSaveEntries', /audition\/schedule/);
+// ═══════════ Phase 33 (Ahmed): Attendance Monitor ═══════════
+// Per-agent online/break/meeting timeline from Time Logs + Daily Logs +
+// shift windows from the Schedule sheet. One cached GET per range (60s
+// server-side), no polling. In-shift OFFLINE renders as a RED bar with the
+// duration printed on the strip ("red line with duration on this day").
+const ATM_ST_COLOR = { 'Online':'#00e676','On Task':'#00d4ff','Working Ticket':'#00b0ff','Meeting':'#b967ff','Break':'#ffb800','Offline':'#4b5563' };
+const ATM_ST_LABEL = { 'Online':'Online','On Task':'On task','Working Ticket':'Ticket','Meeting':'Meeting','Break':'Break','Offline':'Offline' };
+let atmMode='week', atmFrom=null, atmData=null, atmLoading=false, atmCache={};
+
+function atmDowMon(d){ const x=new Date(d); const w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
+function atmBounds(){
+    if (atmMode==='month'){ const f=new Date(atmFrom.getFullYear(),atmFrom.getMonth(),1); return [f,new Date(f.getFullYear(),f.getMonth()+1,0)]; }
+    const f=atmDowMon(atmFrom); const t=new Date(f); t.setDate(t.getDate()+6); return [f,t];
+}
+function atmPct(axis){ return v => ((v/axis)*100).toFixed(3); }
+function atmMinLabel(m){ m=Math.round(m||0); if(m<60) return m+'m'; const h=m/60; return (h%1?h.toFixed(1):String(h))+'h'; }
+function atmHm(mins){
+    mins=Math.round(mins||0);
+    const pre = mins>=1440 ? '+' : '';
+    const m = mins%1440;
+    return pre+String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+}
+function atmSetMode(m){
+    atmMode=(m==='month')?'month':'week';
+    const wb=document.getElementById('atmModeWeekBtn'), mb=document.getElementById('atmModeMonthBtn');
+    if(wb) wb.classList.toggle('active',atmMode==='week');
+    if(mb) mb.classList.toggle('active',atmMode==='month');
+    atmLoad(true);
+}
+function atmShift(dir){
+    if(!atmFrom) atmFrom=new Date();
+    if(atmMode==='month') atmFrom=new Date(atmFrom.getFullYear(),atmFrom.getMonth()+dir,1);
+    else atmFrom.setDate(atmFrom.getDate()+7*dir);
+    atmLoad(true);
+}
+function atmToday(){ atmFrom=atmDowMon(new Date()); atmLoad(true); }
+function atmOnOpen(){
+    if(!atmFrom) atmFrom=atmDowMon(new Date());
+    const wb=document.getElementById('atmModeWeekBtn'), mb=document.getElementById('atmModeMonthBtn');
+    if(wb) wb.classList.toggle('active',atmMode==='week');
+    if(mb) mb.classList.toggle('active',atmMode==='month');
+    if(atmData) atmRender();
+    atmLoad(false);
+}
+async function atmLoad(force){
+    if(atmLoading) return;
+    const [f,t]=atmBounds();
+    const key=String(schDayInt(f))+'-'+String(schDayInt(t));
+    const lbl=document.getElementById('atmRangeLabel');
+    if(lbl) lbl.textContent = atmMode==='month'
+        ? f.toLocaleDateString('en-GB',{month:'long',year:'numeric'})
+        : 'Week of '+schDayLabel(schDayInt(f));
+    const c=atmCache[key];
+    if(!force && c && (Date.now()-c.ts)<300000 && c.data){ atmData=c.data; atmRender(); return; }
+    atmLoading=true;
+    const host=document.getElementById('atmHost');
+    if(host) host.innerHTML='<div class="atm-empty">⏳ Loading attendance…</div>';
+    try{
+        const qs=new URLSearchParams({user:loggedUser,email:loggedEmail,
+            my_open_id:(localStorage.getItem('xenaOpenId')||''),
+            from:String(schDayInt(f)),to:String(schDayInt(t))});
+        const r=await fetch('/api/audition/attendance?'+qs.toString());
+        const d=await r.json();
+        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+        atmData=d; atmCache={}; atmCache[key]={ts:Date.now(),data:d};
+        atmRender();
+    }catch(e){
+        if(host) host.innerHTML='<div class="atm-empty">⚠️ '+escHtml(e.message||String(e))+'</div>';
+    }finally{ atmLoading=false; }
+}
+function atmFlagChip(fl,D){
+    const t={late:'⏰ Late '+atmMinLabel(D.late_min),
+             gap:'🔴 Offline '+atmMinLabel(D.gap_min)+' in shift',
+             missing:'⚠️ Missing '+atmMinLabel(D.missing_min),
+             early:'↩ Left early '+atmMinLabel(D.early_min),
+             no_show:'🚫 No show'}[fl];
+    return t?`<span class="atm-flag ${fl}">${t}</span>`:'';
+}
+function atmDayRow(a,ds,axis,ticks){
+    const D=(a.days||{})[ds]||{};
+    const p=atmPct(axis);
+    const isOff=D.shift&&['Off','Annual Leave','Sick Leave'].includes(D.shift.type);
+    const shiftTxt=D.shift?`${D.shift.type}${D.shift.start?(' '+D.shift.start):''}${D.shift.end?('→'+D.shift.end):''}`:((D.segments||[]).length?'(no shift row)':'—');
+    let shiftWin='';
+    if(D.shift&&D.shift.start_min!=null&&D.shift.end_min!=null){
+        shiftWin=`<div class="atm-shiftwin" title="Shift: ${escHtml(shiftTxt)}" style="left:${p(D.shift.start_min)}%;width:${p(Math.max(1,D.shift.end_min-D.shift.start_min))}%"></div>`;
+    }
+    let segs='',gaps='';
+    (D.segments||[]).forEach(x=>{
+        const c=ATM_ST_COLOR[x.st]||'#7c8aa0';
+        segs+=`<div class="atm-seg" title="${escHtml((ATM_ST_LABEL[x.st]||x.st)+' '+atmHm(x.s)+' → '+atmHm(x.e)+(x.open?' (still running)':''))}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%;background:${c}"></div>`;
+    });
+    (D.inshift_gaps||[]).forEach(x=>{
+        gaps+=`<div class="atm-gap" title="${escHtml('OFFLINE in shift '+atmHm(x.s)+' → '+atmHm(x.e)+' ('+x.min+' min)')}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%"></div>`;
+        if(x.min>=10) gaps+=`<div class="atm-gaplbl" style="left:${p((x.s+x.e)/2)}%">${atmMinLabel(x.min)}</div>`;
+    });
+    let flags='';
+    (D.flags||[]).forEach(fl=>{ flags+=atmFlagChip(fl,D); });
+    const stats=(D.worked_min>0||D.break_min>0||D.meeting_min>0)
+        ? `⏱ ${atmMinLabel(D.worked_min)} · ☕ ${atmMinLabel(D.break_min)} · 🎤 ${atmMinLabel(D.meeting_min)}`
+        : (isOff?'🌙 Off day':'—');
+    const punch=(D.first!=null)?`🕒 ${atmHm(D.first)} → ${(D.last!=null?atmHm(D.last):'now')}`:'';
+    return `<div class="atm-day">
+      <div class="atm-day-label"><b>${schDayLabel(+ds)}</b>
+        <span>${escHtml(shiftTxt)}</span>
+        <span>${stats}</span>
+        ${punch?`<span>${punch}</span>`:''}
+      </div>
+      <div>
+        <div class="atm-strip">${ticks}${shiftWin}${segs}${gaps}</div>
+        ${flags?`<div class="atm-flags">${flags}</div>`:''}
+      </div>
+    </div>`;
+}
+function atmAgentCard(a){
+    const days=atmData.days||[];
+    let axis=1440;
+    days.forEach(ds=>{ const D=(a.days||{})[String(ds)]; if(!D) return;
+        axis=Math.max(axis,(D.shift&&D.shift.end_min)||0,D.last||0,
+            ...((D.segments||[]).map(x=>x.e)), ...((D.inshift_gaps||[]).map(x=>x.e)));
+    });
+    axis=Math.min(2160,Math.ceil(axis/360)*360);
+    const p=atmPct(axis);
+    let ticks='';
+    for(let m=360;m<axis;m+=360) ticks+=`<div class="atm-tick" style="left:${p(m)}%"></div>`;
+    if(axis>1440) ticks+=`<div class="atm-nextday" style="left:${p(1440)}%"></div>`;
+    let scale='';
+    for(let m=0;m<axis;m+=360){ const h=Math.floor(m/60)%24;
+        scale+=`<span style="position:absolute;left:${p(m)}%;transform:translateX(${m===0?'0':'-50'}%);top:1px">${m>=1440?'+':''}${String(h).padStart(2,'0')}</span>`; }
+    const S=a.summary||{};
+    const chip=(txt,cls)=>`<b class="${cls||''}">${txt}</b>`;
+    const sumChips=[
+        chip('✅ '+S.worked_days+'d · '+atmMinLabel(S.worked_min||0)),
+        chip('📆 Off '+(S.off_days||0)+'d'),
+        S.late_days?chip('⏰ Late '+S.late_days+'d ('+atmMinLabel(S.late_min)+')','alert'):'',
+        S.gap_min?chip('🔴 Gaps '+atmMinLabel(S.gap_min),'bad'):'',
+        S.missing_min?chip('⚠️ Missing '+atmMinLabel(S.missing_min),'bad'):'',
+        S.no_show?chip('🚫 No-show '+S.no_show,'bad'):'',
+        S.early_min?chip('↩ Early '+atmMinLabel(S.early_min),'alert'):'',
+        S.worked_days?chip('📊 Avg '+(S.avg_day_h||0)+'h/d'):''
+    ].join('');
+    const live=(a.live&&a.live.status)?a.live.status:'Offline';
+    const liveOn=['Online','On Task','Working Ticket','Meeting'].includes(live);
+    const dayRows=days.map(ds=>atmDayRow(a,String(ds),axis,ticks)).join('');
+    return `<div class="card atm-agent">
+      <div class="atm-agent-head">
+        <span class="atm-name">👤 ${escHtml(a.name)}</span>
+        <span class="atm-live ${liveOn?'on':'dim'}">${liveOn?'🟢':'⚪'} ${escHtml(live)}</span>
+        <div class="atm-sum">${sumChips}</div>
+      </div>
+      <div class="atm-scale"><div class="atm-scale-label">${days.length} days${axis>1440?' · overnight axis +'+((axis-1440)/60)+'h':''}</div>
+        <div class="atm-scale-bar">${ticks}${scale}</div></div>
+      ${dayRows}
+    </div>`;
+}
+function atmRender(){
+    const host=document.getElementById('atmHost');
+    const warnC=document.getElementById('atmWarnCard');
+    const leg=document.getElementById('atmLegend');
+    if(!atmData){ if(host) host.innerHTML=''; return; }
+    const q=((document.getElementById('atmSearch')||{}).value||'').trim().toLowerCase();
+    if(leg) leg.innerHTML=Object.keys(ATM_ST_LABEL).map(k=>
+        `<span class="atm-lg"><i style="background:${ATM_ST_COLOR[k]}"></i>${ATM_ST_LABEL[k]}</span>`).join('')
+        +`<span class="atm-lg"><i style="background:#ff4d6d"></i>Offline in shift</span>`
+        +`<span class="atm-lg"><i style="background:transparent;border:1px dashed rgba(0,212,255,.7);width:9px;height:13px"></i>Shift window</span>`;
+    const ws=(atmData.warnings||[]);
+    if(warnC){
+        if(ws.length){
+            warnC.style.display='block';
+            const kindMeta={late:['⏰','late'],gap:['🔴','gap'],missing:['⚠️','missing']};
+            warnC.innerHTML=`<div class="ap-head"><div><h3 style="margin:0">🚨 Attendance warnings</h3>
+                <p class="ap-sync" style="margin:0">${ws.length} in this range — late starts, in-shift offline gaps, unworked shift time.</p></div></div>`
+                +ws.map(w=>`<div class="atm-warn-item"><span class="atm-warn-day">${schDayLabel(w.day)}</span>
+                    <span class="atm-warn-kind ${(kindMeta[w.kind]||['',''])[1]}">${(kindMeta[w.kind]||['•',''])[0]} ${escHtml(w.kind)}</span>
+                    <span><b>${escHtml(w.agent)}</b> — ${escHtml(w.detail)}</span></div>`).join('');
+        } else { warnC.style.display='none'; warnC.innerHTML=''; }
+    }
+    const agents=(atmData.agents||[]).filter(a=>!q||(a.name||'').toLowerCase().includes(q)||(a.email||'').includes(q));
+    if(!host) return;
+    if(!agents.length){ host.innerHTML=`<div class="atm-empty">No agents${q?' matching “'+escHtml(q)+'”':''} on the roster for this range.</div>`; return; }
+    host.innerHTML=agents.map(a=>atmAgentCard(a)).join('');
+}
+
 </script>
 </body>
 </html>
