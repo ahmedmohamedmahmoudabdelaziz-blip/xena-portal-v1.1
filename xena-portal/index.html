@@ -2108,8 +2108,8 @@
         /* Phase 14: one-click mention button (Ahmed: "add button when click
            on it mention this person who made this comment instead of typing
            @ and their name") — violet accent so it reads apart from Reply. */
-        .cmn-mention-btn{background:transparent;border:1px solid rgba(36,107,130,.35);color:var(--accent-purple);font-size:.64rem;font-weight:700;padding:2px 10px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:.75;transition:opacity .15s,background .15s,border-color .15s;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
-        .cmn-mention-btn:hover{opacity:1;background:rgba(36,107,130,.12);border-color:rgba(36,107,130,.55);}
+        .cmn-mention-btn{background:transparent;border:1px solid rgba(0,212,255,.35);color:var(--accent-purple);font-size:.64rem;font-weight:700;padding:2px 10px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:.75;transition:opacity .15s,background .15s,border-color .15s;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
+        .cmn-mention-btn:hover{opacity:1;background:rgba(0,212,255,.12);border-color:rgba(0,212,255,.55);}
         .cmn-quick-reply{margin-top:7px;display:flex;flex-direction:column;gap:6px;position:relative;}
         .cmn-quick-reply textarea{width:100%;min-height:52px;resize:vertical;background:rgba(var(--ink-rgb),0.05);border:1px solid var(--border,var(--border));border-radius:8px;color:var(--text,var(--text));font-family:inherit;font-size:.74rem;padding:7px 9px;box-sizing:border-box;outline:none;}
         .cmn-quick-reply textarea:focus{border-color:rgba(0,212,255,.5);}
@@ -2126,7 +2126,7 @@
         @keyframes cmtPop{from{transform:translateY(10px) scale(.98);opacity:0;}to{transform:none;opacity:1;}}
         .cmt-head{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--border);flex:none;background:rgba(var(--ink-rgb),0.02);position:relative;}
         .cmt-head::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,#00d4ff,var(--primary) 60%,transparent 95%);opacity:.5;border-radius:2px;}
-        .cmt-head-icon{flex:none;width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(36,107,130,.25));border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+        .cmt-head-icon{flex:none;width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(0,212,255,.25));border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.9rem;}
         .cmt-head-main{flex:1;min-width:0;}
         .cmt-title{font-weight:800;font-size:.86rem;color:var(--text,var(--text));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
         .cmt-sub{font-size:.66rem;color:var(--text-muted,var(--text-muted));margin-top:2px;display:flex;align-items:center;gap:6px;}
@@ -2151,9 +2151,9 @@
         .cmt-empty{color:var(--text-muted,var(--text-muted));font-size:.78rem;text-align:center;padding:30px 0;}
         /* Phase 14: one-click mention chip on each thread comment — click to
            drop @Author into the composer without typing the name. */
-        .cmt-mention-btn{flex:none;align-self:center;background:transparent;border:1px solid rgba(36,107,130,.35);color:var(--accent-purple);font-size:.62rem;font-weight:800;padding:1px 8px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:0;transition:opacity .15s,background .15s,border-color .15s;}
+        .cmt-mention-btn{flex:none;align-self:center;background:transparent;border:1px solid rgba(0,212,255,.35);color:var(--accent-purple);font-size:.62rem;font-weight:800;padding:1px 8px;border-radius:999px;cursor:pointer;font-family:inherit;opacity:0;transition:opacity .15s,background .15s,border-color .15s;}
         .cmt-item:hover .cmt-mention-btn{opacity:.85;}
-        .cmt-mention-btn:hover{opacity:1 !important;background:rgba(36,107,130,.15);border-color:rgba(36,107,130,.6);}
+        .cmt-mention-btn:hover{opacity:1 !important;background:rgba(0,212,255,.15);border-color:rgba(0,212,255,.6);}
         @media (hover:none){.cmt-mention-btn{opacity:.75;}}
         .cmt-composer{flex:none;border-top:1px solid var(--border);padding:10px 14px;background:rgba(var(--ink-rgb),0.02);position:relative;}
         .cmt-input-wrap{display:flex;gap:8px;align-items:flex-end;}
@@ -2177,7 +2177,7 @@
     </style>
 <style id="unified-theme-planner">
 /* Shared theme contract: every app surface follows the same palette. */
-:root,[data-theme="dark"]{--native-scheme:dark;color-scheme:dark;--bg:#111820;--surface:#1a2430;--surface-hover:#243141;--surface-inset:#151e28;--sidebar-bg:#151e28;--text:#e4eaf1;--text-muted:#a6b4c4;--border:#344354;--border-hover:#62758b;--accent-cyan:#73c8e2;--accent-green:#7bd4a3;--accent-purple:#bca7ed;--accent-amber:#e7bf6b;--accent-rose:#f29aac;--ink-rgb:225,234,242;--shadow:0 5px 20px rgba(0,0,0,.16);--radius:14px;--primary:#246b82;--on-primary:#fff}
+:root,[data-theme="dark"]{--native-scheme:dark;color-scheme:dark;--bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;--surface-inset:#101018;--sidebar-bg:#101623;--text:#e0e0e0;--text-muted:#8b8fa3;--border:#2a2c3f;--border-hover:#3d4059;--accent-cyan:#00d4ff;--accent-green:#00e676;--accent-purple:#b967ff;--accent-amber:#ffb800;--accent-rose:#ff4d6d;--ink-rgb:224,224,224;--shadow:0 8px 32px rgba(0,0,0,.4);--radius:16px;--primary:#0891b2;--on-primary:#fff}
 [data-theme="light"]{--native-scheme:light;color-scheme:light;--bg:#e9edf0;--surface:#f6f7f6;--surface-hover:#e7edf1;--surface-inset:#edf0f2;--sidebar-bg:#edf0f2;--text:#223344;--text-muted:#526475;--border:#c7d1d9;--border-hover:#8295a6;--accent-cyan:#17627c;--accent-green:#246d47;--accent-purple:#6943a1;--accent-amber:#865a0c;--accent-rose:#b13753;--ink-rgb:34,51,68;--shadow:0 4px 16px rgba(36,49,63,.06);--primary:#246b82;--on-primary:#fff}
 
 /* ===== Phase 26: Soft Material component pass ======================
@@ -2187,7 +2187,7 @@ body .btn{border-radius:999px}
 body input[type="text"],body input[type="number"],body input[type="email"],body input[type="password"],body input[type="date"],body input[type="time"],body input[type="search"],body textarea,body select{border-radius:12px}
 body .nav-item{border-radius:0 999px 999px 0;margin-right:10px}
 body .nav-item:hover{background:var(--surface-hover)}
-body .nav-item.active,body .nav-item.active-nav{color:var(--accent-cyan)!important;border-left-color:var(--accent-cyan);background:rgba(115,200,226,.12);font-weight:600}
+body .nav-item.active,body .nav-item.active-nav{color:var(--accent-cyan)!important;border-left-color:var(--accent-cyan);background:rgba(0,212,255,.10);font-weight:600}
 body :focus-visible{outline:2px solid var(--primary);outline-offset:1px}
 body ::-webkit-scrollbar{width:10px;height:10px}
 body ::-webkit-scrollbar-track{background:transparent}
@@ -2231,7 +2231,7 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .mw-empty{color:var(--text-muted);font-size:.82rem;padding:10px 4px;text-align:center}
 .mw-quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .mw-quick button{padding:14px 10px;border-radius:14px;border:1px solid var(--border);background:var(--surface-inset);color:var(--text);font-size:.84rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit}
-.mw-quick button:hover{border-color:var(--primary);color:var(--primary);background:rgba(36,107,130,.1)}
+.mw-quick button:hover{border-color:var(--primary);color:var(--primary);background:rgba(0,212,255,.1)}
 .mw-open{padding:7px 14px!important;width:auto!important;font-size:.76rem;white-space:nowrap}
 .nav-item-top{padding-left:18px!important;font-weight:700}
 
@@ -2241,16 +2241,16 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .twx-step:hover{border-color:var(--border-hover);color:var(--text)}
 .twx-step.done{background:rgba(52,168,113,.13);border-color:rgba(52,168,113,.4);color:var(--accent-green)}
 .twx-step.done .twx-step-dot{background:var(--accent-green);color:#fff}
-.twx-step.current{border-color:var(--primary);color:var(--primary);background:rgba(36,107,130,.12)}
+.twx-step.current{border-color:var(--primary);color:var(--primary);background:rgba(0,212,255,.12)}
 .twx-step.current .twx-step-dot{background:var(--primary);color:var(--on-primary)}
 .twx-step-dot{width:18px;height:18px;border-radius:50%;background:var(--border);color:var(--text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;flex-shrink:0}
-@keyframes twxPulse{0%{box-shadow:0 0 0 0 rgba(36,107,130,.5)}100%{box-shadow:0 0 0 14px rgba(36,107,130,0)}}
+@keyframes twxPulse{0%{box-shadow:0 0 0 0 rgba(0,212,255,.5)}100%{box-shadow:0 0 0 14px rgba(0,212,255,0)}}
 .twx-pulse{animation:twxPulse .8s ease-out 2;border-radius:12px}
 
 /* Phase 26: draft save feedback + restore chips */
 .drf-badge{position:fixed;bottom:18px;right:18px;z-index:10003;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);padding:7px 14px;border-radius:999px;font-size:.76rem;box-shadow:var(--shadow);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
 .drf-badge.show{opacity:1;transform:translateY(0)}
-.drf-restore{display:flex;align-items:center;gap:8px;margin:6px 0;padding:7px 12px;border-radius:999px;background:rgba(36,107,130,.1);border:1px dashed var(--primary);font-size:.76rem;color:var(--text);flex-wrap:wrap}
+.drf-restore{display:flex;align-items:center;gap:8px;margin:6px 0;padding:7px 12px;border-radius:999px;background:rgba(0,212,255,.1);border:1px dashed var(--primary);font-size:.76rem;color:var(--text);flex-wrap:wrap}
 .drf-r-btn,.drf-d-btn{border:none;border-radius:999px;padding:3px 10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit}
 .drf-r-btn{background:var(--primary);color:var(--on-primary)}
 .drf-d-btn{background:transparent;color:var(--text-muted);border:1px solid var(--border)}
@@ -2350,6 +2350,74 @@ option{background:var(--surface);color:var(--text)}
     .login-card{padding:40px 22px;}
     .login-card h1{font-size:1.45rem;white-space:normal;}
 }
+
+/* ═══════════════ Phase 31 (Ahmed): Rewards page + mobile ease-of-use ═══════════════ */
+/* Rewards: 2x2 grid of group tables on desktop, stacked on mobile. Each
+   table is exactly the 3 columns Ahmed asked for: User ID · Agency/BD Code ·
+   select checkbox (the head checkbox selects all rows in THAT table). */
+.rw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.rw-card{margin:0;padding:0;overflow:hidden;}
+.rw-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.rw-title{font-weight:800;font-size:1.02rem;display:flex;align-items:center;gap:9px;}
+.rw-badge{background:rgba(0,212,255,.14);color:var(--primary);border-radius:999px;padding:2px 11px;font-size:.78rem;font-weight:800;}
+.rw-apply{margin-left:auto;padding:8px 16px;font-size:.8rem;}
+.rw-apply:disabled{opacity:.45;cursor:not-allowed;}
+.rw-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.rw-table{width:100%;border-collapse:collapse;font-size:.88rem;}
+.rw-table th{background:var(--surface-inset);color:var(--text-muted);text-transform:uppercase;font-size:.66rem;letter-spacing:.6px;font-weight:700;text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.rw-table td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+.rw-table tbody tr{transition:background .15s;}
+.rw-table tbody tr:hover{background:rgba(0,212,255,.05);}
+.rw-table tbody tr.rw-checked{background:rgba(52,168,113,.08);}
+.rw-table tbody tr:last-child td{border-bottom:none;}
+.rw-ck-col{width:46px;text-align:center;}
+.rw-ck{width:19px;height:19px;accent-color:var(--primary);cursor:pointer;vertical-align:middle;}
+.rw-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;}
+.rw-empty{padding:26px 14px;text-align:center;color:var(--text-muted);font-size:.85rem;}
+.rw-note{color:var(--text-muted);font-size:.82rem;margin:12px 2px 0;}
+@media (max-width:900px){
+    .rw-grid{grid-template-columns:minmax(0,1fr);}
+    .rw-head{padding:14px;}
+    .rw-apply{width:100%;margin-left:0;padding:11px;}
+}
+
+/* Phase 31 mobile ease-of-use (all rules <=900px; desktop untouched).
+   1) The floating ⚡/📝/📡 dock sat top-center, covering the tab bar and a
+      big slice of the form on a phone. It becomes a compact vertical FAB
+      stack parked bottom-RIGHT — thumb-reachable, covering nothing. */
+@media (max-width:900px){
+    .twx-dock{top:auto;bottom:96px;left:auto;right:12px;transform:none;flex-direction:column;align-items:flex-end;gap:10px;}
+    body.sidebar-collapsed .twx-dock{left:auto;}
+    .twx-fab{width:50px;height:50px;font-size:1.25rem;}
+    /* 2) Scratch note: bottom sheet instead of a floating card — full width,
+          capped at half the screen, thumb-close ✕. */
+    #twNotePop{top:auto;bottom:14px;left:10px;right:10px;width:auto;max-height:46vh;}
+    #twNoteText{min-height:120px;}
+    /* 3) Duplicate-radar bubble: capped height so a long verdict can never
+          cover half the phone screen; it scrolls internally instead. */
+    #twRadarMsg,#awsRadarMsg{max-height:42vh;}
+    /* 4) Draft-save toast: keep clear of the bottom-right FAB stack. */
+    .drf-badge{top:118px;bottom:auto;right:12px;}
+}
+@media (max-width:600px){
+    /* 5) Sheet-style tables (Under Investigation): on a 390px phone every
+          cell was ellipsis-clipped ("SUBMITTE", "2026-10-…"). Let cells wrap
+          and slim the min width; the wrap keeps momentum horizontal scroll
+          for whatever still overflows. */
+    .ti-table{min-width:700px;font-size:.78rem;}
+    .ti-table td{white-space:normal;max-width:150px;overflow:visible;text-overflow:clip;}
+    .ti-table th{white-space:normal;}
+}
+
+/* ═══════════════ Phase 32 (Ahmed): dark mode returns to its saturated
+   "shine" look — neon accents, glow shadows, cyan/green gradient buttons
+   (flat --primary stays for light mode) — plus the light-mode fix for the
+   chat-style bubbles that hardcoded a near-opaque DARK gradient. ═══════════ */
+[data-theme="dark"] .btn-primary{background:linear-gradient(135deg,var(--accent-cyan),#3a7bd5);color:#000}
+[data-theme="dark"] .btn-success{background:linear-gradient(135deg,var(--accent-green),#00b0ff);color:#000}
+[data-theme="light"] #twNotePop{background:linear-gradient(160deg,rgba(255,246,224,.97),var(--surface))}
+[data-theme="light"] .twx-radar-msg{background:linear-gradient(160deg,rgba(255,235,238,.97),var(--surface));border-color:rgba(214,48,80,.45);box-shadow:0 12px 32px rgba(36,49,63,.18)}
+[data-theme="light"] .twx-radar-msg.scanning{box-shadow:0 12px 32px rgba(36,49,63,.18),0 0 22px rgba(255,184,0,.18)}
 </style>
 </head>
 
@@ -2600,6 +2668,10 @@ option{background:var(--surface);color:var(--text)}
                     <div class="nav-item" id="nav-live-tickets" onclick="openInTab('live-tickets')"><span data-i18n="liveQueue">Live Queue</span></div>
                     <div class="nav-item" id="nav-ticket-new" onclick="twOpenCreateWorkspace()"><span>🆕 New Ticket</span></div>
                     <div class="nav-item" id="nav-tickets-pending" onclick="openInTab('tickets-pending')"><span>🕵️ Under Investigation</span></div>
+                    <!-- Phase 31 (Ahmed): Rewards — pending reward payouts for
+                         completed Agency/BD Creation requests, gated by the
+                         tickets_rewards sub-key (master tickets / admin see it). -->
+                    <div class="nav-item" id="nav-rewards" onclick="openInTab('rewards')"><span>🎁 Rewards</span></div>
                     <!-- Phase 10.13 (Ahmed): Audit moved here from Submit Request.
                          Its access key is unchanged (submit_audit), only the
                          sidebar placement moved. -->
@@ -3575,6 +3647,7 @@ option{background:var(--surface);color:var(--text)}
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_live_queue"> Live Queue</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_new"> 🆕 New Ticket (create from empty Ticket Workspace)</label>
                                 <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_pending"> 🕵️ Under Investigation list</label>
+                                <label class="sub-opt-lbl"><input type="checkbox" id="mod_tickets_rewards"> 🎁 Rewards</label>
                                 <!-- Phase 10.18 (Ahmed): Audit Workstation belongs with the
                                      Ticket Queue tools, not Submit Request -- same grant key
                                      (mod_submit_audit), so every existing grant keeps working
@@ -4657,6 +4730,27 @@ option{background:var(--surface);color:var(--text)}
                 </div>
             </div>
 
+            <!-- Phase 31 (Ahmed): Rewards — one table per region x type
+                 (PK/IN · Agency/BD). Completed (Status = Done) Agency/BD
+                 Creation requests whose Reward checkbox is still unchecked.
+                 Nothing loads until Search is clicked (zero-cost open, same
+                 contract as Under Investigation). Checking rows + "Mark
+                 Rewarded" writes Reward=true back to the Grand Table. -->
+            <div id="pg-rewards" style="display:none">
+                <div class="card" style="margin:0 0 18px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+                        <div>
+                            <h3 class="ltq-title">🎁 Rewards</h3>
+                            <p class="ltq-subtitle">Completed <b>Agency Creation</b> / <b>BD Creation</b> requests (Status = <b>Done</b>) not rewarded yet, grouped by region. Tick what you paid out, then <b>Mark Rewarded</b> — it checks the Reward box on the sheet.</p>
+                        </div>
+                        <button class="btn btn-primary" id="rwSearchBtn" onclick="rwSearch()">🔍 Search</button>
+                    </div>
+                </div>
+                <div id="rwCount" style="color:var(--text-muted);font-size:.85rem;margin-bottom:12px">Click <b>Search</b> to load the pending rewards.</div>
+                <div class="rw-grid" id="rwResults"></div>
+                <div id="rwNote" class="rw-note" style="display:none"></div>
+            </div>
+
             <!-- Phase 11 (Ahmed): Audition Status Management — Agent Presence
                  System. One batched write per status change to the Agent Roster
                  (Current Status + Status Change Time + Memory); the native
@@ -5201,6 +5295,7 @@ const pageTitlesMap = {
     'my-requests': 'My Recent Requests',
     'live-tickets': 'Live Ticket Queue',
     'tickets-pending': 'Under Investigation',
+    'rewards': 'Rewards',
     'admin-preview': 'Preview Agent View',
     'audition-status': 'Audition Status',
     'audition-schedule': 'Audition Schedule'
@@ -5228,6 +5323,7 @@ const zhPageTitlesMap = {
     'my-requests': '我的最近请求',
     'live-tickets': '实时工单队列',
     'tickets-pending': '待调查请求',
+    'rewards': '奖励',
     'admin-preview': '预览成员视图',
     'audition-status': '状态管理',
     'audition-schedule': '审核排班'
@@ -5235,7 +5331,7 @@ const zhPageTitlesMap = {
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule'];
+const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-rewards'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -5548,6 +5644,11 @@ function executePageLogic(page) {
         _expandNavGroup('navBodyTickets','navArrTickets');
         // Phase 10.13: NOTHING is fetched here on purpose -- the agent clicks
         // Search (tiSearch) so opening this page by mistake costs zero calls.
+    } else if(page==='rewards'){
+        document.getElementById('pg-rewards').style.display='block';
+        _expandNavGroup('navBodyTickets','navArrTickets');
+        // Phase 31: same zero-cost contract as Under Investigation --
+        // rwSearch() is the only fetch, fired by the Search button.
     } else if(page==='admin-preview'){
         document.getElementById('pg-admin-preview').style.display='block';
         _expandNavGroup('navBodyAdmin','navArrAdmin');
@@ -8300,7 +8401,7 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue',
-     'tickets_new','tickets_pending','audition_access','preview_access'].forEach(key => {
+     'tickets_new','tickets_pending','tickets_rewards','audition_access','preview_access'].forEach(key => {
         const master = key.split('_')[0];
         const hasAccess = m.includes(key) || m.split(',').map(s=>s.trim()).includes(master) || m.includes('admin');
         const cb = document.getElementById(`mod_${key}`);
@@ -9794,7 +9895,7 @@ async function confirmSaveRole() {
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue',
-     'tickets_new','tickets_pending','audition_access','preview_access'].forEach(m => {
+     'tickets_new','tickets_pending','tickets_rewards','audition_access','preview_access'].forEach(m => {
         const cb = document.getElementById(`mod_${m}`);
         if(cb && cb.checked) modules.push(m);
     });
@@ -9904,7 +10005,7 @@ async function addAgent() {
      'compare_radar','compare_diff','compare_area_chart','compare_leaderboard','compare_consistency',
      'query_requests','query_agency_list',
      'submit_new_request','submit_audit','submit_my_requests','tickets_live_queue',
-     'tickets_new','tickets_pending','audition_access','preview_access'].forEach(m => {
+     'tickets_new','tickets_pending','tickets_rewards','audition_access','preview_access'].forEach(m => {
         const cb = document.getElementById(`mod_${m}`);
         if(cb && cb.checked) modules.push(m);
     });
@@ -11719,6 +11820,154 @@ function tiTableHtml(rows) {
     </table></div>`;
 }
 
+// ─── Phase 31: Rewards ───
+// Ahmed: "add new tab name it rewards under the TICKET QUEUE ... one table
+// for PK agency and IN Agency and PK BD and IN BD ... 3 columns: user id,
+// agency code or bd code, check box with option to check all in this table
+// in the head of each table". Zero-cost open: rwSearch() is the only fetch.
+// Marking writes Reward=true to the Grand Table via /api/rewards/mark and
+// drops the row locally, so this page and the sheet views stay in sync.
+const RW_GROUPS = [
+    { key: 'pk_agency', flag: '🇵🇰', title: 'PK · Agency', codeLabel: 'Agency Code' },
+    { key: 'in_agency', flag: '🇮🇳', title: 'IN · Agency', codeLabel: 'Agency Code' },
+    { key: 'pk_bd',     flag: '🇵🇰', title: 'PK · BD',     codeLabel: 'BD Code' },
+    { key: 'in_bd',     flag: '🇮🇳', title: 'IN · BD',     codeLabel: 'BD Code' },
+];
+
+async function rwSearch() {
+    const btn = document.getElementById('rwSearchBtn');
+    const countEl = document.getElementById('rwCount');
+    const resultsEl = document.getElementById('rwResults');
+    if (!resultsEl) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Searching…'; }
+    if (countEl) countEl.textContent = 'Searching the sheet…';
+    resultsEl.innerHTML = '';
+    try {
+        const res = await fetch(`/api/rewards?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}`);
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Search failed');
+        const groups = data.groups || {};
+        const total = data.count || 0;
+        if (countEl) countEl.textContent = total
+            ? `${total} request${total === 1 ? '' : 's'} waiting for their reward.`
+            : 'Nothing waiting for a reward right now. 🎉';
+        const noteEl = document.getElementById('rwNote');
+        if (noteEl) {
+            if (data.no_region) {
+                noteEl.style.display = '';
+                noteEl.textContent = `ℹ️ ${data.no_region} more request${data.no_region === 1 ? '' : 's'} matched the conditions but have no Region set on the sheet — set their Region to PK/IN there and they will appear here.`;
+            } else {
+                noteEl.style.display = 'none';
+                noteEl.textContent = '';
+            }
+        }
+        resultsEl.innerHTML = RW_GROUPS.map(g => rwTableHtml(g, groups[g.key] || [])).join('');
+    } catch (e) {
+        if (countEl) countEl.textContent = 'Search failed — please try again.';
+        ToastManager.show('Rewards search failed: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Search'; }
+    }
+}
+
+function rwTableHtml(g, rows) {
+    const body = rows.map(r => {
+        const rid = escHtml(r.record_id || '');
+        return `<tr data-rid="${rid}">
+            <td title="${escHtml(r.user_id || '—')}">${escHtml(r.user_id || '—')}</td>
+            <td class="rw-code" title="${escHtml(r.code || '—')}">${escHtml(r.code || '—')}</td>
+            <td class="rw-ck-col"><input type="checkbox" class="rw-ck" onchange="rwRowToggle('${g.key}', this)"></td>
+        </tr>`;
+    }).join('');
+    const table = rows.length
+        ? `<div class="rw-table-wrap"><table class="rw-table">
+            <thead><tr><th>User ID</th><th>${g.codeLabel}</th><th class="rw-ck-col" title="Select all in this table"><input type="checkbox" class="rw-ck" id="rwAll-${g.key}" onchange="rwToggleAll('${g.key}', this)"></th></tr></thead>
+            <tbody>${body}</tbody>
+        </table></div>`
+        : `<div class="rw-empty">🎉 Nothing pending here.</div>`;
+    return `<div class="card rw-card" id="rwCard-${g.key}">
+        <div class="rw-head">
+            <div class="rw-title">${g.flag} ${g.title} <span class="rw-badge" id="rwBadge-${g.key}">${rows.length}</span></div>
+            <button type="button" class="btn btn-primary rw-apply" id="rwApply-${g.key}" disabled onclick="rwMark('${g.key}')">✓ Mark Rewarded</button>
+        </div>
+        ${table}
+    </div>`;
+}
+
+function rwToggleAll(key, headCb) {
+    document.querySelectorAll(`#rwCard-${key} tbody .rw-ck`).forEach(cb => { cb.checked = headCb.checked; });
+    rwRefreshHead(key);
+}
+
+function rwRowToggle(key, cb) {
+    const tr = cb && cb.closest('tr');
+    if (tr) tr.classList.toggle('rw-checked', cb.checked);
+    rwRefreshHead(key);
+}
+
+function rwRefreshHead(key) {
+    const boxes = [...document.querySelectorAll(`#rwCard-${key} tbody .rw-ck`)];
+    boxes.forEach(b => { const tr = b.closest('tr'); if (tr) tr.classList.toggle('rw-checked', b.checked); });
+    const head = document.getElementById(`rwAll-${key}`);
+    const n = boxes.filter(b => b.checked).length;
+    if (head) {
+        head.checked = boxes.length > 0 && n === boxes.length;
+        head.indeterminate = n > 0 && n < boxes.length;
+    }
+    const btn = document.getElementById(`rwApply-${key}`);
+    if (btn) {
+        btn.disabled = n === 0;
+        btn.textContent = n ? `✓ Mark Rewarded (${n})` : '✓ Mark Rewarded';
+    }
+}
+
+async function rwMark(key) {
+    if (previewMode) { ToastManager.show('👁 Preview mode is view-only.', 'warning'); return; }
+    const boxes = [...document.querySelectorAll(`#rwCard-${key} tbody .rw-ck`)].filter(b => b.checked);
+    const ids = boxes.map(b => b.closest('tr').dataset.rid).filter(Boolean);
+    if (!ids.length) return;
+    const btn = document.getElementById(`rwApply-${key}`);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Marking…'; }
+    try {
+        const res = await fetch('/api/rewards/mark', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, record_ids: ids })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Mark failed');
+        const failedIds = new Set((data.failures || []).flatMap(f => f.record_ids || []));
+        let removed = 0;
+        boxes.forEach(b => {
+            const tr = b.closest('tr');
+            if (tr && !failedIds.has(tr.dataset.rid)) { tr.remove(); removed++; }
+        });
+        const badge = document.getElementById(`rwBadge-${key}`);
+        const left = document.querySelectorAll(`#rwCard-${key} tbody tr`).length;
+        if (badge) badge.textContent = left;
+        if (!left) {
+            const card = document.getElementById(`rwCard-${key}`);
+            const wrap = card && card.querySelector('.rw-table-wrap');
+            if (wrap) wrap.outerHTML = '<div class="rw-empty">🎉 Nothing pending here.</div>';
+        }
+        rwRefreshHead(key);
+        ToastManager.show(removed
+            ? `✅ ${removed} request${removed === 1 ? '' : 's'} marked as rewarded on the sheet.`
+            : 'Nothing was marked.', removed ? 'success' : 'warning');
+        if (failedIds.size) ToastManager.show(`⚠️ ${failedIds.size} record(s) failed — they stay listed, just mark them again.`, 'error');
+        const countEl = document.getElementById('rwCount');
+        if (countEl) {
+            const totalLeft = document.querySelectorAll('#rwResults tbody tr').length;
+            countEl.textContent = totalLeft
+                ? `${totalLeft} request${totalLeft === 1 ? '' : 's'} waiting for their reward.`
+                : 'Nothing waiting for a reward right now. 🎉';
+        }
+    } catch (e) {
+        ToastManager.show('Mark rewarded failed: ' + e.message, 'error');
+        rwRefreshHead(key);
+    }
+}
+
 // ─── Phase 10.13: Preview Agent View ───
 // Ahmed: "invite new thing under access management option called preview
 // agent view give by a toggle switch named preview access ... then i choose
@@ -12729,11 +12978,13 @@ function configureSidebarAndCards() {
     const navLiveTq = document.getElementById('nav-live-tickets');
     const navTicketNew = document.getElementById('nav-ticket-new');
     const navTicketsPending = document.getElementById('nav-tickets-pending');
+    const navRewards = document.getElementById('nav-rewards'); // Phase 31
     if (navLiveTq) navLiveTq.style.display = (hasTicketsMaster || hasExactMod('tickets_live_queue')) ? '' : 'none';
     if (navTicketNew) navTicketNew.style.display = (hasTicketsMaster || hasExactMod('tickets_new')) ? '' : 'none';
     if (navTicketsPending) navTicketsPending.style.display = (hasTicketsMaster || hasExactMod('tickets_pending')) ? '' : 'none';
+    if (navRewards) navRewards.style.display = (hasTicketsMaster || hasExactMod('tickets_rewards')) ? '' : 'none';
     const grpTickets = document.getElementById('navGrpTickets');
-    if (grpTickets) grpTickets.style.display = [navLiveTq, navTicketNew, navTicketsPending, navAudit].some(el => el && el.style.display !== 'none') ? '' : 'none';
+    if (grpTickets) grpTickets.style.display = [navLiveTq, navTicketNew, navTicketsPending, navRewards, navAudit].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     // Phase 10.13: the Admin group's items are gated individually so a holder
     // of ONLY 'preview_access' sees just "Preview Agent View" -- never Manage
