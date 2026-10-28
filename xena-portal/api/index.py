@@ -388,6 +388,80 @@ def _get_cached_uat(open_id):
 _schema_cache = {"data": {}, "lock": threading.Lock()}
 _SCHEMA_REDIS_TTL = 300
 
+# ════════════════════════════════════════════════════════════════════
+# Phase 34: ONE /fields fetch for BOTH caches + stale-while-revalidate.
+# update_request() calls get_table_schema() AND get_field_ui_types() on every
+# save, and they used to each fetch the SAME /fields endpoint separately -- a
+# cold serverless instance (or one with Redis unreachable) burned TWO
+# sequential cross-border round trips before the save even started. Now one
+# combined fetch fills both caches, and a stale cache answers instantly while
+# a background thread refreshes -- saves never wait on schema lookups.
+# ════════════════════════════════════════════════════════════════════
+_FIELDS_META_STALE_TTL = 24 * 3600  # a stale schema may serve for at most a day
+_fields_meta_refreshing = set()
+_fields_meta_refreshing_lock = threading.Lock()
+
+def _fetch_fields_meta(table_id, token, base_id):
+    """ONE paginated /fields call that populates BOTH the field-name schema
+    cache and the ui-types cache (plus their Redis keys)."""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
+    names, types = set(), {}
+    page_token = None
+    for _ in range(5):  # hard cap: 5 pages x 100 fields
+        params = {"page_size": 100}
+        if page_token:
+            params["page_token"] = page_token
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=20).json()
+        if resp.get("code") != 0:
+            raise RuntimeError(resp.get("msg") or f"fields fetch failed (code {resp.get('code')})")
+        data = resp.get("data") or {}
+        for f in data.get("items", []):
+            name = f.get("field_name")
+            if not name:
+                continue
+            names.add(name)
+            # Fall back to the numeric "type" code (2 == Number) if "ui_type"
+            # isn't present on this API version, so this works either way.
+            ui_type = f.get("ui_type") or ("Number" if f.get("type") == 2 else None)
+            if ui_type:
+                types[name] = ui_type
+        page_token = data.get("page_token")
+        if not data.get("has_more") or not page_token:
+            break
+    now = time.time()
+    with _schema_cache["lock"]:
+        _schema_cache["data"][table_id] = {"fields": names, "ts": now}
+    with _field_types_cache["lock"]:
+        _field_types_cache["data"][table_id] = {"types": types, "ts": now}
+    if REDIS_ENABLED:
+        try:
+            redis_set_json(f"xena:schema:{table_id}", list(names), ttl=_FIELDS_META_STALE_TTL)
+            redis_set_json(f"xena:fieldtypes:{table_id}", types, ttl=_FIELDS_META_STALE_TTL)
+        except Exception:
+            pass
+    return names, types
+
+def _refresh_fields_meta_bg(table_id, token, base_id):
+    """Refresh the /fields caches in the background (stale-while-revalidate).
+    Deduplicated per table so a burst of saves triggers ONE refresh."""
+    with _fields_meta_refreshing_lock:
+        if table_id in _fields_meta_refreshing:
+            return
+        _fields_meta_refreshing.add(table_id)
+    def _run():
+        try:
+            _fetch_fields_meta(table_id, token, base_id)
+        except Exception as e:
+            logger.warn("fields_meta_bg_refresh_failed", table_id=table_id, error=str(e))
+        finally:
+            with _fields_meta_refreshing_lock:
+                _fields_meta_refreshing.discard(table_id)
+    try:
+        threading.Thread(target=_run, daemon=True).start()
+    except Exception:
+        with _fields_meta_refreshing_lock:
+            _fields_meta_refreshing.discard(table_id)
+
 def get_table_schema(table_id, token, base_id, ttl=300):
     """
     ISSUE 1 FIX (Ticket Open Speed): same cold-start problem as the token cache above --
@@ -409,16 +483,18 @@ def get_table_schema(table_id, token, base_id, ttl=300):
                 _schema_cache["data"][table_id] = {"fields": fields, "ts": time.time()}
             return fields
 
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
+    # Phase 34 stale-while-revalidate: a stale in-memory schema still answers
+    # instantly (schema changes are rare; the background refresh lands within
+    # seconds) instead of making the agent's SAVE wait on a cold cross-border
+    # /fields fetch -- that wait was a big chunk of "saving takes so long".
+    with _schema_cache["lock"]:
+        stale = _schema_cache["data"].get(table_id)
+    if stale and time.time() - stale["ts"] < _FIELDS_META_STALE_TTL:
+        _refresh_fields_meta_bg(table_id, token, base_id)
+        return stale["fields"]
     try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
-        if resp.get("code") == 0:
-            fields = set(f.get("field_name") for f in resp.get("data", {}).get("items", []))
-            with _schema_cache["lock"]:
-                _schema_cache["data"][table_id] = {"fields": fields, "ts": time.time()}
-            if REDIS_ENABLED:
-                redis_set_json(redis_key, list(fields), ttl=_SCHEMA_REDIS_TTL)
-            return fields
+        fields, _ = _fetch_fields_meta(table_id, token, base_id)
+        return fields
     except Exception as e:
         logger.error("get_table_schema_failed", table_id=table_id, error=str(e))
     with _schema_cache["lock"]:
@@ -454,23 +530,16 @@ def get_field_ui_types(table_id, token, base_id, ttl=300):
                 _field_types_cache["data"][table_id] = {"types": cached_types, "ts": time.time()}
             return cached_types
 
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base_id}/tables/{table_id}/fields"
+    # Phase 34 stale-while-revalidate: same as get_table_schema -- a stale
+    # types cache answers instantly while a background thread refreshes.
+    with _field_types_cache["lock"]:
+        stale = _field_types_cache["data"].get(table_id)
+    if stale and time.time() - stale["ts"] < _FIELDS_META_STALE_TTL:
+        _refresh_fields_meta_bg(table_id, token, base_id)
+        return stale["types"]
     try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15).json()
-        if resp.get("code") == 0:
-            types = {}
-            for f in resp.get("data", {}).get("items", []):
-                name = f.get("field_name")
-                # Fall back to the numeric "type" code (2 == Number) if "ui_type" isn't
-                # present on this API version, so this still works either way.
-                ui_type = f.get("ui_type") or ("Number" if f.get("type") == 2 else None)
-                if name and ui_type:
-                    types[name] = ui_type
-            with _field_types_cache["lock"]:
-                _field_types_cache["data"][table_id] = {"types": types, "ts": time.time()}
-            if REDIS_ENABLED:
-                redis_set_json(redis_key, types, ttl=_FIELD_TYPES_REDIS_TTL)
-            return types
+        _, types = _fetch_fields_meta(table_id, token, base_id)
+        return types
     except Exception as e:
         logger.error("get_field_ui_types_failed", table_id=table_id, error=str(e))
     with _field_types_cache["lock"]:
@@ -3224,25 +3293,173 @@ def audit_logs():
     filtered = [l for l in logs if _matches(l)]
     return jsonify(filtered[:limit])
 
-def _feishu_get(url, headers=None, params=None, timeout=20, tries=2, stream=False):
+def _feishu_get(url, headers=None, params=None, timeout=20, tries=2, stream=False, retry_timeout=None):
     """GET against open.feishu.cn with one automatic retry on transient
-    network failures (ReadTimeout / ConnectionError). The Vercel -> Feishu-CN
-    cross-border link regularly spikes past 10s; a single 10s attempt turned
-    those spikes into hard user-facing failures ("Failed to open ticket ...
-    Read timed out"), so the ceiling is now 20s with a second attempt before
-    the error is allowed to surface. Only network-layer exceptions retry --
-    HTTP responses (even 4xx/5xx) come back to the caller unchanged."""
+    network failures (ReadTimeout / ConnectionError). Only network-layer
+    exceptions retry -- HTTP responses (even 4xx/5xx) come back unchanged.
+    Phase 34b (speed): retry_timeout lets the retry carry its own ceiling, so
+    hot user-facing paths fail FAST on the first attempt (6-8s) and give the
+    retry a bit more room (10-12s) -- instead of blocking 20-40s per call on a
+    sick cross-border link."""
     last = None
     for attempt in range(tries):
         try:
             return feishu_session.get(url, headers=headers, params=params,
-                                      timeout=timeout, stream=stream)
+                                      timeout=(timeout if attempt == 0 else (retry_timeout or timeout)),
+                                      stream=stream)
         except Exception as e:
             last = e
-            logger.warning("feishu_get_retry", url=url[:90], attempt=attempt + 1, error=str(e))
+            logger.warn("feishu_get_retry", url=url[:90], attempt=attempt + 1, error=str(e))
             if attempt + 1 < tries:
                 time.sleep(0.8 * (attempt + 1))
     raise last
+
+def _put_json_retry(url, headers, payload, timeout=10, tries=2, retry_timeout=15):
+    """Phase 34: PUT with one retry on network-layer failures only
+    (ReadTimeout / ConnectionError / non-JSON gateway pages). Every record PUT
+    this app sends carries the FULL intended field state, so re-sending the
+    identical payload is idempotent -- safe to retry. Phase 34b (speed):
+    fail-fast 10s first attempt, 15s retry -- the link either answers in ~2s
+    or it is spiking, and waiting 25s before retrying just made users stare at
+    a spinner."""
+    last = None
+    for attempt in range(tries):
+        try:
+            return feishu_session.put(url, headers=headers, json=payload,
+                                      timeout=(timeout if attempt == 0 else (retry_timeout or timeout))).json()
+        except Exception as e:
+            last = e
+            logger.warn("feishu_put_retry", url=url[:90], attempt=attempt + 1, error=str(e))
+            if attempt + 1 < tries:
+                time.sleep(0.8 * (attempt + 1))
+    raise last
+
+def _post_json_retry(url, headers, payload, timeout=8, tries=2, retry_timeout=10):
+    """Phase 34b: POST with one retry on network-layer failures -- for
+    READ-ONLY endpoints only (records/search). Never use for writes."""
+    last = None
+    for attempt in range(tries):
+        try:
+            return feishu_session.post(url, headers=headers, json=payload,
+                                       timeout=(timeout if attempt == 0 else (retry_timeout or timeout))).json()
+        except Exception as e:
+            last = e
+            logger.warn("feishu_post_retry", url=url[:90], attempt=attempt + 1, error=str(e))
+            if attempt + 1 < tries:
+                time.sleep(0.8 * (attempt + 1))
+    raise last
+
+def _wallet_search(headers, code):
+    """Live Agency Points table search by exact Agency Code (read-only, so a
+    cross-border spike gets one automatic retry)."""
+    r = _post_json_retry(
+        f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
+        headers=headers,
+        payload={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}})
+    if r.get("code") != 0:
+        raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
+    for it in r.get("data", {}).get("items", []):
+        if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == code:
+            return it
+    return None
+
+def _fetch_wallet_fast(headers, code):
+    """Phase 34b (Ahmed: charge must answer in 5-10s): records/search is the
+    slowest leg of the charge flow (~2-4s server-side on the big Agency Points
+    table). Cache agency_code -> wallet record_id (Redis, in-mem fallback) and
+    read the wallet by direct record GET (~1s) instead. The cached path still
+    verifies the Agency Code matches EXACTLY, and ANY doubt (cache miss,
+    deleted row, code mismatch, network error) falls back to the live search,
+    which also re-populates the cache -- the cache can therefore never return
+    the wrong wallet; worst case it costs one wasted GET before the search."""
+    if not code:
+        return None
+    key = f"xena:wallet_ref:{code}"
+    cached_id = None
+    try:
+        cached = redis_get_json(key)
+        if isinstance(cached, dict):
+            cached_id = cached.get("record_id")
+    except Exception:
+        cached_id = None
+    if cached_id:
+        try:
+            r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cached_id}",
+                            headers=headers, timeout=6, tries=2, retry_timeout=8).json()
+            if r.get("code") == 0:
+                rec = (r.get("data") or {}).get("record") or {}
+                if extract_field_text(get_field_local(rec.get("fields", {}), "Agency Code")).strip() == code:
+                    return rec
+        except Exception:
+            pass
+        try:
+            redis_cmd("DEL", key)
+        except Exception:
+            pass
+    rec = _wallet_search(headers, code)
+    if rec and rec.get("record_id"):
+        try:
+            redis_set_json(key, {"record_id": rec["record_id"]}, ttl=7 * 24 * 3600)
+        except Exception:
+            pass
+    return rec
+
+def _wallet_verify_put(wallet_record_id, headers, fields_payload, expected_used, baseline_used=None):
+    """Phase 34: PUT the agency wallet with post-failure verification, so a
+    network timeout can never double-deduct and can never lie about whether
+    the deduction landed. A read timeout on the write is AMBIGUOUS (Feishu
+    may have applied it server-side); instead of blindly retrying we re-read
+    the wallet's Used Points and compare against the value this charge tried
+    to write:
+      - matches expected     -> the write LANDED: report success, never re-write
+                                (a blind retry here would DOUBLE-DEDUCT).
+      - matches baseline     -> the write did NOT land: one retry, verify again.
+      - matches NEITHER      -> the wallet changed under us (another write landed
+                                mid-flight): do NOT overwrite, report conflict.
+    Returns (ok, error_message, http_status)."""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{wallet_record_id}"
+
+    def _read_used():
+        try:
+            r = _feishu_get(url, headers=headers, timeout=6, tries=2, retry_timeout=8).json()
+            if r.get("code") != 0:
+                return None
+            f = ((r.get("data") or {}).get("record") or {}).get("fields", {})
+            txt = extract_field_text(get_field_local(f, "Used Points", "Used"))
+            if not str(txt).strip():
+                return None
+            return parse_float_safe(txt)
+        except Exception:
+            return None
+
+    expected = float(expected_used)
+    last_err = None
+    for attempt in (1, 2):
+        try:
+            wr = feishu_session.put(url, headers=headers, json={"fields": fields_payload}, timeout=(10 if attempt == 1 else 12)).json()
+            if wr.get("code") == 0:
+                return True, None, 200
+            # A real API rejection is NOT ambiguous -- nothing landed, no retry.
+            return False, f"Wallet update failed (nothing deducted): {wr.get('msg')}", 400
+        except Exception as e:
+            last_err = e
+            logger.warn("wallet_put_verify", record_id=wallet_record_id, attempt=attempt, error=str(e))
+            got = _read_used()
+            if got is not None:
+                if abs(got - expected) < 0.001:
+                    # The write landed despite the timeout -- report success.
+                    logger.info("wallet_put_landed_despite_timeout", record_id=wallet_record_id, used=got)
+                    return True, None, 200
+                if baseline_used is not None and abs(got - baseline_used) > 0.001:
+                    return False, ("The agency wallet changed while the charge was in flight -- nothing further was written. "
+                                   "Please re-open the ticket and charge again."), 409
+            if attempt == 1:
+                time.sleep(1.0)
+    got = _read_used()
+    if got is not None and abs(got - expected) < 0.001:
+        return True, None, 200
+    return False, (f"Could not reach Feishu to update the wallet ({last_err}). "
+                   "As far as we can verify NOTHING was deducted -- please check the agency wallet in the sheet before trying again."), 502
 
 @app.route('/api/requests/single', methods=['GET'])
 def get_single_request():
@@ -3253,7 +3470,7 @@ def get_single_request():
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     try:
-        resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, tries=2)
+        resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=8, tries=2, retry_timeout=12)
         data = resp.json()
         if data.get("code") == 0:
             # Phase 10.47: teach the name resolver the people on this ticket
@@ -3291,7 +3508,7 @@ def get_request_pictures():
     tat = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     try:
-        resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=20, tries=2)
+        resp = _feishu_get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=8, tries=2, retry_timeout=12)
         data = resp.json()
         if data.get("code") != 0:
             return jsonify({"success": False, "error": data.get("msg")}), 400
@@ -3636,9 +3853,15 @@ def update_request():
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     logger.info("update_fields_payload", record_id=record_id, fields=fields)
+    # Phase 34: the save PUT now rides the retry helper -- a cross-border spike
+    # past 15s used to kill the whole save even though Feishu often finished
+    # the write anyway. The payload carries the FULL field state, so one
+    # identical retry is idempotent; if BOTH attempts die at the network layer
+    # we re-read the record and confirm from last_modified_time whether the
+    # write landed, so the agent gets the truth instead of a phantom failure.
+    save_started_ms = int(time.time() * 1000)
     try:
-        resp = feishu_session.put(url, headers=headers, json={"fields": fields}, timeout=15)
-        data = resp.json()
+        data = _put_json_retry(url, headers=headers, payload={"fields": fields})
         logger.info("update_feishu_response", record_id=record_id, response=data)
         if data.get("code") == 0:
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
@@ -3649,7 +3872,19 @@ def update_request():
             return jsonify({"success": True})
         return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        logger.error("update_put_failed", record_id=record_id, error=str(e))
+        try:
+            cur = _feishu_get(url, headers=headers, timeout=6, tries=2, retry_timeout=8).json()
+            mtime = int(((cur.get("data") or {}).get("record") or {}).get("last_modified_time") or 0)
+            if mtime and mtime >= save_started_ms - 3000:
+                # Feishu applied our write even though the response was lost.
+                ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+                audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | confirmed via re-read after network timeout", ip=ip, severity="Info")
+                kick_table_resync()
+                return jsonify({"success": True, "slow_confirm": True})
+            return jsonify({"success": False, "error": "Feishu confirmed the save did NOT land -- nothing was written. Please hit Save again."})
+        except Exception as e2:
+            return jsonify({"success": False, "error": f"Could not reach Feishu to confirm the save ({e2}). Please re-open the ticket to check its state before saving again."})
 
 # ════════════════════════════════════════════════════════════════════
 # AGENCY POINT CHARGE (portal-side, instant)
@@ -3923,26 +4158,21 @@ def agency_points_charge():
     #    uses the agency_code hint from the client; verified against the ticket
     #    below).
     def _fetch_ticket():
-        r = feishu_session.get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                               headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
+        # Phase 34: the Vercel->Feishu-CN link regularly spikes past 10s, and a
+        # single 10s attempt with NO retry turned those spikes into "Charge
+        # failed: Read timed out (read timeout=10)" -- dying BEFORE anything
+        # was deducted. _feishu_get retries transient failures (20s ceiling).
+        r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                        headers={"Authorization": f"Bearer {tat}"}, timeout=6, tries=2, retry_timeout=10).json()
         if r.get("code") != 0:
             raise RuntimeError(r.get("msg") or "Could not read the ticket.")
         return r["data"]["record"].get("fields", {})
 
     def _fetch_wallet(code):
-        if not code:
-            return None
-        r = feishu_session.post(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
-            headers=headers,
-            json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}},
-            timeout=30).json()
-        if r.get("code") != 0:
-            raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
-        for it in r.get("data", {}).get("items", []):
-            if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == code:
-                return it
-        return None
+        # Phase 34b (speed): agency-code -> record_id cache turns the slow
+        # table search into a ~1s direct GET; live-search fallback on any
+        # doubt. Exact Agency Code verification is kept either way.
+        return _fetch_wallet_fast(headers, code)
 
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -4004,16 +4234,15 @@ def agency_points_charge():
     # workflow also writes it as text) -- sending a number fails with
     # TextFieldConvFail, so it goes out as a JS-style numeric string.
     if total_cost > 0:
-        try:
-            wr = feishu_session.put(
-                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
-                headers=headers,
-                json={"fields": {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
-                timeout=15).json()
-            if wr.get("code") != 0:
-                return jsonify({"success": False, "error": f"Wallet update failed (nothing deducted): {wr.get('msg')}"}), 400
-        except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
+        # Phase 34: verified wallet write -- a network timeout re-reads Used
+        # Points to decide whether the deduction landed instead of failing
+        # blindly (or, worse, double-deducting on a retry).
+        ok, werr, wstatus = _wallet_verify_put(
+            agency_rec['record_id'], headers,
+            {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]},
+            charge["new_used_points"], baseline_used=used_pts)
+        if not ok:
+            return jsonify({"success": False, "error": werr}), wstatus
 
     # 5) Charge-more bookkeeping: the ticket's tracker becomes CUMULATIVE
     #    (existing approved items + this charge's items), and every charge
@@ -4057,11 +4286,10 @@ def agency_points_charge():
             acm_field, acm_name = _wallet_acm_for_ticket(af, tfields)
             if acm_field:
                 ticket_fields[acm_field] = acm_name
-            tw = feishu_session.put(
+            tw = _put_json_retry(
                 f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
                 headers=headers,
-                json={"fields": ticket_fields},
-                timeout=15).json()
+                payload={"fields": ticket_fields})
             if tw.get("code") != 0:
                 ticket_write_failed = True
                 logger.error("ap_charge_ticket_write_failed", record_id=record_id, response=tw)
@@ -4216,26 +4444,21 @@ def agency_points_correct_charge():
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     def _fetch_ticket():
-        r = feishu_session.get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                               headers={"Authorization": f"Bearer {tat}"}, timeout=10).json()
+        # Phase 34: the Vercel->Feishu-CN link regularly spikes past 10s, and a
+        # single 10s attempt with NO retry turned those spikes into "Charge
+        # failed: Read timed out (read timeout=10)" -- dying BEFORE anything
+        # was deducted. _feishu_get retries transient failures (20s ceiling).
+        r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                        headers={"Authorization": f"Bearer {tat}"}, timeout=6, tries=2, retry_timeout=10).json()
         if r.get("code") != 0:
             raise RuntimeError(r.get("msg") or "Could not read the ticket.")
         return r["data"]["record"].get("fields", {})
 
     def _fetch_wallet(code):
-        if not code:
-            return None
-        r = feishu_session.post(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
-            headers=headers,
-            json={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}},
-            timeout=30).json()
-        if r.get("code") != 0:
-            raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
-        for it in r.get("data", {}).get("items", []):
-            if extract_field_text(get_field_local(it.get("fields", {}), "Agency Code")).strip() == code:
-                return it
-        return None
+        # Phase 34b (speed): agency-code -> record_id cache turns the slow
+        # table search into a ~1s direct GET; live-search fallback on any
+        # doubt. Exact Agency Code verification is kept either way.
+        return _fetch_wallet_fast(headers, code)
 
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -4295,16 +4518,13 @@ def agency_points_correct_charge():
 
     # 3) ONE wallet write, always: even a corrected order that approves
     #    nothing must still persist the reversal (used -= old deduction).
-    try:
-        wr = feishu_session.put(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{agency_rec['record_id']}",
-            headers=headers,
-            json={"fields": {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]}},
-            timeout=15).json()
-        if wr.get("code") != 0:
-            return jsonify({"success": False, "error": f"Wallet update failed (nothing changed): {wr.get('msg')}"}), 400
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    # Phase 34: same verified wallet write as the charge endpoint.
+    ok, werr, wstatus = _wallet_verify_put(
+        agency_rec['record_id'], headers,
+        {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]},
+        charge["new_used_points"], baseline_used=used_pts)
+    if not ok:
+        return jsonify({"success": False, "error": werr}), wstatus
 
     # 4) Ticket bookkeeping: tracker = old tracker minus the reversed items,
     #    plus the corrected order's items; receipt = everything before the
@@ -4336,11 +4556,10 @@ def agency_points_correct_charge():
             ticket_fields["Agency Code"] = agency_code  # Phase 10.25 heal, same write
         if acm_field:
             ticket_fields[acm_field] = acm_name  # Phase 10.38 ACM sync, same write
-        tw = feishu_session.put(
+        tw = _put_json_retry(
             f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
             headers=headers,
-            json={"fields": ticket_fields},
-            timeout=15).json()
+            payload={"fields": ticket_fields})
         if tw.get("code") != 0:
             ticket_write_failed = True
             logger.error("ap_correct_ticket_write_failed", record_id=record_id, response=tw)
@@ -7644,30 +7863,62 @@ def rewards_mark():
         return jsonify({"success": True, "marked": len(clean_ids),
                         "requested": len(clean_ids), "failures": []})
 
-    tat = get_tenant_access_token()
+    uat = sanitize_text(body.get('uat') or request.form.get('uat', ''))
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/batch_update"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    TOKEN_AUTH_ERROR_CODES = (99991663, 99991668, 99991677)
 
-    marked, failures = 0, []
-    for i in range(0, len(clean_ids), 100):
-        chunk = clean_ids[i:i + 100]
-        payload = {"records": [{"record_id": rid, "fields": {"Reward": True}} for rid in chunk]}
-        try:
-            resp = feishu_session.put(url, headers=headers, json=payload, timeout=20)
-            res = resp.json()
-        except Exception as e:
-            failures.append({"chunk": i // 100, "record_ids": chunk, "error": str(e)})
-            continue
-        if res.get("code") == 0:
-            marked += len(chunk)
-        else:
-            failures.append({"chunk": i // 100, "record_ids": chunk,
-                             "error": f"{res.get('code')}: {res.get('msg')}"})
+    def _mark_pass(bearer):
+        """One full pass over the chunks with one network retry per chunk.
+        Returns (marked, failures, token_dead) -- the real Feishu error text
+        rides along in failures so the admin finally sees WHY a row refused
+        (Phase 33: the stuck-record toast only said '1 failed')."""
+        headers = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+        marked, failures, dead = 0, [], False
+        for i in range(0, len(clean_ids), 100):
+            chunk = clean_ids[i:i + 100]
+            payload = {"records": [{"record_id": rid, "fields": {"Reward": True}} for rid in chunk]}
+            for attempt in (1, 2):
+                try:
+                    resp = feishu_session.put(url, headers=headers, json=payload, timeout=20)
+                    res = resp.json()
+                except Exception as e:
+                    if attempt == 1:
+                        continue  # one retry on transport errors
+                    failures.append({"chunk": i // 100, "record_ids": chunk, "error": str(e)})
+                    break
+                if res.get("code") == 0:
+                    marked += len(chunk)
+                    break
+                if res.get("code") in TOKEN_AUTH_ERROR_CODES:
+                    dead = True  # whole pass is unusable
+                    break
+                failures.append({"chunk": i // 100, "record_ids": chunk,
+                                 "error": f"{res.get('code')}: {res.get('msg')}"})
+                break
+        return marked, failures, dead
 
-    audit.log(user, "REWARDS_MARK", f"marked {marked}/{len(clean_ids)} rewarded",
+    # Phase 33: the Grand Table base runs advanced permissions -- the app
+    # (tenant) token is locked out of the requests table (91403 Forbidden),
+    # which is exactly why marking silently failed. Write with the acting
+    # admin's user token first (the same UAT the ticket-create route uses);
+    # fall back to the tenant token only when no UAT or the UAT is dead.
+    marked, failures, used = 0, [], "none"
+    if uat:
+        m, f, dead = _mark_pass(uat)
+        if not dead:
+            marked, failures, used = m, f, "user"
+    if used == "none":
+        m, f, dead = _mark_pass(get_tenant_access_token())
+        if not dead:
+            marked, failures, used = m, f, "tenant"
+        elif uat:
+            failures = failures or [{"chunk": 0, "record_ids": clean_ids[:100],
+                                     "error": "Your login token expired — please log out and log back in, then mark again."}]
+
+    audit.log(user, "REWARDS_MARK", f"marked {marked}/{len(clean_ids)} rewarded via {used}",
               ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""),
               severity="Info")
-    return jsonify({"success": not failures, "marked": marked,
+    return jsonify({"success": not failures, "marked": marked, "used": used,
                     "requested": len(clean_ids), "failures": failures})
 
 
@@ -10026,6 +10277,11 @@ def _resolve_record_numberings(record_ids, token):
 SCHED_TABLE_ID     = "tblfB8sUlmDV9KtD"
 SCHED_REQ_TABLE_ID = "tbldJqbfy3APXIdA"
 SCHED_PRESET_TABLE_ID = "tblATopUf6WlqKAY"
+# Phase 33: attendance data source tables (same base; Time Logs = status
+# segments per agent per day, Daily Logs = one row per punched day)
+TIMEL_TABLE_ID = "tbliw5lW85rBgmM6"
+DAILY_TABLE_ID = "tblBpruGXE2smOeK"
+CAIRO_OFFSET_MIN = 120  # the Base renders every datetime at fixed +02:00 — mirror it
 SCHED_PRESET_TTL      = 300
 SCHED_PRESET_MAX      = 30
 SCHED_PRESET_SEED     = [("Day shift", "On Site", "09:00", "17:00", 1),
@@ -10261,7 +10517,7 @@ def audition_schedule_save():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 502
     by = user or email
-    creates, updates, deleted, errs = [], 0, 0, []
+    creates, upd_recs, deleted, errs = [], [], 0, []
     for e in entries[:500]:
         em = (e.get("email") or "").strip().lower()
         fields = _sched_fields(em, e.get("name") or em, e["day"], e["type"],
@@ -10270,17 +10526,24 @@ def audition_schedule_save():
                                sanitize_text(str(e.get("note") or ""), max_length=200), by)
         rid = existing.get(fields["Key"])
         if rid:
-            try:
-                r = feishu_session.put(f"{base_url}/{rid}", headers=headers,
-                                       json={"fields": fields}, timeout=15).json()
-                if r.get("code") == 0:
-                    updates += 1
-                else:
-                    errs.append(f"{fields['Key']}: {r.get('msg')}")
-            except Exception as ex:
-                errs.append(f"{fields['Key']}: {ex}")
+            upd_recs.append({"record_id": rid, "fields": fields})
         else:
             creates.append({"fields": fields})
+    # Phase 33: batch_update replaces the serial single-PUT-per-row loop --
+    # every PUT was its own cross-border round-trip (0.5-1s each, a 10-cell
+    # save took 10s+). Now it is one round-trip per 100 rows.
+    updates = 0
+    for i in range(0, len(upd_recs), 100):
+        chunk = upd_recs[i:i + 100]
+        try:
+            r = feishu_session.put(f"{base_url}/batch_update", headers=headers,
+                                   json={"records": chunk}, timeout=30).json()
+            if r.get("code") == 0:
+                updates += len(chunk)
+            else:
+                errs.append(f"batch_update: {r.get('code')}: {r.get('msg')}")
+        except Exception as ex:
+            errs.append(f"batch_update: {ex}")
     created_n = 0
     for i in range(0, len(creates), 400):
         chunk = creates[i:i + 400]
@@ -10612,6 +10875,31 @@ def audition_requests_create():
         pass
     return jsonify({"success": True, "key": fields["Key"]})
 
+def _agent_common_shift(email, near_day, token):
+    """The agent's most frequent working shift within +/-14 days of near_day
+    -- the fallback cell when a Change-Off swap needs to fill the old off day
+    but the taken day held no shift. Returns (type, start, end) or None."""
+    try:
+        d0 = near_day - 14
+        d1 = near_day + 14
+        cnt = {}
+        for it in _sched_search_range(d0, d1, token,
+                                      field_names=["Key", "Agent Email", "Type", "Start", "End"]):
+            f = it.get("fields") or {}
+            em = (_mirror_cell_text(f.get("Agent Email")) or "").lower()
+            t = _mirror_cell_text(f.get("Type")) or ""
+            if t not in ("On Site", "Work From Home") or em != (email or "").lower():
+                continue
+            s, e = _mirror_cell_text(f.get("Start")) or "", _mirror_cell_text(f.get("End")) or ""
+            k = (t, s, e)
+            cnt[k] = cnt.get(k, 0) + 1
+        if cnt:
+            return max(cnt.items(), key=lambda kv: kv[1])[0]
+    except Exception:
+        pass
+    return None
+
+
 @app.route('/api/audition/requests/decide', methods=['POST'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def audition_requests_decide():
@@ -10648,29 +10936,69 @@ def audition_requests_decide():
     if decision == "Approved":
         stype = SCHED_REQ_TO_TYPE.get(rq["type"])
         days = _sched_day_range(rq["from_day"], rq["to_day"]) if (rq["from_day"] and rq["to_day"]) else []
-        if stype and days and rq["email"]:
+        # Phase 33 (Ahmed: "the off day is SWAP day off to another working day"):
+        # a Change Off with from != to is a SWAP, not a leave range -- the
+        # working To-day becomes Off AND its shift moves to the old off day,
+        # so the team never loses coverage and the agent never gains a 2nd day.
+        swap = (rq["type"] == "Change Off" and rq["from_day"] and rq["to_day"]
+                and rq["from_day"] != rq["to_day"])
+        if swap:
+            days = [rq["from_day"], rq["to_day"]]
+        if (stype or swap) and days and rq["email"]:
             existing = {}
             try:
-                for it in _sched_search_range(days[0], days[-1], token, field_names=["Key"]):
+                for it in _sched_search_range(min(days), max(days), token,
+                                               field_names=["Key", "Type", "Start", "End"]):
                     k = _mirror_cell_text((it.get("fields") or {}).get("Key"))
                     if k:
-                        existing[k] = it.get("record_id")
+                        existing[k] = {"record_id": it.get("record_id"), "fields": it.get("fields") or {}}
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 502
             sched_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{SCHED_TABLE_ID}/records"
+            entries_out = []
+            if swap:
+                em = (rq["email"] or "").lower()
+                row_to = existing.get(f"{em}|{rq['to_day']}") or {}
+                to_f = row_to.get("fields") or {}
+                mv_type = _mirror_cell_text(to_f.get("Type")) or ""
+                mv_start = _mirror_cell_text(to_f.get("Start")) or ""
+                mv_end = _mirror_cell_text(to_f.get("End")) or ""
+                if mv_type not in ("On Site", "Work From Home"):
+                    # To-day held no shift: reuse the agent's most common
+                    # working shift nearby so the swapped-in day is never blank.
+                    cs = _agent_common_shift(rq["email"], rq["to_day"], token)
+                    if cs:
+                        mv_type, mv_start, mv_end = cs
+                    else:
+                        mv_type, mv_start, mv_end = "On Site", "16:00", "01:00"
+                entries_out.append(_sched_fields(
+                    rq["email"], rq["name"], rq["to_day"], "Off", "", "",
+                    f"Change Off {rq['key']}: took this day off (was {mv_type} {mv_start}-{mv_end})",
+                    user or email))
+                entries_out.append(_sched_fields(
+                    rq["email"], rq["name"], rq["from_day"], mv_type, mv_start, mv_end,
+                    f"Change Off {rq['key']}: swapped in (was Off)", user or email))
+            else:
+                for d in days:
+                    entries_out.append(_sched_fields(
+                        rq["email"], rq["name"], d, stype, "", "",
+                        f"Request {rq['key']}", user or email))
             creates = []
-            for d in days:
-                f2 = _sched_fields(rq["email"], rq["name"], d, stype, "", "", f"Request {rq['key']}", user or email)
-                erid = existing.get(f2["Key"])
+            upd_recs = []
+            for f2 in entries_out:
+                erid = (existing.get(f2["Key"]) or {}).get("record_id")
                 if erid:
-                    try:
-                        r1 = feishu_session.put(f"{sched_url}/{erid}", headers=headers, json={"fields": f2}, timeout=15).json()
-                        if r1.get("code") == 0:
-                            wrote += 1
-                    except Exception:
-                        pass
+                    upd_recs.append({"record_id": erid, "fields": f2})
                 else:
                     creates.append({"fields": f2})
+            for i in range(0, len(upd_recs), 100):
+                try:
+                    r1 = feishu_session.put(f"{sched_url}/batch_update", headers=headers,
+                                            json={"records": upd_recs[i:i + 100]}, timeout=30).json()
+                    if r1.get("code") == 0:
+                        wrote += len(upd_recs[i:i + 100])
+                except Exception:
+                    pass
             for i in range(0, len(creates), 400):
                 try:
                     r2 = feishu_session.post(f"{sched_url}/batch_create", headers=headers,
@@ -10694,6 +11022,366 @@ def audition_requests_decide():
     except Exception:
         pass
     return jsonify({"success": True, "decision": decision, "schedule_rows_written": wrote})
+
+
+# ---------------- Phase 33: Attendance Monitor ----------------
+# Ahmed: "a system that manages the login time of the agents ... show red line
+# with duration on this day at agent schedule at this shift, warnings to the
+# admins". Data: Time Logs (status segments) + Daily Logs (punches) + the
+# Audition Schedule (shift times), joined per agent per day.
+ATT_WORKED = {"Online", "On Task", "Working Ticket", "Meeting"}
+ATT_GAP_STATUSES = {"Offline"}          # red in-shift gaps
+ATT_GAP_MIN_ALERT = 15                  # minutes before a gap becomes a warning
+ATT_LATE_MIN_ALERT = 10
+ATT_MISSING_MIN_ALERT = 60
+
+
+def _att_text(fv):
+    """Flatten any Base cell shape to text (str / list / segments / dict)."""
+    if fv is None:
+        return ""
+    if isinstance(fv, str):
+        return fv.strip()
+    if isinstance(fv, (int, float)):
+        return str(fv)
+    if isinstance(fv, list):
+        parts = []
+        for v in fv:
+            if isinstance(v, dict):
+                parts.append(str(v.get("text") or v.get("value") or ""))
+            else:
+                parts.append(str(v))
+        return ("".join(parts)).strip()
+    if isinstance(fv, dict):
+        if "text" in fv or "value" in fv:
+            return _att_text(fv.get("text") if "text" in fv else fv.get("value"))
+        return str(fv)
+    return str(fv)
+
+
+def _att_epoch_min(ms):
+    """Epoch ms -> (day_int YYYYMMDD, minute-of-day) at the Base's fixed
+    +02:00 Cairo rendering (mirrors what the sheet itself shows)."""
+    try:
+        local = int(ms) + CAIRO_OFFSET_MIN * 60000
+    except Exception:
+        return None, None
+    day = local // 86400000
+    minute = (local % 86400000) // 60000
+    import datetime as _dt
+    d = _dt.datetime(1970, 1, 1) + _dt.timedelta(days=int(day))
+    return d.year * 10000 + d.month * 100 + d.day, int(minute)
+
+
+def _att_day_str(day_int):
+    s = str(day_int)
+    return f"{s[0:4]}/{s[4:6]}/{s[6:8]}"
+
+
+def _att_hhmm_to_min(t):
+    try:
+        h, m = str(t).split(":")[:2]
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
+
+def _att_search_days(token, table_id, day_ints, field_names):
+    """records/search over Time Logs / Daily Logs by their Date Match formula
+    (exact day strings, OR-combined -- the validated filter form for these
+    tables; created_at/datetime range filters are NOT supported here).
+    page_size/page_token MUST be query params (body params get dropped)."""
+    conds = [{"field_name": "Date Match", "operator": "is", "value": [_att_day_str(d)]}
+             for d in day_ints]
+    if not conds:
+        return []
+    body = {"field_names": field_names,
+            "filter": {"conjunction": "or", "conditions": conds}}
+    out, page_token, pages = [], None, 0
+    url = (f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}"
+           f"/tables/{table_id}/records/search")
+    while pages < 12:
+        params = {"page_size": 500}
+        if page_token:
+            params["page_token"] = page_token
+        resp = feishu_session.post(url,
+                                   headers={"Authorization": f"Bearer {token}",
+                                            "Content-Type": "application/json; charset=utf-8"},
+                                   params=params, json=body, timeout=20)
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"{data.get('code')}: {data.get('msg')}")
+        dd = data.get("data") or {}
+        out.extend(dd.get("items") or [])
+        page_token = dd.get("page_token")
+        pages += 1
+        if not dd.get("has_more") or not page_token:
+            break
+    return out
+
+
+def _att_row_day(fields):
+    """Time Logs / Daily Logs rows carry their own day bucket in Date Match."""
+    return _att_text(fields.get("Date Match"))
+
+
+@app.route('/api/audition/attendance', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_attendance():
+    """Phase 33 Attendance Monitor. ?from=YYYYMMDD&to=YYYYMMDD (<= 31 days).
+    Admins see every roster agent; agents see only themselves (matched by
+    open_id on the roster's user field). Cached 60s per range."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    my_open_id = sanitize_text(request.args.get('my_open_id', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    is_admin = _sched_is_admin(perms)
+    fd, td = _sched_day_ok(request.args.get('from')), _sched_day_ok(request.args.get('to'))
+    if not fd or not td or td < fd or len(_sched_day_range(fd, td)) > 31:
+        return jsonify({"success": False, "error": "Need a valid from/to range (max 31 days)."}), 400
+    cache_key = f"xena:att:{fd}:{td}:{1 if is_admin else 0}:{my_open_id or (email or '').lower()}"
+    try:
+        cached = redis_get_json(cache_key)
+        if isinstance(cached, dict) and cached.get("success"):
+            return jsonify(cached)
+    except Exception:
+        pass
+    token = get_tenant_access_token()
+    day_ints = _sched_day_range(fd, td)
+    day_set = {str(d) for d in day_ints}
+    # ---- roster (3 rows: agents + live status checkboxes) ----
+    agents = []
+    try:
+        rr = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ROSTER_TABLE_ID}/records/search",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"},
+            params={"page_size": 100}, json={"field_names": None}, timeout=15).json()
+        for it in (rr.get("data") or {}).get("items") or []:
+            f = it.get("fields") or {}
+            name = ""
+            em = ""
+            oid = ""
+            an = f.get("Agent Name")
+            if isinstance(an, list) and an and isinstance(an[0], dict):
+                name = str(an[0].get("name") or "")
+                oid = str(an[0].get("id") or "")
+            flat = {k: _att_text(v) for k, v in f.items()}
+            for k, v in flat.items():
+                if "@" in str(v) and "." in str(v):
+                    em = str(v).strip().lower()
+                    break
+            agents.append({"agent_id": it.get("record_id"),
+                           "name": name or _att_text(f.get("Agent")) or it.get("record_id"),
+                           "open_id": oid, "email": em,
+                           "live": {"status": flat.get("Current Status") or "Offline",
+                                    "since": None}})
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Roster: {e}"}), 502
+    if not is_admin:
+        mine = [a for a in agents if (my_open_id and a["open_id"] == my_open_id)
+                or (email and a["email"] == (email or "").lower())]
+        agents = mine
+    allowed = {a["agent_id"] for a in agents}
+    # ---- schedule rows for shift windows ----
+    sched = {}
+    try:
+        for it in _sched_search_range(fd, td, token,
+                                      field_names=["Key", "Agent Email", "Type", "Start", "End"]):
+            f = it.get("fields") or {}
+            em = (_mirror_cell_text(f.get("Agent Email")) or "").lower()
+            k = _mirror_cell_text(f.get("Key")) or ""
+            parts = k.rsplit("|", 1)
+            if len(parts) == 2:
+                sched[(em, parts[1])] = {
+                    "type": _mirror_cell_text(f.get("Type")) or "",
+                    "start": _mirror_cell_text(f.get("Start")) or "",
+                    "end": _mirror_cell_text(f.get("End")) or ""}
+    except Exception:
+        pass
+    # ---- time logs (status segments) ----
+    segs = {a["agent_id"]: {} for a in agents}
+    try:
+        items = _att_search_days(token, TIMEL_TABLE_ID, day_ints,
+                                 ["Match ID", "Status", "Start Time", "End Time", "Date Match", "Duration"])
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Time Logs: {e}"}), 502
+    for it in items:
+        f = it.get("fields") or {}
+        mid = _att_text(f.get("Match ID"))
+        if mid not in allowed:
+            continue
+        dm = _att_text(f.get("Date Match")).replace("/", "")
+        if dm not in day_set:
+            continue
+        st = _att_text(f.get("Status")) or "Offline"
+        end_ms = f.get("End Time")
+        end_ms = end_ms if isinstance(end_ms, int) else None
+        s_day, s_min = _att_epoch_min(f.get("Start Time") if isinstance(f.get("Start Time"), int) else None)
+        e_day, e_min = _att_epoch_min(end_ms)
+        if s_min is None:
+            continue
+        # express both ends as minutes relative to this row's Date Match
+        # day 00:00, so overnight segments run past 1440 cleanly.
+        try:
+            day0 = int(dm)
+        except Exception:
+            day0 = s_day
+        s_rel = s_min + max(s_day - day0, 0) * 1440
+        if e_min is None:
+            # still running: clip the open end at "now" (Cairo clock)
+            now_day, now_min = _att_epoch_min(int(time.time() * 1000))
+            e_rel = (now_min + max(now_day - day0, 0) * 1440) if now_min is not None else s_rel
+        else:
+            e_rel = e_min + max(e_day - day0, 0) * 1440
+        segs[mid].setdefault(dm, []).append(
+            {"st": st, "s": s_rel, "e": max(e_rel, s_rel + 1), "open": e_min is None})
+    # ---- daily logs (punches) ----
+    punches = {a["agent_id"]: {} for a in agents}
+    try:
+        ditems = _att_search_days(token, DAILY_TABLE_ID, day_ints,
+                                  ["Match ID", "First Punch", "Last Punch", "Total Valid Time",
+                                   "Shift Status", "Date Match"])
+    except Exception:
+        ditems = []
+    for it in ditems:
+        f = it.get("fields") or {}
+        mid = _att_text(f.get("Match ID"))
+        if mid not in allowed:
+            continue
+        dm = _att_text(f.get("Date Match")).replace("/", "")
+        if dm not in day_set:
+            continue
+        try:
+            dm_day = int(dm)
+        except Exception:
+            dm_day = None
+
+        def _punch_rel(ms_val):
+            # Minutes relative to this row's Date Match day 00:00, so an
+            # overnight Last Punch (next-day 01:58) reads 1558 not 118 --
+            # otherwise every punch-only overnight day flags a false "early".
+            d_i, m_i = _att_epoch_min(ms_val if isinstance(ms_val, int) else None)
+            if m_i is None or dm_day is None:
+                return None
+            return m_i + max(d_i - dm_day, 0) * 1440
+        punches[mid][dm] = {
+            "first": _punch_rel(f.get("First Punch")),
+            "last": _punch_rel(f.get("Last Punch")),
+            "valid": f.get("Total Valid Time"),
+            "closed": _att_text(f.get("Shift Status")) == "Closed"}
+    # ---- compute per agent per day ----
+    agents_out, warnings = [], []
+    for a in agents:
+        em = a["email"]
+        days_out, summ = {}, {"worked_days": 0, "worked_min": 0, "off_days": 0, "late_days": 0,
+                              "late_min": 0, "gap_min": 0, "missing_min": 0, "break_min": 0,
+                              "meeting_min": 0, "offline_min": 0, "no_show": 0, "early_min": 0}
+        for d in day_ints:
+            ds = str(d)
+            row_segs = sorted(segs[a["agent_id"]].get(ds, []), key=lambda x: x["s"])
+            dl = punches[a["agent_id"]].get(ds) or {}
+            sh = sched.get((em, ds)) or None
+            shift = None
+            if sh and sh.get("type"):
+                s0 = _att_hhmm_to_min(sh.get("start"))
+                e0 = _att_hhmm_to_min(sh.get("end"))
+                shift = {"type": sh["type"], "start": sh.get("start") or "", "end": sh.get("end") or "",
+                         "start_min": s0, "end_min": (e0 + 1440 if (e0 is not None and s0 is not None and e0 <= s0) else e0)}
+            worked_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ATT_WORKED)
+            off_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Offline")
+            brk_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Break")
+            mtg_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Meeting")
+            first_p = min([x["s"] for x in row_segs], default=None)
+            last_p = max([x["e"] for x in row_segs if not x["open"]], default=None)
+            if dl.get("first") is not None:
+                first_p = dl["first"] if first_p is None else min(first_p, dl["first"])
+            if dl.get("last") is not None:
+                last_p = dl["last"] if last_p is None else max(last_p, dl["last"])
+            late_min = gap_min = missing_min = early_min = 0
+            inshift = []
+            if shift and shift.get("type") in ("On Site", "Work From Home") and shift["start_min"] is not None:
+                sl, el = shift["start_min"], shift["end_min"] or 1440
+                if first_p is not None and first_p > sl:
+                    late_min = first_p - sl
+                if last_p is not None and last_p < el:
+                    early_min = el - last_p
+                for x in row_segs:
+                    if x["st"] in ATT_GAP_STATUSES:
+                        ov = min(x["e"], el) - max(x["s"], sl)
+                        if ov > 0:
+                            gap_min += ov
+                            inshift.append({"s": max(x["s"], sl), "e": min(x["e"], el), "min": ov,
+                                            "st": x["st"]})
+                in_work = 0
+                for x in row_segs:
+                    if x["st"] in ATT_WORKED:
+                        ov = min(x["e"], el) - max(x["s"], sl)
+                        if ov > 0:
+                            in_work += ov
+                missing_min = max(0, (el - sl) - in_work)
+                if not row_segs:
+                    summ["no_show"] += 1
+            flags = []
+            if late_min > ATT_LATE_MIN_ALERT:
+                flags.append("late")
+                warnings.append({"day": d, "agent": a["name"], "kind": "late",
+                                 "detail": f"{late_min:.0f} min after shift start"})
+            if gap_min > ATT_GAP_MIN_ALERT:
+                flags.append("gap")
+                warnings.append({"day": d, "agent": a["name"], "kind": "gap",
+                                 "detail": f"{gap_min:.0f} min offline inside the shift"})
+            if missing_min > ATT_MISSING_MIN_ALERT:
+                flags.append("missing")
+                warnings.append({"day": d, "agent": a["name"], "kind": "missing",
+                                 "detail": f"{missing_min:.0f} min of the shift not worked"})
+            if early_min > ATT_LATE_MIN_ALERT:
+                flags.append("early")
+            if not row_segs and (not shift or shift.get("type") in ("On Site", "Work From Home")):
+                if shift:
+                    flags.append("no_show")
+            days_out[ds] = {"segments": row_segs, "inshift_gaps": inshift,
+                            "first": first_p, "last": last_p,
+                            "worked_min": round(worked_min, 1), "offline_min": round(off_min, 1),
+                            "break_min": round(brk_min, 1), "meeting_min": round(mtg_min, 1),
+                            "shift": shift, "late_min": late_min, "gap_min": round(gap_min, 1),
+                            "missing_min": round(missing_min, 1), "early_min": early_min,
+                            "flags": flags, "punch_closed": dl.get("closed", False)}
+            if worked_min > 15:
+                summ["worked_days"] += 1
+                summ["worked_min"] += worked_min
+            if shift and shift.get("type") in ("Off", "Annual Leave", "Sick Leave"):
+                summ["off_days"] += 1
+            elif not shift:
+                summ["off_days"] += 0
+            summ["late_min"] += late_min
+            summ["gap_min"] += gap_min
+            summ["missing_min"] += missing_min
+            summ["early_min"] += early_min
+            summ["break_min"] += brk_min
+            summ["meeting_min"] += mtg_min
+            summ["offline_min"] += off_min
+            if late_min > ATT_LATE_MIN_ALERT:
+                summ["late_days"] += 1
+        summ["worked_h"] = round(summ["worked_min"] / 60, 1)
+        summ["avg_day_h"] = round(summ["worked_min"] / 60 / summ["worked_days"], 2) if summ["worked_days"] else 0
+        a2 = dict(a)
+        a2["days"] = days_out
+        a2["summary"] = summ
+        agents_out.append(a2)
+    out = {"success": True, "admin": is_admin, "from": fd, "to": td,
+           "days": day_ints, "agents": agents_out,
+           "warnings": sorted(warnings, key=lambda w: (-w["day"], w["agent"]))[:100]}
+    try:
+        redis_set_json(cache_key, out, ttl=60)
+    except Exception:
+        pass
+    try:
+        audit.log(user, "ATTENDANCE_VIEW", f"{fd}->{td} ({len(agents_out)} agents)", severity="Info")
+    except Exception:
+        pass
+    return jsonify(out)
 
 
 @app.route('/api/comments/feed', methods=['GET'])
