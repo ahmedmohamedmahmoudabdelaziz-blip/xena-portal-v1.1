@@ -242,6 +242,9 @@ _token_cache = {"token": None, "expires_at": 0, "lock": threading.Lock()}
 # on a Session have the exact same signature and return value as the bare module
 # functions, so this is purely a performance change.
 feishu_session = http_requests.Session()
+# Phase 36: captured at import time (tests swap http_requests for a fake
+# afterwards) -- network-layer exception types for the friendly stall error.
+_NET_EXC = (http_requests.exceptions.RequestException,)
 _TOKEN_REDIS_KEY = "xena:tenant_access_token"
 
 def get_tenant_access_token():
@@ -3299,19 +3302,29 @@ def audit_logs():
     filtered = [l for l in logs if _matches(l)]
     return jsonify(filtered[:limit])
 
-def _feishu_get(url, headers=None, params=None, timeout=20, tries=2, stream=False, retry_timeout=None):
+def _feishu_get(url, headers=None, params=None, timeout=20, tries=2, stream=False, retry_timeout=None, retry_timeouts=None):
     """GET against open.feishu.cn with one automatic retry on transient
     network failures (ReadTimeout / ConnectionError). Only network-layer
     exceptions retry -- HTTP responses (even 4xx/5xx) come back unchanged.
     Phase 34b (speed): retry_timeout lets the retry carry its own ceiling, so
     hot user-facing paths fail FAST on the first attempt (6-8s) and give the
     retry a bit more room (10-12s) -- instead of blocking 20-40s per call on a
-    sick cross-border link."""
+    sick cross-border link.
+    Phase 36: retry_timeouts is a per-attempt ceiling list -- the
+    charge-critical ticket read gets a THIRD, roomier attempt instead of
+    dying at two (~17s), because Ahmed's link stalls in bursts that outlast
+    both fast attempts."""
+    ceilings = [timeout]
+    if retry_timeouts:
+        ceilings += list(retry_timeouts)
+    else:
+        ceilings += [retry_timeout or timeout] * max(0, tries - 1)
+    ceilings += [ceilings[-1]] * max(0, tries - len(ceilings))
     last = None
     for attempt in range(tries):
         try:
             return feishu_session.get(url, headers=headers, params=params,
-                                      timeout=(timeout if attempt == 0 else (retry_timeout or timeout)),
+                                      timeout=ceilings[attempt],
                                       stream=stream)
         except Exception as e:
             last = e
@@ -3340,14 +3353,21 @@ def _put_json_retry(url, headers, payload, timeout=10, tries=2, retry_timeout=15
                 time.sleep(0.8 * (attempt + 1))
     raise last
 
-def _post_json_retry(url, headers, payload, timeout=8, tries=2, retry_timeout=10):
+def _post_json_retry(url, headers, payload, timeout=8, tries=2, retry_timeout=10, retry_timeouts=None):
     """Phase 34b: POST with one retry on network-layer failures -- for
-    READ-ONLY endpoints only (records/search). Never use for writes."""
+    READ-ONLY endpoints only (records/search). Never use for writes.
+    Phase 36: retry_timeouts = per-attempt ceiling list (see _feishu_get)."""
+    ceilings_post = [timeout]
+    if retry_timeouts:
+        ceilings_post += list(retry_timeouts)
+    else:
+        ceilings_post += [retry_timeout or timeout] * max(0, tries - 1)
+    ceilings_post += [ceilings_post[-1]] * max(0, tries - len(ceilings_post))
     last = None
     for attempt in range(tries):
         try:
             return feishu_session.post(url, headers=headers, json=payload,
-                                       timeout=(timeout if attempt == 0 else (retry_timeout or timeout))).json()
+                                       timeout=ceilings_post[attempt]).json()
         except Exception as e:
             last = e
             logger.warn("feishu_post_retry", url=url[:90], attempt=attempt + 1, error=str(e))
@@ -3379,7 +3399,8 @@ def _wallet_search(headers, code):
     r = _post_json_retry(
         f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search",
         headers=headers,
-        payload={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}})
+        payload={"filter": {"conjunction": "and", "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]}},
+        timeout=8, tries=3, retry_timeouts=[10, 14])
     if r.get("code") != 0:
         raise RuntimeError(r.get("msg") or "Agency Points lookup failed.")
     for it in r.get("data", {}).get("items", []):
@@ -3409,7 +3430,7 @@ def _fetch_wallet_fast(headers, code):
     if cached_id:
         try:
             r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cached_id}",
-                            headers=headers, timeout=6, tries=2, retry_timeout=8).json()
+                            headers=headers, timeout=6, tries=3, retry_timeouts=[8, 12]).json()
             if r.get("code") == 0:
                 rec = (r.get("data") or {}).get("record") or {}
                 if extract_field_text(get_field_local(rec.get("fields", {}), "Agency Code")).strip() == code:
@@ -4187,7 +4208,7 @@ def agency_points_charge():
         # failed: Read timed out (read timeout=10)" -- dying BEFORE anything
         # was deducted. _feishu_get retries transient failures (20s ceiling).
         r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                        headers={"Authorization": f"Bearer {tat}"}, timeout=6, tries=2, retry_timeout=10).json()
+                        headers={"Authorization": f"Bearer {tat}"}, timeout=6, tries=3, retry_timeouts=[10, 15]).json()
         if r.get("code") != 0:
             raise RuntimeError(r.get("msg") or "Could not read the ticket.")
         return r["data"]["record"].get("fields", {})
@@ -4205,6 +4226,12 @@ def agency_points_charge():
             tfields = fut_ticket.result()
             wallet_hint = fut_wallet.result()
     except Exception as e:
+        # Phase 36: raw urllib3 text ("Read timed out (read timeout=10)")
+        # made agents think the charge half-happened and hammer retry. A
+        # stall here happens BEFORE any deduction -- say so, plainly.
+        if isinstance(e, _NET_EXC) or "timed out" in str(e).lower():
+            logger.warn("charge_net_stall", error=str(e))
+            return jsonify({"success": False, "error": "Feishu connection is stalling right now -- the portal tried 3 times and got no answer. Nothing was deducted. Wait about a minute and press Charge again."}), 504
         return jsonify({"success": False, "error": str(e)}), 400
 
     existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
@@ -4473,7 +4500,7 @@ def agency_points_correct_charge():
         # failed: Read timed out (read timeout=10)" -- dying BEFORE anything
         # was deducted. _feishu_get retries transient failures (20s ceiling).
         r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                        headers={"Authorization": f"Bearer {tat}"}, timeout=6, tries=2, retry_timeout=10).json()
+                        headers={"Authorization": f"Bearer {tat}"}, timeout=6, tries=3, retry_timeouts=[10, 15]).json()
         if r.get("code") != 0:
             raise RuntimeError(r.get("msg") or "Could not read the ticket.")
         return r["data"]["record"].get("fields", {})
@@ -4491,6 +4518,12 @@ def agency_points_correct_charge():
             tfields = fut_ticket.result()
             wallet_hint = fut_wallet.result()
     except Exception as e:
+        # Phase 36: raw urllib3 text ("Read timed out (read timeout=10)")
+        # made agents think the charge half-happened and hammer retry. A
+        # stall here happens BEFORE any deduction -- say so, plainly.
+        if isinstance(e, _NET_EXC) or "timed out" in str(e).lower():
+            logger.warn("charge_net_stall", error=str(e))
+            return jsonify({"success": False, "error": "Feishu connection is stalling right now -- the portal tried 3 times and got no answer. Nothing was deducted. Wait about a minute and press Charge again."}), 504
         return jsonify({"success": False, "error": str(e)}), 400
 
     existing_receipt = extract_field_text(get_field_local(tfields, "Transaction Receipt"))
@@ -7903,7 +7936,7 @@ def rewards_mark():
             payload = {"records": [{"record_id": rid, "fields": {"Reward": True}} for rid in chunk]}
             for attempt in (1, 2):
                 try:
-                    resp = feishu_session.put(url, headers=headers, json=payload, timeout=20)
+                    resp = feishu_session.post(url, headers=headers, json=payload, timeout=20)  # Phase 37: batch_update is POST-only (PUT -> 99992402)
                     res = resp.json()
                 except Exception as e:
                     if attempt == 1:
@@ -10560,7 +10593,7 @@ def audition_schedule_save():
     for i in range(0, len(upd_recs), 100):
         chunk = upd_recs[i:i + 100]
         try:
-            r = feishu_session.put(f"{base_url}/batch_update", headers=headers,
+            r = feishu_session.post(f"{base_url}/batch_update", headers=headers,  # Phase 37: POST-only
                                    json={"records": chunk}, timeout=30).json()
             if r.get("code") == 0:
                 updates += len(chunk)
@@ -11017,7 +11050,7 @@ def audition_requests_decide():
                     creates.append({"fields": f2})
             for i in range(0, len(upd_recs), 100):
                 try:
-                    r1 = feishu_session.put(f"{sched_url}/batch_update", headers=headers,
+                    r1 = feishu_session.post(f"{sched_url}/batch_update", headers=headers,  # Phase 37: POST-only
                                             json={"records": upd_recs[i:i + 100]}, timeout=30).json()
                     if r1.get("code") == 0:
                         wrote += len(upd_recs[i:i + 100])
