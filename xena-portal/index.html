@@ -2590,167 +2590,28 @@ option{background:var(--surface);color:var(--text)}
 
 </style>
 <style id="samurai-radial-v8">
-.samurai-radial-toggle,
-.samurai-radial-disc {
-  display: none;
+.samurai-radial-toggle,.samurai-radial-disc{display:none}
+@media screen and (max-width:600px){
+ #twxDock,#awsDock,body.sidebar-collapsed #twxDock,body.sidebar-collapsed #awsDock{left:auto!important;right:12px!important;bottom:calc(18px + env(safe-area-inset-bottom))!important;top:auto!important;width:48px!important;height:48px!important;padding:0!important;border:0!important;border-radius:50%;background:none!important;box-shadow:none!important;transform:none!important;display:block!important;max-width:none;pointer-events:none}
+ html.samurai-android #twxDock,html.samurai-android #awsDock{bottom:82px!important}
+ .samurai-radial-toggle{display:flex;position:absolute;right:0;bottom:0;width:48px;height:48px;border:1px solid #c6a7ff;border-radius:50%;align-items:center;justify-content:center;background:#7135d6;color:#fff;font-size:25px;box-shadow:0 4px 16px #27104966;cursor:pointer;pointer-events:auto}
+ .samurai-radial-toggle svg{width:23px;height:23px}
+ .samurai-radial-disc{display:block;position:absolute;right:-4px;bottom:-4px;width:210px;height:210px;border-radius:100% 32px 28px 32px;background:linear-gradient(135deg,#7d39e9e8,#372264eb);box-shadow:0 6px 26px #170d3233;opacity:0;transform:scale(.3);transform-origin:bottom right;transition:transform .18s ease,opacity .18s ease;pointer-events:none}
+ .radial-open .samurai-radial-disc{opacity:1;transform:scale(1)}
+ #twxDock>.twx-topbar-wrapper,#twxDock>.twx-radar-dock,#awsDock>.twx-radar-dock{position:absolute!important;right:0;bottom:0;top:auto;width:48px;height:48px;pointer-events:none}
+ #twxDock>.twx-topbar-wrapper{right:65px;bottom:137px}
+ #twxDock>.twx-radar-dock,#awsDock>.twx-radar-dock{right:0;bottom:154px}
+ #twxDock>.twx-fab-note{position:absolute!important;right:123px;bottom:83px}
+ #twxDock>.xena-transfer-fab{position:absolute!important;right:152px!important;bottom:12px!important;top:auto!important;order:initial}
+ #twxDock .twx-fab,#awsDock .twx-fab{width:48px!important;height:48px!important;min-width:48px;box-shadow:0 3px 10px #15062633!important;transition:opacity .15s!important}
+ #twxDock:not(.radial-open) .twx-fab,#awsDock:not(.radial-open) .twx-fab{visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+ #twxDock.radial-open .twx-fab,#awsDock.radial-open .twx-fab{visibility:visible!important;opacity:1!important;pointer-events:auto!important}
+ .twx-topbar-wrapper .twx-topbar,body.sidebar-collapsed .twx-topbar-wrapper .twx-topbar{left:50%!important;bottom:80px!important;transform:translateX(-50%)!important;transform-origin:bottom center!important}
+ .twx-topbar-wrapper.chat-collapsed .twx-topbar{transform:translateX(-50%) scale(0)!important}
+ #awsDock .samurai-radial-disc{width:115px;height:210px}
 }
+@media (prefers-reduced-motion:reduce){.samurai-radial-disc{transition:none!important}}
 
-@media screen and (max-width: 600px) {
-  #twxDock,
-  #awsDock,
-  body.sidebar-collapsed #twxDock,
-  body.sidebar-collapsed #awsDock {
-    left: auto !important;
-    right: 12px !important;
-    bottom: calc(18px + env(safe-area-inset-bottom)) !important;
-    top: auto !important;
-    width: 48px !important;
-    height: 48px !important;
-    padding: 0 !important;
-    border: 0 !important;
-    border-radius: 50%;
-    background: none !important;
-    box-shadow: none !important;
-    transform: none !important;
-    display: block !important;
-    max-width: none;
-    pointer-events: none;
-  }
-
-  html.samurai-android #twxDock,
-  html.samurai-android #awsDock {
-    bottom: 82px !important;
-  }
-
-  .samurai-radial-toggle {
-    display: flex;
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 48px;
-    height: 48px;
-    border: 1px solid #c6a7ff;
-    border-radius: 50%;
-    align-items: center;
-    justify-content: center;
-    background: #7135d6;
-    color: #fff;
-    font-size: 25px;
-    box-shadow: 0 4px 16px #27104966;
-    cursor: pointer;
-    pointer-events: auto;
-  }
-
-  .samurai-radial-toggle svg {
-    width: 23px;
-    height: 23px;
-  }
-
-  .samurai-radial-disc {
-    display: block;
-    position: absolute;
-    right: -4px;
-    bottom: -4px;
-    width: 210px;
-    height: 210px;
-    border-radius: 100% 32px 28px 32px;
-    background: linear-gradient(135deg, #7d39e9e8, #372264eb);
-    box-shadow: 0 6px 26px #170d3233;
-    opacity: 0;
-    transform: scale(.3);
-    transform-origin: bottom right;
-    transition: transform .18s ease, opacity .18s ease;
-    pointer-events: none;
-  }
-
-  .radial-open .samurai-radial-disc {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  #twxDock > .twx-topbar-wrapper,
-  #twxDock > .twx-radar-dock,
-  #awsDock > .twx-radar-dock {
-    position: absolute !important;
-    right: 0;
-    bottom: 0;
-    top: auto;
-    width: 48px;
-    height: 48px;
-    pointer-events: none;
-  }
-
-  #twxDock > .twx-topbar-wrapper {
-    right: 65px;
-    bottom: 137px;
-  }
-
-  #twxDock > .twx-radar-dock,
-  #awsDock > .twx-radar-dock {
-    right: 0;
-    bottom: 154px;
-  }
-
-  #twxDock > .twx-fab-note {
-    position: absolute !important;
-    right: 123px;
-    bottom: 83px;
-  }
-
-  #twxDock > .xena-transfer-fab {
-    position: absolute !important;
-    right: 152px !important;
-    bottom: 12px !important;
-    top: auto !important;
-    order: initial;
-  }
-
-  #twxDock .twx-fab,
-  #awsDock .twx-fab {
-    width: 48px !important;
-    height: 48px !important;
-    min-width: 48px;
-    box-shadow: 0 3px 10px #15062633 !important;
-    transition: opacity .15s !important;
-  }
-
-  #twxDock:not(.radial-open) .twx-fab,
-  #awsDock:not(.radial-open) .twx-fab {
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
-
-  #twxDock.radial-open .twx-fab,
-  #awsDock.radial-open .twx-fab {
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-  }
-
-  .twx-topbar-wrapper .twx-topbar,
-  body.sidebar-collapsed .twx-topbar-wrapper .twx-topbar {
-    left: 50% !important;
-    bottom: 80px !important;
-    transform: translateX(-50%) !important;
-    transform-origin: bottom center !important;
-  }
-
-  .twx-topbar-wrapper.chat-collapsed .twx-topbar {
-    transform: translateX(-50%) scale(0) !important;
-  }
-
-  #awsDock .samurai-radial-disc {
-    width: 115px;
-    height: 210px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .samurai-radial-disc {
-    transition: none !important;
-  }
-}
 </style>
 </head>
 
@@ -23547,90 +23408,24 @@ function atmRender(){
 
 </script>
 <script id="samurai-radial-v8-js">
-(() => {
-  const mobile = matchMedia('(max-width:600px)');
-
-  function init() {
-    const docks = [
-      ...document.querySelectorAll('#twxDock,#awsDock')
-    ];
-
-    function close(dock) {
-      dock.classList.remove('radial-open');
-
-      const button = dock.querySelector('.samurai-radial-toggle');
-      if (button) {
-        button.setAttribute('aria-expanded', 'false');
-        button.setAttribute('aria-label', 'Open workspace actions');
-      }
-    }
-
-    docks.forEach(dock => {
-      const disc = document.createElement('div');
-      disc.className = 'samurai-radial-disc';
-      disc.setAttribute('aria-hidden', 'true');
-      dock.prepend(disc);
-
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'samurai-radial-toggle';
-      toggle.setAttribute('aria-label', 'Open workspace actions');
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.title = 'Workspace actions';
-
-      toggle.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="6" height="6" rx="2"/>
-          <rect x="15" y="3" width="6" height="6" rx="2"/>
-          <rect x="3" y="15" width="6" height="6" rx="2"/>
-          <rect x="15" y="15" width="6" height="6" rx="2"/>
-        </svg>
-      `;
-
-      dock.append(toggle);
-
-      toggle.addEventListener('click', () => {
-        const open = !dock.classList.contains('radial-open');
-        docks.forEach(close);
-
-        if (open) {
-          dock.classList.add('radial-open');
-          toggle.setAttribute('aria-expanded', 'true');
-          toggle.setAttribute('aria-label', 'Close workspace actions');
-        }
-      });
-
-      dock.addEventListener('click', event => {
-        if (mobile.matches && event.target.closest('.twx-fab')) {
-          close(dock);
-        }
-      });
-    });
-
-    document.addEventListener('click', event => {
-      if (mobile.matches && !event.target.closest('.twx-dock')) {
-        docks.forEach(close);
-      }
-    });
-
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') {
-        docks.forEach(close);
-      }
-    });
-
-    mobile.addEventListener('change', () => {
-      docks.forEach(close);
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+(()=>{
+ const mobile=matchMedia('(max-width:600px)');
+ function init(){
+  const docks=[...document.querySelectorAll('#twxDock,#awsDock')];
+  function close(dock){dock.classList.remove('radial-open');const b=dock.querySelector('.samurai-radial-toggle');if(b){b.setAttribute('aria-expanded','false');b.setAttribute('aria-label','Open workspace actions');}}
+  docks.forEach(dock=>{
+   const disc=document.createElement('div');disc.className='samurai-radial-disc';disc.setAttribute('aria-hidden','true');dock.prepend(disc);
+   const toggle=document.createElement('button');toggle.type='button';toggle.className='samurai-radial-toggle';toggle.setAttribute('aria-label','Open workspace actions');toggle.setAttribute('aria-expanded','false');toggle.title='Workspace actions';toggle.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="6" rx="2"/><rect x="15" y="3" width="6" height="6" rx="2"/><rect x="3" y="15" width="6" height="6" rx="2"/><rect x="15" y="15" width="6" height="6" rx="2"/></svg>';dock.append(toggle);
+   toggle.addEventListener('click',()=>{const open=!dock.classList.contains('radial-open');docks.forEach(close);if(open){dock.classList.add('radial-open');toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Close workspace actions');}});
+   dock.addEventListener('click',e=>{if(mobile.matches&&e.target.closest('.twx-fab'))close(dock);});
+  });
+  document.addEventListener('click',e=>{if(mobile.matches&&!e.target.closest('.twx-dock'))docks.forEach(close);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')docks.forEach(close);});
+  mobile.addEventListener('change',()=>docks.forEach(close));
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
+
 </script>
 </body>
 </html>
