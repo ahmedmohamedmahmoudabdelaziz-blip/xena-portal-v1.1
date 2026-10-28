@@ -2416,6 +2416,44 @@ def samurai_video():
     response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
     return response
 
+
+# ---------- Phase 29: PWA support (installable Android app / PWABuilder APK) ----------
+# Deploy manifest.webmanifest, sw.js, icon-192.png, icon-512.png, icon-maskable-512.png
+# at the project root alongside index.html -- same root_dir pattern as home()/samurai_video().
+@app.route('/manifest.webmanifest', methods=['GET'])
+def pwa_manifest():
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return send_file(os.path.join(root_dir, 'manifest.webmanifest'), mimetype='application/manifest+json')
+
+@app.route('/sw.js', methods=['GET'])
+def pwa_sw():
+    # The service worker must be served from root scope; no-store so updates land immediately.
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    response = send_file(os.path.join(root_dir, 'sw.js'), mimetype='text/javascript')
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
+
+@app.route('/icon-<name>', methods=['GET'])
+def pwa_icon(name):
+    if name not in ('192.png', '512.png', 'maskable-512.png'):
+        return jsonify({"error": "not found"}), 404
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return send_file(os.path.join(root_dir, 'icon-' + name), mimetype='image/png')
+
+@app.route('/.well-known/assetlinks.json', methods=['GET'])
+def pwa_assetlinks():
+    # Digital Asset Links -- required by the PWABuilder-generated Android app (TWA)
+    # to hide the browser address bar. PWABuilder's downloaded zip contains
+    # assetlinks.json; deploy that file at the project root and this route serves it.
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    p = os.path.join(root_dir, 'assetlinks.json')
+    if not os.path.exists(p):
+        return jsonify({"error": "assetlinks.json not deployed yet (it comes from the PWABuilder zip)"}), 404
+    response = send_file(p, mimetype='application/json')
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
 @app.route('/api/samurai-image', methods=['GET'])
 def samurai_image():
     # Serves the intro's still image (samurai silhouetted against the moon).
@@ -7422,6 +7460,216 @@ def list_under_investigation():
     rows.sort(key=lambda r: r["_sort_ts"], reverse=True)
     for r in rows: r.pop("_sort_ts", None)
     return jsonify({"success": True, "results": rows, "count": len(rows)})
+
+# ================= Phase 31 (Ahmed): Rewards page =================
+# New "Rewards" tab under Ticket Queue: completed Agency Creation / BD
+# Creation requests (Status = Done) whose Reward checkbox is NOT checked yet,
+# grouped into 4 tables (PK/IN x Agency/BD). Checking rows + "Mark Rewarded"
+# writes Reward=true back to the Grand Table -- exactly like ticking the
+# checkbox in the Base view. Mirrors the Base views Ahmed screenshotted:
+# "Reward agency" = Request Type contains "Agency Creation" + Reward
+# unchecked + Status Done; "Reward BD" = Request Type is "BD Creation" +
+# the same two conditions.
+#
+# Checkbox filter semantics (verified live against the Grand Table via the
+# raw records/search API, 2026-10-28): an UNCHECKED checkbox matches
+# {"operator":"is","value":["false"]} -- ["Checked"]/["Unchecked"] and
+# isEmpty are all rejected with 1254018 InvalidFilter. The Status option is
+# literally "Done " WITH trailing space (field option list), so the filter
+# value must carry it.
+def _rewards_search(search_url, headers, type_op, type_val, deadline):
+    """One paginated /records/search for one reward bucket (agency or bd).
+    Returns (items, error) -- error "" means the bucket fetched completely."""
+    items, page_token = [], None
+    for _ in range(6):  # 6 * 500 = 3,000 hard ceiling; real counts are tiny
+        if time.time() >= deadline:
+            return items, "time_budget_exceeded"
+        payload = {
+            "page_size": 500,
+            "filter": {"conjunction": "and", "conditions": [
+                {"field_name": "Status", "operator": "is", "value": ["Done "]},
+                {"field_name": "Reward", "operator": "is", "value": ["false"]},
+                {"field_name": "Request Type", "operator": type_op, "value": [type_val]},
+            ]},
+        }
+        if page_token:
+            payload["page_token"] = page_token
+        try:
+            resp = feishu_session.post(search_url, headers=headers, json=payload,
+                                       timeout=max(3, min(15, deadline - time.time())))
+            data = resp.json()
+        except Exception as e:
+            return items, str(e)
+        if data.get("code") != 0:
+            return items, f"{data.get('code')}: {data.get('msg')}"
+        block = data.get("data", {})
+        items.extend(block.get("items", []))
+        page_token = block.get("page_token")
+        if not page_token or not block.get("has_more", False):
+            return items, ""
+    return items, "page_ceiling_reached"
+
+
+def _rewards_region(fields):
+    """The Region select is the source of truth; fall back to the ACM name
+    lists for older rows where Region was never filled (same convention the
+    my-requests / points endpoints already use)."""
+    region = clean(get_field_local(fields, "Region", "Agency Region")).upper()
+    if region in ("PK", "IN"):
+        return region
+    acm = (clean(get_field_local(fields, "Acm Name (PK)")) or
+           clean(get_field_local(fields, "Acm Name (IN)")) or
+           clean(get_field_local(fields, "Acm", "Assigned Member"))).lower()
+    if acm in PK_ACMS:
+        return "PK"
+    if acm in IN_ACMS:
+        return "IN"
+    return ""
+
+
+def _rewards_row(item, code_field_names):
+    fields = item.get("fields", {})
+    return {
+        "record_id": item.get("record_id"),
+        "numbering": extract_field_text(get_field_local(fields, "Numbering")),
+        "user_id":   extract_field_text(get_field_local(fields, "User ID")),
+        "code":      extract_field_text(get_field_local(fields, *code_field_names)),
+    }
+
+
+def _rewards_permitted(perms):
+    # Exact-key check, same contract as pull_assigned: the master 'tickets'
+    # module or the 'tickets_rewards' sub-key; super admins always. A bare
+    # substring "tickets" match would hand this to every granular tickets_*
+    # holder (tickets_new / tickets_pending / tickets_live_queue).
+    return bool(perms.get("is_super_admin")) or \
+        any(m in ("tickets", "tickets_rewards") for m in perms.get("modules", []))
+
+
+@app.route('/api/rewards', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def rewards_list():
+    user  = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    if not _rewards_permitted(perms):
+        return jsonify({"error": "Access denied"}), 403
+
+    groups = {"pk_agency": [], "in_agency": [], "pk_bd": [], "in_bd": []}
+    if MOCK_MODE:
+        return jsonify({"success": True, "groups": groups, "count": 0,
+                        "no_region": 0, "fetch_complete": True, "stop_reason": ""})
+
+    tat = get_tenant_access_token()
+    search_url, headers = _query_search_url_and_headers(tat)
+    deadline = time.time() + 45  # Vercel 60s headroom discipline (my-requests)
+
+    errors, no_region = [], 0
+    # The agency bucket mirrors the "Reward agency" Base view (Request Type
+    # CONTAINS "Agency Creation"); the bd bucket mirrors "Reward BD"
+    # (Request Type IS "BD Creation").
+    for kind, op, val in (("agency", "contains", "Agency Creation"),
+                          ("bd", "is", "BD Creation")):
+        items, err = _rewards_search(search_url, headers, op, val, deadline)
+        if err:
+            errors.append(f"{kind}: {err}")
+        seen = set()
+        for it in items:
+            rid = it.get("record_id")
+            if rid and rid in seen:
+                continue
+            if rid:
+                seen.add(rid)
+            region = _rewards_region(it.get("fields", {}))
+            if region not in ("PK", "IN"):
+                no_region += 1
+                continue
+            code_fields = ("Agency Code",) if kind == "agency" else ("Bd Code", "BD Code")
+            groups[f"{region.lower()}_{kind}"].append(_rewards_row(it, code_fields))
+
+    def _num_key(r):
+        try:
+            return (0, int(r["numbering"]))
+        except (TypeError, ValueError):
+            return (1, 0)
+    for g in groups.values():
+        g.sort(key=_num_key)  # oldest ticket first, like Under Investigation
+
+    total = sum(len(g) for g in groups.values())
+    audit.log(user, "REWARDS_VIEW", f"{total} pending reward rows",
+              ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""),
+              severity="Info")
+    return jsonify({
+        "success": not errors,
+        "groups": groups,
+        "count": total,
+        "no_region": no_region,
+        "fetch_complete": not errors,
+        "stop_reason": "; ".join(errors),
+    })
+
+
+@app.route('/api/rewards/mark', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def rewards_mark():
+    """Bulk 'Reward' checkbox writer. One call per table action: the checked
+    record_ids get Reward=true via /records/batch_update in chunks of 100
+    (Feishu 1254104s past 200, and smaller chunks keep each cross-border
+    round-trip short). A failed chunk is reported with its record_ids so the
+    frontend keeps exactly those rows listed -- nothing is silently dropped."""
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user')  or request.form.get('user', ''))
+    email = sanitize_text(body.get('email') or request.form.get('email', ''))
+    record_ids = body.get('record_ids')
+    if record_ids is None:
+        record_ids = request.form.getlist('record_ids')
+    if not isinstance(record_ids, list):
+        record_ids = []
+
+    perms = get_user_permissions(email, user)
+    if not _rewards_permitted(perms):
+        return jsonify({"error": "Access denied"}), 403
+
+    clean_ids, seen_ids = [], set()
+    for rid in record_ids:
+        rid = sanitize_text(str(rid))
+        if rid and rid.startswith("rec") and rid not in seen_ids:
+            seen_ids.add(rid)
+            clean_ids.append(rid)
+        if len(clean_ids) >= 200:  # one click never writes more than 200 rows
+            break
+    if not clean_ids:
+        return jsonify({"success": False, "error": "No records selected"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "marked": len(clean_ids),
+                        "requested": len(clean_ids), "failures": []})
+
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/batch_update"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    marked, failures = 0, []
+    for i in range(0, len(clean_ids), 100):
+        chunk = clean_ids[i:i + 100]
+        payload = {"records": [{"record_id": rid, "fields": {"Reward": True}} for rid in chunk]}
+        try:
+            resp = feishu_session.put(url, headers=headers, json=payload, timeout=20)
+            res = resp.json()
+        except Exception as e:
+            failures.append({"chunk": i // 100, "record_ids": chunk, "error": str(e)})
+            continue
+        if res.get("code") == 0:
+            marked += len(chunk)
+        else:
+            failures.append({"chunk": i // 100, "record_ids": chunk,
+                             "error": f"{res.get('code')}: {res.get('msg')}"})
+
+    audit.log(user, "REWARDS_MARK", f"marked {marked}/{len(clean_ids)} rewarded",
+              ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""),
+              severity="Info")
+    return jsonify({"success": not failures, "marked": marked,
+                    "requested": len(clean_ids), "failures": failures})
+
 
 @app.route('/api/tickets/pull-assigned', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
