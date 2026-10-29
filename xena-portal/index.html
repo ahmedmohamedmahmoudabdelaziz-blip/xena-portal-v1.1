@@ -2613,6 +2613,26 @@ option{background:var(--surface);color:var(--text)}
 @media (prefers-reduced-motion:reduce){.samurai-radial-disc{transition:none!important}}
 
 </style>
+<style id="samurai-radial-v10-fix">
+@media screen and (max-width: 600px) {
+.samurai-radial-toggle {
+touch-action: manipulation;
+-webkit-tap-highlight-color: transparent;
+z-index: 3;
+}
+
+#twxDock > .twx-topbar-wrapper {
+right: 65px !important;
+bottom: 137px !important;
+}
+
+#twxDock > .twx-radar-dock,
+#awsDock > .twx-radar-dock {
+right: 0 !important;
+bottom: 154px !important;
+}
+}
+</style>
 </head>
 
 <body>
@@ -23412,24 +23432,113 @@ function atmRender(){
 
 </script>
 <script id="samurai-radial-v8-js">
-(()=>{
- const mobile=matchMedia('(max-width:600px)');
- function init(){
-  const docks=[...document.querySelectorAll('#twxDock,#awsDock')];
-  function close(dock){dock.classList.remove('radial-open');const b=dock.querySelector('.samurai-radial-toggle');if(b){b.setAttribute('aria-expanded','false');b.setAttribute('aria-label','Open workspace actions');}}
-  docks.forEach(dock=>{
-   const disc=document.createElement('div');disc.className='samurai-radial-disc';disc.setAttribute('aria-hidden','true');dock.prepend(disc);
-   const toggle=document.createElement('button');toggle.type='button';toggle.className='samurai-radial-toggle';toggle.setAttribute('aria-label','Open workspace actions');toggle.setAttribute('aria-expanded','false');toggle.title='Workspace actions';toggle.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="6" rx="2"/><rect x="15" y="3" width="6" height="6" rx="2"/><rect x="3" y="15" width="6" height="6" rx="2"/><rect x="15" y="15" width="6" height="6" rx="2"/></svg>';dock.append(toggle);
-   toggle.addEventListener('click',()=>{const open=!dock.classList.contains('radial-open');docks.forEach(close);if(open){dock.classList.add('radial-open');toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Close workspace actions');}});
-   dock.addEventListener('click',e=>{if(mobile.matches&&e.target.closest('.twx-fab'))close(dock);});
-  });
-  document.addEventListener('click',e=>{if(mobile.matches&&!e.target.closest('.twx-dock'))docks.forEach(close);});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')docks.forEach(close);});
-  mobile.addEventListener('change',()=>docks.forEach(close));
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
-})();
+(() => {
+const mobile = matchMedia('(max-width:600px)');
 
+function init() {
+const docks = [
+...document.querySelectorAll('#twxDock,#awsDock')
+];
+
+function close(dock) {
+dock.classList.remove('radial-open');
+
+const button = dock.querySelector('.samurai-radial-toggle');
+if (button) {
+button.setAttribute('aria-expanded', 'false');
+button.setAttribute(
+'aria-label',
+'Open workspace actions'
+);
+}
+}
+
+docks.forEach(dock => {
+// Prevent duplicate launcher buttons.
+if (dock.querySelector('.samurai-radial-toggle')) return;
+
+const disc = document.createElement('div');
+disc.className = 'samurai-radial-disc';
+disc.setAttribute('aria-hidden', 'true');
+dock.prepend(disc);
+
+const toggle = document.createElement('button');
+toggle.type = 'button';
+toggle.className = 'samurai-radial-toggle';
+toggle.title = 'Workspace actions';
+toggle.setAttribute('aria-label', 'Open workspace actions');
+toggle.setAttribute('aria-expanded', 'false');
+
+toggle.innerHTML = `
+<svg viewBox="0 0 24 24"
+fill="none"
+stroke="currentColor"
+stroke-width="2">
+<rect x="3" y="3" width="6" height="6" rx="2"/>
+<rect x="15" y="3" width="6" height="6" rx="2"/>
+<rect x="3" y="15" width="6" height="6" rx="2"/>
+<rect x="15" y="15" width="6" height="6" rx="2"/>
+</svg>
+`;
+
+dock.append(toggle);
+
+toggle.addEventListener('click', event => {
+event.preventDefault();
+event.stopPropagation();
+
+const shouldOpen = !dock.classList.contains('radial-open');
+docks.forEach(close);
+
+if (shouldOpen) {
+dock.classList.add('radial-open');
+toggle.setAttribute('aria-expanded', 'true');
+toggle.setAttribute(
+'aria-label',
+'Close workspace actions'
+);
+}
+});
+
+// Preserve existing actions, including extension buttons
+// that stop click propagation.
+document.addEventListener('click', event => {
+if (
+mobile.matches &&
+dock.contains(event.target) &&
+event.target.closest('.twx-fab')
+) {
+setTimeout(() => close(dock), 0);
+}
+}, true);
+});
+
+document.addEventListener('click', event => {
+if (
+mobile.matches &&
+!event.target.closest('.twx-dock')
+) {
+docks.forEach(close);
+}
+});
+
+document.addEventListener('keydown', event => {
+if (event.key === 'Escape') {
+docks.forEach(close);
+}
+});
+
+mobile.addEventListener('change', () => {
+docks.forEach(close);
+});
+}
+
+if (document.readyState === 'loading') {
+document.addEventListener('DOMContentLoaded', init);
+} else {
+init();
+}
+})();
 </script>
 </body>
 </html>
