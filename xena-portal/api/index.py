@@ -1080,10 +1080,18 @@ def load_local_json(filename):
     if data is not None:
         with _local_json_lock:
             _local_json_cache[filename] = (data, time.time())
+        # BUG FIX (stale-snapshot incident, Oct 2026): this path used to stamp
+        # build_mtime = time.time() -- i.e. "the data was built RIGHT NOW" -- for
+        # bytes that were actually committed at the last deploy. A stale committed
+        # snapshot then read as fresh FOREVER (age ~ 0 on every cold start), so the
+        # snapshot chain never fell through to the live sources. The HTTP fetch
+        # returns the same bytes as the on-disk file, so it must inherit the same
+        # provenance: the build script's own generated_at stamp (None = unknown
+        # age = NOT fresh, handled by get_requests_table_snapshot).
         _data_status[filename] = {
             "source": "http_self_fetch",
             "records": len(data) if isinstance(data, list) else None,
-            "loaded_at": time.time(), "build_mtime": time.time(),
+            "loaded_at": time.time(), "build_mtime": _read_build_meta_generated_at(),
         }
         return data
 
@@ -1104,7 +1112,7 @@ LOCAL_SNAPSHOT_MAX_AGE_SECONDS = 3 * 3600
 def local_json_age_seconds(filename):
     """Seconds since the on-disk build snapshot was last written, or None if unknown."""
     status = _data_status.get(filename)
-    if not status or "build_mtime" not in status:
+    if not status or status.get("build_mtime") is None:
         return None
     return time.time() - status["build_mtime"]
 
@@ -2259,15 +2267,98 @@ def ensure_background_sync_started():
 
 GET_SNAPSHOT_COLD_FETCH_BUDGET_SECONDS = 20
 
-def get_requests_table_snapshot(from_dt=None):
+
+# How far behind the requested window a cached snapshot may lag before we stop
+# trusting it for that window. 36h absorbs a missed nightly build and timezone
+# edges without ever serving a snapshot that simply CANNOT contain the asked-for
+# period (the incident: a build snapshot whose newest record was Sep 30 happily
+# answered an Oct 1-31 "Current Month" query with all-zeros).
+SNAPSHOT_WINDOW_GRACE_HOURS = 36
+
+_last_snapshot_debug = {}
+
+def _snapshot_newest_dt(items, probe=400):
+    """Newest parseable submission date in a snapshot, or None. Every source in
+    get_requests_table_snapshot is newest-first (Numbering DESC / build script),
+    so probing the head of the list is enough."""
+    if not isinstance(items, list):
+        return None
+    newest = None
+    for item in items[:probe]:
+        if not isinstance(item, dict):
+            continue
+        dt = parse_feishu_date(get_field_local(item.get("fields", {}),
+                                               "Submitted on Copy", "Submitted on", "Created Time", "Date"))
+        if dt and (newest is None or dt > newest):
+            newest = dt
+    return newest
+
+def _snapshot_covers_window(items, from_dt, to_dt):
+    """(covered, reason) -- can this snapshot truthfully answer [from_dt, to_dt)?
+    Rejected when its newest record predates the window start (the window is
+    entirely invisible to it -- exactly how Current Month rendered 0/0/0 off a
+    September-ending build snapshot), or when it lags the window end -- or now,
+    for open-ended queries -- by more than SNAPSHOT_WINDOW_GRACE_HOURS. No window
+    at all => no constraint => covered."""
+    if not from_dt and not to_dt:
+        return True, ""
+    newest = _snapshot_newest_dt(items)
+    if newest is None:
+        return False, "no parseable record dates"
+    if from_dt and newest < from_dt:
+        return False, f"newest record {newest.date()} predates window start {from_dt.date()}"
+    # Cap the required coverage at NOW: windows routinely extend into the future
+    # ("Current Month" runs to month-end) and no snapshot can contain future
+    # records -- what matters is that the snapshot is current up to today.
+    window_end = min(to_dt, datetime.now()) if to_dt else datetime.now()
+    if newest < window_end - timedelta(hours=SNAPSHOT_WINDOW_GRACE_HOURS):
+        return False, f"newest record {newest.date()} lags window end {window_end.date()} by >{SNAPSHOT_WINDOW_GRACE_HOURS}h"
+    return True, ""
+
+def get_requests_table_snapshot(from_dt=None, to_dt=None):
+    dbg = {"skipped": [],
+           "window_from": from_dt.date().isoformat() if from_dt else None,
+           "window_to":   to_dt.date().isoformat() if to_dt else None}
+
+    def _dbg(source, rows, items):
+        newest = _snapshot_newest_dt(items)
+        _last_snapshot_debug.clear()
+        _last_snapshot_debug.update({**dbg, "source": source, "rows": rows,
+                                     "newest_record": newest.date().isoformat() if newest else None})
+
     local_data = load_local_json("requests.json")
     local_age = local_json_age_seconds("requests.json")
-    local_is_fresh = local_data and (local_age is None or local_age < LOCAL_SNAPSHOT_MAX_AGE_SECONDS)
+    # BUG FIX (stale-snapshot incident), part 1: `local_age is None` used to count
+    # as FRESH, so any snapshot with an unknown build time (older deploys without
+    # _build_meta.json, or the http_self_fetch path) was trusted unconditionally.
+    # Unknown age must mean NOT fresh.
+    local_covers, local_why = (False, "no local snapshot")
+    if local_data:
+        local_covers, local_why = _snapshot_covers_window(local_data, from_dt, to_dt)
+    # Part 2: freshness of the FILE is not enough -- the snapshot must actually
+    # COVER the requested window. A fresh-stamped snapshot whose data ends
+    # 2026-09-30 still cannot answer an October query; serving it produced the
+    # all-zeros Current Month report.
+    # Part 3 (windowed fast path): for a WINDOWED read, coverage IS the
+    # freshness proof -- _snapshot_covers_window already requires the newest
+    # record to sit within SNAPSHOT_WINDOW_GRACE_HOURS of the window end, so a
+    # covering snapshot is recent BY DEFINITION for that window. Trust coverage
+    # over the 3h _build_meta stamp so a daily fetch_data.py cron keeps the
+    # snapshot fast path alive all day, instead of dropping to the slow live
+    # fetch 3 hours after every build. Non-windowed callers (no from/to) keep
+    # the strict stamp rule since coverage cannot prove recency for them.
+    windowed = bool(from_dt or to_dt)
+    local_is_fresh = bool(local_data) and local_covers and (
+        windowed or (local_age is not None and local_age < LOCAL_SNAPSHOT_MAX_AGE_SECONDS))
+    if local_data and not local_covers:
+        dbg["skipped"].append({"source": "build_snapshot", "reason": local_why,
+                               "rows": len(local_data) if isinstance(local_data, list) else None})
 
     if local_is_fresh:
         master_keys = set()
         if isinstance(local_data, list) and len(local_data) > 0:
             master_keys.update(local_data[0].get("fields", {}).keys())
+        _dbg("build_snapshot", len(local_data), local_data)
         return local_data, master_keys, True, "", True
 
     ensure_background_sync_started()
@@ -2276,20 +2367,28 @@ def get_requests_table_snapshot(from_dt=None):
         complete, reason = _bg_sync["fetch_complete"], _bg_sync["stop_reason"]
 
     if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
-        return items, keys, complete, reason, True
+        covers, why = _snapshot_covers_window(items, from_dt, to_dt)
+        if covers:
+            _dbg("background_sync", len(items), items)
+            return items, keys, complete, reason, True
+        dbg["skipped"].append({"source": "background_sync", "reason": why, "rows": len(items)})
 
     if REDIS_ENABLED:
         cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
         if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
             r_items, r_keys = cached["items"], set(cached.get("keys", []))
-            with _bg_sync_lock:
-                _bg_sync["requests_items"] = r_items
-                _bg_sync["requests_keys"]  = r_keys
-                _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
-                _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
-                _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
-            threading.Thread(target=_background_sync_requests_table, daemon=True).start()
-            return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
+            covers, why = _snapshot_covers_window(r_items, from_dt, to_dt)
+            if covers:
+                with _bg_sync_lock:
+                    _bg_sync["requests_items"] = r_items
+                    _bg_sync["requests_keys"]  = r_keys
+                    _bg_sync["updated_at"]     = cached.get("updated_at", time.time())
+                    _bg_sync["fetch_complete"] = cached.get("fetch_complete", True)
+                    _bg_sync["stop_reason"]    = cached.get("stop_reason", "")
+                threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+                _dbg("redis_snapshot", len(r_items), r_items)
+                return r_items, r_keys, cached.get("fetch_complete", True), cached.get("stop_reason", ""), True
+            dbg["skipped"].append({"source": "redis_snapshot", "reason": why, "rows": len(r_items)})
 
     # BUG FIX ("Server timeout: Data too large or loading"): this is the true cold path
     # (no warm in-process cache, no fresh Redis snapshot) -- give it a hard time budget
@@ -2302,6 +2401,7 @@ def get_requests_table_snapshot(from_dt=None):
     # GET_SNAPSHOT_COLD_FETCH_BUDGET_SECONDS accordingly.
     live_items, live_keys, live_complete, live_reason = fetch_requests_sharded(from_dt=from_dt, max_seconds=GET_SNAPSHOT_COLD_FETCH_BUDGET_SECONDS)
     if live_items:
+        _dbg("live_fetch", len(live_items), live_items)
         return live_items, live_keys, live_complete, live_reason, False
 
     # Nothing fresher was reachable (live Feishu fetch itself came back empty/failed,
@@ -2310,9 +2410,15 @@ def get_requests_table_snapshot(from_dt=None):
     # honestly via stop_reason so the frontend can surface a staleness warning
     # instead of silently presenting old data as current.
     if local_data:
-        age_note = f" (build snapshot is {int(local_age/3600) if local_age else '?'}h old)"
+        stale_newest = _snapshot_newest_dt(local_data)
+        age_note = f" (build snapshot is {int(local_age/3600) if local_age else '?'}h old"
+        if stale_newest:
+            age_note += f", newest record {stale_newest.date()}"
+        age_note += ")"
+        _dbg("stale_build_snapshot", len(local_data), local_data)
         return local_data, set(local_data[0].get("fields", {}).keys()) if local_data else set(), False, f"stale_snapshot{age_note}", True
 
+    _dbg("live_fetch_empty", 0, [])
     return live_items, live_keys, live_complete, live_reason, False
 
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
@@ -2388,7 +2494,18 @@ def get_points_snapshot_from_public_file():
 def get_points_table_snapshot():
     local_data = load_local_json("points.json")
     local_age = local_json_age_seconds("points.json")
-    local_is_fresh = local_data and (local_age is None or local_age < LOCAL_SNAPSHOT_MAX_AGE_SECONDS)
+    # Same fix as get_requests_table_snapshot: unknown build age is NOT fresh.
+    # Points reads carry no window, so prove freshness by DATA recency instead:
+    # a snapshot whose newest record sits within SNAPSHOT_WINDOW_GRACE_HOURS of
+    # now is recent by definition. Keeps the snapshot fast path alive all day
+    # on a daily fetch_data.py cron instead of going live 3h after each build.
+    # Unparseable dates -> local_recent stays False -> stamp rule decides.
+    local_recent = False
+    if local_data:
+        _pn = _snapshot_newest_dt(local_data)
+        local_recent = _pn is not None and _pn >= datetime.now() - timedelta(hours=SNAPSHOT_WINDOW_GRACE_HOURS)
+    local_is_fresh = local_data and (
+        (local_age is not None and local_age < LOCAL_SNAPSHOT_MAX_AGE_SECONDS) or local_recent)
 
     if local_is_fresh:
         return local_data, True, "", True
@@ -6200,13 +6317,14 @@ def analytics():
             if cmp_to_dt and newest_dt and cmp_to_dt > newest_dt: newest_dt = cmp_to_dt
         except ValueError: pass
 
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt, to_dt=newest_dt)
 
     stats = run_analytics(all_items, from_dt, to_dt, region_filter, acm_filter, type_filter, allowed_acms, allowed_regs)
     stats["fetch_complete"] = fetch_complete
     stats["stop_reason"]    = stop_reason
     stats["feishu_keys"]    = sorted(list(master_keys))
     stats["served_from_background_cache"] = from_bg_cache
+    stats["snapshot_debug"] = dict(_last_snapshot_debug)
 
     cmp_stats = None
     if cmp_from and cmp_to:
@@ -6305,7 +6423,7 @@ def compare():
     oldest_dt = min([g[1] for g in groups_spec if g[1] is not None], default=None)
     newest_dt = max([g[2] for g in groups_spec if g[2] is not None], default=None)
 
-    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt)
+    all_items, master_keys, fetch_complete, stop_reason, from_bg_cache = get_requests_table_snapshot(from_dt=oldest_dt, to_dt=newest_dt)
 
     # Executive YTD analytics (Target whole check) only make sense when comparing
     # ACMs -- the Points table is a live snapshot with no per-period history, so a
@@ -6382,6 +6500,7 @@ def compare():
         "mode": mode, "groups": groups,
         "fetch_complete": fetch_complete, "stop_reason": ("" if fetch_complete else stop_reason),
         "served_from_background_cache": from_bg_cache, "duration_ms": duration_ms,
+        "snapshot_debug": dict(_last_snapshot_debug),
     })
 
 def _shape_compare_group(label, raw):
