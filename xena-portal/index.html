@@ -6658,7 +6658,7 @@ function enhanceSelect(select) {
         }));
         document.addEventListener('scroll', onScrollOrResize, true);
         window.addEventListener('resize', onScrollOrResize);
-        setTimeout(() => searchInput.focus(), 10);
+        if (!matchMedia('(max-width:600px)').matches) setTimeout(() => searchInput.focus(), 10);
     };
 
     display.addEventListener('click', () => {
@@ -23566,101 +23566,64 @@ function atmRender(){
 })();
 
 </script>
-<script id="samurai-radial-v8-js">
+<script id="samurai-mobile-v13">
 (() => {
-const selector = '#twxDock,#awsDock';
-const mobile = matchMedia('(max-width:600px)');
-const docks = () => document.querySelectorAll(selector);
-
-function close(dock) {
-dock.classList.remove('radial-open');
-
-const button = dock.querySelector('.samurai-radial-toggle');
-if (button) {
-button.setAttribute('aria-expanded', 'false');
-button.setAttribute('aria-label', 'Open workspace actions');
-}
-}
-
-function prepare() {
-docks().forEach(dock => {
-if (!dock.querySelector('.samurai-radial-disc')) {
-const disc = document.createElement('div');
-disc.className = 'samurai-radial-disc';
-disc.setAttribute('aria-hidden', 'true');
-dock.prepend(disc);
-}
-
-if (dock.querySelector('.samurai-radial-toggle')) return;
-
-const button = document.createElement('button');
-button.type = 'button';
-button.className = 'samurai-radial-toggle';
-button.title = 'Workspace actions';
-button.innerHTML = `
-<svg viewBox="0 0 24 24"
-fill="none" stroke="currentColor" stroke-width="2">
-<rect x="3" y="3" width="6" height="6" rx="2"/>
-<rect x="15" y="3" width="6" height="6" rx="2"/>
-<rect x="3" y="15" width="6" height="6" rx="2"/>
-<rect x="15" y="15" width="6" height="6" rx="2"/>
-</svg>
-`;
-
-dock.append(button);
-close(dock);
-});
-}
-
-// Attached to the document so cloned workspaces also work.
-document.addEventListener('click', event => {
-if (!mobile.matches || !(event.target instanceof Element)) return;
-
-const button = event.target.closest('.samurai-radial-toggle');
-const dock = event.target.closest(selector);
-
-if (button && dock) {
-event.preventDefault();
-event.stopPropagation();
-
-const open = !dock.classList.contains('radial-open');
-docks().forEach(close);
-
-if (open) {
-dock.classList.add('radial-open');
-button.setAttribute('aria-expanded', 'true');
-button.setAttribute('aria-label', 'Close workspace actions');
-}
-} else if (dock && event.target.closest('.twx-fab')) {
-// Let the original action run before closing the fan.
-setTimeout(() => close(dock), 0);
-} else if (!dock) {
-docks().forEach(close);
-}
-}, true);
-
-document.addEventListener('keydown', event => {
-if (event.key === 'Escape') docks().forEach(close);
-});
-
-mobile.addEventListener('change', () => docks().forEach(close));
-
-function init() {
-prepare();
-
-// Also prepare workspaces inserted after page load.
-new MutationObserver(prepare).observe(document.body, {
-childList: true,
-subtree: true
-});
-}
-
-if (document.readyState === 'loading') {
-document.addEventListener('DOMContentLoaded', init, { once: true });
-} else {
-init();
-}
+  if(window.__samuraiMobile13)return;
+  window.__samuraiMobile13=true;
+  const mobile=()=>matchMedia('(max-width:600px)').matches;
+  const viewport=document.querySelector('meta[name="viewport"]');
+  if(viewport)viewport.content='width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=4, user-scalable=yes';
+  const style=document.createElement('style');
+  style.textContent=`@media(max-width:600px){
+    .ss-panel{border-radius:14px!important;box-shadow:0 8px 32px #0004!important}
+    .ss-option{min-height:42px;display:flex;align-items:center;padding:8px 12px!important}
+    .ss-search{font-size:16px!important;min-height:42px}
+    #twRadarMsg,#awsRadarMsg{position:fixed!important;top:8px!important;left:10px!important;right:10px!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:24dvh!important;overflow:auto!important;transform:none!important;border-radius:14px!important;z-index:2147483600!important}
+    .xena-transfer-toast{position:fixed!important;top:8px!important;left:10px!important;right:10px!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:26dvh!important;overflow:auto!important;border-radius:14px!important;box-sizing:border-box!important;z-index:2147483601!important}
+    .xena-transfer-toast .xtt-msg{max-height:9em;overflow:auto;font-size:13px;line-height:1.45}
+    .xena-transfer-toast .xtt-x{min-width:36px;min-height:36px}
+    .samurai-message-details{font:inherit;border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit;padding:6px 10px}
+    .xena-transfer-toast.samurai-compact .xtt-msg{max-height:3em;overflow:hidden}
+    .xena-transfer-toast.samurai-compact .xtt-foot{display:none}
+  }`;
+  document.head.append(style);
+  // Opening a list should not summon the keyboard. Explicitly tapping its
+  // search box still enables typing, including Arabic/Urdu input.
+  document.addEventListener('pointerdown',e=>{
+    if(!mobile())return;
+    document.querySelectorAll('.ss-search').forEach(i=>i.readOnly=true);
+    if(e.target.matches?.('.ss-search'))e.target.readOnly=false;
+  },true);
+  document.addEventListener('focusin',e=>{
+    if(mobile()&&e.target.matches?.('.ss-search')&&e.target.readOnly)e.target.blur();
+  },true);
+  const selector='#twxDock,#awsDock';
+  const docks=()=>document.querySelectorAll(selector);
+  const close=d=>{d.classList.remove('radial-open');const b=d.querySelector('.samurai-radial-toggle');if(b){b.setAttribute('aria-expanded','false');b.setAttribute('aria-label','Open workspace actions');}};
+  function prepare(){
+    docks().forEach(d=>{
+      if(!d.querySelector('.samurai-radial-disc')){const disc=document.createElement('div');disc.className='samurai-radial-disc';disc.setAttribute('aria-hidden','true');d.prepend(disc);}
+      if(!d.querySelector('.samurai-radial-toggle')){const b=document.createElement('button');b.type='button';b.className='samurai-radial-toggle';b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="6" rx="2"/><rect x="15" y="3" width="6" height="6" rx="2"/><rect x="3" y="15" width="6" height="6" rx="2"/><rect x="15" y="15" width="6" height="6" rx="2"/></svg>';d.append(b);close(d);}
+    });
+    if(mobile())document.querySelectorAll('.xena-transfer-toast:not([data-mobile12])').forEach(t=>{
+      t.dataset.mobile12='1';t.classList.add('samurai-compact');
+      const button=document.createElement('button');button.type='button';button.className='samurai-message-details';button.textContent='Show details';button.setAttribute('aria-expanded','false');
+      button.onclick=()=>{const expanded=t.classList.toggle('samurai-compact')===false;button.textContent=expanded?'Less':'Show details';button.setAttribute('aria-expanded',String(expanded));};
+      t.append(button);
+    });
+  }
+  window.addEventListener('click',e=>{
+    if(!mobile()||!(e.target instanceof Element))return;
+    const b=e.target.closest('.samurai-radial-toggle'),d=e.target.closest(selector);
+    if(b&&d){e.preventDefault();e.stopImmediatePropagation();const open=!d.classList.contains('radial-open');docks().forEach(close);if(open){d.classList.add('radial-open');b.setAttribute('aria-expanded','true');b.setAttribute('aria-label','Close workspace actions');}}
+    else if(!d)docks().forEach(close);
+    else if(e.target.closest('.twx-fab'))setTimeout(()=>close(d),0);
+  },true);
+  window.addEventListener('keydown',e=>{if(e.key==='Escape')docks().forEach(close);});
+  matchMedia('(max-width:600px)').addEventListener?.('change',()=>docks().forEach(close));
+  prepare();new MutationObserver(prepare).observe(document.body,{childList:true,subtree:true});
 })();
+
 </script>
 </body>
 </html>
