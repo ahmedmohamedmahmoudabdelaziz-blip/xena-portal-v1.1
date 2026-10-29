@@ -11097,10 +11097,14 @@ async function generateAnalytics() {
         btn.innerText=origText; btn.disabled=false;
         kpiCards.forEach(c=>c.classList.remove('skeleton'));
 
-        if (data.scanned_rows>0&&data.kpis.creations===0) {
+        const _snapDbg=data.snapshot_debug||{};
+        const _staleServed=(data.stop_reason||'').startsWith('stale_snapshot');
+        if (_staleServed) {
+            ToastManager.show(`Showing a saved snapshot that only covers up to ${_snapDbg.newest_record||'an older date'} — live data is refreshing in the background. Wait ~1 min and click 🔄 Refresh.`,'warning',10000);
+        } else if (data.scanned_rows>0&&data.kpis.creations===0) {
             ToastManager.show(`Column Mismatch: Checked ${data.scanned_rows} records. No creations found — check field names.`,'warning',8000);
         }
-        if (data.fetch_complete===false) {
+        if (data.fetch_complete===false && !_staleServed) {
             ToastManager.show(`Data may be incomplete (${data.scanned_rows} rows). Reason: ${data.stop_reason||'unknown'}. Try narrowing date range.`,'warning',8000);
         }
         if (data.cache_hit) {
