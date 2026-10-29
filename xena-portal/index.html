@@ -11117,14 +11117,10 @@ async function generateAnalytics() {
         btn.innerText=origText; btn.disabled=false;
         kpiCards.forEach(c=>c.classList.remove('skeleton'));
 
-        const _snapDbg=data.snapshot_debug||{};
-        const _staleServed=(data.stop_reason||'').startsWith('stale_snapshot');
-        if (_staleServed) {
-            ToastManager.show(`Showing a saved snapshot that only covers up to ${_snapDbg.newest_record||'an older date'} — live data is refreshing in the background. Wait ~1 min and click 🔄 Refresh.`,'warning',10000);
-        } else if (data.scanned_rows>0&&data.kpis.creations===0) {
+        if (data.scanned_rows>0&&data.kpis.creations===0) {
             ToastManager.show(`Column Mismatch: Checked ${data.scanned_rows} records. No creations found — check field names.`,'warning',8000);
         }
-        if (data.fetch_complete===false && !_staleServed) {
+        if (data.fetch_complete===false) {
             ToastManager.show(`Data may be incomplete (${data.scanned_rows} rows). Reason: ${data.stop_reason||'unknown'}. Try narrowing date range.`,'warning',8000);
         }
         if (data.cache_hit) {
@@ -23433,12 +23429,9 @@ function atmRender(){
 </script>
 <script id="samurai-radial-v8-js">
 (() => {
+const selector = '#twxDock,#awsDock';
 const mobile = matchMedia('(max-width:600px)');
-
-function init() {
-const docks = [
-...document.querySelectorAll('#twxDock,#awsDock')
-];
+const docks = () => document.querySelectorAll(selector);
 
 function close(dock) {
 dock.classList.remove('radial-open');
@@ -23446,34 +23439,28 @@ dock.classList.remove('radial-open');
 const button = dock.querySelector('.samurai-radial-toggle');
 if (button) {
 button.setAttribute('aria-expanded', 'false');
-button.setAttribute(
-'aria-label',
-'Open workspace actions'
-);
+button.setAttribute('aria-label', 'Open workspace actions');
 }
 }
 
-docks.forEach(dock => {
-// Prevent duplicate launcher buttons.
-if (dock.querySelector('.samurai-radial-toggle')) return;
-
+function prepare() {
+docks().forEach(dock => {
+if (!dock.querySelector('.samurai-radial-disc')) {
 const disc = document.createElement('div');
 disc.className = 'samurai-radial-disc';
 disc.setAttribute('aria-hidden', 'true');
 dock.prepend(disc);
+}
 
-const toggle = document.createElement('button');
-toggle.type = 'button';
-toggle.className = 'samurai-radial-toggle';
-toggle.title = 'Workspace actions';
-toggle.setAttribute('aria-label', 'Open workspace actions');
-toggle.setAttribute('aria-expanded', 'false');
+if (dock.querySelector('.samurai-radial-toggle')) return;
 
-toggle.innerHTML = `
+const button = document.createElement('button');
+button.type = 'button';
+button.className = 'samurai-radial-toggle';
+button.title = 'Workspace actions';
+button.innerHTML = `
 <svg viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-stroke-width="2">
+fill="none" stroke="currentColor" stroke-width="2">
 <rect x="3" y="3" width="6" height="6" rx="2"/>
 <rect x="15" y="3" width="6" height="6" rx="2"/>
 <rect x="3" y="15" width="6" height="6" rx="2"/>
@@ -23481,60 +23468,56 @@ stroke-width="2">
 </svg>
 `;
 
-dock.append(toggle);
+dock.append(button);
+close(dock);
+});
+}
 
-toggle.addEventListener('click', event => {
+// Attached to the document so cloned workspaces also work.
+document.addEventListener('click', event => {
+if (!mobile.matches || !(event.target instanceof Element)) return;
+
+const button = event.target.closest('.samurai-radial-toggle');
+const dock = event.target.closest(selector);
+
+if (button && dock) {
 event.preventDefault();
 event.stopPropagation();
 
-const shouldOpen = !dock.classList.contains('radial-open');
-docks.forEach(close);
+const open = !dock.classList.contains('radial-open');
+docks().forEach(close);
 
-if (shouldOpen) {
+if (open) {
 dock.classList.add('radial-open');
-toggle.setAttribute('aria-expanded', 'true');
-toggle.setAttribute(
-'aria-label',
-'Close workspace actions'
-);
+button.setAttribute('aria-expanded', 'true');
+button.setAttribute('aria-label', 'Close workspace actions');
 }
-});
-
-// Preserve existing actions, including extension buttons
-// that stop click propagation.
-document.addEventListener('click', event => {
-if (
-mobile.matches &&
-dock.contains(event.target) &&
-event.target.closest('.twx-fab')
-) {
+} else if (dock && event.target.closest('.twx-fab')) {
+// Let the original action run before closing the fan.
 setTimeout(() => close(dock), 0);
+} else if (!dock) {
+docks().forEach(close);
 }
 }, true);
-});
-
-document.addEventListener('click', event => {
-if (
-mobile.matches &&
-!event.target.closest('.twx-dock')
-) {
-docks.forEach(close);
-}
-});
 
 document.addEventListener('keydown', event => {
-if (event.key === 'Escape') {
-docks.forEach(close);
-}
+if (event.key === 'Escape') docks().forEach(close);
 });
 
-mobile.addEventListener('change', () => {
-docks.forEach(close);
+mobile.addEventListener('change', () => docks().forEach(close));
+
+function init() {
+prepare();
+
+// Also prepare workspaces inserted after page load.
+new MutationObserver(prepare).observe(document.body, {
+childList: true,
+subtree: true
 });
 }
 
 if (document.readyState === 'loading') {
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', init, { once: true });
 } else {
 init();
 }
