@@ -2789,6 +2789,125 @@ bottom: 154px !important;
   #cmnPanel .cmn-refresh{width:36px;height:36px}
 }
 </style>
+<style id="phase47-xg">
+/* ===== Phase 47 (Ahmed): Fluid Capacity Gantt + Live Pulse + Executive Analytics ===== */
+/* ---- shared ---- */
+.xea-empty,.xg-empty{padding:28px;text-align:center;color:var(--text-muted);font-size:.9rem}
+
+/* ---- 1) Fluid Capacity Gantt ---- */
+#xgWrap{border:1px solid rgba(var(--ink-rgb),.09);border-radius:var(--radius,14px);overflow:hidden;background:rgba(var(--ink-rgb),.015)}
+.xg-scroll{overflow:auto;max-height:66vh}
+.xg-ruler{display:flex;position:sticky;top:0;z-index:6;background:rgba(var(--ink-rgb),.07);backdrop-filter:blur(10px);border-bottom:1px solid rgba(var(--ink-rgb),.1)}
+.xg-corner{flex:0 0 190px}
+.xg-rday{flex:1;position:relative;min-width:86px;padding:7px 0 6px;text-align:center;border-left:1px solid rgba(var(--ink-rgb),.06)}
+.xg-rday b{display:block;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+.xg-rday span{font-size:.66rem;color:var(--text-muted)}
+.xg-rday.today b{color:var(--accent-cyan)}
+.xg-rday i{position:absolute;top:100%;height:4px;width:1px;background:rgba(var(--ink-rgb),.12)}
+.xg-lanes{display:flex}
+.xg-agents-col{flex:0 0 190px;border-right:1px solid rgba(var(--ink-rgb),.08)}
+.xg-agent{height:46px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-bottom:1px solid rgba(var(--ink-rgb),.05)}
+.xg-name{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:128px}
+.xg-hrs{font-size:.68rem;font-weight:700;color:var(--text-muted);flex:none}
+.xg-hrs.low{color:var(--accent-green)}
+.xg-hrs.over{color:var(--accent-rose)}
+.xg-main{flex:1;position:relative;min-width:602px}
+.xg-lane{height:46px;border-bottom:1px solid rgba(var(--ink-rgb),.05);position:relative;transition:background .18s ease,opacity .18s ease}
+.xg-sep{position:absolute;top:0;bottom:0;width:1px;background:rgba(var(--ink-rgb),.055);pointer-events:none}
+.xg-todayband{position:absolute;top:0;bottom:0;background:rgba(0,212,255,.06);pointer-events:none}
+.xg-pill{position:absolute;top:9px;height:28px;border-radius:999px;display:flex;align-items:center;gap:5px;padding:0 10px;font-size:.68rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 1px 3px rgba(0,0,0,.28);
+  transition:transform .16s ease,box-shadow .16s ease,opacity .16s ease}
+.xg-pill .xg-pt{opacity:.85;font-weight:600}
+.xg-t-OnSite{background:linear-gradient(135deg,#00b8d9,#0090b7)}
+.xg-t-WorkFromHome{background:linear-gradient(135deg,#8b5cf6,#6d3fd4)}
+.xg-off{position:absolute;top:16px;height:14px;border-radius:999px;background:rgba(var(--ink-rgb),.1);color:var(--text-muted);font-size:.6rem;display:flex;align-items:center;justify-content:center}
+.xg-pill.xg-flying{cursor:grabbing;transform:scale(1.05);z-index:30;box-shadow:0 16px 38px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.35);opacity:.96}
+.xg-lane.xg-under{background:rgba(0,230,118,.07);box-shadow:inset 2px 0 0 var(--accent-green)}
+.xg-lane.xg-over{opacity:.45;background:repeating-linear-gradient(45deg,transparent 0 8px,rgba(var(--ink-rgb),.05) 8px 16px)}
+.xg-lane.xg-target{background:rgba(0,212,255,.09)}
+.xg-now{position:absolute;top:0;bottom:0;width:2px;background:var(--accent-cyan);box-shadow:0 0 10px 1px rgba(0,212,255,.75);z-index:4;pointer-events:none;transition:left .8s linear}
+.xg-now::before{content:'';position:absolute;top:0;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent-cyan);box-shadow:0 0 8px rgba(0,212,255,.9)}
+.xg-badge{position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#1b1730;color:#fff;font-size:.62rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;display:none;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.xg-pill.xg-flying .xg-badge{display:block}
+.xg-legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid rgba(var(--ink-rgb),.07);font-size:.7rem;color:var(--text-muted)}
+.xg-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* ---- 2) Live Pulse ---- */
+#xapPulse{margin-bottom:14px}
+.xap-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px;border-radius:var(--radius,14px);border:1px solid rgba(0,212,255,.18);background:linear-gradient(135deg,rgba(0,212,255,.07),rgba(185,103,255,.06))}
+.xap-title{font-size:.82rem;font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.xap-title em{font-style:normal;font-weight:600;color:var(--text-muted);font-size:.72rem}
+.xap-dot{width:9px;height:9px;border-radius:50%;background:var(--accent-green);box-shadow:0 0 8px var(--accent-green);animation:xapBlink 1.6s ease-in-out infinite}
+@keyframes xapBlink{0%,100%{opacity:1}50%{opacity:.35}}
+.xap-chips{display:flex;gap:8px;flex-wrap:wrap}
+.xap-chip{display:flex;align-items:center;gap:8px;border:1px solid rgba(var(--ink-rgb),.12);background:rgba(var(--ink-rgb),.03);color:inherit;border-radius:999px;padding:7px 14px;font-size:.76rem;font-weight:700;cursor:pointer;transition:all .16s ease}
+.xap-chip b{font-size:.86rem}
+.xap-chip:hover{transform:translateY(-1px)}
+.xap-chip.track.active{border-color:var(--accent-green);background:rgba(0,230,118,.12);box-shadow:0 4px 14px rgba(0,230,118,.25)}
+.xap-chip.soon.active{border-color:var(--accent-amber,#ffb800);background:rgba(255,184,0,.12);box-shadow:0 4px 14px rgba(255,184,0,.25)}
+.xap-chip.crit.active{border-color:var(--accent-rose);background:rgba(255,77,109,.12);box-shadow:0 4px 14px rgba(255,77,109,.25)}
+.atm-gap{animation:xapBreathe 2.2s ease-in-out infinite}
+@keyframes xapBreathe{0%,100%{box-shadow:0 0 0 0 rgba(255,77,109,0)}50%{box-shadow:0 0 10px 2px rgba(255,77,109,.65)}}
+.xap-now{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--accent-cyan);box-shadow:0 0 9px 1px rgba(0,212,255,.8);z-index:5;pointer-events:none;transition:left 1s linear}
+.xap-now::before{content:'';position:absolute;top:-4px;left:-3.5px;width:9px;height:9px;border-radius:50%;background:var(--accent-cyan);box-shadow:0 0 7px rgba(0,212,255,.95)}
+/* expandable anomaly cards */
+.atm-warn-item.xap-warn{cursor:pointer;position:relative;flex-wrap:wrap;transition:background .16s ease}
+.atm-warn-item.xap-warn:hover{background:rgba(var(--ink-rgb),.045)}
+.xap-chev{margin-left:auto;color:var(--text-muted);transition:transform .18s ease;font-size:.8rem}
+.atm-warn-item.open .xap-chev{transform:rotate(180deg)}
+.xap-detail{display:none;flex-basis:100%;padding:10px 4px 4px}
+.atm-warn-item.open .xap-detail{display:block}
+.xap-stats{display:flex;gap:12px;flex-wrap:wrap;font-size:.74rem;color:var(--text-muted);margin-bottom:10px}
+.xap-stats b{color:inherit}
+.xap-actions{display:flex;gap:8px;flex-wrap:wrap}
+.xap-btn{border:1px solid rgba(var(--ink-rgb),.14);background:rgba(var(--ink-rgb),.04);color:inherit;border-radius:10px;padding:7px 12px;font-size:.74rem;font-weight:700;cursor:pointer;transition:all .15s ease}
+.xap-btn:hover{transform:translateY(-1px)}
+.xap-btn.ok:hover{border-color:var(--accent-green);background:rgba(0,230,118,.12)}
+.xap-btn.warn2:hover{border-color:var(--accent-amber,#ffb800);background:rgba(255,184,0,.12)}
+.xap-btn.info:hover{border-color:var(--accent-cyan);background:rgba(0,212,255,.12)}
+.atm-warn-item.xap-resolved{opacity:.62;border-left:3px solid var(--accent-green)}
+.atm-warn-item.xap-resolved .atm-warn-kind{filter:grayscale(1)}
+.xap-badge{margin-left:auto;font-size:.68rem;font-weight:700;color:var(--accent-green);cursor:pointer}
+.atm-warn-item.xap-resolved .xap-chev{display:none}
+
+/* ---- 3) Executive Analytics ---- */
+.xea-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.xea-card h4{margin:0 0 4px}
+.xea-hint{margin:0 0 12px;font-size:.76rem;color:var(--text-muted)}
+.xea-chart{min-height:220px}
+.xea-svg{width:100%;height:auto;display:block}
+.xea-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--text-muted);margin-top:8px}
+.xea-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.xea-debrief{display:flex;flex-direction:column;gap:10px}
+.xea-line{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:rgba(var(--ink-rgb),.03);border:1px solid rgba(var(--ink-rgb),.06);font-size:.86rem;line-height:1.5}
+.xea-line .xea-ic{font-size:1.05rem;flex:none}
+@media(max-width:900px){.xea-grid{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .xg-agent,.xg-corner{flex-basis:132px}
+  .xg-name{max-width:80px}
+  .xg-rday{min-width:64px}
+  .xg-main{min-width:448px}
+}
+@media(prefers-reduced-motion:reduce){
+  .atm-gap,.xap-dot{animation:none!important}
+  .xap-now{transition:none}
+}
+.xg-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid rgba(var(--ink-rgb),.07)}
+.xg-toolbar .btn{padding:7px 14px;font-size:.76rem}
+.xg-lane.xg-busy{opacity:.45}
+.xg-pill.xg-drag{touch-action:none}
+#xgViewToggle{display:none}
+
+</style>
+<style id="phase48-zoomfix">
+/* Phase 48: paint the page background on the ROOT element too.
+   On Android WebView, scaling the page below 100% shrinks <body>'s painted
+   area and the compositor shows the native view behind it (black gap at the
+   bottom). A background on <html> propagates to the whole canvas/viewport,
+   so the dark theme always fills the screen at any zoom level. */
+html{background:var(--bg);min-height:100%}
+</style>
 </head>
 
 <body>
@@ -3080,6 +3199,7 @@ bottom: 154px !important;
                     <div class="nav-item" id="nav-audition-status" onclick="openInTab('audition-status')"><span data-i18n="auditionStatusMgmt">Audition Status Management</span></div>
                     <div class="nav-item" id="nav-audition-schedule" onclick="openInTab('audition-schedule')"><span data-i18n="auditionSchedule">Audition Schedule</span></div>
                     <div class="nav-item" id="nav-audition-attendance" onclick="openInTab('audition-attendance')"><span data-i18n="auditionAttendance">Attendance Monitor</span></div>
+                    <div class="nav-item" id="nav-audition-exec" onclick="openInTab('audition-exec')"><span data-i18n="auditionExec">Executive Analytics</span></div>
                 </div>
             </div>
 
@@ -5202,6 +5322,10 @@ bottom: 154px !important;
                                 <button type="button" id="schModeWeekBtn" class="sch-vt-btn active" onclick="schSetRangeMode('week')">Week</button>
                                 <button type="button" id="schModeMonthBtn" class="sch-vt-btn" onclick="schSetRangeMode('month')">Month</button>
                             </div>
+                            <div class="sch-viewtoggle" id="xgViewToggle">
+                                <button type="button" id="xgViewTimelineBtn" class="sch-vt-btn active" onclick="xgSetView('timeline')">⏱ Timeline</button>
+                                <button type="button" id="xgViewGridBtn" class="sch-vt-btn" onclick="xgSetView('grid')">▦ Grid</button>
+                            </div>
                             <button class="btn btn-secondary" onclick="schLoad(true)" style="flex:none">🔄 Refresh</button>
                         </div>
                     </div>
@@ -5260,6 +5384,7 @@ bottom: 154px !important;
                         </div>
                     </div>
                     <div class="sch-grid-wrap" id="schTeamWeekWrap"><table class="sch-grid" id="schGrid"></table></div>
+                    <div id="xgWrap" style="display:none"></div>
                     <div class="sch-grid-wrap" id="schTeamMonthWrap" style="display:none"><div class="sch-mgrid" id="schMonthGrid"></div></div>
                 </div>
 
@@ -5432,8 +5557,49 @@ bottom: 154px !important;
                         <div class="atm-legend" id="atmLegend"></div>
                     </div>
                 </div>
+                <div id="xapPulse"></div>
                 <div id="atmWarnCard" class="card" style="display:none;margin-bottom:14px"></div>
                 <div id="atmHost">⏳ Loading…</div>
+            </div>
+
+            <!-- Phase 47 (Ahmed): Executive Reporting & Analytics — adherence matrix,
+                 fulfillment vs target, automated weekly debrief. Same gate as the
+                 other Audition tabs; 60s cached reads, NO polling. -->
+            <div id="pg-audition-exec" style="display:none">
+                <div class="card" style="margin-bottom:14px">
+                    <div class="ap-head">
+                        <div>
+                            <h3 style="margin-bottom:4px">📈 Executive Analytics</h3>
+                            <p class="ap-sync" style="margin:0" id="xeaSub">Adherence, fulfillment and the automated weekly debrief — computed locally from live schedule + attendance data.</p>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <button type="button" class="sch-navbtn" onclick="xeaShift(-1)">‹</button>
+                            <div class="sch-weeklabel" id="xeaWeekLabel">—</div>
+                            <button type="button" class="sch-navbtn" onclick="xeaShift(1)">›</button>
+                            <button type="button" class="sch-navbtn sch-todaybtn" onclick="xeaToday()">This week</button>
+                            <button class="btn btn-secondary" onclick="xeaLoad(true)" style="flex:none">🔄 Refresh</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="xea-grid">
+                    <div class="card xea-card">
+                        <h4>🎯 Schedule Adherence Matrix</h4>
+                        <p class="xea-hint">Agent capacity (scheduled hours) × punctuality score. Bottom-right = burnout risk.</p>
+                        <div class="xea-chart" id="xeaScatter"></div>
+                    </div>
+                    <div class="card xea-card">
+                        <h4>📉 Fulfillment vs Target</h4>
+                        <p class="xea-hint">Scheduled coverage vs actual attendance coverage, per day.</p>
+                        <div class="xea-chart" id="xeaArea"></div>
+                        <div class="xea-legend"><span><i style="background:var(--accent-cyan)"></i>Scheduled hours</span><span><i style="background:var(--accent-green)"></i>Attended hours</span></div>
+                    </div>
+                </div>
+                <div class="card xea-card">
+                    <h4>🤖 Automated Weekly Debrief</h4>
+                    <p class="xea-hint">Generated locally from this week's schedule + attendance. Push it to the team insights feed.</p>
+                    <div class="xea-debrief" id="xeaDebrief"><div class="xea-empty">⏳ Loading analytics…</div></div>
+                    <div style="margin-top:12px"><button class="btn btn-primary" onclick="xeaPushInsights()">📣 Push to #insightsPanel</button></div>
+                </div>
             </div>
 
             <!-- Phase 10.13 (Ahmed): Preview Agent View -- the Lark Base
@@ -5633,6 +5799,7 @@ const translations = {
         audition: "Audition",
         auditionSchedule: "Audition Schedule",
         auditionAttendance: "Attendance Monitor",
+        auditionExec: "Executive Analytics",
         auditionStatusMgmt: "Audition Status Management",
         manageAgents: "Manage Agents",
         auditLog: "Audit Log",
@@ -5669,6 +5836,7 @@ const translations = {
         auditionStatusMgmt: "状态管理",
         auditionSchedule: "排班",
         auditionAttendance: "考勤监控",
+        auditionExec: "高管分析",
         manageAgents: "管理代理",
         auditLog: "审计日志",
         logout: "退出登录",
@@ -5756,7 +5924,7 @@ const zhPageTitlesMap = {
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-audition-attendance','pg-rewards'];
+const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-audition-attendance','pg-audition-exec','pg-rewards'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -6090,6 +6258,10 @@ function executePageLogic(page) {
         document.getElementById('pg-audition-attendance').style.display='block';
         _expandNavGroup('navBodyAudition','navArrAudition');
         atmOnOpen(); // Phase 33: attendance monitor (60s cached read, NO polling)
+    } else if(page==='audition-exec'){
+        document.getElementById('pg-audition-exec').style.display='block';
+        _expandNavGroup('navBodyAudition','navArrAudition');
+        xeaOnOpen(); // Phase 47: executive analytics (60s cached reads, NO polling)
     } else if(page==='my-requests'){
         document.getElementById('pg-my-requests').style.display='block';
         _expandNavGroup('navBodySubmit','navArrSubmit');
@@ -13732,8 +13904,11 @@ function configureSidebarAndCards() {
     // agent's timeline, agents see only themselves, matched server-side).
     const navAuditionAttendance = document.getElementById('nav-audition-attendance');
     if (navAuditionAttendance) navAuditionAttendance.style.display = (isAdmin || hasExactMod('audition_status') || hasExactMod('audition_access')) ? '' : 'none';
+    // Phase 47: Executive Analytics -- same gate as Schedule/Attendance.
+    const navAuditionExec = document.getElementById('nav-audition-exec');
+    if (navAuditionExec) navAuditionExec.style.display = (isAdmin || hasExactMod('audition_status') || hasExactMod('audition_access')) ? '' : 'none';
     const grpAudition = document.getElementById('navGrpAudition');
-    if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule, navAuditionAttendance].some(el => el && el.style.display !== 'none') ? '' : 'none';
+    if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule, navAuditionAttendance, navAuditionExec].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     if (isAdmin) {
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
@@ -23675,6 +23850,571 @@ function atmRender(){
   const prepare0=prepare;
   prepare=function(){prepare0();docks().forEach(buildMenu);syncMenus();};
   prepare();new MutationObserver(prepare).observe(document.body,{childList:true,subtree:true});
+})();
+
+</script>
+<script id="phase47-xg">
+/* Phase 47 (Ahmed): Fluid Capacity Gantt (xg) + Live Pulse (xap) + Executive Analytics (xea)
+   Additive layer — the legacy grid, monitor and all existing flows stay untouched.
+   Namespaces: xg* (schedule timeline), xap* (attendance pulse), xea* (exec analytics). */
+(function () {
+'use strict';
+function $(id) { return document.getElementById(id); }
+var XG_KEY = 'xgView';
+
+/* ============================ 1) FLUID CAPACITY GANTT ============================ */
+var xgView = (function () { try { return localStorage.getItem(XG_KEY) || 'timeline'; } catch (e) { return 'timeline'; } })();
+
+function xgHm(m) { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+function xgEsc(s) { return escHtml(s == null ? '' : s); }
+function xgDays() {
+    if (typeof schWeekStart === 'undefined' || !schWeekStart) return [];
+    var b = schRangeBounds(), out = [], d = new Date(b[0]);
+    while (d <= b[1] && out.length < 31) { out.push(new Date(d)); d.setDate(d.getDate() + 1); }
+    return out;
+}
+function xgAgents() {
+    if (schView === 'team' && isAdmin) return schFilteredAgents().filter(function (a) { return a && a.email; });
+    var seen = {}, out = [];
+    schPlannerRows().forEach(function (r) {
+        var k = (r.email || r.name || '').toLowerCase();
+        if (k && !seen[k]) { seen[k] = 1; out.push({ name: r.name || r.email, email: r.email || '' }); }
+    });
+    return out;
+}
+
+window.xgSetView = function (v) {
+    xgView = (v === 'grid') ? 'grid' : 'timeline';
+    try { localStorage.setItem(XG_KEY, xgView); } catch (e) {}
+    xgApplyView();
+};
+
+function xgApplyView() {
+    var wrap = $('xgWrap'), grid = $('schTeamWeekWrap');
+    var tb = $('xgViewTimelineBtn'), gb = $('xgViewGridBtn'), tg = $('xgViewToggle');
+    if (typeof schRangeMode === 'undefined') return;
+    var ok = schRangeMode === 'week';
+    var show = xgView === 'timeline' && ok;
+    if (tg) tg.style.display = (schView === 'team' && isAdmin) ? 'flex' : 'none';
+    if (tb) { tb.classList.toggle('active', show); tb.disabled = !ok; tb.title = ok ? '' : 'Timeline is a week view — switch back to Week to use it.'; }
+    if (gb) gb.classList.toggle('active', !show);
+    if (wrap) wrap.style.display = show ? 'block' : 'none';
+    if (grid && schRangeMode === 'week') grid.style.display = show ? 'none' : 'block';
+    if (show) xgRender();
+}
+
+function xgRender() {
+    var wrap = $('xgWrap'); if (!wrap) return;
+    var days = xgDays();
+    if (!days.length) { wrap.innerHTML = '<div class="xg-empty">Pick a week first.</div>'; return; }
+    var totalMin = days.length * 1440;
+    var rows = schPlannerRows();
+    var agents = xgAgents();
+    if (!agents.length) { wrap.innerHTML = '<div class="xg-empty">No agents on the roster for this view.</div>'; return; }
+    var byAgent = {};
+    rows.forEach(function (r) { var k = (r.email || r.name || '').toLowerCase(); (byAgent[k] = byAgent[k] || []).push(r); });
+    var todayInt = schDayInt(new Date());
+    var ruler = '<div class="xg-corner"></div>';
+    days.forEach(function (d) {
+        var isT = schDayInt(d) === todayInt, ticks = '';
+        for (var h = 6; h < 24; h += 6) ticks += '<i style="left:' + (h / 24 * 100) + '%"></i>';
+        ruler += '<div class="xg-rday' + (isT ? ' today' : '') + '"><b>' + d.toLocaleDateString('en-GB', { weekday: 'short' })
+            + '</b><span>' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + '</span>' + ticks + '</div>';
+    });
+    var editable = isAdmin && schView === 'team';
+    var col = '', main = '';
+    agents.forEach(function (a) {
+        var em = (a.email || '').toLowerCase();
+        var hrs = schAgentHours(a.email || '');
+        var hcls = hrs >= 50 ? 'over' : (hrs < 35 ? 'low' : '');
+        col += '<div class="xg-agent"><span class="xg-name" title="' + xgEsc(a.name) + '">' + xgEsc(a.name || a.email)
+            + '</span><span class="xg-hrs ' + hcls + '">' + hrs + 'h</span></div>';
+        var pills = '';
+        (byAgent[em] || []).forEach(function (r) {
+            var di = Math.round((schDateFromInt(r.day) - days[0]) / 86400000);
+            if (di < 0 || di >= days.length) return;
+            var st = schMinutes(r.start), en = schMinutes(r.end);
+            if (SCH_WORK_TYPES.indexOf(r.type) >= 0 && st !== null && en !== null) {
+                var dur = ((en - st) + 1440) % 1440; if (dur <= 0) dur = 1440;
+                var endAbs = Math.min(st + dur, 1440);
+                var left = (di * 1440 + st) / totalMin * 100;
+                var width = Math.max((endAbs - st) / totalMin * 100, .8);
+                var meta = SCH_META[r.type] || {};
+                pills += '<div class="xg-pill xg-t-' + (meta.cls || 'OnSite') + (editable ? ' xg-drag' : '') + '" style="left:' + left.toFixed(3) + '%;width:' + width.toFixed(3) + '%" '
+                    + 'data-email="' + xgEsc(r.email || '') + '" data-name="' + xgEsc(r.name || '') + '" data-day="' + r.day + '" data-type="' + xgEsc(r.type) + '" '
+                    + 'data-start="' + st + '" data-dur="' + dur + '" data-note="' + xgEsc(r.note || '') + '" title="' + xgEsc(r.name) + ' · ' + xgEsc(r.type) + ' ' + r.start + '→' + r.end + '">'
+                    + '<span>' + (meta.i || '🕒') + '</span><span class="xg-pt">' + xgHm(st) + '→' + xgHm(st + dur) + '</span><span class="xg-badge"></span></div>';
+            } else {
+                pills += '<div class="xg-off" style="left:' + (di * 1440 / totalMin * 100).toFixed(3) + '%;width:' + (1440 / totalMin * 100).toFixed(3) + '%">' + xgEsc(r.type) + '</div>';
+            }
+        });
+        main += '<div class="xg-lane" data-email="' + xgEsc(a.email || '') + '" data-name="' + xgEsc(a.name || '') + '">' + pills + '</div>';
+    });
+    var seps = '';
+    for (var s2 = 1; s2 < days.length; s2++) seps += '<div class="xg-sep" style="left:' + (s2 / days.length * 100).toFixed(3) + '%"></div>';
+    var nowHtml = '';
+    var tdi = -1;
+    for (var ti = 0; ti < days.length; ti++) if (schDayInt(days[ti]) === todayInt) tdi = ti;
+    if (tdi >= 0) {
+        var nm = new Date(), mm = nm.getHours() * 60 + nm.getMinutes();
+        nowHtml = '<div class="xg-now" data-base="' + tdi + '" style="left:' + ((tdi * 1440 + mm) / totalMin * 100).toFixed(3) + '%"></div>';
+    }
+    wrap.innerHTML = '<div class="xg-toolbar">'
+        + '<button type="button" class="btn btn-secondary" id="xgSmartBtn">✨ Smart Build</button>'
+        + '<button type="button" class="btn btn-secondary" id="xgSwapBtn">⇄ Shift swap</button>'
+        + '<span style="font-size:.72rem;color:var(--text-muted)">Drag a pill to retime it' + (editable ? ', or drop it on a teammate’s lane to move it' : '') + '. Green lanes are under-utilized, striped lanes near overtime.</span>'
+        + '</div>'
+        + '<div class="xg-scroll"><div class="xg-ruler">' + ruler + '</div>'
+        + '<div class="xg-lanes"><div class="xg-agents-col">' + col + '</div><div class="xg-main">' + seps + main + nowHtml + '</div></div></div>'
+        + '<div class="xg-legend"><span><i style="background:linear-gradient(135deg,#00b8d9,#0090b7)"></i>On Site</span>'
+        + '<span><i style="background:linear-gradient(135deg,#8b5cf6,#6d3fd4)"></i>Work From Home</span>'
+        + '<span><i style="background:rgba(120,130,150,.35)"></i>Off / Leave</span>'
+        + '<span><i style="background:var(--accent-green)"></i>Under-utilized</span>'
+        + '<span><i style="background:var(--accent-rose)"></i>Overtime risk</span></div>';
+    var sb = $('xgSmartBtn');
+    if (sb) sb.onclick = function () { ToastManager.show('Smart Build (auto-draft from audition volume + availability) needs the scheduling algorithm service — planned as a backend update. Drag pills to compose the week for now.', 'warning', 7000); };
+    var sw = $('xgSwapBtn');
+    if (sw) sw.onclick = function () { ToastManager.show('One-click swaps with peer notification ride on a backend hook — planned next. For now, drag the pill onto the teammate’s lane to move it.', 'warning', 7000); };
+    if (editable) xgBindDrag(wrap, days, totalMin);
+}
+
+function xgBindDrag(wrap, days, totalMin) {
+    var main = wrap.querySelector('.xg-main'); if (!main) return;
+    wrap.querySelectorAll('.xg-pill.xg-drag').forEach(function (pill) {
+        pill.addEventListener('pointerdown', function (ev) {
+            if (ev.button !== 0 && ev.pointerType === 'mouse') return;
+            ev.preventDefault();
+            var lanes = [].slice.call(main.querySelectorAll('.xg-lane'));
+            var rect0 = main.getBoundingClientRect();
+            var pxPerMin = rect0.width / totalMin;
+            var st0 = +pill.dataset.start, dur = +pill.dataset.dur;
+            var startX = ev.clientX;
+            var email = (pill.dataset.email || '').toLowerCase();
+            var day = +pill.dataset.day;
+            var curStart = st0, target = null;
+            lanes.forEach(function (l) {
+                var le = (l.dataset.email || '').toLowerCase(); if (!le) return;
+                var h = schAgentHours(le);
+                if (h >= 50) l.classList.add('xg-over'); else if (h < 35) l.classList.add('xg-under');
+                var busy = schRows.some(function (r) { return (r.email || '').toLowerCase() === le && +r.day === day && le !== email; });
+                if (busy) l.classList.add('xg-busy');
+            });
+            pill.classList.add('xg-flying'); pill.style.transition = 'none';
+            var badge = pill.querySelector('.xg-badge');
+            try { pill.setPointerCapture(ev.pointerId); } catch (e) {}
+            function laneAt(y) { var r = main.getBoundingClientRect(); var i = Math.floor((y - r.top) / 46); return (i >= 0 && i < lanes.length) ? lanes[i] : null; }
+            function paint() {
+                var di = Math.round((schDateFromInt(day) - days[0]) / 86400000);
+                pill.style.left = ((di * 1440 + curStart) / totalMin * 100).toFixed(3) + '%';
+                var dy = target ? (target.offsetTop - pill.parentElement.offsetTop) : 0;
+                pill.style.transform = dy ? 'translateY(' + dy + 'px)' : '';
+                if (badge) badge.textContent = xgHm(curStart) + ' → ' + xgHm(curStart + dur) + (target && (target.dataset.email || '').toLowerCase() !== email ? ' ⇄ ' + (target.dataset.name || '') : '');
+            }
+            function move(e2) {
+                var dm = Math.round((e2.clientX - startX) / pxPerMin / 15) * 15;
+                curStart = Math.min(Math.max(st0 + dm, 0), Math.max(0, 1440 - dur));
+                var nl = laneAt(e2.clientY);
+                if (nl !== target) { lanes.forEach(function (l) { l.classList.remove('xg-target'); }); target = nl; if (target) target.classList.add('xg-target'); }
+                paint();
+            }
+            function cleanup() {
+                pill.removeEventListener('pointermove', move);
+                pill.removeEventListener('pointerup', up);
+                pill.removeEventListener('pointercancel', up);
+                lanes.forEach(function (l) { l.classList.remove('xg-under', 'xg-over', 'xg-busy', 'xg-target'); });
+                pill.classList.remove('xg-flying'); pill.style.transition = ''; pill.style.transform = '';
+            }
+            function up() {
+                pill.removeEventListener('pointermove', move);
+                pill.removeEventListener('pointerup', up);
+                pill.removeEventListener('pointercancel', up);
+                lanes.forEach(function (l) { l.classList.remove('xg-under', 'xg-over', 'xg-busy', 'xg-target'); });
+                var dest = (target && (target.dataset.email || '').toLowerCase() !== email) ? target : null;
+                var changed = curStart !== st0 || !!dest;
+                pill.classList.remove('xg-flying'); pill.style.transition = ''; pill.style.transform = '';
+                if (!changed) { paint(); return; }
+                if (dest) {
+                    var busy = schRows.some(function (r) { return (r.email || '').toLowerCase() === (dest.dataset.email || '').toLowerCase() && +r.day === day; });
+                    if (busy) { ToastManager.show((dest.dataset.name || 'That agent') + ' already has an entry that day — move blocked.', 'warning', 4500); paint(); return; }
+                }
+                var tEmail = dest ? (dest.dataset.email || '') : pill.dataset.email;
+                var tName = dest ? (dest.dataset.name || '') : pill.dataset.name;
+                var entry = { email: tEmail, name: tName, day: day, type: pill.dataset.type, start: xgHm(curStart), end: xgHm(curStart + dur), note: pill.dataset.note || '' };
+                var dels = dest ? [email + '|' + day] : [];
+                (async function () {
+                    try {
+                        await schSaveEntries([entry], dels);
+                        schApplyLocal([entry], dels);
+                        schRenderAll();
+                        ToastManager.show('Shift updated — ' + entry.start + ' → ' + entry.end + (dest ? ' · moved to ' + tName : ''), 'success', 3200);
+                    } catch (err) {
+                        ToastManager.show(err.message || String(err), 'error', 8000);
+                        schRenderAll();
+                    }
+                })();
+            }
+            pill.addEventListener('pointermove', move);
+            pill.addEventListener('pointerup', up);
+            pill.addEventListener('pointercancel', up);
+            paint();
+        });
+    });
+}
+
+/* ============================ 2) LIVE PULSE DASHBOARD ============================ */
+var xapFilter = 'all';
+var XAP_RKEY = 'xapResolved';
+function xapResolved() { try { return JSON.parse(localStorage.getItem(XAP_RKEY) || '{}'); } catch (e) { return {}; } }
+function xapSaveResolved(o) { try { localStorage.setItem(XAP_RKEY, JSON.stringify(o)); } catch (e) {} }
+function xapKey(a) { return ((a.email || a.name || '') + '').toLowerCase(); }
+function xapClassify(a) {
+    var today = schDayInt(new Date());
+    var D = (a.days || {})[String(today)]; if (!D || !D.shift) return null;
+    var sh = D.shift, st = sh.start_min, en = sh.end_min;
+    if (st == null || en == null) return null;
+    if (SCH_OFF_TYPES.indexOf(sh.type) >= 0) return null;
+    var nw = new Date(), m = nw.getHours() * 60 + nw.getMinutes();
+    var inWin = en > st ? (m >= st && m <= en) : (m >= st || m <= en);
+    if (!inWin) return null;
+    var liveOn = ['Online', 'On Task', 'Working Ticket', 'Meeting'].indexOf(a.live && a.live.status) >= 0;
+    var gaps = D.inshift_gaps || [];
+    for (var i = 0; i < gaps.length; i++) { var g = gaps[i]; if (m >= g.s && m <= g.e) return (g.min >= 5) ? 'crit' : 'soon'; }
+    if (!liveOn) {
+        if (m - st >= 15 && !(D.worked_min > 0)) return 'crit';
+        return 'soon';
+    }
+    return 'track';
+}
+window.xapSetFilter = function (f) {
+    xapFilter = (xapFilter === f) ? 'all' : f;
+    xapRenderPulse();
+};
+function xapRenderPulse() {
+    var host = $('xapPulse'); if (!host) return;
+    var page = $('pg-audition-attendance');
+    if (!page || page.style.display === 'none') return;
+    if (!atmData || !atmData.agents) { host.innerHTML = ''; return; }
+    var counts = { track: 0, soon: 0, crit: 0 }, cls = {};
+    atmData.agents.forEach(function (a) { var c = xapClassify(a); if (c) { counts[c]++; cls[xapKey(a)] = c; } });
+    var live = counts.track + counts.soon + counts.crit;
+    host.innerHTML = '<div class="xap-bar"><span class="xap-title"><span class="xap-dot"></span>Live Pulse <em>' + live + ' in shift right now</em></span>'
+        + '<div class="xap-chips">'
+        + '<button type="button" class="xap-chip track' + (xapFilter === 'track' ? ' active' : '') + '" onclick="xapSetFilter(\'track\')">✅ On-Track <b>' + counts.track + '</b></button>'
+        + '<button type="button" class="xap-chip soon' + (xapFilter === 'soon' ? ' active' : '') + '" onclick="xapSetFilter(\'soon\')">⏳ Approaching Gap <b>' + counts.soon + '</b></button>'
+        + '<button type="button" class="xap-chip crit' + (xapFilter === 'crit' ? ' active' : '') + '" onclick="xapSetFilter(\'crit\')">🚨 Critical <b>' + counts.crit + '</b></button>'
+        + '</div></div>';
+    document.querySelectorAll('#atmHost .atm-agent').forEach(function (c) {
+        var k = (c.getAttribute('data-xap-key') || '').toLowerCase();
+        c.style.display = (xapFilter === 'all' || cls[k] === xapFilter) ? '' : 'none';
+    });
+    xapUpgradeWarn();
+}
+function xapUpgradeWarn() {
+    var warnC = $('atmWarnCard'); if (!warnC || !atmData) return;
+    var ws = atmData.warnings || [];
+    var items = warnC.querySelectorAll('.atm-warn-item');
+    var res = xapResolved();
+    var ACTION_LABEL = { excuse: 'Excused', points: 'Points deducted', reassign: 'Reassigned' };
+    items.forEach(function (it, i) {
+        var w = ws[i]; if (!w) return;
+        var key = w.agent + '|' + w.day + '|' + w.kind;
+        if (!it.classList.contains('xap-warn')) {
+            it.classList.add('xap-warn');
+            it.insertAdjacentHTML('beforeend', '<span class="xap-chev">▾</span><div class="xap-detail"></div>');
+            it.addEventListener('click', function (ev) {
+                if (ev.target.closest('.xap-btn') || ev.target.closest('.xap-badge')) return;
+                it.classList.toggle('open');
+            });
+        }
+        var det = it.querySelector('.xap-detail');
+        var ag = (atmData.agents || []).filter(function (a) { return (a.name || '') === w.agent; })[0] || {};
+        var S = ag.summary || {};
+        det.innerHTML = '<div class="xap-stats">'
+            + '<span>Adherence this range:</span>'
+            + '<span>✅ <b>' + (S.worked_days || 0) + '</b> worked</span>'
+            + '<span>⏰ <b>' + (S.late_days || 0) + '</b> late (' + atmMinLabel(S.late_min || 0) + ')</span>'
+            + '<span>🔴 <b>' + atmMinLabel(S.gap_min || 0) + '</b> gaps</span>'
+            + '<span>🚫 <b>' + (S.no_show || 0) + '</b> no-shows</span></div>'
+            + '<div class="xap-actions">'
+            + '<button type="button" class="xap-btn ok" onclick="xapResolve(' + i + ',\'excuse\')">✅ Excuse Absence</button>'
+            + '<button type="button" class="xap-btn warn2" onclick="xapResolve(' + i + ',\'points\')">➖ Deduct Points</button>'
+            + '<button type="button" class="xap-btn info" onclick="xapResolve(' + i + ',\'reassign\')">🔀 Reassign Auditions</button>'
+            + '</div>';
+        var oldBadge = it.querySelector('.xap-badge'); if (oldBadge) oldBadge.remove();
+        if (res[key]) {
+            it.classList.add('xap-resolved');
+            it.insertAdjacentHTML('beforeend', '<span class="xap-badge">✓ ' + (ACTION_LABEL[res[key].a] || 'Resolved') + ' — undo</span>');
+        } else {
+            it.classList.remove('xap-resolved');
+        }
+    });
+    if (!warnC._xapDel) {
+        warnC._xapDel = 1;
+        warnC.addEventListener('click', function (ev) {
+            var bd = ev.target.closest('.xap-badge'); if (!bd) return;
+            var it = bd.closest('.atm-warn-item'); if (!it) return;
+            var idx = [].indexOf.call(warnC.querySelectorAll('.atm-warn-item'), it);
+            var w = (atmData.warnings || [])[idx]; if (!w) return;
+            var r = xapResolved(); delete r[w.agent + '|' + w.day + '|' + w.kind];
+            xapSaveResolved(r); xapUpgradeWarn();
+        });
+    }
+}
+window.xapResolve = function (i, action) {
+    var w = (atmData && atmData.warnings || [])[i]; if (!w) return;
+    var r = xapResolved();
+    r[w.agent + '|' + w.day + '|' + w.kind] = { a: action, ts: Date.now() };
+    xapSaveResolved(r);
+    xapUpgradeWarn();
+    var who = w.agent + ' (' + schDayLabel(w.day) + ')';
+    var msgs = {
+        excuse: '✅ Absence excused for ' + who + '. Recorded locally — supervisor webhook escalation rides on the backend hook (planned).',
+        points: '➖ Point deduction for ' + who + ' logged locally — the points-system write needs the backend hook (planned).',
+        reassign: '🔀 Reassignment for ' + who + ' noted locally — auto-reassign needs the backend hook; meanwhile adjust the shift in Audition Schedule.'
+    };
+    ToastManager.show(msgs[action] || 'Resolved.', 'success', 6000);
+};
+function xapWrapStatics() {
+    if (typeof window.atmAgentCard === 'function' && !window.atmAgentCard._xap) {
+        var oc = window.atmAgentCard;
+        var wc = function (a) {
+            var html = oc.apply(this, arguments);
+            return html.replace('<div class="card atm-agent">', '<div class="card atm-agent" data-xap-key="' + escHtml(xapKey(a)) + '">');
+        };
+        wc._xap = 1; window.atmAgentCard = wc;
+    }
+    if (typeof window.atmDayRow === 'function' && !window.atmDayRow._xap) {
+        var od = window.atmDayRow;
+        var wd = function (a, ds, axis, ticks) {
+            var html = od.apply(this, arguments);
+            if (+ds === schDayInt(new Date())) {
+                var nw = new Date(), m = nw.getHours() * 60 + nw.getMinutes();
+                html = html.replace('<div class="atm-strip">', '<div class="atm-strip"><div class="xap-now" data-axis="' + axis + '" style="left:' + (m / axis * 100).toFixed(3) + '%"></div>');
+            }
+            return html;
+        };
+        wd._xap = 1; window.atmDayRow = wd;
+    }
+}
+
+/* ============================ 3) EXECUTIVE ANALYTICS ============================ */
+var xeaWeekStart = null, xeaCache = {}, xeaData = null, xeaDebriefText = [];
+function xeaBounds() { var s = xeaWeekStart || schDowMon(new Date()); var e = new Date(s); e.setDate(e.getDate() + 6); return [s, e]; }
+function xeaLabel() {
+    var b = xeaBounds(), l = $('xeaWeekLabel');
+    if (l) l.textContent = b[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' → ' + b[1].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+window.xeaOnOpen = function () {
+    if (!xeaWeekStart) xeaWeekStart = schDowMon(new Date());
+    xeaLabel();
+    if (xeaData) { xeaRender(); return; }
+    xeaLoad(false);
+};
+window.xeaShift = function (n) {
+    var s = xeaWeekStart || schDowMon(new Date());
+    s = new Date(s); s.setDate(s.getDate() + 7 * n);
+    xeaWeekStart = s; xeaData = null; xeaLabel(); xeaLoad(false);
+};
+window.xeaToday = function () { xeaWeekStart = schDowMon(new Date()); xeaData = null; xeaLabel(); xeaLoad(true); };
+window.xeaLoad = function (force) {
+    var b = xeaBounds();
+    var f = schDayInt(b[0]), t = schDayInt(b[1]);
+    var key = f + '-' + t;
+    var c = xeaCache[key];
+    if (!force && c && (Date.now() - c.ts) < 60000) { xeaData = c.data; xeaRender(); return; }
+    var u = loggedUser || '', em = loggedEmail || '', oid = localStorage.getItem('xenaOpenId') || '';
+    var ls = new Date(b[0]); ls.setDate(ls.getDate() - 7);
+    var le = new Date(ls); le.setDate(le.getDate() + 6);
+    Promise.all([
+        fetch('/api/audition/schedule?' + new URLSearchParams({ user: u, email: em, from: String(f), to: String(t) })).then(function (r) { return r.json(); }),
+        fetch('/api/audition/attendance?' + new URLSearchParams({ user: u, email: em, my_open_id: oid, from: String(f), to: String(t) })).then(function (r) { return r.json(); }),
+        fetch('/api/audition/attendance?' + new URLSearchParams({ user: u, email: em, my_open_id: oid, from: String(schDayInt(ls)), to: String(schDayInt(le)) })).then(function (r) { return r.json(); })
+    ]).then(function (rs) {
+        var sch = rs[0], att = rs[1], attL = rs[2];
+        if (!sch || !sch.success) throw new Error((sch && sch.error) || 'schedule load failed');
+        if (!att || !att.success) throw new Error((att && att.error) || 'attendance load failed');
+        xeaData = { sch: sch.rows || [], att: att, attL: (attL && attL.success) ? attL : null, days: att.days || [] };
+        xeaCache = {}; xeaCache[key] = { ts: Date.now(), data: xeaData };
+        xeaRender();
+    }).catch(function (e) {
+        var d = $('xeaDebrief');
+        if (d) d.innerHTML = '<div class="xea-line"><span class="xea-ic">⚠️</span><span>' + escHtml(e.message || String(e)) + '</span></div>';
+        ToastManager.show('Executive analytics failed to load: ' + (e.message || e), 'error');
+    });
+};
+function xeaAgents() {
+    if (!xeaData) return [];
+    var capByEm = {};
+    xeaData.sch.forEach(function (r) {
+        var k = (r.email || '').toLowerCase(); if (!k) return;
+        capByEm[k] = (capByEm[k] || 0) + schDuration(r);
+    });
+    return (xeaData.att.agents || []).map(function (a) {
+        var em = (a.email || '').toLowerCase();
+        var S = a.summary || {};
+        var score = Math.max(0, Math.min(100, 100 - 8 * (S.late_days || 0) - 15 * (S.no_show || 0) - 4 * Math.round((S.gap_min || 0) / 60)));
+        return {
+            name: a.name || em || '?', em: em,
+            cap: Math.round((capByEm[em] || 0) * 10) / 10,
+            worked: Math.round(((S.worked_min || 0) / 60) * 10) / 10,
+            score: score, S: S
+        };
+    });
+}
+function xeaRenderScatter() {
+    var host = $('xeaScatter'); if (!host) return;
+    var A = xeaAgents();
+    if (!A.length) { host.innerHTML = '<div class="xea-empty">No agent data in this range.</div>'; return; }
+    var W = 640, H = 300, pl = 44, pr = 16, pt = 16, pb = 34;
+    var maxCap = 0;
+    A.forEach(function (a) { if (a.cap > maxCap) maxCap = a.cap; });
+    var xMax = Math.max(40, Math.ceil(maxCap / 5) * 5);
+    function X(v) { return pl + (v / xMax) * (W - pl - pr); }
+    function Y(v) { return pt + (1 - v / 100) * (H - pt - pb); }
+    var avgX = A.reduce(function (n, a) { return n + a.cap; }, 0) / A.length;
+    var s = '<svg class="xea-svg" viewBox="0 0 ' + W + ' ' + H + '" id="xeaScatterSvg">';
+    for (var g = 0; g <= 4; g++) {
+        var yv = g * 25;
+        s += '<line x1="' + pl + '" y1="' + Y(yv) + '" x2="' + (W - pr) + '" y2="' + Y(yv) + '" stroke="rgba(127,140,160,.18)"/>';
+        s += '<text x="' + (pl - 6) + '" y="' + (Y(yv) + 4) + '" font-size="10" fill="rgba(127,140,160,.8)" text-anchor="end">' + yv + '</text>';
+    }
+    var step = Math.max(5, Math.round(xMax / 6 / 5) * 5);
+    for (var gx = 0; gx <= xMax; gx += step) {
+        s += '<line x1="' + X(gx) + '" y1="' + pt + '" x2="' + X(gx) + '" y2="' + (H - pb) + '" stroke="rgba(127,140,160,.12)"/>';
+        s += '<text x="' + X(gx) + '" y="' + (H - pb + 16) + '" font-size="10" fill="rgba(127,140,160,.8)" text-anchor="middle">' + gx + 'h</text>';
+    }
+    s += '<line x1="' + X(avgX) + '" y1="' + pt + '" x2="' + X(avgX) + '" y2="' + (H - pb) + '" stroke="rgba(0,212,255,.4)" stroke-dasharray="4 4"/>';
+    s += '<line x1="' + pl + '" y1="' + Y(85) + '" x2="' + (W - pr) + '" y2="' + Y(85) + '" stroke="rgba(0,230,118,.4)" stroke-dasharray="4 4"/>';
+    A.forEach(function (a) {
+        var col = a.score >= 85 ? '#00e676' : (a.score >= 70 ? '#ffb800' : '#ff4d6d');
+        s += '<circle cx="' + X(a.cap) + '" cy="' + Y(a.score) + '" r="6" fill="' + col + '" fill-opacity=".85" stroke="rgba(0,0,0,.35)">'
+            + '<title>' + escHtml(a.name) + ' — ' + a.cap + 'h scheduled · ' + a.score + '% punctuality · ' + a.worked + 'h attended</title></circle>';
+    });
+    s += '<text x="' + (pl + 6) + '" y="' + (pt + 12) + '" font-size="10" fill="rgba(0,230,118,.9)">reliable</text>';
+    s += '<text x="' + (W - pr - 4) + '" y="' + (H - pb - 6) + '" font-size="10" fill="rgba(255,77,109,.9)" text-anchor="end">burnout risk →</text>';
+    s += '</svg>';
+    host.innerHTML = s;
+}
+function xeaRenderArea() {
+    var host = $('xeaArea'); if (!host) return;
+    var days = xeaData.days || [];
+    if (!days.length) { host.innerHTML = '<div class="xea-empty">No attendance days in this range.</div>'; return; }
+    var schedByDay = {}, attByDay = {};
+    xeaData.sch.forEach(function (r) { schedByDay[r.day] = (schedByDay[r.day] || 0) + schDuration(r); });
+    (xeaData.att.agents || []).forEach(function (a) {
+        days.forEach(function (d) {
+            var D = (a.days || {})[String(d)];
+            if (D && D.worked_min) attByDay[d] = (attByDay[d] || 0) + D.worked_min / 60;
+        });
+    });
+    var W = 640, H = 300, pl = 44, pr = 16, pt = 16, pb = 34, maxV = 1;
+    days.forEach(function (d) { maxV = Math.max(maxV, schedByDay[d] || 0, attByDay[d] || 0); });
+    maxV = Math.ceil(maxV / 5) * 5;
+    function X(i) { return pl + (i / Math.max(1, days.length - 1)) * (W - pl - pr); }
+    function Y(v) { return pt + (1 - v / maxV) * (H - pt - pb); }
+    function path(get) { var p = ''; days.forEach(function (d, i) { p += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(get(d)).toFixed(1); }); return p; }
+    function area(get) { return path(get) + 'L' + X(days.length - 1).toFixed(1) + ' ' + Y(0) + 'L' + X(0).toFixed(1) + ' ' + Y(0) + 'Z'; }
+    function gv(g) { return function (d) { return g[d] || 0; }; }
+    var s = '<svg class="xea-svg" viewBox="0 0 ' + W + ' ' + H + '" id="xeaAreaSvg">';
+    for (var g = 0; g <= 4; g++) {
+        var yv = maxV * g / 4;
+        s += '<line x1="' + pl + '" y1="' + Y(yv) + '" x2="' + (W - pr) + '" y2="' + Y(yv) + '" stroke="rgba(127,140,160,.18)"/>';
+        s += '<text x="' + (pl - 6) + '" y="' + (Y(yv) + 4) + '" font-size="10" fill="rgba(127,140,160,.8)" text-anchor="end">' + Math.round(yv) + 'h</text>';
+    }
+    s += '<path d="' + area(gv(schedByDay)) + '" fill="rgba(0,212,255,.16)"/>';
+    s += '<path d="' + path(gv(schedByDay)) + '" fill="none" stroke="#00d4ff" stroke-width="2"/>';
+    s += '<path d="' + area(gv(attByDay)) + '" fill="rgba(0,230,118,.16)"/>';
+    s += '<path d="' + path(gv(attByDay)) + '" fill="none" stroke="#00e676" stroke-width="2"/>';
+    days.forEach(function (d, i) {
+        var sv = Math.round((schedByDay[d] || 0) * 10) / 10, av = Math.round((attByDay[d] || 0) * 10) / 10;
+        s += '<circle cx="' + X(i) + '" cy="' + Y(schedByDay[d] || 0) + '" r="3" fill="#00d4ff"><title>' + schDayLabel(d) + ': ' + sv + 'h scheduled</title></circle>';
+        s += '<circle cx="' + X(i) + '" cy="' + Y(attByDay[d] || 0) + '" r="3" fill="#00e676"><title>' + schDayLabel(d) + ': ' + av + 'h attended</title></circle>';
+        s += '<text x="' + X(i) + '" y="' + (H - pb + 16) + '" font-size="10" fill="rgba(127,140,160,.85)" text-anchor="middle">' + schDateFromInt(d).toLocaleDateString('en-GB', { weekday: 'short' }) + '</text>';
+    });
+    s += '</svg>';
+    host.innerHTML = s;
+}
+function xeaRenderDebrief() {
+    var host = $('xeaDebrief'); if (!host) return;
+    var A = xeaAgents();
+    var schedH = Math.round(xeaData.sch.reduce(function (n, r) { return n + schDuration(r); }, 0) * 10) / 10;
+    var attH = Math.round(A.reduce(function (n, a) { return n + a.worked; }, 0) * 10) / 10;
+    var attLH = 0;
+    if (xeaData.attL) attLH = Math.round((xeaData.attL.agents || []).reduce(function (n, a) { return n + ((a.summary || {}).worked_min || 0); }, 0) / 60 * 10) / 10;
+    var lateD = A.reduce(function (n, a) { return n + (a.S.late_days || 0); }, 0);
+    var noShow = A.reduce(function (n, a) { return n + (a.S.no_show || 0); }, 0);
+    var gapH = Math.round(A.reduce(function (n, a) { return n + (a.S.gap_min || 0); }, 0) / 60 * 10) / 10;
+    var days = xeaData.days || [], worst = null;
+    days.forEach(function (d) {
+        var s2 = 0;
+        xeaData.sch.forEach(function (r) { if (+r.day === +d) s2 += schDuration(r); });
+        var a2 = 0;
+        (xeaData.att.agents || []).forEach(function (ag) { var D = (ag.days || {})[String(d)]; if (D) a2 += (D.worked_min || 0) / 60; });
+        var miss = s2 - a2;
+        if (s2 > 0 && (!worst || miss > worst.miss)) worst = { d: d, miss: Math.round(miss * 10) / 10, s: Math.round(s2 * 10) / 10 };
+    });
+    var best = null;
+    A.forEach(function (a) { if (a.cap > 0 && (!best || a.score > best.score)) best = a; });
+    var lines = [];
+    if (schedH > 0) {
+        var cov = Math.round(attH / schedH * 1000) / 10;
+        lines.push(['📊', 'This week covered <b>' + cov + '%</b> of scheduled capacity — ' + attH + 'h attended of ' + schedH + 'h scheduled.']);
+    } else lines.push(['📊', 'No scheduled hours this week — the timeline is empty.']);
+    if (attLH > 0) {
+        var dlt = Math.round((attH - attLH) / attLH * 1000) / 10;
+        lines.push([dlt >= 0 ? '📈' : '📉', 'Attendance is ' + (dlt >= 0 ? 'up' : 'down') + ' <b>' + Math.abs(dlt) + '%</b> vs last week (' + attLH + 'h → ' + attH + 'h).']);
+    }
+    if (worst && worst.miss > 0) lines.push(['🕳', 'Biggest shortfall: <b>' + schDayLabel(worst.d) + '</b> — ' + worst.miss + 'h of ' + worst.s + 'h scheduled went unattended.']);
+    lines.push(['⏰', 'Punctuality: ' + lateD + ' late start' + (lateD === 1 ? '' : 's') + ', ' + noShow + ' no-show' + (noShow === 1 ? '' : 's') + ', ' + gapH + 'h of in-shift gaps across the team.']);
+    if (best) lines.push(['🏆', 'Most reliable: <b>' + escHtml(best.name) + '</b> — ' + best.score + '% punctuality over ' + best.cap + 'h scheduled.']);
+    xeaDebriefText = lines.map(function (l) { return l[1]; });
+    host.innerHTML = lines.map(function (l) { return '<div class="xea-line"><span class="xea-ic">' + l[0] + '</span><span>' + l[1] + '</span></div>'; }).join('');
+}
+window.xeaPushInsights = function () {
+    var list = $('insightsList');
+    if (!list) { ToastManager.show('Insights panel is not on this page — open it from the dashboard.', 'warning'); return; }
+    if (!xeaDebriefText.length) { ToastManager.show('Load the analytics first — nothing to push yet.', 'warning'); return; }
+    var b = xeaBounds();
+    var li = document.createElement('li');
+    li.innerHTML = '<span>🤖</span><span><b>Weekly debrief ' + escHtml(b[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))
+        + ' → ' + escHtml(b[1].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + ':</b> ' + xeaDebriefText.join(' ') + '</span>';
+    list.insertBefore(li, list.firstChild);
+    ToastManager.show('Debrief pushed to the insights feed.', 'success', 3000);
+};
+function xeaRender() { if (!xeaData) return; xeaRenderScatter(); xeaRenderArea(); xeaRenderDebrief(); }
+
+/* ============================ wiring ============================ */
+function xgWrapFn(name, after) {
+    var o = window[name];
+    if (typeof o !== 'function' || o._xg) return;
+    var w = function () { var r = o.apply(this, arguments); try { after(); } catch (e) {} return r; };
+    w._xg = 1; window[name] = w;
+}
+xgWrapFn('schRenderAll', function () { try { xgApplyView(); } catch (e) {} });
+xgWrapFn('atmRender', function () { try { xapRenderPulse(); } catch (e) {} });
+xapWrapStatics();
+
+/* minute tick: glide the now-markers, refresh pulse + gantt now line */
+setInterval(function () {
+    try {
+        var nw = new Date(), m = nw.getHours() * 60 + nw.getMinutes();
+        document.querySelectorAll('.xap-now').forEach(function (n) {
+            var ax = +n.getAttribute('data-axis') || 1440;
+            n.style.left = (m / ax * 100).toFixed(3) + '%';
+        });
+        var ap = $('pg-audition-attendance');
+        if (ap && ap.style.display === 'block' && typeof atmData !== 'undefined' && atmData) xapRenderPulse();
+        var gw = $('xgWrap');
+        if (gw && gw.style.display === 'block') {
+            var nowEl = gw.querySelector('.xg-now');
+            if (nowEl) {
+                var days = xgDays(), tdi = -1, todayInt = schDayInt(new Date());
+                for (var i = 0; i < days.length; i++) if (schDayInt(days[i]) === todayInt) tdi = i;
+                if (tdi >= 0) nowEl.style.left = ((tdi * 1440 + m) / (days.length * 1440) * 100).toFixed(3) + '%';
+            }
+        }
+    } catch (e) {}
+}, 60000);
 })();
 
 </script>
