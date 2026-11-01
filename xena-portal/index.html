@@ -2908,6 +2908,86 @@ bottom: 154px !important;
    so the dark theme always fills the screen at any zoom level. */
 html{background:var(--bg);min-height:100%}
 </style>
+<style id="phase49-float">
+/* Phase 49 (Ahmed): mobile floating dock — draggable + expandable vertical icon pill,
+   matching the reference design (small round toggle, tap expands a slim vertical
+   pill of icon buttons, drag the toggle up/down along the right edge).
+   Additive layer: DOM, open/close logic and .samurai-menu mechanics untouched. */
+@media screen and (max-width:600px){
+  /* 1) Draggable: dock bottom gains a JS-controlled lift variable */
+  #twxDock,
+  #awsDock,
+  body.sidebar-collapsed #twxDock,
+  body.sidebar-collapsed #awsDock{
+    bottom:calc(18px + env(safe-area-inset-bottom) + var(--x49-lift,0px)) !important;
+  }
+  html.samurai-android #twxDock,
+  html.samurai-android #awsDock{
+    bottom:calc(82px + var(--x49-lift,0px)) !important;
+  }
+  .samurai-radial-toggle{
+    touch-action:none;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+
+  /* 2) Expandable pill: the action menu becomes a slim vertical icon pill */
+  .samurai-menu{
+    min-width:0;
+    width:60px;
+    max-width:60px;
+    max-height:70dvh;
+    right:6px;
+    padding:10px 7px;
+    border-radius:30px;
+    background:linear-gradient(160deg,#7d39e9f2,#372264f6);
+    border:1px solid rgba(166,120,255,.35);
+    color:#fff;
+    box-shadow:0 10px 30px rgba(42,19,85,.55);
+    transform-origin:bottom center;
+  }
+  :root[data-theme="dark"] .samurai-menu,
+  body.dark .samurai-menu{
+    background:linear-gradient(160deg,#7d39e9f2,#2c1b56f6);
+    border-color:rgba(166,120,255,.45);
+    color:#fff;
+  }
+  .samurai-menu .samurai-menu-title{display:none}
+  .samurai-menu-item{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:44px;
+    height:44px;
+    min-height:44px;
+    padding:0;
+    margin:5px auto;
+    gap:0;
+    border-radius:50%;
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.20);
+    color:#fff;
+    text-align:center;
+  }
+  .samurai-menu-item:active{background:rgba(255,255,255,.32)}
+  .samurai-menu-item .smi-tx{display:none}
+  .samurai-menu-item .smi-ic{
+    flex:none;
+    width:auto;
+    height:auto;
+    background:transparent;
+    font-size:19px;
+    line-height:1;
+    color:#fff;
+  }
+  .samurai-menu-item .smi-ic svg{width:22px;height:22px;stroke:currentColor}
+}
+@media (prefers-reduced-motion:reduce){
+  @media screen and (max-width:600px){
+    .samurai-menu,.samurai-menu-item{transition:none!important}
+  }
+}
+</style>
 </head>
 
 <body>
@@ -24415,6 +24495,120 @@ setInterval(function () {
         }
     } catch (e) {}
 }, 60000);
+})();
+
+</script>
+<script id="phase49-float">
+/* Phase 49 (Ahmed): mobile floating dock — draggable toggle + pill icon enhancement.
+   Additive IIFE: reuses the existing .samurai-menu machinery (buildMenu/syncMenus),
+   only adds (a) vertical drag of the dock along the right edge with persistence,
+   (b) crisp SVG icons inside the pill items cloned from the source FABs. */
+(function () {
+'use strict';
+var LIFT_KEY = 'x49dockLift';
+function mobile() { return window.matchMedia('(max-width:600px)').matches; }
+function docks() { return document.querySelectorAll('#twxDock,#awsDock'); }
+function getLift() {
+  try { return Math.max(0, parseInt(localStorage.getItem(LIFT_KEY) || '0', 10) || 0); }
+  catch (e) { return 0; }
+}
+var currentLift = getLift();
+function maxLift() { return Math.max(0, window.innerHeight - 160); }
+function repositionMenus() {
+  docks().forEach(function (d) {
+    var m = d._smenu;
+    if (!m || !m.classList.contains('open')) return;
+    var t = d.querySelector('.samurai-radial-toggle');
+    if (!t) return;
+    var r = t.getBoundingClientRect();
+    m.style.bottom = Math.max(8, window.innerHeight - r.top + 10) + 'px';
+  });
+}
+function setLift(v, persist) {
+  v = Math.max(0, Math.min(v, maxLift()));
+  currentLift = v;
+  document.documentElement.style.setProperty('--x49-lift', v + 'px');
+  if (persist) { try { localStorage.setItem(LIFT_KEY, String(v)); } catch (e) {} }
+  repositionMenus();
+  return v;
+}
+function setOpen(d, open) {
+  var b = d.querySelector('.samurai-radial-toggle');
+  d.classList.toggle('radial-open', open);
+  if (b) {
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.setAttribute('aria-label', open ? 'Close workspace actions' : 'Open workspace actions');
+  }
+}
+/* Clone each FAB's svg glyph into its pill item (text emoji fallback kept). */
+function enhanceIcons() {
+  docks().forEach(function (d) {
+    var m = d._smenu;
+    if (!m) return;
+    var fabs = [].slice.call(d.querySelectorAll('.twx-fab,.xena-transfer-fab'))
+      .filter(function (f) { return !f.closest('.samurai-menu'); });
+    var items = m.querySelectorAll('.samurai-menu-item');
+    for (var i = 0; i < items.length; i++) {
+      var ic = items[i].querySelector('.smi-ic');
+      if (!ic || ic.dataset.x49 === '1') continue;
+      var f = fabs[i];
+      var svg = f ? f.querySelector('svg') : null;
+      /* Only mark as done once the svg is actually cloned — FAB glyphs can be
+         injected after our first pass, and the mark must not block the retry. */
+      if (svg) { ic.textContent = ''; ic.appendChild(svg.cloneNode(true)); ic.dataset.x49 = '1'; }
+    }
+  });
+}
+function armDrag(tg) {
+  if (tg._x49drag) return;
+  tg._x49drag = true;
+  var startY = 0, startLift = 0, dragging = false, dock = null, wasOpen = false, pid = null;
+  tg.addEventListener('pointerdown', function (e) {
+    if (!mobile()) return;
+    dock = tg.closest('#twxDock,#awsDock');
+    if (!dock) return;
+    startY = e.clientY;
+    startLift = getLift();
+    dragging = false;
+    pid = e.pointerId;
+    wasOpen = dock.classList.contains('radial-open');
+    try { tg.setPointerCapture(pid); } catch (err) {}
+  });
+  tg.addEventListener('pointermove', function (e) {
+    if (pid === null || e.pointerId !== pid) return;
+    var dy = startY - e.clientY;
+    if (!dragging && Math.abs(dy) > 8) dragging = true;
+    if (dragging) { e.preventDefault(); setLift(startLift + dy, false); }
+  });
+  function end(e) {
+    if (pid === null || (e && e.pointerId !== pid)) return;
+    pid = null;
+    if (dragging) {
+      setLift(currentLift, true);
+      /* The synthetic click that follows a pointer drag toggles the menu via the
+         app's own capture-phase window handler, which also stopImmediatePropagation
+         — so no listener of ours can see that click. The click dispatch finishes
+         synchronously right after pointerup; revert to the pre-drag open state on
+         the next macrotask instead. */
+      var d = dock, open = wasOpen;
+      window.setTimeout(function () { setOpen(d, open); repositionMenus(); }, 0);
+    }
+    dragging = false;
+  }
+  tg.addEventListener('pointerup', end);
+  tg.addEventListener('pointercancel', end);
+}
+function armAll() {
+  document.querySelectorAll('.samurai-radial-toggle').forEach(armDrag);
+}
+setLift(getLift(), false);
+armAll();
+enhanceIcons();
+new MutationObserver(function () { armAll(); enhanceIcons(); }).observe(document.body, { childList: true, subtree: true });
+window.addEventListener('resize', function () {
+  if (getLift() > maxLift()) setLift(maxLift(), true);
+  repositionMenus();
+});
 })();
 
 </script>
