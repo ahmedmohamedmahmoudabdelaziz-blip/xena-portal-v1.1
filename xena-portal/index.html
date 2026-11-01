@@ -2235,11 +2235,11 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .atm-day-label{font-size:.72rem;color:var(--text-sec);line-height:1.35}
 .atm-day-label b{color:var(--text);font-size:.74rem}
 .atm-day-label span{display:block;font-size:.62rem;opacity:.8}
-.atm-strip{position:relative;height:34px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px}
-.atm-seg{position:absolute;top:3px;height:12px;border-radius:3px;opacity:.95;min-width:1px}
-.atm-shiftwin{position:absolute;top:1px;height:30px;border:1px dashed rgba(0,212,255,.55);border-radius:6px;background:rgba(0,212,255,.05);pointer-events:none}
-.atm-gap{position:absolute;bottom:3px;height:8px;background:#ff4d6d;border-radius:3px;box-shadow:0 0 6px rgba(255,77,109,.55)}
-.atm-gaplbl{position:absolute;bottom:12px;font-size:.58rem;font-weight:700;color:#ff8fa3;white-space:nowrap;transform:translateX(-50%)}
+.atm-strip{position:relative;height:44px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px}
+.atm-seg{position:absolute;top:5px;height:20px;border-radius:4px;opacity:.95;min-width:1px}
+.atm-shiftwin{position:absolute;top:2px;height:38px;border:1px dashed rgba(0,212,255,.55);border-radius:6px;background:rgba(0,212,255,.05);pointer-events:none}
+.atm-gap{position:absolute;bottom:5px;height:10px;background:#ff4d6d;border-radius:3px;box-shadow:0 0 6px rgba(255,77,109,.55)}
+.atm-gaplbl{position:absolute;bottom:16px;font-size:.58rem;font-weight:700;color:#ff8fa3;white-space:nowrap;transform:translateX(-50%)}
 .atm-tick{position:absolute;top:0;height:100%;width:1px;background:rgba(255,255,255,.06)}
 .atm-nextday{position:absolute;top:0;height:100%;width:1px;background:rgba(0,212,255,.35)}
 .atm-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
@@ -2987,6 +2987,42 @@ html{background:var(--bg);min-height:100%}
     .samurai-menu,.samurai-menu-item{transition:none!important}
   }
 }
+</style>
+<style id="phase50-attendance">
+/* Phase 50 (Ahmed): Attendance Monitor + My Work + Executive Analytics refresh.
+   - agent header becomes an identity card: avatar, name, email, live pill,
+     today's shift chip
+   - today's day-row highlighted so "now" is findable at a glance
+   - My Work shift rows: typed icon + colored edge + TODAY badge
+   - exec tab: per-agent adherence table */
+.atm-id{display:flex;align-items:center;gap:10px;min-width:0}
+.atm-ava{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,212,255,.4);flex:none;background:var(--surface-inset)}
+.atm-ava-fb{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#b967ff);color:#fff;font-weight:800;font-size:1rem;flex:none}
+.atm-idtx{display:flex;flex-direction:column;min-width:0}
+.atm-idtx .atm-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atm-mail{font-size:.66rem;color:var(--text-sec);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atm-today{font-size:.66rem;padding:3px 9px;border-radius:999px;border:1px solid rgba(0,212,255,.4);color:#00d4ff;background:rgba(0,212,255,.08);flex:none;font-weight:600}
+.atm-day.today{background:rgba(0,212,255,.05);border-radius:8px;border-top-color:rgba(0,212,255,.25)}
+.atm-warn-kind.no_show{background:rgba(255,77,109,.16);color:#ff4d6d;border:1px solid rgba(255,77,109,.5)}
+.atm-warn-kind.early{background:rgba(0,212,255,.12);color:#00d4ff;border:1px solid rgba(0,212,255,.35)}
+.mw-shift{justify-content:flex-start;border-left:3px solid var(--border-hover)}
+.mw-shift-ic{font-size:1.05rem;flex:none}
+.mw-shift-onsite{border-left-color:var(--accent-cyan)}
+.mw-shift-wfh{border-left-color:var(--accent-purple)}
+.mw-shift-off{border-left-color:var(--text-muted)}
+.mw-shift-leave{border-left-color:var(--accent-amber)}
+.mw-shift-sick{border-left-color:var(--accent-rose)}
+.mw-shift.today{background:rgba(0,212,255,.07);border-color:rgba(0,212,255,.45)}
+.mw-today{color:var(--primary);font-size:.62rem;letter-spacing:.08em;margin-left:6px;font-weight:800}
+.xea-table-wrap{overflow-x:auto}
+.xea-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.xea-table th{text-align:left;font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-sec);padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.xea-table td{padding:8px 10px;border-bottom:1px dashed rgba(255,255,255,.06);white-space:nowrap}
+.xea-table tr:last-child td{border-bottom:none}
+.xea-table .good{color:#00e676;font-weight:700}
+.xea-table .mid{color:#ffb800;font-weight:700}
+.xea-table .low{color:#ff4d6d;font-weight:700}
+.xea-table .xa-name{font-weight:600}
 </style>
 </head>
 
@@ -5675,10 +5711,15 @@ html{background:var(--bg);min-height:100%}
                     </div>
                 </div>
                 <div class="card xea-card">
+                    <h4>👥 Per-Agent Adherence</h4>
+                    <p class="xea-hint">One row per agent — scheduled vs attended hours, coverage, punctuality score and the flags behind it.</p>
+                    <div class="xea-table-wrap" id="xeaTable"><div class="xea-empty">⏳ Loading…</div></div>
+                </div>
+                <div class="card xea-card">
                     <h4>🤖 Automated Weekly Debrief</h4>
-                    <p class="xea-hint">Generated locally from this week's schedule + attendance. Push it to the team insights feed.</p>
+                    <p class="xea-hint">Generated locally from this week's schedule + attendance. Post it to the team insights feed on the Welcome tab.</p>
                     <div class="xea-debrief" id="xeaDebrief"><div class="xea-empty">⏳ Loading analytics…</div></div>
-                    <div style="margin-top:12px"><button class="btn btn-primary" onclick="xeaPushInsights()">📣 Push to #insightsPanel</button></div>
+                    <div style="margin-top:12px"><button class="btn btn-primary" onclick="xeaPushInsights()">📣 Post debrief to the insights feed</button></div>
                 </div>
             </div>
 
@@ -23480,13 +23521,25 @@ function mwRender(data) {
     if (sEl) {
         if (data.errs.shifts) sEl.innerHTML = '<div class="mw-empty">' + mwEsc(data.errs.shifts) + '</div>';
         else if (!data.shifts.length) sEl.innerHTML = '<div class="mw-empty">No shifts scheduled for you in the next 7 days.</div>';
-        else sEl.innerHTML = data.shifts.map(r => {
-            const d = schDateFromInt(Number(r.day));
-            const wd = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-            const isWork = (typeof SCH_WORK_TYPES !== 'undefined' && SCH_WORK_TYPES.indexOf(r.type) !== -1);
-            const time = isWork && r.start && r.end ? ' · ' + r.start + '–' + r.end : '';
-            return '<div class="mw-row"><div class="mw-row-main"><span class="mw-row-title">' + mwEsc(wd + ' — ' + (r.type || '') + time) + '</span>' + (r.note ? '<span class="mw-row-sub">' + mwEsc(r.note) + '</span>' : '') + '</div></div>';
-        }).join('');
+        else {
+            /* Phase 50 (Ahmed): "the schedule part in my work not look attractive" —
+               sorted by day+start, typed icon + colored edge, TODAY badge. */
+            const T_META = {'On Site':['🏢','onsite'],'Work From Home':['🏠','wfh'],'Off':['🌙','off'],'Annual Leave':['🌴','leave'],'Sick Leave':['🤒','sick']};
+            const todayInt = schDayInt(new Date());
+            const shifts = data.shifts.slice().sort((a, b) => (Number(a.day) - Number(b.day)) || String(a.start || '').localeCompare(String(b.start || '')));
+            sEl.innerHTML = shifts.map(r => {
+                const d = schDateFromInt(Number(r.day));
+                const wd = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                const meta = T_META[r.type] || ['📅', 'other'];
+                const isWork = (typeof SCH_WORK_TYPES !== 'undefined' && SCH_WORK_TYPES.indexOf(r.type) !== -1);
+                const time = isWork && r.start && r.end ? r.start + ' – ' + r.end : '';
+                const isToday = Number(r.day) === todayInt;
+                return '<div class="mw-row mw-shift mw-shift-' + meta[1] + (isToday ? ' today' : '') + '">' +
+                    '<span class="mw-shift-ic">' + meta[0] + '</span>' +
+                    '<div class="mw-row-main"><span class="mw-row-title">' + mwEsc(wd) + (isToday ? ' <b class="mw-today">TODAY</b>' : '') + '</span>' +
+                    '<span class="mw-row-sub">' + mwEsc((r.type || '') + (time ? ' · ' + time : '')) + (r.note ? ' — ' + mwEsc(r.note) : '') + '</span></div></div>';
+            }).join('');
+        }
     }
     const rEl = document.getElementById('mwReqs');
     const rCount = document.getElementById('mwReqCount');
@@ -23644,9 +23697,13 @@ function atmPct(axis){ return v => ((v/axis)*100).toFixed(3); }
 function atmMinLabel(m){ m=Math.round(m||0); if(m<60) return m+'m'; const h=m/60; return (h%1?h.toFixed(1):String(h))+'h'; }
 function atmHm(mins){
     mins=Math.round(mins||0);
-    const pre = mins>=1440 ? '+' : '';
-    const m = mins%1440;
-    return pre+String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+    // Overnight times read "14:28 (+1d)" — the old bare "+14:28" looked like
+    // "+14 hours" (Ahmed: "what is +14 his shift end that day at 9 or 10???").
+    if(mins>=1440){
+        const d=Math.floor(mins/1440), m=mins%1440;
+        return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+' (+'+d+'d)';
+    }
+    return String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
 }
 function atmSetMode(m){
     atmMode=(m==='month')?'month':'week';
@@ -23701,14 +23758,16 @@ function atmFlagChip(fl,D){
              gap:'🔴 Offline '+atmMinLabel(D.gap_min)+' in shift',
              missing:'⚠️ Missing '+atmMinLabel(D.missing_min),
              early:'↩ Left early '+atmMinLabel(D.early_min),
-             no_show:'🚫 No show'}[fl];
+             no_show:'🚫 Absent — never signed in'}[fl];
     return t?`<span class="atm-flag ${fl}">${t}</span>`:'';
 }
 function atmDayRow(a,ds,axis,ticks){
     const D=(a.days||{})[ds]||{};
     const p=atmPct(axis);
     const isOff=D.shift&&['Off','Annual Leave','Sick Leave'].includes(D.shift.type);
-    const shiftTxt=D.shift?`${D.shift.type}${D.shift.start?(' '+D.shift.start):''}${D.shift.end?('→'+D.shift.end):''}`:((D.segments||[]).length?'(no shift row)':'—');
+    const isAbsent=(D.flags||[]).includes('no_show');
+    const shiftTxt=D.shift?`${D.shift.type}${D.shift.start?(' '+D.shift.start):''}${D.shift.end?('→'+D.shift.end):''}`:((D.segments||[]).length?'(no shift scheduled)':'—');
+    const isToday=(+ds===schDayInt(new Date()));
     let shiftWin='';
     if(D.shift&&D.shift.start_min!=null&&D.shift.end_min!=null){
         shiftWin=`<div class="atm-shiftwin" title="Shift: ${escHtml(shiftTxt)}" style="left:${p(D.shift.start_min)}%;width:${p(Math.max(1,D.shift.end_min-D.shift.start_min))}%"></div>`;
@@ -23725,10 +23784,10 @@ function atmDayRow(a,ds,axis,ticks){
     let flags='';
     (D.flags||[]).forEach(fl=>{ flags+=atmFlagChip(fl,D); });
     const stats=(D.worked_min>0||D.break_min>0||D.meeting_min>0)
-        ? `⏱ ${atmMinLabel(D.worked_min)} · ☕ ${atmMinLabel(D.break_min)} · 🎤 ${atmMinLabel(D.meeting_min)}`
-        : (isOff?'🌙 Off day':'—');
+        ? `⏱ ${atmMinLabel(D.worked_min)} worked · ⚡ ${atmMinLabel(D.ontask_min||0)} on task · ☕ ${atmMinLabel(D.break_min)} · 🎤 ${atmMinLabel(D.meeting_min)}`
+        : (isAbsent?'🚫 Absent — scheduled, never signed in':(isOff?'🌙 Off day':'—'));
     const punch=(D.first!=null)?`🕒 ${atmHm(D.first)} → ${(D.last!=null?atmHm(D.last):'now')}`:'';
-    return `<div class="atm-day">
+    return `<div class="atm-day${isToday?' today':''}">
       <div class="atm-day-label"><b>${schDayLabel(+ds)}</b>
         <span>${escHtml(shiftTxt)}</span>
         <span>${stats}</span>
@@ -23747,14 +23806,20 @@ function atmAgentCard(a){
         axis=Math.max(axis,(D.shift&&D.shift.end_min)||0,D.last||0,
             ...((D.segments||[]).map(x=>x.e)), ...((D.inshift_gaps||[]).map(x=>x.e)));
     });
-    axis=Math.min(2160,Math.ceil(axis/360)*360);
+    axis=Math.min(2880,Math.ceil(axis/60)*60); /* Phase 50: hour-granular axis — a
+        90-min overnight overshoot no longer inflates the strip to +6h of empty
+        width (Ahmed: "slim line in big wide box"). */
     const p=atmPct(axis);
     let ticks='';
     for(let m=360;m<axis;m+=360) ticks+=`<div class="atm-tick" style="left:${p(m)}%"></div>`;
     if(axis>1440) ticks+=`<div class="atm-nextday" style="left:${p(1440)}%"></div>`;
     let scale='';
     for(let m=0;m<axis;m+=360){ const h=Math.floor(m/60)%24;
-        scale+=`<span style="position:absolute;left:${p(m)}%;transform:translateX(${m===0?'0':'-50'}%);top:1px">${m>=1440?'+':''}${String(h).padStart(2,'0')}</span>`; }
+        /* The cyan divider at 1440 marks midnight; times past it read as plain
+           clock times, with the "(+1d)" explainer on the divider itself —
+           replaces the cryptic bare "+14"/"+15" labels. */
+        const lbl=(m===1440)?String(h).padStart(2,'0')+' (+1d)':String(h).padStart(2,'0');
+        scale+=`<span style="position:absolute;left:${p(m)}%;transform:translateX(${m===0?'0':'-50'}%);top:1px">${lbl}</span>`; }
     const S=a.summary||{};
     const chip=(txt,cls)=>`<b class="${cls||''}">${txt}</b>`;
     const sumChips=[
@@ -23763,20 +23828,33 @@ function atmAgentCard(a){
         S.late_days?chip('⏰ Late '+S.late_days+'d ('+atmMinLabel(S.late_min)+')','alert'):'',
         S.gap_min?chip('🔴 Gaps '+atmMinLabel(S.gap_min),'bad'):'',
         S.missing_min?chip('⚠️ Missing '+atmMinLabel(S.missing_min),'bad'):'',
-        S.no_show?chip('🚫 No-show '+S.no_show,'bad'):'',
+        S.no_show?chip('🚫 Absent '+S.no_show+'d','bad'):'',
         S.early_min?chip('↩ Early '+atmMinLabel(S.early_min),'alert'):'',
         S.worked_days?chip('📊 Avg '+(S.avg_day_h||0)+'h/d'):''
     ].join('');
     const live=(a.live&&a.live.status)?a.live.status:'Offline';
     const liveOn=['Online','On Task','Working Ticket','Meeting'].includes(live);
     const dayRows=days.map(ds=>atmDayRow(a,String(ds),axis,ticks)).join('');
+    const initial=((a.name||'?').trim()[0]||'?').toUpperCase();
+    const ava=a.avatar
+        ? `<img class="atm-ava" src="${escHtml(a.avatar)}" alt="" loading="lazy" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline-flex'"><span class="atm-ava-fb" style="display:none">${escHtml(initial)}</span>`
+        : `<span class="atm-ava-fb">${escHtml(initial)}</span>`;
+    const todayInt=schDayInt(new Date());
+    const TD=(a.days||{})[String(todayInt)]||{};
+    const todayShift=(TD.shift&&TD.shift.start)
+        ? `<span class="atm-today" title="Today's shift">Today: ${escHtml(TD.shift.type)} ${escHtml(TD.shift.start)}→${escHtml(TD.shift.end||'')}</span>`
+        : (TD.shift?`<span class="atm-today" title="Today">Today: ${escHtml(TD.shift.type)}</span>`:'');
     return `<div class="card atm-agent">
       <div class="atm-agent-head">
-        <span class="atm-name">👤 ${escHtml(a.name)}</span>
+        <div class="atm-id">${ava}<div class="atm-idtx">
+          <span class="atm-name">${escHtml(a.name)}</span>
+          ${a.email?`<span class="atm-mail">${escHtml(a.email)}</span>`:''}
+        </div></div>
         <span class="atm-live ${liveOn?'on':'dim'}">${liveOn?'🟢':'⚪'} ${escHtml(live)}</span>
+        ${todayShift}
         <div class="atm-sum">${sumChips}</div>
       </div>
-      <div class="atm-scale"><div class="atm-scale-label">${days.length} days${axis>1440?' · overnight axis +'+((axis-1440)/60)+'h':''}</div>
+      <div class="atm-scale"><div class="atm-scale-label">${days.length} days${axis>1440?' · extends into next day':''}</div>
         <div class="atm-scale-bar">${ticks}${scale}</div></div>
       ${dayRows}
     </div>`;
@@ -23795,11 +23873,11 @@ function atmRender(){
     if(warnC){
         if(ws.length){
             warnC.style.display='block';
-            const kindMeta={late:['⏰','late'],gap:['🔴','gap'],missing:['⚠️','missing']};
+            const kindMeta={late:['⏰','late','Late'],gap:['🔴','gap','Offline gap'],missing:['⚠️','missing','Unworked'],no_show:['🚫','no_show','Absent'],early:['↩','early','Left early']};
             warnC.innerHTML=`<div class="ap-head"><div><h3 style="margin:0">🚨 Attendance warnings</h3>
-                <p class="ap-sync" style="margin:0">${ws.length} in this range — late starts, in-shift offline gaps, unworked shift time.</p></div></div>`
+                <p class="ap-sync" style="margin:0">${ws.length} in this range — absences, late starts, in-shift offline gaps, unworked shift time, early leaves.</p></div></div>`
                 +ws.map(w=>`<div class="atm-warn-item"><span class="atm-warn-day">${schDayLabel(w.day)}</span>
-                    <span class="atm-warn-kind ${(kindMeta[w.kind]||['',''])[1]}">${(kindMeta[w.kind]||['•',''])[0]} ${escHtml(w.kind)}</span>
+                    <span class="atm-warn-kind ${(kindMeta[w.kind]||['',''])[1]}">${(kindMeta[w.kind]||['•','',''])[0]} ${escHtml((kindMeta[w.kind]||['','',w.kind])[2])}</span>
                     <span><b>${escHtml(w.agent)}</b> — ${escHtml(w.detail)}</span></div>`).join('');
         } else { warnC.style.display='none'; warnC.innerHTML=''; }
     }
@@ -24369,6 +24447,8 @@ function xeaRenderScatter() {
         var col = a.score >= 85 ? '#00e676' : (a.score >= 70 ? '#ffb800' : '#ff4d6d');
         s += '<circle cx="' + X(a.cap) + '" cy="' + Y(a.score) + '" r="6" fill="' + col + '" fill-opacity=".85" stroke="rgba(0,0,0,.35)">'
             + '<title>' + escHtml(a.name) + ' — ' + a.cap + 'h scheduled · ' + a.score + '% punctuality · ' + a.worked + 'h attended</title></circle>';
+        /* Phase 50 (Ahmed): name every dot so the chart reads without hovering. */
+        s += '<text x="' + (X(a.cap) + 9) + '" y="' + (Y(a.score) + 3) + '" font-size="9" fill="rgba(224,224,224,.85)">' + escHtml(String(a.name || '').split(' ')[0]) + '</text>';
     });
     s += '<text x="' + (pl + 6) + '" y="' + (pt + 12) + '" font-size="10" fill="rgba(0,230,118,.9)">reliable</text>';
     s += '<text x="' + (W - pr - 4) + '" y="' + (H - pb - 6) + '" font-size="10" fill="rgba(255,77,109,.9)" text-anchor="end">burnout risk →</text>';
@@ -24461,7 +24541,25 @@ window.xeaPushInsights = function () {
     list.insertBefore(li, list.firstChild);
     ToastManager.show('Debrief pushed to the insights feed.', 'success', 3000);
 };
-function xeaRender() { if (!xeaData) return; xeaRenderScatter(); xeaRenderArea(); xeaRenderDebrief(); }
+function xeaRenderTable() {
+    var host = $('xeaTable'); if (!host) return;
+    var A = xeaAgents().slice().sort(function (a, b) { return b.score - a.score || b.cap - a.cap; });
+    if (!A.length) { host.innerHTML = '<div class="xea-empty">No agent data in this range.</div>'; return; }
+    var rows = A.map(function (a) {
+        var S = a.S || {};
+        var cov = a.cap > 0 ? Math.round(a.worked / a.cap * 1000) / 10 : null;
+        var covCls = cov == null ? '' : (cov >= 90 ? 'good' : (cov >= 70 ? 'mid' : 'low'));
+        var scCls = a.score >= 85 ? 'good' : (a.score >= 70 ? 'mid' : 'low');
+        return '<tr><td class="xa-name">' + escHtml(a.name) + '</td>'
+            + '<td>' + a.cap + 'h</td><td>' + a.worked + 'h</td>'
+            + '<td class="' + covCls + '">' + (cov == null ? '—' : cov + '%') + '</td>'
+            + '<td>' + (S.late_days || 0) + '</td><td>' + (S.no_show || 0) + '</td>'
+            + '<td>' + (Math.round((S.gap_min || 0) / 60 * 10) / 10) + 'h</td>'
+            + '<td class="' + scCls + '">' + a.score + '%</td></tr>';
+    }).join('');
+    host.innerHTML = '<table class="xea-table"><thead><tr><th>Agent</th><th>Scheduled</th><th>Attended</th><th>Coverage</th><th>Late</th><th>No-show</th><th>Gaps</th><th>Punctuality</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+function xeaRender() { if (!xeaData) return; xeaRenderScatter(); xeaRenderArea(); xeaRenderDebrief(); xeaRenderTable(); }
 
 /* ============================ wiring ============================ */
 function xgWrapFn(name, after) {
