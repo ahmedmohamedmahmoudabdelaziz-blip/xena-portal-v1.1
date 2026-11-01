@@ -11144,6 +11144,19 @@ def _att_hhmm_to_min(t):
         return None
 
 
+def _att_day_diff(a, b):
+    """Calendar-day distance between two YYYYMMDD ints (a - b). Plain int
+    subtraction is WRONG across day rollovers (20261101 - 20261031 = 70, not
+    1) — that bug inflated every overnight segment / punch by ~69 phantom
+    days (~1,656h), producing 1,700h weeks and 36h timeline axes."""
+    try:
+        da = datetime.strptime(str(int(a)), "%Y%m%d")
+        db = datetime.strptime(str(int(b)), "%Y%m%d")
+        return (da - db).days
+    except Exception:
+        return 0
+
+
 def _att_search_days(token, table_id, day_ints, field_names):
     """records/search over Time Logs / Daily Logs by their Date Match formula
     (exact day strings, OR-combined -- the validated filter form for these
@@ -11212,6 +11225,12 @@ def audition_attendance():
     # ---- roster (3 rows: agents + live status checkboxes) ----
     agents = []
     try:
+        # The roster has NO email field for this app (no contact scope), so an
+        # "@" scan over its cells always missed -> every shift lookup keyed on
+        # "" and every day read "(no shift row)". Join display names against
+        # Access Management's Email field instead — the exact join the
+        # schedule editor has used since Phase 23.
+        amap = _access_name_email_map()
         rr = feishu_session.post(
             f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ROSTER_TABLE_ID}/records/search",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"},
@@ -11221,18 +11240,25 @@ def audition_attendance():
             name = ""
             em = ""
             oid = ""
+            av = ""
             an = f.get("Agent Name")
             if isinstance(an, list) and an and isinstance(an[0], dict):
                 name = str(an[0].get("name") or "")
                 oid = str(an[0].get("id") or "")
+                em = str(an[0].get("email") or "").strip().lower()
+                av = str(an[0].get("avatar_url") or "")
             flat = {k: _att_text(v) for k, v in f.items()}
-            for k, v in flat.items():
-                if "@" in str(v) and "." in str(v):
-                    em = str(v).strip().lower()
-                    break
+            disp = name or _att_text(f.get("Agent")) or ""
+            if not em and disp:
+                em = amap.get(disp.strip().lower(), "")
+            if not em:
+                for k, v in flat.items():
+                    if "@" in str(v) and "." in str(v):
+                        em = str(v).strip().lower()
+                        break
             agents.append({"agent_id": it.get("record_id"),
-                           "name": name or _att_text(f.get("Agent")) or it.get("record_id"),
-                           "open_id": oid, "email": em,
+                           "name": disp or it.get("record_id"),
+                           "open_id": oid, "email": em, "avatar": av,
                            "live": {"status": flat.get("Current Status") or "Offline",
                                     "since": None}})
     except Exception as e:
@@ -11286,13 +11312,13 @@ def audition_attendance():
             day0 = int(dm)
         except Exception:
             day0 = s_day
-        s_rel = s_min + max(s_day - day0, 0) * 1440
+        s_rel = s_min + max(_att_day_diff(s_day, day0), 0) * 1440
         if e_min is None:
             # still running: clip the open end at "now" (Cairo clock)
             now_day, now_min = _att_epoch_min(int(time.time() * 1000))
-            e_rel = (now_min + max(now_day - day0, 0) * 1440) if now_min is not None else s_rel
+            e_rel = (now_min + max(_att_day_diff(now_day, day0), 0) * 1440) if now_min is not None else s_rel
         else:
-            e_rel = e_min + max(e_day - day0, 0) * 1440
+            e_rel = e_min + max(_att_day_diff(e_day, day0), 0) * 1440
         segs[mid].setdefault(dm, []).append(
             {"st": st, "s": s_rel, "e": max(e_rel, s_rel + 1), "open": e_min is None})
     # ---- daily logs (punches) ----
@@ -11323,7 +11349,7 @@ def audition_attendance():
             d_i, m_i = _att_epoch_min(ms_val if isinstance(ms_val, int) else None)
             if m_i is None or dm_day is None:
                 return None
-            return m_i + max(d_i - dm_day, 0) * 1440
+            return m_i + max(_att_day_diff(d_i, dm_day), 0) * 1440
         punches[mid][dm] = {
             "first": _punch_rel(f.get("First Punch")),
             "last": _punch_rel(f.get("Last Punch")),
@@ -11335,7 +11361,8 @@ def audition_attendance():
         em = a["email"]
         days_out, summ = {}, {"worked_days": 0, "worked_min": 0, "off_days": 0, "late_days": 0,
                               "late_min": 0, "gap_min": 0, "missing_min": 0, "break_min": 0,
-                              "meeting_min": 0, "offline_min": 0, "no_show": 0, "early_min": 0}
+                              "meeting_min": 0, "offline_min": 0, "no_show": 0, "early_min": 0,
+                              "ontask_min": 0}
         for d in day_ints:
             ds = str(d)
             row_segs = sorted(segs[a["agent_id"]].get(ds, []), key=lambda x: x["s"])
@@ -11348,6 +11375,7 @@ def audition_attendance():
                 shift = {"type": sh["type"], "start": sh.get("start") or "", "end": sh.get("end") or "",
                          "start_min": s0, "end_min": (e0 + 1440 if (e0 is not None and s0 is not None and e0 <= s0) else e0)}
             worked_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ATT_WORKED)
+            task_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ("On Task", "Working Ticket"))
             off_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Offline")
             brk_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Break")
             mtg_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Meeting")
@@ -11399,9 +11427,12 @@ def audition_attendance():
             if not row_segs and (not shift or shift.get("type") in ("On Site", "Work From Home")):
                 if shift:
                     flags.append("no_show")
+                    warnings.append({"day": d, "agent": a["name"], "kind": "no_show",
+                                     "detail": f"scheduled {shift.get('start') or ''}-{shift.get('end') or ''} but never signed in"})
             days_out[ds] = {"segments": row_segs, "inshift_gaps": inshift,
                             "first": first_p, "last": last_p,
-                            "worked_min": round(worked_min, 1), "offline_min": round(off_min, 1),
+                            "worked_min": round(worked_min, 1), "ontask_min": round(task_min, 1),
+                            "offline_min": round(off_min, 1),
                             "break_min": round(brk_min, 1), "meeting_min": round(mtg_min, 1),
                             "shift": shift, "late_min": late_min, "gap_min": round(gap_min, 1),
                             "missing_min": round(missing_min, 1), "early_min": early_min,
@@ -11420,6 +11451,7 @@ def audition_attendance():
             summ["break_min"] += brk_min
             summ["meeting_min"] += mtg_min
             summ["offline_min"] += off_min
+            summ["ontask_min"] += task_min
             if late_min > ATT_LATE_MIN_ALERT:
                 summ["late_days"] += 1
         summ["worked_h"] = round(summ["worked_min"] / 60, 1)
