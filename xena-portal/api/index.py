@@ -1026,6 +1026,30 @@ def _fetch_data_over_http(filename):
         logger.warn("local_json_http_fallback_failed", file=filename, error=str(e))
     return None
 
+# Phase 52 (Ahmed: the 48x/day "Cache" deploy-hook rebuilds filled Vercel
+# Functions Storage to 34 GB): the build snapshot now ALSO lives in Redis,
+# written every 30 min by .github/workflows/refresh-data.yml running
+# refresh_redis.py -- same tables, same field projection, same ghost-row
+# filtering as the build-time fetch_data.py, but pushed straight to Upstash
+# with zero deployments. load_local_json() below prefers whichever snapshot
+# (disk-baked vs Redis) is FRESHER, so the read path, the frontend, and the
+# 3h staleness math all work exactly as before.
+REDIS_KEY_BUILDSNAP_PREFIX = "xena:buildsnap:"
+
+def _redis_buildsnap(filename):
+    """Return (data, generated_at) for the Redis build snapshot of this file,
+    or (None, None). The writer (refresh_redis.py) never overwrites with an
+    empty result, so a present value is always a real snapshot."""
+    if not REDIS_ENABLED:
+        return None, None
+    try:
+        snap = redis_get_json(REDIS_KEY_BUILDSNAP_PREFIX + filename.rsplit(".", 1)[0])
+        if isinstance(snap, dict) and snap.get("data") is not None:
+            return snap["data"], snap.get("generated_at")
+    except Exception:
+        pass
+    return None, None
+
 def load_local_json(filename):
     with _local_json_lock:
         if filename in _local_json_cache:
@@ -1034,13 +1058,12 @@ def load_local_json(filename):
                 return data
 
     tried_paths = _candidate_data_paths(filename)
+    disk_data, disk_mtime, disk_path = None, None, None
     for file_path in tried_paths:
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                with _local_json_lock:
-                    _local_json_cache[filename] = (data, time.time())
                 # BUG FIX ("Analytics Report flatlines at an old date and never
                 # recovers"): this used to be trusted forever with no freshness check
                 # at all, unlike every other snapshot source in this file (background
@@ -1067,14 +1090,34 @@ def load_local_json(filename):
                         build_mtime = os.path.getmtime(file_path)
                     except OSError:
                         build_mtime = time.time()
-                _data_status[filename] = {
-                    "source": "disk", "path": file_path,
-                    "records": len(data) if isinstance(data, list) else None,
-                    "loaded_at": time.time(), "build_mtime": build_mtime,
-                }
-                return data
+                disk_data, disk_mtime, disk_path = data, build_mtime, file_path
             except Exception as e:
                 logger.error("local_json_read_failed", file=filename, path=file_path, error=str(e))
+
+    # Phase 52: pick the FRESHER of the two snapshots (disk-baked vs
+    # Redis-pushed). Early in the migration the baked file from the last
+    # "Cache"-hook build is still the freshest and keeps serving seamlessly;
+    # once the GitHub runner is live, its 30-min pushes win every time.
+    snap_data, snap_mtime = _redis_buildsnap(filename)
+    if snap_data is not None and (disk_data is None or (snap_mtime or 0) >= (disk_mtime or 0)):
+        with _local_json_lock:
+            _local_json_cache[filename] = (snap_data, time.time())
+        _data_status[filename] = {
+            "source": "redis_buildsnap",
+            "records": len(snap_data) if isinstance(snap_data, list) else None,
+            "loaded_at": time.time(), "build_mtime": snap_mtime or time.time(),
+        }
+        return snap_data
+
+    if disk_data is not None:
+        with _local_json_lock:
+            _local_json_cache[filename] = (disk_data, time.time())
+        _data_status[filename] = {
+            "source": "disk", "path": disk_path,
+            "records": len(disk_data) if isinstance(disk_data, list) else None,
+            "loaded_at": time.time(), "build_mtime": disk_mtime or time.time(),
+        }
+        return disk_data
 
     data = _fetch_data_over_http(filename)
     if data is not None:
