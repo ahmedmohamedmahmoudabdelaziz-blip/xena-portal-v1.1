@@ -45,7 +45,12 @@ REDIS_KEY_PREFIX = "xena:buildsnap:"
 # transparently. MAX_VALUE_BYTES guards the FINAL encoded size.
 PLAIN_JSON_LIMIT = 7_000_000
 MAX_VALUE_BYTES = 9_000_000
-PER_TABLE_FETCH_BUDGET_SECONDS = 360 # same as fetch_data.py
+PER_TABLE_FETCH_BUDGET_SECONDS = 600 # GitHub job allows it (15 min cap, 4 tables in
+                                       # parallel). A budget stop or failed page now
+                                       # marks the fetch INCOMPLETE and the table is
+                                       # NOT pushed - a partial snapshot is worse
+                                       # than a stale one (live incident 2026-11-03:
+                                       # 17,500/18,901 requests pushed at 360s).
 
 
 def log(msg):
@@ -125,10 +130,12 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
     start = time.time()
     page_num = 1
     consecutive_empty_pages = 0
+    complete = True
 
     for _ in range(500):
         if time.time() - start > PER_TABLE_FETCH_BUDGET_SECONDS:
             log(f"   ⏱️ [{label}]: total timeout reached ({PER_TABLE_FETCH_BUDGET_SECONDS}s)")
+            complete = False
             break
 
         params = {"page_size": 500}
@@ -153,6 +160,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
 
         if not success:
             log(f"   ❌ [{label}] Failed to fetch page {page_num} after 4 attempts. Stopping here.")
+            complete = False
             break
 
         block = data.get("data", {})
@@ -195,7 +203,7 @@ def fetch_all_records(table_id, config, app_id, app_secret, base_id):
             seen.add(rid)
             unique.append(it)
 
-    return unique
+    return unique, complete
 
 
 # ── Same tables / same projections as fetch_data.py (parity requirement) ────
@@ -284,11 +292,15 @@ def refresh_table(table, app_id, app_secret, base_id, redis_url, redis_token):
     key = REDIS_KEY_PREFIX + name
 
     try:
-        data = fetch_all_records(table["id"], table, app_id, app_secret, base_id)
+        data, complete = fetch_all_records(table["id"], table, app_id, app_secret, base_id)
     except Exception as e:
         log(f"❌ [{label}] fetch crashed: {e}")
         traceback.print_exc()
         return False, "fetch crashed; previous snapshot kept"
+
+    if not complete:
+        log(f"❌ [{label}] fetch INCOMPLETE ({len(data)} records before stop) - NOT overwriting; a partial snapshot is worse than a stale one.")
+        return False, f"incomplete fetch ({len(data)} records before stop); previous snapshot kept"
 
     if not data:
         log(f"❌ [{label}] fetch returned ZERO real records - NOT overwriting the existing snapshot.")
