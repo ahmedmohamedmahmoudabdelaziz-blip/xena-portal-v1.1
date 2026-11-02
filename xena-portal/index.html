@@ -13011,6 +13011,37 @@ window.fetch = function (url, opts) {
     return _pvOrigFetch(url, opts);
 };
 
+// Phase 51 (Ahmed: "i disabled noora access ... why she still able to work on
+// website"): MID-SESSION CUTOFF. The backend's blanket gate now answers
+// 403 {code:"ACCESS_DISABLED"} on any /api call from a toggled-off member, so
+// a disabled agent's very next click/poll is caught HERE on every fetch and
+// the tab reloads. The session is deliberately NOT wiped: after the reload
+// /api/auth/me returns zero modules for them and the page-load gate renders
+// the access-denied screen with the Request Access button. The
+// xenaAccessDisabled flag stops a reload loop while they sit on that screen;
+// it is cleared as soon as /api/auth/me reports real modules again (i.e. an
+// admin re-enabled them).
+(function () {
+    const _accPrevFetch = window.fetch.bind(window);
+    window.fetch = function (url, opts) {
+        return _accPrevFetch(url, opts).then(function (res) {
+            try {
+                if (res && res.status === 403 && typeof url === 'string'
+                    && url.indexOf('/api/') !== -1) {
+                    res.clone().json().then(function (d) {
+                        if (d && d.code === 'ACCESS_DISABLED') {
+                            try { if (localStorage.getItem('xenaAccessDisabled')) return; } catch (e) {}
+                            try { localStorage.setItem('xenaAccessDisabled', '1'); } catch (e) {}
+                            location.reload();
+                        }
+                    }).catch(function () {});
+                }
+            } catch (e) {}
+            return res;
+        });
+    };
+})();
+
 // Phase 10.27 (Ahmed): preview page is now SEARCH-FIRST -- opening it costs
 // zero requests ("make it only show the records when type search so no waste
 // the requests and quota"). The member list is fetched ONCE on the first
@@ -21588,7 +21619,13 @@ if (loggedUser&&loggedUat) {
             userPermissions = d;
             userModules = d.modules || [];
             isAdmin = !!d.is_super_admin;
-            
+
+            // Phase 51: access is real again (re-enabled) -> clear the
+            // mid-session cutoff guard so a FUTURE disable can reload us once more.
+            if (isAdmin || userModules.length > 0) {
+                try { localStorage.removeItem('xenaAccessDisabled'); } catch (e) {}
+            }
+
             if (!isAdmin && userModules.length === 0) {
                 document.getElementById('sidebar').style.display = 'none';
                 document.querySelector('.main-content').style.marginLeft = '0';
