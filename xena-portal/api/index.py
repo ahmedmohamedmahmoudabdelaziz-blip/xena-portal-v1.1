@@ -1039,11 +1039,17 @@ REDIS_KEY_BUILDSNAP_PREFIX = "xena:buildsnap:"
 def _redis_buildsnap(filename):
     """Return (data, generated_at) for the Redis build snapshot of this file,
     or (None, None). The writer (refresh_redis.py) never overwrites with an
-    empty result, so a present value is always a real snapshot."""
+    empty result, so a present value is always a real snapshot. Tables whose
+    raw snapshot exceeds the Upstash request limit are stored gzip+base64
+    wrapped ({"encoding": "gzip+base64", "payload_b64": ...}) — unwrap those
+    transparently; the inner dict has the exact plain snapshot shape."""
     if not REDIS_ENABLED:
         return None, None
     try:
         snap = redis_get_json(REDIS_KEY_BUILDSNAP_PREFIX + filename.rsplit(".", 1)[0])
+        if isinstance(snap, dict) and snap.get("encoding") == "gzip+base64" and snap.get("payload_b64"):
+            import base64 as _b64, gzip as _gz
+            snap = json.loads(_gz.decompress(_b64.b64decode(snap["payload_b64"])).decode("utf-8"))
         if isinstance(snap, dict) and snap.get("data") is not None:
             return snap["data"], snap.get("generated_at")
     except Exception:

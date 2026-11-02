@@ -29,6 +29,8 @@ ENV (set as GitHub repo secrets, same values as your Vercel env vars):
   LARK_APP_ID, LARK_APP_SECRET,
   UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 """
+import base64
+import gzip
 import json, os, sys, time, traceback
 from datetime import datetime, timezone
 import concurrent.futures
@@ -36,7 +38,13 @@ import concurrent.futures
 import requests
 
 REDIS_KEY_PREFIX = "xena:buildsnap:"
-MAX_VALUE_BYTES = 8_000_000          # stay well under Upstash request limits
+# Upstash REST rejects oversized commands (free tier ~10 MB/request; the
+# Requests table snapshot is ~22 MB raw). Above PLAIN_JSON_LIMIT we store the
+# SAME snapshot dict gzip-compressed and base64-wrapped, flagged with
+# "encoding": "gzip+base64" — the backend (_redis_buildsnap) unwraps it
+# transparently. MAX_VALUE_BYTES guards the FINAL encoded size.
+PLAIN_JSON_LIMIT = 7_000_000
+MAX_VALUE_BYTES = 9_000_000
 PER_TABLE_FETCH_BUDGET_SECONDS = 360 # same as fetch_data.py
 
 
@@ -294,8 +302,15 @@ def refresh_table(table, app_id, app_secret, base_id, redis_url, redis_token):
     }, ensure_ascii=False, separators=(",", ":"))
 
     size = len(payload.encode("utf-8"))
+    if size > PLAIN_JSON_LIMIT:
+        raw = size
+        packed = base64.b64encode(gzip.compress(payload.encode("utf-8"), compresslevel=6)).decode("ascii")
+        payload = json.dumps({"encoding": "gzip+base64", "payload_b64": packed}, separators=(",", ":"))
+        size = len(payload.encode("utf-8"))
+        log(f"   ... [{label}] snapshot {raw/1e6:.1f} MB -> gzip+base64 {size/1e6:.1f} MB")
+
     if size > MAX_VALUE_BYTES:
-        log(f"❌ [{label}] payload {size} bytes exceeds limit {MAX_VALUE_BYTES} - NOT writing.")
+        log(f"❌ [{label}] payload {size} bytes exceeds limit {MAX_VALUE_BYTES} even after compression - NOT writing.")
         return False, f"payload too large ({size} bytes); previous snapshot kept"
 
     ok, detail = redis_set(key, payload, redis_url, redis_token)
