@@ -359,6 +359,20 @@ class GitHubRepo:
             pass
         return None
 
+    def seed_repo(self):
+        """Create the very first commit via the Contents API. GitHub's
+        git-data endpoints (blobs/trees/commits) all answer 409
+        "Git Repository is empty" on a zero-commit repo, and the Contents
+        API is the only way to create that first commit."""
+        seed = (b"# xena-data\n\nXena Portal 30-min data snapshots "
+                b"(written by GitHub Actions). Do not edit manually.\n")
+        r = self._req("PUT", f"/repos/{self.repo}/contents/README.md",
+                      json={"message": "init snapshot store",
+                            "content": base64.b64encode(seed).decode("ascii"),
+                            "branch": self.branch})
+        if r.status_code not in (200, 201):
+            raise RuntimeError(f"seed failed: {r.status_code} {r.text[:200]}")
+
     def create_blob(self, content_bytes):
         r = self._req("POST", f"/repos/{self.repo}/git/blobs",
                       json={"content": base64.b64encode(content_bytes).decode("ascii"),
@@ -439,6 +453,12 @@ def main():
     # 2) Load current repo state (old tree + old meta for hash-skip).
     repo = GitHubRepo(repo_name, repo_token, branch)
     tree_sha, entries, old_meta = repo.load_state()
+    if tree_sha is None:
+        # Zero-commit repo: seed the first commit via the Contents API (the
+        # git-data endpoints 409 until it exists), then reload.
+        log("ℹ️  Data repo has no commits yet - seeding README.md first commit via Contents API")
+        repo.seed_repo()
+        tree_sha, entries, old_meta = repo.load_state()
     old_tables = (old_meta.get("tables") or {}) if isinstance(old_meta, dict) else {}
 
     # 3) Build blobs only for CHANGED tables; reuse old blobs for the rest.
