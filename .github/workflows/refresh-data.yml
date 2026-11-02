@@ -1,0 +1,61 @@
+# Xena Portal - refresh the data snapshot every 30 min WITHOUT a Vercel rebuild.
+# Replaces the old cron-job.org -> "Cache" deploy hook cycle (each ping forced a
+# full ~216 MB redeploy and filled Functions Storage). This runner fetches the
+# same Feishu tables and pushes the snapshot straight into Upstash Redis;
+# index4.py serves whichever snapshot (disk vs Redis) is fresher.
+#
+# SETUP (one time):
+#   1. Put this file at  .github/workflows/refresh-data.yml  in the repo.
+#   2. Put refresh_redis.py in the SAME folder as fetch_data.py.
+#   3. Repo -> Settings -> Secrets and variables -> Actions -> add 4 secrets
+#      (same values already in your Vercel env vars):
+#        LARK_APP_ID, LARK_APP_SECRET,
+#        UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+#   4. Actions tab -> "Refresh Xena data snapshot" -> Run workflow (manual test).
+#   5. Once one run is green: delete the cron-job.org job and the Vercel
+#      "Cache" deploy hook (Settings -> Git -> Deploy Hooks).
+#
+# Notes:
+#   - Free on public repos. Scheduled runs can lag a few minutes at GitHub
+#     peak times - the snapshot is still fresher than the old multi-minute
+#     build+deploy gap, and never leaves a half-built site.
+#   - GitHub auto-disables schedules after 60 days of repo inactivity; any
+#     push re-enables them.
+name: Refresh Xena data snapshot (Redis)
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}   # allows a manual "Run workflow" button
+
+permissions:
+  contents: none          # read-only checkout; this workflow never pushes
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requests
+        run: pip install requests
+
+      - name: Fetch Feishu tables and push snapshot to Upstash Redis
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        run: |
+          set -e
+          SCRIPT_DIR=$(dirname "$(find . -maxdepth 4 -name fetch_data.py | head -1)")
+          echo "Using script directory: $SCRIPT_DIR"
+          test -f "$SCRIPT_DIR/refresh_redis.py"
+          python "$SCRIPT_DIR/refresh_redis.py"
