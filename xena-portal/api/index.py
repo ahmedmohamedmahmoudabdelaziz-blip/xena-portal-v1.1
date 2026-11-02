@@ -1442,41 +1442,133 @@ def parse_granular_string(raw_str):
     return res
 
 # Phase 12 (Ahmed: "One toggle per member covering everything: login access +
-# notifications"): a single Redis HASH holds every member's on/off state
-# (field = lowercased email OR Person name, value "1"/"0"; ABSENT = enabled).
-# When a member is toggled OFF, _get_user_permissions_raw returns zero
-# modules: the login flow lands on the access-denied / request-access page,
-# every /api endpoint denies, and the notification bell gets 403 and hides.
-# The hardcoded ADMIN_USERS super-admin early-return stays EXEMPT as a
-# failsafe so the team can never lock itself out. Fail-OPEN on Redis errors —
-# a store hiccup must never lock the whole team out either.
-ACCESS_TOGGLES_KEY = "xena:access:toggles"
+# notifications") — REBUILT in Phase 51 after Ahmed's 2026-11-02 report: "i
+# disabled noora access from the toggle button ... why she still able to work
+# on website". Root cause of the old design: the on/off state lived ONLY in a
+# Redis hash — when Redis is unreachable (his production state more than
+# once), the HSET silently no-ops (redis_cmd swallows errors) while the
+# endpoint still answered {"success": true}, and every read failed OPEN.
+# Phase 51: the "Active" checkbox column on the Access Management sheet is
+# the single source of truth (durable, admin-visible). The toggle endpoint
+# writes the SHEET first and returns an honest error when that write fails.
+# Reads use a 45s in-process cache of the sheet map; the endpoint invalidates
+# it after a successful write so the flip lands on the very next request.
+# Fail-OPEN only when the sheet fetch itself fails AND no cache exists — a
+# Feishu hiccup must never lock the whole team out. The legacy Redis hash is
+# still written best-effort for backward compatibility but no longer read.
+ACCESS_TOGGLES_KEY = "xena:access:toggles"  # legacy mirror (write-only now)
+SHEET_TOGGLES_TTL = 45
+_SHEET_TOGGLES_CACHE = {"ts": 0.0, "map": {}, "rids": {}}
 
 def _TOGGLED_OFF_PERMS():
     return {"is_super_admin": False, "modules": [],
             "permissions": {"acms": {}, "regions": {}}, "toggled_off": True}
+
+def _sheet_toggles(force=False):
+    """Sheet-backed toggle state: {"map": {email/person-lower: enabled_bool},
+    "rids": {ident: record_id}} from the Access table's "Active" checkbox.
+    A missing/blank Active cell = enabled (pre-Phase-51 rows). On fetch error
+    the last good cache is kept; with no cache at all we fail OPEN (empty map
+    -> everyone allowed)."""
+    now = time.time()
+    if (not force and _SHEET_TOGGLES_CACHE["ts"] > 0
+            and (now - _SHEET_TOGGLES_CACHE["ts"]) < SHEET_TOGGLES_TTL):
+        return _SHEET_TOGGLES_CACHE
+    try:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        if res.get("code") not in (0, None):
+            raise RuntimeError(f"bitable returned code {res.get('code')}")
+        mmap, rids = {}, {}
+        for item in res.get("data", {}).get("items", []):
+            fields = item.get("fields", {}) or {}
+            rid = item.get("record_id", "")
+            active = fields.get("Active")
+            enabled = True if active is None else bool(active)
+            em = extract_field_text(fields.get("Email", "")).lower().strip()
+            ps = extract_field_text(fields.get("Person", "")).lower().strip()
+            for ident in (em, ps):
+                if ident:
+                    mmap[ident] = enabled
+                    if rid:
+                        rids[ident] = rid
+        _SHEET_TOGGLES_CACHE["map"] = mmap
+        _SHEET_TOGGLES_CACHE["rids"] = rids
+        _SHEET_TOGGLES_CACHE["ts"] = now
+    except Exception:
+        pass  # keep the stale cache (or stay empty -> fail open)
+    return _SHEET_TOGGLES_CACHE
 
 def _access_toggle_allows(ident):
     ident = (ident or "").strip().lower()
     if not ident:
         return True
     try:
-        v = redis_cmd("HGET", ACCESS_TOGGLES_KEY, ident)
+        return bool(_sheet_toggles()["map"].get(ident, True))
     except Exception:
         return True
-    return v != "0"
 
 def _access_toggles_map():
-    """{ident: enabled_bool} for the admin users UI — one HGETALL total."""
+    """{ident: enabled_bool} for the admin users UI — sheet-backed (one
+    cached fetch per 45s, shared with the request gate)."""
     try:
-        flat = redis_cmd("HGETALL", ACCESS_TOGGLES_KEY) or []
+        return dict(_sheet_toggles()["map"])
     except Exception:
         return {}
-    out = {}
-    if isinstance(flat, list):
-        for i in range(0, len(flat) - 1, 2):
-            out[str(flat[i])] = (str(flat[i + 1]) != "0")
-    return out
+
+# Phase 51: BLANKET mid-session enforcement. Before this, only ~half of the
+# /api routes called get_user_permissions at all — Noora's actual work
+# endpoints (/api/live-queue, /api/requests/single, /api/requests/update)
+# merely checked that SOME user param existed, so a toggled-off member kept
+# working until their next full page load. This gate runs on EVERY /api
+# request carrying an identity and answers 403 ACCESS_DISABLED the moment the
+# sheet says off; the frontend's fetch interceptor turns that into an
+# instant logout to the access-denied screen. Identity-less requests pass
+# through to the endpoint's own checks (webhooks, pollers, media <img> loads
+# carry no identity headers). Hardcoded ADMIN_USERS stay exempt as the
+# failsafe against self-lockout; MOCK_MODE skips (test harness).
+_ACCESS_GATE_EXEMPT = (
+    "/api/login", "/api/callback", "/api/app-version", "/api/health",
+    "/api/webhook/feishu", "/api/samurai-video", "/api/samurai-image",
+    "/api/sync/refresh", "/api/tickets/pull-assigned", "/api/access-request",
+    "/api/auth/me", "/api/auth/check-session", "/api/auth/refresh-session",
+    "/api/attachments/", "/api/comments/media/",
+)
+
+def _access_gate():
+    # Registered via app.before_request(_access_gate) right after the Flask
+    # app is created (this block sits above `app = Flask(__name__)`).
+    if MOCK_MODE:
+        return
+    try:
+        path = request.path
+        if not path.startswith("/api/"):
+            return
+        for prefix in _ACCESS_GATE_EXEMPT:
+            if path.startswith(prefix):
+                return
+        email = (request.headers.get("X-User-Email", "") or request.args.get("email", "")
+                 or request.form.get("email", "") or "")
+        name = (request.headers.get("X-User-Name", "") or request.args.get("user", "")
+                or request.form.get("user", "") or "")
+        if not email and not name and request.is_json:
+            body = request.get_json(silent=True) or {}
+            email = str(body.get("email", "") or "")
+            name = str(body.get("user", "") or body.get("name", "") or "")
+        email = sanitize_text(email, 200).strip().lower()
+        name = sanitize_text(name, 120).strip().lower()
+        if not email and not name:
+            return  # no identity -> endpoint's own auth decides
+        if any(a == name for a in ADMIN_USERS):
+            return  # super-admin failsafe
+        if not _access_toggle_allows(email) or not _access_toggle_allows(name):
+            return jsonify({"success": False,
+                            "error": "Your access has been disabled by an administrator.",
+                            "code": "ACCESS_DISABLED"}), 403
+    except Exception:
+        return  # never break a request over the gate itself
 
 def _get_user_permissions_raw(email, name):
     name_clean = name.strip().lower() if name else ""
@@ -2428,6 +2520,10 @@ def get_points_table_snapshot():
 
 app = Flask(__name__)
 
+# Phase 51: blanket access gate — runs on every /api request (see the
+# definition above for the full rationale and the exempt list).
+app.before_request(_access_gate)
+
 @app.before_request
 def _presence_before_request():
     """Phase 10.27 (Ahmed): piggyback presence on traffic that ALREADY
@@ -2922,14 +3018,15 @@ def _require_admin_identity():
 @app.route('/api/admin/member-toggle', methods=['POST'])
 @rate_limit(20, 300)
 def admin_member_toggle():
-    """Phase 12: THE one toggle per member — covers login access + comment
-    notifications + every module (Ahmed: "One toggle per member covering
-    everything: login access + notifications"). Body {email, enabled}.
-    Writes the Redis toggle hash; _get_user_permissions_raw reads it on every
-    request, so the flip takes effect immediately (no cache bust, no
-    re-login needed for the admin). The target's NEXT request is denied /
-    allowed. Toggling the hardcoded super-admins is accepted but harmless —
-    their failsafe path never checks the toggle."""
+    """Phase 51: THE one toggle per member — now DURABLE and HONEST. Writes
+    the "Active" checkbox on the member's Access Management SHEET row first
+    (the source of truth); success is reported ONLY when that write succeeds
+    (the old version wrote a Redis hash that silently no-oped when the store
+    was down, yet still toasted "Access disabled"). After a successful write
+    the 45s sheet cache is invalidated so the blanket gate blocks the
+    target's very next request; the legacy Redis hash is mirrored
+    best-effort. Body {email, enabled}. Toggling the hardcoded super-admins
+    is accepted but harmless — their failsafe path never checks the toggle."""
     admin_name, admin_email, err = _require_admin_identity()
     if err:
         return err
@@ -2938,10 +3035,33 @@ def admin_member_toggle():
     if not target:
         return jsonify({"success": False, "error": "email is required"}), 400
     enabled = bool(data.get("enabled", True))
+    st = _sheet_toggles()
+    rid = st["rids"].get(target)
+    if not rid:
+        st = _sheet_toggles(force=True)  # maybe the row is newer than the cache
+        rid = st["rids"].get(target)
+    if not rid:
+        return jsonify({"success": False,
+                        "error": f"No Access Management row matches '{target}'. Nothing was changed."}), 404
+    try:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records/{rid}"
+        headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+        res = http_requests.put(url, headers=headers, json={"fields": {"Active": enabled}}, timeout=15).json()
+        if res.get("code") != 0:
+            return jsonify({"success": False,
+                            "error": f"Could not save the toggle to the sheet: {res.get('msg', 'unknown error')}. Nothing was changed."}), 502
+    except Exception as e:
+        return jsonify({"success": False,
+                        "error": f"Could not save the toggle to the sheet: {e}. Nothing was changed."}), 502
+    # Sheet write landed -> make the flip visible to THIS instance immediately
+    # (other instances follow within SHEET_TOGGLES_TTL seconds) and keep the
+    # legacy Redis hash as a best-effort mirror for anything still reading it.
+    _SHEET_TOGGLES_CACHE["ts"] = 0.0
     try:
         redis_cmd("HSET", ACCESS_TOGGLES_KEY, target, "1" if enabled else "0")
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 502
+    except Exception:
+        pass
     audit.log(admin_name, "MEMBER_TOGGLE_ON" if enabled else "MEMBER_TOGGLE_OFF",
               target, ip=request.headers.get("X-Forwarded-For",""),
               severity="Warning" if not enabled else "Info")
