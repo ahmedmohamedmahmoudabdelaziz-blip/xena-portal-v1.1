@@ -1056,6 +1056,93 @@ def _redis_buildsnap(filename):
         pass
     return None, None
 
+# Phase 53 (Ahmed: Upstash free tier's 10 GB/month bandwidth could not carry
+# the 30-min snapshot writes - ~9.6 GB/month for the writer alone): the build
+# snapshot now lives in a PRIVATE GitHub repo, written every 30 min by the
+# same Actions runner (refresh_snapshot.py): one <name>.json.gz per table plus
+# a meta.json index. Raw file downloads are unmetered, so bandwidth stops
+# being a constraint. Redis keeps serving COMMENTS only and remains a
+# snapshot fallback below (zero-downtime cutover): fresher of the two wins.
+XENA_DATA_REPO = os.environ.get("XENA_DATA_REPO", "").strip()      # "owner/xena-data"
+XENA_DATA_TOKEN = os.environ.get("XENA_DATA_TOKEN", "").strip()    # read-only PAT scoped to that repo
+XENA_DATA_BRANCH = os.environ.get("XENA_DATA_BRANCH", "main").strip() or "main"
+_GITHUB_META_TTL = 60                       # meta.json is tiny; re-check at most 1x/min
+_github_meta_cache = {"at": 0.0, "meta": None}
+_github_data_cache = {}                     # filename -> (sha256, data); sha never changes for identical content
+
+def _github_raw_get(path):
+    """GET one file from the private data repo. Returns bytes or None."""
+    if not XENA_DATA_REPO or not XENA_DATA_TOKEN:
+        return None
+    url = f"https://raw.githubusercontent.com/{XENA_DATA_REPO}/{XENA_DATA_BRANCH}/{path}"
+    try:
+        resp = http_requests.get(url, headers={"Authorization": f"Bearer {XENA_DATA_TOKEN}"}, timeout=25)
+        if resp.status_code == 200:
+            return resp.content
+        logger.warn("github_raw_bad_status", path=path, status=resp.status_code)
+    except Exception as e:
+        logger.warn("github_raw_failed", path=path, error=str(e))
+    return None
+
+def _github_meta():
+    """meta.json, cached for _GITHUB_META_TTL seconds; on a fetch failure the
+    last good meta keeps being served (stale beats down)."""
+    now = time.time()
+    if _github_meta_cache["meta"] is not None and now - _github_meta_cache["at"] < _GITHUB_META_TTL:
+        return _github_meta_cache["meta"]
+    raw = _github_raw_get("meta.json")
+    if raw:
+        try:
+            m = json.loads(raw.decode("utf-8"))
+            if isinstance(m, dict) and isinstance(m.get("tables"), dict):
+                _github_meta_cache["meta"] = m
+                _github_meta_cache["at"] = now
+        except Exception:
+            pass
+    return _github_meta_cache["meta"]
+
+def _github_buildsnap(filename):
+    """Return (data, generated_at) from the GitHub-repo snapshot, or (None, None).
+    The per-file cache is keyed by the content sha256 from meta.json: unchanged
+    content is never re-downloaded even when meta's verified-at time moves."""
+    meta = _github_meta()
+    if not meta:
+        return None, None
+    name = filename.rsplit(".", 1)[0]
+    entry = meta["tables"].get(name)
+    if not isinstance(entry, dict) or not entry.get("ok"):
+        return None, None
+    gen = entry.get("generated_at")
+    sha = entry.get("sha256")
+    cached = _github_data_cache.get(filename)
+    if cached is not None and sha and cached[0] == sha:
+        return cached[1], gen
+    raw = _github_raw_get(entry.get("file") or f"{name}.json.gz")
+    if not raw:
+        return None, None
+    try:
+        import gzip as _gz
+        snap = json.loads(_gz.decompress(raw).decode("utf-8"))
+        if isinstance(snap, dict) and snap.get("data") is not None:
+            if len(_github_data_cache) > 8:
+                _github_data_cache.clear()   # only 4 files exist; crude bound is fine
+            _github_data_cache[filename] = (sha, snap["data"])
+            return snap["data"], gen
+    except Exception as e:
+        logger.warn("github_snap_decode_failed", file=filename, error=str(e))
+    return None, None
+
+def _remote_buildsnap(filename):
+    """Fresher of the two remote snapshots: GitHub repo (Phase 53) vs Redis
+    (Phase 52). Returns (data, generated_at, source) or (None, None, None)."""
+    gh_data, gh_mtime = _github_buildsnap(filename)
+    r_data, r_mtime = _redis_buildsnap(filename)
+    if gh_data is not None and (r_data is None or (gh_mtime or 0) >= (r_mtime or 0)):
+        return gh_data, gh_mtime, "github_buildsnap"
+    if r_data is not None:
+        return r_data, r_mtime, "redis_buildsnap"
+    return None, None, None
+
 def load_local_json(filename):
     with _local_json_lock:
         if filename in _local_json_cache:
@@ -1100,16 +1187,16 @@ def load_local_json(filename):
             except Exception as e:
                 logger.error("local_json_read_failed", file=filename, path=file_path, error=str(e))
 
-    # Phase 52: pick the FRESHER of the two snapshots (disk-baked vs
-    # Redis-pushed). Early in the migration the baked file from the last
-    # "Cache"-hook build is still the freshest and keeps serving seamlessly;
+    # Phase 52/53: pick the FRESHER snapshot among GitHub-repo (Phase 53),
+    # Redis (Phase 52) and disk-baked. Early in the migration the baked file
+    # from the last build is still the freshest and keeps serving seamlessly;
     # once the GitHub runner is live, its 30-min pushes win every time.
-    snap_data, snap_mtime = _redis_buildsnap(filename)
+    snap_data, snap_mtime, snap_source = _remote_buildsnap(filename)
     if snap_data is not None and (disk_data is None or (snap_mtime or 0) >= (disk_mtime or 0)):
         with _local_json_lock:
             _local_json_cache[filename] = (snap_data, time.time())
         _data_status[filename] = {
-            "source": "redis_buildsnap",
+            "source": snap_source or "remote_buildsnap",
             "records": len(snap_data) if isinstance(snap_data, list) else None,
             "loaded_at": time.time(), "build_mtime": snap_mtime or time.time(),
         }

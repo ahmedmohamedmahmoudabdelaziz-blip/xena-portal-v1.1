@@ -1,27 +1,37 @@
 # Xena Portal - refresh the data snapshot every 30 min WITHOUT a Vercel rebuild.
 # Replaces the old cron-job.org -> "Cache" deploy hook cycle (each ping forced a
 # full ~216 MB redeploy and filled Functions Storage). This runner fetches the
-# same Feishu tables and pushes the snapshot straight into Upstash Redis;
-# index4.py serves whichever snapshot (disk vs Redis) is fresher.
+# same Feishu tables and commits the snapshot into a PRIVATE GitHub data repo
+# (Phase 53); index4.py serves whichever snapshot (GitHub vs Redis vs disk) is
+# fresher. (Phase 52 pushed to Upstash Redis instead - moved off it because the
+# free tier's 10 GB/month bandwidth could not carry ~9.6 GB/month of writes.)
 #
 # SETUP (one time):
-#   1. Put this file at  .github/workflows/refresh-data.yml  in the repo.
-#   2. Put refresh_redis.py in the SAME folder as fetch_data.py.
-#   3. Repo -> Settings -> Secrets and variables -> Actions -> add 4 secrets
-#      (same values already in your Vercel env vars):
-#        LARK_APP_ID, LARK_APP_SECRET,
-#        UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
-#   4. Actions tab -> "Refresh Xena data snapshot" -> Run workflow (manual test).
-#   5. Once one run is green: delete the cron-job.org job and the Vercel
-#      "Cache" deploy hook (Settings -> Git -> Deploy Hooks).
+#   1. Put this file at  .github/workflows/refresh-data.yml  in the PUBLIC
+#      portal repo (public repo = free unlimited Actions minutes).
+#   2. Put refresh_snapshot.py in the SAME folder as fetch_data.py.
+#   3. Create a PRIVATE repo (e.g. "xena-data") - no README needed.
+#   4. Create a fine-grained PAT scoped to that repo ONLY, Contents:
+#      Read and Write (note: fine-grained PATs expire after max 1 year -
+#      when it expires the refresh stops and the portal silently serves the
+#      last snapshot, so calendar the renewal).
+#   5. Repo -> Settings -> Secrets and variables -> Actions -> add secrets:
+#        LARK_APP_ID, LARK_APP_SECRET        (same values as Vercel env)
+#        DATA_REPO_TOKEN                     (the PAT from step 4)
+#      and set DATA_REPO below ("your-username/xena-data" - not secret).
+#   6. Actions tab -> "Refresh Xena data snapshot" -> Run workflow (manual test).
+#   7. Once one run is green: delete the cron-job.org job and the Vercel
+#      "Cache" deploy hook (Settings -> Git -> Deploy Hooks), and the
+#      UPSTASH_* secrets here can go too (Redis now serves comments only).
 #
 # Notes:
-#   - Free on public repos. Scheduled runs can lag a few minutes at GitHub
-#     peak times - the snapshot is still fresher than the old multi-minute
-#     build+deploy gap, and never leaves a half-built site.
+#   - Scheduled runs can lag a few minutes at GitHub peak times - the snapshot
+#     is still fresher than the old multi-minute build+deploy gap, and never
+#     leaves a half-built site.
 #   - GitHub auto-disables schedules after 60 days of repo inactivity; any
-#     push re-enables them.
-name: Refresh Xena data snapshot (Redis)
+#     push re-enables them (this workflow's own commits to the data repo do
+#     NOT count - activity must be on THIS repo).
+name: Refresh Xena data snapshot (GitHub repo)
 
 on:
   schedule:
@@ -29,7 +39,7 @@ on:
   workflow_dispatch: {}   # allows a manual "Run workflow" button
 
 permissions:
-  contents: none          # read-only checkout; this workflow never pushes
+  contents: none          # read-only checkout; pushes to the data repo use the PAT
 
 jobs:
   refresh:
@@ -47,15 +57,15 @@ jobs:
       - name: Install requests
         run: pip install requests
 
-      - name: Fetch Feishu tables and push snapshot to Upstash Redis
+      - name: Fetch Feishu tables and push snapshot to the data repo
         env:
           LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+          DATA_REPO: ahmedmohamedmahmoudabdelaziz-blip/xena-data
         run: |
           set -e
           SCRIPT_DIR=$(dirname "$(find . -maxdepth 4 -name fetch_data.py | head -1)")
           echo "Using script directory: $SCRIPT_DIR"
-          test -f "$SCRIPT_DIR/refresh_redis.py"
-          python "$SCRIPT_DIR/refresh_redis.py"
+          test -f "$SCRIPT_DIR/refresh_snapshot.py"
+          python "$SCRIPT_DIR/refresh_snapshot.py"
