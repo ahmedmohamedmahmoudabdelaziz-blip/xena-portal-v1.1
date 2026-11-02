@@ -323,9 +323,11 @@ class GitHubRepo:
 
     def load_state(self):
         """Return (tree_sha|None, entries {path: blob_sha}, old_meta dict).
-        An empty repo (no branch yet) returns (None, {}, {})."""
+        An empty repo returns (None, {}, {}). GitHub answers 409
+        "Git Repository is empty" (not 404) for refs on a repo with no
+        commits yet — both mean "start fresh"."""
         r = self._req("GET", f"/repos/{self.repo}/git/ref/heads/{self.branch}")
-        if r.status_code == 404:
+        if r.status_code in (404, 409):
             return None, {}, {}
         r.raise_for_status()
         commit_sha = r.json()["object"]["sha"]
@@ -382,9 +384,15 @@ class GitHubRepo:
         r.raise_for_status()
         commit = r.json()["sha"]
 
-        r = self._req("PATCH", f"/repos/{self.repo}/git/refs/heads/{self.branch}",
-                      json={"sha": commit, "force": True})
-        if r.status_code == 404:  # branch does not exist yet (empty repo)
+        if base_tree_sha:
+            # Existing history -> move the branch ref.
+            r = self._req("PATCH", f"/repos/{self.repo}/git/refs/heads/{self.branch}",
+                          json={"sha": commit, "force": True})
+            if r.status_code == 404:  # branch missing unexpectedly
+                r = self._req("POST", f"/repos/{self.repo}/git/refs",
+                              json={"ref": f"refs/heads/{self.branch}", "sha": commit})
+        else:
+            # Empty repo -> the branch does not exist yet; create it directly.
             r = self._req("POST", f"/repos/{self.repo}/git/refs",
                           json={"ref": f"refs/heads/{self.branch}", "sha": commit})
         r.raise_for_status()
