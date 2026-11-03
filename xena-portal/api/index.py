@@ -7516,6 +7516,94 @@ def compute_single_agency_target_ledger(points_items, requests_items, code):
         "base_points": base_pts, "privileges": privileges,
     }
 
+# ─── Phase 59 (Ahmed): the respondent's REAL chat groups for fast buttons ────
+# "sehar she is in 2 group so why only one group appare" -- the ticket's
+# "Mention this Group" lookup resolves ONE Group Name per matched row, but the
+# Group Webhooks table's `test` (GroupChat links) column lists EVERY chat the
+# agent is actually in (Sehar's row links PK-Sehar AND PK-Zohaib). This
+# endpoint reads that tiny table (~26 rows, 5-min in-process cache) and
+# returns all chat names for a respondent; the frontend filters them against
+# the Mentioned Group options and renders the fast buttons.
+GROUPS_TABLE_ID = "tblpgMD1AfAXQYzd"
+_GROUPS_CACHE = {"ts": 0.0, "rows": None}
+_GROUPS_CACHE_TTL = 300  # 26 rows; 5 min is plenty for "who is in which group"
+
+def _group_webhook_rows():
+    now = time.time()
+    if _GROUPS_CACHE["rows"] is not None and now - _GROUPS_CACHE["ts"] < _GROUPS_CACHE_TTL:
+        return _GROUPS_CACHE["rows"]
+    headers = {"Authorization": f"Bearer {get_tenant_access_token()}"}
+    items, token = [], None
+    while True:
+        # page_size/page_token MUST be query params -- body copies are silently
+        # dropped (Phase 55 lesson).
+        params = {"page_size": 100}
+        if token:
+            params["page_token"] = token
+        r = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{GROUPS_TABLE_ID}/records/search",
+            headers=headers, params=params,
+            json={"automatic_fields": False}, timeout=30).json()
+        if r.get("code") != 0:
+            raise RuntimeError(r.get("msg") or "Group Webhooks lookup failed.")
+        d = r.get("data", {})
+        items.extend(d.get("items", []))
+        if not d.get("has_more"):
+            break
+        token = d.get("page_token")
+    rows = []
+    for it in items:
+        f = it.get("fields", {})
+        gname = extract_field_text(get_field_local(f, "Group Name")).strip()
+        agents = []
+        av = get_field_local(f, "Agent Name")
+        if isinstance(av, list):
+            agents = [str(u.get("name", "")).strip() for u in av if isinstance(u, dict)]
+        chats = []
+        tv = get_field_local(f, "test")
+        if isinstance(tv, list):
+            chats = [str(c.get("name", "")).strip() for c in tv if isinstance(c, dict) and c.get("name")]
+        rows.append({"group": gname, "agents": agents, "chats": chats})
+    _GROUPS_CACHE["rows"] = rows
+    _GROUPS_CACHE["ts"] = now
+    return rows
+
+
+@app.route('/api/groups/for-respondent', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def groups_for_respondent():
+    """Phase 59: ?name=<respondent display name> -> {"groups": [...]} -- every
+    chat group the respondent belongs to (matched rows' Group Name first, then
+    the row's `test` chat links, deduped). The workspace renders these as the
+    Mentioned-Group fast buttons, so agents in 2 chats get 2 buttons."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = get_user_permissions(email, user)
+    # Workspace helper, not a data page: any module holder (or super admin).
+    if not perms.get("is_super_admin") and not perms.get("modules"):
+        return jsonify({"error": "Access denied"}), 403
+    name = sanitize_text(request.args.get('name', '')).strip()
+    if not name:
+        return jsonify({"success": False, "error": "Missing name"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "groups": ["PK-Sehar-Audition group", "PK-Zohaib-Audition group"]})
+    try:
+        rows = _group_webhook_rows()
+    except Exception as e:
+        logger.warn("groups_for_respondent_failed", error=str(e))
+        return jsonify({"success": False, "error": "Group lookup failed"}), 502
+    nlow = name.lower()
+    groups = []
+    for row in rows:
+        hit = any(a and (a.lower() == nlow or nlow in a.lower() or a.lower() in nlow)
+                  for a in row["agents"])
+        if not hit:
+            continue
+        for g in [row["group"]] + row["chats"]:
+            if g and g not in groups:
+                groups.append(g)
+    return jsonify({"success": True, "groups": groups})
+
 @app.route('/api/agency-target/formula', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def agency_target_formula():
