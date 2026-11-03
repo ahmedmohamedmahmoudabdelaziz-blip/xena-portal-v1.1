@@ -1619,11 +1619,22 @@ def parse_granular_string(raw_str):
 # Reads use a 45s in-process cache of the sheet map; the endpoint invalidates
 # it after a successful write so the flip lands on the very next request.
 # Fail-OPEN only when the sheet fetch itself fails AND no cache exists — a
-# Feishu hiccup must never lock the whole team out. The legacy Redis hash is
-# still written best-effort for backward compatibility but no longer read.
-ACCESS_TOGGLES_KEY = "xena:access:toggles"  # legacy mirror (write-only now)
+# Feishu hiccup must never lock the whole team out.
+# Phase 56 (2026-11-04, Ahmed: "no need for the 45s check — when the toggle
+# flips, update the sheet AND cut online users right away; offline users get
+# no access at re-login"): the 45s sheet cache is a LAZY read, not a poll
+# (zero cost when nobody is working) — but on Vercel each warm instance kept
+# its own copy, so a portal-side flip took up to 45s to reach the OTHER
+# instances. The Redis hash is now a READ-WRITE instant overlay: the toggle
+# route HSETs it, the gate reads it FIRST (cross-instance, ~5s staleness
+# cap), and every successful sheet refresh reconciles it (sheet = source of
+# truth, so a direct sheet-side flip always wins once seen). Offline users
+# are blocked at login by the exact same check. No polling anywhere.
+ACCESS_TOGGLES_KEY = "xena:access:toggles"  # instant toggle overlay (read+write)
 SHEET_TOGGLES_TTL = 45
+MIRROR_TTL = 5  # seconds between HGETALL reads of the overlay per instance
 _SHEET_TOGGLES_CACHE = {"ts": 0.0, "map": {}, "rids": {}}
+_MIRROR_CACHE = {"ts": 0.0, "map": None}
 
 def _TOGGLED_OFF_PERMS():
     return {"is_super_admin": False, "modules": [],
@@ -1662,14 +1673,62 @@ def _sheet_toggles(force=False):
         _SHEET_TOGGLES_CACHE["map"] = mmap
         _SHEET_TOGGLES_CACHE["rids"] = rids
         _SHEET_TOGGLES_CACHE["ts"] = now
+        # Phase 56: reconcile the instant overlay against the fresh sheet
+        # (sheet = source of truth). Any overlay entry that contradicts the
+        # sheet — or points at a row that no longer exists — is removed, so a
+        # direct sheet-side flip always wins within one refresh. A portal-side
+        # flip wrote the sheet FIRST, so it never contradicts.
+        try:
+            mirror = _MIRROR_CACHE["map"]
+            if mirror:
+                stale = [k for k, v in mirror.items()
+                         if mmap.get(k, True) != (v != "0")]
+                for k in stale:
+                    redis_cmd("HDEL", ACCESS_TOGGLES_KEY, k)
+                    mirror.pop(k, None)
+        except Exception:
+            pass
     except Exception:
         pass  # keep the stale cache (or stay empty -> fail open)
     return _SHEET_TOGGLES_CACHE
+
+def _mirror_toggles():
+    """Phase 56 instant overlay: {ident: "0"/"1"} shared across ALL instances
+    via Redis — a portal-side flip lands everywhere within MIRROR_TTL seconds
+    instead of up to SHEET_TOGGLES_TTL. One HGETALL per MIRROR_TTL per warm
+    instance (~1 cheap command; nothing when nobody is working). Returns None
+    when Redis is unavailable — the sheet map then decides (fail-safe)."""
+    now = time.time()
+    if _MIRROR_CACHE["map"] is not None and (now - _MIRROR_CACHE["ts"]) < MIRROR_TTL:
+        return _MIRROR_CACHE["map"]
+    try:
+        raw = redis_cmd("HGETALL", ACCESS_TOGGLES_KEY)
+    except Exception:
+        raw = None
+    if not isinstance(raw, list):
+        _MIRROR_CACHE["map"] = None
+        _MIRROR_CACHE["ts"] = now
+        return None
+    mmap = {}
+    for i in range(0, len(raw) - 1, 2):
+        mmap[str(raw[i]).strip().lower()] = str(raw[i + 1])
+    _MIRROR_CACHE["map"] = mmap
+    _MIRROR_CACHE["ts"] = now
+    return mmap
 
 def _access_toggle_allows(ident):
     ident = (ident or "").strip().lower()
     if not ident:
         return True
+    try:
+        mirror = _mirror_toggles()
+        if mirror is not None and ident in mirror:
+            allowed = mirror[ident] != "0"  # instant overlay wins (portal flips)
+            _sheet_toggles()  # keep the lazy 45s refresh+reconcile alive so a
+                              # sheet-side flip can override the overlay
+            return allowed
+    except Exception:
+        pass
     try:
         return bool(_sheet_toggles()["map"].get(ident, True))
     except Exception:
@@ -1677,9 +1736,16 @@ def _access_toggle_allows(ident):
 
 def _access_toggles_map():
     """{ident: enabled_bool} for the admin users UI — sheet-backed (one
-    cached fetch per 45s, shared with the request gate)."""
+    cached fetch per 45s, shared with the request gate) with the Phase 56
+    instant overlay applied on top, so the UI shows a portal flip immediately
+    even on an instance whose sheet cache is still warm."""
     try:
-        return dict(_sheet_toggles()["map"])
+        mmap = dict(_sheet_toggles()["map"])
+        mirror = _mirror_toggles()
+        if mirror:
+            for ident, val in mirror.items():
+                mmap[ident] = (val != "0")
+        return mmap
     except Exception:
         return {}
 
@@ -3188,9 +3254,9 @@ def admin_member_toggle():
     (the source of truth); success is reported ONLY when that write succeeds
     (the old version wrote a Redis hash that silently no-oped when the store
     was down, yet still toasted "Access disabled"). After a successful write
-    the 45s sheet cache is invalidated so the blanket gate blocks the
-    target's very next request; the legacy Redis hash is mirrored
-    best-effort. Body {email, enabled}. Toggling the hardcoded super-admins
+    the Redis overlay is updated so EVERY instance blocks the target's next
+    request within ~5s (Phase 56) — plus this instance's caches are
+    invalidated. Body {email, enabled}. Toggling the hardcoded super-admins
     is accepted but harmless — their failsafe path never checks the toggle."""
     admin_name, admin_email, err = _require_admin_identity()
     if err:
@@ -3219,10 +3285,13 @@ def admin_member_toggle():
     except Exception as e:
         return jsonify({"success": False,
                         "error": f"Could not save the toggle to the sheet: {e}. Nothing was changed."}), 502
-    # Sheet write landed -> make the flip visible to THIS instance immediately
-    # (other instances follow within SHEET_TOGGLES_TTL seconds) and keep the
-    # legacy Redis hash as a best-effort mirror for anything still reading it.
+    # Sheet write landed -> make the flip visible instantly: this instance's
+    # caches are invalidated, and the Redis overlay HSET makes EVERY other
+    # warm instance honor it within MIRROR_TTL seconds (Phase 56 — no more
+    # 45s cross-instance window). The next sheet refresh reconciles the
+    # overlay against the sheet (source of truth).
     _SHEET_TOGGLES_CACHE["ts"] = 0.0
+    _MIRROR_CACHE["ts"] = 0.0
     try:
         redis_cmd("HSET", ACCESS_TOGGLES_KEY, target, "1" if enabled else "0")
     except Exception:
