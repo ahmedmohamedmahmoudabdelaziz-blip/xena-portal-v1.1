@@ -494,61 +494,88 @@ TABLES = [
 # ── Fetch phase (safety guards live here) ───────────────────────────────────
 
 def fetch_table_snapshot(table, app_id, app_secret, base_id,
-                         prev_records=None, force_full=False):
+                         prev_records=None, force_full=False, full_fallback=True):
     """Fetch one table from Feishu with all Phase 52/55 safety guards.
-    Incremental tables use a server-side date filter + record_id merge into
-    prev_records; anything else does a full read.
+
+    Incremental tables (Requests/Audit) use a server-side date filter +
+    record_id merge into prev_records. Order of attempts:
+      1. incremental (unless force_full / no previous snapshot)
+      2. full fetch (whenever incremental can't run or failed)
+      3. incremental AGAIN as a last resort when the full fetch failed and a
+         previous snapshot exists (slow Feishu nights: the 8h backstop full
+         fetch may die at 5k/19k pages - the table must still refresh its
+         recent rows, or the snapshot starves until one full fetch survives).
+         full_fallback=False (manual FORCE_FULL) keeps the strict behavior.
+
     Returns (ok, detail, data_list|None, mode). A failed fetch NEVER produces
     data - the previous snapshot is kept instead."""
     label = table["label"]
-    do_incremental = (table.get("mode") == "incremental" and not force_full
-                      and prev_records)
+    is_inc_table = table.get("mode") == "incremental"
 
-    if do_incremental:
+    def incremental_attempt():
+        """Returns a 4-tuple result, or None = 'cannot do incremental, try full'."""
+        if not (is_inc_table and prev_records):
+            return None
         since_ms = max_date_ms(prev_records, table["date_fields"]) - INCREMENTAL_OVERLAP_MS
         try:
             fetched, complete, pages, _min_date = fetch_records_search_filtered(
                 table["id"], table, app_id, app_secret, base_id, since_ms)
         except Exception as e:
             log(f"⚠️ [{label}] incremental fetch crashed ({e}) - falling back to a full fetch")
-            do_incremental = False
-        else:
-            if fetched is None and pages == 0:
-                # no usable date field in schema -> explicit full-fetch fallback
-                log(f"ℹ️ [{label}] incremental unavailable - falling back to a full fetch")
-                do_incremental = False
-            elif not complete:
-                log(f"⚠️ [{label}] incremental fetch INCOMPLETE after {pages} page(s) - falling back to a full fetch")
-                do_incremental = False
-            elif not fetched:
-                # genuinely nothing new -> merged == prev, still a fresh verified pass
-                log(f"✅ [{label}] incremental: 0 new rows in {pages} page(s) - snapshot unchanged")
-                return True, f"incremental: 0 new ({pages}p)", list(prev_records), "incremental"
-            else:
-                merged, n_new, n_upd = merge_snapshots(prev_records, fetched)
-                if len(merged) < len(prev_records):
-                    log(f"   ⚠️ [{label}] merged {len(merged)} < prev {len(prev_records)} (rows deleted in Feishu?) - keeping merged; next full refresh reconciles")
-                log(f"✅ [{label}] incremental: {pages} pages, +{n_new} new, {n_upd} updated -> {len(merged)} records total")
-                return True, f"incremental {pages}p: +{n_new} new, {n_upd} updated, total {len(merged)}", merged, "incremental"
+            return None
+        if fetched is None and pages == 0:
+            # no usable date field in schema -> explicit full-fetch fallback
+            log(f"ℹ️ [{label}] incremental unavailable - falling back to a full fetch")
+            return None
+        if not complete:
+            log(f"⚠️ [{label}] incremental fetch INCOMPLETE after {pages} page(s) - falling back to a full fetch")
+            return None
+        if not fetched:
+            # genuinely nothing new -> merged == prev, still a fresh verified pass
+            log(f"✅ [{label}] incremental: 0 new rows in {pages} page(s) - snapshot unchanged")
+            return True, f"incremental: 0 new ({pages}p)", list(prev_records), "incremental"
+        merged, n_new, n_upd = merge_snapshots(prev_records, fetched)
+        if len(merged) < len(prev_records):
+            log(f"   ⚠️ [{label}] merged {len(merged)} < prev {len(prev_records)} (rows deleted in Feishu?) - keeping merged; next full refresh reconciles")
+        log(f"✅ [{label}] incremental: {pages} pages, +{n_new} new, {n_upd} updated -> {len(merged)} records total")
+        return True, f"incremental {pages}p: +{n_new} new, {n_upd} updated, total {len(merged)}", merged, "incremental"
 
-    # full fetch
+    # 1) incremental first (unless forced / no previous snapshot)
+    if not force_full:
+        res = incremental_attempt()
+        if res is not None:
+            return res
+
+    # 2) full fetch
     try:
         data, complete = fetch_all_records(table["id"], table, app_id, app_secret, base_id)
     except Exception as e:
         log(f"❌ [{label}] fetch crashed: {e}")
         traceback.print_exc()
-        return False, "fetch crashed; previous snapshot kept", None, "full"
+        data, complete = None, False
 
-    if not complete:
+    if complete and data:
+        log(f"✅ [{label}] full fetch: {len(data)} records")
+        return True, f"full: {len(data)} records", data, "full"
+
+    # 3) full failed -> last-resort incremental (slow-Feishu starvation guard)
+    if full_fallback and prev_records:
+        log(f"⚠️ [{label}] full fetch failed - retrying incrementally so recent rows still land")
+        res = incremental_attempt()
+        if res is not None and res[0]:
+            return res
+        if res is not None and not res[0]:
+            return res
+        # None here = incremental impossible too; fall through to failure
+
+    if data is not None and not complete:
         log(f"❌ [{label}] fetch INCOMPLETE ({len(data)} records before stop) - NOT overwriting; a partial snapshot is worse than a stale one.")
         return False, f"incomplete fetch ({len(data)} records before stop); previous snapshot kept", None, "full"
-
-    if not data:
+    if data is not None and not data:
         log(f"❌ [{label}] fetch returned ZERO real records - NOT overwriting the existing snapshot.")
         return False, "empty fetch; previous snapshot kept", None, "full"
-
-    log(f"✅ [{label}] full fetch: {len(data)} records")
-    return True, f"full: {len(data)} records", data, "full"
+    log(f"❌ [{label}] fetch crashed - previous snapshot kept")
+    return False, "fetch crashed; previous snapshot kept", None, "full"
 
 
 # ── GitHub writer (Git Data API, single root commit + force ref) ────────────
@@ -739,28 +766,31 @@ def main():
     old_tables = (old_meta.get("tables") or {}) if isinstance(old_meta, dict) else {}
 
     # 2) Per-table fetch plan: incremental needs the previous data list; the
-    #    8-hour backstop (or a missing last_full_at) forces full.
+    #    8-hour backstop (or a missing last_full_at) forces full. Even on a
+    #    backstop-full run we still load the previous snapshot: if the full
+    #    fetch dies mid-way on a slow Feishu night, fetch_table_snapshot can
+    #    fall back to incremental so the table does not starve.
     now = time.time()
     plans = {}
     for t in TABLES:
         name = t["filename"].rsplit(".", 1)[0]
         old_entry = old_tables.get(name) if isinstance(old_tables.get(name), dict) else {}
-        plan = {"prev": None, "force_full": force_full_env, "old_entry": old_entry}
+        plan = {"prev": None, "force_full": force_full_env,
+                "full_fallback": not force_full_env, "old_entry": old_entry}
         if t.get("mode") == "incremental" and not force_full_env:
             last_full_at = old_entry.get("last_full_at") or 0
             if not last_full_at:
                 plan["force_full"] = True   # first run after deploy / after meta loss
-                log(f"ℹ️  [{t['label']}] no last_full_at in meta - doing a full fetch this run (stamps the backstop clock)")
+                log(f"ℹ️  [{t['label']}] no last_full_at in meta - trying a full fetch this run (stamps the backstop clock; falls back to incremental if Feishu is slow)")
             elif now - last_full_at >= FULL_REFRESH_INTERVAL_S:
                 plan["force_full"] = True
-                log(f"ℹ️  [{t['label']}] last full refresh {int((now-last_full_at)//3600)}h ago - doing a full fetch (backstop)")
-            if not plan["force_full"]:
-                old_file = old_entry.get("file") or f"{name}.json.gz"
-                prev = load_prev_snapshot(repo, old_entry, old_file, t["label"])
-                if prev is None:
-                    plan["force_full"] = True  # no usable previous snapshot
-                else:
-                    plan["prev"] = prev
+                log(f"ℹ️  [{t['label']}] last full refresh {int((now-last_full_at)//3600)}h ago - doing a full fetch (backstop; falls back to incremental if it fails)")
+            old_file = old_entry.get("file") or f"{name}.json.gz"
+            prev = load_prev_snapshot(repo, old_entry, old_file, t["label"])
+            if prev is None and not plan["force_full"]:
+                plan["force_full"] = True  # no usable previous snapshot
+            else:
+                plan["prev"] = prev
         plans[name] = plan
 
     # 3) Fetch all tables in parallel (network-bound, up to 10 min each).
@@ -768,7 +798,8 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = {executor.submit(fetch_table_snapshot, t, app_id, app_secret, base_id,
                                    prev_records=plans[t["filename"].rsplit(".", 1)[0]]["prev"],
-                                   force_full=plans[t["filename"].rsplit(".", 1)[0]]["force_full"]): t
+                                   force_full=plans[t["filename"].rsplit(".", 1)[0]]["force_full"],
+                                   full_fallback=plans[t["filename"].rsplit(".", 1)[0]]["full_fallback"]): t
                    for t in TABLES}
         for fut in concurrent.futures.as_completed(futures):
             label = futures[fut]["label"]
