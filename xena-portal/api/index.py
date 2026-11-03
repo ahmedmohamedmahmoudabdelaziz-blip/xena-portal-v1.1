@@ -11735,7 +11735,7 @@ def audition_attendance():
         days_out, summ = {}, {"worked_days": 0, "worked_min": 0, "off_days": 0, "late_days": 0,
                               "late_min": 0, "gap_min": 0, "missing_min": 0, "break_min": 0,
                               "meeting_min": 0, "offline_min": 0, "no_show": 0, "early_min": 0,
-                              "ontask_min": 0}
+                              "ontask_min": 0, "ticket_min": 0}
         for d in day_ints:
             ds = str(d)
             is_future = today_int is not None and d > today_int
@@ -11750,7 +11750,11 @@ def audition_attendance():
                 shift = {"type": sh["type"], "start": sh.get("start") or "", "end": sh.get("end") or "",
                          "start_min": s0, "end_min": (e0 + 1440 if (e0 is not None and s0 is not None and e0 <= s0) else e0)}
             seg_worked_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ATT_WORKED)
-            task_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ("On Task", "Working Ticket"))
+            # Phase 60b (Ahmed): separate the two working flavors -- On Task and
+            # Working Ticket are DIFFERENT statuses and must never blur into one
+            # number ("mano didn't put on task today but it show he has on task").
+            task_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "On Task")
+            ticket_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Working Ticket")
             off_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Offline")
             brk_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Break")
             mtg_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Meeting")
@@ -11812,7 +11816,7 @@ def audition_attendance():
                 # scheduled but not started: render the window, flag nothing
                 days_out[ds] = {"segments": row_segs, "inshift_gaps": [],
                                 "first": first_p, "last": last_p,
-                                "worked_min": 0, "ontask_min": 0, "offline_min": 0,
+                                "worked_min": 0, "ontask_min": 0, "ticket_min": 0, "offline_min": 0,
                                 "break_min": 0, "meeting_min": 0,
                                 "shift": shift, "late_min": 0, "gap_min": 0,
                                 "missing_min": 0, "early_min": 0,
@@ -11849,7 +11853,7 @@ def audition_attendance():
                                      "detail": f"scheduled {shift.get('start') or ''}-{shift.get('end') or ''} but never signed in"})
             days_out[ds] = {"segments": row_segs, "inshift_gaps": inshift,
                             "first": first_p, "last": last_p,
-                            "worked_min": round(worked_min, 1), "ontask_min": round(task_min, 1),
+                            "worked_min": round(worked_min, 1), "ontask_min": round(task_min, 1), "ticket_min": round(ticket_min, 1),
                             "offline_min": round(off_min, 1),
                             "break_min": round(brk_min, 1), "meeting_min": round(mtg_min, 1),
                             "shift": shift, "late_min": late_min, "gap_min": round(gap_min, 1),
@@ -11870,6 +11874,7 @@ def audition_attendance():
             summ["meeting_min"] += mtg_min
             summ["offline_min"] += off_min
             summ["ontask_min"] += task_min
+            summ["ticket_min"] += ticket_min
             if late_min > ATT_LATE_MIN_ALERT:
                 summ["late_days"] += 1
         summ["worked_h"] = round(summ["worked_min"] / 60, 1)
