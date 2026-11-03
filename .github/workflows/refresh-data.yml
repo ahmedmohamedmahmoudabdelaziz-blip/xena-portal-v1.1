@@ -36,7 +36,12 @@ name: Refresh Xena data snapshot (GitHub repo)
 on:
   schedule:
     - cron: "*/30 * * * *"
-  workflow_dispatch: {}   # allows a manual "Run workflow" button
+  workflow_dispatch:       # allows a manual "Run workflow" button
+    inputs:
+      force_full:
+        description: "Force a FULL refresh of every table (skips the fast incremental path)"
+        type: boolean
+        default: false
 
 permissions:
   contents: none          # read-only checkout; pushes to the data repo use the PAT
@@ -63,6 +68,7 @@ jobs:
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
           DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
           DATA_REPO: ahmedmohamedmahmoudabdelaziz-blip/xena-data
+          FORCE_FULL: ${{ inputs.force_full == true }}
         run: |
           set -e
           SCRIPT_DIR=$(dirname "$(find . -maxdepth 4 -name fetch_data.py | head -1)")
