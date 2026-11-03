@@ -1500,6 +1500,27 @@
         /* Phase 27: ticket's own-group chip echoed beside the Mentioned Group picker */
         .tw-mg-own{margin-top:6px;align-self:flex-start;white-space:normal;}
 
+        /* ═══ Phase 57 (Ahmed): fast group buttons + quick-note chips ═══ */
+        /* One-tap group buttons beside the Mentioned Group select -- they SET
+           the select (never replace it) so any other group stays one click away. */
+        .tw-mg-fast{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+        .tw-mg-fast-btn{position:relative;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:600;letter-spacing:.2px;cursor:pointer;color:#dff6ff;background:linear-gradient(135deg, rgba(0,212,255,.16), rgba(168,85,247,.16));border:1px solid rgba(0,212,255,.45);box-shadow:0 2px 10px rgba(0,212,255,.12);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+        .tw-mg-fast-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,212,255,.28);border-color:var(--accent-cyan);}
+        .tw-mg-fast-btn:active{transform:translateY(0) scale(.97);}
+        .tw-mg-fast-btn.active{background:linear-gradient(135deg, rgba(0,212,255,.34), rgba(168,85,247,.34));border-color:var(--accent-cyan);box-shadow:0 0 0 2px rgba(0,212,255,.25), 0 6px 18px rgba(0,212,255,.30);}
+        .tw-mg-pop{animation:twMgPop .35s ease;}
+        @keyframes twMgPop{0%{transform:scale(.94)}55%{transform:scale(1.05)}100%{transform:scale(1)}}
+        /* Quick-note preset chips above the Audition Note textarea -- one click
+           fills the note (placeholders resolved from the ticket), the textarea
+           stays fully editable afterwards. */
+        .tw-aud-quick{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 8px;}
+        .tw-aud-quick-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:2px;}
+        .tw-aud-quick-chip{max-width:100%;text-align:left;padding:7px 13px;border-radius:12px;font-size:12.5px;line-height:1.35;cursor:pointer;color:#e9e2ff;background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.40);transition:transform .15s ease, box-shadow .15s ease, background .15s ease;white-space:normal;}
+        .tw-aud-quick-chip:hover{background:linear-gradient(135deg, rgba(168,85,247,.22), rgba(0,212,255,.18));border-color:var(--accent-purple);transform:translateY(-2px);box-shadow:0 6px 16px rgba(168,85,247,.25);}
+        .tw-aud-quick-chip:active{transform:scale(.97);}
+        .tw-note-flash{animation:twNoteFlash .6s ease;}
+        @keyframes twNoteFlash{0%{box-shadow:0 0 0 0 rgba(0,212,255,.55);}100%{box-shadow:0 0 0 14px rgba(0,212,255,0);}}
+
         /* ═══════════════ Phase 10: Live Ticket Queue + Ticket Workspace redesign ═══════════════ */
         /* Queue hero header */
         .ltq-hero{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;padding:28px 32px;margin-bottom:26px;border-radius:20px;background:linear-gradient(135deg, rgba(0,212,255,0.10) 0%, var(--surface) 45%, rgba(168,85,247,0.08) 100%);border:1px solid rgba(0,212,255,0.25);box-shadow:0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);position:relative;overflow:hidden;}
@@ -5200,6 +5221,11 @@ html{background:var(--bg);min-height:100%}
                            </div>
                            <div class="control-group twx-full">
                                <label>Audition Note</label>
+                               <!-- Phase 57 (Ahmed): per-Request-Type quick-note chips.
+                                    One click fills the textarea (placeholders like
+                                    (User ID) / (BASE POINTS) auto-resolved from the
+                                    ticket); the note stays fully editable after. -->
+                               <div class="tw-aud-quick" id="twAudQuick" style="display:none"></div>
                                <textarea id="tw-audition-note" name="Audition note" data-feishu-field="Audition note" rows="3" class="form-highlight-input tw-txt-auto"></textarea>
                            </div>
                            <!-- "Done by" (fld1fFCCbr): filled in by twOpenWorkspace
@@ -5232,6 +5258,12 @@ html{background:var(--bg);min-height:100%}
                                <select id="tw-mentioned-group" name="Mentioned Group" data-feishu-field="Mentioned Group" class="form-highlight-input">
                                    <option value="">-- Select --</option>
                                </select>
+                               <!-- Phase 57 (Ahmed): one-tap fast buttons for THIS
+                                    ticket's group(s) -- the ticket's own group plus the
+                                    ACM's audition group (two buttons when both exist).
+                                    Clicking one SETS the select above; the dropdown
+                                    stays for any other choice. -->
+                               <div class="tw-mg-fast" id="twMgFast" style="display:none"></div>
                                <!-- Phase 27 (Ahmed): the ticket's OWN group (Mention this
                                     Group) echoed right beside the Mentioned Group picker,
                                     so the agent sees both groups in one glance while
@@ -16018,6 +16050,7 @@ function twSelectRequestType(type) {
     twManualReqType = type;
     twRenderSection2(ltActiveTicket, type);
     twRenderReqTypeTabs(type);
+    twRenderQuickNotes(type); // Phase 57: quick-note chips follow the picked type
 }
 
 // Fixed ticket-head info, always these two chips (Numbering is already shown as the
@@ -16065,6 +16098,157 @@ function twRenderHeadMeta(ticket) {
     }
     setTimeout(() => { try { twHydrateAvatars(metaEl); } catch (e) {} }, 0);
 }
+
+/* ═══════════════ Phase 57 (Ahmed, 2026-11-04): fast group buttons + quick notes ═══
+   ① twRenderMgFast -- one-tap buttons beside the Mentioned Group select for the
+      groups THIS ticket belongs to (its own "Mention this Group" + the ACM's
+      "<Region>-<Name>-Audition group"; two buttons when both exist). A click only
+      SETS the select -- the dropdown stays for any other choice.
+   ② twRenderQuickNotes -- preset Audition-Note chips per Request Type. Placeholders
+      in ( ) auto-fill from the ticket: ( BASE POINTS ) becomes the target amount
+      (1 point = 100K, e.g. 221 -> 22.1M, 9 -> 900K); ( User ID ) / ( Rejected Ids ) /
+      ( Reject Reason ) join multiple values with ", "; ( Remaining ) = User IDs
+      minus Rejected Ids. Unresolvable placeholders are kept as-is for manual typing. */
+
+const TW_QUICK_NOTES = {
+    'remove bd': ['waiting for approval', 'removed'],
+    'add room border': ['added', 'not qualified'],
+    'room pinup (only for the famous kols)': ['pinned for ......', 'not enough target or days for current month', 'not a kol', 'new kol pls send a ss from user side'],
+    'app rating reward': ['added', 'already took it before', 'duplicated screenshot, another user already got the reward with this screen'],
+    'welcome package': ['added', 'already took it before', 'old user and level above 25 already'],
+    'add & remove games': ['added', 'removed', 'not in the blacklist check with the bug group', 'not in the blacklist and the level is under 25 apply for welcome package'],
+    'add & remove host sign': ['added', 'removed', 'wallet balance is not 0', 'active host', 'duplicated request already removed'],
+    'change agency name': ['changed', 'duplicated agency name ask him to choose another one'],
+    'agency target privilege': ['added', 'unqualified only achieved ( BASE POINTS )', 'added for all except ( Rejected Ids ) as not host in the same agency and no evidence provided', 'added for ( User ID ) except ( Rejected Ids ) as already took it before', 'not enough target already got all avaliable dynamic', 'elgible for only ( Remaining ) pls confirm with him which IDs he want to add', 'duplicated already added before'],
+    'agency creation': ['( Reject Reason )'],
+};
+let twQuickNotesCurrent = [];
+
+function twQuickNoteKey(type) {
+    return String(type || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function twQuickNotesFor(type) {
+    return TW_QUICK_NOTES[twQuickNoteKey(type)] || [];
+}
+
+// points -> target amount: 1 point = 100K (221 -> "22.1M", 9 -> "900K")
+function twFmtTarget(n) {
+    if (!isFinite(n)) return '';
+    if (n >= 1e6) { const m = n / 1e6; return (Number.isInteger(m) ? String(m) : m.toFixed(1)) + 'M'; }
+    if (n >= 1e3) { const k = n / 1e3; return (Number.isInteger(k) ? String(k) : k.toFixed(1)) + 'K'; }
+    return String(n);
+}
+
+function twResolveQuickNote(tpl, fields) {
+    fields = fields || {};
+    // ID lists may be separated by comma/semicolon/newline/space in the sheet
+    const idList = (v) => feishuValueToString(v).split(/[,;|\s\n]+/).map(s => s.trim()).filter(Boolean);
+    // Reject Reason values contain spaces ("Duplicate NID (First time)") --
+    // split those on commas/newlines only.
+    const reasonList = (v) => feishuValueToString(v).split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    const uids = idList(fields['User ID']);
+    const rejected = idList(fields['Rejected Ids']);
+    const rejSet = new Set(rejected.map(s => s.toLowerCase()));
+    const remaining = uids.filter(u => !rejSet.has(u.toLowerCase()));
+    const resolvers = {
+        'base points': () => {
+            const n = parseFloat(feishuValueToString(fields['Base Points']));
+            return isNaN(n) ? null : twFmtTarget(n * 100000);
+        },
+        'rejected ids': () => rejected.length ? rejected.join(', ') : null,
+        'user id': () => uids.length ? uids.join(', ') : null,
+        'reject reason': () => { const r = reasonList(fields['Reject Reason']); return r.length ? r.join(', ') : null; },
+        'remaining': () => remaining.length ? remaining.join(', ') : null,
+    };
+    return String(tpl).replace(/\(\s*(BASE POINTS|Rejected Ids|User ID|Reject Reason|Remaining)\s*\)/gi, (m, name) => {
+        const fn = resolvers[String(name).trim().toLowerCase()];
+        const v = fn ? fn() : null;
+        return (v === null || v === '' || v === undefined) ? m : v;
+    });
+}
+
+function twRenderQuickNotes(type) {
+    const box = document.getElementById('twAudQuick');
+    if (!box) return;
+    const notes = twQuickNotesFor(type);
+    twQuickNotesCurrent = notes;
+    if (!notes.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'flex';
+    box.innerHTML = '<span class="tw-aud-quick-label">⚡ Quick notes</span>' +
+        notes.map((n, i) => `<button type="button" class="tw-aud-quick-chip" onclick="twPickQuickNote(${i})" title="Fill the Audition Note with this">${escHtml(n)}</button>`).join('');
+}
+
+function twPickQuickNote(i) {
+    const note = document.getElementById('tw-audition-note');
+    if (!note || !twQuickNotesCurrent[i]) return;
+    note.value = twResolveQuickNote(twQuickNotesCurrent[i], (ltActiveTicket && ltActiveTicket.fields) || {});
+    note.dispatchEvent(new Event('input', { bubbles: true })); // autogrow + dirty tracking
+    note.focus();
+    note.classList.remove('tw-note-flash'); void note.offsetWidth; note.classList.add('tw-note-flash');
+}
+
+// Fast Mentioned-Group buttons -----------------------------------------------
+function twMgFastGroups(ticket) {
+    if (!ticket || !ticket.fields) return [];
+    const opts = (((typeof FIELD_SCHEMA !== 'undefined' && FIELD_SCHEMA['Mentioned Group']) || {}).options) || [];
+    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    // sheet spelling drift lives here (ACM option "Haseeb" vs group "Hasseb")
+    const alias = { 'haseeb': 'hasseb' };
+    const findOpt = (token) => {
+        const t = norm(token);
+        if (!t) return '';
+        let hit = opts.find(o => norm(o).includes(t));
+        if (!hit) {
+            const m = t.match(/^(pk|in)(.*)$/);
+            const alt = m && alias[m[2]];
+            if (alt) hit = opts.find(o => norm(o).includes(m[1] + alt));
+        }
+        return hit || '';
+    };
+    const out = [];
+    const push = (g) => { if (g && !out.includes(g)) out.push(g); };
+    push(findOpt(feishuValueToString(ticket.fields['Mention this Group']).trim()));
+    const acmPk = feishuValueToString(ticket.fields['Acm Name (PK)']).trim();
+    if (acmPk) push(findOpt('pk' + norm(acmPk.split(/\s+/)[0])));
+    const acmIn = feishuValueToString(ticket.fields['Acm Name (IN)']).trim();
+    if (acmIn) push(findOpt('in' + norm(acmIn.split(/\s+/)[0])));
+    return out.slice(0, 2); // Ahmed: at most two buttons (agent can have 2 groups)
+}
+
+function twRenderMgFast(ticket) {
+    const box = document.getElementById('twMgFast');
+    if (!box) return;
+    const groups = ticket ? twMgFastGroups(ticket) : [];
+    if (!groups.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'flex';
+    box.innerHTML = groups.map(g =>
+        `<button type="button" class="tw-mg-fast-btn" data-g="${escHtml(g)}" onclick="twPickMgFast(this)" title="Set Mentioned Group to ${escHtml(g)}">⚡ ${escHtml(g)}</button>`
+    ).join('');
+    const sel = document.getElementById('tw-mentioned-group');
+    if (sel && !sel.dataset.fastBound) {
+        sel.dataset.fastBound = '1';
+        sel.addEventListener('change', twMgFastSync); // manual picks keep the glow honest
+    }
+    twMgFastSync();
+}
+
+function twPickMgFast(btn) {
+    const sel = document.getElementById('tw-mentioned-group');
+    if (!sel || !btn) return;
+    sel.value = btn.dataset.g || '';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    twMgFastSync();
+    btn.classList.remove('tw-mg-pop'); void btn.offsetWidth; btn.classList.add('tw-mg-pop');
+}
+
+function twMgFastSync() {
+    const sel = document.getElementById('tw-mentioned-group');
+    const box = document.getElementById('twMgFast');
+    if (!sel || !box) return;
+    const cur = sel.value;
+    box.querySelectorAll('.tw-mg-fast-btn').forEach(b => b.classList.toggle('active', b.dataset.g === cur));
+}
+
 
 // Phase 10.4: floating scratch note -- toggled from the dock's 📝 circle,
 // draggable by its head, floats above the image lightbox, cleared on open/submit.
@@ -16442,6 +16626,8 @@ async function twOpenWorkspace(recordId) {
     LT_BASIC_KEYS_ORDERED.forEach(key => sec1Shell.appendChild(createTwControl(key, undefined)));
     twRenderSection2({ record_id: recordId, fields: {} }, '');
     twRenderReqTypeTabs('');
+    twRenderMgFast(null);        // Phase 57: no ticket yet -> hide the fast buttons
+    twRenderQuickNotes('');      // Phase 57: no type yet -> hide the quick-note chips
     const mpShell = document.getElementById('tw-mentioned-person-wrap');
     if (mpShell) { mpShell.classList.add('control-group'); twRenderMemberPicker(mpShell, '<label>Mentioned Person</label>', 'Mentioned Person', null); }
     const dbShell = document.getElementById('tw-done-by-wrap');
@@ -16636,6 +16822,11 @@ async function twOpenWorkspace(recordId) {
             if (mgResendCb) mgResendCb.checked = false;
             twxMgResendSync(mgVal);
         }
+
+        // Phase 57 (Ahmed): fast group buttons for this ticket + the
+        // per-request-type quick-note chips above the Audition Note.
+        twRenderMgFast(ticket);
+        twRenderQuickNotes(twManualReqType || actualReqType);
 
         // Phase 10.4: "Reject Reason" + "Create Way" moved into the Dynamic
         // Request Section for Agency Creation tickets (twRenderAgencyCreationExtras,
