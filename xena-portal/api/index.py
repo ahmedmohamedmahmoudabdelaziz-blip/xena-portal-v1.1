@@ -7516,93 +7516,9 @@ def compute_single_agency_target_ledger(points_items, requests_items, code):
         "base_points": base_pts, "privileges": privileges,
     }
 
-# ─── Phase 59 (Ahmed): the respondent's REAL chat groups for fast buttons ────
-# "sehar she is in 2 group so why only one group appare" -- the ticket's
-# "Mention this Group" lookup resolves ONE Group Name per matched row, but the
-# Group Webhooks table's `test` (GroupChat links) column lists EVERY chat the
-# agent is actually in (Sehar's row links PK-Sehar AND PK-Zohaib). This
-# endpoint reads that tiny table (~26 rows, 5-min in-process cache) and
-# returns all chat names for a respondent; the frontend filters them against
-# the Mentioned Group options and renders the fast buttons.
-GROUPS_TABLE_ID = "tblpgMD1AfAXQYzd"
-_GROUPS_CACHE = {"ts": 0.0, "rows": None}
-_GROUPS_CACHE_TTL = 300  # 26 rows; 5 min is plenty for "who is in which group"
-
-def _group_webhook_rows():
-    now = time.time()
-    if _GROUPS_CACHE["rows"] is not None and now - _GROUPS_CACHE["ts"] < _GROUPS_CACHE_TTL:
-        return _GROUPS_CACHE["rows"]
-    headers = {"Authorization": f"Bearer {get_tenant_access_token()}"}
-    items, token = [], None
-    while True:
-        # page_size/page_token MUST be query params -- body copies are silently
-        # dropped (Phase 55 lesson).
-        params = {"page_size": 100}
-        if token:
-            params["page_token"] = token
-        r = feishu_session.post(
-            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{GROUPS_TABLE_ID}/records/search",
-            headers=headers, params=params,
-            json={"automatic_fields": False}, timeout=30).json()
-        if r.get("code") != 0:
-            raise RuntimeError(r.get("msg") or "Group Webhooks lookup failed.")
-        d = r.get("data", {})
-        items.extend(d.get("items", []))
-        if not d.get("has_more"):
-            break
-        token = d.get("page_token")
-    rows = []
-    for it in items:
-        f = it.get("fields", {})
-        gname = extract_field_text(get_field_local(f, "Group Name")).strip()
-        agents = []
-        av = get_field_local(f, "Agent Name")
-        if isinstance(av, list):
-            agents = [str(u.get("name", "")).strip() for u in av if isinstance(u, dict)]
-        chats = []
-        tv = get_field_local(f, "test")
-        if isinstance(tv, list):
-            chats = [str(c.get("name", "")).strip() for c in tv if isinstance(c, dict) and c.get("name")]
-        rows.append({"group": gname, "agents": agents, "chats": chats})
-    _GROUPS_CACHE["rows"] = rows
-    _GROUPS_CACHE["ts"] = now
-    return rows
-
-
-@app.route('/api/groups/for-respondent', methods=['GET'])
-@rate_limit(*RATE_LIMIT_RECORDS)
-def groups_for_respondent():
-    """Phase 59: ?name=<respondent display name> -> {"groups": [...]} -- every
-    chat group the respondent belongs to (matched rows' Group Name first, then
-    the row's `test` chat links, deduped). The workspace renders these as the
-    Mentioned-Group fast buttons, so agents in 2 chats get 2 buttons."""
-    user = sanitize_text(request.args.get('user', ''))
-    email = sanitize_text(request.args.get('email', ''))
-    perms = get_user_permissions(email, user)
-    # Workspace helper, not a data page: any module holder (or super admin).
-    if not perms.get("is_super_admin") and not perms.get("modules"):
-        return jsonify({"error": "Access denied"}), 403
-    name = sanitize_text(request.args.get('name', '')).strip()
-    if not name:
-        return jsonify({"success": False, "error": "Missing name"}), 400
-    if MOCK_MODE:
-        return jsonify({"success": True, "groups": ["PK-Sehar-Audition group", "PK-Zohaib-Audition group"]})
-    try:
-        rows = _group_webhook_rows()
-    except Exception as e:
-        logger.warn("groups_for_respondent_failed", error=str(e))
-        return jsonify({"success": False, "error": "Group lookup failed"}), 502
-    nlow = name.lower()
-    groups = []
-    for row in rows:
-        hit = any(a and (a.lower() == nlow or nlow in a.lower() or a.lower() in nlow)
-                  for a in row["agents"])
-        if not hit:
-            continue
-        for g in [row["group"]] + row["chats"]:
-            if g and g not in groups:
-                groups.append(g)
-    return jsonify({"success": True, "groups": groups})
+# (Phase 59 groups endpoint removed at Ahmed's request -- he extended the
+# "Mention this Group" lookup column itself, so the fast buttons read the
+# ticket lookup directly again and this endpoint is not needed.)
 
 @app.route('/api/agency-target/formula', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -11798,6 +11714,21 @@ def audition_attendance():
             "valid": f.get("Total Valid Time"),
             "closed": _att_text(f.get("Shift Status")) == "Closed"}
     # ---- compute per agent per day ----
+    # Phase 60 (Ahmed): time sanity rules.
+    #   * FUTURE days (shift hasn't happened): no warnings, no Absent/Missing
+    #     in the summary, no flags at all -- "why warns for shifts not even
+    #     started yet".
+    #   * TODAY (shift in progress): late/gap measured up to NOW only;
+    #     missing/early/no_show only once the shift has actually ended (else a
+    #     15:00 shift shows "Absent" at 11:00 and "Left early" mid-shift).
+    #   * Worked time = the sheet's own "Total Valid Time" from Daily Logs
+    #     when present (minutes) -- the portal's numbers then match the sheet
+    #     Ahmed checks against (Mano: 537.5+547.8 = 18h05m, avg 9h03m) instead
+    #     of a divergent segment sum (9.77h). Segment sum stays as fallback.
+    now_ms = int(time.time() * 1000)
+    today_int, now_min_rel = _att_epoch_min(now_ms)
+    if now_min_rel is None:
+        today_int, now_min_rel = None, None
     agents_out, warnings = [], []
     for a in agents:
         em = a["email"]
@@ -11807,6 +11738,8 @@ def audition_attendance():
                               "ontask_min": 0}
         for d in day_ints:
             ds = str(d)
+            is_future = today_int is not None and d > today_int
+            is_today = today_int is not None and d == today_int
             row_segs = sorted(segs[a["agent_id"]].get(ds, []), key=lambda x: x["s"])
             dl = punches[a["agent_id"]].get(ds) or {}
             sh = sched.get((em, ds)) or None
@@ -11816,11 +11749,22 @@ def audition_attendance():
                 e0 = _att_hhmm_to_min(sh.get("end"))
                 shift = {"type": sh["type"], "start": sh.get("start") or "", "end": sh.get("end") or "",
                          "start_min": s0, "end_min": (e0 + 1440 if (e0 is not None and s0 is not None and e0 <= s0) else e0)}
-            worked_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ATT_WORKED)
+            seg_worked_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ATT_WORKED)
             task_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ("On Task", "Working Ticket"))
             off_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Offline")
             brk_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Break")
             mtg_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Meeting")
+            # Phase 60: the sheet's own valid-time number wins when it exists
+            valid_min = None
+            _v = dl.get("valid")
+            if isinstance(_v, dict) and isinstance(_v.get("value"), list) and _v["value"]:
+                try:
+                    valid_min = float(_v["value"][0])
+                except Exception:
+                    valid_min = None
+            elif isinstance(_v, (int, float)):
+                valid_min = float(_v)
+            worked_min = valid_min if valid_min is not None else seg_worked_min
             first_p = min([x["s"] for x in row_segs], default=None)
             last_p = max([x["e"] for x in row_segs if not x["open"]], default=None)
             if dl.get("first") is not None:
@@ -11829,28 +11773,54 @@ def audition_attendance():
                 last_p = dl["last"] if last_p is None else max(last_p, dl["last"])
             late_min = gap_min = missing_min = early_min = 0
             inshift = []
-            if shift and shift.get("type") in ("On Site", "Work From Home") and shift["start_min"] is not None:
+            shift_live = bool(shift and shift.get("type") in ("On Site", "Work From Home")
+                              and shift["start_min"] is not None)
+            if shift_live and not is_future:
                 sl, el = shift["start_min"], shift["end_min"] or 1440
-                if first_p is not None and first_p > sl:
+                # For today's in-progress shift everything is measured up to
+                # NOW; "not started yet" (now < sl) produces nothing at all.
+                now_cap = now_min_rel if is_today and now_min_rel is not None else None
+                shift_started = (now_cap is None) or (now_cap > sl)
+                shift_ended = (now_cap is None) or (now_cap >= el)
+                el_eff = min(el, now_cap) if now_cap is not None else el
+                if shift_started and first_p is not None and first_p > sl:
                     late_min = first_p - sl
-                if last_p is not None and last_p < el:
+                if shift_ended and last_p is not None and last_p < el:
                     early_min = el - last_p
                 for x in row_segs:
                     if x["st"] in ATT_GAP_STATUSES:
-                        ov = min(x["e"], el) - max(x["s"], sl)
+                        xe = min(x["e"], el_eff)
+                        ov = xe - max(x["s"], sl)
                         if ov > 0:
                             gap_min += ov
-                            inshift.append({"s": max(x["s"], sl), "e": min(x["e"], el), "min": ov,
+                            inshift.append({"s": max(x["s"], sl), "e": xe, "min": ov,
                                             "st": x["st"]})
                 in_work = 0
                 for x in row_segs:
                     if x["st"] in ATT_WORKED:
-                        ov = min(x["e"], el) - max(x["s"], sl)
+                        ov = min(x["e"], el_eff) - max(x["s"], sl)
                         if ov > 0:
                             in_work += ov
-                missing_min = max(0, (el - sl) - in_work)
-                if not row_segs:
+                # Missing = the shift's unworked remainder -- only meaningful
+                # once the shift is over; mid-shift it would be a moving guess.
+                if shift_ended:
+                    missing_min = max(0, (el - sl) - in_work)
+                if not row_segs and shift_ended:
                     summ["no_show"] += 1
+            flags = []
+            if is_future:
+                # scheduled but not started: render the window, flag nothing
+                days_out[ds] = {"segments": row_segs, "inshift_gaps": [],
+                                "first": first_p, "last": last_p,
+                                "worked_min": 0, "ontask_min": 0, "offline_min": 0,
+                                "break_min": 0, "meeting_min": 0,
+                                "shift": shift, "late_min": 0, "gap_min": 0,
+                                "missing_min": 0, "early_min": 0,
+                                "flags": [], "punch_closed": dl.get("closed", False),
+                                "future": True}
+                if shift and shift.get("type") in ("Off", "Annual Leave", "Sick Leave") and not is_future:
+                    summ["off_days"] += 1
+                continue
             flags = []
             if late_min > ATT_LATE_MIN_ALERT:
                 flags.append("late")
@@ -11867,7 +11837,13 @@ def audition_attendance():
             if early_min > ATT_LATE_MIN_ALERT:
                 flags.append("early")
             if not row_segs and (not shift or shift.get("type") in ("On Site", "Work From Home")):
-                if shift:
+                # Phase 60: today only counts as Absent once the shift has
+                # actually ended (a 15:00 shift is not "never signed in" at 11:00).
+                _ns_ok = True
+                if is_today and shift and shift.get("start_min") is not None and now_min_rel is not None:
+                    _el = shift["end_min"] or 1440
+                    _ns_ok = now_min_rel >= _el
+                if shift and _ns_ok:
                     flags.append("no_show")
                     warnings.append({"day": d, "agent": a["name"], "kind": "no_show",
                                      "detail": f"scheduled {shift.get('start') or ''}-{shift.get('end') or ''} but never signed in"})
@@ -11898,6 +11874,9 @@ def audition_attendance():
                 summ["late_days"] += 1
         summ["worked_h"] = round(summ["worked_min"] / 60, 1)
         summ["avg_day_h"] = round(summ["worked_min"] / 60 / summ["worked_days"], 2) if summ["worked_days"] else 0
+        # Phase 60: minute-precision average for the frontend's "9h 03m"
+        # formatting (decimals like 9.77h confused everyone).
+        summ["avg_day_min"] = round(summ["worked_min"] / summ["worked_days"]) if summ["worked_days"] else 0
         a2 = dict(a)
         a2["days"] = days_out
         a2["summary"] = summ
