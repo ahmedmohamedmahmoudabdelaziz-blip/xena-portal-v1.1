@@ -1503,9 +1503,10 @@
         /* ═══ Phase 57 (Ahmed): fast group buttons + quick-note chips ═══ */
         /* One-tap group buttons beside the Mentioned Group select -- they SET
            the select (never replace it) so any other group stays one click away. */
-        /* Phase 60 (Ahmed): equal-size side-by-side buttons, fixed height. */
-        .tw-mg-fast{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin-top:8px;}
-        .tw-mg-fast-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;font-size:12.5px;font-weight:600;letter-spacing:.2px;cursor:pointer;color:#dff6ff;background:linear-gradient(135deg, rgba(0,212,255,.16), rgba(168,85,247,.16));border:1px solid rgba(0,212,255,.45);box-shadow:0 2px 10px rgba(0,212,255,.12);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        /* Phase 60b (Ahmed): equal-size side-by-side buttons that wrap to two
+           lines instead of truncating. */
+        .tw-mg-fast{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin-top:8px;align-items:stretch;}
+        .tw-mg-fast-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:6px 10px;border-radius:14px;font-size:11.5px;font-weight:600;letter-spacing:.2px;line-height:1.3;text-align:center;cursor:pointer;color:#dff6ff;background:linear-gradient(135deg, rgba(0,212,255,.16), rgba(168,85,247,.16));border:1px solid rgba(0,212,255,.45);box-shadow:0 2px 10px rgba(0,212,255,.12);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;white-space:normal;overflow:hidden;}
         .tw-mg-fast-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,212,255,.28);border-color:var(--accent-cyan);}
         .tw-mg-fast-btn:active{transform:translateY(0) scale(.97);}
         .tw-mg-fast-btn.active{background:linear-gradient(135deg, rgba(0,212,255,.34), rgba(168,85,247,.34));border-color:var(--accent-cyan);box-shadow:0 0 0 2px rgba(0,212,255,.25), 0 6px 18px rgba(0,212,255,.30);}
@@ -1514,13 +1515,23 @@
         /* Quick-note preset chips above the Audition Note textarea -- one click
            fills the note (placeholders resolved from the ticket), the textarea
            stays fully editable afterwards. */
-        /* Phase 60 (Ahmed): tidy 2-column grid, uniform rows, 2-line clamp
-           (full text stays on the hover tooltip + fills on click). */
-        .tw-aud-quick{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 8px;}
-        .tw-aud-quick-label{grid-column:1/-1;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;background-clip:text;color:transparent;}
-        .tw-aud-quick-chip{min-width:0;text-align:left;padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.35;cursor:pointer;color:#e9e2ff;background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.40);transition:transform .15s ease, box-shadow .15s ease, background .15s ease;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-        .tw-aud-quick-chip:hover{background:linear-gradient(135deg, rgba(168,85,247,.22), rgba(0,212,255,.18));border-color:var(--accent-purple);transform:translateY(-1px);box-shadow:0 4px 12px rgba(168,85,247,.25);}
-        .tw-aud-quick-chip:active{transform:scale(.97);}
+        /* Quick-note presets: ONE compact button that opens a clean dropdown
+           menu of full-text rows -- no more wall of cramped chips (Phase 60b). */
+        .tw-aud-quick{position:relative;margin:4px 0 8px;}
+        .tw-aud-quick-toggle{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;color:#e9f6ff;background:linear-gradient(135deg, rgba(0,212,255,.14), rgba(168,85,247,.14));border:1px solid rgba(0,212,255,.40);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+        .tw-aud-quick-toggle:hover{border-color:var(--accent-cyan);box-shadow:0 4px 14px rgba(0,212,255,.20);transform:translateY(-1px);}
+        .tw-aud-quick-toggle .cnt{background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));color:#fff;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:800;}
+        .tw-aud-quick-toggle .chev{transition:transform .18s ease;opacity:.7;font-size:10px;}
+        .tw-aud-quick.open .tw-aud-quick-toggle .chev{transform:rotate(180deg);}
+        .tw-aud-quick-menu{position:absolute;z-index:60;left:0;right:0;top:calc(100% + 6px);max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid rgba(168,85,247,.35);border-radius:14px;box-shadow:0 18px 44px rgba(0,0,0,.45);padding:6px;display:none;}
+        .tw-aud-quick.open .tw-aud-quick-menu{display:block;animation:twQuickIn .16s ease;}
+        @keyframes twQuickIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+        .tw-aud-quick-item{display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:var(--text);font-size:12.5px;line-height:1.45;cursor:pointer;transition:background .12s ease, transform .12s ease;white-space:normal;}
+        .tw-aud-quick-item:hover{background:linear-gradient(135deg, rgba(0,212,255,.10), rgba(168,85,247,.12));}
+        .tw-aud-quick-item:active{transform:scale(.99);}
+        [data-theme="light"] .tw-aud-quick-toggle{color:#0b4a63;border-color:rgba(2,132,199,.55);}
+        [data-theme="light"] .tw-aud-quick-menu{border-color:rgba(124,58,237,.35);box-shadow:0 18px 44px rgba(40,60,90,.18);}
+        [data-theme="light"] .tw-aud-quick-item{color:#1e293b;}
         .tw-note-flash{animation:twNoteFlash .6s ease;}
         @keyframes twNoteFlash{0%{box-shadow:0 0 0 0 rgba(0,212,255,.55);}100%{box-shadow:0 0 0 14px rgba(0,212,255,0);}}
         /* Phase 59 (Ahmed): light-theme readability -- the dark-tuned chip colors
@@ -2258,22 +2269,33 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .atm-sum b{font-size:.68rem;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.08);color:var(--text-sec)}
 .atm-sum b.alert{color:#ffb800;border-color:rgba(255,184,0,.4)}
 .atm-sum b.bad{color:#ff4d6d;border-color:rgba(255,77,109,.4)}
-.atm-scale{display:grid;grid-template-columns:118px 1fr;gap:10px;align-items:center;margin-bottom:2px}
+.atm-scale{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center;margin-bottom:2px}
 .atm-scale-label{font-size:.62rem;color:var(--text-sec)}
 .atm-scale-bar{position:relative;height:13px;font-size:.6rem;color:var(--text-sec)}
-.atm-day{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:6px 0;border-top:1px dashed rgba(255,255,255,.06);align-items:center}
+.atm-day{display:grid;grid-template-columns:170px 1fr;gap:14px;padding:10px 0;border-top:1px dashed rgba(255,255,255,.06);align-items:center}
 .atm-day:hover{background:rgba(255,255,255,.02)}
-.atm-day-label{font-size:.72rem;color:var(--text-sec);line-height:1.35}
-.atm-day-label b{color:var(--text);font-size:.74rem}
-.atm-day-label span{display:block;font-size:.62rem;opacity:.8}
-.atm-strip{position:relative;height:44px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px}
-.atm-seg{position:absolute;top:5px;height:20px;border-radius:4px;opacity:.95;min-width:1px}
-/* Phase 60 (Ahmed): an Off day renders a recognizable hatched band instead of
+/* Phase 60b (Ahmed): the day row reads as clean stacked lines, not one jammed
+   string -- day + colored shift pill, shift hours, compact stats, punches. */
+.atm-day-label{line-height:1.35}
+.atm-day-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.atm-day-top b{color:var(--text);font-size:.78rem}
+.atm-shift-pill{font-size:.58rem;font-weight:700;padding:2px 9px;border-radius:999px;letter-spacing:.5px;text-transform:uppercase}
+.atm-shift-pill.wfh{background:rgba(0,212,255,.13);color:#7ee7ff;border:1px solid rgba(0,212,255,.35)}
+.atm-shift-pill.onsite{background:rgba(185,103,255,.13);color:#d7b8ff;border:1px solid rgba(185,103,255,.35)}
+.atm-shift-pill.off{background:rgba(148,163,184,.12);color:#9aa7b8;border:1px solid rgba(148,163,184,.30)}
+.atm-day-sub{font-size:.66rem;color:var(--text-sec);margin-top:4px}
+.atm-day-stats{margin-top:5px;font-size:.66rem;color:var(--text-sec);line-height:1.6}
+.atm-day-punch{font-size:.62rem;color:var(--text-muted);margin-top:3px}
+.atm-strip{position:relative;height:48px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px;overflow:hidden}
+.atm-seg{position:absolute;top:7px;height:34px;border-radius:5px;opacity:.95;min-width:1px}
+/* Phase 60b (Ahmed): an Off day renders a recognizable hatched band instead of
    an empty dark strip -- "if mano off it not show he is off, insist of empty" */
-.atm-offday{position:absolute;top:2px;height:38px;left:0;right:0;border-radius:6px;background:repeating-linear-gradient(135deg, rgba(148,163,184,.10) 0 8px, transparent 0 12px);border:1px dashed rgba(148,163,184,.45);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:2.5px}
-.atm-shiftwin{position:absolute;top:2px;height:38px;border:1px dashed rgba(0,212,255,.55);border-radius:6px;background:rgba(0,212,255,.05);pointer-events:none}
-.atm-gap{position:absolute;bottom:5px;height:10px;background:#ff4d6d;border-radius:3px;box-shadow:0 0 6px rgba(255,77,109,.55)}
-.atm-gaplbl{position:absolute;bottom:16px;font-size:.58rem;font-weight:700;color:#ff8fa3;white-space:nowrap;transform:translateX(-50%)}
+.atm-offday{position:absolute;top:0;height:100%;left:0;right:0;background:repeating-linear-gradient(135deg, rgba(148,163,184,.10) 0 8px, transparent 0 12px);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:2.5px}
+/* Phase 60b: the shift window is a soft background band the segments sit
+   INSIDE -- no more floating dashed box with a dead gap around it. */
+.atm-shiftwin{position:absolute;top:0;height:100%;border-left:1px solid rgba(0,212,255,.40);border-right:1px solid rgba(0,212,255,.40);background:rgba(0,212,255,.05);pointer-events:none}
+.atm-gap{position:absolute;bottom:7px;height:14px;background:#ff4d6d;border-radius:3px;box-shadow:0 0 6px rgba(255,77,109,.55)}
+.atm-gaplbl{position:absolute;bottom:23px;font-size:.58rem;font-weight:700;color:#ff8fa3;white-space:nowrap;transform:translateX(-50%)}
 .atm-tick{position:absolute;top:0;height:100%;width:1px;background:rgba(255,255,255,.06)}
 .atm-nextday{position:absolute;top:0;height:100%;width:1px;background:rgba(0,212,255,.35)}
 .atm-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
@@ -16192,17 +16214,33 @@ function twRenderQuickNotes(type) {
     if (!box) return;
     const notes = twQuickNotesFor(type);
     twQuickNotesCurrent = notes;
+    box.classList.remove('open');
     if (!notes.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-    box.style.display = 'flex';
-    box.innerHTML = '<span class="tw-aud-quick-label">⚡ Quick notes</span>' +
-        notes.map((n, i) => `<button type="button" class="tw-aud-quick-chip" onclick="twPickQuickNote(${i})" title="Fill the Audition Note with this">${escHtml(n)}</button>`).join('');
+    // Phase 60b (Ahmed): ONE elegant button + a clean dropdown menu with
+    // full-text rows -- no more wall of cramped chips.
+    box.style.display = 'block';
+    box.innerHTML = `<button type="button" class="tw-aud-quick-toggle" onclick="twQuickNotesToggle(event)">⚡ Quick notes <span class="cnt">${notes.length}</span> <span class="chev">▾</span></button>
+      <div class="tw-aud-quick-menu">${notes.map((n, i) => `<button type="button" class="tw-aud-quick-item" onclick="twPickQuickNote(${i})">${escHtml(n)}</button>`).join('')}</div>`;
 }
+
+function twQuickNotesToggle(ev) {
+    if (ev) ev.stopPropagation();
+    const box = document.getElementById('twAudQuick');
+    if (box) box.classList.toggle('open');
+}
+// one global closer -- clicking anywhere else folds the menu
+document.addEventListener('click', () => {
+    const box = document.getElementById('twAudQuick');
+    if (box) box.classList.remove('open');
+});
 
 function twPickQuickNote(i) {
     const note = document.getElementById('tw-audition-note');
     if (!note || !twQuickNotesCurrent[i]) return;
     note.value = twResolveQuickNote(twQuickNotesCurrent[i], twLiveFields());
     note.dispatchEvent(new Event('input', { bubbles: true })); // autogrow + dirty tracking
+    const qbox = document.getElementById('twAudQuick');
+    if (qbox) qbox.classList.remove('open'); // picked -> fold the menu
     note.focus();
     note.classList.remove('tw-note-flash'); void note.offsetWidth; note.classList.add('tw-note-flash');
 }
@@ -23962,10 +24000,11 @@ xdWrapSave('schSaveEntries', /audition\/schedule/);
 // shift windows from the Schedule sheet. One cached GET per range (60s
 // server-side), no polling. In-shift OFFLINE renders as a RED bar with the
 // duration printed on the strip ("red line with duration on this day").
-// Phase 60 (Ahmed): "On task" and "Ticket" are ONE thing -- both are online
-// working states; a single "Working" entry keeps the legend readable.
-const ATM_ST_COLOR = { 'Online':'#00e676','On Task':'#00d4ff','Working Ticket':'#00d4ff','Meeting':'#b967ff','Break':'#ffb800','Offline':'#4b5563' };
-const ATM_ST_LABEL = { 'Online':'Online','On Task':'Working','Working Ticket':'Working','Meeting':'Meeting','Break':'Break','Offline':'Offline' };
+// Phase 60b (Ahmed): "Working Ticket" wears the SAME green as Online -- it IS
+// online -- while "On task" keeps its own cyan. Counting was already unified
+// (both are in ATT_WORKED); now the colors say so too.
+const ATM_ST_COLOR = { 'Online':'#00e676','On Task':'#00d4ff','Working Ticket':'#00e676','Meeting':'#b967ff','Break':'#ffb800','Offline':'#4b5563' };
+const ATM_ST_LABEL = { 'Online':'Online','On Task':'On task','Working Ticket':'Ticket','Meeting':'Meeting','Break':'Break','Offline':'Offline' };
 let atmMode='week', atmFrom=null, atmData=null, atmLoading=false, atmCache={};
 
 function atmDowMon(d){ const x=new Date(d); const w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
@@ -24046,11 +24085,13 @@ function atmDayRow(a,ds,axis,ticks){
     const p=atmPct(axis);
     const isOff=D.shift&&['Off','Annual Leave','Sick Leave'].includes(D.shift.type);
     const isAbsent=(D.flags||[]).includes('no_show');
-    const shiftTxt=D.shift?`${D.shift.type}${D.shift.start?(' '+D.shift.start):''}${D.shift.end?('→'+D.shift.end):''}`:((D.segments||[]).length?'(no shift scheduled)':'—');
+    const pillCls=D.shift?({'Work From Home':'wfh','On Site':'onsite'}[D.shift.type]||'off'):'';
+    const pillTxt=D.shift?({'Work From Home':'WFH','On Site':'On Site'}[D.shift.type]||D.shift.type):'';
+    const shiftHours=D.shift&&D.shift.start?`${D.shift.start} → ${D.shift.end||''}`:'';
     const isToday=(+ds===schDayInt(new Date()));
     let shiftWin='';
     if(D.shift&&D.shift.start_min!=null&&D.shift.end_min!=null){
-        shiftWin=`<div class="atm-shiftwin" title="Shift: ${escHtml(shiftTxt)}" style="left:${p(D.shift.start_min)}%;width:${p(Math.max(1,D.shift.end_min-D.shift.start_min))}%"></div>`;
+        shiftWin=`<div class="atm-shiftwin" title="Shift window" style="left:${p(D.shift.start_min)}%;width:${p(Math.max(1,D.shift.end_min-D.shift.start_min))}%"></div>`;
     }
     let segs='',gaps='';
     (D.segments||[]).forEach(x=>{
@@ -24058,22 +24099,33 @@ function atmDayRow(a,ds,axis,ticks){
         segs+=`<div class="atm-seg" title="${escHtml((ATM_ST_LABEL[x.st]||x.st)+' '+atmHm(x.s)+' → '+atmHm(x.e)+(x.open?' (still running)':''))}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%;background:${c}"></div>`;
     });
     (D.inshift_gaps||[]).forEach(x=>{
-        gaps+=`<div class="atm-gap" title="${escHtml('OFFLINE in shift '+atmHm(x.s)+' → '+atmHm(x.e)+' ('+x.min+' min)')}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%"></div>`;
+        gaps+=`<div class="atm-gap" title="${escHtml('Offline in shift '+atmHm(x.s)+' → '+atmHm(x.e)+' ('+x.min+' min)')}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%"></div>`;
         if(x.min>=10) gaps+=`<div class="atm-gaplbl" style="left:${p((x.s+x.e)/2)}%">${atmMinLabel(x.min)}</div>`;
     });
     let flags='';
     (D.flags||[]).forEach(fl=>{ flags+=atmFlagChip(fl,D); });
-    const stats=D.future
-        ? '🕐 Scheduled — not started yet'
-        : ((D.worked_min>0||D.break_min>0||D.meeting_min>0)
-            ? `⏱ ${atmMinLabel(D.worked_min)} worked · ⚡ ${atmMinLabel(D.ontask_min||0)} working · ☕ ${atmMinLabel(D.break_min)} · 🎤 ${atmMinLabel(D.meeting_min)}`
-            : (isAbsent?'🚫 Absent — scheduled, never signed in':(isOff?'🌙 Off day':'—')));
+    // Phase 60b: clean stacked stats -- only non-zero parts, on-task and
+    // ticket reported SEPARATELY (they are different statuses).
+    let statsLine='';
+    if(D.future){
+        statsLine='🕐 Scheduled — not started yet';
+    }else if(D.worked_min>0||D.break_min>0||D.meeting_min>0){
+        const parts=[`⏱ ${atmMinLabel(D.worked_min)} worked`];
+        if(D.ontask_min>0) parts.push(`⚡ ${atmMinLabel(D.ontask_min)} on task`);
+        if(D.ticket_min>0) parts.push(`🎫 ${atmMinLabel(D.ticket_min)} ticket`);
+        if(D.break_min>0) parts.push(`☕ ${atmMinLabel(D.break_min)} break`);
+        if(D.meeting_min>0) parts.push(`🎤 ${atmMinLabel(D.meeting_min)} meeting`);
+        statsLine=parts.join(' · ');
+    }else{
+        statsLine=isAbsent?'🚫 Absent — scheduled, never signed in':(isOff?'🌙 Off day':'—');
+    }
     const punch=(D.first!=null)?`🕒 ${atmHm(D.first)} → ${(D.last!=null?atmHm(D.last):'now')}`:'';
     return `<div class="atm-day${isToday?' today':''}">
-      <div class="atm-day-label"><b>${schDayLabel(+ds)}</b>
-        <span>${escHtml(shiftTxt)}</span>
-        <span>${stats}</span>
-        ${punch?`<span>${punch}</span>`:''}
+      <div class="atm-day-label">
+        <div class="atm-day-top"><b>${schDayLabel(+ds)}</b>${pillTxt?`<span class="atm-shift-pill ${pillCls}">${escHtml(pillTxt)}</span>`:''}</div>
+        ${shiftHours?`<div class="atm-day-sub">${escHtml(shiftHours)}</div>`:''}
+        <div class="atm-day-stats">${escHtml(statsLine)}</div>
+        ${punch?`<div class="atm-day-punch">${punch}</div>`:''}
       </div>
       <div>
         <div class="atm-strip">${ticks}${shiftWin}${isOff?'<div class="atm-offday">OFF</div>':''}${segs}${gaps}</div>
