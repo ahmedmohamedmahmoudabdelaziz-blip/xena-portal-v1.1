@@ -1071,17 +1071,46 @@ _github_meta_cache = {"at": 0.0, "meta": None}
 _github_data_cache = {}                     # filename -> (sha256, data); sha never changes for identical content
 
 def _github_raw_get(path):
-    """GET one file from the private data repo. Returns bytes or None."""
+    """GET one file from the private data repo. Returns bytes or None.
+
+    Phase 54 (2026-11-03, Ahmed's screenshot: Analytics served by the emergency
+    live-sharded path with a "Data may be incomplete (1500 rows)" warning
+    while a complete 18.9k-row GitHub snapshot sat one request away): a cold
+    serverless instance made ONE attempt against raw.githubusercontent.com,
+    it timed out, and the whole GitHub snapshot path silently disabled itself
+    for that instance -> backend fell through to a 20s live fetch. Fixes:
+    (1) use api.github.com/contents (Accept: application/vnd.github.raw) -
+    the git-data API host, which stayed 100% reliable all night while the
+    raw CDN timed out twice from two different networks; (2) retry transient
+    failures (network errors AND 5xx/429) up to 3 attempts with short backoff
+    - with the sha256 content cache a successful retry is not re-downloaded.
+    """
     if not XENA_DATA_REPO or not XENA_DATA_TOKEN:
         return None
-    url = f"https://raw.githubusercontent.com/{XENA_DATA_REPO}/{XENA_DATA_BRANCH}/{path}"
-    try:
-        resp = http_requests.get(url, headers={"Authorization": f"Bearer {XENA_DATA_TOKEN}"}, timeout=25)
-        if resp.status_code == 200:
-            return resp.content
-        logger.warn("github_raw_bad_status", path=path, status=resp.status_code)
-    except Exception as e:
-        logger.warn("github_raw_failed", path=path, error=str(e))
+    url = f"https://api.github.com/repos/{XENA_DATA_REPO}/contents/{path}"
+    headers = {
+        "Authorization": f"Bearer {XENA_DATA_TOKEN}",
+        "Accept": "application/vnd.github.raw",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    last_err = None
+    for attempt in range(3):
+        try:
+            resp = http_requests.get(url, headers=headers,
+                                    params={"ref": XENA_DATA_BRANCH}, timeout=30)
+            if resp.status_code == 200:
+                return resp.content
+            if 500 <= resp.status_code < 600 or resp.status_code == 429:
+                last_err = f"status {resp.status_code}"
+            else:
+                # 401/403/404: retrying cannot help, bail out now
+                logger.warn("github_raw_bad_status", path=path, status=resp.status_code)
+                return None
+        except Exception as e:
+            last_err = str(e)
+        if attempt < 2:
+            time.sleep(1 + attempt)   # 1s, 2s; keeps worst case under the request budget
+    logger.warn("github_raw_failed", path=path, error=last_err, attempts=3)
     return None
 
 def _github_meta():
