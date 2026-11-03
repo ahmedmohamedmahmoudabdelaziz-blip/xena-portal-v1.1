@@ -5258,18 +5258,14 @@ html{background:var(--bg);min-height:100%}
                                <select id="tw-mentioned-group" name="Mentioned Group" data-feishu-field="Mentioned Group" class="form-highlight-input">
                                    <option value="">-- Select --</option>
                                </select>
-                               <!-- Phase 57 (Ahmed): one-tap fast buttons for THIS
-                                    ticket's group(s) -- the ticket's own group plus the
-                                    ACM's audition group (two buttons when both exist).
+                               <!-- Phase 57/58 (Ahmed): one-tap fast buttons for the
+                                    group(s) THIS ticket is put in ("Mention this Group").
                                     Clicking one SETS the select above; the dropdown
                                     stays for any other choice. -->
                                <div class="tw-mg-fast" id="twMgFast" style="display:none"></div>
-                               <!-- Phase 27 (Ahmed): the ticket's OWN group (Mention this
-                                    Group) echoed right beside the Mentioned Group picker,
-                                    so the agent sees both groups in one glance while
-                                    choosing -- populated by twRenderHeadMeta, hidden when
-                                    the ticket has no group yet. -->
-                               <span class="tw-head-chip chip-cyan tw-mg-own" id="twMgOwnChip" style="display:none"></span>
+                               <!-- Phase 58 (Ahmed): the Phase 27 own-group echo chip is
+                                    retired -- the fast buttons above already show the
+                                    ticket's own group(s), so the echo was duplicate. -->
                            </div>
                            <!-- Approve Note (Phase 10, Ahmed): writes straight to the
                                 sheet's "approve note" field, same pattern as Audition
@@ -16085,17 +16081,9 @@ function twRenderHeadMeta(ticket) {
         <span class="tw-head-chip chip-purple"><span class="tw-head-chip-label">Submitted</span>${escHtml(submittedVal)}</span>
         <span class="tw-head-chip chip-amber"><span class="tw-head-chip-label">Respondents</span>${respondentsHtml}</span>
     `;
-    // Phase 27 (Ahmed): mirror the ticket's own group next to the Mentioned
-    // Group select too (see twMgOwnChip markup) so both groups sit together.
-    const mgOwn = document.getElementById('twMgOwnChip');
-    if (mgOwn) {
-        if (groupVal && groupVal !== '—') {
-            mgOwn.innerHTML = `<span class="tw-head-chip-label">Group</span>${escHtml(groupVal)}`;
-            mgOwn.style.display = '';
-        } else {
-            mgOwn.style.display = 'none';
-        }
-    }
+    // Phase 58 (Ahmed): the Phase 27 own-group echo chip (twMgOwnChip) is
+    // retired -- the Phase 57 fast buttons already show the ticket's own
+    // group(s) right beside the select, so the echo was duplicate.
     setTimeout(() => { try { twHydrateAvatars(metaEl); } catch (e) {} }, 0);
 }
 
@@ -16144,8 +16132,11 @@ function twResolveQuickNote(tpl, fields) {
     // ID lists may be separated by comma/semicolon/newline/space in the sheet
     const idList = (v) => feishuValueToString(v).split(/[,;|\s\n]+/).map(s => s.trim()).filter(Boolean);
     // Reject Reason values contain spaces ("Duplicate NID (First time)") --
-    // split those on commas/newlines only.
-    const reasonList = (v) => feishuValueToString(v).split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    // split those on commas/newlines only. Phase 58 (Ahmed): drop the
+    // "(System)" / "(Sheet)" qualifiers -- agents don't type them.
+    const reasonList = (v) => feishuValueToString(v).split(/[,;\n]+/)
+        .map(s => s.trim().replace(/\s*\((system|sheet)\)\s*$/i, ''))
+        .filter(Boolean);
     const uids = idList(fields['User ID']);
     const rejected = idList(fields['Rejected Ids']);
     const rejSet = new Set(rejected.map(s => s.toLowerCase()));
@@ -16181,38 +16172,61 @@ function twRenderQuickNotes(type) {
 function twPickQuickNote(i) {
     const note = document.getElementById('tw-audition-note');
     if (!note || !twQuickNotesCurrent[i]) return;
-    note.value = twResolveQuickNote(twQuickNotesCurrent[i], (ltActiveTicket && ltActiveTicket.fields) || {});
+    note.value = twResolveQuickNote(twQuickNotesCurrent[i], twLiveFields());
     note.dispatchEvent(new Event('input', { bubbles: true })); // autogrow + dirty tracking
     note.focus();
     note.classList.remove('tw-note-flash'); void note.offsetWidth; note.classList.add('tw-note-flash');
 }
 
+// Phase 58 (Ahmed, video): placeholders must resolve from the LIVE form --
+// the open-time snapshot (ltActiveTicket) goes stale the moment the agent
+// edits a field (a Reject Reason removed in the card was still typed into
+// the note). Mirrors twCollectFields' reading rules (text/number/textarea/
+// select by name; data-multi checkboxes -> array of checked values).
+function twLiveFields() {
+    const fields = Object.assign({}, (ltActiveTicket && ltActiveTicket.fields) || {});
+    const form = document.getElementById('tw-form');
+    if (!form) return fields;
+    form.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => {
+        if (!el.name || el.readOnly || el.disabled) return;
+        fields[el.name] = el.value;
+    });
+    const cbByName = {};
+    form.querySelectorAll('input[type="checkbox"][data-multi="true"]').forEach(el => {
+        if (!el.name) return;
+        (cbByName[el.name] = cbByName[el.name] || []).push(el);
+    });
+    Object.keys(cbByName).forEach(name => {
+        fields[name] = cbByName[name].filter(e => e.checked).map(e => e.value);
+    });
+    return fields;
+}
+
 // Fast Mentioned-Group buttons -----------------------------------------------
+// Phase 58 (Ahmed): ONLY the group(s) the ticket is actually put in
+// ("Mention this Group" lookup) -- never the ACM's own group ("why does the
+// Enzo group appear while this person only exists in the SA agency group").
+// The lookup can carry one or two values; cap at two buttons.
 function twMgFastGroups(ticket) {
     if (!ticket || !ticket.fields) return [];
     const opts = (((typeof FIELD_SCHEMA !== 'undefined' && FIELD_SCHEMA['Mentioned Group']) || {}).options) || [];
     const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    // sheet spelling drift lives here (ACM option "Haseeb" vs group "Hasseb")
-    const alias = { 'haseeb': 'hasseb' };
-    const findOpt = (token) => {
-        const t = norm(token);
+    const findOpt = (name) => {
+        const t = norm(name);
         if (!t) return '';
-        let hit = opts.find(o => norm(o).includes(t));
-        if (!hit) {
-            const m = t.match(/^(pk|in)(.*)$/);
-            const alt = m && alias[m[2]];
-            if (alt) hit = opts.find(o => norm(o).includes(m[1] + alt));
-        }
-        return hit || '';
+        return opts.find(o => norm(o) === t) || opts.find(o => norm(o).includes(t)) || '';
     };
+    const raw = ticket.fields['Mention this Group'];
+    const names = [];
+    if (Array.isArray(raw)) {
+        raw.forEach(v => { const s = feishuValueToString(v).trim(); if (s) names.push(s); });
+    } else {
+        const s = feishuValueToString(raw).trim();
+        if (s) names.push(s);
+    }
     const out = [];
-    const push = (g) => { if (g && !out.includes(g)) out.push(g); };
-    push(findOpt(feishuValueToString(ticket.fields['Mention this Group']).trim()));
-    const acmPk = feishuValueToString(ticket.fields['Acm Name (PK)']).trim();
-    if (acmPk) push(findOpt('pk' + norm(acmPk.split(/\s+/)[0])));
-    const acmIn = feishuValueToString(ticket.fields['Acm Name (IN)']).trim();
-    if (acmIn) push(findOpt('in' + norm(acmIn.split(/\s+/)[0])));
-    return out.slice(0, 2); // Ahmed: at most two buttons (agent can have 2 groups)
+    names.forEach(n => { const g = findOpt(n); if (g && !out.includes(g)) out.push(g); });
+    return out.slice(0, 2);
 }
 
 function twRenderMgFast(ticket) {
