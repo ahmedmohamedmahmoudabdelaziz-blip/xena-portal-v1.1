@@ -1503,8 +1503,9 @@
         /* ═══ Phase 57 (Ahmed): fast group buttons + quick-note chips ═══ */
         /* One-tap group buttons beside the Mentioned Group select -- they SET
            the select (never replace it) so any other group stays one click away. */
-        .tw-mg-fast{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
-        .tw-mg-fast-btn{position:relative;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:600;letter-spacing:.2px;cursor:pointer;color:#dff6ff;background:linear-gradient(135deg, rgba(0,212,255,.16), rgba(168,85,247,.16));border:1px solid rgba(0,212,255,.45);box-shadow:0 2px 10px rgba(0,212,255,.12);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
+        /* Phase 60 (Ahmed): equal-size side-by-side buttons, fixed height. */
+        .tw-mg-fast{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin-top:8px;}
+        .tw-mg-fast-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 12px;border-radius:999px;font-size:12.5px;font-weight:600;letter-spacing:.2px;cursor:pointer;color:#dff6ff;background:linear-gradient(135deg, rgba(0,212,255,.16), rgba(168,85,247,.16));border:1px solid rgba(0,212,255,.45);box-shadow:0 2px 10px rgba(0,212,255,.12);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
         .tw-mg-fast-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,212,255,.28);border-color:var(--accent-cyan);}
         .tw-mg-fast-btn:active{transform:translateY(0) scale(.97);}
         .tw-mg-fast-btn.active{background:linear-gradient(135deg, rgba(0,212,255,.34), rgba(168,85,247,.34));border-color:var(--accent-cyan);box-shadow:0 0 0 2px rgba(0,212,255,.25), 0 6px 18px rgba(0,212,255,.30);}
@@ -1513,10 +1514,12 @@
         /* Quick-note preset chips above the Audition Note textarea -- one click
            fills the note (placeholders resolved from the ticket), the textarea
            stays fully editable afterwards. */
-        .tw-aud-quick{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 8px;}
-        .tw-aud-quick-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:2px;}
-        .tw-aud-quick-chip{max-width:100%;text-align:left;padding:7px 13px;border-radius:12px;font-size:12.5px;line-height:1.35;cursor:pointer;color:#e9e2ff;background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.40);transition:transform .15s ease, box-shadow .15s ease, background .15s ease;white-space:normal;}
-        .tw-aud-quick-chip:hover{background:linear-gradient(135deg, rgba(168,85,247,.22), rgba(0,212,255,.18));border-color:var(--accent-purple);transform:translateY(-2px);box-shadow:0 6px 16px rgba(168,85,247,.25);}
+        /* Phase 60 (Ahmed): tidy 2-column grid, uniform rows, 2-line clamp
+           (full text stays on the hover tooltip + fills on click). */
+        .tw-aud-quick{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 8px;}
+        .tw-aud-quick-label{grid-column:1/-1;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-purple));-webkit-background-clip:text;background-clip:text;color:transparent;}
+        .tw-aud-quick-chip{min-width:0;text-align:left;padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.35;cursor:pointer;color:#e9e2ff;background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.40);transition:transform .15s ease, box-shadow .15s ease, background .15s ease;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+        .tw-aud-quick-chip:hover{background:linear-gradient(135deg, rgba(168,85,247,.22), rgba(0,212,255,.18));border-color:var(--accent-purple);transform:translateY(-1px);box-shadow:0 4px 12px rgba(168,85,247,.25);}
         .tw-aud-quick-chip:active{transform:scale(.97);}
         .tw-note-flash{animation:twNoteFlash .6s ease;}
         @keyframes twNoteFlash{0%{box-shadow:0 0 0 0 rgba(0,212,255,.55);}100%{box-shadow:0 0 0 14px rgba(0,212,255,0);}}
@@ -2265,6 +2268,9 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .atm-day-label span{display:block;font-size:.62rem;opacity:.8}
 .atm-strip{position:relative;height:44px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px}
 .atm-seg{position:absolute;top:5px;height:20px;border-radius:4px;opacity:.95;min-width:1px}
+/* Phase 60 (Ahmed): an Off day renders a recognizable hatched band instead of
+   an empty dark strip -- "if mano off it not show he is off, insist of empty" */
+.atm-offday{position:absolute;top:2px;height:38px;left:0;right:0;border-radius:6px;background:repeating-linear-gradient(135deg, rgba(148,163,184,.10) 0 8px, transparent 0 12px);border:1px dashed rgba(148,163,184,.45);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:2.5px}
 .atm-shiftwin{position:absolute;top:2px;height:38px;border:1px dashed rgba(0,212,255,.55);border-radius:6px;background:rgba(0,212,255,.05);pointer-events:none}
 .atm-gap{position:absolute;bottom:5px;height:10px;background:#ff4d6d;border-radius:3px;box-shadow:0 0 6px rgba(255,77,109,.55)}
 .atm-gaplbl{position:absolute;bottom:16px;font-size:.58rem;font-weight:700;color:#ff8fa3;white-space:nowrap;transform:translateX(-50%)}
@@ -16271,47 +16277,9 @@ function twMgFastPaint(groups) {
 function twRenderMgFast(ticket) {
     const box = document.getElementById('twMgFast');
     if (!box) return;
-    const groups = ticket ? twMgFastGroups(ticket) : [];
-    twMgFastPaint(groups); // instant: the ticket's lookup group(s)
-    if (ticket) twMgFastEnrich(ticket); // Phase 59: the respondent's REAL chats
-}
-
-// Phase 59 (Ahmed): "sehar she is in 2 group so why only one group appare" --
-// the ticket lookup carries one group; the Group Webhooks table's chat links
-// carry ALL the chats the respondent is in. Ask the backend; when it knows
-// better, its answer REPLACES the lookup buttons (lookup stays the fallback
-// when the endpoint has nothing / is down).
-async function twMgFastEnrich(ticket) {
-    try {
-        const resp = ticket.fields['Respondents'];
-        const names = (Array.isArray(resp)
-            ? resp.map(u => (u && (u.name || u.en_name)) || '').filter(Boolean)
-            : [feishuValueToString(resp).trim()].filter(Boolean));
-        if (!names.length) return;
-        const stillSameTicket = () => ltActiveTicket === ticket; // no stale repaint after switching tickets
-        const authQs = `&user=${encodeURIComponent(loggedUser || '')}&email=${encodeURIComponent(loggedEmail || '')}`;
-        const found = [];
-        for (const nm of names) {
-            try {
-                const r = await fetch('/api/groups/for-respondent?name=' + encodeURIComponent(nm) + authQs);
-                const d = await r.json();
-                if (d && d.success && Array.isArray(d.groups)) {
-                    d.groups.forEach(g => { if (!found.includes(g)) found.push(g); });
-                }
-            } catch (e) { /* keep the lookup buttons */ }
-        }
-        if (!found.length || !stillSameTicket()) return;
-        // map to real select options (endpoint names can drift in case/spacing)
-        const opts = (((typeof FIELD_SCHEMA !== 'undefined' && FIELD_SCHEMA['Mentioned Group']) || {}).options) || [];
-        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const mapped = [];
-        found.forEach(n => {
-            const g = opts.find(o => norm(o) === norm(n)) || opts.find(o => norm(o).includes(norm(n)));
-            if (g && !mapped.includes(g)) mapped.push(g);
-        });
-        if (!mapped.length) return;
-        twMgFastPaint(mapped.slice(0, 2)); // Ahmed: at most two buttons
-    } catch (e) { /* never break the workspace over a fast button */ }
+    // Phase 60 (Ahmed): the "Mention this Group" lookup itself now carries all
+    // of the agent's groups -- read it directly, no extra API calls.
+    twMgFastPaint(ticket ? twMgFastGroups(ticket) : []);
 }
 
 function twPickMgFast(btn) {
@@ -23994,8 +23962,10 @@ xdWrapSave('schSaveEntries', /audition\/schedule/);
 // shift windows from the Schedule sheet. One cached GET per range (60s
 // server-side), no polling. In-shift OFFLINE renders as a RED bar with the
 // duration printed on the strip ("red line with duration on this day").
-const ATM_ST_COLOR = { 'Online':'#00e676','On Task':'#00d4ff','Working Ticket':'#00b0ff','Meeting':'#b967ff','Break':'#ffb800','Offline':'#4b5563' };
-const ATM_ST_LABEL = { 'Online':'Online','On Task':'On task','Working Ticket':'Ticket','Meeting':'Meeting','Break':'Break','Offline':'Offline' };
+// Phase 60 (Ahmed): "On task" and "Ticket" are ONE thing -- both are online
+// working states; a single "Working" entry keeps the legend readable.
+const ATM_ST_COLOR = { 'Online':'#00e676','On Task':'#00d4ff','Working Ticket':'#00d4ff','Meeting':'#b967ff','Break':'#ffb800','Offline':'#4b5563' };
+const ATM_ST_LABEL = { 'Online':'Online','On Task':'Working','Working Ticket':'Working','Meeting':'Meeting','Break':'Break','Offline':'Offline' };
 let atmMode='week', atmFrom=null, atmData=null, atmLoading=false, atmCache={};
 
 function atmDowMon(d){ const x=new Date(d); const w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
@@ -24004,7 +23974,7 @@ function atmBounds(){
     const f=atmDowMon(atmFrom); const t=new Date(f); t.setDate(t.getDate()+6); return [f,t];
 }
 function atmPct(axis){ return v => ((v/axis)*100).toFixed(3); }
-function atmMinLabel(m){ m=Math.round(m||0); if(m<60) return m+'m'; const h=m/60; return (h%1?h.toFixed(1):String(h))+'h'; }
+function atmMinLabel(m){ m=Math.round(m||0); if(m<60) return m+'m'; const h=Math.floor(m/60), mm=m%60; return mm ? (h+'h '+String(mm).padStart(2,'0')+'m') : (h+'h'); } // Phase 60: "9h 03m", never "9.03h"
 function atmHm(mins){
     mins=Math.round(mins||0);
     // Overnight times read "14:28 (+1d)" — the old bare "+14:28" looked like
@@ -24093,9 +24063,11 @@ function atmDayRow(a,ds,axis,ticks){
     });
     let flags='';
     (D.flags||[]).forEach(fl=>{ flags+=atmFlagChip(fl,D); });
-    const stats=(D.worked_min>0||D.break_min>0||D.meeting_min>0)
-        ? `⏱ ${atmMinLabel(D.worked_min)} worked · ⚡ ${atmMinLabel(D.ontask_min||0)} on task · ☕ ${atmMinLabel(D.break_min)} · 🎤 ${atmMinLabel(D.meeting_min)}`
-        : (isAbsent?'🚫 Absent — scheduled, never signed in':(isOff?'🌙 Off day':'—'));
+    const stats=D.future
+        ? '🕐 Scheduled — not started yet'
+        : ((D.worked_min>0||D.break_min>0||D.meeting_min>0)
+            ? `⏱ ${atmMinLabel(D.worked_min)} worked · ⚡ ${atmMinLabel(D.ontask_min||0)} working · ☕ ${atmMinLabel(D.break_min)} · 🎤 ${atmMinLabel(D.meeting_min)}`
+            : (isAbsent?'🚫 Absent — scheduled, never signed in':(isOff?'🌙 Off day':'—')));
     const punch=(D.first!=null)?`🕒 ${atmHm(D.first)} → ${(D.last!=null?atmHm(D.last):'now')}`:'';
     return `<div class="atm-day${isToday?' today':''}">
       <div class="atm-day-label"><b>${schDayLabel(+ds)}</b>
@@ -24104,7 +24076,7 @@ function atmDayRow(a,ds,axis,ticks){
         ${punch?`<span>${punch}</span>`:''}
       </div>
       <div>
-        <div class="atm-strip">${ticks}${shiftWin}${segs}${gaps}</div>
+        <div class="atm-strip">${ticks}${shiftWin}${isOff?'<div class="atm-offday">OFF</div>':''}${segs}${gaps}</div>
         ${flags?`<div class="atm-flags">${flags}</div>`:''}
       </div>
     </div>`;
@@ -24140,7 +24112,7 @@ function atmAgentCard(a){
         S.missing_min?chip('⚠️ Missing '+atmMinLabel(S.missing_min),'bad'):'',
         S.no_show?chip('🚫 Absent '+S.no_show+'d','bad'):'',
         S.early_min?chip('↩ Early '+atmMinLabel(S.early_min),'alert'):'',
-        S.worked_days?chip('📊 Avg '+(S.avg_day_h||0)+'h/d'):''
+        S.worked_days?chip('📊 Avg '+atmMinLabel(S.avg_day_min!=null?S.avg_day_min:Math.round((S.avg_day_h||0)*60))+'/d'):''
     ].join('');
     const live=(a.live&&a.live.status)?a.live.status:'Offline';
     const liveOn=['Online','On Task','Working Ticket','Meeting'].includes(live);
@@ -24175,7 +24147,7 @@ function atmRender(){
     const leg=document.getElementById('atmLegend');
     if(!atmData){ if(host) host.innerHTML=''; return; }
     const q=((document.getElementById('atmSearch')||{}).value||'').trim().toLowerCase();
-    if(leg) leg.innerHTML=Object.keys(ATM_ST_LABEL).map(k=>
+    if(leg) leg.innerHTML=Object.keys(ATM_ST_LABEL).filter((k,i,arr)=>arr.findIndex(x=>ATM_ST_LABEL[x]===ATM_ST_LABEL[k])===i).map(k=>
         `<span class="atm-lg"><i style="background:${ATM_ST_COLOR[k]}"></i>${ATM_ST_LABEL[k]}</span>`).join('')
         +`<span class="atm-lg"><i style="background:#ff4d6d"></i>Offline in shift</span>`
         +`<span class="atm-lg"><i style="background:transparent;border:1px dashed rgba(0,212,255,.7);width:9px;height:13px"></i>Shift window</span>`;
