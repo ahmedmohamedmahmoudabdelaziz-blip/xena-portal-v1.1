@@ -1520,6 +1520,13 @@
         .tw-aud-quick-chip:active{transform:scale(.97);}
         .tw-note-flash{animation:twNoteFlash .6s ease;}
         @keyframes twNoteFlash{0%{box-shadow:0 0 0 0 rgba(0,212,255,.55);}100%{box-shadow:0 0 0 14px rgba(0,212,255,0);}}
+        /* Phase 59 (Ahmed): light-theme readability -- the dark-tuned chip colors
+           washed out to near-invisible on the light palette. */
+        [data-theme="light"] .tw-mg-fast-btn{color:#0b4a63;background:linear-gradient(135deg, rgba(2,132,199,.14), rgba(124,58,237,.12));border-color:rgba(2,132,199,.55);box-shadow:0 2px 8px rgba(15,60,80,.12);}
+        [data-theme="light"] .tw-mg-fast-btn:hover{box-shadow:0 6px 16px rgba(2,132,199,.25);border-color:#0284c7;}
+        [data-theme="light"] .tw-mg-fast-btn.active{background:linear-gradient(135deg, rgba(2,132,199,.28), rgba(124,58,237,.24));border-color:#0284c7;box-shadow:0 0 0 2px rgba(2,132,199,.25), 0 6px 16px rgba(2,132,199,.25);}
+        [data-theme="light"] .tw-aud-quick-chip{color:#4a1d96;background:rgba(124,58,237,.07);border-color:rgba(124,58,237,.45);}
+        [data-theme="light"] .tw-aud-quick-chip:hover{background:linear-gradient(135deg, rgba(124,58,237,.14), rgba(2,132,199,.10));border-color:#7c3aed;box-shadow:0 6px 14px rgba(124,58,237,.22);}
 
         /* ═══════════════ Phase 10: Live Ticket Queue + Ticket Workspace redesign ═══════════════ */
         /* Queue hero header */
@@ -16107,7 +16114,7 @@ const TW_QUICK_NOTES = {
     'add & remove games': ['added', 'removed', 'not in the blacklist check with the bug group', 'not in the blacklist and the level is under 25 apply for welcome package'],
     'add & remove host sign': ['added', 'removed', 'wallet balance is not 0', 'active host', 'duplicated request already removed'],
     'change agency name': ['changed', 'duplicated agency name ask him to choose another one'],
-    'agency target privilege': ['added', 'unqualified only achieved ( BASE POINTS )', 'added for all except ( Rejected Ids ) as not host in the same agency and no evidence provided', 'added for ( User ID ) except ( Rejected Ids ) as already took it before', 'not enough target already got all avaliable dynamic', 'elgible for only ( Remaining ) pls confirm with him which IDs he want to add', 'duplicated already added before'],
+    'agency target privilege': ['added', 'unqualified only achieved ( BASE POINTS )', 'added for all except ( Rejected Ids ) as not host in the same agency and no evidence provided', 'not host in the same agency and no evidence provided', 'added for ( User ID ) except ( Rejected Ids ) as already took it before', 'not enough target already got all avaliable dynamic', 'elgible for only ( Remaining ) pls confirm with him which IDs he want to add', 'duplicated already added before'],
     'agency creation': ['( Reject Reason )'],
 };
 let twQuickNotesCurrent = [];
@@ -16125,6 +16132,20 @@ function twFmtTarget(n) {
     if (n >= 1e6) { const m = n / 1e6; return (Number.isInteger(m) ? String(m) : m.toFixed(1)) + 'M'; }
     if (n >= 1e3) { const k = n / 1e3; return (Number.isInteger(k) ? String(k) : k.toFixed(1)) + 'K'; }
     return String(n);
+}
+
+// Phase 59 (Ahmed): ( Remaining ) is the REMAINING number on the live Formula
+// card ("how many remaining id that appear in the chip") -- NOT the ID list.
+// Reads the card's current formula string; null when no card is painted.
+function twFormulaRemaining() {
+    try {
+        const form = document.getElementById('tw-form');
+        const grp = form && form.querySelector('[data-formula-live="1"]');
+        if (!grp || !grp.dataset) return null;
+        const s = grp.dataset.lastFormulaStr || grp.dataset.sheetFormula || '';
+        const m = /Remaining:\s*(-?[\d,]+)/.exec(s);
+        return m ? m[1].replace(/,/g, '') : null;
+    } catch (e) { return null; }
 }
 
 function twResolveQuickNote(tpl, fields) {
@@ -16149,7 +16170,9 @@ function twResolveQuickNote(tpl, fields) {
         'rejected ids': () => rejected.length ? rejected.join(', ') : null,
         'user id': () => uids.length ? uids.join(', ') : null,
         'reject reason': () => { const r = reasonList(fields['Reject Reason']); return r.length ? r.join(', ') : null; },
-        'remaining': () => remaining.length ? remaining.join(', ') : null,
+        // Phase 59: the REMAINING stat from the live Formula card (the count),
+        // NOT the IDs list -- "how many remaining id that appear in the chip".
+        'remaining': () => twFormulaRemaining(),
     };
     return String(tpl).replace(/\(\s*(BASE POINTS|Rejected Ids|User ID|Reject Reason|Remaining)\s*\)/gi, (m, name) => {
         const fn = resolvers[String(name).trim().toLowerCase()];
@@ -16229,10 +16252,9 @@ function twMgFastGroups(ticket) {
     return out.slice(0, 2);
 }
 
-function twRenderMgFast(ticket) {
+function twMgFastPaint(groups) {
     const box = document.getElementById('twMgFast');
     if (!box) return;
-    const groups = ticket ? twMgFastGroups(ticket) : [];
     if (!groups.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
     box.style.display = 'flex';
     box.innerHTML = groups.map(g =>
@@ -16244,6 +16266,52 @@ function twRenderMgFast(ticket) {
         sel.addEventListener('change', twMgFastSync); // manual picks keep the glow honest
     }
     twMgFastSync();
+}
+
+function twRenderMgFast(ticket) {
+    const box = document.getElementById('twMgFast');
+    if (!box) return;
+    const groups = ticket ? twMgFastGroups(ticket) : [];
+    twMgFastPaint(groups); // instant: the ticket's lookup group(s)
+    if (ticket) twMgFastEnrich(ticket); // Phase 59: the respondent's REAL chats
+}
+
+// Phase 59 (Ahmed): "sehar she is in 2 group so why only one group appare" --
+// the ticket lookup carries one group; the Group Webhooks table's chat links
+// carry ALL the chats the respondent is in. Ask the backend; when it knows
+// better, its answer REPLACES the lookup buttons (lookup stays the fallback
+// when the endpoint has nothing / is down).
+async function twMgFastEnrich(ticket) {
+    try {
+        const resp = ticket.fields['Respondents'];
+        const names = (Array.isArray(resp)
+            ? resp.map(u => (u && (u.name || u.en_name)) || '').filter(Boolean)
+            : [feishuValueToString(resp).trim()].filter(Boolean));
+        if (!names.length) return;
+        const stillSameTicket = () => ltActiveTicket === ticket; // no stale repaint after switching tickets
+        const authQs = `&user=${encodeURIComponent(loggedUser || '')}&email=${encodeURIComponent(loggedEmail || '')}`;
+        const found = [];
+        for (const nm of names) {
+            try {
+                const r = await fetch('/api/groups/for-respondent?name=' + encodeURIComponent(nm) + authQs);
+                const d = await r.json();
+                if (d && d.success && Array.isArray(d.groups)) {
+                    d.groups.forEach(g => { if (!found.includes(g)) found.push(g); });
+                }
+            } catch (e) { /* keep the lookup buttons */ }
+        }
+        if (!found.length || !stillSameTicket()) return;
+        // map to real select options (endpoint names can drift in case/spacing)
+        const opts = (((typeof FIELD_SCHEMA !== 'undefined' && FIELD_SCHEMA['Mentioned Group']) || {}).options) || [];
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const mapped = [];
+        found.forEach(n => {
+            const g = opts.find(o => norm(o) === norm(n)) || opts.find(o => norm(o).includes(norm(n)));
+            if (g && !mapped.includes(g)) mapped.push(g);
+        });
+        if (!mapped.length) return;
+        twMgFastPaint(mapped.slice(0, 2)); // Ahmed: at most two buttons
+    } catch (e) { /* never break the workspace over a fast button */ }
 }
 
 function twPickMgFast(btn) {
