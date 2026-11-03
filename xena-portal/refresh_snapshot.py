@@ -49,12 +49,18 @@ whole table every 30 minutes:
     record_id (new appended, changed replaced).
   - 2-day OVERLAP covers the measured filter fuzziness (~14 h early rows
     - harmless, the record_id merge dedups them).
+  - Phase 55c (2026-11-03): Ahmed added the auto-updating "Last Modified
+    Date" field (Feishu type 1002) to the Requests table, so its incremental
+    key is now modification time - edits to ANY row, however old, are
+    re-fetched within 30 min (validated live: September-submitted rows
+    modified today appear; 313 modifications in one 3 h sample). The
+    submitted date remains the fallback if the field is ever removed.
   - Backstop: a FULL refresh of every incremental table every 8 h
-    (FULL_REFRESH_INTERVAL_S) - this is what catches edits to OLD rows
-    (a date filter can only see rows whose date is recent; Feishu's API
-    offers no filter/sort on last-modified time - InvalidSort/InvalidFilter,
-    probed live 2026-11-03). last_full_at in meta.json drives this; the
-    first run after deploy has no last_full_at and does a full fetch.
+    (FULL_REFRESH_INTERVAL_S) - reconciles deletions and anything a filtered
+    read could ever miss. Before Phase 55c this was also the only catch for
+    old-row edits (Feishu's API has no filter/sort on the SYSTEM modified_at
+    - InvalidSort/InvalidFilter, probed live; the user-added "Last Modified
+    Date" FIELD is what made modified-time filtering possible).
   - Points + Access stay FULL every run: they are small (5.7k / 8 rows)
     and Points balances change via row EDITS, which a date filter can't
     see.
@@ -429,13 +435,25 @@ TABLES = [
         "filename": "requests.json",
         "label": "Requests",
         # Phase 55: 19k rows = 38 pages is the slow pole; a server-side date
-        # filter cuts the 30-min refresh to ~2-4 pages. Edits to OLD rows are
-        # picked up by the 8-hour full-refresh backstop.
+        # filter cuts the 30-min refresh to a few pages. Phase 55c made the
+        # incremental key the auto-updating "Last Modified Date" field, so
+        # edits to OLD rows land within 30 min; the 8-hour full-refresh
+        # backstop remains for deletions and meta-clock reconciliation.
         "mode": "incremental",
-        "date_fields": ["Submitted on Copy", "Submitted on", "Created Time"],
+        # Phase 55c (2026-11-03, field added by Ahmed): "Last Modified Date" is
+        # Feishu's auto-updating last-modified-time field (type 1002) - unlike
+        # the submitted date it moves on EVERY edit, so the incremental fetch
+        # now catches edits to old rows within 30 min (probed live: rows
+        # submitted in September modified today; 313 modifications in 3h).
+        # The submitted-date fields stay as fallback if the field is removed.
+        "date_fields": ["Last Modified Date", "Submitted on Copy", "Submitted on", "Created Time"],
         "human_keys": ["Agency Code", "User ID", "Bd Code", "BD Code", "NID Number", "NID", "Respondents", "Otherapp ID", "Otherapp Name", "Other App Name", "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member"],
         "aliases": [
             "Numbering", "Submitted on Copy", "Submitted on", "Created Time", "Date",
+            # "Last Modified Date" rides in the projection so max_date_ms can
+            # compute the next run's `since` from it (prev snapshot rows must
+            # carry the field, otherwise since falls back to submitted date).
+            "Last Modified Date",
             "Request Type", "Request type", "Type", "Category",
             "Status", "Request Status", "Agency Status", "State",
             "Region", "Agency Region",
