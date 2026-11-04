@@ -1515,23 +1515,35 @@
         /* Quick-note preset chips above the Audition Note textarea -- one click
            fills the note (placeholders resolved from the ticket), the textarea
            stays fully editable afterwards. */
-        /* Quick-note presets: ONE compact button that opens a clean dropdown
-           menu of full-text rows -- no more wall of cramped chips (Phase 60b). */
-        .tw-aud-quick{position:relative;margin:4px 0 8px;}
-        .tw-aud-quick-toggle{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;color:#e9f6ff;background:linear-gradient(135deg, rgba(0,212,255,.14), rgba(168,85,247,.14));border:1px solid rgba(0,212,255,.40);transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;}
-        .tw-aud-quick-toggle:hover{border-color:var(--accent-cyan);box-shadow:0 4px 14px rgba(0,212,255,.20);transform:translateY(-1px);}
-        .tw-aud-quick-toggle .cnt{background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));color:#fff;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:800;}
-        .tw-aud-quick-toggle .chev{transition:transform .18s ease;opacity:.7;font-size:10px;}
+        /* Quick-note presets (Phase 61 redesign, Ahmed): a premium
+           gradient-border pill -- glowing bolt medallion, count badge, animated
+           chevron -- opening a polished menu with numbered full-text rows. */
+        .tw-aud-quick{position:relative;margin:6px 0 10px;}
+        .tw-aud-quick-toggle{position:relative;display:inline-flex;align-items:center;gap:9px;padding:6px 16px 6px 7px;border-radius:999px;font-size:12.5px;font-weight:700;letter-spacing:.3px;cursor:pointer;color:#eaf7ff;border:1px solid transparent;background:linear-gradient(135deg,#0d1a30,#131a35) padding-box,linear-gradient(120deg,#00d4ff 0%,#a855f7 55%,#ff5da2 110%) border-box;box-shadow:0 3px 14px rgba(0,212,255,.16),0 1px 0 rgba(255,255,255,.06) inset;transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;}
+        .tw-aud-quick-toggle:hover{transform:translateY(-1px);box-shadow:0 7px 22px rgba(0,212,255,.30),0 0 0 3px rgba(168,85,247,.14);filter:brightness(1.12);}
+        .tw-aud-quick-toggle:active{transform:translateY(0) scale(.98);}
+        .tw-aud-quick-toggle .qn-ico{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;font-size:13px;background:linear-gradient(135deg,#00d4ff,#a855f7);box-shadow:0 0 10px rgba(0,212,255,.55),0 1px 0 rgba(255,255,255,.35) inset;}
+        .tw-aud-quick-toggle .qn-label{background:linear-gradient(90deg,#9be9ff,#d8b4fe);-webkit-background-clip:text;background-clip:text;color:transparent;}
+        .tw-aud-quick-toggle .cnt{background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple));color:#fff;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:800;box-shadow:0 0 8px rgba(168,85,247,.45);}
+        .tw-aud-quick-toggle .chev{transition:transform .2s ease;opacity:.75;font-size:10px;}
         .tw-aud-quick.open .tw-aud-quick-toggle .chev{transform:rotate(180deg);}
-        .tw-aud-quick-menu{position:absolute;z-index:60;left:0;right:0;top:calc(100% + 6px);max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid rgba(168,85,247,.35);border-radius:14px;box-shadow:0 18px 44px rgba(0,0,0,.45);padding:6px;display:none;}
-        .tw-aud-quick.open .tw-aud-quick-menu{display:block;animation:twQuickIn .16s ease;}
-        @keyframes twQuickIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-        .tw-aud-quick-item{display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:var(--text);font-size:12.5px;line-height:1.45;cursor:pointer;transition:background .12s ease, transform .12s ease;white-space:normal;}
-        .tw-aud-quick-item:hover{background:linear-gradient(135deg, rgba(0,212,255,.10), rgba(168,85,247,.12));}
+        .tw-aud-quick-menu{position:absolute;z-index:60;left:0;right:0;top:calc(100% + 8px);max-height:300px;overflow-y:auto;background:linear-gradient(180deg,#101a30,#0d1526);border:1px solid rgba(0,212,255,.30);border-radius:16px;box-shadow:0 24px 54px rgba(0,0,0,.55),0 0 0 1px rgba(168,85,247,.14);padding:8px;display:none;scrollbar-width:thin;}
+        .tw-aud-quick.open .tw-aud-quick-menu{display:block;animation:twQuickIn .18s ease;}
+        @keyframes twQuickIn{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:none}}
+        .tw-aud-quick-menu .qn-menu-head{display:flex;align-items:center;gap:7px;padding:7px 10px 9px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#7fdcff;border-bottom:1px solid rgba(0,212,255,.16);margin-bottom:6px;}
+        .tw-aud-quick-item{position:relative;display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:9px 11px;border:0;border-radius:11px;background:transparent;color:var(--text);font-size:12.5px;line-height:1.5;cursor:pointer;transition:background .13s ease, transform .13s ease;white-space:normal;}
+        .tw-aud-quick-item .qn-num{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;margin-top:1px;border-radius:7px;font-size:10px;font-weight:800;color:#9be9ff;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.28);}
+        .tw-aud-quick-item .qn-txt{flex:1;}
+        .tw-aud-quick-item::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(180deg,#00d4ff,#a855f7);opacity:0;transition:opacity .13s ease;}
+        .tw-aud-quick-item:hover{background:linear-gradient(135deg, rgba(0,212,255,.13), rgba(168,85,247,.15));transform:translateX(2px);}
+        .tw-aud-quick-item:hover::before{opacity:1;}
         .tw-aud-quick-item:active{transform:scale(.99);}
-        [data-theme="light"] .tw-aud-quick-toggle{color:#0b4a63;border-color:rgba(2,132,199,.55);}
-        [data-theme="light"] .tw-aud-quick-menu{border-color:rgba(124,58,237,.35);box-shadow:0 18px 44px rgba(40,60,90,.18);}
+        [data-theme="light"] .tw-aud-quick-toggle{color:#0b4a63;background:linear-gradient(135deg,#ffffff,#eef4ff) padding-box,linear-gradient(120deg,#0284c7,#7c3aed) border-box;box-shadow:0 3px 12px rgba(2,132,199,.18);}
+        [data-theme="light"] .tw-aud-quick-toggle .qn-label{background:linear-gradient(90deg,#0369a1,#6d28d9);-webkit-background-clip:text;background-clip:text;color:transparent;}
+        [data-theme="light"] .tw-aud-quick-menu{background:#ffffff;border-color:rgba(2,132,199,.35);box-shadow:0 20px 46px rgba(40,60,90,.22);}
+        [data-theme="light"] .tw-aud-quick-menu .qn-menu-head{color:#0369a1;border-bottom-color:rgba(2,132,199,.18);}
         [data-theme="light"] .tw-aud-quick-item{color:#1e293b;}
+        [data-theme="light"] .tw-aud-quick-item .qn-num{color:#0369a1;background:rgba(2,132,199,.10);border-color:rgba(2,132,199,.30);}
         .tw-note-flash{animation:twNoteFlash .6s ease;}
         @keyframes twNoteFlash{0%{box-shadow:0 0 0 0 rgba(0,212,255,.55);}100%{box-shadow:0 0 0 14px rgba(0,212,255,0);}}
         /* Phase 59 (Ahmed): light-theme readability -- the dark-tuned chip colors
@@ -2254,8 +2266,19 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 
 /* ===== Phase 33 (Ahmed): Attendance Monitor ===== */
 .atm-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
-.atm-tools label{font-size:.74rem;color:var(--text-sec);display:flex;gap:8px;align-items:center}
-.atm-tools input{margin:0}
+/* Phase 61 (Ahmed: "why you keep the search box like this"): a real search
+   pill -- icon inside, gradient focus ring, one-click clear -- instead of a
+   bare input squeezed next to the legend. */
+.atm-searchwrap{position:relative;display:flex;align-items:center;flex:0 1 340px;min-width:250px}
+.atm-searchwrap .atm-search-ico{position:absolute;left:12px;font-size:12px;opacity:.6;pointer-events:none}
+.atm-searchwrap input{width:100%;margin:0;padding:9px 34px 9px 34px;border-radius:999px;border:1px solid rgba(0,212,255,.32);background:var(--surface-inset);color:var(--text);font-size:12.5px;outline:none;transition:border-color .15s ease, box-shadow .15s ease}
+.atm-searchwrap input:hover{border-color:rgba(0,212,255,.55)}
+.atm-searchwrap input:focus{border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.18),0 4px 16px rgba(0,212,255,.16)}
+.atm-searchwrap input::placeholder{color:var(--text-muted)}
+.atm-search-clear{position:absolute;right:7px;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:0;border-radius:999px;background:rgba(148,163,184,.16);color:var(--text-sec);font-size:10px;cursor:pointer;transition:background .12s ease, color .12s ease, transform .12s ease}
+.atm-search-clear:hover{background:rgba(255,77,109,.24);color:#ff8fa3;transform:scale(1.08)}
+[data-theme="light"] .atm-searchwrap input{border-color:rgba(2,132,199,.40);background:#fff;color:#1e293b}
+[data-theme="light"] .atm-searchwrap input:focus{border-color:#0284c7;box-shadow:0 0 0 3px rgba(2,132,199,.16)}
 .atm-legend{display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1;min-width:220px}
 .atm-lg{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;color:var(--text-sec)}
 .atm-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
@@ -2287,7 +2310,10 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 .atm-day-stats{margin-top:5px;font-size:.66rem;color:var(--text-sec);line-height:1.6}
 .atm-day-punch{font-size:.62rem;color:var(--text-muted);margin-top:3px}
 .atm-strip{position:relative;height:48px;background:var(--surface-inset);border:1px solid rgba(255,255,255,.07);border-radius:8px;overflow:hidden}
-.atm-seg{position:absolute;top:7px;height:34px;border-radius:5px;opacity:.95;min-width:1px}
+/* Phase 61: merged runs render as glossy blocks with the duration printed
+   inside when there is room -- no more barcode of 1-min slivers. */
+.atm-seg{position:absolute;top:6px;height:36px;border-radius:6px;min-width:2px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -7px 12px rgba(0,0,0,.20)}
+.atm-seg-lbl{font-size:.6rem;font-weight:800;color:rgba(4,12,20,.85);letter-spacing:.3px;pointer-events:none;white-space:nowrap;overflow:hidden;text-shadow:0 1px 0 rgba(255,255,255,.22)}
 /* Phase 60b (Ahmed): an Off day renders a recognizable hatched band instead of
    an empty dark strip -- "if mano off it not show he is off, insist of empty" */
 .atm-offday{position:absolute;top:0;height:100%;left:0;right:0;background:repeating-linear-gradient(135deg, rgba(148,163,184,.10) 0 8px, transparent 0 12px);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:2.5px}
@@ -5722,6 +5748,7 @@ html{background:var(--bg);min-height:100%}
                                 <button type="button" id="atmModeWeekBtn" class="sch-vt-btn active" onclick="atmSetMode('week')">Week</button>
                                 <button type="button" id="atmModeMonthBtn" class="sch-vt-btn" onclick="atmSetMode('month')">Month</button>
                             </div>
+                            <button class="btn btn-secondary" onclick="atmCopyReport(this)" style="flex:none" title="Copy a paste-ready text report for the visible range (respects the agent filter)">📋 Copy report</button>
                             <button class="btn btn-secondary" onclick="atmLoad(true)" style="flex:none">🔄 Refresh</button>
                         </div>
                     </div>
@@ -5732,7 +5759,11 @@ html{background:var(--bg);min-height:100%}
                         <button type="button" class="sch-navbtn sch-todaybtn" onclick="atmToday()">This week</button>
                     </div>
                     <div class="atm-tools">
-                        <label>Find an agent<input id="atmSearch" type="search" placeholder="Name or email" oninput="atmRender()"></label>
+                        <div class="atm-searchwrap">
+                            <span class="atm-search-ico">🔍</span>
+                            <input id="atmSearch" type="search" placeholder="Find an agent — name or email…" aria-label="Find an agent" oninput="atmRender()">
+                            <button type="button" class="atm-search-clear" title="Clear search" onclick="const i=document.getElementById('atmSearch');i.value='';atmRender();i.focus();">✕</button>
+                        </div>
                         <div class="atm-legend" id="atmLegend"></div>
                     </div>
                 </div>
@@ -16219,8 +16250,8 @@ function twRenderQuickNotes(type) {
     // Phase 60b (Ahmed): ONE elegant button + a clean dropdown menu with
     // full-text rows -- no more wall of cramped chips.
     box.style.display = 'block';
-    box.innerHTML = `<button type="button" class="tw-aud-quick-toggle" onclick="twQuickNotesToggle(event)">⚡ Quick notes <span class="cnt">${notes.length}</span> <span class="chev">▾</span></button>
-      <div class="tw-aud-quick-menu">${notes.map((n, i) => `<button type="button" class="tw-aud-quick-item" onclick="twPickQuickNote(${i})">${escHtml(n)}</button>`).join('')}</div>`;
+    box.innerHTML = `<button type="button" class="tw-aud-quick-toggle" onclick="twQuickNotesToggle(event)" title="Preset notes for this request type — one click fills the note, still editable"><span class="qn-ico">⚡</span><span class="qn-label">Quick notes</span><span class="cnt">${notes.length}</span><span class="chev">▾</span></button>
+      <div class="tw-aud-quick-menu"><div class="qn-menu-head">✨ Tap a note to fill — you can still edit it</div>${notes.map((n, i) => `<button type="button" class="tw-aud-quick-item" onclick="twPickQuickNote(${i})"><span class="qn-num">${i + 1}</span><span class="qn-txt">${escHtml(n)}</span></button>`).join('')}</div>`;
 }
 
 function twQuickNotesToggle(ev) {
@@ -24094,9 +24125,22 @@ function atmDayRow(a,ds,axis,ticks){
         shiftWin=`<div class="atm-shiftwin" title="Shift window" style="left:${p(D.shift.start_min)}%;width:${p(Math.max(1,D.shift.end_min-D.shift.start_min))}%"></div>`;
     }
     let segs='',gaps='';
-    (D.segments||[]).forEach(x=>{
+    /* Phase 61 (Ahmed: "why the line still look like sporadic"): the raw Time
+       Logs arrive as dozens of 1-3 min slivers (online/ticket/online/ticket)
+       which rendered as a scattered barcode. Merge adjacent same-status
+       segments (3-min bridge tolerance) into ONE continuous run, and print
+       the duration INSIDE wide runs -- the strip now reads as clean blocks. */
+    const _runs=[];
+    (D.segments||[]).slice().sort((a,b)=>a.s-b.s).forEach(x=>{
+        const last=_runs[_runs.length-1];
+        if(last&&last.st===x.st&&x.s<=last.e+3){ last.e=Math.max(last.e,x.e); if(x.open)last.open=true; }
+        else _runs.push({st:x.st,s:x.s,e:x.e,open:!!x.open});
+    });
+    _runs.forEach(x=>{
         const c=ATM_ST_COLOR[x.st]||'#7c8aa0';
-        segs+=`<div class="atm-seg" title="${escHtml((ATM_ST_LABEL[x.st]||x.st)+' '+atmHm(x.s)+' → '+atmHm(x.e)+(x.open?' (still running)':''))}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%;background:${c}"></div>`;
+        const wpct=p(Math.max(1,x.e-x.s));
+        const lbl=wpct>=9?`<span class="atm-seg-lbl">${atmMinLabel(Math.round(x.e-x.s))}</span>`:'';
+        segs+=`<div class="atm-seg" title="${escHtml((ATM_ST_LABEL[x.st]||x.st)+' '+atmHm(x.s)+' → '+atmHm(x.e)+(x.open?' (still running)':''))}" style="left:${p(x.s)}%;width:${wpct}%;background:${c}">${lbl}</div>`;
     });
     (D.inshift_gaps||[]).forEach(x=>{
         gaps+=`<div class="atm-gap" title="${escHtml('Offline in shift '+atmHm(x.s)+' → '+atmHm(x.e)+' ('+x.min+' min)')}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%"></div>`;
@@ -24219,6 +24263,87 @@ function atmRender(){
     if(!host) return;
     if(!agents.length){ host.innerHTML=`<div class="atm-empty">No agents${q?' matching “'+escHtml(q)+'”':''} on the roster for this range.</div>`; return; }
     host.innerHTML=agents.map(a=>atmAgentCard(a)).join('');
+}
+/* Phase 61 (Ahmed: "can this be given as a report to a manager?"): one click
+   copies a clean, paste-ready text report of the visible range -- respects the
+   agent search filter, WhatsApp/Lark-friendly plain text, per-day detail plus
+   team totals and the warnings list. */
+function atmCopyReport(btn){
+    if(!atmData) return;
+    const q=((document.getElementById('atmSearch')||{}).value||'').trim().toLowerCase();
+    const agents=(atmData.agents||[]).filter(a=>!q||(a.name||'').toLowerCase().includes(q)||(a.email||'').includes(q));
+    if(!agents.length) return;
+    const days=atmData.days||[];
+    const rangeLbl=((document.getElementById('atmRangeLabel')||{}).textContent||'').replace(/\s+/g,' ').trim();
+    const flagTxt={late:'late',gap:'offline gap',missing:'missing',early:'left early',no_show:'absent'};
+    const L=[];
+    L.push('📊 ATTENDANCE REPORT — '+rangeLbl);
+    L.push('Generated '+new Date().toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+agents.length+' agent'+(agents.length===1?'':'s'));
+    L.push('');
+    const team={wd:0,wm:0,off:0,late:0,gap:0,miss:0,abs:0,early:0};
+    agents.forEach(a=>{
+        const S=a.summary||{};
+        team.wd+=S.worked_days||0; team.wm+=S.worked_min||0; team.off+=S.off_days||0;
+        team.late+=S.late_days||0; team.gap+=S.gap_min||0; team.miss+=S.missing_min||0;
+        team.abs+=S.no_show||0; team.early+=S.early_min||0;
+        L.push('👤 '+a.name+(a.email?' ('+a.email+')':''));
+        const parts=['✅ Worked '+(S.worked_days||0)+'d · '+atmMinLabel(S.worked_min||0)];
+        if(S.worked_days) parts.push('📊 Avg '+atmMinLabel(S.avg_day_min!=null?S.avg_day_min:Math.round((S.avg_day_h||0)*60))+'/d');
+        if(S.off_days) parts.push('📆 Off '+S.off_days+'d');
+        if(S.late_days) parts.push('⏰ Late '+S.late_days+'d ('+atmMinLabel(S.late_min)+')');
+        if(S.gap_min) parts.push('🔴 Offline gaps '+atmMinLabel(S.gap_min));
+        if(S.missing_min) parts.push('⚠️ Missing '+atmMinLabel(S.missing_min));
+        if(S.no_show) parts.push('🚫 Absent '+S.no_show+'d');
+        if(S.early_min) parts.push('↩ Left early '+atmMinLabel(S.early_min));
+        L.push('   '+parts.join(' · '));
+        days.forEach(ds=>{
+            const D=(a.days||{})[String(ds)];
+            if(!D||D.future) return;
+            const shift=D.shift?(D.shift.type+(D.shift.start?' '+D.shift.start+'→'+(D.shift.end||''):'')):'—';
+            let line='   • '+schDayLabel(+ds)+' — '+shift;
+            if(D.worked_min>0){
+                line+=' · worked '+atmMinLabel(D.worked_min);
+                const sub=[];
+                if(D.ontask_min>0) sub.push('on task '+atmMinLabel(D.ontask_min));
+                if(D.ticket_min>0) sub.push('ticket '+atmMinLabel(D.ticket_min));
+                if(D.break_min>0) sub.push('break '+atmMinLabel(D.break_min));
+                if(D.meeting_min>0) sub.push('meeting '+atmMinLabel(D.meeting_min));
+                if(sub.length) line+=' ('+sub.join(', ')+')';
+                if(D.first!=null) line+=' · '+atmHm(D.first)+' → '+(D.last!=null?atmHm(D.last):'now');
+            }else if((D.flags||[]).includes('no_show')){
+                line+=' · 🚫 ABSENT — never signed in';
+            }
+            const fl=(D.flags||[]).filter(f=>f!=='no_show').map(f=>flagTxt[f]?flagTxt[f]+' '+atmMinLabel(D[f+'_min']||0):f);
+            if(fl.length) line+='  ['+fl.join('; ')+']';
+            L.push(line);
+        });
+        L.push('');
+    });
+    if(agents.length>1){
+        L.push('🏢 TEAM TOTAL — worked '+team.wd+'d · '+atmMinLabel(team.wm)+' · off '+team.off+'d'
+            +(team.late?' · late '+team.late+'d':'')+(team.gap?' · gaps '+atmMinLabel(team.gap):'')
+            +(team.miss?' · missing '+atmMinLabel(team.miss):'')+(team.abs?' · absent '+team.abs+'d':'')
+            +(team.early?' · early '+atmMinLabel(team.early):''));
+        L.push('');
+    }
+    const names=new Set(agents.map(a=>a.name));
+    const ws=(atmData.warnings||[]).filter(w=>names.has(w.agent));
+    if(ws.length){
+        L.push('🚨 WARNINGS ('+ws.length+')');
+        ws.forEach(w=>L.push('   • '+schDayLabel(w.day)+' — '+w.agent+': '+w.detail));
+    }
+    const txt=L.join('\n');
+    const done=()=>{ if(btn){ const o=btn.innerHTML; btn.innerHTML='✅ Copied!'; setTimeout(()=>{ btn.innerHTML=o; },1600); } };
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(done).catch(()=>{ atmCopyFallback(txt); done(); });
+    }else{ atmCopyFallback(txt); done(); }
+}
+function atmCopyFallback(txt){
+    const ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    ta.remove();
 }
 
 </script>
