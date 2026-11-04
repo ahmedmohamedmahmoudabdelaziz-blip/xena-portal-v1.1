@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
+<script>window.__sdeb=function(f,ms){var t=0;return function(){if(t)return;t=setTimeout(function(){t=0;try{f()}catch(e){console.error(e)}},ms||120)}};</script>
 <script>try{const t=localStorage.getItem('xenaTheme');document.documentElement.dataset.theme=['light','dark'].includes(t)?t:(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}catch(e){}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audition Dashboard</title>
@@ -2597,7 +2598,7 @@ option{background:var(--surface);color:var(--text)}
 <style id="samurai-mobile-v7">
 /* Samurai mobile layout v7. All desktop rules and business handlers are retained. */
 .samurai-mobile-only,.samurai-mobile-glyph{display:none}
-@media screen and (max-width:600px){
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
  html,body{width:100%;max-width:100%;overscroll-behavior-y:none}
  .app-shell{min-height:100dvh!important}
  .main-content{height:var(--samurai-vh,100dvh);min-width:0;max-width:100%;margin-left:0}
@@ -2677,7 +2678,7 @@ option{background:var(--surface);color:var(--text)}
   display: none;
 }
 
-@media screen and (max-width: 600px) {
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
   #twxDock,
   #awsDock,
   body.sidebar-collapsed #twxDock,
@@ -2835,7 +2836,7 @@ option{background:var(--surface);color:var(--text)}
 }
 </style>
 <style id="samurai-radial-v10-fix">
-@media screen and (max-width: 600px) {
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
 .samurai-radial-toggle {
 touch-action: manipulation;
 -webkit-tap-highlight-color: transparent;
@@ -2856,7 +2857,7 @@ bottom: 154px !important;
 </style>
 <style id="samurai-menu-panel">
 .samurai-menu{display:none}
-@media screen and (max-width:600px){
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
   .samurai-radial-disc{display:none!important}
   #twxDock .twx-fab,#awsDock .twx-fab,#twxDock .xena-transfer-fab,#awsDock .xena-transfer-fab,#twxDock.radial-open .twx-fab,#awsDock.radial-open .twx-fab{visibility:hidden!important;opacity:0!important;pointer-events:none!important;position:absolute!important}
   .samurai-menu{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:2147483000;min-width:230px;max-width:calc(100vw - 24px);max-height:60dvh;overflow:auto;padding:8px;border-radius:18px;background:rgba(255,255,255,.96);color:#1b1730;border:1px solid #d9ccff;box-shadow:0 14px 40px #1b173055;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform-origin:bottom right;transform:scale(.85);opacity:0;pointer-events:none;transition:transform .16s ease,opacity .16s ease}
@@ -2965,7 +2966,7 @@ bottom: 154px !important;
 .xea-line{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:rgba(var(--ink-rgb),.03);border:1px solid rgba(var(--ink-rgb),.06);font-size:.86rem;line-height:1.5}
 .xea-line .xea-ic{font-size:1.05rem;flex:none}
 @media(max-width:900px){.xea-grid{grid-template-columns:1fr}}
-@media(max-width:600px){
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
   .xg-agent,.xg-corner{flex-basis:132px}
   .xg-name{max-width:80px}
   .xg-rday{min-width:64px}
@@ -2995,7 +2996,7 @@ html{background:var(--bg);min-height:100%}
    matching the reference design (small round toggle, tap expands a slim vertical
    pill of icon buttons, drag the toggle up/down along the right edge).
    Additive layer: DOM, open/close logic and .samurai-menu mechanics untouched. */
-@media screen and (max-width:600px){
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
   /* 1) Draggable: dock bottom gains a JS-controlled lift variable */
   #twxDock,
   #awsDock,
@@ -3065,7 +3066,7 @@ html{background:var(--bg);min-height:100%}
   .samurai-menu-item .smi-ic svg{width:22px;height:22px;stroke:currentColor}
 }
 @media (prefers-reduced-motion:reduce){
-  @media screen and (max-width:600px){
+  @media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
     .samurai-menu,.samurai-menu-item{transition:none!important}
   }
 }
@@ -6858,8 +6859,13 @@ function buildDropzoneHtml(id, fieldName, required) {
              onpaste="dzHandlePaste(event,'${id}')">
             <div class="dz-hint">📎 Paste or drag files here</div>
             <div class="dz-upload-link">+ Upload local files</div>
+            <div class="dz-quick">
+                <button type="button" class="dz-qbtn" title="Take a photo with the camera" onclick="event.stopPropagation();document.getElementById('${id}_cam').click()">📷 Camera</button>
+                <button type="button" class="dz-qbtn" title="Paste an image from the clipboard" onclick="event.stopPropagation();dzPasteFromClipboard('${id}', this)">📋 Paste</button>
+            </div>
         </div>
         <input type="file" id="${id}" name="${escHtml(fieldName)}" ${required ? 'required' : ''} multiple style="display:none" onchange="dzOnNativeChange('${id}')">
+        <input type="file" id="${id}_cam" accept="image/*" capture="environment" style="display:none" onchange="dzOnCameraChange('${id}_cam','${id}')">
         <div class="dz-thumbs" id="${id}_thumbs"></div>`;
 }
 
@@ -7043,6 +7049,7 @@ function enhanceSelect(select) {
         document.removeEventListener('scroll', onScrollOrResize, true);
         window.removeEventListener('resize', onScrollOrResize);
     };
+    panel._ssClose = closePanel; // Phase 62: lets the mobile sheet swipe-down gesture reach this closure
     const openPanel = () => {
         if (select.disabled) return;
         ssRenderOptions(select, optList, '', () => { ssSyncDisplay(select, displayText); closePanel(); });
@@ -7062,7 +7069,7 @@ function enhanceSelect(select) {
         }));
         document.addEventListener('scroll', onScrollOrResize, true);
         window.addEventListener('resize', onScrollOrResize);
-        if (!matchMedia('(max-width:600px)').matches) setTimeout(() => searchInput.focus(), 10);
+        if (!matchMedia('(max-width:600px), (pointer:coarse) and (max-width:1100px)').matches) setTimeout(() => searchInput.focus(), 10);
     };
 
     display.addEventListener('click', () => {
@@ -14666,6 +14673,7 @@ function ltRenderQueue() {
             <div class="ltq-card-top">
                 <span class="ltq-card-type">${escHtml(type)}</span>
                 <span class="ltq-card-num">${escHtml(num)}</span>
+                <button type="button" class="ltq-copy" title="Copy ticket number" onclick="event.stopPropagation();samCopyText('${escHtml(num)}', this)">⧉</button>
             </div>
             <div class="ltq-card-main">${escHtml(main)}</div>
             <div class="ltq-card-sub">👤 ${escHtml(t.assigned_member || 'Unassigned')}</div>
@@ -16165,16 +16173,19 @@ function twRenderHeadMeta(ticket) {
       minus Rejected Ids. Unresolvable placeholders are kept as-is for manual typing. */
 
 const TW_QUICK_NOTES = {
-    'remove bd': ['waiting for approval', 'removed'],
+    'remove bd': ['waiting for approval', 'removed', 'rejected'],
     'add room border': ['added', 'not qualified'],
     'room pinup (only for the famous kols)': ['pinned for ......', 'not enough target or days for current month', 'not a kol', 'new kol pls send a ss from user side'],
     'app rating reward': ['added', 'already took it before', 'duplicated screenshot, another user already got the reward with this screen'],
     'welcome package': ['added', 'already took it before', 'old user and level above 25 already'],
     'add & remove games': ['added', 'removed', 'not in the blacklist check with the bug group', 'not in the blacklist and the level is under 25 apply for welcome package'],
     'add & remove host sign': ['added', 'removed', 'wallet balance is not 0', 'active host', 'duplicated request already removed'],
-    'change agency name': ['changed', 'duplicated agency name ask him to choose another one'],
+    'change agency name': ['changed', 'duplicated agency name ask him to choose another one', 'choose another agency name as it must not exceed 20 characters'],
     'agency target privilege': ['added', 'unqualified only achieved ( BASE POINTS )', 'added for all except ( Rejected Ids ) as not host in the same agency and no evidence provided', 'not host in the same agency and no evidence provided', 'added for ( User ID ) except ( Rejected Ids ) as already took it before', 'not enough target already got all avaliable dynamic', 'elgible for only ( Remaining ) pls confirm with him which IDs he want to add', 'duplicated already added before'],
     'agency creation': ['( Reject Reason )'],
+    'agency point request': ['not enough points has only ( Point Balance ) point', 'already got 10 trend card this month and reached the limit cannot take again', 'not agency under you pls ask him to contact the agency cs or his acm', 'not host in the same agency and no evidence provided'],
+    'bd creation': ['created and agencies linked under him', "not qualified to be a BD didn't achieve 10M target", 'host account cannot be a BD', 'he is agency manager with different NID so we cannot proceed with this one', 'same person with agency .... please warn him and ask him to hunt agencies from outside the app'],
+    'closing agency': ['agency closed', 'wallet balance is not 0', 'sub agency will be closed next month', 'host transferred to the new agency no need to take action', 'host sign removed no need to take action', 'invalid, not the same person', 'report recalled , no need to take action'],
 };
 let twQuickNotesCurrent = [];
 
@@ -16232,8 +16243,15 @@ function twResolveQuickNote(tpl, fields) {
         // Phase 59: the REMAINING stat from the live Formula card (the count),
         // NOT the IDs list -- "how many remaining id that appear in the chip".
         'remaining': () => twFormulaRemaining(),
+        // Phase 62: the live Point Balance formula chip (read-only, so it comes
+        // from the ticket snapshot -- it can't change while the form is open).
+        'point balance': () => {
+            const raw = feishuValueToString(fields['Point Balance']);
+            const n = parseFloat(String(raw).replace(/[^\d.\-]/g, ''));
+            return Number.isFinite(n) ? n.toLocaleString('en-US') : (raw || null);
+        },
     };
-    return String(tpl).replace(/\(\s*(BASE POINTS|Rejected Ids|User ID|Reject Reason|Remaining)\s*\)/gi, (m, name) => {
+    return String(tpl).replace(/\(\s*(BASE POINTS|Rejected Ids|User ID|Reject Reason|Remaining|Point Balance)\s*\)/gi, (m, name) => {
         const fn = resolvers[String(name).trim().toLowerCase()];
         const v = fn ? fn() : null;
         return (v === null || v === '' || v === undefined) ? m : v;
@@ -16247,11 +16265,27 @@ function twRenderQuickNotes(type) {
     twQuickNotesCurrent = notes;
     box.classList.remove('open');
     if (!notes.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-    // Phase 60b (Ahmed): ONE elegant button + a clean dropdown menu with
-    // full-text rows -- no more wall of cramped chips.
+    // Phase 62 (Ahmed, 2026-11-05): sentiment-colored rows (rose = blocked /
+    // rejected, green = done, amber = needs action), the request type in the
+    // menu head, a live filter when the list is long, CAPS ( Placeholder )
+    // tokens drawn as chips, and a staggered open animation. Picking a note
+    // still resolves placeholders from the LIVE form (twPickQuickNote).
     box.style.display = 'block';
+    const typeLabel = String(type || '').trim();
+    const filterHtml = notes.length >= 5
+        ? `<div class="qn-filter"><input type="text" class="qn-filter-input" placeholder="Filter notes…" onclick="event.stopPropagation()" oninput="twQuickNotesFilter(this.value)"></div>`
+        : '';
     box.innerHTML = `<button type="button" class="tw-aud-quick-toggle" onclick="twQuickNotesToggle(event)" title="Preset notes for this request type — one click fills the note, still editable"><span class="qn-ico">⚡</span><span class="qn-label">Quick notes</span><span class="cnt">${notes.length}</span><span class="chev">▾</span></button>
-      <div class="tw-aud-quick-menu"><div class="qn-menu-head">✨ Tap a note to fill — you can still edit it</div>${notes.map((n, i) => `<button type="button" class="tw-aud-quick-item" onclick="twPickQuickNote(${i})"><span class="qn-num">${i + 1}</span><span class="qn-txt">${escHtml(n)}</span></button>`).join('')}</div>`;
+      <div class="tw-aud-quick-menu"><div class="qn-menu-head"><span class="qn-head-ico">✨</span><span class="qn-head-type">${escHtml(typeLabel)}</span><span class="qn-head-cnt">${notes.length}</span></div>${filterHtml}<div class="qn-items">${notes.map((n, i) => `<button type="button" class="tw-aud-quick-item qn-${twQuickNoteMood(n)}" data-idx="${i}" style="--qn-i:${i}" onclick="twPickQuickNote(${i})"><span class="qn-num">${i + 1}</span><span class="qn-txt">${twQuickNoteDecor(escHtml(n))}</span></button>`).join('')}</div></div>`;
+}
+
+function twQuickNotesFilter(q) {
+    const box = document.getElementById('twAudQuick');
+    if (!box) return;
+    const needle = String(q || '').trim().toLowerCase();
+    box.querySelectorAll('.tw-aud-quick-item').forEach(el => {
+        el.style.display = (!needle || el.textContent.toLowerCase().includes(needle)) ? '' : 'none';
+    });
 }
 
 function twQuickNotesToggle(ev) {
@@ -17136,12 +17170,16 @@ async function twSubmitNewTicket() {
     const filed = await twSubmitNewTicketCore();
     if (filed && filed.record_id) {
         ToastManager.show('Request successfully submitted to Feishu!', 'success');
+        try { samVibrate('ok'); } catch (e) {}
+        try { if (twCreateMode) samSaveLastChoice(); } catch (e) {}
         xdClearPrefix('wsCreate:'); // Phase 10.44: the draft is filed -- stop restoring it
         if (filed.created_via && String(filed.created_via).startsWith('tenant_token')) {
             ToastManager.show('Note: this ticket was filed under the app identity, not yours. Please log out and log in again so future tickets show your name.', 'warning', 12000);
         }
         twResetNote(true);
         twCloseWorkspace(); // resets create mode + returns to the queue
+    } else {
+        try { samVibrate('err'); } catch (e) {}
     }
     btns.forEach(b => { b.disabled = false; b.textContent = twCreateMode ? '🚀 Submit Request' : '💾 Save & Resolve'; });
 }
@@ -17448,6 +17486,7 @@ function lightboxRenderExtractResult(result) {
     }
     body.innerHTML = `
         <pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.82rem;color:var(--text-primary,#e8eaf0);margin:0;padding:6px 14px 10px;flex:1;min-height:0;overflow:auto;">${escHtml(result.text)}</pre>
+        ${samOcrLinesHtml(result.text)}
         <button type="button" onclick="lightboxCopyExtractedText()" style="margin:0 14px 12px;padding:5px 12px;font-size:.78rem;border-radius:6px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,var(--accent-cyan));cursor:pointer;flex:none;">📋 Copy text</button>`;
 }
 
@@ -18353,7 +18392,7 @@ function createTwControl(key, value) {
         // Phase 10.2: "User ID" also renders in the Dynamic Request Section --
         // data-mirror keeps the two boxes in lockstep.
         const mirrorAttr = key === 'User ID' ? ' data-mirror="User ID"' : '';
-        wrap.innerHTML = label + `<textarea name="${escHtml(key)}"${mirrorAttr} class="form-highlight-input tw-txt-auto" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
+        wrap.innerHTML = label + `<textarea name="${escHtml(key)}"${mirrorAttr}${twInputModeAttr(key)} class="form-highlight-input tw-txt-auto" rows="4" style="resize:vertical;font-family:inherit;">${escHtml(valStr)}</textarea>`;
         requestAnimationFrame(() => twAutoGrowAll(wrap)); // Phase 10.13.2: fit the content on render, not only on typing
         return wrap;
     }
@@ -18371,7 +18410,7 @@ function createTwControl(key, value) {
         wrap.innerHTML = label + `<input type="text" name="${escHtml(key)}" value="${escHtml(valStr)}" class="form-highlight-input" readonly style="opacity:.7;cursor:not-allowed;">`;
         return wrap;
     }
-    wrap.innerHTML = label + `<textarea name="${escHtml(key)}" rows="1" class="form-highlight-input tw-txt-auto">${escHtml(valStr)}</textarea>`;
+    wrap.innerHTML = label + `<textarea name="${escHtml(key)}"${twInputModeAttr(key)} rows="1" class="form-highlight-input tw-txt-auto">${escHtml(valStr)}</textarea>`;
     requestAnimationFrame(() => twAutoGrowAll(wrap)); // Phase 10.13.2: fit the content on render, not only on typing
     return wrap;
 }
@@ -18763,9 +18802,11 @@ async function twSaveWorkspace() {
         ltQueue = ltQueue.filter(t => (t.record_id||t.id) !== rid);
 
         twCloseWorkspace();
+        try { samVibrate('ok'); } catch (e) {}
         return true; // Phase 26: tell the save-state wrapper this save landed
     } catch (e) {
         ToastManager.show('Failed to save: ' + e.message, e.isUploadAbort ? 'warning' : 'error', e.isUploadAbort ? 9000 : 5000);
+        try { samVibrate('err'); } catch (e) {}
         return false; // Phase 26: save-state wrapper shows Failed, not Saved
     } finally {
         btns.forEach(b => { b.disabled = false; b.textContent = '💾 Save & Resolve'; });
@@ -24368,7 +24409,7 @@ function atmCopyFallback(txt){
 <script id="samurai-mobile-ui-v7">
 /* Presentation-only mobile controls: reuse original inputs, links and handlers. */
 (()=>{
- const mobile=window.matchMedia('(max-width:600px)');
+ const mobile=window.matchMedia('(max-width:600px), (pointer:coarse) and (max-width:1100px)');
  function init(){
   const wrap=document.getElementById('glsWrap'),input=document.getElementById('glsInput'),bar=document.querySelector('.page-top-bar'),right=document.querySelector('.top-bar-right');
   if(!wrap||!input||!bar||!right)return;
@@ -24402,7 +24443,7 @@ function atmCopyFallback(txt){
   const viewport=document.querySelector('meta[name="viewport"]');
   if(viewport)viewport.content='width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=4, user-scalable=yes';
   const style=document.createElement('style');
-  style.textContent=`@media(max-width:600px){
+  style.textContent=`@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
     .ss-panel{border-radius:14px!important;box-shadow:0 8px 32px #0004!important}
     .ss-option{min-height:42px;display:flex;align-items:center;padding:8px 12px!important}
     .ss-search,.pp-filter,.rr-filter{font-size:16px!important;min-height:42px}
@@ -24433,7 +24474,7 @@ function atmCopyFallback(txt){
   },true);
   // Lists that open with a search box start in "no keyboard" mode; tapping
   // the box itself brings the keyboard up.
-  new MutationObserver(()=>{if(mobile())document.querySelectorAll(SEARCH).forEach(i=>{if(document.activeElement!==i){i.readOnly=true;i.setAttribute('inputmode','none');}});}).observe(document.body,{childList:true,subtree:true});
+  new MutationObserver(__sdeb(()=>{if(mobile())document.querySelectorAll(SEARCH).forEach(i=>{if(document.activeElement!==i){i.readOnly=true;i.setAttribute('inputmode','none');}});},200)).observe(document.body,{childList:true,subtree:true});
   const selector='#twxDock,#awsDock';
   const docks=()=>document.querySelectorAll(selector);
   const close=d=>{d.classList.remove('radial-open');const b=d.querySelector('.samurai-radial-toggle');if(b){b.setAttribute('aria-expanded','false');b.setAttribute('aria-label','Open workspace actions');}};
@@ -24457,7 +24498,7 @@ function atmCopyFallback(txt){
     else if(e.target.closest('.twx-fab'))setTimeout(()=>close(d),0);
   },true);
   window.addEventListener('keydown',e=>{if(e.key==='Escape')docks().forEach(close);});
-  matchMedia('(max-width:600px)').addEventListener?.('change',()=>docks().forEach(close));
+  matchMedia('(max-width:600px), (pointer:coarse) and (max-width:1100px)').addEventListener?.('change',()=>docks().forEach(close));
   function label(f){
     const t=(f.getAttribute('title')||f.getAttribute('aria-label')||'').split(/\s[—–-]\s/)[0].trim();
     return t||'Action';
@@ -24480,11 +24521,11 @@ function atmCopyFallback(txt){
     });
   }
   function syncMenus(){docks().forEach(d=>{if(!d._smenu)return;const on=d.classList.contains('radial-open')&&mobile();d._smenu.classList.toggle('open',on);if(on){const t=d.querySelector('.samurai-radial-toggle');if(t){const r=t.getBoundingClientRect();d._smenu.style.bottom=Math.max(8,innerHeight-r.top+10)+'px';}}});}
-  new MutationObserver(syncMenus).observe(document.body,{attributes:true,subtree:true,attributeFilter:['class']});
+  new MutationObserver(__sdeb(syncMenus,80)).observe(document.body,{attributes:true,subtree:true,attributeFilter:['class']});
   document.addEventListener('pointerdown',e=>{if(e.target.closest&&!e.target.closest('.samurai-menu,.samurai-radial-toggle')){docks().forEach(close);syncMenus();}},true);
   const prepare0=prepare;
   prepare=function(){prepare0();docks().forEach(buildMenu);syncMenus();};
-  prepare();new MutationObserver(prepare).observe(document.body,{childList:true,subtree:true});
+  prepare();new MutationObserver(__sdeb(function(){prepare();},60)).observe(document.body,{childList:true,subtree:true});
 })();
 
 </script>
@@ -25081,7 +25122,7 @@ setInterval(function () {
 (function () {
 'use strict';
 var LIFT_KEY = 'x49dockLift';
-function mobile() { return window.matchMedia('(max-width:600px)').matches; }
+function mobile() { return window.matchMedia('(max-width:600px), (pointer:coarse) and (max-width:1100px)').matches; }
 function docks() { return document.querySelectorAll('#twxDock,#awsDock'); }
 function getLift() {
   try { return Math.max(0, parseInt(localStorage.getItem(LIFT_KEY) || '0', 10) || 0); }
@@ -25179,7 +25220,7 @@ function armAll() {
 setLift(getLift(), false);
 armAll();
 enhanceIcons();
-new MutationObserver(function () { armAll(); enhanceIcons(); }).observe(document.body, { childList: true, subtree: true });
+new MutationObserver(__sdeb(function () { armAll(); enhanceIcons(); },150)).observe(document.body, { childList: true, subtree: true });
 window.addEventListener('resize', function () {
   if (getLift() > maxLift()) setLift(maxLift(), true);
   repositionMenus();
@@ -25187,5 +25228,662 @@ window.addEventListener('resize', function () {
 })();
 
 </script>
+<style id="samurai-mobile-v14">
+/* Samurai mobile v14 (additive): tablet = mobile, keyboard-aware lightbox + scratch note, slim duplicate banner, lighter rendering on touch devices. */
+@media (pointer:coarse){
+ #mainApp{position:relative;overflow-x:clip}
+ @supports not (overflow-x:clip){#mainApp{overflow-x:hidden}}
+ *{-webkit-tap-highlight-color:transparent}
+ button,[role=button],a,select,summary,label,.tab-item,.twx-fab,.ss-option{touch-action:manipulation}
+ *,*::before,*::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+ #loginOverlay .login-aurora,#loginOverlay .login-orb,#loginOverlay .login-dot,.login-card::before,.login-card .brand-mark-wrap::before,.twx-topbar::before{animation:none!important}
+ #loginOverlay .login-orb,.sam-grain{display:none!important}
+ .img-lightbox-overlay{background:rgba(8,6,14,.96)!important}
+}
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
+ /* 16px fields: no zoom-on-focus jump, easier typing */
+ #tw-form input:not([type=checkbox]):not([type=radio]),#tw-form textarea,#tw-form select,.page-content-wrapper textarea{font-size:16px!important}
+ /* duplicate banner: one slim line when clean, tap to expand */
+ #twRadarMsg.samurai-slim,#awsRadarMsg.samurai-slim{max-height:40px!important;overflow:hidden!important;white-space:nowrap;text-overflow:ellipsis;padding-top:8px!important;padding-bottom:8px!important}
+ #twRadarMsg.samurai-slim.samurai-expanded,#awsRadarMsg.samurai-slim.samurai-expanded{max-height:24dvh!important;white-space:normal}
+ body.samurai-kb #twRadarMsg.samurai-slim,body.samurai-kb #awsRadarMsg.samurai-slim{display:none!important}
+ /* while typing: free the space the keyboard and the floating dock fight over */
+ body.samurai-kb #twxDock,body.samurai-kb #awsDock,body.samurai-kb .drf-badge{display:none!important}
+ body.samurai-kb .page-content-wrapper{padding-bottom:12px!important}
+ .twn-foot{display:none!important}
+ body.samurai-kb #twNotePop,body:has(.img-lightbox-overlay.active) #twNotePop{bottom:8px!important}
+ body.samurai-kb #twNoteText,body:has(.img-lightbox-overlay.active) #twNoteText{min-height:56px!important;flex:1 1 auto;resize:none}
+ #twNotePop.open{max-height:min(46dvh,340px)!important}
+ body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(32dvh,176px)!important}
+ /* picture + extracted text + note share the screen instead of stacking on each other */
+ .img-lightbox-overlay{--lbpanel:0px;--lbnote:0px;--lbh:calc(100dvh - 56px - var(--lbpanel) - var(--lbnote) - 14px);justify-content:flex-start!important;padding-top:52px;box-sizing:border-box}
+ .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(26dvh,200px)}
+ body:has(#twNotePop.open) .img-lightbox-overlay{--lbnote:min(32dvh,176px)}
+ .img-lightbox-main{flex-direction:column!important;gap:6px!important;padding:0 6px!important;align-items:stretch!important}
+ .img-lightbox-stage{height:var(--lbh)!important;flex:none!important;width:100%!important;min-height:90px}
+ .img-lightbox-canvas img{max-width:calc(100vw - 12px)!important;max-height:var(--lbh)!important}
+ .img-lightbox-extract-panel{flex:none!important;width:100%!important;max-width:100%!important;max-height:var(--lbpanel)!important;align-self:stretch!important}
+ .img-lightbox-hint{display:none!important}
+ .img-lightbox-toolbar{flex-wrap:nowrap!important;left:52px;right:6px;top:6px!important;max-width:none!important;overflow-x:auto;justify-content:flex-start;gap:4px!important;scrollbar-width:none}
+ .img-lightbox-toolbar button{flex:none;width:34px!important;height:34px!important}
+}
+
+</style>
+<script id="samurai-mobile-v14-js">
+(()=>{
+ if(window.__samuraiV14)return;window.__samuraiV14=true;
+ const coarse=matchMedia('(pointer:coarse)').matches;
+ const vv=window.visualViewport;
+ let base=0;
+ const typingEl=()=>{const a=document.activeElement;return !!a&&(/^(INPUT|TEXTAREA)$/.test(a.tagName)||a.isContentEditable)&&!(a.type&&/^(checkbox|radio|button|submit|file)$/.test(a.type));};
+ function kb(){
+  const h=vv?vv.height:innerHeight,t=typingEl();
+  if(!t)base=h;else base=Math.max(base,h);
+  document.body.classList.toggle('samurai-kb',t&&base-h>140);
+ }
+ window.__samuraiKb=()=>({base,h:vv?vv.height:innerHeight,typing:typingEl()});
+ let raf=0;const kbSoon=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;kb();});};
+ (vv||window).addEventListener('resize',kbSoon);
+ addEventListener('orientationchange',()=>{base=0;setTimeout(kb,400);});
+ document.addEventListener('focusin',e=>{
+  kb();
+  const t=e.target;
+  if(coarse&&t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)&&!t.closest('#twNotePop,.img-lightbox-overlay'))setTimeout(()=>{try{
+   const r=t.getBoundingClientRect(),h=vv?vv.height:innerHeight;
+   if(r.bottom>h-24||r.top<56)t.scrollIntoView({block:'center',behavior:'smooth'});
+  }catch(_){}},380);
+ });
+ document.addEventListener('focusout',()=>setTimeout(kb,160));
+ // clean duplicate banner -> one slim line
+ function slim(m){
+  const open=m.classList.contains('open');
+  const clean=open&&m.querySelector('.aws-dup-clean')&&!m.querySelector('.aws-dup-hit,.aws-dup-detail,.aws-dup-verdict');
+  if(m.classList.contains('samurai-slim')!==!!clean)m.classList.toggle('samurai-slim',!!clean);
+  if(!clean&&m.classList.contains('samurai-expanded'))m.classList.remove('samurai-expanded');
+ }
+ ['twRadarMsg','awsRadarMsg'].forEach(id=>{
+  const m=document.getElementById(id);if(!m)return;
+  new MutationObserver(()=>slim(m)).observe(m,{childList:true,attributes:true,attributeFilter:['class']});
+  m.addEventListener('click',e=>{if(m.classList.contains('samurai-slim')&&!e.target.closest('.twx-radar-msg-x'))m.classList.toggle('samurai-expanded');},true);
+  slim(m);
+ });
+ // overflow guard: if some wide element ever shrinks the whole page (black strip), force 1:1 again and say which element did it
+ let warned=false;
+ function guard(){
+  if(!coarse)return;
+  const shell=document.getElementById('mainApp');
+  if(!shell||!shell.offsetWidth)return;
+  if(innerWidth-shell.offsetWidth>8&&!(vv&&vv.scale>1.01)){
+   const m=document.querySelector('meta[name="viewport"]');
+   if(m&&!/minimum-scale=1(,|$)/.test(m.content))m.content='width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=4, user-scalable=yes';
+   if(!warned){warned=true;const W=shell.offsetWidth,bad=[];
+    for(const e of shell.querySelectorAll('*')){const cs=getComputedStyle(e);if(cs.position==='fixed'||cs.display==='none')continue;const r=e.getBoundingClientRect();if(r.width&&r.right>W+4){bad.push((e.id?'#'+e.id:'')+'.'+String(e.className).slice(0,30));if(bad.length>=5)break;}}
+    console.warn('[samurai] page was wider than the screen; offenders:',bad.join(' | '));}
+  }
+ }
+ addEventListener('resize',__sdeb(guard,200));
+ setTimeout(guard,800);setTimeout(guard,3000);setInterval(()=>{if(!document.hidden)guard();},4000);
+})();
+
+</script>
+
+<style id="samurai-mobile-v15">
+/* ═══ Samurai v15 / Phase 62 (Ahmed, 2026-11-05) ═══
+   Quick-note menu polish + mobile workflow upgrades: floating submit pill,
+   Next-field bar, use-last chip, bottom sheets, pull-to-refresh, card copy,
+   dropzone camera/paste, OCR tap-to-insert. */
+
+/* ── Quick notes: sentiment-colored rows ── */
+.tw-aud-quick-item{--qn-acc:#f5b14d;}
+.tw-aud-quick-item.qn-pos{--qn-acc:#34e29a;}
+.tw-aud-quick-item.qn-neg{--qn-acc:#ff6b81;}
+.tw-aud-quick-item .qn-num{color:var(--qn-acc);background:color-mix(in srgb,var(--qn-acc) 13%,transparent);border-color:color-mix(in srgb,var(--qn-acc) 34%,transparent);}
+.tw-aud-quick-item::before{background:var(--qn-acc);opacity:.42;}
+.tw-aud-quick-item:hover::before{opacity:1;}
+.qn-ph{display:inline-block;padding:0 7px;margin:0 1px;border-radius:6px;font-size:.92em;font-weight:700;background:rgba(0,212,255,.13);border:1px dashed rgba(0,212,255,.45);color:#8fe6ff;white-space:nowrap;}
+[data-theme="light"] .qn-ph{color:#0369a1;background:rgba(2,132,199,.10);border-color:rgba(2,132,199,.4);}
+.qn-head-type{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none;letter-spacing:.2px;}
+.qn-head-cnt{flex:none;margin-left:auto;background:rgba(0,212,255,.14);border:1px solid rgba(0,212,255,.3);color:#9be9ff;border-radius:999px;padding:0 8px;font-size:10px;font-weight:800;line-height:16px;}
+.qn-filter{padding:0 2px 8px;}
+.qn-filter-input{width:100%;box-sizing:border-box;padding:7px 11px;border-radius:10px;border:1px solid rgba(0,212,255,.25);background:rgba(0,0,0,.25);color:var(--text);font-size:12px;outline:none;font-family:inherit;}
+.qn-filter-input:focus{border-color:var(--accent-cyan);box-shadow:0 0 0 2px rgba(0,212,255,.15);}
+[data-theme="light"] .qn-filter-input{background:#f4f8ff;}
+.tw-aud-quick.open .tw-aud-quick-item{animation:qnItemIn .28s ease both;animation-delay:calc(var(--qn-i,0)*28ms);}
+@keyframes qnItemIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.tw-aud-quick-toggle .qn-ico{animation:qnBoltPulse 3.2s ease-in-out infinite;}
+@keyframes qnBoltPulse{0%,88%,100%{box-shadow:0 0 10px rgba(0,212,255,.55),0 1px 0 rgba(255,255,255,.35) inset}94%{box-shadow:0 0 20px rgba(0,212,255,.95),0 1px 0 rgba(255,255,255,.35) inset}}
+@media (prefers-reduced-motion: reduce){.tw-aud-quick-toggle .qn-ico,.tw-aud-quick.open .tw-aud-quick-item{animation:none!important}}
+
+/* ── Queue card copy button ── */
+.ltq-copy{flex:none;align-self:center;margin-left:4px;padding:2px 7px;border-radius:8px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:#9be9ff;font-size:11px;cursor:pointer;transition:all .15s;line-height:1.4;}
+.ltq-copy:hover{background:rgba(0,212,255,.18);}
+.ltq-copy.copied{background:rgba(52,226,154,.2);border-color:rgba(52,226,154,.5);color:#34e29a;}
+
+/* ── Dropzone quick actions ── */
+.dz-quick{display:flex;gap:8px;justify-content:center;margin-top:6px;}
+.dz-qbtn{padding:5px 12px;border-radius:9px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.07);color:#9be9ff;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s;}
+.dz-qbtn:hover{background:rgba(0,212,255,.16);}
+[data-theme="light"] .dz-qbtn{color:#0369a1;border-color:rgba(2,132,199,.35);background:rgba(2,132,199,.07);}
+
+/* ── OCR tap-to-insert ── */
+.ocr-insert{margin:0 14px 8px;flex:none;border:1px solid rgba(0,212,255,.22);border-radius:10px;background:rgba(0,212,255,.05);overflow:hidden;}
+.ocr-insert>summary{padding:7px 11px;font-size:.75rem;font-weight:700;color:#9be9ff;cursor:pointer;list-style:none;user-select:none;}
+.ocr-insert>summary::before{content:'▸ ';}.ocr-insert[open]>summary::before{content:'▾ ';}
+.ocr-lines{max-height:180px;overflow-y:auto;padding:2px 6px 8px;}
+.ocr-line{display:flex;align-items:center;gap:6px;padding:4px 5px;border-radius:8px;font-size:.74rem;line-height:1.35;}
+.ocr-line:hover{background:rgba(0,212,255,.07);}
+.ocr-line-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.ocr-chips{flex:none;display:flex;gap:4px;}
+.ocr-chip{padding:2px 7px;border-radius:7px;border:1px solid rgba(168,85,247,.4);background:rgba(168,85,247,.1);color:#d8b4fe;font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+.ocr-chip:hover{background:rgba(168,85,247,.2);}
+.ocr-chip.done{border-color:rgba(52,226,154,.6);background:rgba(52,226,154,.15);color:#34e29a;}
+[data-theme="light"] .ocr-chip{color:#6d28d9;}
+
+/* ── Floating submit pill ── */
+.sam-go-submit{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:9500;display:none;align-items:center;gap:8px;padding:12px 20px;border-radius:999px;border:1px solid transparent;font-family:inherit;font-size:13.5px;font-weight:800;letter-spacing:.3px;color:#fff;cursor:pointer;background:linear-gradient(135deg,#0284c7,#7c3aed);box-shadow:0 10px 30px rgba(2,132,199,.45),0 2px 0 rgba(255,255,255,.18) inset;transition:transform .18s ease,opacity .18s ease;}
+.sam-go-submit.show{display:inline-flex;animation:samPillIn .25s cubic-bezier(.2,.9,.3,1.2);}
+.sam-go-submit:active{transform:scale(.95);}
+.sam-go-submit.warn{background:linear-gradient(135deg,#b45309,#dc2645);box-shadow:0 10px 30px rgba(220,80,80,.4);}
+@keyframes samPillIn{from{opacity:0;transform:translateY(14px) scale(.94)}to{opacity:1;transform:none}}
+body.samurai-kb .sam-go-submit{display:none!important;}
+.sam-miss-flash{animation:samMissFlash 1.5s ease;}
+@keyframes samMissFlash{0%,60%{box-shadow:0 0 0 3px rgba(255,107,129,.55)}100%{box-shadow:none}}
+.sam-pulse{animation:samSavePulse 1.5s ease;}
+@keyframes samSavePulse{0%,55%{box-shadow:0 0 0 5px rgba(0,212,255,.45)}100%{box-shadow:none}}
+
+/* ── Next-field bar (above mobile keyboard) ── */
+.sam-nextbar{position:fixed;right:10px;z-index:9600;display:none;gap:6px;padding:5px;border-radius:12px;background:rgba(13,21,38,.92);border:1px solid rgba(0,212,255,.3);box-shadow:0 8px 24px rgba(0,0,0,.45);}
+.sam-nextbar.show{display:flex;}
+.sam-nextbar button{padding:6px 13px;border-radius:9px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.1);color:#9be9ff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.sam-nextbar button:active{transform:scale(.95);}
+[data-theme="light"] .sam-nextbar{background:rgba(255,255,255,.95);}
+[data-theme="light"] .sam-nextbar button{color:#0369a1;}
+
+/* ── Use-last chip ── */
+.sam-last-chip{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 12px;border-radius:13px;border:1px dashed rgba(168,85,247,.5);background:linear-gradient(135deg,rgba(168,85,247,.10),rgba(0,212,255,.07));font-size:12px;color:var(--text);}
+.sam-last-chip .slc-ico{flex:none;color:#d8b4fe;}
+.sam-last-chip .slc-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sam-last-chip .slc-txt b{color:#d8b4fe;}
+.sam-last-chip .slc-apply{flex:none;padding:4px 12px;border-radius:8px;border:1px solid rgba(168,85,247,.55);background:rgba(168,85,247,.16);color:#d8b4fe;font-size:11px;font-weight:800;cursor:pointer;}
+.sam-last-chip .slc-x{flex:none;padding:2px 7px;border-radius:7px;border:0;background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px;}
+[data-theme="light"] .sam-last-chip .slc-txt b,[data-theme="light"] .sam-last-chip .slc-apply{color:#6d28d9;}
+
+/* ── Pull-to-refresh indicator ── */
+#ltPtr{height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:600;color:#7fdcff;transition:height .18s ease;}
+#ltPtr .ltp-ico{display:inline-block;transition:transform .18s ease;font-size:14px;}
+#ltPtr.ltp-ready .ltp-ico{transform:rotate(180deg);}
+#ltPtr.ltp-done{color:#34e29a;}
+
+/* ── Bottom sheets (mobile / tablet touch) ── */
+@keyframes samSheetUp{from{transform:translateY(48px);opacity:.4}to{transform:none;opacity:1}}
+@media (max-width:600px), (pointer:coarse) and (max-width:1100px){
+  .ss-panel.ss-portaled{position:fixed!important;left:8px!important;right:8px!important;width:auto!important;top:auto!important;bottom:0!important;max-height:min(52vh,430px)!important;border-radius:18px 18px 0 0!important;z-index:12000;box-shadow:0 -18px 50px rgba(0,0,0,.5)!important;animation:samSheetUp .22s ease;padding-top:4px;}
+  .ss-panel.ss-portaled::before{content:'';display:block;width:44px;height:5px;border-radius:3px;background:rgba(127,220,255,.35);margin:6px auto 2px;flex:none;}
+  .ss-panel.ss-portaled .ss-options{max-height:calc(min(52vh,430px) - 64px);}
+  body.samurai-kb .ss-panel.ss-portaled{max-height:34vh!important;}
+  body.samurai-kb .ss-panel.ss-portaled .ss-options{max-height:calc(34vh - 64px);}
+  .pp-all.pp-portaled{left:8px!important;right:8px!important;width:auto!important;top:auto!important;bottom:0!important;max-height:56vh!important;border-radius:18px 18px 0 0!important;box-shadow:0 -18px 50px rgba(0,0,0,.5)!important;animation:samSheetUp .22s ease;}
+  #twPreviewPanel{top:auto!important;left:8px!important;right:8px!important;bottom:0!important;width:auto!important;max-height:60vh!important;border-radius:18px 18px 0 0;transform:none;box-shadow:0 -18px 50px rgba(0,0,0,.55);}
+  #twPreviewPanel.open{animation:samSheetUp .22s ease!important;}
+}
+</style>
+
+
+<script id="samurai-mobile-v15-js">
+/* ═══ Samurai v15 / Phase 62 JS (Ahmed, 2026-11-05) ═══
+   Mobile workflow helpers: keyboard input modes, haptics, floating submit
+   pill, Next-field bar, use-last chip, bottom-sheet gestures, pull-to-refresh,
+   card copy, dropzone camera/paste, OCR tap-to-insert. */
+
+// ── Keyboard input modes (used by the control builder's textarea branches) ──
+// NID stays plain text on purpose: the numeric pad has no dash key.
+function twInputModeAttr(key) {
+    const NUM = new Set(['User ID', 'New ID', 'Old ID', 'Old ID (1)', 'Old ID (1) (1)', 'Reporter ID', 'Reporter ID (1)', 'Reporter ID (1) (1)', 'Possible BD ID', 'New agency owner ID', 'New Short ID', 'Agency Code', 'BD Hunted Agency Code']);
+    if (NUM.has(key)) return ' inputmode="numeric"';
+    if (key === 'Whatsapp Number') return ' inputmode="tel"';
+    if (key === 'Email Adress') return ' inputmode="email"';
+    return '';
+}
+
+// ── Quick-note helpers (used by the Phase 62 renderer) ──
+function twQuickNoteMood(n) {
+    const t = ' ' + String(n || '').toLowerCase() + ' ';
+    if (/ not |cannot|rejected|invalid|duplicated|unqualified|not enough|didn't|different nid|is not 0|no evidence|reached the limit|warn him/.test(t)) return 'neg';
+    if (/added|done|removed|closed|created|changed|pinned|transferred|no need|linked under|recalled/.test(t)) return 'pos';
+    return 'warn';
+}
+function twQuickNoteDecor(escaped) {
+    return escaped.replace(/\(\s*[A-Z][A-Za-z ]{2,28}?\s*\)/g, m => `<span class="qn-ph">${m}</span>`);
+}
+
+// ── Haptics: native APK hook first, web vibration as fallback ──
+function samVibrate(kind) {
+    try {
+        if (window.XenaAndroid && typeof window.XenaAndroid.vibrate === 'function') {
+            window.XenaAndroid.vibrate(kind); // native bridge (APK side)
+            return;
+        }
+        if (navigator.vibrate) navigator.vibrate(kind === 'err' ? [40, 60, 40] : 25);
+    } catch (e) {}
+}
+
+// ── Copy helper (clipboard API + legacy fallback + toast) ──
+async function samCopyText(text, btn) {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        ta.remove();
+    }
+    if (btn) { btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 1200); }
+    try { ToastManager.show('Copied ' + text, 'success', 1800); } catch (e) {}
+}
+
+// ── Dropzone camera capture + clipboard paste ──
+function dzOnCameraChange(camId, mainId) {
+    const input = document.getElementById(camId);
+    if (input && input.files && input.files.length) {
+        dzAddFiles(mainId, Array.from(input.files));
+        input.value = '';
+    }
+}
+async function dzPasteFromClipboard(id, btn) {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+        ToastManager.show('Clipboard read is not available here — tap the box and paste directly instead', 'warning', 4500);
+        return;
+    }
+    try {
+        const items = await navigator.clipboard.read();
+        const files = [];
+        for (const item of items) {
+            for (const type of item.types) {
+                if (type.startsWith('image/')) {
+                    const blob = await item.getType(type);
+                    files.push(new File([blob], 'pasted.' + (type.split('/')[1] || 'png'), { type }));
+                }
+            }
+        }
+        if (!files.length) { ToastManager.show('No image in the clipboard right now', 'info', 3000); return; }
+        dzAddFiles(id, files);
+    } catch (e) {
+        ToastManager.show('Clipboard permission denied — tap the box and paste directly instead', 'warning', 4500);
+    }
+}
+
+// ── OCR tap-to-insert lines (rendered into the lightbox extract panel) ──
+function samOcrLinesHtml(text) {
+    const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length >= 3).slice(0, 25);
+    const escAttr = (v) => escHtml(v).replace(/"/g, '&quot;');
+    const rowArr = lines.map(l => {
+        const hasNid = /\b\d{5}-\d{7}-\d\b|\b\d{13}\b/.test(l);
+        const hasNum = /\b\d{4,10}\b/.test(l);
+        const hasWord = /[A-Za-z]{3,}/.test(l);
+        let chips = '';
+        if (hasNid) chips += `<button type="button" class="ocr-chip" data-act="nid">→ NID</button>`;
+        if (hasNum && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="uid">→ User ID</button>`;
+        if (hasWord) chips += `<button type="button" class="ocr-chip" data-act="name">→ Name</button>`;
+        if (!chips) return '';
+        return `<div class="ocr-line" data-val="${escAttr(l)}"><span class="ocr-line-txt">${escHtml(l)}</span><span class="ocr-chips">${chips}</span></div>`;
+    }).filter(Boolean);
+    if (!rowArr.length) return '';
+    return `<details class="ocr-insert"><summary>👆 Tap-to-insert into the open form (${rowArr.length} lines)</summary><div class="ocr-lines">${rowArr.join('')}</div></details>`;
+}
+
+// ── Remember-last request choices (chip at the top of the create form) ──
+function samSaveLastChoice() {
+    const form = document.getElementById('tw-form');
+    if (!form) return;
+    const g = (n) => { const el = form.querySelector(`[name="${n}"]`); return el ? String(el.value || '') : ''; };
+    const region = g('Region'), type = g('Request Type');
+    if (!type) return;
+    const acmPK = g('Acm Name (PK)'), acmIN = g('Acm Name (IN)');
+    const acmField = acmPK ? 'Acm Name (PK)' : (acmIN ? 'Acm Name (IN)' : '');
+    try {
+        localStorage.setItem('samLastReqChoice', JSON.stringify({ region, type, acm: acmPK || acmIN || '', acmField, ts: Date.now() }));
+    } catch (e) {}
+}
+function samRenderLastChoiceChip() {
+    const old = document.getElementById('samLastChip');
+    if (old) old.remove();
+    if (!twCreateMode) return;
+    let c = null;
+    try { c = JSON.parse(localStorage.getItem('samLastReqChoice') || 'null'); } catch (e) {}
+    if (!c || !c.type) return;
+    const stack = document.getElementById('twCol1Stack');
+    if (!stack) return;
+    const parts = [c.region, c.type, c.acm].filter(Boolean);
+    const chip = document.createElement('div');
+    chip.id = 'samLastChip';
+    chip.className = 'sam-last-chip';
+    chip.innerHTML = `<span class="slc-ico">↩</span><span class="slc-txt" title="${escHtml(parts.join(' · '))}">Use last: <b>${escHtml(parts.join(' · '))}</b></span><button type="button" class="slc-apply">Apply</button><button type="button" class="slc-x" title="Dismiss">✕</button>`;
+    chip.querySelector('.slc-apply').onclick = () => samApplyLastChoice();
+    chip.querySelector('.slc-x').onclick = () => chip.remove();
+    stack.prepend(chip);
+}
+async function samApplyLastChoice() {
+    let c = null;
+    try { c = JSON.parse(localStorage.getItem('samLastReqChoice') || 'null'); } catch (e) {}
+    const form = document.getElementById('tw-form');
+    if (!c || !form) return;
+    const tick = (ms) => new Promise(r => setTimeout(r, ms || 70));
+    const setAndFire = (name, val) => {
+        const ok = twSetNamedControl(form, name, val);
+        if (ok) {
+            const el = form.querySelector(`[name="${name}"]`);
+            if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return ok;
+    };
+    const applied = [];
+    if (c.region && setAndFire('Region', c.region)) { applied.push('Region'); await tick(); }
+    if (c.type && setAndFire('Request Type', c.type)) { applied.push('type'); await tick(120); }
+    // ACM options may reload after the region swap -- retry briefly.
+    if (c.acm && c.acmField) {
+        for (let i = 0; i < 6; i++) {
+            if (setAndFire(c.acmField, c.acm)) { applied.push('ACM'); break; }
+            await tick(150);
+        }
+    }
+    ToastManager.show(applied.length ? 'Last choices applied (' + applied.join(', ') + ')' : 'Saved choices do not match this form — please pick manually', applied.length ? 'success' : 'warning', 3500);
+    const chip = document.getElementById('samLastChip');
+    if (chip && applied.length) chip.remove();
+}
+
+// ── Focus the next visible editable control in the ticket form ──
+function samFocusNext(from) {
+    const form = document.getElementById('tw-form');
+    if (!form) return;
+    const items = Array.from(form.querySelectorAll('textarea:not([readonly]):not([disabled]), input:not([type="hidden"]):not([readonly]):not([disabled]), .ss-display'))
+        .filter(el => el.offsetParent !== null);
+    if (!items.length) return;
+    const i = items.indexOf(from);
+    const next = items[(i >= 0 ? i + 1 : 0)] || items[0];
+    if (!next) return;
+    next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (next.classList.contains('ss-display')) next.click(); // open the picker
+    else next.focus();
+}
+
+(function samV15Init() {
+    const coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+
+    // ── OCR chip clicks (delegated -- chips are re-rendered per OCR run) ──
+    document.addEventListener('click', (e) => {
+        const chip = e.target.closest && e.target.closest('.ocr-chip');
+        if (!chip) return;
+        const line = chip.closest('.ocr-line');
+        const txt = line ? (line.dataset.val || '') : '';
+        const act = chip.dataset.act;
+        let value = txt;
+        if (act === 'nid') { const m = txt.match(/\b\d{5}-\d{7}-\d\b|\b\d{13}\b/); if (m) value = m[0]; }
+        if (act === 'uid') { const m = txt.match(/\b\d{4,10}\b/); if (m) value = m[0]; }
+        const form = document.getElementById('tw-form');
+        if (!form) { ToastManager.show('Open a ticket first, then tap a chip to insert', 'info', 3000); return; }
+        const names = act === 'nid' ? ['NID Number'] : act === 'uid' ? ['User ID', 'New ID', 'Old ID'] : ['Name', 'Host Name', 'Owner Name', 'New agency name', 'Agency Name'];
+        let used = '';
+        for (const n of names) {
+            const el = Array.from(form.querySelectorAll(`[name="${n}"]`)).find(x => !x.disabled && !x.readOnly && (x.tagName === 'TEXTAREA' || x.tagName === 'INPUT'));
+            if (!el) continue;
+            if (act === 'uid' && el.value.trim()) el.value = el.value.trim().replace(/[,;\s]+$/, '') + ', ' + value;
+            else el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.classList.add('reqfld-autofilled');
+            used = n; break;
+        }
+        if (used) { chip.classList.add('done'); ToastManager.show('Inserted into "' + used + '"', 'success', 2200); }
+        else ToastManager.show('No editable ' + (act === 'nid' ? 'NID' : act === 'uid' ? 'User ID' : 'Name') + ' field in this request type', 'warning', 3500);
+    });
+
+    // ── Use-last chip: render whenever create-mode chrome re-applies ──
+    if (typeof twApplyCreateModeChrome === 'function') {
+        const _samOrigChrome = twApplyCreateModeChrome;
+        twApplyCreateModeChrome = function () {
+            const r = _samOrigChrome.apply(this, arguments);
+            try { samRenderLastChoiceChip(); } catch (e) {}
+            return r;
+        };
+    }
+
+    // ── Floating submit pill (shows when both save buttons are off-screen) ──
+    try {
+        const ws = document.getElementById('pg-ticket-workspace');
+        const btns = ['twSaveBtn', 'twSaveBtn2'].map(id => document.getElementById(id)).filter(Boolean);
+        if (ws && btns.length) {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.id = 'samGoSubmit';
+            pill.className = 'sam-go-submit';
+            pill.innerHTML = '🚀 <span>Go to Submit</span>';
+            document.body.appendChild(pill);
+            const vis = new Map();
+            const upd = () => {
+                const wsOpen = ws.style.display !== 'none';
+                const anyVisible = btns.some(b => vis.get(b));
+                const missing = document.querySelector('#tw-form .twx-missing');
+                pill.classList.toggle('warn', !!missing);
+                pill.innerHTML = missing ? '⚠️ <span>Missing fields</span>' : (twCreateMode ? '🚀 <span>Go to Submit</span>' : '💾 <span>Go to Save</span>');
+                pill.classList.toggle('show', !!(wsOpen && !anyVisible));
+            };
+            if ('IntersectionObserver' in window) {
+                const io = new IntersectionObserver((entries) => {
+                    entries.forEach(en => vis.set(en.target, en.isIntersecting));
+                    upd();
+                }, { threshold: 0.05 });
+                btns.forEach(b => io.observe(b));
+            }
+            const mo = new MutationObserver(upd);
+            mo.observe(ws, { attributes: true, attributeFilter: ['style', 'class'] });
+            mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+            document.addEventListener('input', (typeof __sdeb === 'function' ? __sdeb(upd, 400) : upd), true);
+            pill.addEventListener('click', () => {
+                const missing = document.querySelector('#tw-form .twx-missing');
+                if (missing) {
+                    missing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    missing.classList.remove('sam-miss-flash'); void missing.offsetWidth; missing.classList.add('sam-miss-flash');
+                    return;
+                }
+                const target = document.getElementById('twSaveBtn2') || document.getElementById('twSaveBtn');
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    target.classList.remove('sam-pulse'); void target.offsetWidth; target.classList.add('sam-pulse');
+                }
+            });
+            setTimeout(upd, 900);
+        }
+    } catch (e) {}
+
+    // ── Enter jumps to the next field (single-line inputs + closed selects) ──
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (!t || !t.closest) return;
+        if (t.tagName === 'TEXTAREA') return;       // textareas keep their newline (Next bar below)
+        if (t.closest('.ss-panel')) return;          // Enter inside a picker searches/picks there
+        if (t.classList && t.classList.contains('ss-display')) {
+            if (document.querySelector('.ss-panel.ss-portaled')) return; // a picker is open -- Enter belongs to it
+            if (t.closest('#tw-form')) { e.preventDefault(); samFocusNext(t); }
+            return;
+        }
+        if (t.matches && t.matches('input[type="text"], input[type="number"], input[type="email"], input[type="tel"]') && !t.readOnly && !t.disabled && t.closest('#tw-form')) {
+            e.preventDefault(); samFocusNext(t);
+        }
+    });
+
+    // ── Next-field bar above the mobile keyboard (touch devices, textareas) ──
+    if (coarse) {
+        try {
+            const bar = document.createElement('div');
+            bar.className = 'sam-nextbar';
+            bar.innerHTML = '<button type="button" data-nb="next">Next ›</button><button type="button" data-nb="done">Done</button>';
+            document.body.appendChild(bar);
+            const vv = window.visualViewport;
+            const place = () => {
+                const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+                bar.style.bottom = (kb + 8) + 'px';
+            };
+            let active = null;
+            document.addEventListener('focusin', (e) => {
+                const t = e.target;
+                if (t && t.tagName === 'TEXTAREA' && !t.readOnly && !t.disabled && t.closest('#tw-form')) {
+                    active = t; place(); bar.classList.add('show');
+                } else {
+                    bar.classList.remove('show'); active = null;
+                }
+            });
+            document.addEventListener('focusout', () => {
+                setTimeout(() => {
+                    if (!document.activeElement || document.activeElement.tagName !== 'TEXTAREA') { bar.classList.remove('show'); active = null; }
+                }, 120);
+            });
+            if (vv) { vv.addEventListener('resize', place); vv.addEventListener('scroll', place); }
+            bar.addEventListener('pointerdown', (e) => e.preventDefault()); // tapping the bar keeps field focus
+            bar.addEventListener('click', (e) => {
+                const b = e.target.closest('button'); if (!b || !active) return;
+                if (b.dataset.nb === 'next') samFocusNext(active);
+                else active.blur();
+            });
+        } catch (e) {}
+    }
+
+    // ── Bottom-sheet swipe-down to close (ss pickers / reason panel / preview) ──
+    (function samInitSheets() {
+        let drag = null;
+        document.addEventListener('touchstart', (e) => {
+            const p = e.target.closest && e.target.closest('.ss-panel.ss-portaled, .pp-all.pp-portaled, #twPreviewPanel');
+            if (!p) return;
+            drag = { p: p, y: e.touches[0].clientY, dy: 0 };
+        }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            if (!drag) return;
+            const dy = e.touches[0].clientY - drag.y;
+            if (dy > 0 && drag.p.scrollTop <= 0) {
+                drag.dy = dy;
+                drag.p.style.transition = 'none';
+                drag.p.style.transform = 'translateY(' + dy + 'px)';
+            }
+        }, { passive: true });
+        document.addEventListener('touchend', () => {
+            if (!drag) return;
+            const p = drag.p, dy = drag.dy; drag = null;
+            p.style.transition = 'transform .18s ease';
+            if (dy > 70) {
+                p.style.transform = 'translateY(110%)';
+                setTimeout(() => {
+                    p.style.transition = ''; p.style.transform = '';
+                    if (p._ssClose) p._ssClose();
+                    else if (p._ppClose) p._ppClose();
+                    else if (p.id === 'twPreviewPanel' && typeof twTogglePreview === 'function') twTogglePreview(false);
+                }, 150);
+            } else {
+                p.style.transform = '';
+                setTimeout(() => { p.style.transition = ''; }, 200);
+            }
+        });
+    })();
+
+    // ── Pull-to-refresh on the ticket queue (60s freshness cache) ──
+    (function samInitPull() {
+        const wrap = document.querySelector('.page-content-wrapper');
+        if (!wrap) return;
+        let ptrEl = null, startY = null, dy = 0, busy = false;
+        const ensure = () => {
+            if (ptrEl && document.contains(ptrEl)) return ptrEl;
+            const grid = document.getElementById('ltQueueGrid');
+            if (!grid) return null;
+            ptrEl = document.createElement('div');
+            ptrEl.id = 'ltPtr';
+            ptrEl.innerHTML = '<span class="ltp-ico">↓</span><span class="ltp-txt">Pull to refresh</span>';
+            grid.parentNode.insertBefore(ptrEl, grid);
+            return ptrEl;
+        };
+        const queueVisible = () => {
+            const pg = document.getElementById('pg-live-tickets');
+            return pg && pg.style.display !== 'none';
+        };
+        const setH = (h, ready) => {
+            const el = ensure(); if (!el) return;
+            el.style.transition = 'none';
+            el.style.height = h > 6 ? Math.min(h, 110) + 'px' : '0px';
+            el.classList.toggle('ltp-ready', !!ready);
+            if (h > 6) el.querySelector('.ltp-txt').textContent = ready ? 'Release to refresh' : 'Pull to refresh';
+        };
+        const fire = async () => {
+            const el = ensure(); if (!el) return;
+            busy = true;
+            el.classList.remove('ltp-ready');
+            el.style.transition = '';
+            el.style.height = '44px';
+            el.querySelector('.ltp-ico').textContent = '⟳';
+            el.querySelector('.ltp-txt').textContent = 'Refreshing…';
+            const ago = Date.now() - (typeof ltLastPullAt !== 'undefined' ? ltLastPullAt : 0);
+            if (ago < 60000) {
+                el.classList.add('ltp-done');
+                el.querySelector('.ltp-ico').textContent = '✓';
+                el.querySelector('.ltp-txt').textContent = 'Fresh — checked ' + Math.max(1, Math.round(ago / 1000)) + 's ago';
+            } else {
+                try {
+                    await ltPullAssigned();
+                    el.classList.add('ltp-done');
+                    el.querySelector('.ltp-ico').textContent = '✓';
+                    el.querySelector('.ltp-txt').textContent = 'Updated just now';
+                } catch (e) {
+                    el.querySelector('.ltp-ico').textContent = '⚠';
+                    el.querySelector('.ltp-txt').textContent = 'Refresh failed — try again';
+                }
+            }
+            setTimeout(() => {
+                el.style.height = '0px';
+                el.classList.remove('ltp-done');
+                el.querySelector('.ltp-ico').textContent = '↓';
+                busy = false;
+            }, 1400);
+        };
+        wrap.addEventListener('touchstart', (e) => {
+            if (!queueVisible() || wrap.scrollTop > 2 || busy) { startY = null; return; }
+            startY = e.touches[0].clientY; dy = 0;
+        }, { passive: true });
+        wrap.addEventListener('touchmove', (e) => {
+            if (startY == null) return;
+            dy = e.touches[0].clientY - startY;
+            if (dy <= 0 || wrap.scrollTop > 2) { setH(0); startY = null; return; }
+            setH(dy * 0.55, dy > 120);
+            if (dy > 12) e.preventDefault();
+        }, { passive: false });
+        wrap.addEventListener('touchend', () => {
+            if (startY == null) return;
+            const d = dy; startY = null; dy = 0;
+            const el = ptrEl;
+            if (el) el.style.transition = '';
+            if (d > 120) fire(); else setH(0);
+        });
+    })();
+
+    // ── Swipe right on a queue card = copy its number (button is the visible way) ──
+    (function samInitSwipeCopy() {
+        const grid = document.getElementById('ltQueueGrid');
+        if (!grid) return;
+        let sx = 0, sy = 0, card = null;
+        grid.addEventListener('touchstart', (e) => {
+            card = e.target.closest && e.target.closest('.ltq-card');
+            if (!card) return;
+            sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+        }, { passive: true });
+        grid.addEventListener('touchend', (e) => {
+            if (!card) return;
+            const dx = e.changedTouches[0].clientX - sx;
+            const dyy = Math.abs(e.changedTouches[0].clientY - sy);
+            const c = card; card = null;
+            if (dx > 90 && dyy < 60) {
+                const numEl = c.querySelector('.ltq-card-num');
+                const txt = numEl ? numEl.textContent.trim() : '';
+                if (txt) samCopyText(txt, c.querySelector('.ltq-copy'));
+            }
+        });
+    })();
+})();
+</script>
+
 </body>
 </html>
