@@ -16306,7 +16306,10 @@ function twPickQuickNote(i) {
     note.dispatchEvent(new Event('input', { bubbles: true })); // autogrow + dirty tracking
     const qbox = document.getElementById('twAudQuick');
     if (qbox) qbox.classList.remove('open'); // picked -> fold the menu
-    note.focus();
+    // Phase 63 (Ahmed): on touch devices do NOT focus the note -- focusing
+    // popped the virtual keyboard right after every pick, covering the form.
+    const _samCoarsePick = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+    if (!_samCoarsePick) note.focus();
     note.classList.remove('tw-note-flash'); void note.offsetWidth; note.classList.add('tw-note-flash');
 }
 
@@ -16456,6 +16459,10 @@ function twNoteMakeDraggable(pop) {
     pop.dataset.dragHooked = '1';
     const head = pop.querySelector('.twn-head');
     if (!head) return;
+    // Phase 63 (Ahmed): touch devices PIN the note (CSS fixed spot) -- finger
+    // drags moved it by accident, and a restored desktop position could park
+    // it off-screen. Drag + restore stay desktop-only.
+    if (window.matchMedia && matchMedia('(pointer:coarse)').matches) return;
     // Phase 10.32 (Ahmed): the note REMEMBERS where it was dropped (per
     // session) -- every workspace instance restores the saved position, so
     // reopening a ticket doesn't send it back to top-center.
@@ -25520,9 +25527,15 @@ function samOcrLinesHtml(text) {
         const hasNid = /\b\d{5}-\d{7}-\d\b|\b\d{13}\b/.test(l);
         const hasNum = /\b\d{4,10}\b/.test(l);
         const hasWord = /[A-Za-z]{3,}/.test(l);
+        // Phase 63 (Ahmed): other-app IDs can be numbers OR letters -- offer a
+        // dedicated chip for any id-like token (4-16 chars incl. a digit),
+        // date-shaped tokens excluded.
+        const noDates = l.replace(/\b\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{2,4}\b/g, ' ');
+        const hasOther = /\b(?=[A-Za-z0-9._-]*\d)[A-Za-z0-9][A-Za-z0-9._-]{3,15}\b/.test(noDates);
         let chips = '';
         if (hasNid) chips += `<button type="button" class="ocr-chip" data-act="nid">→ NID</button>`;
         if (hasNum && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="uid">→ User ID</button>`;
+        if (hasOther && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="otherapp">→ Otherapp</button>`;
         if (hasWord) chips += `<button type="button" class="ocr-chip" data-act="name">→ Name</button>`;
         if (!chips) return '';
         return `<div class="ocr-line" data-val="${escAttr(l)}"><span class="ocr-line-txt">${escHtml(l)}</span><span class="ocr-chips">${chips}</span></div>`;
@@ -25619,9 +25632,15 @@ function samFocusNext(from) {
         let value = txt;
         if (act === 'nid') { const m = txt.match(/\b\d{5}-\d{7}-\d\b|\b\d{13}\b/); if (m) value = m[0]; }
         if (act === 'uid') { const m = txt.match(/\b\d{4,10}\b/); if (m) value = m[0]; }
+        if (act === 'otherapp') { // Phase 63: numbers OR letters; skip date-shaped tokens
+            const clean = txt.replace(/\b\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{2,4}\b/g, ' ');
+            const mix = clean.match(/\b(?=[A-Za-z0-9._-]*[A-Za-z])(?=[A-Za-z0-9._-]*\d)[A-Za-z0-9][A-Za-z0-9._-]{3,15}\b/);
+            const num = clean.match(/\b\d{4,16}\b/);
+            if (mix) value = mix[0]; else if (num) value = num[0];
+        }
         const form = document.getElementById('tw-form');
         if (!form) { ToastManager.show('Open a ticket first, then tap a chip to insert', 'info', 3000); return; }
-        const names = act === 'nid' ? ['NID Number'] : act === 'uid' ? ['User ID', 'New ID', 'Old ID'] : ['Name', 'Host Name', 'Owner Name', 'New agency name', 'Agency Name'];
+        const names = act === 'nid' ? ['NID Number'] : act === 'otherapp' ? ['Otherapp ID'] : act === 'uid' ? ['User ID', 'New ID', 'Old ID'] : ['Name', 'Host Name', 'Owner Name', 'New agency name', 'Agency Name'];
         let used = '';
         for (const n of names) {
             const el = Array.from(form.querySelectorAll(`[name="${n}"]`)).find(x => !x.disabled && !x.readOnly && (x.tagName === 'TEXTAREA' || x.tagName === 'INPUT'));
@@ -25633,7 +25652,7 @@ function samFocusNext(from) {
             used = n; break;
         }
         if (used) { chip.classList.add('done'); ToastManager.show('Inserted into "' + used + '"', 'success', 2200); }
-        else ToastManager.show('No editable ' + (act === 'nid' ? 'NID' : act === 'uid' ? 'User ID' : 'Name') + ' field in this request type', 'warning', 3500);
+        else ToastManager.show('No editable ' + (act === 'nid' ? 'NID' : act === 'otherapp' ? 'Otherapp ID' : act === 'uid' ? 'User ID' : 'Name') + ' field in this request type', 'warning', 3500);
     });
 
     // ── Use-last chip: render whenever create-mode chrome re-applies ──
@@ -25882,6 +25901,81 @@ function samFocusNext(from) {
             }
         });
     })();
+})();
+</script>
+
+
+<style id="samurai-mobile-v16">
+/* ═══ Samurai v16 / Phase 63 (Ahmed follow-up, 2026-11-05) ═══
+   Pill to the left on touch, radar bubble fully tappable, dup drawer as a
+   proper sheet, scratch note pinned + roomier on touch. */
+.twx-radar-msg{cursor:pointer;}
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
+ /* 2. pill: LEFT on touch (stays right on PC -- base rule untouched) */
+ .sam-go-submit{right:auto!important;left:16px;}
+ /* 5. duplicate-match drawers: bottom sheets above every overlay */
+ #twDupDrawer.aws-dup-drawer,#auditDupDrawer.aws-dup-drawer{left:8px!important;right:8px!important;bottom:0!important;height:auto!important;max-height:70dvh;border-radius:18px 18px 0 0;z-index:12000!important;}
+ /* 4. scratch note: pinned bottom strip, roomier than v14's squeeze */
+ #twNotePop.open{left:12px!important;right:12px!important;top:auto!important;bottom:12px!important;width:auto!important;max-width:none!important;max-height:min(46dvh,380px)!important;}
+ body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(34dvh,250px)!important;}
+ #twNotePop .twn-head{cursor:default;touch-action:auto;}
+ body.samurai-kb #twNotePop.open{bottom:8px!important;}
+}
+</style>
+
+<script id="samurai-mobile-v16-js">
+/* ═══ Samurai v16 / Phase 63 JS (Ahmed follow-up, 2026-11-05) ═══ */
+(function () {
+    if (window.__samuraiV16) return; window.__samuraiV16 = true;
+
+    // ── 5. Radar bubble: tapping the MESSAGE opens the match drawer ──
+    // Ahmed: on mobile the bubble says "click to review" but only the 👀
+    // button worked. This delegated handler is registered after the
+    // outside-click closer, so on any tap sequence the drawer ends up OPEN;
+    // forceOpen=true is idempotent, double-fire is harmless.
+    document.addEventListener('click', (e) => {
+        const m = e.target && e.target.closest && e.target.closest('#twRadarMsg, #awsRadarMsg');
+        if (!m || (e.target.closest && e.target.closest('.twx-radar-msg-x'))) return;
+        try {
+            if (m.id === 'twRadarMsg' && typeof twRadarToggleMatches === 'function') twRadarToggleMatches(true);
+            else if (m.id === 'awsRadarMsg' && typeof auditRevealDuplicates === 'function') auditRevealDuplicates();
+        } catch (err) {}
+    });
+
+    // ── 6. Mention-group fast buttons: ACM fallback + repaint on show ──
+    // Ahmed: the quick group buttons sometimes never appear. Primary source
+    // is the "Mention this Group" lookup; when it comes back empty, derive a
+    // candidate from the ticket's ACM name and re-use the exact fuzzy
+    // matcher (via a synthetic ticket) so spellings like Hasseb/Haseeb and
+    // Mubeen's "PK-Mubeen Group" still land on real options.
+    if (typeof twRenderMgFast === 'function') {
+        const _samOrigRenderMgFast = twRenderMgFast;
+        twRenderMgFast = function (ticket) {
+            _samOrigRenderMgFast.apply(this, arguments);
+            try {
+                const box = document.getElementById('twMgFast');
+                if (!box || box.querySelector('.tw-mg-fast-btn') || !ticket || !ticket.fields) return;
+                const region = String(feishuValueToString(ticket.fields['Region']) || '').trim().toUpperCase() === 'IN' ? 'IN' : 'PK';
+                const acmRaw = ticket.fields[region === 'IN' ? 'Acm Name (IN)' : 'Acm Name (PK)'];
+                const acm = String(feishuValueToString(acmRaw) || '').trim();
+                if (!acm) return;
+                const fake = { fields: { 'Mention this Group': [region + '-' + acm.replace(/\s+/g, '') + '-Audition group', acm] } };
+                const groups = twMgFastGroups(fake);
+                if (groups.length && typeof twMgFastPaint === 'function') twMgFastPaint(groups);
+            } catch (e) {}
+        };
+    }
+    try {
+        const ws = document.getElementById('pg-ticket-workspace');
+        if (ws && typeof MutationObserver !== 'undefined') {
+            new MutationObserver(() => {
+                if (ws.style.display === 'none') return;
+                if (typeof ltActiveTicket !== 'undefined' && ltActiveTicket && typeof twRenderMgFast === 'function') {
+                    try { twRenderMgFast(ltActiveTicket); } catch (e) {}
+                }
+            }).observe(ws, { attributes: true, attributeFilter: ['style'] });
+        }
+    } catch (e) {}
 })();
 </script>
 
