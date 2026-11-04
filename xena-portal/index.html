@@ -16309,10 +16309,28 @@ function twMgFastGroups(ticket) {
     if (!ticket || !ticket.fields) return [];
     const opts = (((typeof FIELD_SCHEMA !== 'undefined' && FIELD_SCHEMA['Mentioned Group']) || {}).options) || [];
     const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    /* Phase 61b (Ahmed: "Hamza has two groups, why only 1 shown?"): the lookup
+       spelled it "PK-Haseeb-Audition group" while the sheet option is the
+       typo'd "PK-Hasseb-Audition group" -- strict matching silently DROPPED
+       the button. Fuzzy fallback: compare the group CORE (strip pk-/in-
+       prefix and -audition/-group filler) with vowels removed and repeated
+       letters collapsed -- "haseeb" and "hasseb" both reduce to "hsb". Only
+       UNIQUE reduced matches are accepted, so near-names never cross-match. */
+    const core = (s) => norm(s).replace(/^(pk|in)/, '').replace(/(audition)?group$/, '');
+    const reduce = (s) => core(s).replace(/[aeiou]/g, '').replace(/(.)\1+/g, '$1');
     const findOpt = (name) => {
         const t = norm(name);
         if (!t) return '';
-        return opts.find(o => norm(o) === t) || opts.find(o => norm(o).includes(t)) || '';
+        const exact = opts.find(o => norm(o) === t) || opts.find(o => norm(o).includes(t)) || opts.find(o => t.includes(norm(o)));
+        if (exact) return exact;
+        const r = reduce(name);
+        if (r.length < 3) return '';
+        /* same consonant skeleton AND near-same core length: "haseeb"↔"hasseb"
+           (both 6) and "ehtesham"↔"ehtisham" (both 8) match; a hypothetical
+           "hasan"(5) can NOT grab "hussian"(7) -- length gap blocks it. */
+        const cn = core(name).length;
+        const hits = opts.filter(o => reduce(o) === r && Math.abs(core(o).length - cn) <= 1);
+        return hits.length === 1 ? hits[0] : '';
     };
     const raw = ticket.fields['Mention this Group'];
     const names = [];
