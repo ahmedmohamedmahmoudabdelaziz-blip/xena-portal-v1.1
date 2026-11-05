@@ -26167,5 +26167,320 @@ if (typeof schRenderGrid === 'function') {
 }
 </script>
 
+<style id="samurai-mobile-v18">
+/* ═══ Samurai v18 / Phase B (Ahmed, 2026-11-05) ═══
+   Settings popover, timezone now-line, extra planner checks. */
+.sam-set-btn{flex:none;}
+.sam-set-pop{position:fixed;top:64px;right:14px;z-index:12000;width:min(360px,calc(100vw - 28px));
+ background:var(--surface);border:1px solid var(--border-hover);border-radius:16px;box-shadow:var(--shadow);
+ padding:16px;font-size:.82rem;color:var(--text);}
+.sam-set-title{font-weight:800;font-size:.9rem;margin-bottom:10px;}
+.sam-set-note{font-size:.72rem;color:var(--text-muted);margin:2px 0 10px;line-height:1.45;}
+.sam-set-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;}
+.sam-set-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sam-set-grid label{display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--text-muted);font-weight:700;}
+.sam-set-grid input,.sam-set-grid select{padding:7px 9px;border-radius:9px;border:1px solid var(--border);
+ background:var(--bg);color:var(--text);font-size:.84rem;font-family:inherit;width:100%;}
+.sam-set-actions{display:flex;gap:8px;margin-top:12px;}
+.sam-set-actions .btn{flex:1;}
+.atm-now{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--accent-amber);
+ border-radius:2px;z-index:5;box-shadow:0 0 7px rgba(255,184,0,.75);pointer-events:none;}
+.atm-strip{position:relative;}
+#schCheckList li.sam-xcheck{border-left:2px solid var(--accent-amber);padding-left:8px;}
+@media screen and (max-width:600px){
+ .sam-set-pop{top:auto;bottom:12px;right:12px;left:12px;width:auto;max-height:70dvh;overflow:auto;}
+}
+</style>
+<script id="samurai-mobile-v18-js">
+/* ═══ Samurai v18 / Phase B JS (Ahmed, 2026-11-05) ═══
+   Top-level functions (not IIFE) — inline onclick uses them. */
+
+// ── Settings object (shared by attendance + schedule) ──
+const SAM_ATT_SET_KEY = 'xena.att.settings';
+const SAM_ATT_DEFAULTS = { custom: false, lateGraceMin: 10, earlyGraceMin: 10, minGapMin: 15, minMissingMin: 30, coverageTarget: 0, tz: '' };
+function samAttSettings() {
+    try { return Object.assign({}, SAM_ATT_DEFAULTS, JSON.parse(localStorage.getItem(SAM_ATT_SET_KEY) || '{}')); }
+    catch (e) { return Object.assign({}, SAM_ATT_DEFAULTS); }
+}
+function samAttSaveSettingsObj(o) {
+    try { localStorage.setItem(SAM_ATT_SET_KEY, JSON.stringify(o)); } catch (e) {}
+}
+
+// ── Shared shift-vs-actual engine: re-classify one day against thresholds ──
+const SAM_ATT_WORKED = ['Online', 'On Task', 'Working Ticket'];
+const SAM_ATT_OFFT = ['Off', 'Annual Leave', 'Sick Leave'];
+function samAttEvalDay(D, S) {
+    const res = { flags: [], late_min: 0, early_min: 0, gap_min: 0, missing_min: 0 };
+    if (!D || D.future || !D.shift) return res;
+    if (SAM_ATT_OFFT.includes(D.shift.type)) return res;
+    const s0 = D.shift.start_min, s1 = D.shift.end_min;
+    if (s0 == null || s1 == null || s1 <= s0) return res;
+    const segs = (D.segments || []).slice().sort((a, b) => a.s - b.s);
+    if (!segs.length) {
+        res.flags.push('no_show', 'missing');
+        res.missing_min = s1 - s0;
+        return res;
+    }
+    const firstS = segs[0].s;
+    const lastE = Math.max.apply(null, segs.map(x => x.e).concat([D.last || 0]));
+    if (firstS > s0 + S.lateGraceMin) { res.flags.push('late'); res.late_min = Math.round(firstS - s0); }
+    if (lastE < s1 - S.earlyGraceMin) { res.flags.push('early'); res.early_min = Math.round(s1 - lastE); }
+    const gaps = (D.inshift_gaps || []).filter(g => (g.min != null ? g.min : (g.e - g.s)) >= S.minGapMin);
+    if (gaps.length) { res.flags.push('gap'); res.gap_min = Math.round(gaps.reduce((n, g) => n + (g.min != null ? g.min : (g.e - g.s)), 0)); }
+    let cover = 0, cur = null;
+    segs.filter(x => SAM_ATT_WORKED.includes(x.st)).forEach(x => {
+        const a = Math.max(x.s, s0), b = Math.min(x.e, s1);
+        if (b <= a) return;
+        if (cur && a <= cur[1]) cur[1] = Math.max(cur[1], b);
+        else { if (cur) cover += cur[1] - cur[0]; cur = [a, b]; }
+    });
+    if (cur) cover += cur[1] - cur[0];
+    const missing = Math.max(0, (s1 - s0) - cover - res.gap_min);
+    if (missing >= S.minMissingMin) { res.flags.push('missing'); res.missing_min = Math.round(missing); }
+    return res;
+}
+
+// Deep-clone the backend payload, re-classify every day, rebuild warnings +
+// per-agent summaries. The raw object is never mutated, so toggling custom
+// thresholds off restores the exact server view.
+function samAttAdjust(raw, S) {
+    const d = JSON.parse(JSON.stringify(raw));
+    const warnings = [];
+    const minLbl = (m) => (typeof atmMinLabel === 'function') ? atmMinLabel(m) : (m + 'm');
+    (d.agents || []).forEach(a => {
+        const sum = a.summary || (a.summary = {});
+        let lateDays = 0, lateMin = 0, gapMin = 0, missMin = 0, noShow = 0, earlyMin = 0;
+        Object.keys(a.days || {}).forEach(ds => {
+            const D = a.days[ds];
+            const r = samAttEvalDay(D, S);
+            D.flags = r.flags.slice();
+            D.late_min = r.late_min; D.gap_min = r.gap_min;
+            D.missing_min = r.missing_min; D.early_min = r.early_min;
+            if (r.late_min) { lateDays++; lateMin += r.late_min; }
+            gapMin += r.gap_min; missMin += r.missing_min; earlyMin += r.early_min;
+            if (r.flags.indexOf('no_show') >= 0) noShow++;
+            const txt = {
+                late: 'Signed in ' + minLbl(r.late_min) + ' after shift start',
+                gap: 'Offline ' + minLbl(r.gap_min) + ' inside shift',
+                missing: minLbl(r.missing_min) + ' of the shift unworked',
+                early: 'Left ' + minLbl(r.early_min) + ' before shift end',
+                no_show: 'Scheduled, never signed in'
+            };
+            r.flags.forEach(fl => warnings.push({ day: +ds, agent: a.name, kind: fl, detail: txt[fl] }));
+        });
+        sum.late_days = lateDays; sum.late_min = lateMin; sum.gap_min = gapMin;
+        sum.missing_min = missMin; sum.no_show = noShow; sum.early_min = earlyMin;
+    });
+    warnings.sort((x, y) => (x.day - y.day) || String(x.agent).localeCompare(String(y.agent)));
+    d.warnings = warnings;
+    d.samCustom = true;
+    return d;
+}
+
+let __samAttRaw = null, __samAttAdjusted = null;
+if (typeof atmRender === 'function') {
+    const _samV18AtmRender = atmRender;
+    atmRender = function () {
+        try {
+            if (typeof atmData !== 'undefined' && atmData) {
+                if (atmData !== __samAttRaw && atmData !== __samAttAdjusted) __samAttRaw = atmData;
+                const S = samAttSettings();
+                atmData = S.custom ? (__samAttAdjusted = samAttAdjust(__samAttRaw, S)) : __samAttRaw;
+            }
+        } catch (e) {}
+        return _samV18AtmRender.apply(this, arguments);
+    };
+}
+
+// ── Timezone now-line on today's strip (atmDayRow wrap; axis is a param) ──
+function samAttNowMin(tz) {
+    try {
+        if (tz === 'device') { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
+        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+        const h = +parts.filter(p => p.type === 'hour')[0].value, m = +parts.filter(p => p.type === 'minute')[0].value;
+        return (h % 24) * 60 + m;
+    } catch (e) { return null; }
+}
+if (typeof atmDayRow === 'function') {
+    const _samV18AtmDayRow = atmDayRow;
+    atmDayRow = function (a, ds, axis, ticks) {
+        let h = _samV18AtmDayRow.apply(this, arguments);
+        try {
+            const tz = samAttSettings().tz;
+            if (tz && +ds === schDayInt(new Date())) {
+                const nm = samAttNowMin(tz);
+                if (nm != null && nm <= axis) {
+                    const p = atmPct(axis);
+                    const lbl = String(Math.floor(nm / 60)).padStart(2, '0') + ':' + String(nm % 60).padStart(2, '0');
+                    const marker = '<div class="atm-now" style="left:' + p(nm) + '%" title="Now ' + lbl + (tz === 'device' ? ' (device time)' : ' (' + tz.replace('_', ' ') + ')') + '"></div>';
+                    h = h.replace(/(<div class="atm-strip">[\s\S]*)<\/div>(\s*<div class="atm-flags">|\s*<\/div>)/, '$1' + marker + '</div>$2');
+                }
+            }
+        } catch (e) {}
+        return h;
+    };
+}
+
+// ── Schedule: extra conflict & coverage checks (appended to planner list) ──
+function samSchExtraChecks() {
+    const issues = [];
+    if (typeof schPlannerRows !== 'function') return issues;
+    const rows = schPlannerRows();
+    const WORK = ['On Site', 'Work From Home'], OFFT = ['Off', 'Annual Leave', 'Sick Leave'];
+    // duplicate / off-vs-work conflicts on the same agent+day
+    const byKey = {};
+    rows.forEach(r => { const k = (r.email || r.name || '').toLowerCase() + '|' + r.day; (byKey[k] = byKey[k] || []).push(r); });
+    Object.keys(byKey).forEach(k => {
+        const list = byKey[k];
+        if (list.length < 2) return;
+        const nm = list[0].name || list[0].email;
+        const hasWork = list.some(r => WORK.includes(r.type));
+        const hasOff = list.some(r => OFFT.includes(r.type));
+        if (hasWork && hasOff) issues.push('⚠️ ' + nm + ' · ' + schDayLabel(list[0].day) + ': has BOTH a work shift and an Off/leave entry — remove one.');
+        else issues.push('⚠️ ' + nm + ' · ' + schDayLabel(list[0].day) + ': ' + list.length + ' entries on the same day (' + list.map(r => r.type).join(' + ') + ').');
+    });
+    // no off day this week
+    if (typeof schRangeMode !== 'undefined' && schRangeMode === 'week') {
+        const byPerson = {};
+        rows.forEach(r => { const k = (r.email || r.name || '').toLowerCase(); (byPerson[k] = byPerson[k] || []).push(r); });
+        Object.keys(byPerson).forEach(k => {
+            const list = byPerson[k];
+            if (list.filter(r => WORK.includes(r.type)).length >= 7)
+                issues.push('🌙 ' + (list[0].name || list[0].email) + ': scheduled all 7 days — no off day this week.');
+        });
+    }
+    // coverage: hours below the configured target (team week view, admins)
+    const S = samAttSettings();
+    if (S.coverageTarget > 0 && typeof schView !== 'undefined' && schView === 'team'
+        && typeof isAdmin !== 'undefined' && isAdmin
+        && typeof schRangeMode !== 'undefined' && schRangeMode === 'week') {
+        const days = {};
+        rows.filter(r => WORK.includes(r.type)).forEach(r => {
+            const a = schMinutes(r.start), b0 = schMinutes(r.end);
+            if (a == null || b0 == null) return;
+            const b = b0 <= a ? b0 + 1440 : b0;
+            (days[r.day] = days[r.day] || []).push([a, b]);
+        });
+        Object.keys(days).forEach(day => {
+            const bad = [];
+            for (let h = 0; h < 24; h++) {
+                const n = days[day].filter(w => w[0] < h * 60 + 60 && w[1] > h * 60).length;
+                if (n > 0 && n < S.coverageTarget) bad.push(h);
+            }
+            const ranges = [];
+            bad.forEach(h => { const last = ranges[ranges.length - 1]; if (last && last[1] === h - 1) last[1] = h; else ranges.push([h, h]); });
+            ranges.slice(0, 3).forEach(rg => issues.push('📐 ' + schDayLabel(+day) + ': '
+                + String(rg[0]).padStart(2, '0') + ':00–' + String(rg[1] + 1).padStart(2, '0') + ':00 has fewer than '
+                + S.coverageTarget + ' working agents.'));
+        });
+    }
+    return issues.slice(0, 12);
+}
+function samSchExtraChecksRender() {
+    const list = document.getElementById('schCheckList');
+    if (!list) return;
+    list.querySelectorAll('li.sam-xcheck').forEach(li => li.remove());
+    const extra = samSchExtraChecks();
+    if (extra.length) {
+        const lis = list.querySelectorAll('li');
+        if (lis.length === 1 && lis[0].textContent.indexOf('Checks flag') === 0) list.innerHTML = '';
+        extra.forEach(t => { const li = document.createElement('li'); li.className = 'sam-xcheck'; li.textContent = t; list.appendChild(li); });
+    }
+    const total = list.querySelectorAll('li').length;
+    const sum = document.getElementById('schCheckSummary');
+    if (sum && total) sum.textContent = total + ' planning check' + (total === 1 ? '' : 's') + ' to review';
+}
+if (typeof schPlannerRender === 'function') {
+    const _samV18SchPlanner = schPlannerRender;
+    schPlannerRender = function () {
+        const r = _samV18SchPlanner.apply(this, arguments);
+        try { samSchExtraChecksRender(); } catch (e) {}
+        return r;
+    };
+}
+
+// ── Settings popover (gear on BOTH pages) ──
+function samSetToggle() {
+    let pop = document.getElementById('samAttSetPop');
+    if (pop && pop.style.display !== 'none') { pop.style.display = 'none'; return; }
+    if (!pop) { samSetBuild(); pop = document.getElementById('samAttSetPop'); }
+    const S = samAttSettings();
+    document.getElementById('samSetCustom').checked = !!S.custom;
+    document.getElementById('samSetLate').value = S.lateGraceMin;
+    document.getElementById('samSetEarly').value = S.earlyGraceMin;
+    document.getElementById('samSetGap').value = S.minGapMin;
+    document.getElementById('samSetMiss').value = S.minMissingMin;
+    document.getElementById('samSetCov').value = S.coverageTarget;
+    document.getElementById('samSetTz').value = S.tz;
+    pop.style.display = 'block';
+}
+function samSetBuild() {
+    const pop = document.createElement('div');
+    pop.id = 'samAttSetPop';
+    pop.className = 'sam-set-pop';
+    pop.style.display = 'none';
+    pop.innerHTML =
+        '<div class="sam-set-title">⚙️ Attendance & schedule settings</div>'
+        + '<label class="sam-set-row"><input type="checkbox" id="samSetCustom"> <span>Use custom thresholds</span></label>'
+        + '<div class="sam-set-note">Custom thresholds re-classify attendance <b>in your browser only</b> — the sheet and everyone else\u2019s view are untouched. Turn the toggle off to return to the server standard.</div>'
+        + '<div class="sam-set-grid">'
+        + '<label>Late grace (min)<input type="number" id="samSetLate" min="0" max="120"></label>'
+        + '<label>Early-leave grace (min)<input type="number" id="samSetEarly" min="0" max="120"></label>'
+        + '<label>Min offline gap (min)<input type="number" id="samSetGap" min="1" max="240"></label>'
+        + '<label>Min unworked (min)<input type="number" id="samSetMiss" min="1" max="480"></label>'
+        + '<label>Coverage target (agents/hr, 0=off)<input type="number" id="samSetCov" min="0" max="50"></label>'
+        + '<label>Now-line timezone<select id="samSetTz">'
+        + '<option value="">Off</option><option value="device">My device time</option>'
+        + '<option value="Africa/Cairo">Cairo</option><option value="Asia/Riyadh">Riyadh</option>'
+        + '<option value="Asia/Karachi">Karachi</option><option value="Asia/Jakarta">Jakarta</option>'
+        + '<option value="UTC">UTC</option></select></label>'
+        + '</div>'
+        + '<div class="sam-set-actions">'
+        + '<button type="button" class="btn btn-primary" onclick="samSetSave()">💾 Save</button>'
+        + '<button type="button" class="btn btn-secondary" onclick="samSetReset()">Reset</button>'
+        + '<button type="button" class="btn btn-secondary" onclick="samSetToggle()">✕</button>'
+        + '</div>';
+    document.body.appendChild(pop);
+}
+function samSetRead() {
+    const num = (id, d) => { const v = parseInt((document.getElementById(id) || {}).value, 10); return isNaN(v) ? d : v; };
+    return {
+        custom: !!document.getElementById('samSetCustom').checked,
+        lateGraceMin: Math.max(0, Math.min(120, num('samSetLate', 10))),
+        earlyGraceMin: Math.max(0, Math.min(120, num('samSetEarly', 10))),
+        minGapMin: Math.max(1, Math.min(240, num('samSetGap', 15))),
+        minMissingMin: Math.max(1, Math.min(480, num('samSetMiss', 30))),
+        coverageTarget: Math.max(0, Math.min(50, num('samSetCov', 0))),
+        tz: (document.getElementById('samSetTz') || {}).value || ''
+    };
+}
+function samSetSave() {
+    samAttSaveSettingsObj(samSetRead());
+    samSetToggle();
+    try { if (typeof atmData !== 'undefined' && atmData) atmRender(); } catch (e) {}
+    try { if (typeof schPlannerRender === 'function' && document.getElementById('pg-audition-schedule').style.display !== 'none') schPlannerRender(); } catch (e) {}
+    if (typeof ToastManager !== 'undefined') ToastManager.show('Settings saved', 'success', 2000);
+}
+function samSetReset() {
+    samAttSaveSettingsObj(Object.assign({}, SAM_ATT_DEFAULTS));
+    samSetToggle(); samSetToggle(); // close + reopen to repopulate
+    try { if (typeof atmData !== 'undefined' && atmData) atmRender(); } catch (e) {}
+    try { if (typeof schPlannerRender === 'function' && document.getElementById('pg-audition-schedule').style.display !== 'none') schPlannerRender(); } catch (e) {}
+}
+(function samSetInit() {
+    const mk = () => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-secondary sam-set-btn';
+        b.innerHTML = '⚙️ Thresholds'; b.title = 'Custom attendance thresholds, coverage target, timezone';
+        b.onclick = samSetToggle;
+        return b;
+    };
+    const atmTools = document.querySelector('.atm-tools');
+    if (atmTools) atmTools.appendChild(mk());
+    const schTools = document.querySelector('.sch-tools');
+    if (schTools) schTools.appendChild(mk());
+})();
+</script>
+
 </body>
 </html>
