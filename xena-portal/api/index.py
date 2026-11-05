@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v19 Phase C 2026-11-05"
+XENA_BUILD = "v19.1 day-boundary 2026-11-05"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -12162,6 +12162,78 @@ def audition_attendance():
                 e0 = _att_hhmm_to_min(sh.get("end"))
                 shift = {"type": sh["type"], "start": sh.get("start") or "", "end": sh.get("end") or "",
                          "start_min": s0, "end_min": (e0 + 1440 if (e0 is not None and s0 is not None and e0 <= s0) else e0)}
+            # Phase 67 (Ahmed): day-boundary hygiene. The sheet leaves the
+            # day's last status row OPEN when the agent closes the app without
+            # a new status flip, and stretches a trailing Offline row until the
+            # NEXT shift's login — together they made finished days look alive:
+            # "Out 10:58 (+1d)" where 10:58 was the next shift's first punch,
+            # and yesterday rendering "still on" (Noora, off since 20:02).
+            #   1. an open segment is closed by the next segment's start;
+            #   2. on past days an Offline row keeps only its in-shift portion
+            #      (the rest is between-shifts time, not this day's);
+            #   3. a segment starting a brand-new session > 3h after this
+            #      day's activity stopped (and past the shift window) is the
+            #      next shift leaking into this row — dropped;
+            #   4. a Daily-Log punch separated from this day's real activity
+            #      by > 3h belongs to the adjacent shift, not this day;
+            #   5. an open work tail on a past day caps at the sane last punch
+            #      or the shift end — never runs to "now".
+            _GRACE = 180
+            if row_segs:
+                for _i, _x in enumerate(row_segs):
+                    if _x.get("open") and _i + 1 < len(row_segs):
+                        _x["e"] = max(_x["s"] + 1, min(_x["e"], row_segs[_i + 1]["s"]))
+                        _x["open"] = False
+            if row_segs and not is_today and not is_future:
+                _se = shift["end_min"] if shift and shift.get("end_min") is not None else None
+                # (2) Offline rows on a past day
+                for _x in row_segs:
+                    if _x["st"] == "Offline":
+                        if _x.get("open"):
+                            _x["e"] = _x["s"]     # offline since s: the day ended there
+                            _x["open"] = False
+                        else:
+                            _x["e"] = min(_x["e"], _se if _se is not None else 1440)
+                row_segs = [x for x in row_segs if x["e"] > x["s"]]
+                # (3) a segment starting a brand-new session > 3h after this
+                #     day's activity stopped (and past the shift window) is the
+                #     next shift leaking into this row — drop it BEFORE the
+                #     punch sanity check, or the leaked session legitimizes the
+                #     poisoned punch
+                _keep, _max_e = [], None
+                for _x in row_segs:
+                    if _max_e is not None and _x["s"] > _max_e + _GRACE and (
+                            (_se is not None and _x["s"] > _se + _GRACE)
+                            or (_se is None and _x["s"] > _max_e + 720)):
+                        continue                  # next shift's session, not this day's
+                    _keep.append(_x)
+                    _max_e = max(_max_e or 0, _x["e"])
+                row_segs = _keep
+                # (4) punch sanity vs the cleaned segments
+                _seg_first = min([x["s"] for x in row_segs], default=None)
+                _seg_last_c = max([x["e"] for x in row_segs if not x.get("open")], default=None)
+                _dl_first, _dl_last = dl.get("first"), dl.get("last")
+                if isinstance(_dl_first, (int, float)) and isinstance(_seg_first, (int, float)) \
+                        and _dl_first < _seg_first - _GRACE:
+                    _dl_first = None      # previous shift's tail punch, not today's In
+                if isinstance(_dl_last, (int, float)):
+                    if isinstance(_seg_last_c, (int, float)) and _dl_last > _seg_last_c + _GRACE:
+                        _dl_last = None   # next shift's login punch, not today's Out
+                    elif _seg_last_c is None and _se is not None and _dl_last > _se + _GRACE:
+                        _dl_last = None   # no closed segments to anchor: bound by the shift
+                # (5) open work tail on a past day
+                if row_segs and row_segs[-1].get("open"):
+                    _tail = row_segs[-1]
+                    _cap = None
+                    if isinstance(_dl_last, (int, float)) and _dl_last > _tail["s"]:
+                        _cap = _dl_last
+                    elif _se is not None and _se > _tail["s"]:
+                        _cap = _se
+                    _tail["e"] = _tail["s"] if _cap is None else min(_tail["e"], _cap)
+                    _tail["open"] = False
+                    row_segs = [x for x in row_segs if x["e"] > x["s"]]
+            else:
+                _dl_first, _dl_last = dl.get("first"), dl.get("last")
             seg_worked_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] in ATT_WORKED)
             # Phase 60b (Ahmed): separate the two working flavors -- On Task and
             # Working Ticket are DIFFERENT statuses and must never blur into one
@@ -12186,11 +12258,13 @@ def audition_attendance():
                 valid_min = float(_v)
             worked_min = valid_min if valid_min is not None else seg_worked_min
             first_p = min([x["s"] for x in row_segs], default=None)
-            last_p = max([x["e"] for x in row_segs if not x["open"]], default=None)
-            if dl.get("first") is not None:
-                first_p = dl["first"] if first_p is None else min(first_p, dl["first"])
-            if dl.get("last") is not None:
-                last_p = dl["last"] if last_p is None else max(last_p, dl["last"])
+            # "Out" = last time he was ACTIVE — an Offline row's end is between-
+            # shifts time, never the moment he stopped working (Phase 67).
+            last_p = max([x["e"] for x in row_segs if not x.get("open") and x["st"] != "Offline"], default=None)
+            if isinstance(_dl_first, (int, float)):
+                first_p = _dl_first if first_p is None else min(first_p, _dl_first)
+            if isinstance(_dl_last, (int, float)):
+                last_p = _dl_last if last_p is None else max(last_p, _dl_last)
             late_min = gap_min = missing_min = early_min = 0
             inshift = []
             shift_live = bool(shift and shift.get("type") in ("On Site", "Work From Home")
