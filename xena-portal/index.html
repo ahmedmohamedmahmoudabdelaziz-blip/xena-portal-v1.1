@@ -10016,7 +10016,10 @@ function schPresetDragStart(e, rid) {
 function schDragStart(e) {
     const c = e.currentTarget;
     schDragCtx = { email: c.getAttribute('data-em'), day: +c.getAttribute('data-day') };
-    e.dataTransfer.effectAllowed = 'move';
+    /* v19.2: 'copyMove' — with plain 'move', the cross-agent dragover's
+       dropEffect:'copy' was rejected → 🚫 cursor and the drop never fired,
+       so dragging a shift onto ANOTHER agent silently did nothing. */
+    e.dataTransfer.effectAllowed = 'copyMove';
     try { e.dataTransfer.setData('text/plain', schDragCtx.email + '|' + schDragCtx.day); } catch (x) {}
     c.classList.add('sch-dragging');
 }
@@ -26552,10 +26555,13 @@ function samSetReset() {
 #sam19ver .dot.bad{background:#ff4d6d;animation:sam19Blink 1s ease-in-out infinite}
 @keyframes sam19Blink{50%{opacity:.35}}
 
-/* ── Lightbox above everything; radar + docks hidden while a pic is open ── */
+/* ── Lightbox above everything; only the RADAR hides while a pic is open (v19.2,
+   Ahmed: "hide the radar when pic open, NOT the floating button") — the ⚡/📝
+   dock fabs stay reachable, lifted above the lightbox. ── */
 .img-lightbox-overlay{z-index:10050!important}
 body:has(.img-lightbox-overlay.active) .twx-radar-msg{display:none!important}
-body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.active) #awsDock{display:none!important}
+body:has(.img-lightbox-overlay.active) .twx-radar-dock{display:none!important}
+body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.active) #awsDock{z-index:10060!important}
 
 /* v19.1 (Ahmed): Next/Done + Go to Submit share the RIGHT rail on touch —
    supersedes v16's mobile-left pill rule (later + !important wins). */
@@ -26570,6 +26576,8 @@ body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.a
 .lb-ex-top{display:flex;align-items:center;gap:8px;flex:none;padding:8px 12px 2px;flex-wrap:wrap}
 .lb-ex-copy{padding:6px 13px;font-size:.8rem;font-weight:700;border-radius:8px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,var(--accent-cyan,#00d4ff));cursor:pointer;font-family:inherit;flex:none}
 .lb-ex-count{font-size:.68rem;color:var(--text-muted,var(--text-muted))}
+.lb-ex-full{padding:6px 13px;font-size:.8rem;font-weight:700;border-radius:8px;border:1px solid var(--accent-amber,#ffb800);background:rgba(255,184,0,.12);color:var(--accent-amber,#ffb800);cursor:pointer;font-family:inherit;flex:none}
+@media screen and (min-width:901px){ .lb-ex-full{display:none} }
 @media screen and (max-width:900px){
   .lb-ex-handle{display:flex}
   #imgLightboxExtractText{font-size:.98rem!important;line-height:1.55!important}
@@ -26577,8 +26585,8 @@ body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.a
   .img-lightbox-extract-panel .ocr-line{font-size:.95rem!important;padding:2px 0}
   .img-lightbox-extract-panel .ocr-chip{font-size:.86rem!important;padding:6px 13px}
   .img-lightbox-extract-panel{border-radius:14px 14px 0 0}
-  /* taller defaults; the handle + JS var can resize 140px..78vh */
-  .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(36dvh,300px)}
+  /* taller defaults; the handle + JS var + ⤢ Full can resize 140px..near-full */
+  .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(46dvh,340px)}
   body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(32dvh,260px)!important}
   body:has(.img-lightbox-overlay.active) #twNoteText{min-height:64px!important;font-size:16px!important;resize:vertical}
   #twNotePop #twNoteText{font-size:16px}
@@ -26588,7 +26596,7 @@ body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.a
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v19.1 day-boundary 2026-11-05';
+window.SAM19_BUILD='v19.2 dock+extract 2026-11-05';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -26968,13 +26976,27 @@ function sam19PanelDrag(hd){
     const ov=document.getElementById('imgLightboxOverlay');
     if(!panel||!ov)return;
     const startY=e.clientY,h0=panel.getBoundingClientRect().height;
-    const maxH=Math.max(150,Math.min(window.innerHeight*0.78,window.innerHeight-160));
+    const maxH=Math.max(150,window.innerHeight-120);
     const move=(ev)=>{ov.style.setProperty('--lbpanel',Math.max(140,Math.min(maxH,h0+(startY-ev.clientY)))+'px');};
     const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};
     document.addEventListener('pointermove',move);
     document.addEventListener('pointerup',up);
   });
 }
+/* v19.2 (Ahmed): "the extraction size is not full" — one tap maximizes the
+   extract panel to near-full screen (pic collapses to a slim strip); tap
+   again (⤡ Fit) to restore the default split. */
+window.sam19ExFull=function(btn){
+  const ov=document.getElementById('imgLightboxOverlay');
+  if(!ov)return;
+  if(btn.dataset.full==='1'){
+    ov.style.removeProperty('--lbpanel');
+    btn.dataset.full='';btn.textContent='⤢ Full';
+  }else{
+    ov.style.setProperty('--lbpanel',Math.max(240,window.innerHeight-104)+'px');
+    btn.dataset.full='1';btn.textContent='⤡ Fit';
+  }
+};
 window.lightboxRenderExtractResult=function(result){
   const panel=document.getElementById('imgLightboxExtractPanel');
   const body=document.getElementById('imgLightboxExtractBody');
@@ -26996,6 +27018,7 @@ window.lightboxRenderExtractResult=function(result){
   const words=txt.trim().split(/\s+/).length;
   body.innerHTML='<div class="lb-ex-top">'
     +'<button type="button" class="lb-ex-copy" onclick="lightboxCopyExtractedText()">📋 Copy text</button>'
+    +'<button type="button" class="lb-ex-full" onclick="sam19ExFull(this)">⤢ Full</button>'
     +'<span class="lb-ex-count">'+words+' words · auto-extracted</span></div>'
     +samOcrLinesHtml(txt)
     +'<pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.86rem;color:var(--text-primary,#e8eaf0);margin:0;padding:8px 14px 12px;flex:1;min-height:0;overflow:auto;">'+escHtml(txt)+'</pre>';
