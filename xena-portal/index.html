@@ -26557,6 +26557,13 @@ function samSetReset() {
 body:has(.img-lightbox-overlay.active) .twx-radar-msg{display:none!important}
 body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.active) #awsDock{display:none!important}
 
+/* v19.1 (Ahmed): Next/Done + Go to Submit share the RIGHT rail on touch —
+   supersedes v16's mobile-left pill rule (later + !important wins). */
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
+ .sam-go-submit{left:auto!important;right:16px!important;}
+ .sam-nextbar{right:16px;}
+}
+
 /* ── Mobile: bigger extract + note, resize handle, chips above ── */
 .lb-ex-handle{display:none;flex:none;height:26px;align-items:center;justify-content:center;cursor:ns-resize;touch-action:none;border-bottom:1px solid var(--border,var(--border))}
 .lb-ex-handle span{display:block;width:44px;height:5px;border-radius:3px;background:var(--border,var(--border))}
@@ -26581,7 +26588,7 @@ body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.a
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v19 Phase C 2026-11-05';
+window.SAM19_BUILD='v19.1 day-boundary 2026-11-05';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -26628,7 +26635,7 @@ window.sam19Form=function(title,desc,bodyHtml,okLabel){
 window.sam19Msg=function(title,desc,bodyHtml){return sheetOpen(title,desc,bodyHtml);};
 
 /* ─────────── attendance: green work-band continuity + Avail + In/Out punch ─────────── */
-const SAM19_WORKSET=['#00e676','#00d4ff','#b967ff','#00b25d'];
+const SAM19_WORKSET=['#00e676','#00d4ff','#b967ff'];
 const sam19IsWork=(c)=>SAM19_WORKSET.indexOf(String(c).trim())>=0;
 function sam19BridgeSegs(h){
   const re=/(<div class="atm-seg" title="([^"]*)" style="left:([\d.]+)%;width:([\d.]+)%;background:([^"]+)"([^>]*)>)/g;
@@ -26638,7 +26645,6 @@ function sam19BridgeSegs(h){
   const out=[];
   for(let i=0;i<segs.length;i++){
     const s=segs[i];let bg=s.bg;
-    if(bg==='#00e676'&&/^Ticket\b/.test(s.title))bg='#00b25d';   /* Working Ticket: own deeper green */
     let w=s.w;
     if(i>0){
       const p=out[out.length-1];
@@ -26720,9 +26726,9 @@ if(typeof atmRender==='function'){
     try{
       const leg=document.getElementById('atmLegend');
       if(leg){
-        const items=[['#00e676','Online'],['#00b25d','Working tkt'],['#00d4ff','On task'],['#b967ff','Meeting'],['#ffb800','Break'],['#4b5563','Offline']];
+        const items=[['#00e676','Online / Working tkt'],['#00d4ff','On task'],['#b967ff','Meeting'],['#ffb800','Break'],['#4b5563','Offline']];
         leg.innerHTML=items.map(x=>'<span class="atm-lg"><i style="background:'+x[0]+'"></i>'+x[1]+'</span>').join('')
-          +'<span class="atm-lg"><i style="background:linear-gradient(90deg,#00e676,#00b25d,#00d4ff);width:18px"></i>Work band (continuous)</span>'
+          +'<span class="atm-lg"><i style="background:linear-gradient(90deg,#00e676,#00d4ff,#b967ff);width:18px"></i>Work band (continuous)</span>'
           +'<span class="atm-lg"><i style="background:transparent;border:1.5px dashed #00e676;width:10px;height:14px"></i>Avail = online, no ticket</span>'
           +'<span class="atm-lg"><i style="background:#ff4d6d"></i>Offline in shift</span>'
           +'<span class="atm-lg"><i style="background:transparent;border:1px dashed rgba(0,212,255,.7);width:9px;height:13px"></i>Shift window</span>';
