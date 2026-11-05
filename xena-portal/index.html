@@ -24155,7 +24155,7 @@ async function atmLoad(force){
     if(!force && c && (Date.now()-c.ts)<300000 && c.data){ atmData=c.data; atmRender(); return; }
     atmLoading=true;
     const host=document.getElementById('atmHost');
-    if(host) host.innerHTML='<div class="atm-empty">⏳ Loading attendance…</div>';
+    if(host) host.innerHTML='<div class="sam-skel-note">⏳ Loading attendance…</div><div class="sam-skel-card"></div><div class="sam-skel-card"></div><div class="sam-skel-card"></div>';
     try{
         const qs=new URLSearchParams({user:loggedUser,email:loggedEmail,
             my_open_id:(localStorage.getItem('xenaOpenId')||''),
@@ -25532,10 +25532,16 @@ function samOcrLinesHtml(text) {
         // date-shaped tokens excluded.
         const noDates = l.replace(/\b\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{2,4}\b/g, ' ');
         const hasOther = /\b(?=[A-Za-z0-9._-]*\d)[A-Za-z0-9][A-Za-z0-9._-]{3,15}\b/.test(noDates);
+        // Phase 64 (Ahmed): applier real name -- a clean 1-4 word alpha line
+        // (optionally after a "name:"-style label); digit lines excluded.
+        const rnameLbl = l.match(/(?:real\s*name|applier(?:'s)?\s*name|name)\s*[:：\-–]\s*(.+)$/i);
+        const rnameCand = (rnameLbl ? rnameLbl[1] : l).trim();
+        const hasRname = !hasNid && !/\d/.test(rnameCand) && /^[A-Za-z][A-Za-z.'\-]*(?:\s+[A-Za-z][A-Za-z.'\-]*){0,3}$/.test(rnameCand);
         let chips = '';
         if (hasNid) chips += `<button type="button" class="ocr-chip" data-act="nid">→ NID</button>`;
         if (hasNum && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="uid">→ User ID</button>`;
         if (hasOther && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="otherapp">→ Otherapp</button>`;
+        if (hasRname) chips += `<button type="button" class="ocr-chip" data-act="rname">→ Real Name</button>`;
         if (hasWord) chips += `<button type="button" class="ocr-chip" data-act="name">→ Name</button>`;
         if (!chips) return '';
         return `<div class="ocr-line" data-val="${escAttr(l)}"><span class="ocr-line-txt">${escHtml(l)}</span><span class="ocr-chips">${chips}</span></div>`;
@@ -25623,6 +25629,9 @@ function samFocusNext(from) {
     const coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
 
     // ── OCR chip clicks (delegated -- chips are re-rendered per OCR run) ──
+    // Phase 64 (Ahmed): CAPTURE phase -- the lightbox extract panel carries an
+    // inline onclick="event.stopPropagation()" that swallowed every chip tap
+    // before it could bubble up to document, so NO chip ever filled a field.
     document.addEventListener('click', (e) => {
         const chip = e.target.closest && e.target.closest('.ocr-chip');
         if (!chip) return;
@@ -25638,9 +25647,15 @@ function samFocusNext(from) {
             const num = clean.match(/\b\d{4,16}\b/);
             if (mix) value = mix[0]; else if (num) value = num[0];
         }
+        if (act === 'rname') { // Phase 64 (Ahmed): applier real name -- 1 to 4 words
+            const lbl = txt.match(/(?:real\s*name|applier(?:'s)?\s*name|name)\s*[:：\-–]\s*(.+)$/i);
+            const cand = (lbl ? lbl[1] : txt).trim();
+            const wm = cand.match(/[A-Za-z][A-Za-z.'\-]*/g);
+            if (wm && wm.length) value = wm.slice(0, 4).join(' ');
+        }
         const form = document.getElementById('tw-form');
         if (!form) { ToastManager.show('Open a ticket first, then tap a chip to insert', 'info', 3000); return; }
-        const names = act === 'nid' ? ['NID Number'] : act === 'otherapp' ? ['Otherapp ID'] : act === 'uid' ? ['User ID', 'New ID', 'Old ID'] : ['Name', 'Host Name', 'Owner Name', 'New agency name', 'Agency Name'];
+        const names = act === 'nid' ? ['NID Number'] : act === 'otherapp' ? ['Otherapp ID'] : act === 'rname' ? ['Applier real name', 'Applier Real Name'] : act === 'uid' ? ['User ID', 'New ID', 'Old ID'] : ['Name', 'Host Name', 'Owner Name', 'New agency name', 'Agency Name'];
         let used = '';
         for (const n of names) {
             const el = Array.from(form.querySelectorAll(`[name="${n}"]`)).find(x => !x.disabled && !x.readOnly && (x.tagName === 'TEXTAREA' || x.tagName === 'INPUT'));
@@ -25652,8 +25667,8 @@ function samFocusNext(from) {
             used = n; break;
         }
         if (used) { chip.classList.add('done'); ToastManager.show('Inserted into "' + used + '"', 'success', 2200); }
-        else ToastManager.show('No editable ' + (act === 'nid' ? 'NID' : act === 'otherapp' ? 'Otherapp ID' : act === 'uid' ? 'User ID' : 'Name') + ' field in this request type', 'warning', 3500);
-    });
+        else ToastManager.show('No editable ' + (act === 'nid' ? 'NID' : act === 'otherapp' ? 'Otherapp ID' : act === 'rname' ? 'Applier Real Name' : act === 'uid' ? 'User ID' : 'Name') + ' field in this request type', 'warning', 3500);
+    }, true); // capture: see note above
 
     // ── Use-last chip: render whenever create-mode chrome re-applies ──
     if (typeof twApplyCreateModeChrome === 'function') {
@@ -25977,6 +25992,179 @@ function samFocusNext(from) {
         }
     } catch (e) {}
 })();
+</script>
+
+<style id="samurai-mobile-v17">
+/* ═══ Samurai v17 / Phase 64 + Phase A (Ahmed, 2026-11-05) ═══
+   Attendance: skeleton loading + summary strip + saved filters.
+   Schedule: mobile day view (one day at a time) + saved search. */
+.sam-skel-note{padding:16px 4px 10px;font-size:.8rem;color:var(--text-muted);}
+.sam-skel-card{height:96px;border-radius:14px;margin:0 0 12px;border:1px solid var(--border);
+ background:linear-gradient(90deg,var(--surface) 25%,var(--surface-hover) 50%,var(--surface) 75%);
+ background-size:200% 100%;animation:samSkel 1.15s linear infinite;}
+@keyframes samSkel{to{background-position:-200% 0;}}
+.sam-atm-sum{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+.sam-atm-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+ border:1px solid var(--border);background:var(--surface);font-size:.76rem;font-weight:700;
+ color:var(--text);cursor:pointer;font-family:inherit;}
+.sam-atm-chip:hover{border-color:var(--border-hover);}
+.sam-atm-chip b{font-weight:800;}
+.sam-atm-chip.ok{border-color:rgba(0,230,118,.4);color:var(--accent-green);}
+.sam-atm-chip.warn{border-color:rgba(255,184,0,.4);color:var(--accent-amber);}
+.sam-schdaynav{display:none;gap:6px;overflow-x:auto;padding:2px 2px 8px;-webkit-overflow-scrolling:touch;}
+.sam-sch-daybtn{flex:none;padding:7px 13px;border-radius:999px;border:1px solid var(--border);
+ background:var(--surface);color:var(--text-muted);font-size:.76rem;font-weight:700;cursor:pointer;font-family:inherit;}
+.sam-sch-daybtn.on{border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(0,212,255,.1);}
+.sam-sch-daybtn.istoday{box-shadow:inset 0 -2px 0 var(--accent-cyan);}
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
+ .sam-schdaynav{display:flex;}
+ /* team week grid: one day at a time, agent column pinned */
+ .sch-mobday .sch-grid{min-width:0;}
+ .sch-mobday .sch-grid tr>*{display:none;}
+ .sch-mobday .sch-grid tr>*:first-child{display:table-cell;width:118px;}
+ .sch-mobday[data-actday="0"] .sch-grid tr>*:nth-child(2),
+ .sch-mobday[data-actday="1"] .sch-grid tr>*:nth-child(3),
+ .sch-mobday[data-actday="2"] .sch-grid tr>*:nth-child(4),
+ .sch-mobday[data-actday="3"] .sch-grid tr>*:nth-child(5),
+ .sch-mobday[data-actday="4"] .sch-grid tr>*:nth-child(6),
+ .sch-mobday[data-actday="5"] .sch-grid tr>*:nth-child(7),
+ .sch-mobday[data-actday="6"] .sch-grid tr>*:nth-child(8){display:table-cell;}
+ /* my schedule: swipeable day cards */
+ #schMyWeek.sch-myweek{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;}
+ #schMyWeek.sch-myweek .sch-day{min-width:74%;scroll-snap-align:center;}
+}
+</style>
+<script id="samurai-mobile-v17-js">
+/* ═══ Samurai v17 / Phase 64 + Phase A JS (Ahmed, 2026-11-05) ═══ */
+// Top-level (NOT IIFE) — samSchSetDay is called from inline onclick.
+
+// ── Attendance: summary strip (agents + warning mix for the visible range) ──
+function samAtmSummary() {
+    const host = document.getElementById('atmHost');
+    if (!host || typeof atmData === 'undefined' || !atmData) return;
+    let bar = document.getElementById('atmSummary');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'atmSummary';
+        bar.className = 'sam-atm-sum';
+        host.parentNode.insertBefore(bar, host);
+    }
+    const q = ((document.getElementById('atmSearch') || {}).value || '').trim().toLowerCase();
+    const agents = (atmData.agents || []).filter(a => !q || (a.name || '').toLowerCase().includes(q) || (a.email || '').includes(q));
+    const ws = (atmData.warnings || []);
+    const KINDS = { no_show: ['🚫', 'Absent'], late: ['⏰', 'Late'], gap: ['🔴', 'Offline gap'], missing: ['⚠️', 'Unworked'], early: ['↩', 'Left early'] };
+    const counts = {};
+    ws.forEach(w => { counts[w.kind] = (counts[w.kind] || 0) + 1; });
+    const flagged = new Set(ws.map(w => w.agent)).size;
+    let h = '<span class="sam-atm-chip" style="cursor:default">👥 <b>' + agents.length + '</b>&nbsp;agents</span>';
+    Object.keys(KINDS).forEach(k => {
+        if (counts[k]) h += '<button type="button" class="sam-atm-chip" onclick="document.getElementById(\'atmWarnCard\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">'
+            + KINDS[k][0] + ' ' + KINDS[k][1] + ' <b>' + counts[k] + '</b></button>';
+    });
+    if (!ws.length) h += '<span class="sam-atm-chip ok" style="cursor:default">✅ No warnings in this range</span>';
+    else h += '<span class="sam-atm-chip warn" style="cursor:default">⚠️ <b>' + flagged + '</b>&nbsp;agent' + (flagged === 1 ? '' : 's') + ' flagged</span>';
+    bar.innerHTML = h;
+}
+
+// ── Attendance: saved filter (search + week/month mode) ──
+if (typeof atmRender === 'function') {
+    const _samV17AtmRender = atmRender;
+    atmRender = function () {
+        const r = _samV17AtmRender.apply(this, arguments);
+        try {
+            localStorage.setItem('xena.atm.q', (document.getElementById('atmSearch') || {}).value || '');
+            samAtmSummary();
+        } catch (e) {}
+        return r;
+    };
+}
+if (typeof atmSetMode === 'function') {
+    const _samV17AtmSetMode = atmSetMode;
+    atmSetMode = function (m) {
+        try { localStorage.setItem('xena.atm.mode', m === 'month' ? 'month' : 'week'); } catch (e) {}
+        return _samV17AtmSetMode.apply(this, arguments);
+    };
+}
+if (typeof atmOnOpen === 'function') {
+    const _samV17AtmOnOpen = atmOnOpen;
+    atmOnOpen = function () {
+        try {
+            const q = localStorage.getItem('xena.atm.q');
+            const inp = document.getElementById('atmSearch');
+            if (q && inp && !inp.value) inp.value = q;
+            const m = localStorage.getItem('xena.atm.mode');
+            if ((m === 'month' || m === 'week') && typeof atmMode !== 'undefined' && m !== atmMode) atmMode = m;
+        } catch (e) {}
+        return _samV17AtmOnOpen.apply(this, arguments);
+    };
+}
+
+// ── Schedule: saved search ──
+if (typeof schRenderAll === 'function') {
+    const _samV17SchRenderAll = schRenderAll;
+    schRenderAll = function () {
+        try { localStorage.setItem('xena.sch.q', (document.getElementById('schSearch') || {}).value || ''); } catch (e) {}
+        return _samV17SchRenderAll.apply(this, arguments);
+    };
+}
+if (typeof schOnOpen === 'function') {
+    const _samV17SchOnOpen = schOnOpen;
+    schOnOpen = function () {
+        try {
+            const q = localStorage.getItem('xena.sch.q');
+            const inp = document.getElementById('schSearch');
+            if (q && inp && !inp.value) inp.value = q;
+        } catch (e) {}
+        return _samV17SchOnOpen.apply(this, arguments);
+    };
+}
+
+// ── Schedule: mobile day view (team week grid, one day at a time) ──
+function samSchSetDay(i) {
+    const wrap = document.getElementById('schTeamWeekWrap');
+    if (!wrap) return;
+    wrap.classList.add('sch-mobday');
+    wrap.dataset.actday = String(i);
+    const nav = document.getElementById('samSchDayNav');
+    if (nav) Array.from(nav.children).forEach((b, j) => b.classList.toggle('on', j === i));
+}
+function samSchDayNav(days, todayInt) {
+    const wrap = document.getElementById('schTeamWeekWrap');
+    const grid = document.getElementById('schGrid');
+    if (!wrap || !grid) return;
+    const mobile = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || window.innerWidth <= 600;
+    let nav = document.getElementById('samSchDayNav');
+    if (!mobile || !Array.isArray(days) || !days.length) {
+        wrap.classList.remove('sch-mobday');
+        if (nav) nav.style.display = 'none';
+        return;
+    }
+    if (!nav) {
+        nav = document.createElement('div');
+        nav.id = 'samSchDayNav';
+        nav.className = 'sam-schdaynav';
+        wrap.insertBefore(nav, grid);
+    }
+    nav.style.display = '';
+    const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    nav.innerHTML = days.map((d, i) => {
+        const di = schDayInt(d);
+        return '<button type="button" class="sam-sch-daybtn' + (di === todayInt ? ' istoday' : '') + '" data-dayidx="' + i + '" onclick="samSchSetDay(' + i + ')">'
+            + DOW[(d.getDay() + 6) % 7] + ' ' + d.getDate() + '</button>';
+    }).join('');
+    let idx = days.findIndex(d => schDayInt(d) === todayInt);
+    const cur = parseInt(wrap.dataset.actday || '-1', 10);
+    if (idx < 0) idx = (cur >= 0 && cur < days.length) ? cur : 0;
+    samSchSetDay(idx);
+}
+if (typeof schRenderGrid === 'function') {
+    const _samV17SchRenderGrid = schRenderGrid;
+    schRenderGrid = function (days, todayInt) {
+        const r = _samV17SchRenderGrid.apply(this, arguments);
+        try { samSchDayNav(days, todayInt); } catch (e) {}
+        return r;
+    };
+}
 </script>
 
 </body>
