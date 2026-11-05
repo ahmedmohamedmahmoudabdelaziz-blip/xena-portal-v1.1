@@ -33,6 +33,12 @@ MOCK_MODE = not bool(APP_ID and APP_SECRET)
 APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL_DEPLOYMENT_ID")
                or f"local-{int(time.time())}")
 
+# Human-readable build tag -- bumped every shipped phase so anyone can verify in
+# 5 seconds WHICH version is actually live ("did the right files get deployed?"
+# needs to never require guessing again). Surfaced by /api/app-version and the
+# frontend version badge; the badge warns when FE and BE tags disagree.
+XENA_BUILD = "v19 Phase C 2026-11-05"
+
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
@@ -2963,7 +2969,7 @@ def app_version():
     detect a new deploy shipping mid-session and force a fresh login rather
     than keep running stale code (or, worse, against server logic that's
     already changed)."""
-    return jsonify({"version": APP_VERSION})
+    return jsonify({"version": APP_VERSION, "build": XENA_BUILD})
 
 @app.route('/api/auth/check-session', methods=['GET'])
 def check_session():
@@ -10857,12 +10863,35 @@ def audition_schedule_get():
             redis_set_json(ck, {"v": ver, "rows": rows}, ttl=SCHED_READ_TTL)
         except Exception:
             pass
+    # Phase 66 (C): draft/publish -- agents read the last PUBLISHED snapshot
+    # of a week (draft edits stay invisible); admins read live rows plus the
+    # per-week draft state. Weeks never published stay live for everyone.
+    weeks_meta = {}
+    try:
+        for wk in sorted({_sched_week_key(d) for d in _sched_day_range(from_day, to_day, cap=SCHED_MAX_SPAN * 2 + 7)}):
+            pub = _sched_pub_get(wk)
+            try:
+                dirty = redis_get_json("xena:sched:dirty:%d" % wk)
+            except Exception:
+                dirty = None
+            weeks_meta[str(wk)] = {"published": bool(pub),
+                                   "published_at": (pub or {}).get("ts"),
+                                   "published_by": (pub or {}).get("by"),
+                                   "dirty": bool(dirty)}
+            if pub and not is_admin:
+                wk_days = set(_sched_day_range(wk, _sched_day_add(wk, 6), cap=7))
+                snap = [dict(r) for r in (pub.get("rows") or [])
+                        if from_day <= int(r.get("day") or 0) <= to_day]
+                rows = [r for r in rows if r.get("day") not in wk_days] + snap
+    except Exception:
+        pass
     if not is_admin:
         em, nm = (email or "").strip().lower(), (user or "").strip().lower()
         rows = [r for r in rows if (em and (r.get("email") or "").lower() == em)
                 or (nm and (r.get("name") or "").strip().lower() == nm)]
     return jsonify({"success": True, "from": from_day, "to": to_day,
                     "types": list(SCHED_TYPES), "rows": rows,
+                    "weeks": weeks_meta,
                     "server_time_ms": int(time.time() * 1000),
                     "admin": is_admin})
 
@@ -10923,6 +10952,169 @@ def audition_schedule_save():
             pass
     if not days:
         return jsonify({"success": False, "error": "No valid day found in the request."}), 400
+    by = user or email
+    res = _sched_write(entries[:500], delete_keys, by, token)
+    created_n, updates, deleted, errs = res["created"], res["updated"], res["deleted"], res["errors"]
+    # Phase 66 (C): every save leaves the touched weeks in DRAFT state until
+    # an admin publishes them -- agents keep reading the last snapshot.
+    try:
+        for d in dict.fromkeys(days):
+            _sched_dirty_mark(_sched_week_key(d), by)
+    except Exception:
+        pass
+    try:
+        audit.log(user, "AUDITION_SCHEDULE_SAVE", f"+{created_n}/~{updates}/-{deleted}", severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": not errs, "created": created_n,
+                    "updated": updates, "deleted": deleted, "errors": errs[:10]})
+
+
+# ═══ Phase 66 / Phase C (Ahmed, 2026-11-05): draft/publish schedules, swap
+# requests, Feishu alerts ═══
+# Publish model: publishing SNAPSHOTS the week's live rows into Redis
+# (xena:sched:pub:<monday-int>). Agents read the snapshot (drafts stay
+# invisible until published); admins read live rows with a draft badge.
+# Any save marks the week dirty; Discard restores the live rows to the
+# snapshot. Alerts go through the SAME bot the portal already uses -- sending
+# Feishu messages is free within open-platform rate limits; alert failures
+# never block the action, they are reported in the response payload.
+
+SCHED_PUB_TTL     = 86400 * 366
+SCHED_SWAPS_KEY   = "xena:sched:swaps"
+SCHED_SWAPS_MAX   = 100
+SCHED_SWAPS_RECENT = 30
+
+def _sched_week_key(day_int):
+    """Monday (yyyymmdd int) of the week containing day_int."""
+    try:
+        dt = datetime.strptime(str(int(day_int)), "%Y%m%d")
+    except Exception:
+        return None
+    return int((dt - timedelta(days=dt.weekday())).strftime("%Y%m%d"))
+
+def _sched_pub_get(wk):
+    try:
+        v = redis_get_json("xena:sched:pub:%d" % wk)
+        return v if isinstance(v, dict) else None
+    except Exception:
+        return None
+
+def _sched_pub_set(wk, payload):
+    try:
+        redis_set_json("xena:sched:pub:%d" % wk, payload, ttl=SCHED_PUB_TTL)
+    except Exception:
+        pass
+
+def _sched_dirty_mark(wk, by):
+    try:
+        redis_set_json("xena:sched:dirty:%d" % wk,
+                       {"by": by or "", "ts": int(time.time() * 1000)}, ttl=SCHED_PUB_TTL)
+    except Exception:
+        pass
+
+def _sched_dirty_clear(wk):
+    try:
+        redis_set_json("xena:sched:dirty:%d" % wk, None, ttl=SCHED_PUB_TTL)
+    except Exception:
+        pass
+
+def _sched_swaps_all():
+    try:
+        v = redis_get_json(SCHED_SWAPS_KEY)
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
+
+def _sched_swaps_put(lst):
+    try:
+        redis_set_json(SCHED_SWAPS_KEY, lst[:SCHED_SWAPS_MAX], ttl=SCHED_PUB_TTL)
+    except Exception:
+        pass
+
+def _sched_roster_map(token):
+    """email -> {open_id, name} from the Agent Roster (for Feishu alerts)."""
+    out = {}
+    try:
+        amap = _access_name_email_map()
+        rr = feishu_session.post(
+            "https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search" % (BASE_ID, ROSTER_TABLE_ID),
+            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json; charset=utf-8"},
+            params={"page_size": 100}, json={"field_names": None}, timeout=15).json()
+        for it in (rr.get("data") or {}).get("items") or []:
+            f = it.get("fields") or {}
+            name, oid, em = "", "", ""
+            an = f.get("Agent Name")
+            if isinstance(an, list) and an and isinstance(an[0], dict):
+                name = str(an[0].get("name") or "")
+                oid = str(an[0].get("id") or "")
+                em = str(an[0].get("email") or "").strip().lower()
+            flat = {k: _att_text(v) for k, v in f.items()}
+            disp = name or _att_text(f.get("Agent")) or ""
+            if not em and disp:
+                em = amap.get(disp.strip().lower(), "")
+            if not em:
+                for k, v in flat.items():
+                    if "@" in str(v) and "." in str(v):
+                        em = str(v).strip().lower()
+                        break
+            if em:
+                out[em] = {"open_id": oid, "name": name or disp}
+    except Exception:
+        pass
+    return out
+
+def _feishu_send_text(token, open_id, text):
+    """Bot IM message (free within open-platform limits). Returns (ok, msg)."""
+    if not open_id:
+        return False, "no open_id on the roster"
+    try:
+        r = feishu_session.post(
+            "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id",
+            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json; charset=utf-8"},
+            json={"receive_id": open_id, "msg_type": "text", "content": json.dumps({"text": text})},
+            timeout=15).json()
+        return (r.get("code") == 0), str(r.get("msg") or "")
+    except Exception as e:
+        return False, str(e)
+
+def _sched_alert(token, emails, text, rmap=None):
+    """Best-effort alert to a set of emails; returns a summary. NEVER raises."""
+    out = {"sent": 0, "failed": 0, "error": ""}
+    try:
+        rmap = rmap if rmap is not None else _sched_roster_map(token)
+        for em in emails:
+            info = (rmap or {}).get((em or "").lower())
+            ok, msg = _feishu_send_text(token, (info or {}).get("open_id") or "", text)
+            out["sent" if ok else "failed"] += 1
+            if not ok and not out["error"]:
+                out["error"] = msg
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+def _sched_cairo_today():
+    try:
+        return int((datetime.utcnow() + timedelta(minutes=CAIRO_OFFSET_MIN)).strftime("%Y%m%d"))
+    except Exception:
+        return 0
+
+def _sched_write(entries, delete_keys, by, token):
+    """Phase 66 (C): the shared Schedule-table write machinery (upserts keyed
+    email|day + deletes, batched, one version bump at the end) -- now used by
+    the admin save route, draft-discard and swap approvals alike."""
+    base_url = "https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records" % (BASE_ID, SCHED_TABLE_ID)
+    headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json; charset=utf-8"}
+    days = []
+    for e in entries:
+        days.append(e["day"])
+    for k in delete_keys:
+        try:
+            days.append(int(str(k).rsplit("|", 1)[1]))
+        except Exception:
+            pass
+    if not days:
+        return {"created": 0, "updated": 0, "deleted": 0, "errors": ["No valid day in the write batch."]}
     lo, hi = min(days), max(days)
     existing = {}
     try:
@@ -10931,10 +11123,9 @@ def audition_schedule_save():
             if k:
                 existing[k] = it.get("record_id")
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 502
-    by = user or email
+        return {"created": 0, "updated": 0, "deleted": 0, "errors": [str(e)]}
     creates, upd_recs, deleted, errs = [], [], 0, []
-    for e in entries[:500]:
+    for e in entries:
         em = (e.get("email") or "").strip().lower()
         fields = _sched_fields(em, e.get("name") or em, e["day"], e["type"],
                                sanitize_text(str(e.get("start") or ""), max_length=8),
@@ -10945,52 +11136,274 @@ def audition_schedule_save():
             upd_recs.append({"record_id": rid, "fields": fields})
         else:
             creates.append({"fields": fields})
-    # Phase 33: batch_update replaces the serial single-PUT-per-row loop --
-    # every PUT was its own cross-border round-trip (0.5-1s each, a 10-cell
-    # save took 10s+). Now it is one round-trip per 100 rows.
     updates = 0
     for i in range(0, len(upd_recs), 100):
         chunk = upd_recs[i:i + 100]
         try:
-            r = feishu_session.post(f"{base_url}/batch_update", headers=headers,  # Phase 37: POST-only
-                                   json={"records": chunk}, timeout=30).json()
+            r = feishu_session.post(base_url + "/batch_update", headers=headers,
+                                    json={"records": chunk}, timeout=30).json()
             if r.get("code") == 0:
                 updates += len(chunk)
             else:
-                errs.append(f"batch_update: {r.get('code')}: {r.get('msg')}")
+                errs.append("batch_update: %s: %s" % (r.get("code"), r.get("msg")))
         except Exception as ex:
-            errs.append(f"batch_update: {ex}")
+            errs.append("batch_update: %s" % ex)
     created_n = 0
     for i in range(0, len(creates), 400):
         chunk = creates[i:i + 400]
         try:
-            r = feishu_session.post(f"{base_url}/batch_create", headers=headers,
+            r = feishu_session.post(base_url + "/batch_create", headers=headers,
                                     json={"records": chunk}, timeout=30).json()
             if r.get("code") == 0:
                 created_n += len(chunk)
             else:
-                errs.append(f"batch_create: {r.get('code')}: {r.get('msg')}")
+                errs.append("batch_create: %s: %s" % (r.get("code"), r.get("msg")))
         except Exception as ex:
-            errs.append(f"batch_create: {ex}")
+            errs.append("batch_create: %s" % ex)
     if delete_keys:
         rids = [existing[k] for k in delete_keys if k in existing]
         for i in range(0, len(rids), 400):
             try:
-                r = feishu_session.post(f"{base_url}/batch_delete", headers=headers,
+                r = feishu_session.post(base_url + "/batch_delete", headers=headers,
                                         json={"records": rids[i:i + 400]}, timeout=30).json()
                 if r.get("code") == 0:
                     deleted += len(rids[i:i + 400])
                 else:
-                    errs.append(f"batch_delete: {r.get('code')}: {r.get('msg')}")
+                    errs.append("batch_delete: %s: %s" % (r.get("code"), r.get("msg")))
             except Exception as ex:
-                errs.append(f"batch_delete: {ex}")
+                errs.append("batch_delete: %s" % ex)
+    _sched_bump()
+    return {"created": created_n, "updated": updates, "deleted": deleted, "errors": errs}
+
+@app.route('/api/audition/schedule/publish', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_publish():
+    """Admin: snapshot the week's live rows as the PUBLISHED schedule, clear
+    the draft flag and alert every agent scheduled that week via Feishu."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    wk = _sched_week_key(_sched_day_ok(body.get('week')))
+    if not wk:
+        return jsonify({"success": False, "error": "Need a valid day for the week (yyyymmdd)."}), 400
+    token = get_tenant_access_token()
+    try:
+        rows = [_sched_row_out(it) for it in _sched_search_range(wk, _sched_day_add(wk, 6), token)]
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    by = user or email
+    _sched_pub_set(wk, {"rows": rows, "by": by, "ts": int(time.time() * 1000)})
+    _sched_dirty_clear(wk)
     _sched_bump()
     try:
-        audit.log(user, "AUDITION_SCHEDULE_SAVE", f"+{created_n}/~{updates}/-{deleted}", severity="Info")
+        label = datetime.strptime(str(wk), "%Y%m%d").strftime("%a %d %b %Y")
+    except Exception:
+        label = str(wk)
+    alerts = _sched_alert(token, sorted({(r.get("email") or "").lower() for r in rows if r.get("email")}),
+                          "📅 Xena audition schedule for the week of " + label + " is published — open the portal → Audition Schedule to see your shifts.")
+    try:
+        audit.log(user, "AUDITION_SCHEDULE_PUBLISH", "week %s rows=%s alerts=%s" % (wk, len(rows), alerts["sent"]), severity="Info")
     except Exception:
         pass
-    return jsonify({"success": not errs, "created": created_n,
-                    "updated": updates, "deleted": deleted, "errors": errs[:10]})
+    return jsonify({"success": True, "week": wk, "rows": len(rows), "alerts": alerts})
+
+@app.route('/api/audition/schedule/discard', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_draft_discard():
+    """Admin: roll the week's LIVE rows back to the last published snapshot
+    (undoes every unpublished draft edit). Refuses if never published."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms or not _sched_is_admin(perms):
+        return jsonify({"success": False, "error": "Admin only."}), 403
+    wk = _sched_week_key(_sched_day_ok(body.get('week')))
+    if not wk:
+        return jsonify({"success": False, "error": "Need a valid day for the week (yyyymmdd)."}), 400
+    pub = _sched_pub_get(wk)
+    if not pub:
+        return jsonify({"success": False, "error": "This week was never published — there is no snapshot to restore to."}), 400
+    token = get_tenant_access_token()
+    try:
+        live = [_sched_row_out(it) for it in _sched_search_range(wk, _sched_day_add(wk, 6), token)]
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    snap_keys = {(r.get("email") or "").lower() + "|" + str(r.get("day")) for r in (pub.get("rows") or [])}
+    entries = [{"email": r.get("email") or "", "name": r.get("name") or "",
+                "day": int(r.get("day") or 0), "type": r.get("type") or "On Site",
+                "start": r.get("start") or "", "end": r.get("end") or "",
+                "note": r.get("note") or ""}
+               for r in (pub.get("rows") or []) if (r.get("email") or "").strip() and r.get("day")]
+    delete_keys = [(r.get("email") or "").lower() + "|" + str(r.get("day"))
+                   for r in live
+                   if (r.get("email") or "").lower() + "|" + str(r.get("day")) not in snap_keys]
+    by = user or email
+    res = _sched_write(entries, delete_keys, by, token)
+    if res["errors"]:
+        return jsonify({"success": False, "error": "; ".join(res["errors"][:3]), "detail": res}), 502
+    _sched_dirty_clear(wk)
+    try:
+        audit.log(user, "AUDITION_SCHEDULE_DISCARD", "week %s restored %s deleted %s" % (wk, len(entries), len(delete_keys)), severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": True, "week": wk, "restored": len(entries), "deleted": len(delete_keys)})
+
+@app.route('/api/audition/schedule/swap-request', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_swap_request():
+    """Agent: ask a colleague to SWAP shifts with me on one day. Both rows
+    must exist; the target (or an admin) approves in the portal and the
+    approval performs the actual exchange. Target gets a Feishu alert."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    day = _sched_day_ok(body.get('day'))
+    to_email = (sanitize_text(body.get('with_email')) or "").strip().lower()
+    my_email = (email or "").strip().lower()
+    if not day:
+        return jsonify({"success": False, "error": "Need a valid day (yyyymmdd)."}), 400
+    if not to_email or not my_email:
+        return jsonify({"success": False, "error": "Need your email and the colleague's email."}), 400
+    if to_email == my_email:
+        return jsonify({"success": False, "error": "You cannot swap with yourself."}), 400
+    token = get_tenant_access_token()
+    try:
+        rows = [_sched_row_out(it) for it in _sched_search_range(day, day, token)]
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    mine = next((r for r in rows if (r.get("email") or "").lower() == my_email), None)
+    theirs = next((r for r in rows if (r.get("email") or "").lower() == to_email), None)
+    if not mine:
+        return jsonify({"success": False, "error": "You have no shift on that day — nothing to swap."}), 400
+    if not theirs:
+        return jsonify({"success": False, "error": "That colleague has no shift on that day — pick someone scheduled that day."}), 400
+    swaps = _sched_swaps_all()
+    for x in swaps:
+        if (x.get("status") == "pending" and int(x.get("day") or 0) == day
+                and (x.get("from_email") or "").lower() == my_email
+                and (x.get("to_email") or "").lower() == to_email):
+            return jsonify({"success": False, "error": "You already have a pending swap request with this colleague for that day."}), 400
+    swaps.insert(0, {"id": uuid.uuid4().hex[:12], "day": day,
+                    "from_email": my_email, "from_name": mine.get("name") or my_email,
+                    "to_email": to_email, "to_name": theirs.get("name") or to_email,
+                    "status": "pending", "ts": int(time.time() * 1000)})
+    _sched_swaps_put(swaps)
+    _sched_alert(token, [to_email],
+                 "⇄ Swap request: " + (mine.get("name") or my_email) + " asks to swap shifts with you on " + str(day) + ". Open the portal → Audition Schedule → Swap requests to approve or decline.")
+    try:
+        audit.log(user, "AUDITION_SCHEDULE_SWAP_REQ", "%s -> %s day %s" % (my_email, to_email, day), severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": True})
+
+@app.route('/api/audition/schedule/swaps', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_swaps_list():
+    """Swaps that involve me (plus all pending for admins). Pending swaps
+    whose day has passed are auto-expired on read."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    is_admin = _sched_is_admin(perms)
+    me = (email or "").strip().lower()
+    today = _sched_cairo_today()
+    swaps = _sched_swaps_all()
+    changed = False
+    for x in swaps:
+        if x.get("status") == "pending" and int(x.get("day") or 0) < today:
+            x["status"] = "expired"
+            changed = True
+    if changed:
+        _sched_swaps_put(swaps)
+    out = []
+    for x in swaps:
+        mine = bool(me) and ((x.get("from_email") or "").lower() == me or (x.get("to_email") or "").lower() == me)
+        if is_admin:
+            if x.get("status") == "pending" or mine:
+                out.append(x)
+        elif mine:
+            out.append(x)
+        if len(out) >= SCHED_SWAPS_RECENT:
+            break
+    return jsonify({"success": True, "swaps": out, "today": today})
+
+@app.route('/api/audition/schedule/swap-decide', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_swap_decide():
+    """Target agent (or admin) approves/declines a swap. Approving performs
+    the actual exchange of the two shifts through the shared write machinery."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    is_admin = _sched_is_admin(perms)
+    sid = sanitize_text(body.get('id'))
+    decision = sanitize_text(body.get('decision'))
+    if not sid or decision not in ("approve", "decline"):
+        return jsonify({"success": False, "error": "Need id and decision=approve|decline."}), 400
+    me = (email or "").strip().lower()
+    swaps = _sched_swaps_all()
+    x = next((y for y in swaps if y.get("id") == sid), None)
+    if not x:
+        return jsonify({"success": False, "error": "Swap request not found."}), 404
+    if x.get("status") != "pending":
+        return jsonify({"success": False, "error": "This request is already " + str(x.get("status")) + "."}), 400
+    if not is_admin and (x.get("to_email") or "").lower() != me:
+        return jsonify({"success": False, "error": "Only the asked colleague (or an admin) can decide this swap."}), 403
+    token = get_tenant_access_token()
+    day = int(x.get("day") or 0)
+    if decision == "approve":
+        try:
+            rows = [_sched_row_out(it) for it in _sched_search_range(day, day, token)]
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 502
+        fe, te = (x.get("from_email") or "").lower(), (x.get("to_email") or "").lower()
+        a = next((r for r in rows if (r.get("email") or "").lower() == fe), None)
+        b = next((r for r in rows if (r.get("email") or "").lower() == te), None)
+        if not a or not b:
+            x["status"] = "stale"
+            _sched_swaps_put(swaps)
+            return jsonify({"success": False, "error": "One of the two shifts no longer exists on that day — the request is void."}), 409
+        entries = [
+            {"email": fe, "name": a.get("name") or fe, "day": day, "type": b.get("type") or "On Site",
+             "start": b.get("start") or "", "end": b.get("end") or "", "note": b.get("note") or ""},
+            {"email": te, "name": b.get("name") or te, "day": day, "type": a.get("type") or "On Site",
+             "start": a.get("start") or "", "end": a.get("end") or "", "note": a.get("note") or ""}]
+        res = _sched_write(entries, [], user or email, token)
+        if res["errors"]:
+            return jsonify({"success": False, "error": "; ".join(res["errors"][:3])}), 502
+        x["status"] = "approved"
+        x["decided_by"] = user or email
+        x["decided_ts"] = int(time.time() * 1000)
+        _sched_swaps_put(swaps)
+        _sched_dirty_mark(_sched_week_key(day), user or email)
+        _sched_alert(token, [fe], "✅ Your swap on " + str(day) + " was approved by " + (x.get("to_name") or te) + " — the shifts are exchanged. Open the portal to see your new shift.")
+        try:
+            audit.log(user, "AUDITION_SCHEDULE_SWAP_OK", "%s <-> %s day %s" % (fe, te, day), severity="Info")
+        except Exception:
+            pass
+        return jsonify({"success": True, "status": "approved"})
+    x["status"] = "declined"
+    x["decided_by"] = user or email
+    x["decided_ts"] = int(time.time() * 1000)
+    _sched_swaps_put(swaps)
+    _sched_alert(token, [(x.get("from_email") or "")], "⛔ Your swap request on " + str(day) + " was declined. Open the portal to see other options or ask an admin.")
+    try:
+        audit.log(user, "AUDITION_SCHEDULE_SWAP_NO", "%s day %s" % (sid, day), severity="Info")
+    except Exception:
+        pass
+    return jsonify({"success": True, "status": "declined"})
 
 @app.route('/api/audition/schedule/agents', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
@@ -11735,7 +12148,7 @@ def audition_attendance():
         days_out, summ = {}, {"worked_days": 0, "worked_min": 0, "off_days": 0, "late_days": 0,
                               "late_min": 0, "gap_min": 0, "missing_min": 0, "break_min": 0,
                               "meeting_min": 0, "offline_min": 0, "no_show": 0, "early_min": 0,
-                              "ontask_min": 0, "ticket_min": 0}
+                              "ontask_min": 0, "ticket_min": 0, "avail_min": 0}
         for d in day_ints:
             ds = str(d)
             is_future = today_int is not None and d > today_int
@@ -11758,6 +12171,9 @@ def audition_attendance():
             off_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Offline")
             brk_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Break")
             mtg_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Meeting")
+            # Phase 66 (Ahmed): "avail" = minutes in the plain Online status --
+            # online in the app and NOT on any ticket (statuses are exclusive).
+            onl_min = sum(x["e"] - x["s"] for x in row_segs if x["st"] == "Online")
             # Phase 60: the sheet's own valid-time number wins when it exists
             valid_min = None
             _v = dl.get("valid")
@@ -11817,7 +12233,7 @@ def audition_attendance():
                 days_out[ds] = {"segments": row_segs, "inshift_gaps": [],
                                 "first": first_p, "last": last_p,
                                 "worked_min": 0, "ontask_min": 0, "ticket_min": 0, "offline_min": 0,
-                                "break_min": 0, "meeting_min": 0,
+                                "break_min": 0, "meeting_min": 0, "online_min": 0,
                                 "shift": shift, "late_min": 0, "gap_min": 0,
                                 "missing_min": 0, "early_min": 0,
                                 "flags": [], "punch_closed": dl.get("closed", False),
@@ -11856,6 +12272,7 @@ def audition_attendance():
                             "worked_min": round(worked_min, 1), "ontask_min": round(task_min, 1), "ticket_min": round(ticket_min, 1),
                             "offline_min": round(off_min, 1),
                             "break_min": round(brk_min, 1), "meeting_min": round(mtg_min, 1),
+                            "online_min": round(onl_min, 1),
                             "shift": shift, "late_min": late_min, "gap_min": round(gap_min, 1),
                             "missing_min": round(missing_min, 1), "early_min": early_min,
                             "flags": flags, "punch_closed": dl.get("closed", False)}
@@ -11875,6 +12292,7 @@ def audition_attendance():
             summ["offline_min"] += off_min
             summ["ontask_min"] += task_min
             summ["ticket_min"] += ticket_min
+            summ["avail_min"] += onl_min
             if late_min > ATT_LATE_MIN_ALERT:
                 summ["late_days"] += 1
         summ["worked_h"] = round(summ["worked_min"] / 60, 1)
