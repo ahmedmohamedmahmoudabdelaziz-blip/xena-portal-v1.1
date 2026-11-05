@@ -17272,16 +17272,19 @@ async function twSubmitNewTicketCore() {
     const submitterOpenId = localStorage.getItem('xenaOpenId') || '';
     if (submitterOpenId) finalData.append('open_id', submitterOpenId);
     finalData.append('payload', JSON.stringify(fields));
-    form.querySelectorAll('input[type="file"]').forEach(fInput => {
-        if (fInput.files.length > 0) {
-            Array.from(fInput.files).forEach(file => finalData.append(fInput.name, file));
+    // v22: compress oversized images BEFORE they enter the request body (see
+    // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
+    for (const fInput of form.querySelectorAll('input[type="file"]')) {
+        for (const file of Array.from(fInput.files)) {
+            finalData.append(fInput.name, await samCompressImageFile(file));
         }
-    });
+    }
 
     try {
         const res = await fetch('/api/requests/submit', { method: 'POST', body: finalData });
+        if (res.status === 413) throw new Error('the attached pic(s) are too large for the server (HTTP 413) — remove one or use smaller pics, then submit again');
         let data;
-        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response.'); }
+        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response (HTTP ' + res.status + ').'); }
         // Same session-expiry handling as submitReqForm: nothing was created,
         // so the draft stays filled for a resubmit right after re-login.
         if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
@@ -17532,10 +17535,17 @@ async function lightboxRunLarkExtract(src, myToken, force) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         let blob = await resp.blob();
 
-        // Feishu's OCR endpoint has a hard 5MB cap. Re-encode as a smaller JPEG via
-        // canvas instead of failing outright if the original attachment is bigger.
-        if (blob.size > 4.5 * 1024 * 1024 && img) {
+        // v22: the REAL bottleneck is upstream of Feishu -- this POST carries the
+        // image as base64 (+~37%), and Vercel rejects bodies over ~4.5MB with a
+        // plain-text 413 before Flask runs (that was Ahmed's "Unexpected token 'R'…"
+        // on the 4.39MB NID pic: base64 made it ~5.86MB). Anything over 3MB raw is
+        // re-encoded as a compact JPEG, with the shared compressor as a second
+        // stage for extreme cases.
+        if (blob.size > 3 * 1024 * 1024 && img) {
             blob = await lightboxDownscaleForOcr(img);
+        }
+        if (blob.size > 3 * 1024 * 1024) {
+            blob = await samCompressImageFile(new File([blob], 'ocr.jpg', { type: 'image/jpeg' }));
         }
 
         const base64 = await lightboxBlobToBase64(blob);
@@ -17544,6 +17554,7 @@ async function lightboxRunLarkExtract(src, myToken, force) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user: loggedUser, image: base64 })
         });
+        if (res.status === 413) throw new Error('the image is too large for the server (HTTP 413) — try a smaller pic');
         const data = await res.json();
 
         if (!data.success) {
@@ -17569,6 +17580,60 @@ async function lightboxExtractText() {
     const img = document.getElementById('imgLightboxImg');
     if (!img || !img.src) return;
     await lightboxRunLarkExtract(img.src, lightboxExtractToken, true);
+}
+
+// Phase v22 (Ahmed's 4.4MB NID pic, 2026-11-06): Vercel rejects request bodies
+// over ~4.5MB with a plain-text "Request Entity Too Large" (HTTP 413) BEFORE Flask
+// ever runs, and the OCR POST base64-inflates images ~37% -- so one big phone pic
+// broke BOTH ticket save and Lark OCR with the cryptic "Unexpected token 'R'…"
+// JSON error. Fix at the source: any image over 2.6MB is re-encoded to a compact
+// JPEG (max dim 3000 keeps NID digits crisp for OCR) BEFORE it enters FormData or
+// the OCR POST. Smaller files and non-images pass through byte-identical, and any
+// failure falls back to the original file so nothing new can break.
+const SAM_IMG_COMPRESS_TRIGGER = 2.6 * 1024 * 1024; // start compressing above this
+const SAM_IMG_COMPRESS_TARGET = 1.8 * 1024 * 1024;  // accept first result under this
+async function samCompressImageFile(file) {
+    try {
+        if (!file || !file.type || !file.type.startsWith('image/')) return file;
+        if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
+        if (file.size <= SAM_IMG_COMPRESS_TRIGGER) return file;
+        let bmp = null;
+        if (typeof createImageBitmap === 'function') {
+            try { bmp = await createImageBitmap(file); } catch (e) { bmp = null; }
+        }
+        if (!bmp) {
+            bmp = await new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const im = new Image();
+                im.onload = () => { URL.revokeObjectURL(url); resolve(im); };
+                im.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+                im.src = url;
+            });
+        }
+        const w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight;
+        if (!w0 || !h0) return file;
+        const nameStem = String(file.name || 'image').replace(/\.[a-z0-9]+$/i, '') || 'image';
+        for (const maxDim of [3000, 2400]) {
+            const scale = Math.min(1, maxDim / Math.max(w0, h0));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(w0 * scale));
+            canvas.height = Math.max(1, Math.round(h0 * scale));
+            canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+            for (const q of [0.87, 0.8, 0.72, 0.62]) {
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+                if (!blob) continue;
+                if (blob.size <= SAM_IMG_COMPRESS_TARGET || (maxDim === 2400 && q === 0.62)) {
+                    if (blob.size < file.size) {
+                        return new File([blob], nameStem + '.jpg', { type: 'image/jpeg', lastModified: file.lastModified || Date.now() });
+                    }
+                    return file;
+                }
+            }
+        }
+        return file;
+    } catch (e) {
+        return file; // fail-open: never block a save on a compression hiccup
+    }
 }
 
 function lightboxBlobToBase64(blob) {
@@ -18749,20 +18814,25 @@ async function twSaveWorkspace() {
 
     finalData.append('fields', JSON.stringify(fields));
     
-    form.querySelectorAll('input[type="file"]').forEach(fInput => {
-        if (fInput.files.length > 0) {
-            Array.from(fInput.files).forEach(file => {
-                finalData.append(fInput.name, file);
-            });
+    // v22: compress oversized images BEFORE they enter the request body (see
+    // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
+    for (const fInput of form.querySelectorAll('input[type="file"]')) {
+        for (const file of Array.from(fInput.files)) {
+            finalData.append(fInput.name, await samCompressImageFile(file));
         }
-    });
-    
+    }
+
     try {
         const res = await fetch('/api/requests/update', {
             method: 'POST',
             body: finalData
         });
-        const data = await res.json();
+        // v22: an oversized upload never reaches Flask -- Vercel answers with a
+        // plain-text 413, and res.json() blew up with "Unexpected token 'R'…"
+        // (Ahmed's 4.4MB NID pic). Say what actually happened instead.
+        if (res.status === 413) throw new Error('the attached pic(s) are too large for the server (HTTP 413) — remove one or use smaller pics, then save again');
+        let data;
+        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response (HTTP ' + res.status + ').'); }
         // Phase 10.29 (Ahmed): the backend now aborts the WHOLE save when any
         // attachment fails to upload (502 + failed_files) instead of silently
         // skipping the file. Surface that as a longer WARNING naming the
@@ -20527,21 +20597,22 @@ async function submitReqForm(e) {
 
         finalData.append('payload', JSON.stringify(payloadFields));
 
-        form.querySelectorAll('input[type="file"]').forEach(fInput => {
-            if (fInput.files.length > 0) {
-                Array.from(fInput.files).forEach(file => {
-                    finalData.append(fInput.name, file);
-                });
+        // v22: compress oversized images BEFORE they enter the request body (see
+        // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
+        for (const fInput of form.querySelectorAll('input[type="file"]')) {
+            for (const file of Array.from(fInput.files)) {
+                finalData.append(fInput.name, await samCompressImageFile(file));
             }
-        });
+        }
 
         const res = await fetch('/api/requests/submit', {
             method: 'POST',
             body: finalData
         });
 
+        if (res.status === 413) throw new Error('the attached pic(s) are too large for the server (HTTP 413) — remove one or use smaller pics, then submit again');
         let data;
-        try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response.'); }
+        try { data = await res.json(); } catch(err) { throw new Error('Server returned an invalid response (HTTP ' + res.status + ').'); }
 
         // The backend now refuses -- rather than silently filing the ticket under
         // the app's own identity -- once the agent's session is really gone
@@ -21565,16 +21636,19 @@ async function submitAuditForm(e) {
         if (submitterOpenId) finalData.append('open_id', submitterOpenId);
         finalData.append('payload', JSON.stringify(payloadFields));
 
-        form.querySelectorAll('input[type="file"]').forEach(fInput => {
-            if (fInput.files.length > 0) {
-                Array.from(fInput.files).forEach(file => finalData.append(fInput.name, file));
+        // v22: compress oversized images BEFORE they enter the request body (see
+        // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
+        for (const fInput of form.querySelectorAll('input[type="file"]')) {
+            for (const file of Array.from(fInput.files)) {
+                finalData.append(fInput.name, await samCompressImageFile(file));
             }
-        });
+        }
 
         const res = await fetch('/api/requests/submit', { method: 'POST', body: finalData });
 
+        if (res.status === 413) throw new Error('the attached pic(s) are too large for the server (HTTP 413) — remove one or use smaller pics, then submit again');
         let data;
-        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response.'); }
+        try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response (HTTP ' + res.status + ').'); }
 
         if (res.status === 401 && data.code === 'SESSION_EXPIRED') {
             forceSessionExpiredLogout(data.error || 'Your session has expired. Please log in again, then resubmit — everything you filled in was saved and will be restored automatically.');
@@ -26637,7 +26711,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v21 gestures+backkey 2026-11-06';
+window.SAM19_BUILD='v22 imgcompress 2026-11-06';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
