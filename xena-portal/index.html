@@ -55,7 +55,7 @@
         }
         
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;overflow-x:hidden;transition:background .3s,color .3s}
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:calc(100 * var(--vh));line-height:1.5;overflow-x:hidden;transition:background .3s,color .3s}
 
         #loginOverlay{position:fixed;inset:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000;padding:24px;background:var(--surface)}
         #loginOverlay .login-aurora{position:absolute;width:150vmax;height:150vmax;top:50%;left:50%;transform:translate(-50%,-50%);background:conic-gradient(from 0deg,rgba(0,212,255,0) 0deg,rgba(0,212,255,.22) 55deg,rgba(185,103,255,0) 130deg,rgba(185,103,255,.2) 210deg,rgba(0,212,255,0) 290deg,rgba(0,212,255,.22) 360deg);filter:blur(100px);animation:auroraSpin 46s linear infinite;pointer-events:none}
@@ -88,11 +88,11 @@
         @property --borderAngle{syntax:'<angle>';initial-value:0deg;inherits:false}
         @keyframes borderSpin{to{--borderAngle:360deg}}
 
-        .app-shell{display:none;flex-direction:row;min-height:100vh}
+        .app-shell{display:none;flex-direction:row;min-height:calc(100 * var(--vh))}
         
         .sidebar{width:240px;background:var(--sidebar-bg);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;overflow-x:hidden;transition:transform .3s}
         .sidebar * { color: var(--text-muted); }
-        .main-content{margin-left:240px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s; display:flex; flex-direction:column; height: 100vh; overflow: hidden;}
+        .main-content{margin-left:240px;flex:1;min-width:0;box-sizing:border-box;transition:margin-left .3s; display:flex; flex-direction:column; height: calc(100 * var(--vh)); overflow: hidden;}
         
         .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
         .sidebar-brand{font-size:1.05rem;font-weight:700;color:var(--text)!important;white-space:nowrap}
@@ -150,7 +150,7 @@
 
         .page-content-wrapper { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
 
-        .welcome-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:920px;margin:0 auto}
+        .welcome-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:16px;max-width:920px;margin:0 auto}
         .welcome-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:all .3s cubic-bezier(0.2, 0.8, 0.2, 1);box-shadow:var(--shadow);text-align:center; display:flex; flex-direction:column; align-items:center;}
         .welcome-card:hover{transform:translateY(-6px);border-color:var(--accent-cyan);box-shadow:0 12px 40px rgba(0,212,255,.15); background:linear-gradient(180deg, var(--surface) 0%, rgba(0,212,255,0.03) 100%);}
         .welcome-card-icon{margin-bottom:12px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(var(--ink-rgb),0.03);}
@@ -159,7 +159,7 @@
         .welcome-card-desc{font-size:.82rem;color:var(--text-muted);line-height:1.5}
 
         /* QY Cards (Universal Query & My Requests) */
-        .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+        .qy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:20px}
         .qy-card{background:linear-gradient(145deg, var(--surface) 0%, rgba(var(--ink-rgb),0.01) 100%);border:1px solid var(--border);border-radius:16px;padding:20px;transition:all .3s ease; position:relative; overflow:hidden;}
         .qy-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: transparent; transition: background 0.3s ease; }
         .qy-card:hover{border-color:var(--border-hover);transform:translateY(-4px);box-shadow:0 12px 30px rgba(0,0,0,0.4), 0 0 20px rgba(0,212,255,.05);}
@@ -255,7 +255,7 @@
         .agent-presence.pres-off i{background:#6b7280;}
         @keyframes presPulse{0%,100%{opacity:1}50%{opacity:.35}}
         /* ─── Phase 10.27: Preview Agent View -- elegant member cards, lazy search ─── */
-        #pvList{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px;}
+        #pvList{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(255px,100%),1fr));gap:12px;}
         .pv-card{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:10px;background:var(--surface-inset);border:1px solid var(--border);border-radius:14px;padding:14px;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;}
         .pv-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--pv-accent,linear-gradient(90deg,#00d4ff,#7b61ff));opacity:.85;}
         .pv-card:hover{transform:translateY(-2px);border-color:var(--border-hover);box-shadow:0 10px 26px rgba(0,0,0,.35);}
@@ -299,7 +299,7 @@
         .card:hover{border-color:var(--border-hover)}
         
         .centered-search-box{max-width:450px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-        .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
+        .control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:16px;margin-bottom:20px}
         .control-group label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px}
         .control-group select,.control-group input[type=text],.control-group input[type=date],.control-group input[type=email],.control-group input[type=number],.control-group textarea{width:100%;padding:12px 14px;background:var(--surface-inset);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;font-family:inherit;transition:all .2s}
         select option, .control-group select option { background:var(--surface); color:var(--text); }
@@ -387,7 +387,7 @@
         .aws-rawtext::placeholder { color: var(--text-muted); opacity: .75; }
         .aws-left-foot { padding: 10px 18px; font-size: .74rem; color: var(--text-muted); border-top: 1px dashed var(--border); flex-shrink: 0; }
         .aws-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
-        .aws-fields { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-bottom: 0; }
+        .aws-fields { grid-template-columns: repeat(auto-fill, minmax(min(200px,100%),1fr)); margin-bottom: 0; }
         .aws-fields-1col { grid-template-columns: 1fr; }
         .aws-radar { display: flex; align-items: center; gap: 14px; min-width: 0; }
         /* Radar pinned at the top of the middle panel (its own always-visible
@@ -406,7 +406,7 @@
         .aws-rem-ok { color: var(--accent-green); font-weight: 600; font-size: .84rem; display: flex; align-items: center; gap: 6px; }
         .aws-submit { width: auto; padding: 12px 36px; font-size: 1.02rem; flex-direction: column; gap: 1px; line-height: 1.25; }
         .aws-submit-hint { font-size: .66rem; opacity: .65; font-weight: 500; letter-spacing: .3px; }
-        .aws-dup-drawer { display: none; position: fixed; left: 264px; right: 24px; bottom: 84px; height: min(88vh, 980px); background: var(--surface); border: 1px solid var(--accent-amber); border-radius: var(--radius); box-shadow: 0 -14px 55px rgba(0,0,0,.55); z-index: 300; flex-direction: column; overflow: hidden; }
+        .aws-dup-drawer { display: none; position: fixed; left: 264px; right: 24px; bottom: 84px; height: min(calc(88 * var(--vh)), 980px); background: var(--surface); border: 1px solid var(--accent-amber); border-radius: var(--radius); box-shadow: 0 -14px 55px rgba(0,0,0,.55); z-index: 300; flex-direction: column; overflow: hidden; }
         .aws-dup-drawer.open { display: flex; animation: awsDrawerIn .25s ease; }
         @keyframes awsDrawerIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
         .aws-dup-drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--accent-amber); flex-shrink: 0; }
@@ -625,7 +625,7 @@
         .pp-sel-chip button:hover { opacity: 1; background: #8b7cf6; color: #16102e; }
         .pp-filter { width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-inset); color: var(--text); font-size: .82rem; font-family: inherit; outline: none; margin-bottom: 10px; transition: border-color .15s; }
         .pp-filter:focus { border-color: #8b7cf6; box-shadow: 0 0 0 3px rgba(139,124,246,.14); }
-        .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 9px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
+        .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(185px,100%),1fr)); gap: 9px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
         .pp-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border); background: rgba(var(--ink-rgb),0.02); cursor: pointer; text-align: left; font-family: inherit; transition: all .15s; }
         .pp-card:hover { border-color: rgba(139,124,246,.60); background: rgba(139,124,246,.06); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.28); }
         .pp-card.active { border-color: #8b7cf6; background: rgba(139,124,246,.13); box-shadow: 0 0 0 1px rgba(139,124,246,.35), inset 0 1px 0 rgba(255,255,255,.06); }
@@ -696,7 +696,7 @@
            Module cards become a responsive grid of collapsible panels, each
            with a live "granted n/total" badge; the Save button rides a sticky
            bar at the bottom so it's never a long scroll away. */
-        .admin-modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 16px; align-items: start; }
+        .admin-modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(390px,100%),1fr)); gap: 16px; align-items: start; }
         /* Phase 10.14 (Ahmed): Manage Agents card redesign -- "the design of
            the cards ... look messy and Distracted, need it more orgnize,
            elegant". One unified chrome for every module card: a quiet header
@@ -765,7 +765,7 @@
            the same instant -- that's what makes this an actual cross-fade
            instead of a hard cut).
            ============================================================ */
-        #samuraiIntro{display:none;position:fixed;inset:0;width:100vw;height:100vh;z-index:600;overflow:hidden;background:var(--surface);opacity:0;transition:opacity .9s ease}
+        #samuraiIntro{display:none;position:fixed;inset:0;width:100vw;height:calc(100 * var(--vh));z-index:600;overflow:hidden;background:var(--surface);opacity:0;transition:opacity .9s ease}
         #samuraiIntro.playing{display:flex;justify-content:center;align-items:center}
         #samuraiIntro.st-in{opacity:1}
         #samuraiIntro.st-out{opacity:0}
@@ -1008,7 +1008,7 @@
         .ap-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:20px;font-size:.8rem;font-weight:700;border:1px solid currentColor}
         .ap-pill .ap-dot{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
         .ap-since{font-size:.78rem;color:var(--text-muted)}
-        .ap-btns{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px;flex:1;min-width:280px}
+        .ap-btns{display:grid;grid-template-columns:repeat(3,minmax(min(120px,100%),1fr));gap:10px;flex:1;min-width:280px}
         @media (max-width:640px){.ap-btns{grid-template-columns:repeat(2,1fr)}}
         .ap-btn{--sc:#90a4ae;display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-family:inherit;font-size:.88rem;font-weight:600;transition:all .18s;text-align:left}
         .ap-btn .ap-dot{width:10px;height:10px;border-radius:50%;background:var(--sc);flex:none;box-shadow:0 0 7px var(--sc)}
@@ -1017,7 +1017,7 @@
         .ap-btn:disabled{opacity:.45;cursor:not-allowed}
         .ap-btn.ap-busy{animation:apPulse 1s ease infinite}
         @keyframes apPulse{50%{opacity:.55}}
-        .ap-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px}
+        .ap-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(255px,100%),1fr));gap:12px}
         .ap-card{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:.2s}
         .ap-card:hover{border-color:rgba(0,212,255,.35)}
         .ap-card.ap-card-me{border-color:var(--accent-cyan);box-shadow:0 0 0 1px var(--accent-cyan) inset}
@@ -1055,7 +1055,7 @@
            zero extra request cost) with the email underneath. Real Lark
            profile photos would need one contact-API call PER agent, which
            Ahmed explicitly ruled out ("no more request cost"). */
-        .agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+        .agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:14px}
         .agents-count-badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;padding:2px 9px;margin-left:8px;border-radius:999px;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.35);color:var(--accent-cyan);font-size:.75rem;font-weight:700;vertical-align:middle}
         .agent-card{position:relative;display:flex;flex-direction:column;gap:12px;padding:18px 18px 14px;background:linear-gradient(160deg,rgba(var(--ink-rgb),0.03),rgba(var(--ink-rgb),0.0) 45%),var(--bg);border:1px solid var(--border);border-radius:16px;transition:transform .25s,border-color .25s,box-shadow .25s;overflow:hidden}
         .agent-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--agent-accent,linear-gradient(90deg,var(--accent-cyan),var(--accent-purple)));opacity:.9}
@@ -1115,7 +1115,7 @@
         .sch-mdot{width:7px;height:7px;border-radius:50%;flex:none}
         .sch-mmore{font-size:.64rem;color:var(--text-muted);text-align:center;padding:1px 0}
         /* my week cards */
-        .sch-myweek{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+        .sch-myweek{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:10px}
         .sch-day{border-radius:16px;padding:14px;border:1px solid var(--border);background:rgba(var(--ink-rgb),0.03);position:relative;overflow:hidden;transition:transform .15s}
         .sch-day:hover{transform:translateY(-2px)}
         .sch-day::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--sch-accent,rgba(var(--ink-rgb),0.15))}
@@ -1131,7 +1131,7 @@
         .sch-reqrow .grow{flex:1;min-width:200px}
         .sch-status-Pending{color:var(--accent-amber)}.sch-status-Approved{color:#22c55e}.sch-status-Rejected{color:var(--accent-rose)}
         .sch-pop-overlay{position:fixed;inset:0;background:rgba(4,8,18,.72);backdrop-filter:blur(4px);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px}
-        .sch-pop{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+        .sch-pop{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;width:100%;max-width:440px;max-height:calc(90 * var(--vh));overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5)}
         .sch-pop-title{font-weight:800;font-size:1.02rem;margin-bottom:12px}
         .sch-lbl{display:block;font-size:.72rem;color:var(--text-muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px}
         .sch-agentpick{max-height:180px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px}
@@ -1185,7 +1185,7 @@
         .sch-preset .sch-pdel{display:none;position:absolute;top:-6px;right:-4px;width:16px;height:16px;border-radius:50%;background:#ff4d6d;color:var(--text);font-size:.6rem;line-height:16px;text-align:center;cursor:pointer}
         .sch-preset:hover .sch-pdel{display:block}
         .sch-presets-empty{font-size:.72rem;color:var(--text-muted);padding:4px 2px}
-        .sch-typechips{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:8px}
+        .sch-typechips{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(126px,100%),1fr));gap:8px}
         .sch-tchip{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(var(--ink-rgb),0.04);border:1px solid var(--border);cursor:pointer;transition:all .15s;font-family:inherit;color:var(--text);font-size:.8rem;font-weight:700;text-align:left}
         .sch-tchip:hover{border-color:var(--tc);background:var(--tc-bg)}
         .sch-tchip.on{background:var(--tc-bg);border-color:var(--tc);box-shadow:0 0 0 1px var(--tc),0 4px 14px -6px var(--tc)}
@@ -1215,7 +1215,7 @@
         #schCellNote,#schRangeNote{width:100%;box-sizing:border-box}
 
         /* ---- Phase 25: team dashboard + coverage heatmap + drag-and-drop ---- */
-        .sch-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+        .sch-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(132px,100%),1fr));gap:10px}
         .sch-stat{background:rgba(var(--ink-rgb),0.04);border:1px solid var(--border);border-radius:14px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative}
         .sch-stat:hover{transform:translateY(-2px);border-color:var(--sc,rgba(0,212,255,.4));background:rgba(var(--ink-rgb),0.06)}
         .sch-stat .sv{font-size:1.5rem;font-weight:900;color:var(--sc,var(--text));font-variant-numeric:tabular-nums}
@@ -1275,7 +1275,7 @@
         .target-banner{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,176,255,.08));border:1px solid rgba(0,230,118,.2);border-radius:var(--radius);padding:32px;text-align:center;margin-bottom:24px;position:relative}
         .target-banner h2{font-size:2.5rem;color:var(--accent-green);margin:8px 0}
         .acm-badge{position:absolute;top:16px;right:16px;background:var(--bg);padding:6px 14px;border-radius:20px;font-size:.8rem;color:var(--text-muted);border:1px solid var(--border)}
-        .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px}
+        .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr));gap:12px;margin-top:16px}
         .stat-box{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
         .stat-label{font-size:.8rem;color:var(--text-muted);margin-bottom:4px}
         .stat-value{font-size:1.5rem;font-weight:700}
@@ -1573,7 +1573,7 @@
         .ltq-pull-icon{display:inline-block;}
         .ltq-pull-btn:active:not(:disabled) .ltq-pull-icon{transform:rotate(180deg);transition:transform .4s;}
         /* Queue ticket cards */
-        .ltq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px;}
+        .ltq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:22px;}
         .ltq-card{background:linear-gradient(145deg, var(--surface) 0%, rgba(var(--ink-rgb),0.015) 100%);border:1px solid var(--border);border-radius:18px;padding:24px;cursor:pointer;position:relative;overflow:hidden;transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;animation:ltqCardIn .45s cubic-bezier(.2,.9,.3,1.2) backwards;}
         .ltq-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ltq-accent, var(--accent-cyan));box-shadow:0 0 12px var(--ltq-accent, var(--accent-cyan));}
         .ltq-card:hover{transform:translateY(-4px);border-color:var(--ltq-accent, var(--accent-cyan));box-shadow:0 14px 36px rgba(0,0,0,0.35), 0 0 0 1px var(--ltq-accent, var(--accent-cyan));}
@@ -1620,7 +1620,7 @@
            the image lightbox (z 9999), so notes can be copied off screenshots
            without ever closing the picture. Closed via ✕, the Note button, or
            a successful submit. */
-        #twNotePop{position:fixed;top:88px;left:calc(50% - 33px);width:330px;max-height:62vh;z-index:10001;display:none;flex-direction:column;background:linear-gradient(160deg, rgba(40,32,12,0.97), var(--surface));border:1.5px solid rgba(255,184,0,0.45);border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,0.55), 0 0 24px rgba(255,184,0,0.12);overflow:hidden;}
+        #twNotePop{position:fixed;top:88px;left:calc(50% - 33px);width:330px;max-height:calc(62 * var(--vh));z-index:10001;display:none;flex-direction:column;background:linear-gradient(160deg, rgba(40,32,12,0.97), var(--surface));border:1.5px solid rgba(255,184,0,0.45);border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,0.55), 0 0 24px rgba(255,184,0,0.12);overflow:hidden;}
         #twNotePop.open{display:flex;animation:twNoteIn .22s cubic-bezier(.2,.9,.3,1.2);}
         @keyframes twNoteIn{from{opacity:0;transform:translateY(-10px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
         /* Phase 10.4: the note is draggable by its head -- grab anywhere on
@@ -1682,7 +1682,7 @@
            frosted, self-scrolling, centered under the bar like the bar
            itself, above the image lightbox, and it never pushes the form
            down. */
-        #twPreviewPanel{display:none;position:fixed;top:150px;left:calc(50% + 132px);transform:translateX(-50%);width:min(1180px, calc(100vw - 312px));max-height:min(70vh, 640px);overflow-y:auto;z-index:10001;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.10), color-mix(in srgb, var(--surface) 94%, transparent) 55%, rgba(168,85,247,0.08));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,212,255,0.28);box-shadow:0 14px 40px rgba(0,0,0,0.40);}
+        #twPreviewPanel{display:none;position:fixed;top:150px;left:calc(50% + 132px);transform:translateX(-50%);width:min(1180px, calc(100vw - 312px));max-height:min(calc(70 * var(--vh)), 640px);overflow-y:auto;z-index:10001;padding:16px 20px 14px;border-radius:16px;background:linear-gradient(135deg, rgba(0,212,255,0.10), color-mix(in srgb, var(--surface) 94%, transparent) 55%, rgba(168,85,247,0.08));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(0,212,255,0.28);box-shadow:0 14px 40px rgba(0,0,0,0.40);}
         #twPreviewPanel.open{display:block;animation:twPreviewIn .22s cubic-bezier(.2,.9,.3,1.15);}
         @media(max-width:1024px){ #twPreviewPanel{left:50%;width:calc(100vw - 32px);} }
         @keyframes twPreviewIn{from{opacity:0;transform:translateX(-50%) translateY(-8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
@@ -1768,7 +1768,7 @@
            parks it in the header; right:305px + 210px width puts it at
            x851-1061, squarely in that gap. Below ~1280px the gap no longer
            fits it, so the media query tucks it back under the header. */
-        .twx-radar-msg{display:none;position:fixed;top:4px;left:auto;right:305px;z-index:10003;width:min(210px, calc(100vw - 32px));max-height:calc(100vh - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), var(--surface));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
+        .twx-radar-msg{display:none;position:fixed;top:4px;left:auto;right:305px;z-index:10003;width:min(210px, calc(100vw - 32px));max-height:calc(calc(100 * var(--vh)) - 110px);overflow-y:auto;padding:12px 32px 12px 14px;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg, rgba(46,18,26,0.97), var(--surface));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1.5px solid rgba(255,77,109,0.40);box-shadow:0 12px 32px rgba(0,0,0,0.5);cursor:pointer;font-size:.82rem;line-height:1.5;transform:none;transform-origin:top right;color:var(--text);}
         /* Phase 10.7 (Ahmed): the bubble grows DOWNWARD from the circle, so
            max-height + its own scrollbar guarantees even the tallest verdict
            stays fully on-screen. */
@@ -1974,14 +1974,14 @@
             display:flex;align-items:center;justify-content:center;gap:14px;width:100%;padding:0 16px;box-sizing:border-box;
         }
         .img-lightbox-stage{
-            flex:1 1 auto;min-width:0;height:82vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+            flex:1 1 auto;min-width:0;height:calc(82 * var(--vh));display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
         }
         .img-lightbox-canvas{
             position:relative;display:inline-block;cursor:grab;transition:transform .12s ease-out;touch-action:none;
         }
         .img-lightbox-canvas.dragging{cursor:grabbing;transition:none;}
         .img-lightbox-canvas img{
-            display:block;max-width:calc(100vw - 470px);max-height:78vh;object-fit:contain;user-select:none;-webkit-user-drag:none;
+            display:block;max-width:calc(100vw - 470px);max-height:calc(78 * var(--vh));object-fit:contain;user-select:none;-webkit-user-drag:none;
         }
         .img-lightbox-text-layer{position:absolute;inset:0;}
         .img-lightbox-text-layer span{
@@ -1990,17 +1990,17 @@
         .img-lightbox-text-layer span::selection{background:rgba(0,212,255,.45);color:transparent}
         .img-lightbox-hint{color:var(--text-muted,var(--text-muted));font-size:.75rem;margin-top:10px;display:flex;align-items:center;gap:6px}
         /* Phase 10.19 (Ahmed): the extract panel moved from UNDER the pic to BESIDE
-           it on the right, full stage height (82vh) so almost the whole extraction
+           it on the right, full stage height (calc(82 * var(--vh))) so almost the whole extraction
            is visible without scrolling; the <pre> inside flexes to fill it. Shown
            via display:flex (JS), hidden via display:none. */
-        .img-lightbox-extract-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;flex:0 0 360px;width:360px;max-width:360px;margin:0;align-self:stretch;max-height:82vh;box-shadow:0 8px 24px rgba(0,0,0,.4);flex-direction:column;overflow:hidden;}
+        .img-lightbox-extract-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;flex:0 0 360px;width:360px;max-width:360px;margin:0;align-self:stretch;max-height:calc(82 * var(--vh));box-shadow:0 8px 24px rgba(0,0,0,.4);flex-direction:column;overflow:hidden;}
         #imgLightboxExtractBody{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;}
         /* Narrow screens: stack panel under the pic again, capped height. */
         @media (max-width:900px){
             .img-lightbox-main{flex-direction:column;gap:8px;}
-            .img-lightbox-stage{width:100%;flex:none;height:52vh;}
-            .img-lightbox-canvas img{max-width:85vw;max-height:48vh;}
-            .img-lightbox-extract-panel{flex:none;width:92%;max-width:92%;align-self:center;max-height:34vh;}
+            .img-lightbox-stage{width:100%;flex:none;height:calc(52 * var(--vh));}
+            .img-lightbox-canvas img{max-width:85vw;max-height:calc(48 * var(--vh));}
+            .img-lightbox-extract-panel{flex:none;width:92%;max-width:92%;align-self:center;max-height:calc(34 * var(--vh));}
         }
         .img-attach-thumb{
             display:block;width:60px;height:60px;border-radius:8px;overflow:hidden;
@@ -2096,7 +2096,7 @@
         /* Phase 14 restyle — "SHEET NOTIFICATIONS" look (Ahmed's friend's
            monitor site as reference): glassy dark card, gradient header
            rule, card-like rows with a left accent bar for unread, live pill. */
-        #cmnPanel{position:fixed;top:56px;right:16px;width:380px;max-width:calc(100vw - 24px);max-height:72vh;background:linear-gradient(180deg,var(--surface),var(--surface));border:1px solid var(--border);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 0 1px rgba(0,212,255,.04);display:none;flex-direction:column;z-index:3000;overflow:hidden;backdrop-filter:blur(10px);}
+        #cmnPanel{position:fixed;top:56px;right:16px;width:380px;max-width:calc(100vw - 24px);max-height:calc(72 * var(--vh));background:linear-gradient(180deg,var(--surface),var(--surface));border:1px solid var(--border);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 0 1px rgba(0,212,255,.04);display:none;flex-direction:column;z-index:3000;overflow:hidden;backdrop-filter:blur(10px);}
         #cmnPanel.show{display:flex;animation:cmnPanelIn .16s ease-out;}
         @keyframes cmnPanelIn{from{transform:translateY(-6px);opacity:0;}to{transform:none;opacity:1;}}
         .cmn-head{display:flex;align-items:center;gap:8px;padding:13px 14px 12px;border-bottom:1px solid var(--border);flex:none;position:relative;flex-wrap:wrap;row-gap:8px;}
@@ -2177,7 +2177,7 @@
            NOTIFICATIONS look: chat bubbles, gradient head tile, glow focus */
         #cmtOverlay{position:fixed;inset:0;background:rgba(4,6,18,.66);backdrop-filter:blur(4px);z-index:4000;display:none;align-items:center;justify-content:center;padding:18px;}
         #cmtOverlay.show{display:flex;}
-        #cmtModal{width:560px;max-width:100%;max-height:82vh;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--surface),var(--surface));border:1px solid var(--border);border-radius:18px;box-shadow:0 28px 72px rgba(0,0,0,.65),0 0 0 1px rgba(0,212,255,.05);overflow:hidden;animation:cmtPop .18s ease-out;}
+        #cmtModal{width:560px;max-width:100%;max-height:calc(82 * var(--vh));display:flex;flex-direction:column;background:linear-gradient(180deg,var(--surface),var(--surface));border:1px solid var(--border);border-radius:18px;box-shadow:0 28px 72px rgba(0,0,0,.65),0 0 0 1px rgba(0,212,255,.05);overflow:hidden;animation:cmtPop .18s ease-out;}
         @keyframes cmtPop{from{transform:translateY(10px) scale(.98);opacity:0;}to{transform:none;opacity:1;}}
         .cmt-head{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--border);flex:none;background:rgba(var(--ink-rgb),0.02);position:relative;}
         .cmt-head::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,#00d4ff,var(--primary) 60%,transparent 95%);opacity:.5;border-radius:2px;}
@@ -2227,7 +2227,7 @@
         @media (max-width:600px){
             #cmnPanel{top:52px;right:8px;width:calc(100vw - 16px);}
             #cmtOverlay{padding:8px;}
-            #cmtModal{max-height:92vh;}
+            #cmtModal{max-height:calc(92 * var(--vh));}
         }
     </style>
 <style id="unified-theme-planner">
@@ -2391,7 +2391,7 @@ body ::-webkit-scrollbar-thumb:hover{background:var(--border-hover)}
 /* Phase 26: My Work page */
 .mw-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
 .mw-head h2{margin:0}
-.mw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+.mw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:20px}
 .mw-card{margin-bottom:0}
 .mw-card-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:.95rem;margin-bottom:12px}
 .mw-count{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:2px 10px;font-size:.74rem;font-weight:800}
@@ -2443,7 +2443,7 @@ option{background:var(--surface);color:var(--text)}
 .sch-vt-btn.active{background:var(--primary);color:var(--on-primary)}
 .sch-time,.sch-datein,.sch-navbtn{background:var(--surface-inset);border-color:var(--border);color:var(--text)}
 .sch-stat{box-shadow:none}.sch-stat .sv{color:var(--text)}
-.sch-grid-wrap{max-height:70vh;scrollbar-color:var(--border-hover) var(--surface);scrollbar-width:thin}
+.sch-grid-wrap{max-height:calc(70 * var(--vh));scrollbar-color:var(--border-hover) var(--surface);scrollbar-width:thin}
 .sch-grid{border-spacing:5px;table-layout:fixed;min-width:1060px}
 .sch-grid th{position:sticky;top:0;z-index:3;background:var(--surface);padding:12px 6px}
 .sch-grid td:first-child,.sch-grid th:first-child{width:215px;position:sticky;left:0;background:var(--surface);z-index:2}
@@ -2468,7 +2468,7 @@ option{background:var(--surface);color:var(--text)}
 .sch-agenda-row small{display:block;color:var(--text-muted)}
 .sch-legend{display:flex;gap:15px;flex-wrap:wrap;font-size:.73rem;margin:12px 0;color:var(--text-muted)}
 #pg-audition-schedule[aria-busy=true]{cursor:progress}#pg-audition-schedule[aria-busy=true] .sch-sync{opacity:.55}
-@media(max-width:760px){.sch-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.sch-sync{margin:0;width:100%}.sch-tools label{flex:1}.sch-tools input{width:100%}.sch-agenda-row{grid-template-columns:1fr 1fr}.sch-grid td:first-child,.sch-grid th:first-child{width:170px}.sch-weeklabel{min-width:180px}.sch-pop{max-height:90dvh;overflow:auto}}
+@media(max-width:760px){.sch-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.sch-sync{margin:0;width:100%}.sch-tools label{flex:1}.sch-tools input{width:100%}.sch-agenda-row{grid-template-columns:1fr 1fr}.sch-grid td:first-child,.sch-grid th:first-child{width:170px}.sch-weeklabel{min-width:180px}.sch-pop{max-height:calc(90 * var(--vh));overflow:auto}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media print{body.sch-print .sidebar,body.sch-print .top-bar,body.sch-print .topbar,body.sch-print .tabs-bar,body.sch-print #loginOverlay,body.sch-print .sch-tools,body.sch-print #schReqCard,body.sch-print #schMyWrap,body.sch-print #schTeamCard,body.sch-print #schDashCard,body.sch-print .sch-weeknav,body.sch-print .ap-head button,body.sch-print .sch-viewtoggle,body.sch-print #schChecks{display:none!important}body.sch-print .main-content{margin:0!important;height:auto!important;overflow:visible!important}body.sch-print #schAgenda{display:block!important}body.sch-print .app-shell,body.sch-print .page-content-wrapper{height:auto!important;overflow:visible!important}body.sch-print .sch-agenda-row{break-inside:avoid}body.sch-print{--bg:#fff;--surface:#fff;--text:#17212c;--text-muted:#465463;--border:#b5bdc5;background:#fff;color:#17212c}}
 
@@ -2567,11 +2567,11 @@ option{background:var(--surface);color:var(--text)}
     .twx-fab{width:50px;height:50px;font-size:1.25rem;}
     /* 2) Scratch note: bottom sheet instead of a floating card — full width,
           capped at half the screen, thumb-close ✕. */
-    #twNotePop{top:auto;bottom:14px;left:10px;right:10px;width:auto;max-height:46vh;}
+    #twNotePop{top:auto;bottom:14px;left:10px;right:10px;width:auto;max-height:calc(46 * var(--vh));}
     #twNoteText{min-height:120px;}
     /* 3) Duplicate-radar bubble: capped height so a long verdict can never
           cover half the phone screen; it scrolls internally instead. */
-    #twRadarMsg,#awsRadarMsg{max-height:42vh;}
+    #twRadarMsg,#awsRadarMsg{max-height:calc(42 * var(--vh));}
     /* 4) Draft-save toast: keep clear of the bottom-right FAB stack. */
     .drf-badge{top:118px;bottom:auto;right:12px;}
 }
@@ -2600,8 +2600,8 @@ option{background:var(--surface);color:var(--text)}
 .samurai-mobile-only,.samurai-mobile-glyph{display:none}
 @media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
  html,body{width:100%;max-width:100%;overscroll-behavior-y:none}
- .app-shell{min-height:100dvh!important}
- .main-content{height:var(--samurai-vh,100dvh);min-width:0;max-width:100%;margin-left:0}
+ .app-shell{min-height:calc(100 * var(--vh))!important}
+ .main-content{height:var(--samurai-vh,calc(100 * var(--vh)));min-width:0;max-width:100%;margin-left:0}
  .page-top-bar{position:relative;display:flex;flex-wrap:nowrap;gap:4px;padding:3px 8px;min-height:48px;box-sizing:border-box;z-index:101}
  .top-bar-left{flex:none;gap:0}.top-bar-right{flex:1;min-width:0;gap:2px;justify-content:flex-end}
  .hamburger,.utility-icon-btn,.samurai-mobile-only{min-width:40px;min-height:40px;flex:none}
@@ -2616,7 +2616,7 @@ option{background:var(--surface);color:var(--text)}
  .gls-wrap>.gls-input{display:none}
  .gls-wrap.mobile-search-open{position:absolute;top:0;left:0;right:0;max-width:none;width:100%;min-width:0;display:flex;gap:8px;padding:6px 8px;background:var(--surface);box-sizing:border-box;z-index:3}
  .gls-wrap.mobile-search-open>.gls-input{display:block;flex:1;min-width:0;width:auto;font-size:16px;padding:9px 12px;min-height:40px}
- .gls-drop{position:fixed!important;top:52px!important;left:8px!important;right:8px!important;width:auto!important;max-height:calc(var(--samurai-vh,100dvh) - 72px);overflow-y:auto;overflow-wrap:anywhere}
+ .gls-drop{position:fixed!important;top:52px!important;left:8px!important;right:8px!important;width:auto!important;max-height:calc(var(--samurai-vh,calc(100 * var(--vh))) - 72px);overflow-y:auto;overflow-wrap:anywhere}
  .page-top-bar.mobile-utilities-open .top-bar-right>a.utility-icon-btn{display:flex;position:absolute;right:8px;top:50px;width:210px;justify-content:flex-start;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);z-index:5;font-size:14px}
  .page-top-bar.mobile-utilities-open .top-bar-right>a.utility-icon-btn:nth-of-type(2){top:100px}
  .page-top-bar.mobile-utilities-open .top-bar-right>a.utility-icon-btn::after{content:attr(title)}
@@ -2650,7 +2650,7 @@ option{background:var(--surface);color:var(--text)}
  .twx-fab-radar{background:#bc9aff!important;color:#30204e!important}
  .twx-fab:active{transform:scale(.94)}
  .twx-topbar-wrapper:not(.chat-collapsed)>.twx-fab{position:static!important;opacity:1!important;transform:none!important;pointer-events:auto!important;outline:2px solid var(--text)}
- .twx-topbar-wrapper .twx-topbar,body.sidebar-collapsed .twx-topbar-wrapper .twx-topbar{position:fixed;top:auto!important;bottom:68px!important;left:50%!important;width:calc(100vw - 20px)!important;max-height:calc(var(--samurai-vh,100dvh) - 154px);overflow-y:auto;box-sizing:border-box;padding:12px!important;gap:10px!important;border-radius:18px;flex-direction:column;align-items:stretch;transform-origin:bottom center;backdrop-filter:none;background:var(--surface)}
+ .twx-topbar-wrapper .twx-topbar,body.sidebar-collapsed .twx-topbar-wrapper .twx-topbar{position:fixed;top:auto!important;bottom:68px!important;left:50%!important;width:calc(100vw - 20px)!important;max-height:calc(var(--samurai-vh,calc(100 * var(--vh))) - 154px);overflow-y:auto;box-sizing:border-box;padding:12px!important;gap:10px!important;border-radius:18px;flex-direction:column;align-items:stretch;transform-origin:bottom center;backdrop-filter:none;background:var(--surface)}
  .twx-head-center{width:100%;min-width:0}.twx-title{font-size:20px!important;margin:0 0 6px!important}
  .twx-back{padding:7px 10px!important;font-size:12px!important;min-height:36px;text-align:left}
  #tw-head-meta{gap:5px!important;max-height:90px;overflow-y:auto;justify-content:flex-start!important}
@@ -2658,11 +2658,11 @@ option{background:var(--surface);color:var(--text)}
  .twx-actions{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%;min-width:0;gap:6px!important}
  .twx-actions>*{width:auto!important;min-width:0!important;font-size:12px!important;padding:8px!important;min-height:40px;white-space:normal}
  .twx-collapse-btn{grid-column:1/-1}.twx-sec-title{font-size:16px!important;margin-bottom:14px!important}
- #twNotePop{top:auto!important;left:8px!important;right:8px!important;bottom:72px!important;width:auto!important;max-height:55dvh;transform:none!important;background:var(--surface)}
+ #twNotePop{top:auto!important;left:8px!important;right:8px!important;bottom:72px!important;width:auto!important;max-height:calc(55 * var(--vh));transform:none!important;background:var(--surface)}
  #twNoteText{font-size:16px;min-height:110px}.twn-close{min-width:40px;min-height:36px}
- #twPreviewPanel,#twRadarMsg,#awsRadarMsg{left:8px!important;right:8px!important;width:auto!important;max-width:none!important;top:auto!important;bottom:74px!important;max-height:55dvh;transform:none!important;overflow-y:auto}
- #cmnPanel,#cmtModal{max-width:calc(100vw - 16px);box-sizing:border-box}#cmnPanel{left:8px;right:8px;width:auto;top:52px;max-height:calc(var(--samurai-vh,100dvh) - 64px)}
- .img-lightbox-main{padding:0 6px;gap:6px;flex-direction:column}.img-lightbox-stage{width:100%;height:65dvh;flex:auto}
+ #twPreviewPanel,#twRadarMsg,#awsRadarMsg{left:8px!important;right:8px!important;width:auto!important;max-width:none!important;top:auto!important;bottom:74px!important;max-height:calc(55 * var(--vh));transform:none!important;overflow-y:auto}
+ #cmnPanel,#cmtModal{max-width:calc(100vw - 16px);box-sizing:border-box}#cmnPanel{left:8px;right:8px;width:auto;top:52px;max-height:calc(var(--samurai-vh,calc(100 * var(--vh))) - 64px)}
+ .img-lightbox-main{padding:0 6px;gap:6px;flex-direction:column}.img-lightbox-stage{width:100%;height:calc(65 * var(--vh));flex:auto}
  .img-lightbox-toolbar{top:8px;right:8px;gap:4px;flex-wrap:wrap;max-width:75%}.img-lightbox-counter{top:8px;left:8px}
  #toastContainer{max-width:calc(100vw - 20px);right:10px}.sidebar{max-width:85vw}
  .save-state-pill{max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2860,14 +2860,14 @@ bottom: 154px !important;
 @media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
   .samurai-radial-disc{display:none!important}
   #twxDock .twx-fab,#awsDock .twx-fab,#twxDock .xena-transfer-fab,#awsDock .xena-transfer-fab,#twxDock.radial-open .twx-fab,#awsDock.radial-open .twx-fab{visibility:hidden!important;opacity:0!important;pointer-events:none!important;position:absolute!important}
-  .samurai-menu{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:2147483000;min-width:230px;max-width:calc(100vw - 24px);max-height:60dvh;overflow:auto;padding:8px;border-radius:18px;background:rgba(255,255,255,.96);color:#1b1730;border:1px solid #d9ccff;box-shadow:0 14px 40px #1b173055;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform-origin:bottom right;transform:scale(.85);opacity:0;pointer-events:none;transition:transform .16s ease,opacity .16s ease}
+  .samurai-menu{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:2147483000;min-width:230px;max-width:calc(100vw - 24px);max-height:calc(60 * var(--vh));overflow:auto;padding:8px;border-radius:18px;background:rgba(255,255,255,.96);color:#1b1730;border:1px solid #d9ccff;box-shadow:0 14px 40px #1b173055;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform-origin:bottom right;transform:scale(.85);opacity:0;pointer-events:none;transition:transform .16s ease,opacity .16s ease}
   :root[data-theme="dark"] .samurai-menu,body.dark .samurai-menu{background:rgba(30,26,52,.97);color:#f1ecff;border-color:#4b3a85}
   .samurai-menu.open{display:block;transform:none;opacity:1;pointer-events:auto}
   .samurai-menu-item{display:flex;align-items:center;gap:12px;width:100%;min-height:48px;padding:8px 12px;border:0;border-radius:12px;background:transparent;color:inherit;font:600 15px/1.2 system-ui,sans-serif;text-align:left;touch-action:manipulation}
   .samurai-menu-item:active{background:#7135d622}
   .samurai-menu-item .smi-ic{flex:0 0 34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#7135d614;font-size:18px}
   .samurai-menu-title{padding:4px 12px 6px;font:700 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
-  #cmnPanel{top:auto!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;max-width:100vw!important;max-height:80dvh!important;border-radius:20px 20px 0 0!important;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -12px 40px #0006!important}
+  #cmnPanel{top:auto!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;max-width:100vw!important;max-height:calc(80 * var(--vh))!important;border-radius:20px 20px 0 0!important;padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -12px 40px #0006!important}
   #cmnPanel .cmn-tab{min-height:36px;font-size:.8rem}
   #cmnPanel .cmn-refresh{width:36px;height:36px}
 }
@@ -2879,7 +2879,7 @@ bottom: 154px !important;
 
 /* ---- 1) Fluid Capacity Gantt ---- */
 #xgWrap{border:1px solid rgba(var(--ink-rgb),.09);border-radius:var(--radius,14px);overflow:hidden;background:rgba(var(--ink-rgb),.015)}
-.xg-scroll{overflow:auto;max-height:66vh}
+.xg-scroll{overflow:auto;max-height:calc(66 * var(--vh))}
 .xg-ruler{display:flex;position:sticky;top:0;z-index:6;background:rgba(var(--ink-rgb),.07);backdrop-filter:blur(10px);border-bottom:1px solid rgba(var(--ink-rgb),.1)}
 .xg-corner{flex:0 0 190px}
 .xg-rday{flex:1;position:relative;min-width:86px;padding:7px 0 6px;text-align:center;border-left:1px solid rgba(var(--ink-rgb),.06)}
@@ -3019,7 +3019,7 @@ html{background:var(--bg);min-height:100%}
     min-width:0;
     width:60px;
     max-width:60px;
-    max-height:70dvh;
+    max-height:calc(70 * var(--vh));
     right:6px;
     padding:10px 7px;
     border-radius:30px;
@@ -3659,7 +3659,7 @@ html{background:var(--bg);min-height:100%}
                         <div id="cmpAdvChartsWrap" style="display:none;margin-top:24px">
 
                             <!-- Tier 1: Apex KPI cards -->
-                            <div id="cmpExecKpiRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px"></div>
+                            <div id="cmpExecKpiRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:16px;margin-bottom:24px"></div>
                             <div id="cmpExecNoTargetNote" style="display:none;color:var(--text-muted);font-size:.85rem;background:rgba(var(--ink-rgb),0.03);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:24px"></div>
 
                             <!-- Top Performers spotlight + Movers highlight -->
@@ -3675,7 +3675,7 @@ html{background:var(--bg);min-height:100%}
                             </div>
 
                             <!-- Tier 2: Core visual matrix -->
-                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:24px">
                                 <div class="card" style="padding:16px;grid-column:1/-1">
                                     <h4 style="color:var(--accent-cyan);margin-bottom:12px;font-size:.9rem">🎯 Target vs. Realized Gap <span class="info-tip" data-tip="Three bars per group: YTD Target (pace-adjusted), Realized Points (actual earned), and Points Used (redeemed). Compare bar heights to see who's ahead or behind."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                     <div class="chart-wrapper-bar"><canvas id="cmpAdvTargetGapChart"></canvas></div>
@@ -3719,7 +3719,7 @@ html{background:var(--bg);min-height:100%}
                             <div class="card" style="padding:16px;margin-top:24px">
                                 <h4 style="color:var(--text);margin-bottom:4px;font-size:.9rem">📐 Consistency Score <span class="info-tip" data-tip="Coefficient of Variation (std deviation ÷ mean) across the compared groups for each metric. Under 35% = stable performance. 35%+ = volatile — one group spiked while others didn't, or vice versa."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span></h4>
                                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:12px">How stable each metric is across the compared groups — a high score flags a group set that spiked once then collapsed rather than performing steadily.</p>
-                                <div id="cmpConsistency" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
+                                <div id="cmpConsistency" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px"></div>
                             </div>
 
                             <!-- Tier 3: Granular diagnostics table -->
@@ -3759,10 +3759,10 @@ html{background:var(--bg);min-height:100%}
                 </div>
 
                 <!-- KPI strip -->
-                <div id="exKpiStrip" class="kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px"></div>
+                <div id="exKpiStrip" class="kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:12px;margin-bottom:18px"></div>
 
                 <!-- Region rollup -->
-                <div id="exRegionRollup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:18px"></div>
+                <div id="exRegionRollup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px;margin-bottom:18px"></div>
 
                 <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px;align-items:start" id="exMainGrid">
                     <div>
@@ -3879,7 +3879,7 @@ html{background:var(--bg);min-height:100%}
 
             <!-- Agency drill-in modal -->
             <div id="exDrilldownModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeExchangeDrilldown()">
-                <div class="card" style="max-width:760px;width:100%;max-height:88vh;overflow-y:auto;position:relative">
+                <div class="card" style="max-width:760px;width:100%;max-height:calc(88 * var(--vh));overflow-y:auto;position:relative">
                     <button onclick="closeExchangeDrilldown()" style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1">×</button>
                     <div id="exDrilldownBody"><div style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</div></div>
                 </div>
@@ -3893,7 +3893,7 @@ html{background:var(--bg);min-height:100%}
                         Agency Target Table <span class="info-tip" data-tip="Every agency's per-privilege target ledger for the current month: Claimed (this month's quota), Used, Remaining, Pending and Rejected. Built from the same cached snapshots as Search Records — no live per-agency calls."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
                     </h3>
                     <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:20px">This month's target ledger for every agency — Claimed, Used and Remaining per privilege type.</p>
-                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))">
                         <div class="control-group">
                             <label>Quick Search</label>
                             <input type="text" id="attSearch" placeholder="Agency Code, name, or ACM…" oninput="attDebounce()">
@@ -4045,7 +4045,7 @@ html{background:var(--bg);min-height:100%}
 
                         <div id="agencyAchievementBar" style="margin-bottom:16px"></div>
 
-                        <div id="agencyAnalyticsKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px"></div>
+                        <div id="agencyAnalyticsKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px;margin-bottom:16px"></div>
 
                         <div id="agencyDowngradeRisk"></div>
 
@@ -4057,7 +4057,7 @@ html{background:var(--bg);min-height:100%}
                     <div class="card" id="agencyActivityBoardArea" style="display:none">
                         <h3 style="margin-bottom:4px;color:var(--accent-purple)">📋 This Month's Activity</h3>
                         <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:16px">Requests submitted for this agency this month, grouped by outcome.</p>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:14px">
                             <div>
                                 <h5 style="font-size:.78rem;color:var(--accent-amber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⏳ Pending (<span id="agencyBoardPendingCount">0</span>)</h5>
                                 <div id="agencyBoardPending" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -4082,7 +4082,7 @@ html{background:var(--bg);min-height:100%}
 
             <!-- ... Smart Allocator ... -->
             <div id="pg-allocator" style="display:none">
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:24px">
                     <div class="card">
                         <h3 style="margin-bottom:16px;color:var(--accent-cyan); display:flex; align-items:center; gap:8px;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-allocator"></use></svg>
@@ -4394,7 +4394,7 @@ html{background:var(--bg);min-height:100%}
             </div>
 
             <div id="monthlyTargetModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)closeMonthlyTargetModal()">
-                <div class="card" style="max-width:640px;width:92%;max-height:80vh;overflow-y:auto">
+                <div class="card" style="max-width:640px;width:92%;max-height:calc(80 * var(--vh));overflow-y:auto">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                         <h3 id="monthlyTargetModalTitle" style="color:var(--accent-cyan);margin-bottom:0">📅 Monthly Target Breakdown</h3>
                         <button onclick="closeMonthlyTargetModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;line-height:1">×</button>
@@ -4429,7 +4429,7 @@ html{background:var(--bg);min-height:100%}
                         <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Audit Log</h3>
                         <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
                     </div>
-                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr))">
                         <div class="control-group">
                             <label>Search (actor, action, target, IP)</label>
                             <input type="text" id="alSearch" placeholder="e.g. Ahmed, EXPORT, agency code…" oninput="auditDebounce()">
@@ -4655,7 +4655,7 @@ html{background:var(--bg);min-height:100%}
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                         Search Point Records
                     </h3>
-                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr))">
                         <div class="control-group">
                             <label>Quick Search</label>
                             <input type="text" id="prSearch" placeholder="Agency Code or ACM…" oninput="prDebounce()">
@@ -4745,7 +4745,7 @@ html{background:var(--bg);min-height:100%}
                         </div>
                     </div>
 
-                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px">
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));margin-bottom:16px">
                         <div class="control-group">
                             <label>Search</label>
                             <input type="text" id="ptSearch" placeholder="Agency ID or name…" oninput="ptDebounce()">
@@ -4877,7 +4877,7 @@ html{background:var(--bg);min-height:100%}
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                         Agency List
                     </h3>
-                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px; align-items:end;">
+                    <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));margin-bottom:16px; align-items:end;">
                         <div class="control-group">
                             <label>Region</label>
                             <select id="alRegion" onchange="alFetch()" style="background:var(--surface-hover);">
@@ -8067,7 +8067,7 @@ function logout() {
 function renderAccessDeniedScreen(customMsg) {
     const msg = customMsg || 'You do not have permission to view any modules. Please contact your administrator to request access.';
     document.getElementById('pg-welcome').innerHTML = `
-        <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;text-align:center">
+        <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:calc(80 * var(--vh));text-align:center">
             <div style="font-size:4rem;margin-bottom:16px">🔒</div>
             <h2 style="font-size:2.5rem;color:var(--accent-rose);margin-bottom:12px">Access Denied</h2>
             <p style="color:var(--text-muted);font-size:1.1rem;max-width:450px;margin-bottom:24px">${msg}</p>
@@ -17405,6 +17405,16 @@ function lightboxLoadCurrent() {
     lightboxHideExtractPanel();
     const myExtractToken = ++lightboxExtractToken;
     img.src = item.src;
+    // Samurai v20.1 (Ahmed): warm the neighbor pictures so Next/Prev on mobile
+    // feels instant -- plain image preload only, no OCR/extract side effects.
+    try {
+        if (lightboxGallery.length > 1) {
+            [1, -1].forEach(d => {
+                const nb = lightboxGallery[(lightboxIndex + d + lightboxGallery.length) % lightboxGallery.length];
+                if (nb && nb.src && nb.src !== item.src) { const pi = new Image(); pi.src = nb.src; }
+            });
+        }
+    } catch (_) {}
     lightboxUpdateNav();
     lightboxRunOcr(item.src);
     // Phase 10.15 (Ahmed): Lark OCR fires automatically the moment the picture
@@ -20170,7 +20180,7 @@ function renderReqFormFields() {
             wrap.style.gridColumn = '1 / -1';
             const inner = document.createElement('div');
             inner.style.display = 'grid';
-            inner.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+            inner.style.gridTemplateColumns = 'repeat(auto-fit, minmax(min(220px,100%),1fr))';
             inner.style.gap = '20px';
             inner.style.padding = '20px';
             inner.style.background = 'rgba(255,255,255,0.02)';
@@ -24470,8 +24480,8 @@ function atmCopyFallback(txt){
     .ss-panel{border-radius:14px!important;box-shadow:0 8px 32px #0004!important}
     .ss-option{min-height:42px;display:flex;align-items:center;padding:8px 12px!important}
     .ss-search,.pp-filter,.rr-filter{font-size:16px!important;min-height:42px}
-    #twRadarMsg,#awsRadarMsg{position:fixed!important;top:8px!important;left:10px!important;right:10px!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:24dvh!important;overflow:auto!important;transform:none!important;border-radius:14px!important;z-index:2147483600!important}
-    .xena-transfer-toast{position:fixed!important;top:8px!important;left:10px!important;right:10px!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:26dvh!important;overflow:auto!important;border-radius:14px!important;box-sizing:border-box!important;z-index:2147483601!important}
+    #twRadarMsg,#awsRadarMsg{position:fixed!important;top:8px!important;left:10px!important;right:10px!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:calc(24 * var(--vh))!important;overflow:auto!important;transform:none!important;border-radius:14px!important;z-index:2147483600!important}
+    .xena-transfer-toast{position:fixed!important;top:8px!important;left:10px!important;right:10px!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:calc(26 * var(--vh))!important;overflow:auto!important;border-radius:14px!important;box-sizing:border-box!important;z-index:2147483601!important}
     .xena-transfer-toast .xtt-msg{max-height:9em;overflow:auto;font-size:13px;line-height:1.45}
     .xena-transfer-toast .xtt-x{min-width:36px;min-height:36px}
     .samurai-message-details{font:inherit;border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit;padding:6px 10px}
@@ -25268,7 +25278,7 @@ window.addEventListener('resize', function () {
  #tw-form input:not([type=checkbox]):not([type=radio]),#tw-form textarea,#tw-form select,.page-content-wrapper textarea{font-size:16px!important}
  /* duplicate banner: one slim line when clean, tap to expand */
  #twRadarMsg.samurai-slim,#awsRadarMsg.samurai-slim{max-height:40px!important;overflow:hidden!important;white-space:nowrap;text-overflow:ellipsis;padding-top:8px!important;padding-bottom:8px!important}
- #twRadarMsg.samurai-slim.samurai-expanded,#awsRadarMsg.samurai-slim.samurai-expanded{max-height:24dvh!important;white-space:normal}
+ #twRadarMsg.samurai-slim.samurai-expanded,#awsRadarMsg.samurai-slim.samurai-expanded{max-height:calc(24 * var(--vh))!important;white-space:normal}
  body.samurai-kb #twRadarMsg.samurai-slim,body.samurai-kb #awsRadarMsg.samurai-slim{display:none!important}
  /* while typing: free the space the keyboard and the floating dock fight over */
  body.samurai-kb #twxDock,body.samurai-kb #awsDock,body.samurai-kb .drf-badge{display:none!important}
@@ -25276,12 +25286,12 @@ window.addEventListener('resize', function () {
  .twn-foot{display:none!important}
  body.samurai-kb #twNotePop,body:has(.img-lightbox-overlay.active) #twNotePop{bottom:8px!important}
  body.samurai-kb #twNoteText,body:has(.img-lightbox-overlay.active) #twNoteText{min-height:56px!important;flex:1 1 auto;resize:none}
- #twNotePop.open{max-height:min(46dvh,340px)!important}
- body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(32dvh,176px)!important}
+ #twNotePop.open{max-height:min(calc(46 * var(--vh)),340px)!important}
+ body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(calc(32 * var(--vh)),176px)!important}
  /* picture + extracted text + note share the screen instead of stacking on each other */
- .img-lightbox-overlay{--lbpanel:0px;--lbnote:0px;--lbh:calc(100dvh - 56px - var(--lbpanel) - var(--lbnote) - 14px);justify-content:flex-start!important;padding-top:52px;box-sizing:border-box}
- .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(26dvh,200px)}
- body:has(#twNotePop.open) .img-lightbox-overlay{--lbnote:min(32dvh,176px)}
+ .img-lightbox-overlay{--lbpanel:0px;--lbnote:0px;--lbh:calc(calc(100 * var(--vh)) - 56px - var(--lbpanel) - var(--lbnote) - 14px);justify-content:flex-start!important;padding-top:52px;box-sizing:border-box}
+ .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(calc(26 * var(--vh)),200px)}
+ body:has(#twNotePop.open) .img-lightbox-overlay{--lbnote:min(calc(32 * var(--vh)),176px)}
  .img-lightbox-main{flex-direction:column!important;gap:6px!important;padding:0 6px!important;align-items:stretch!important}
  .img-lightbox-stage{height:var(--lbh)!important;flex:none!important;width:100%!important;min-height:90px}
  .img-lightbox-canvas img{max-width:calc(100vw - 12px)!important;max-height:var(--lbh)!important}
@@ -25440,13 +25450,13 @@ body.samurai-kb .sam-go-submit{display:none!important;}
 /* ── Bottom sheets (mobile / tablet touch) ── */
 @keyframes samSheetUp{from{transform:translateY(48px);opacity:.4}to{transform:none;opacity:1}}
 @media (max-width:600px), (pointer:coarse) and (max-width:1100px){
-  .ss-panel.ss-portaled{position:fixed!important;left:8px!important;right:8px!important;width:auto!important;top:auto!important;bottom:0!important;max-height:min(52vh,430px)!important;border-radius:18px 18px 0 0!important;z-index:12000;box-shadow:0 -18px 50px rgba(0,0,0,.5)!important;animation:samSheetUp .22s ease;padding-top:4px;}
+  .ss-panel.ss-portaled{position:fixed!important;left:8px!important;right:8px!important;width:auto!important;top:auto!important;bottom:0!important;max-height:min(calc(52 * var(--vh)),430px)!important;border-radius:18px 18px 0 0!important;z-index:12000;box-shadow:0 -18px 50px rgba(0,0,0,.5)!important;animation:samSheetUp .22s ease;padding-top:4px;}
   .ss-panel.ss-portaled::before{content:'';display:block;width:44px;height:5px;border-radius:3px;background:rgba(127,220,255,.35);margin:6px auto 2px;flex:none;}
-  .ss-panel.ss-portaled .ss-options{max-height:calc(min(52vh,430px) - 64px);}
-  body.samurai-kb .ss-panel.ss-portaled{max-height:34vh!important;}
-  body.samurai-kb .ss-panel.ss-portaled .ss-options{max-height:calc(34vh - 64px);}
-  .pp-all.pp-portaled{left:8px!important;right:8px!important;width:auto!important;top:auto!important;bottom:0!important;max-height:56vh!important;border-radius:18px 18px 0 0!important;box-shadow:0 -18px 50px rgba(0,0,0,.5)!important;animation:samSheetUp .22s ease;}
-  #twPreviewPanel{top:auto!important;left:8px!important;right:8px!important;bottom:0!important;width:auto!important;max-height:60vh!important;border-radius:18px 18px 0 0;transform:none;box-shadow:0 -18px 50px rgba(0,0,0,.55);}
+  .ss-panel.ss-portaled .ss-options{max-height:calc(min(calc(52 * var(--vh)),430px) - 64px);}
+  body.samurai-kb .ss-panel.ss-portaled{max-height:calc(34 * var(--vh))!important;}
+  body.samurai-kb .ss-panel.ss-portaled .ss-options{max-height:calc(calc(34 * var(--vh)) - 64px);}
+  .pp-all.pp-portaled{left:8px!important;right:8px!important;width:auto!important;top:auto!important;bottom:0!important;max-height:calc(56 * var(--vh))!important;border-radius:18px 18px 0 0!important;box-shadow:0 -18px 50px rgba(0,0,0,.5)!important;animation:samSheetUp .22s ease;}
+  #twPreviewPanel{top:auto!important;left:8px!important;right:8px!important;bottom:0!important;width:auto!important;max-height:calc(60 * var(--vh))!important;border-radius:18px 18px 0 0;transform:none;box-shadow:0 -18px 50px rgba(0,0,0,.55);}
   #twPreviewPanel.open{animation:samSheetUp .22s ease!important;}
 }
 </style>
@@ -25960,10 +25970,10 @@ function samFocusNext(from) {
  /* 2. pill: LEFT on touch (stays right on PC -- base rule untouched) */
  .sam-go-submit{right:auto!important;left:16px;}
  /* 5. duplicate-match drawers: bottom sheets above every overlay */
- #twDupDrawer.aws-dup-drawer,#auditDupDrawer.aws-dup-drawer{left:8px!important;right:8px!important;bottom:0!important;height:auto!important;max-height:70dvh;border-radius:18px 18px 0 0;z-index:12000!important;}
+ #twDupDrawer.aws-dup-drawer,#auditDupDrawer.aws-dup-drawer{left:8px!important;right:8px!important;bottom:0!important;height:auto!important;max-height:calc(70 * var(--vh));border-radius:18px 18px 0 0;z-index:12000!important;}
  /* 4. scratch note: pinned bottom strip, roomier than v14's squeeze */
- #twNotePop.open{left:12px!important;right:12px!important;top:auto!important;bottom:12px!important;width:auto!important;max-width:none!important;max-height:min(46dvh,380px)!important;}
- body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(34dvh,250px)!important;}
+ #twNotePop.open{left:12px!important;right:12px!important;top:auto!important;bottom:12px!important;width:auto!important;max-width:none!important;max-height:min(calc(46 * var(--vh)),380px)!important;}
+ body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(calc(34 * var(--vh)),250px)!important;}
  #twNotePop .twn-head{cursor:default;touch-action:auto;}
  body.samurai-kb #twNotePop.open{bottom:8px!important;}
 }
@@ -26219,7 +26229,7 @@ if (typeof schRenderGrid === 'function') {
 .atm-strip{position:relative;}
 #schCheckList li.sam-xcheck{border-left:2px solid var(--accent-amber);padding-left:8px;}
 @media screen and (max-width:600px){
- .sam-set-pop{top:auto;bottom:12px;right:12px;left:12px;width:auto;max-height:70dvh;overflow:auto;}
+ .sam-set-pop{top:auto;bottom:12px;right:12px;left:12px;width:auto;max-height:calc(70 * var(--vh));overflow:auto;}
 }
 </style>
 <script id="samurai-mobile-v18-js">
@@ -26549,7 +26559,7 @@ function samSetReset() {
 /* ── Sheets / modals (choice, swap, publish confirm) ── */
 .sam19-sheet-ov{position:fixed;inset:0;z-index:10060;background:rgba(8,6,14,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:18px;animation:sam19In .16s ease}
 @keyframes sam19In{from{opacity:0}to{opacity:1}}
-.sam19-sheet{background:var(--surface,var(--surface));border:1px solid var(--border,var(--border));border-radius:16px;max-width:480px;width:100%;max-height:86dvh;overflow-y:auto;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.sam19-sheet{background:var(--surface,var(--surface));border:1px solid var(--border,var(--border));border-radius:16px;max-width:480px;width:100%;max-height:calc(86 * var(--vh));overflow-y:auto;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
 .sam19-sheet-t{font-size:1.02rem;font-weight:800;margin-bottom:8px;color:var(--text,var(--text))}
 .sam19-sheet-d{font-size:.82rem;color:var(--text-muted,var(--text-muted));margin-bottom:14px;line-height:1.5}
 .sam19-opt{display:block;width:100%;text-align:left;background:rgba(var(--ink-rgb),.045);border:1px solid var(--border,var(--border));border-radius:12px;padding:11px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s}
@@ -26617,8 +26627,8 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
   .img-lightbox-extract-panel .ocr-chip{font-size:.86rem!important;padding:6px 13px}
   .img-lightbox-extract-panel{border-radius:14px 14px 0 0}
   /* taller defaults; the handle + JS var + ⤢ Full can resize 140px..near-full */
-  .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(46dvh,340px)}
-  body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(32dvh,260px)!important}
+  .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(calc(46 * var(--vh)),340px)}
+  body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(calc(32 * var(--vh)),260px)!important}
   body:has(.img-lightbox-overlay.active) #twNoteText{min-height:64px!important;font-size:16px!important;resize:vertical}
   #twNotePop #twNoteText{font-size:16px}
   #sam19ver{font-size:.54rem;padding:2px 8px}
@@ -26627,7 +26637,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v19.4 left-pills+handles 2026-11-06';
+window.SAM19_BUILD='v20 zoom+back+offline 2026-11-06';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -27074,5 +27084,111 @@ window.lightboxRenderExtractResult=function(result){
 })();
 </script>
 
+<style id="samurai-mobile-v20">
+/* Samurai mobile v20 (Claude, 2026-11-05): zoom-aware heights, close button always reachable, back-key layers, offline pill. */
+:root{--vh:1dvh}
+html.samurai-zoomed{--vh:calc(1dvh / var(--szf,1))}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+@media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
+ /* image viewer: all 9 tools fit on a 360px phone, and Close can never scroll away */
+ .img-lightbox-toolbar{gap:3px!important}
+ .img-lightbox-toolbar button{width:31px!important;height:34px!important;font-size:15px!important;padding:0!important}
+ .img-lightbox-toolbar button:last-child{position:sticky;right:0;background:rgba(20,16,36,.96);color:#fff!important;border-color:rgba(255,255,255,.45);z-index:2}
+ .img-lightbox-counter{font-size:12px!important;left:6px!important;top:12px!important}
+}
+#samOfflinePill{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translate(-50%,-140%);z-index:2147483200;background:#b3261e;color:#fff;border-radius:999px;padding:7px 16px;font:700 12.5px/1.2 system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .25s ease,background .25s;pointer-events:none;max-width:92vw;white-space:nowrap}
+#samOfflinePill.show{transform:translate(-50%,0)}
+#samOfflinePill.ok{background:#1b7f4d}
+
+</style>
+<script id="samurai-mobile-v20-js">
+(()=>{
+ if(window.__samuraiV20)return;window.__samuraiV20=true;
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ /* 1) Android back key closes the top layer (image viewer, scratch note) instead of leaving the page */
+ const stack=[];let ignore=0;
+ const LAYERS={
+  lb:{el:()=>document.getElementById('imgLightboxOverlay'),open:e=>e.classList.contains('active'),close:()=>{try{closeImageLightbox()}catch(_){const e=document.getElementById('imgLightboxOverlay');e&&e.classList.remove('active')}}},
+  note:{el:()=>document.getElementById('twNotePop'),open:e=>e.classList.contains('open'),close:()=>{try{if(typeof twToggleNote==='function'){twToggleNote(false);return}}catch(_){}const e=document.getElementById('twNotePop');e&&e.classList.remove('open')}},
+  /* Samurai v20.1: Back also closes the comment thread modal and the bell panel.
+     Uses the app's own closers so their state objects stay in sync. */
+  cmt:{el:()=>document.getElementById('cmtOverlay'),open:e=>e.classList.contains('show'),close:()=>{try{cmtClose();return}catch(_){}const e=document.getElementById('cmtOverlay');e&&e.classList.remove('show')}},
+  bell:{el:()=>document.getElementById('cmnPanel'),open:e=>e.classList.contains('show'),close:()=>{try{cmnToggle(true);return}catch(_){}const e=document.getElementById('cmnPanel');e&&e.classList.remove('show')}}
+ };
+ function sync(name){
+  const L=LAYERS[name],e=L.el();if(!e)return;
+  const isOpen=L.open(e),idx=stack.indexOf(name);
+  if(isOpen&&idx<0){stack.push(name);try{history.pushState({sam:name},'')}catch(_){}}
+  else if(!isOpen&&idx>=0){
+   const top=idx===stack.length-1;stack.splice(idx,1);
+   if(top){ignore++;try{history.back()}catch(_){ignore--}}
+  }
+ }
+ Object.keys(LAYERS).forEach(name=>{
+  const tryHook=()=>{const e=LAYERS[name].el();if(!e)return false;new MutationObserver(()=>sync(name)).observe(e,{attributes:true,attributeFilter:['class']});sync(name);return true;};
+  if(!tryHook())document.addEventListener('DOMContentLoaded',tryHook);
+ });
+ addEventListener('popstate',()=>{
+  if(ignore>0){ignore--;return;}
+  const name=stack.pop();if(!name)return;
+  LAYERS[name].close();
+ });
+ /* 2) flaky mobile network: retry read-only API calls (never POST/PUT/DELETE) */
+ const of=window.fetch&&window.fetch.bind(window);
+ if(of&&!window.__samFetchRetry){
+  window.__samFetchRetry=true;
+  window.fetch=function(input,init){
+   let url='',method='GET';
+   try{url=typeof input==='string'?input:(input&&input.url)||String(input);method=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();}catch(_){}
+   if(method!=='GET'||!/(^|\/\/[^/]+)\/api\//.test(url))return of(input,init);
+   let n=0;
+   const go=()=>of(input,init).then(r=>{
+     if((r.status===502||r.status===503||r.status===504)&&n<2){n++;return sleep(500*n+250*n*n).then(go);}
+     return r;
+   },e=>{
+     if(n<2&&navigator.onLine!==false&&!(init&&init.signal&&init.signal.aborted)){n++;return sleep(500*n+250*n*n).then(go);}
+     throw e;
+   });
+   return go();
+  };
+ }
+ /* 3) offline / back-online pill */
+ let pill=null,hideT=0;
+ function showPill(text,ok){
+  if(!pill){pill=document.createElement('div');pill.id='samOfflinePill';pill.setAttribute('role','status');document.body.appendChild(pill);}
+  pill.textContent=text;pill.classList.toggle('ok',!!ok);
+  requestAnimationFrame(()=>pill.classList.add('show'));
+  clearTimeout(hideT);if(ok)hideT=setTimeout(()=>pill&&pill.classList.remove('show'),2200);
+ }
+ addEventListener('offline',()=>showPill('📡 Offline — your draft is kept, sending will fail',false));
+ addEventListener('online',()=>showPill('✅ Back online',true));
+ if(navigator.onLine===false)document.addEventListener('DOMContentLoaded',()=>showPill('📡 Offline — your draft is kept, sending will fail',false));
+ /* 4) Samurai v20.1: ACTIVATE the zoom-aware heights without any APK change.
+    v20 shipped --vh = 1dvh / --szf but nothing ever set --szf, so the fix was
+    inert. Here we measure the WebView page scale ourselves and mirror it:
+    primary source visualViewport.scale (pinch zoom / WebView scale), cross-
+    checked against screen.width/innerWidth (some WebViews keep
+    visualViewport.scale at 1 for a setInitialScale zoom). The APK can also
+    still set --szf directly if it knows its own zoom better. */
+ const updSz=()=>{
+  let z=(window.visualViewport&&window.visualViewport.scale)||1;
+  const sw=(window.screen&&window.screen.width)||0;
+  if(sw>0&&window.innerWidth>0){
+   const z2=sw/window.innerWidth;
+   if(Math.abs(z-1)<0.02&&z2>0.05&&z2<5&&Math.abs(z2-1)>=0.02)z=z2;
+  }
+  if(!(z>0.05&&z<5))z=1;
+  z=Math.round(z*1000)/1000;
+  const r=document.documentElement;
+  r.style.setProperty('--szf',String(z));
+  r.classList.toggle('samurai-zoomed',Math.abs(z-1)>0.02);
+ };
+ updSz();
+ addEventListener('resize',updSz);
+ addEventListener('orientationchange',updSz);
+ if(window.visualViewport){visualViewport.addEventListener('resize',updSz);visualViewport.addEventListener('scroll',updSz);}
+})();
+
+</script>
 </body>
 </html>
