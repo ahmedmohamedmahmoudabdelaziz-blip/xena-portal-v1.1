@@ -25547,7 +25547,9 @@ function samOcrLinesHtml(text) {
         // dedicated chip for any id-like token (4-16 chars incl. a digit),
         // date-shaped tokens excluded.
         const noDates = l.replace(/\b\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{2,4}\b/g, ' ');
-        const hasOther = /\b(?=[A-Za-z0-9._-]*\d)[A-Za-z0-9][A-Za-z0-9._-]{3,15}\b/.test(noDates);
+        // v19.4 (Ahmed): handles may start with @ and use _ / . / - anywhere,
+        // e.g. @hd.hd987___ -- the token must still contain at least one digit.
+        const hasOther = /(?:^|[^A-Za-z0-9._@-])@?(?=[A-Za-z0-9._@-]*\d)[A-Za-z0-9][A-Za-z0-9._@-]{3,15}(?![A-Za-z0-9._@-])/.test(noDates);
         // Phase 64 (Ahmed): applier real name -- a clean 1-4 word alpha line
         // (optionally after a "name:"-style label); digit lines excluded.
         const rnameLbl = l.match(/(?:real\s*name|applier(?:'s)?\s*name|name)\s*[:：\-–]\s*(.+)$/i);
@@ -25660,9 +25662,11 @@ function samFocusNext(from) {
         if (act === 'uid') { const m = txt.match(/\b\d{4,10}\b/); if (m) value = m[0]; }
         if (act === 'otherapp') { // Phase 63: numbers OR letters; skip date-shaped tokens
             const clean = txt.replace(/\b\d{1,2}[.\/\-]\d{1,2}[.\/\-]\d{2,4}\b/g, ' ');
-            const mix = clean.match(/\b(?=[A-Za-z0-9._-]*[A-Za-z])(?=[A-Za-z0-9._-]*\d)[A-Za-z0-9][A-Za-z0-9._-]{3,15}\b/);
-            const num = clean.match(/\b\d{4,16}\b/);
-            if (mix) value = mix[0]; else if (num) value = num[0];
+            // v19.4 (Ahmed): handles may start with @ and use _ / . / - anywhere,
+            // e.g. @hd.hd987___ -- capture group 1 is the full handle incl. @.
+            const mix = clean.match(/(?:^|[^A-Za-z0-9._@-])(@?(?=[A-Za-z0-9._@-]*[A-Za-z])(?=[A-Za-z0-9._@-]*\d)[A-Za-z0-9][A-Za-z0-9._@-]{3,15})(?![A-Za-z0-9._@-])/);
+            const num = clean.match(/(?:^|[^A-Za-z0-9._@-])(@?\d{4,16})(?![A-Za-z0-9._@-])/);
+            if (mix) value = mix[1]; else if (num) value = num[1];
         }
         if (act === 'rname') { // Phase 64 (Ahmed): applier real name -- 1 to 4 words
             const lbl = txt.match(/(?:real\s*name|applier(?:'s)?\s*name|name)\s*[:：\-–]\s*(.+)$/i);
@@ -26590,11 +26594,11 @@ body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.a
    (10050) -- tapping 📝 with a pic open opened it invisibly. Lift it above. */
 body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 
-/* v19.1 (Ahmed): Next/Done + Go to Submit share the RIGHT rail on touch —
-   supersedes v16's mobile-left pill rule (later + !important wins). */
+/* v19.4 (Ahmed): pills on the LEFT rail on touch — Go to Submit at the
+   bottom, Next/Done stacked directly above it (place() handles stacking). */
 @media screen and (max-width:600px), screen and (pointer:coarse) and (max-width:1100px){
- .sam-go-submit{left:auto!important;right:16px!important;}
- .sam-nextbar{right:16px;}
+ .sam-go-submit{right:auto!important;left:16px!important;}
+ .sam-nextbar{right:auto;left:16px;}
 }
 
 /* ── Mobile: bigger extract + note, resize handle, chips above ── */
@@ -26623,7 +26627,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v19.3 panel+note+band 2026-11-06';
+window.SAM19_BUILD='v19.4 left-pills+handles 2026-11-06';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
