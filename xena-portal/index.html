@@ -17405,16 +17405,6 @@ function lightboxLoadCurrent() {
     lightboxHideExtractPanel();
     const myExtractToken = ++lightboxExtractToken;
     img.src = item.src;
-    // Samurai v20.1 (Ahmed): warm the neighbor pictures so Next/Prev on mobile
-    // feels instant -- plain image preload only, no OCR/extract side effects.
-    try {
-        if (lightboxGallery.length > 1) {
-            [1, -1].forEach(d => {
-                const nb = lightboxGallery[(lightboxIndex + d + lightboxGallery.length) % lightboxGallery.length];
-                if (nb && nb.src && nb.src !== item.src) { const pi = new Image(); pi.src = nb.src; }
-            });
-        }
-    } catch (_) {}
     lightboxUpdateNav();
     lightboxRunOcr(item.src);
     // Phase 10.15 (Ahmed): Lark OCR fires automatically the moment the picture
@@ -27109,11 +27099,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  const stack=[];let ignore=0;
  const LAYERS={
   lb:{el:()=>document.getElementById('imgLightboxOverlay'),open:e=>e.classList.contains('active'),close:()=>{try{closeImageLightbox()}catch(_){const e=document.getElementById('imgLightboxOverlay');e&&e.classList.remove('active')}}},
-  note:{el:()=>document.getElementById('twNotePop'),open:e=>e.classList.contains('open'),close:()=>{try{if(typeof twToggleNote==='function'){twToggleNote(false);return}}catch(_){}const e=document.getElementById('twNotePop');e&&e.classList.remove('open')}},
-  /* Samurai v20.1: Back also closes the comment thread modal and the bell panel.
-     Uses the app's own closers so their state objects stay in sync. */
-  cmt:{el:()=>document.getElementById('cmtOverlay'),open:e=>e.classList.contains('show'),close:()=>{try{cmtClose();return}catch(_){}const e=document.getElementById('cmtOverlay');e&&e.classList.remove('show')}},
-  bell:{el:()=>document.getElementById('cmnPanel'),open:e=>e.classList.contains('show'),close:()=>{try{cmnToggle(true);return}catch(_){}const e=document.getElementById('cmnPanel');e&&e.classList.remove('show')}}
+  note:{el:()=>document.getElementById('twNotePop'),open:e=>e.classList.contains('open'),close:()=>{const e=document.getElementById('twNotePop');if(!e)return;const b=e.querySelector('[onclick*="twNoteClose"],[onclick*="NoteHide"],.twn-close,button[title="Close"]');if(b)b.click();else e.classList.remove('open');}}
  };
  function sync(name){
   const L=LAYERS[name],e=L.el();if(!e)return;
@@ -27163,30 +27149,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  addEventListener('offline',()=>showPill('📡 Offline — your draft is kept, sending will fail',false));
  addEventListener('online',()=>showPill('✅ Back online',true));
  if(navigator.onLine===false)document.addEventListener('DOMContentLoaded',()=>showPill('📡 Offline — your draft is kept, sending will fail',false));
- /* 4) Samurai v20.1: ACTIVATE the zoom-aware heights without any APK change.
-    v20 shipped --vh = 1dvh / --szf but nothing ever set --szf, so the fix was
-    inert. Here we measure the WebView page scale ourselves and mirror it:
-    primary source visualViewport.scale (pinch zoom / WebView scale), cross-
-    checked against screen.width/innerWidth (some WebViews keep
-    visualViewport.scale at 1 for a setInitialScale zoom). The APK can also
-    still set --szf directly if it knows its own zoom better. */
- const updSz=()=>{
-  let z=(window.visualViewport&&window.visualViewport.scale)||1;
-  const sw=(window.screen&&window.screen.width)||0;
-  if(sw>0&&window.innerWidth>0){
-   const z2=sw/window.innerWidth;
-   if(Math.abs(z-1)<0.02&&z2>0.05&&z2<5&&Math.abs(z2-1)>=0.02)z=z2;
-  }
-  if(!(z>0.05&&z<5))z=1;
-  z=Math.round(z*1000)/1000;
-  const r=document.documentElement;
-  r.style.setProperty('--szf',String(z));
-  r.classList.toggle('samurai-zoomed',Math.abs(z-1)>0.02);
- };
- updSz();
- addEventListener('resize',updSz);
- addEventListener('orientationchange',updSz);
- if(window.visualViewport){visualViewport.addEventListener('resize',updSz);visualViewport.addEventListener('scroll',updSz);}
 })();
 
 </script>
