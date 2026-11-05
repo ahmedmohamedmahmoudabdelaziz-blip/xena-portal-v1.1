@@ -17405,6 +17405,16 @@ function lightboxLoadCurrent() {
     lightboxHideExtractPanel();
     const myExtractToken = ++lightboxExtractToken;
     img.src = item.src;
+    // Samurai v21 (Ahmed asked this back): warm the neighbor pictures so
+    // Next/Prev on mobile feels instant -- plain image preload, no side effects.
+    try {
+        if (lightboxGallery.length > 1) {
+            [1, -1].forEach(d => {
+                const nb = lightboxGallery[(lightboxIndex + d + lightboxGallery.length) % lightboxGallery.length];
+                if (nb && nb.src && nb.src !== item.src) { const pi = new Image(); pi.src = nb.src; }
+            });
+        }
+    } catch (_) {}
     lightboxUpdateNav();
     lightboxRunOcr(item.src);
     // Phase 10.15 (Ahmed): Lark OCR fires automatically the moment the picture
@@ -26627,7 +26637,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v20 zoom+back+offline 2026-11-06';
+window.SAM19_BUILD='v21 gestures+backkey 2026-11-06';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -27099,7 +27109,11 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  const stack=[];let ignore=0;
  const LAYERS={
   lb:{el:()=>document.getElementById('imgLightboxOverlay'),open:e=>e.classList.contains('active'),close:()=>{try{closeImageLightbox()}catch(_){const e=document.getElementById('imgLightboxOverlay');e&&e.classList.remove('active')}}},
-  note:{el:()=>document.getElementById('twNotePop'),open:e=>e.classList.contains('open'),close:()=>{const e=document.getElementById('twNotePop');if(!e)return;const b=e.querySelector('[onclick*="twNoteClose"],[onclick*="NoteHide"],.twn-close,button[title="Close"]');if(b)b.click();else e.classList.remove('open');}}
+  note:{el:()=>document.getElementById('twNotePop'),open:e=>e.classList.contains('open'),close:()=>{try{if(typeof twToggleNote==='function'){twToggleNote(false);return}}catch(_){}const e=document.getElementById('twNotePop');e&&e.classList.remove('open')}},
+  /* Samurai v21 (Ahmed asked these back): Back also closes the comment thread
+     modal and the bell panel. Uses the app's own closers so state stays in sync. */
+  cmt:{el:()=>document.getElementById('cmtOverlay'),open:e=>e.classList.contains('show'),close:()=>{try{cmtClose();return}catch(_){}const e=document.getElementById('cmtOverlay');e&&e.classList.remove('show')}},
+  bell:{el:()=>document.getElementById('cmnPanel'),open:e=>e.classList.contains('show'),close:()=>{try{cmnToggle(true);return}catch(_){}const e=document.getElementById('cmnPanel');e&&e.classList.remove('show')}}
  };
  function sync(name){
   const L=LAYERS[name],e=L.el();if(!e)return;
@@ -27151,6 +27165,142 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  if(navigator.onLine===false)document.addEventListener('DOMContentLoaded',()=>showPill('📡 Offline — your draft is kept, sending will fail',false));
 })();
 
+</script>
+<!-- Samurai v21 (Ahmed comment 7704826827013704955): mobile lightbox gestures --
+     one-finger pan when zoomed, two-finger pinch zoom, swipe left/right for
+     Prev/Next when fit, double-tap to zoom at the tap point; plus Esc closes the
+     bell panel on desktop. Self-contained and idempotent. -->
+<style id="samurai-mobile-v21">
+/* custom touch gestures live on the stage -- stop the browser from hijacking
+   them into scroll / double-tap-zoom */
+#imgLightboxOverlay .img-lightbox-stage{touch-action:none}
+</style>
+<script id="samurai-mobile-v21-js">
+(function(){
+'use strict';
+if(window.__samV21Gestures) return; window.__samV21Gestures = true;
+const stage = document.getElementById('imgLightboxStage');
+if(!stage) return;
+
+/* remember each picture's fit-to-stage zoom so double-tap can return to it */
+let fitZoom = 1;
+const lbImg = document.getElementById('imgLightboxImg');
+if(lbImg) lbImg.addEventListener('load', () => {
+    // runs after every other load listener (incl. the app's own fit-to-stage)
+    setTimeout(() => { try { fitZoom = lightboxZoomLevel || 1; } catch(_){} }, 0);
+});
+
+const overlayActive = () => {
+    const o = document.getElementById('imgLightboxOverlay');
+    return !!(o && o.classList.contains('active'));
+};
+const isOcrSpan = t => !!(t && t.closest && t.closest('.img-lightbox-text-layer span'));
+const dist = (a,b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+const mid  = (a,b) => ({ x:(a.clientX + b.clientX)/2, y:(a.clientY + b.clientY)/2 });
+const stageCenter = () => { const r = stage.getBoundingClientRect(); return { x:r.left + r.width/2, y:r.top + r.height/2 }; };
+
+let mode = null;                 // 'pan' | 'pinch' | 'swipe' | null
+let startX = 0, startY = 0, panX0 = 0, panY0 = 0, t0 = 0, moved = 0;
+let pinchDist0 = 0, pinchMid0 = null, zoom0 = 1, panPinch0 = null;
+let lastTap = 0, lastTapX = 0, lastTapY = 0;
+
+stage.addEventListener('touchstart', e => {
+    if(!overlayActive()) { mode = null; return; }
+    if(e.touches.length === 1){
+        if(isOcrSpan(e.target)) { mode = null; return; }   // let OCR text selection work
+        const t = e.touches[0];
+        mode = (lightboxZoomLevel > 1.05) ? 'pan' : 'swipe';
+        startX = t.clientX; startY = t.clientY; t0 = Date.now(); moved = 0;
+        panX0 = lightboxPanX; panY0 = lightboxPanY;
+    } else if(e.touches.length === 2){
+        mode = 'pinch';
+        pinchDist0 = dist(e.touches[0], e.touches[1]);
+        pinchMid0 = mid(e.touches[0], e.touches[1]);
+        zoom0 = lightboxZoomLevel;
+        panPinch0 = { x: lightboxPanX, y: lightboxPanY };
+    }
+}, { passive: true });
+
+stage.addEventListener('touchmove', e => {
+    if(!mode || !overlayActive()) return;
+    if(mode === 'pinch' && e.touches.length === 2){
+        e.preventDefault();
+        const d = dist(e.touches[0], e.touches[1]);
+        if(!pinchDist0 || !zoom0) return;
+        const z = Math.min(Math.max(zoom0 * d / pinchDist0, 0.25), 6);
+        // keep the pinch midpoint visually fixed on screen
+        const c = stageCenter(), m = mid(e.touches[0], e.touches[1]);
+        const k = z / zoom0;
+        lightboxPanX = (m.x - c.x) - ((pinchMid0.x - c.x) - panPinch0.x) * k;
+        lightboxPanY = (m.y - c.y) - ((pinchMid0.y - c.y) - panPinch0.y) * k;
+        lightboxZoomLevel = z;
+        lightboxApplyTransform();
+    } else if(mode === 'pan' && e.touches.length === 1){
+        e.preventDefault();
+        const t = e.touches[0];
+        moved = Math.max(moved, Math.hypot(t.clientX - startX, t.clientY - startY));
+        lightboxPanX = panX0 + (t.clientX - startX);
+        lightboxPanY = panY0 + (t.clientY - startY);
+        lightboxApplyTransform();
+    } else if(mode === 'swipe' && e.touches.length === 1){
+        const t = e.touches[0];
+        const dx = t.clientX - startX, dy = t.clientY - startY;
+        moved = Math.max(moved, Math.hypot(dx, dy));
+        // horizontal intent -- don't let the browser treat it as a scroll
+        if(Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) e.preventDefault();
+    }
+}, { passive: false });
+
+stage.addEventListener('touchend', e => {
+    if(!overlayActive()) { mode = null; return; }
+    if(mode === 'swipe' && e.changedTouches.length){
+        const dt = Date.now() - t0;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startX, dy = t.clientY - startY;
+        if(dt < 600 && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5){
+            if(dx < 0) lightboxNext(); else lightboxPrev();
+        }
+    }
+    // double-tap zoom (tap = tiny move, quick) -- works from pan or swipe mode
+    if((mode === 'pan' || mode === 'swipe') && e.changedTouches.length){
+        const dt = Date.now() - t0, t = e.changedTouches[0];
+        if(dt < 300 && moved < 12){
+            const now = Date.now();
+            if(now - lastTap < 320 && Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY) < 32){
+                const base = fitZoom || 1;
+                if(lightboxZoomLevel > base + 0.08){
+                    lightboxZoomLevel = base; lightboxPanX = 0; lightboxPanY = 0;
+                } else {
+                    const target = 2.5, c = stageCenter();
+                    const k = target / (lightboxZoomLevel || 1);
+                    lightboxPanX = (t.clientX - c.x) - ((t.clientX - c.x) - lightboxPanX) * k;
+                    lightboxPanY = (t.clientY - c.y) - ((t.clientY - c.y) - lightboxPanY) * k;
+                    lightboxZoomLevel = target;
+                }
+                lightboxApplyTransform();
+                lastTap = 0;
+            } else {
+                lastTap = now; lastTapX = t.clientX; lastTapY = t.clientY;
+            }
+        }
+    }
+    if(e.touches.length === 0) mode = null;
+    else if(e.touches.length === 1 && mode === 'pinch'){
+        // pinch released to one finger -- keep panning smoothly
+        const t = e.touches[0];
+        mode = 'pan'; startX = t.clientX; startY = t.clientY; moved = 999;
+        panX0 = lightboxPanX; panY0 = lightboxPanY;
+    }
+}, { passive: true });
+
+/* desktop: Esc closes the bell panel (lightbox / comment modal / drawers
+   already close on Esc via their own handlers) */
+document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    const p = document.getElementById('cmnPanel');
+    if(p && p.classList.contains('show') && typeof cmnToggle === 'function') cmnToggle(true);
+});
+})();
 </script>
 </body>
 </html>
