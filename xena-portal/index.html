@@ -26482,5 +26482,537 @@ function samSetReset() {
 })();
 </script>
 
+<style id="samurai-mobile-v19">
+/* ═══ Samurai v19 / Phase C (Ahmed, 2026-11-05) ═══
+   Green work-band continuity + Avail metric + In/Out punch + day-card
+   redesign, schedule publish/discard/swaps/CSV, drag Move-Copy-Swap choice,
+   mobile lightbox+extract+note resize, NID cleanup, build badge. */
+
+/* ── Attendance day-card redesign (Ahmed's red square) ── */
+.atm-day{border-radius:12px;padding:7px 10px;margin:2px 0;transition:background .2s,box-shadow .2s}
+.atm-day.today{background:rgba(0,212,255,.045);box-shadow:inset 0 0 0 1px rgba(0,212,255,.22)}
+.atm-day:hover{background:rgba(var(--ink-rgb),.035)}
+.atm-day-top b{font-size:.92rem;letter-spacing:-.01em}
+.atm-day-sub{font-size:.7rem;color:var(--text-muted,var(--text-muted));letter-spacing:.03em;font-variant-numeric:tabular-nums}
+.atm-day-stats{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;font-size:.72rem}
+.atm-stchip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:rgba(var(--ink-rgb),.055);border:1px solid var(--border,var(--border));font-size:.66rem;font-weight:700;color:var(--text,var(--text));white-space:nowrap;line-height:1.6}
+.atm-stchip:first-child{background:rgba(0,230,118,.10);border-color:rgba(0,230,118,.35)}
+.atm-day-punch{margin-top:5px;font-size:.74rem;color:var(--text,var(--text));background:rgba(0,212,255,.055);border:1px dashed rgba(0,212,255,.35);border-radius:8px;padding:3px 9px;display:inline-flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;cursor:default}
+.atm-day-punch b{font-weight:800}
+.atm-punch-live{color:#00e676;font-style:normal;font-weight:800}
+.atm-flags{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px}
+.atm-sum b.sam19-avail{background:rgba(0,230,118,.13);border-color:rgba(0,230,118,.45)}
+.atm-lg i{border-radius:3px}
+
+/* ── Schedule week badges (draft / published) ── */
+.sch-weeklabel{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.sam19-wkbadge{display:inline-flex;align-items:center;gap:4px;font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+.sam19-wkbadge.pub{color:#22d98a;border-color:rgba(0,230,118,.45);background:rgba(0,230,118,.08)}
+.sam19-wkbadge.pub.dirty{color:#f5b14d;border-color:rgba(255,184,0,.5);background:rgba(255,184,0,.08)}
+.sam19-wkbadge.draft{color:#f5b14d;border-color:rgba(255,184,0,.5);background:rgba(255,184,0,.08)}
+.sam19-wkbadge.mixed,.sam19-wkbadge.none{color:var(--text-muted,var(--text-muted));border-color:var(--border,var(--border));background:rgba(var(--ink-rgb),.05)}
+.sam19-toolsbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#sam19PubBtn{background:linear-gradient(135deg,#00e676,#00b0ff);color:#00201a;border:none;font-weight:800}
+[data-theme="light"] #sam19PubBtn{color:#013a2a}
+
+/* ── Sheets / modals (choice, swap, publish confirm) ── */
+.sam19-sheet-ov{position:fixed;inset:0;z-index:10060;background:rgba(8,6,14,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:18px;animation:sam19In .16s ease}
+@keyframes sam19In{from{opacity:0}to{opacity:1}}
+.sam19-sheet{background:var(--surface,var(--surface));border:1px solid var(--border,var(--border));border-radius:16px;max-width:480px;width:100%;max-height:86dvh;overflow-y:auto;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.sam19-sheet-t{font-size:1.02rem;font-weight:800;margin-bottom:8px;color:var(--text,var(--text))}
+.sam19-sheet-d{font-size:.82rem;color:var(--text-muted,var(--text-muted));margin-bottom:14px;line-height:1.5}
+.sam19-opt{display:block;width:100%;text-align:left;background:rgba(var(--ink-rgb),.045);border:1px solid var(--border,var(--border));border-radius:12px;padding:11px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s}
+.sam19-opt:hover{border-color:var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.07)}
+.sam19-opt b{display:block;font-size:.88rem;color:var(--text,var(--text));margin-bottom:2px}
+.sam19-opt span{font-size:.74rem;color:var(--text-muted,var(--text-muted))}
+.sam19-sheet-x{width:100%;padding:9px;border-radius:10px;border:1px solid var(--border,var(--border));background:transparent;color:var(--text-muted,var(--text-muted));cursor:pointer;font-family:inherit;font-size:.82rem;margin-top:4px}
+.sam19-sheet-x:hover{color:var(--text,var(--text))}
+.sam19-frow{display:grid;gap:5px;margin-bottom:12px;font-size:.74rem;color:var(--text-muted,var(--text-muted))}
+.sam19-frow input,.sam19-frow select{border:1px solid var(--border,var(--border));border-radius:9px;padding:10px 12px;font:inherit;font-size:16px;background:var(--surface,var(--surface));color:var(--text,var(--text))}
+.sam19-fnote{font-size:.72rem;color:var(--text-muted,var(--text-muted));line-height:1.5;margin:8px 0 4px}
+.sam19-btnrow{display:flex;gap:8px;margin-top:6px}
+.sam19-btn{flex:1;padding:10px;border-radius:10px;border:none;font-weight:800;font-family:inherit;font-size:.85rem;cursor:pointer}
+.sam19-btn.yes{background:linear-gradient(135deg,#00e676,#00b0ff);color:#00201a}
+.sam19-btn.no{background:rgba(var(--ink-rgb),.07);color:var(--text,var(--text));border:1px solid var(--border,var(--border))}
+.sam19-swap{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border,var(--border));border-radius:12px;margin-bottom:8px;background:rgba(var(--ink-rgb),.03);flex-wrap:wrap}
+.sam19-swap.pending{border-color:rgba(255,184,0,.4)}
+.sam19-swap.approved{border-color:rgba(0,230,118,.4)}
+.sam19-sw-main{flex:1;min-width:180px;font-size:.84rem;color:var(--text,var(--text))}
+.sam19-sw-sub{font-size:.72rem;color:var(--text-muted,var(--text-muted));margin-top:2px}
+.sam19-sw-st{font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:999px;background:rgba(var(--ink-rgb),.07)}
+.sam19-sw-st.pending{color:#f5b14d}.sam19-sw-st.approved{color:#22d98a}.sam19-sw-st.declined{color:#ff6b81}
+.sam19-sw-btns{display:flex;gap:6px}
+.sam19-sw-btns button{padding:6px 13px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e676,#00b0ff);color:#00201a;font-weight:800;font-size:.74rem;cursor:pointer;font-family:inherit}
+.sam19-sw-btns button.no{background:rgba(255,107,129,.14);color:#ff6b81;border:1px solid rgba(255,107,129,.35)}
+
+/* ── Build badge ── */
+#sam19ver{position:fixed;left:10px;bottom:10px;z-index:9000;font-size:.6rem;font-weight:700;color:var(--text-muted,var(--text-muted));background:rgba(var(--ink-rgb),.06);border:1px solid var(--border,var(--border));border-radius:999px;padding:3px 10px;display:flex;align-items:center;gap:5px;cursor:pointer;opacity:.75}
+#sam19ver:hover{opacity:1}
+#sam19ver .dot{width:7px;height:7px;border-radius:50%;background:#22d98a;display:inline-block}
+#sam19ver .dot.bad{background:#ff4d6d;animation:sam19Blink 1s ease-in-out infinite}
+@keyframes sam19Blink{50%{opacity:.35}}
+
+/* ── Lightbox above everything; radar + docks hidden while a pic is open ── */
+.img-lightbox-overlay{z-index:10050!important}
+body:has(.img-lightbox-overlay.active) .twx-radar-msg{display:none!important}
+body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.active) #awsDock{display:none!important}
+
+/* ── Mobile: bigger extract + note, resize handle, chips above ── */
+.lb-ex-handle{display:none;flex:none;height:26px;align-items:center;justify-content:center;cursor:ns-resize;touch-action:none;border-bottom:1px solid var(--border,var(--border))}
+.lb-ex-handle span{display:block;width:44px;height:5px;border-radius:3px;background:var(--border,var(--border))}
+.lb-ex-top{display:flex;align-items:center;gap:8px;flex:none;padding:8px 12px 2px;flex-wrap:wrap}
+.lb-ex-copy{padding:6px 13px;font-size:.8rem;font-weight:700;border-radius:8px;border:1px solid var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.12);color:var(--accent-cyan,var(--accent-cyan,#00d4ff));cursor:pointer;font-family:inherit;flex:none}
+.lb-ex-count{font-size:.68rem;color:var(--text-muted,var(--text-muted))}
+@media screen and (max-width:900px){
+  .lb-ex-handle{display:flex}
+  #imgLightboxExtractText{font-size:.98rem!important;line-height:1.55!important}
+  .img-lightbox-extract-panel .ocr-insert summary{font-size:.9rem!important;padding:11px 12px!important;font-weight:700}
+  .img-lightbox-extract-panel .ocr-line{font-size:.95rem!important;padding:2px 0}
+  .img-lightbox-extract-panel .ocr-chip{font-size:.86rem!important;padding:6px 13px}
+  .img-lightbox-extract-panel{border-radius:14px 14px 0 0}
+  /* taller defaults; the handle + JS var can resize 140px..78vh */
+  .img-lightbox-overlay:has(#imgLightboxExtractPanel:not([style*="display:none"]):not([style*="display: none"])){--lbpanel:min(36dvh,300px)}
+  body:has(.img-lightbox-overlay.active) #twNotePop.open{max-height:min(32dvh,260px)!important}
+  body:has(.img-lightbox-overlay.active) #twNoteText{min-height:64px!important;font-size:16px!important;resize:vertical}
+  #twNotePop #twNoteText{font-size:16px}
+  #sam19ver{font-size:.54rem;padding:2px 8px}
+}
+@media screen and (min-width:901px){ .lb-ex-handle{display:none} }
+</style>
+<script id="samurai-mobile-v19-js">
+/* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
+window.SAM19_BUILD='v19 Phase C 2026-11-05';
+(function(){
+if(window.__sam19)return;window.__sam19=true;
+
+/* ─────────── generic promise sheets ─────────── */
+function sheetOpen(title,desc,bodyHtml){
+  return new Promise(res=>{
+    const ov=document.createElement('div');ov.className='sam19-sheet-ov';
+    ov.innerHTML='<div class="sam19-sheet"><div class="sam19-sheet-t"></div>'+(desc?'<div class="sam19-sheet-d"></div>':'')+(bodyHtml||'')+'<button type="button" class="sam19-sheet-x">Cancel</button></div>';
+    ov.querySelector('.sam19-sheet-t').textContent=title;
+    if(desc)ov.querySelector('.sam19-sheet-d').textContent=desc;
+    const close=(v)=>{ov.remove();res(v);};
+    ov.querySelector('.sam19-sheet-x').onclick=()=>close(null);
+    ov.addEventListener('click',e=>{if(e.target===ov)close(null);});
+    document.body.appendChild(ov);
+    ov.__close=close;
+  });
+}
+window.sam19Confirm=async function(title,desc,okLabel){
+  const ov=await new Promise(r=>{const o=document.createElement('div');o.className='sam19-sheet-ov';
+    o.innerHTML='<div class="sam19-sheet"><div class="sam19-sheet-t"></div><div class="sam19-sheet-d"></div><div class="sam19-btnrow"><button type="button" class="sam19-btn yes"></button><button type="button" class="sam19-btn no">Cancel</button></div></div>';
+    o.querySelector('.sam19-sheet-t').textContent=title;o.querySelector('.sam19-sheet-d').textContent=desc;
+    o.querySelector('.yes').textContent=okLabel||'Confirm';
+    const done=v=>{o.remove();r(v);};
+    o.querySelector('.yes').onclick=()=>done(true);o.querySelector('.no').onclick=()=>done(null);
+    o.addEventListener('click',e=>{if(e.target===o)done(null);});
+    document.body.appendChild(o);});
+  return !!ov;
+};
+window.sam19Form=function(title,desc,bodyHtml,okLabel){
+  return new Promise(res=>{
+    const ov=document.createElement('div');ov.className='sam19-sheet-ov';
+    ov.innerHTML='<div class="sam19-sheet"><div class="sam19-sheet-t"></div><div class="sam19-sheet-d"></div>'+bodyHtml+'<div class="sam19-btnrow"><button type="button" class="sam19-btn yes"></button><button type="button" class="sam19-btn no">Cancel</button></div></div>';
+    ov.querySelector('.sam19-sheet-t').textContent=title;
+    if(desc)ov.querySelector('.sam19-sheet-d').textContent=desc;
+    const collect=()=>{const v={};ov.querySelectorAll('[id]').forEach(el=>{if(el.tagName==='INPUT'||el.tagName==='SELECT'||el.tagName==='TEXTAREA')v[el.id]=el.value;});return v;};
+    const done=v=>{const vals=collect();ov.remove();res(v?vals:null);};
+    ov.querySelector('.sam19-btn.yes').textContent=okLabel||'Confirm';
+    ov.querySelector('.sam19-btn.yes').onclick=()=>done(true);
+    ov.querySelector('.sam19-btn.no').onclick=()=>done(null);
+    ov.addEventListener('click',e=>{if(e.target===ov)done(null);});
+    document.body.appendChild(ov);
+  });
+};
+window.sam19Msg=function(title,desc,bodyHtml){return sheetOpen(title,desc,bodyHtml);};
+
+/* ─────────── attendance: green work-band continuity + Avail + In/Out punch ─────────── */
+const SAM19_WORKSET=['#00e676','#00d4ff','#b967ff','#00b25d'];
+const sam19IsWork=(c)=>SAM19_WORKSET.indexOf(String(c).trim())>=0;
+function sam19BridgeSegs(h){
+  const re=/(<div class="atm-seg" title="([^"]*)" style="left:([\d.]+)%;width:([\d.]+)%;background:([^"]+)"([^>]*)>)/g;
+  const segs=[];let m;
+  while((m=re.exec(h)))segs.push({i:m.index,len:m[0].length,title:m[2],left:+m[3],w:+m[4],bg:m[5],rest:m[6]});
+  if(!segs.length)return h;
+  const out=[];
+  for(let i=0;i<segs.length;i++){
+    const s=segs[i];let bg=s.bg;
+    if(bg==='#00e676'&&/^Ticket\b/.test(s.title))bg='#00b25d';   /* Working Ticket: own deeper green */
+    let w=s.w;
+    if(i>0){
+      const p=out[out.length-1];
+      if(sam19IsWork(p.bg)&&sam19IsWork(bg)){                     /* bridge tiny slivers between work runs */
+        const gap=s.left-(p.left+p.w);
+        if(gap>0&&gap<=0.4)p.w+=gap;
+      }
+    }
+    out.push({left:s.left,w:w,bg:bg,title:s.title,rest:s.rest});
+  }
+  let res='',pos=0;
+  out.forEach((s,idx)=>{
+    const o=segs[idx];
+    res+=h.slice(pos,o.i);
+    res+='<div class="atm-seg" title="'+s.title+'" style="left:'+s.left+'%;width:'+s.w+'%;background:'+s.bg+'"'+s.rest+'>';
+    pos=o.i+o.len;
+  });
+  return res+h.slice(pos);
+}
+function sam19StatsChips(h,D){
+  const m=h.match(/<div class="atm-day-stats">([\s\S]*?)<\/div>/);
+  if(!m)return h;
+  const inner=m[1];
+  if(!/worked/.test(inner))return h;
+  let parts=inner.split(' · ').map(s=>s.trim()).filter(Boolean);
+  if(D&&D.online_min>0){
+    const ai=parts.findIndex(p=>/worked/.test(p))+1;
+    parts.splice(Math.max(ai,1),0,'🟢 '+atmMinLabel(D.online_min)+' avail');
+  }
+  return h.replace(m[0],'<div class="atm-day-stats">'+parts.map(p=>'<span class="atm-stchip">'+p+'</span>').join('')+'</div>');
+}
+function sam19Punch(h,D,ds){
+  const m=h.match(/<div class="atm-day-punch">[\s\S]*?<\/div>/);
+  if(!m||!D||D.first==null)return h;
+  const isToday=(+ds===schDayInt(new Date()));
+  const openRun=(D.segments||[]).some(x=>x.open);
+  let out;
+  if(D.last!=null)out='🕒 In <b>'+atmHm(D.first)+'</b> · Out <b>'+atmHm(D.last)+'</b>'+(openRun?' <i class="atm-punch-live">· still on</i>':'');
+  else out=isToday?'🕒 In <b>'+atmHm(D.first)+'</b> · <i class="atm-punch-live">on shift now</i>':'🕒 In <b>'+atmHm(D.first)+'</b>';
+  const tip='In = first status change of the day. Out = when he went offline (last status change). (+1d) = the time belongs to the next day.';
+  return h.replace(m[0],'<div class="atm-day-punch" title="'+tip+'">'+out+'</div>');
+}
+if(typeof atmDayRow==='function'){
+  const _prev=atmDayRow;
+  atmDayRow=function(a,ds,axis,ticks){
+    let h=_prev.apply(this,arguments);
+    try{
+      const D=((a&&a.days)||{})[String(ds)]||{};
+      h=sam19BridgeSegs(h);
+      h=sam19StatsChips(h,D);
+      h=sam19Punch(h,D,String(ds));
+    }catch(e){}
+    return h;
+  };
+}
+if(typeof atmAgentCard==='function'){
+  const _prev=atmAgentCard;
+  atmAgentCard=function(a){
+    let h=_prev.apply(this,arguments);
+    try{
+      const S=(a&&a.summary)||{};
+      if(S.avail_min>0){
+        const chip='<b class="sam19-avail">🟢 Avail '+atmMinLabel(S.avail_min)+'</b>';
+        const idx=h.indexOf('📆 Off');
+        if(idx>=0)h=h.slice(0,idx)+chip+h.slice(idx);
+        else{
+          const si=h.indexOf('<div class="atm-sum">');
+          if(si>=0){const di=h.indexOf('</div>',si);if(di>=0)h=h.slice(0,di)+chip+h.slice(di);}
+        }
+      }
+    }catch(e){}
+    return h;
+  };
+}
+if(typeof atmRender==='function'){
+  const _prev=atmRender;
+  atmRender=function(){
+    _prev.apply(this,arguments);
+    try{
+      const leg=document.getElementById('atmLegend');
+      if(leg){
+        const items=[['#00e676','Online'],['#00b25d','Working tkt'],['#00d4ff','On task'],['#b967ff','Meeting'],['#ffb800','Break'],['#4b5563','Offline']];
+        leg.innerHTML=items.map(x=>'<span class="atm-lg"><i style="background:'+x[0]+'"></i>'+x[1]+'</span>').join('')
+          +'<span class="atm-lg"><i style="background:linear-gradient(90deg,#00e676,#00b25d,#00d4ff);width:18px"></i>Work band (continuous)</span>'
+          +'<span class="atm-lg"><i style="background:transparent;border:1.5px dashed #00e676;width:10px;height:14px"></i>Avail = online, no ticket</span>'
+          +'<span class="atm-lg"><i style="background:#ff4d6d"></i>Offline in shift</span>'
+          +'<span class="atm-lg"><i style="background:transparent;border:1px dashed rgba(0,212,255,.7);width:9px;height:13px"></i>Shift window</span>';
+      }
+    }catch(e){}
+  };
+}
+
+/* ─────────── schedule: weeks meta from every GET (fetch tap) ─────────── */
+window.schWeeksMeta=window.schWeeksMeta||{};
+try{
+  const _of=window.fetch;
+  window.fetch=function(u,o){
+    const p=_of.apply(this,arguments);
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/audition/schedule?')===0){
+        p.then(r=>{try{r.clone().json().then(d=>{if(d&&d.success&&d.weeks){window.schWeeksMeta=d.weeks;try{sch19Badges();}catch(x){}}}).catch(()=>{});}catch(x){}});
+      }
+    }catch(e){}
+    return p;
+  };
+}catch(e){}
+
+/* ─────────── week badges + tools ─────────── */
+window.sch19Badges=function(){
+  const lbl=document.getElementById('schWeekLabel');
+  if(!lbl)return;
+  let b=document.getElementById('sam19WkBadge');
+  if(!b){b=document.createElement('span');b.id='sam19WkBadge';lbl.after(b);}
+  const wks=new Set();
+  try{
+    const[b0,b1]=schRangeBounds();
+    for(let d=new Date(b0);d<=b1;d.setDate(d.getDate()+1)){
+      const m=new Date(d);m.setDate(m.getDate()-((m.getDay()+6)%7));
+      wks.add(schDayInt(m));
+    }
+  }catch(e){}
+  let pub=0,draft=0,dirty=0,n=0;
+  wks.forEach(w=>{const m=window.schWeeksMeta[String(w)];if(!m)return;n++;if(m.published)pub++;else draft++;if(m.dirty)dirty++;});
+  if(!n){b.className='sam19-wkbadge none';b.textContent='● live — never published';}
+  else if(pub&&draft){b.className='sam19-wkbadge mixed';b.textContent='● '+pub+' published · '+draft+' draft';}
+  else if(pub){b.className='sam19-wkbadge pub'+(dirty?' dirty':'');b.textContent=dirty?'● published + unpublished edits':'● published';}
+  else{b.className='sam19-wkbadge draft';b.textContent='● draft — not published';}
+  b.title='Published weeks are what agents see (frozen snapshot). Amber = edits saved after the last publish (draft).';
+};
+window.sch19EnsureTools=function(){
+  const bar=document.querySelector('#pg-audition-schedule .sch-tools');
+  if(!bar||document.getElementById('sam19PubBtn'))return;
+  const adm=(typeof isAdmin!=='undefined')&&isAdmin;
+  const wrap=document.createElement('div');wrap.className='sam19-toolsbtns';
+  if(adm){
+    wrap.innerHTML+='<button type="button" class="btn btn-primary" id="sam19PubBtn" onclick="sch19Publish()">📤 Publish week</button>'
+      +'<button type="button" class="btn btn-secondary" id="sam19DiscBtn" onclick="sch19Discard()">↩ Discard draft</button>';
+  }else{
+    wrap.innerHTML+='<button type="button" class="btn btn-secondary" id="sam19SwapReqBtn" onclick="sch19SwapReq()">⇄ Request swap</button>';
+  }
+  wrap.innerHTML+='<button type="button" class="btn btn-secondary" id="sam19CsvBtn" onclick="sch19Csv()">⬇ CSV</button>'
+    +'<button type="button" class="btn btn-secondary" id="sam19SwapsBtn" onclick="sch19SwapsOpen()">⇄ Swaps</button>';
+  bar.appendChild(wrap);
+};
+window.sch19Publish=async function(){
+  if(schRangeMode!=='week'){ToastManager.show('Switch to Week view to publish one week at a time.','info',4000);return;}
+  const wk=schDayInt(schWeekStart);
+  const label=schWeekStart.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const ok=await sam19Confirm('📤 Publish the week of '+label+'?','The current live grid is snapshotted as what agents see. Every agent scheduled that week gets a Feishu alert (free). Your later edits stay draft until you publish again.','Publish');
+  if(!ok)return;
+  try{
+    const r=await fetch('/api/audition/schedule/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:loggedUser,email:loggedEmail,week:wk})});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||('HTTP '+r.status));
+    ToastManager.show('✅ Published '+d.rows+' entries · '+(((d.alerts||{}).sent)||0)+' agents alerted on Feishu','success',6500);
+    schLoad(true);
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',8000);}
+};
+window.sch19Discard=async function(){
+  if(schRangeMode!=='week'){ToastManager.show('Switch to Week view first.','info',3500);return;}
+  const wk=schDayInt(schWeekStart);
+  const label=schWeekStart.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const ok=await sam19Confirm('↩ Discard draft edits for the week of '+label+'?','Rolls the LIVE grid back to the last published snapshot. Everything you changed after publishing is undone. Refuses if the week was never published.','Discard draft');
+  if(!ok)return;
+  try{
+    const r=await fetch('/api/audition/schedule/discard',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:loggedUser,email:loggedEmail,week:wk})});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||('HTTP '+r.status));
+    ToastManager.show('↩ Draft discarded — back to the published schedule.','success',5000);
+    schLoad(true);
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',8000);}
+};
+window.sch19Csv=function(){
+  try{
+    const rows=(schRows||[]).slice().sort((a,b)=>(+a.day||0)-(+b.day||0)||String(a.name||'').localeCompare(String(b.name||'')));
+    if(!rows.length){ToastManager.show('Nothing scheduled in this range yet.','info',3000);return;}
+    const q=(v)=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const lines=['Agent,Email,Date,Day,Type,Start,End,Note'];
+    rows.forEach(r=>{
+      const dt=schDateFromInt(+r.day);
+      lines.push([q(r.name),q(r.email),q(dt.toISOString().slice(0,10)),q(dt.toLocaleDateString('en-GB',{weekday:'short'})),q(r.type),q(r.start||''),q(r.end||''),q(r.note||'')].join(','));
+    });
+    const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='xena-schedule-'+schDayInt(schRangeBounds()[0])+'-'+schDayInt(schRangeBounds()[1])+'.csv';
+    document.body.appendChild(a);a.click();a.remove();
+    ToastManager.show('⬇ '+rows.length+' rows exported to CSV.','success',3500);
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',6000);}
+};
+window.sch19SwapReq=async function(){
+  const me=(loggedEmail||'').toLowerCase();
+  const my=(schRows||[]).filter(r=>(r.email||'').toLowerCase()===me&&SCH_WORK_TYPES.includes(r.type));
+  if(!my.length){ToastManager.show('You have no working shifts in this range to swap.','info',4000);return;}
+  const opts=my.map(r=>'<option value="'+r.day+'">'+escHtml(schDayLabel(r.day))+' — '+escHtml(r.type)+' '+escHtml(r.start||'')+(r.end?'–'+escHtml(r.end):'')+'</option>').join('');
+  const vals=await sam19Form('⇄ Request a shift swap','Pick your shift and the colleague you want to swap with. They (or an admin) approve it in the portal — approving exchanges the two shifts instantly. They also get a Feishu alert.',
+    '<div class="sam19-frow"><label>My shift</label><select id="sam19SwDay">'+opts+'</select></div>'
+    +'<div class="sam19-frow"><label>Colleague\'s work email</label><input id="sam19SwEmail" type="email" placeholder="name@company.com" autocomplete="off"></div>'
+    +'<div class="sam19-fnote">Both of you must have a shift on that day.</div>','Send request');
+  if(!vals)return;
+  const day=+vals['sam19SwDay'];
+  const em=(vals['sam19SwEmail']||'').trim();
+  if(!em){ToastManager.show('Enter the colleague\'s work email.','warning',3500);return;}
+  try{
+    const r=await fetch('/api/audition/schedule/swap-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:loggedUser,email:loggedEmail,day:day,with_email:em})});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||('HTTP '+r.status));
+    ToastManager.show('⇄ Swap request sent — they can approve it under Swaps.','success',5000);
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',8000);}
+};
+window.sch19SwapsOpen=async function(){
+  try{
+    const qs=new URLSearchParams({user:loggedUser||'',email:loggedEmail||''});
+    const r=await fetch('/api/audition/schedule/swaps?'+qs);
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||('HTTP '+r.status));
+    const list=d.swaps||[];
+    const me=(loggedEmail||'').toLowerCase();
+    const adm=(typeof isAdmin!=='undefined')&&isAdmin;
+    const rows=list.map(s=>{
+      const st={'pending':'⏳ Pending','approved':'✅ Approved','declined':'⛔ Declined','expired':'💤 Expired'}[s.status]||s.status;
+      const can=(s.status==='pending')&&(adm||((s.to_email||'').toLowerCase()===me));
+      const sub='Day '+s.day+(s.ts?' · '+new Date(s.ts).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'');
+      return '<div class="sam19-swap '+s.status+'"><div class="sam19-sw-main"><b>'+escHtml(s.from_name||s.from_email||'?')+'</b> ⇄ <b>'+escHtml(s.to_name||s.to_email||'?')+'</b>'
+        +'<div class="sam19-sw-sub">'+escHtml(sub)+'</div></div>'
+        +'<span class="sam19-sw-st '+s.status+'">'+st+'</span>'
+        +(can?'<span class="sam19-sw-btns"><button type="button" onclick="sch19SwapDecide(\''+escHtml(s.id)+'\',\'approve\')">Approve</button><button type="button" class="no" onclick="sch19SwapDecide(\''+escHtml(s.id)+'\',\'decline\')">Decline</button></span>':'')
+        +'</div>';
+    }).join('')||'<div class="sam19-fnote">No swap requests yet.</div>';
+    await sam19Msg('⇄ Swap requests',null,'<div>'+rows+'</div>');
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',7000);}
+};
+window.sch19SwapDecide=async function(id,dec){
+  try{
+    const r=await fetch('/api/audition/schedule/swap-decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:loggedUser,email:loggedEmail,id:id,decision:dec})});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||('HTTP '+r.status));
+    ToastManager.show(dec==='approve'?'✅ Swap approved — the two shifts are exchanged.':'Swap declined. The requester gets a Feishu alert.','success',5000);
+    document.querySelectorAll('.sam19-sheet-ov').forEach(x=>x.remove());
+    sch19SwapsOpen();schLoad(true);
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',7000);}
+};
+if(typeof schRenderAll==='function'){
+  const _prev=schRenderAll;
+  schRenderAll=function(){
+    _prev.apply(this,arguments);
+    try{sch19EnsureTools();sch19Badges();}catch(e){}
+  };
+}
+
+/* ─────────── cross-agent drag: Move / Copy / Swap choice ─────────── */
+if(typeof schMoveShift==='function'){
+  const _prev=schMoveShift;
+  schMoveShift=function(fromEmail,fromDay,toEmail,toDay){
+    if(toEmail!==fromEmail)return sch19XferChoice(fromEmail,fromDay,toEmail,toDay);
+    return _prev.apply(this,arguments);
+  };
+}
+window.sch19XferChoice=async function(fe,fd,te,td){
+  const src=schRowFor(fe,fd);
+  if(!src)return;
+  const dst=schRowFor(te,td);
+  const fromName=(src.name||fe||'?'),toName=((schAgents.find(a=>(a.email||'')===te)||{}).name)||te;
+  const what=src.type+(src.start?' '+src.start+'–'+src.end:'');
+  const dayLbl=schDayLabel(td);
+  const opts=[
+    {k:'move',t:'➡️ Move (transfer)',d:fromName+"'s "+what+' on '+schDayLabel(fd)+' moves to '+toName+' on '+dayLbl+' — '+fromName+"'s original day becomes empty."},
+    {k:'copy',t:'📄 Copy (keep both)',d:toName+' also gets the shift on '+dayLbl+'; '+fromName+' keeps theirs.'}
+  ];
+  if(dst)opts.push({k:'swap',t:'⇄ Swap',d:fromName+' and '+toName+' exchange their shifts on '+dayLbl+'.'});
+  let bodyHtml=opts.map(o=>'<button type="button" class="sam19-opt" data-k="'+o.k+'"><b>'+o.t+'</b><span>'+o.d+'</span></button>').join('');
+  const k=await new Promise(res=>{
+    sheetOpen('Drop "'+what+'" → '+toName+' on '+dayLbl+'?',null,bodyHtml).then(v=>res(v));
+    document.querySelectorAll('.sam19-opt').forEach(btn=>{btn.onclick=()=>{document.querySelectorAll('.sam19-sheet-ov').forEach(x=>x.remove());res(btn.dataset.k);};});
+  });
+  if(!k)return;
+  const toEntry={email:te,name:toName,day:td,type:src.type,start:src.start,end:src.end,note:src.note};
+  let entries=[],delKeys=[];
+  if(k==='move'){entries=[toEntry];delKeys=[(fe||'').toLowerCase()+'|'+fd];}
+  else if(k==='copy'){entries=[toEntry];}
+  else{
+    const fromName2=(dst.name||fe||'');
+    entries=[toEntry,{email:fe,name:fromName2,day:fd,type:dst.type,start:dst.start,end:dst.end,note:dst.note}];
+  }
+  try{
+    await schSaveEntries(entries,delKeys);
+    schApplyLocal(entries,delKeys);
+    schRenderAll();
+    ToastManager.show(k==='move'?'➡️ Shift moved — original day cleared.':k==='copy'?'📄 Shift copied.':'⇄ Shifts swapped!','success',4000);
+  }catch(e){ToastManager.show('⚠️ '+e.message,'error',8000);}
+};
+
+/* ─────────── NID chip: strip dashes/spaces on insert ─────────── */
+document.addEventListener('click',(e)=>{
+  try{
+    const chip=e.target.closest&&e.target.closest('.ocr-chip');
+    if(!chip||chip.dataset.act!=='nid')return;
+    const form=document.getElementById('tw-form');
+    if(!form)return;
+    setTimeout(()=>{
+      const el=form.querySelector('[name="NID Number"]');
+      if(!el)return;
+      const raw=el.value||'';
+      if(/^[\d\s-]{8,}$/.test(raw.trim())){
+        const clean=raw.replace(/[-\s]/g,'');
+        if(clean!==raw){
+          el.value=clean;
+          el.dispatchEvent(new Event('input',{bubbles:true}));
+          ToastManager.show('NID cleaned — dashes and spaces removed.','success',2400);
+        }
+      }
+    },40);
+  }catch(x){}
+},true);
+
+/* ─────────── extract panel: chips + copy ABOVE, resize handle ─────────── */
+function sam19PanelDrag(hd){
+  if(hd.dataset.init)return;hd.dataset.init='1';
+  hd.addEventListener('pointerdown',(e)=>{
+    e.preventDefault();
+    const panel=document.getElementById('imgLightboxExtractPanel');
+    const ov=document.getElementById('imgLightboxOverlay');
+    if(!panel||!ov)return;
+    const startY=e.clientY,h0=panel.getBoundingClientRect().height;
+    const maxH=Math.max(150,Math.min(window.innerHeight*0.78,window.innerHeight-160));
+    const move=(ev)=>{ov.style.setProperty('--lbpanel',Math.max(140,Math.min(maxH,h0+(startY-ev.clientY)))+'px');};
+    const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};
+    document.addEventListener('pointermove',move);
+    document.addEventListener('pointerup',up);
+  });
+}
+window.lightboxRenderExtractResult=function(result){
+  const panel=document.getElementById('imgLightboxExtractPanel');
+  const body=document.getElementById('imgLightboxExtractBody');
+  if(!panel||!body)return;
+  panel.style.display='flex';
+  if(!panel.querySelector('.lb-ex-handle')){
+    const hd=document.createElement('div');hd.className='lb-ex-handle';hd.innerHTML='<span></span>';
+    hd.title='Drag up / down to resize this panel';panel.prepend(hd);sam19PanelDrag(hd);
+  }
+  if(!result.success){
+    body.innerHTML='<div style="padding:10px 14px;font-size:.85rem;color:var(--accent-rose);">'+escHtml(result.error||'Text extraction failed')+'</div>';
+    return;
+  }
+  if(!result.text||!result.text.trim()){
+    body.innerHTML='<div style="padding:10px 14px;font-size:.85rem;color:var(--text-muted);">No text found in this image.</div>';
+    return;
+  }
+  const txt=result.text;
+  const words=txt.trim().split(/\s+/).length;
+  body.innerHTML='<div class="lb-ex-top">'
+    +'<button type="button" class="lb-ex-copy" onclick="lightboxCopyExtractedText()">📋 Copy text</button>'
+    +'<span class="lb-ex-count">'+words+' words · auto-extracted</span></div>'
+    +samOcrLinesHtml(txt)
+    +'<pre id="imgLightboxExtractText" style="white-space:pre-wrap;font-family:inherit;font-size:.86rem;color:var(--text-primary,#e8eaf0);margin:0;padding:8px 14px 12px;flex:1;min-height:0;overflow:auto;">'+escHtml(txt)+'</pre>';
+};
+
+/* ─────────── build badge (FE vs BE mismatch guard) ─────────── */
+(async function(){
+  try{
+    const r=await fetch('/api/app-version');
+    const d=await r.json();
+    const be=(d&&d.build)||'unknown';
+    const ok=be===window.SAM19_BUILD;
+    const chip=document.createElement('div');
+    chip.id='sam19ver';
+    chip.title='Portal build check. Click to hide.';
+    chip.innerHTML='<span class="dot'+(ok?'':' bad')+'"></span>FE '+window.SAM19_BUILD+' · BE '+escHtml(be);
+    chip.onclick=()=>chip.remove();
+    document.body.appendChild(chip);
+    if(!ok)setTimeout(()=>ToastManager.show('⚠️ Build mismatch: the backend on Vercel is "'+be+'" but this page is "'+window.SAM19_BUILD+'". Redeploy api/index.py (v19) — features will misbehave until they match.','warning',12000),2500);
+  }catch(e){}
+})();
+})();
+</script>
+
 </body>
 </html>
