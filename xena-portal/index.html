@@ -1994,7 +1994,7 @@
            is visible without scrolling; the <pre> inside flexes to fill it. Shown
            via display:flex (JS), hidden via display:none. */
         .img-lightbox-extract-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;flex:0 0 360px;width:360px;max-width:360px;margin:0;align-self:stretch;max-height:82vh;box-shadow:0 8px 24px rgba(0,0,0,.4);flex-direction:column;overflow:hidden;}
-        #imgLightboxExtractBody{display:flex;flex-direction:column;flex:1;min-height:0;}
+        #imgLightboxExtractBody{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;}
         /* Narrow screens: stack panel under the pic again, capped height. */
         @media (max-width:900px){
             .img-lightbox-main{flex-direction:column;gap:8px;}
@@ -24205,11 +24205,24 @@ function atmDayRow(a,ds,axis,ticks){
         if(last&&last.st===x.st&&x.s<=last.e+3){ last.e=Math.max(last.e,x.e); if(x.open)last.open=true; }
         else _runs.push({st:x.st,s:x.s,e:x.e,open:!!x.open});
     });
+    // v19.3 (Ahmed): merge adjacent runs that render in the SAME colour into
+    // one continuous span (Online and Working Ticket share #00e676) so the band
+    // reads as one solid block instead of a scalloped zipper. The stats chips
+    // below still report online / on-task / ticket minutes separately.
+    const _merged=[];
     _runs.forEach(x=>{
-        const c=ATM_ST_COLOR[x.st]||'#7c8aa0';
+        const cc=ATM_ST_COLOR[x.st]||'#7c8aa0';
+        const last=_merged[_merged.length-1];
+        if(last&&last.c===cc&&x.s<=last.e+3){
+            last.e=Math.max(last.e,x.e); if(x.open)last.open=true;
+            if(!last.sts.includes(x.st))last.sts.push(x.st);
+        }else _merged.push({sts:[x.st],c:cc,s:x.s,e:x.e,open:!!x.open});
+    });
+    _merged.forEach(x=>{
         const wpct=p(Math.max(1,x.e-x.s));
         const lbl=wpct>=9?`<span class="atm-seg-lbl">${atmMinLabel(Math.round(x.e-x.s))}</span>`:'';
-        segs+=`<div class="atm-seg" title="${escHtml((ATM_ST_LABEL[x.st]||x.st)+' '+atmHm(x.s)+' → '+atmHm(x.e)+(x.open?' (still running)':''))}" style="left:${p(x.s)}%;width:${wpct}%;background:${c}">${lbl}</div>`;
+        const _t=x.sts.map(st=>ATM_ST_LABEL[st]||st).join(' + ');
+        segs+=`<div class="atm-seg" title="${escHtml(_t+' '+atmHm(x.s)+' → '+atmHm(x.e)+(x.open?' (still running)':''))}" style="left:${p(x.s)}%;width:${wpct}%;background:${x.c}">${lbl}</div>`;
     });
     (D.inshift_gaps||[]).forEach(x=>{
         gaps+=`<div class="atm-gap" title="${escHtml('Offline in shift '+atmHm(x.s)+' → '+atmHm(x.e)+' ('+x.min+' min)')}" style="left:${p(x.s)}%;width:${p(Math.max(1,x.e-x.s))}%"></div>`;
@@ -25272,7 +25285,7 @@ window.addEventListener('resize', function () {
  .img-lightbox-main{flex-direction:column!important;gap:6px!important;padding:0 6px!important;align-items:stretch!important}
  .img-lightbox-stage{height:var(--lbh)!important;flex:none!important;width:100%!important;min-height:90px}
  .img-lightbox-canvas img{max-width:calc(100vw - 12px)!important;max-height:var(--lbh)!important}
- .img-lightbox-extract-panel{flex:none!important;width:100%!important;max-width:100%!important;max-height:var(--lbpanel)!important;align-self:stretch!important}
+ .img-lightbox-extract-panel{flex:none!important;width:100%!important;max-width:100%!important;height:var(--lbpanel)!important;max-height:var(--lbpanel)!important;align-self:stretch!important}
  .img-lightbox-hint{display:none!important}
  .img-lightbox-toolbar{flex-wrap:nowrap!important;left:52px;right:6px;top:6px!important;max-width:none!important;overflow-x:auto;justify-content:flex-start;gap:4px!important;scrollbar-width:none}
  .img-lightbox-toolbar button{flex:none;width:34px!important;height:34px!important}
@@ -25379,7 +25392,7 @@ window.addEventListener('resize', function () {
 .ocr-insert{margin:0 14px 8px;flex:none;border:1px solid rgba(0,212,255,.22);border-radius:10px;background:rgba(0,212,255,.05);overflow:hidden;}
 .ocr-insert>summary{padding:7px 11px;font-size:.75rem;font-weight:700;color:#9be9ff;cursor:pointer;list-style:none;user-select:none;}
 .ocr-insert>summary::before{content:'▸ ';}.ocr-insert[open]>summary::before{content:'▾ ';}
-.ocr-lines{max-height:180px;overflow-y:auto;padding:2px 6px 8px;}
+.ocr-lines{max-height:none;overflow-y:auto;padding:2px 6px 8px;} /* v19.3 (Ahmed): was capped at 180px -- only ~5 chip rows showed, rest hidden */
 .ocr-line{display:flex;align-items:center;gap:6px;padding:4px 5px;border-radius:8px;font-size:.74rem;line-height:1.35;}
 .ocr-line:hover{background:rgba(0,212,255,.07);}
 .ocr-line-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
@@ -25524,7 +25537,7 @@ async function dzPasteFromClipboard(id, btn) {
 
 // ── OCR tap-to-insert lines (rendered into the lightbox extract panel) ──
 function samOcrLinesHtml(text) {
-    const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length >= 3).slice(0, 25);
+    const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length >= 3).slice(0, 40);
     const escAttr = (v) => escHtml(v).replace(/"/g, '&quot;');
     const rowArr = lines.map(l => {
         const hasNid = /\b\d{5}-\d{7}-\d\b|\b\d{13}\b/.test(l);
@@ -25545,7 +25558,8 @@ function samOcrLinesHtml(text) {
         if (hasNum && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="uid">→ User ID</button>`;
         if (hasOther && !hasNid) chips += `<button type="button" class="ocr-chip" data-act="otherapp">→ Otherapp</button>`;
         if (hasRname) chips += `<button type="button" class="ocr-chip" data-act="rname">→ Real Name</button>`;
-        if (hasWord) chips += `<button type="button" class="ocr-chip" data-act="name">→ Name</button>`;
+        // v19.3 (Ahmed): the → Name chip is removed -- it targeted the applier
+        // 'Name' field, which the → Real Name chip already covers.
         if (!chips) return '';
         return `<div class="ocr-line" data-val="${escAttr(l)}"><span class="ocr-line-txt">${escHtml(l)}</span><span class="ocr-chips">${chips}</span></div>`;
     }).filter(Boolean);
@@ -25758,7 +25772,17 @@ function samFocusNext(from) {
             const vv = window.visualViewport;
             const place = () => {
                 const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-                bar.style.bottom = (kb + 8) + 'px';
+                // v19.3 (Ahmed): keyboard open → sit right above it; keyboard
+                // closed → stack directly above the "Go to Submit" pill, so the
+                // right rail reads top-to-bottom: Next/Done, then Go to Submit.
+                let base = kb + 8;
+                if (kb <= 0) {
+                    const gs = document.querySelector('.sam-go-submit');
+                    if (gs && getComputedStyle(gs).display !== 'none') {
+                        base = Math.max(base, (parseFloat(getComputedStyle(gs).bottom) || 0) + gs.offsetHeight + 10);
+                    }
+                }
+                bar.style.bottom = base + 'px';
             };
             let active = null;
             document.addEventListener('focusin', (e) => {
@@ -26562,6 +26586,9 @@ function samSetReset() {
 body:has(.img-lightbox-overlay.active) .twx-radar-msg{display:none!important}
 body:has(.img-lightbox-overlay.active) .twx-radar-dock{display:none!important}
 body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.active) #awsDock{z-index:10060!important}
+/* v19.3 (Ahmed): the note popover sat at z-index 10001, UNDER the lightbox
+   (10050) -- tapping 📝 with a pic open opened it invisibly. Lift it above. */
+body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 
 /* v19.1 (Ahmed): Next/Done + Go to Submit share the RIGHT rail on touch —
    supersedes v16's mobile-left pill rule (later + !important wins). */
@@ -26596,7 +26623,7 @@ body:has(.img-lightbox-overlay.active) #twxDock,body:has(.img-lightbox-overlay.a
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v19.2 dock+extract 2026-11-05';
+window.SAM19_BUILD='v19.3 panel+note+band 2026-11-06';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
