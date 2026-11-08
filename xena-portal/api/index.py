@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v22 imgcompress 2026-11-06"
+XENA_BUILD = "v23 mirrorfix 2026-11-09"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -8557,6 +8557,12 @@ MIRROR_ENABLE          = True
 MIRROR_PAGE            = 200    # rows per records/search page (one call)
 MIRROR_READ_PAGES_MAX  = 5      # sync pass reads at most 1000 newest rows
 MIRROR_FEED_ROWS       = 200    # feed fast path: newest 200 thread rows, 1 call
+MIRROR_OR_CHUNK        = 50     # upsert probe: single-value "is" conditions OR'ed
+                                # per search call. Feishu now REJECTS one "is"
+                                # condition carrying multiple values (1254018
+                                # InvalidFilter at 2+, 99992402 at ~20+) — live-
+                                # verified on tblUhfs2d43hxy3u 2026-11-09; OR of
+                                # single-value conditions passes at 50.
 MIRROR_STORE_MAX       = 60     # rows upserted per background sync pass (Phase 18:
                                 # was 200 — a full catch-up pass right after the ~20s
                                 # rescan could outlive the serverless function timeout,
@@ -9310,9 +9316,23 @@ def _mirror_upsert(payloads, token):
     cids = [p.get("comment_id") for p in payloads if p.get("comment_id")]
     have = {}
     if cids:
-        for i in range(0, len(cids), MIRROR_PAGE):
-            body = {"filter": {"conjunction": "and", "conditions": [
-                        {"field_name": "Comment ID", "operator": "is", "value": cids[i:i + MIRROR_PAGE]}]}}
+        # v23 (Ahmed's 99992402 report, 2026-11-09): Feishu's records/search now
+        # REJECTS one "is" condition carrying multiple values (1254018
+        # InvalidFilter at 2+, 99992402 field validation failed at ~20+) — it
+        # accepted 200 at mirror creation (2026-10-19), which is why the table
+        # filled back then and silently stopped updating later. The accepted
+        # shape is an OR of single-value conditions (live-verified on
+        # tblUhfs2d43hxy3u, 50 conditions/call). Cids are deduped first.
+        seen_cids, uniq_cids = set(), []
+        for c in cids:
+            if c not in seen_cids:
+                seen_cids.add(c)
+                uniq_cids.append(c)
+        for i in range(0, len(uniq_cids), MIRROR_OR_CHUNK):
+            chunk = uniq_cids[i:i + MIRROR_OR_CHUNK]
+            body = {"filter": {"conjunction": "or", "conditions": [
+                        {"field_name": "Comment ID", "operator": "is", "value": [c]}
+                        for c in chunk]}}
             rows, err = _mirror_search(body, token, pages=2)
             if err:
                 return 0, 0
