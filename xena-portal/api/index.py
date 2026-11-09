@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v24 speed 2026-11-10"
+XENA_BUILD = "v25 charge-save 2026-11-10"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2667,6 +2667,16 @@ def _background_sync_points_table():
             redis_set_json(REDIS_KEY_POINTS_SNAPSHOT, {
                 "items": items, "updated_at": now, "fetch_complete": complete, "stop_reason": reason,
             }, ttl=BACKGROUND_SYNC_MAX_AGE + 300)
+        try:
+            # v25: every points-table refresh also (re)seeds the bulk
+            # agency_code -> wallet record_id map, so _fetch_wallet_fast's
+            # tier-1 lookup is a pure in-memory dict hit on warm instances
+            # (zero Redis round trip), and the shared Redis map key keeps
+            # cold instances one JSON read away from the same warm path.
+            if items:
+                _wallet_map_seed(items)
+        except Exception:
+            pass
     except Exception as e:
         logger.error("background_sync_failed", table="points_table", error=str(e))
     finally:
@@ -3754,6 +3764,74 @@ def _warm_tenant_token_once():
             pass
     threading.Thread(target=_w, daemon=True).start()
 
+# ════════════════════════════════════════════════════════════════════
+# v25 (charge speed): agency_code -> wallet record_id BULK map. The per-code
+# xena:wallet_ref:<code> cache (Phase 34b) only helps agencies that have been
+# charged/searched before on a healthy Redis -- a cold instance with an empty
+# in-memory fallback paid the full 2-4s Agency Points table search on EVERY
+# charge, which was the bulk of Ahmed's "charge avg 10 sec". The points-table
+# background sync already reads the whole table every 180s (and after every
+# portal write via kick_table_resync), so it now also seeds this map; the
+# charge path then resolves the wallet by direct record GET (~1s) instead of
+# searching. ACCURACY UNCHANGED: the map only supplies the record_id -- the
+# wallet is still read fresh by direct GET and the Agency Code is verified
+# exactly, so a stale map entry can never charge the wrong wallet (worst case
+# one wasted GET, then the live search heals).
+# ════════════════════════════════════════════════════════════════════
+REDIS_KEY_WALLET_MAP = "xena:wallet_ref_map"
+_wallet_ref_map = {"map": {}, "ts": 0.0, "lock": threading.Lock()}
+
+def _wallet_map_seed(items):
+    """Build {agency_code: record_id} from a points-table snapshot and store it
+    in-proc + one Redis JSON write. Returns the number of entries."""
+    m = {}
+    for it in items or []:
+        code = extract_field_text(get_field_local((it or {}).get("fields", {}), "Agency Code")).strip()
+        rid = (it or {}).get("record_id")
+        if code and rid:
+            m[code] = rid
+    if not m:
+        return 0
+    with _wallet_ref_map["lock"]:
+        _wallet_ref_map["map"] = m
+        _wallet_ref_map["ts"] = time.time()
+    if REDIS_ENABLED:
+        try:
+            redis_set_json(REDIS_KEY_WALLET_MAP, m, ttl=7 * 24 * 3600)
+        except Exception:
+            pass
+    return len(m)
+
+def _wallet_map_lookup(code):
+    """record_id for an agency code from the bulk map, or None. In-proc copy
+    first, then the Redis copy (survives cold serverless instances; warms the
+    in-proc copy on hit)."""
+    with _wallet_ref_map["lock"]:
+        rid = _wallet_ref_map["map"].get(code)
+    if rid:
+        return rid
+    if REDIS_ENABLED:
+        try:
+            m = redis_get_json(REDIS_KEY_WALLET_MAP)
+            if isinstance(m, dict) and m:
+                with _wallet_ref_map["lock"]:
+                    _wallet_ref_map["map"] = m
+                    _wallet_ref_map["ts"] = time.time()
+                return m.get(code)
+        except Exception:
+            pass
+    return None
+
+def _wallet_map_forget(code):
+    """Drop one entry (in-proc only) after its record failed verification --
+    the per-code key + live search take over, and the next background sync
+    re-seeds the bulk copy."""
+    try:
+        with _wallet_ref_map["lock"]:
+            _wallet_ref_map["map"].pop(code, None)
+    except Exception:
+        pass
+
 def _wallet_search(headers, code):
     """Live Agency Points table search by exact Agency Code (read-only, so a
     cross-border spike gets one automatic retry)."""
@@ -3781,13 +3859,18 @@ def _fetch_wallet_fast(headers, code):
     if not code:
         return None
     key = f"xena:wallet_ref:{code}"
-    cached_id = None
-    try:
-        cached = redis_get_json(key)
-        if isinstance(cached, dict):
-            cached_id = cached.get("record_id")
-    except Exception:
-        cached_id = None
+    # v25 tier 1: the bulk code->record_id map (seeded by the background
+    # points-table sync, shared via one Redis JSON key) -- a pure in-memory
+    # dict hit on a warm instance, ZERO Redis round trip. Falls through to
+    # the per-code key, then the live search, exactly as before.
+    cached_id = _wallet_map_lookup(code)
+    if not cached_id:
+        try:
+            cached = redis_get_json(key)
+            if isinstance(cached, dict):
+                cached_id = cached.get("record_id")
+        except Exception:
+            cached_id = None
     if cached_id:
         try:
             r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cached_id}",
@@ -3802,10 +3885,28 @@ def _fetch_wallet_fast(headers, code):
             redis_cmd("DEL", key)
         except Exception:
             pass
+        # The map entry that just failed verification may be stale (deleted /
+        # re-created wallet row) -- drop the in-proc entry so the next charge
+        # does not waste a GET on it. The shared Redis map key self-heals on
+        # the next background sync (which re-seeds the whole map).
+        _wallet_map_forget(code)
     rec = _wallet_search(headers, code)
     if rec and rec.get("record_id"):
         try:
             redis_set_json(key, {"record_id": rec["record_id"]}, ttl=7 * 24 * 3600)
+        except Exception:
+            pass
+        try:
+            with _wallet_ref_map["lock"]:
+                _wallet_ref_map["map"][code] = rec["record_id"]
+        except Exception:
+            pass
+        try:
+            # A search was needed at all => the bulk map was cold here (fresh
+            # serverless instance or the background sync never ran). Kick the
+            # sync so this instance self-warms instead of paying the search
+            # on every charge.
+            ensure_points_sync_started()
         except Exception:
             pass
     return rec
@@ -4089,7 +4190,45 @@ def update_request():
     fields = {k: v for k, v in fields.items() if k not in EXCLUDED_UPDATE_FIELDS}
 
     tat = get_tenant_access_token()
-    
+
+    # v25 (save speed, Ahmed): the defensive attachment merge needs the
+    # record's CURRENT fields, and the conflict check needs its
+    # last_modified_time -- the SAME read serves both. It is independent of
+    # the file uploads, so when the incoming fields already carry attachment
+    # token lists the read runs in a background thread OVERLAPPING the upload
+    # pool below instead of adding a sequential round trip after it. The
+    # token union itself still happens after both (it needs the new tokens
+    # AND the sheet state); only the network wait is hidden. Saves whose
+    # fields carry no token lists never start the thread here -- if the
+    # uploads below create token lists, the late case runs the same read
+    # synchronously; saves with no attachments at all skip the merge read
+    # entirely (the conflict check then does its own one cheap GET).
+    def _is_token_list(v):
+        return isinstance(v, list) and len(v) > 0 and all(
+            isinstance(x, dict) and x.get("file_token") for x in v)
+
+    _merge_state = {"ran": False, "fields": None, "mtime": 0, "error": None}
+    def _merge_fetch():
+        try:
+            cur_resp = feishu_session.get(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                headers={"Authorization": f"Bearer {tat}"}, timeout=15)
+            cur_data = cur_resp.json()
+            if cur_data.get("code") != 0:
+                raise Exception(cur_data.get("msg") or "record fetch failed")
+            rec = (cur_data.get("data") or {}).get("record") or {}
+            _merge_state["fields"] = rec.get("fields") or {}
+            _merge_state["mtime"] = int(rec.get("last_modified_time") or 0)
+        except Exception as e:
+            _merge_state["error"] = e
+        finally:
+            _merge_state["ran"] = True
+
+    _merge_thread = None
+    if any(_is_token_list(v) for v in fields.values()):
+        _merge_thread = threading.Thread(target=_merge_fetch, daemon=True)
+        _merge_thread.start()
+
     # Safely upload newly selected files
     #
     # BUG FIX (new attachment uploads were deleting the old ones): this used to do
@@ -4170,6 +4309,13 @@ def update_request():
                                         if isinstance(x, dict) and x.get("file_token")]
                 fields[field_name] = existing_tokens + tokens
 
+    # v25 late case: the incoming fields carried NO token lists, but the
+    # uploads above just created some -- the merge read still has to happen
+    # (synchronously this time; the early thread only starts when the
+    # incoming fields already carry token lists).
+    if _merge_thread is None and any(_is_token_list(v) for v in fields.values()):
+        _merge_fetch()
+
     # Drop read-only fields so Feishu doesn't reject the save attempt
     actual_fields = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
     if actual_fields:
@@ -4218,31 +4364,27 @@ def update_request():
     # and only on saves that actually touch attachments. If that read fails we
     # abort BEFORE the PUT (all-or-nothing, same contract as Phase 10.29) --
     # a blind write is exactly how the images were lost.
-    def _is_token_list(v):
-        return isinstance(v, list) and len(v) > 0 and all(
-            isinstance(x, dict) and x.get("file_token") for x in v)
-    if any(_is_token_list(v) for v in fields.values()):
-        try:
-            cur_resp = feishu_session.get(
-                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                headers={"Authorization": f"Bearer {tat}"}, timeout=15)
-            cur_data = cur_resp.json()
-            if cur_data.get("code") != 0:
-                raise Exception(cur_data.get("msg") or "record fetch failed")
-            cur_fields = ((cur_data.get("data") or {}).get("record") or {}).get("fields") or {}
-            for k in list(fields.keys()):
-                if not _is_token_list(fields[k]):
-                    continue
-                on_sheet = cur_fields.get(k)
-                sheet_tokens = [{"file_token": x["file_token"]} for x in on_sheet
-                                if isinstance(x, dict) and x.get("file_token")] \
-                               if isinstance(on_sheet, list) else []
-                seen = {t["file_token"] for t in sheet_tokens}
-                fields[k] = sheet_tokens + [t for t in fields[k] if t["file_token"] not in seen]
-        except Exception as e:
+    # v25: the read itself ran in the background thread started before the
+    # uploads (or synchronously in the late case) -- here we just join it,
+    # keep the all-or-nothing abort contract, and do the same union.
+    if _merge_thread is not None:
+        _merge_thread.join()
+    if _merge_state["ran"]:
+        if _merge_state["error"] is not None:
+            e = _merge_state["error"]
             logger.error("attachment_defensive_merge_failed", record_id=record_id, error=str(e))
             return jsonify({"success": False,
                             "error": f"Could not verify the existing attachments before saving: {e}. Nothing was saved -- please hit Save again."}), 502
+        cur_fields = _merge_state["fields"] or {}
+        for k in list(fields.keys()):
+            if not _is_token_list(fields[k]):
+                continue
+            on_sheet = cur_fields.get(k)
+            sheet_tokens = [{"file_token": x["file_token"]} for x in on_sheet
+                            if isinstance(x, dict) and x.get("file_token")] \
+                           if isinstance(on_sheet, list) else []
+            seen = {t["file_token"] for t in sheet_tokens}
+            fields[k] = sheet_tokens + [t for t in fields[k] if t["file_token"] not in seen]
 
     # Phase 10.12 (fast save): the frontend now diffs against the opened record
     # and sends only fields that actually changed (attachment tokens only when
@@ -4257,6 +4399,36 @@ def update_request():
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    # v25 (save speed, Ahmed): the "sheet changed since you opened it" check
+    # moved HERE from the frontend -- the browser used to burn a whole extra
+    # round trip (browser -> Vercel -> Feishu -> back) BEFORE this POST just
+    # for that. The frontend now stamps opened_at (ms) on the form; we compare
+    # it against the record's last_modified_time, REUSING the merge read when
+    # it already ran (attachment saves: zero extra Feishu calls) or doing one
+    # cheap GET otherwise. Fail-open is kept: an unreadable mtime never blocks
+    # a save. A conflict answers 409 with the sheet's mtime; the frontend
+    # shows the same "overwrite anyway?" confirm and, on OK, resends with
+    # conflict_force=1 -- identical warning semantics, one browser round trip
+    # instead of two on the common path.
+    try:
+        opened_at_ms = int(request.form.get('opened_at', '0') or 0)
+    except (TypeError, ValueError):
+        opened_at_ms = 0
+    conflict_force = str(request.form.get('conflict_force', '') or '').strip() == '1'
+    if opened_at_ms and not conflict_force:
+        sheet_mtime = 0
+        if _merge_state["ran"] and _merge_state["error"] is None:
+            sheet_mtime = _merge_state["mtime"]
+        else:
+            try:
+                _cf = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=8).json()
+                if _cf.get("code") == 0:
+                    sheet_mtime = int((((_cf.get("data") or {}).get("record") or {})).get("last_modified_time") or 0)
+            except Exception:
+                sheet_mtime = 0  # fail-open -- same contract as the old frontend check
+        if sheet_mtime and sheet_mtime > opened_at_ms + 5000:
+            return jsonify({"success": False, "conflict": True, "sheet_mtime": sheet_mtime}), 409
 
     logger.info("update_fields_payload", record_id=record_id, fields=fields)
     # Phase 34: the save PUT now rides the retry helper -- a cross-border spike
