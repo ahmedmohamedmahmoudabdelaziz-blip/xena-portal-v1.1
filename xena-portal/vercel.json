@@ -1,6 +1,7 @@
 {
   "buildCommand": "python fetch_data.py",
   "outputDirectory": "public",
+  "regions": ["sin1"],
   "functions": {
     "api/**/*.py": {
       "maxDuration": 60,
