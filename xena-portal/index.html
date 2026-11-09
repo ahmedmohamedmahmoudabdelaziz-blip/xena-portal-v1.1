@@ -18780,32 +18780,10 @@ async function twSaveWorkspace() {
         }
     }
 
-    // Phase 26 (conflict protection): the sheet row may have been edited by
-    // someone else AFTER this workspace was opened. Re-read just the record's
-    // last_modified_time and warn before overwriting a newer version.
-    // Fail-open: any fetch/parse hiccup never blocks a save.
-    try {
-        const cfRid = document.getElementById('tw-record-id') && document.getElementById('tw-record-id').value;
-        if (cfRid && twOpenedAt) {
-            // Phase 34: cap the pre-save conflict check (fail-open: on any
-            // error, including this abort, the save proceeds). Phase 34b:
-            // 12s -> 5s -- the check is a nice-to-have warning, it must never
-            // dominate save latency.
-            const cfCtl = new AbortController();
-            const cfTimer = setTimeout(() => cfCtl.abort(), 5000);
-            let cfRes;
-            try { cfRes = await fetch('/api/requests/single?record_id=' + encodeURIComponent(cfRid), { signal: cfCtl.signal }); }
-            finally { clearTimeout(cfTimer); }
-            const cfData = await cfRes.json();
-            const cfMtime = cfData && cfData.record && Number(cfData.record.last_modified_time || 0);
-            if (cfMtime && cfMtime > twOpenedAt + 5000) {
-                const cfWhen = new Date(cfMtime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                if (!(await uiConfirm('⚠️ Heads-up: this ticket was updated in the sheet AFTER you opened it (last change: ' + cfWhen + ').\n\nOK = overwrite with your version anyway\nCancel = stop, so you can close and reopen it fresh first'))) {
-                    return;
-                }
-            }
-        }
-    } catch (cfErr) { /* fail-open: never block a save on a check error */ }
+    // v25: the conflict check moved SERVER-SIDE -- it rides the save POST
+    // itself (opened_at stamp below + a 409 answer from the backend). The
+    // browser no longer burns a whole extra round trip before saving; the
+    // warning text and the overwrite-anyway contract are unchanged.
 
     const finalData = new FormData();
 
@@ -18813,7 +18791,10 @@ async function twSaveWorkspace() {
     finalData.append('record_id', document.getElementById('tw-record-id').value);
 
     finalData.append('fields', JSON.stringify(fields));
-    
+    // v25: stamp when this workspace was opened -- the backend compares it
+    // against the sheet's last_modified_time for the conflict check.
+    finalData.append('opened_at', String(twOpenedAt || 0));
+
     // v22: compress oversized images BEFORE they enter the request body (see
     // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
     for (const fInput of form.querySelectorAll('input[type="file"]')) {
@@ -18822,7 +18803,12 @@ async function twSaveWorkspace() {
         }
     }
 
+    // v25: the save POST is a resend-able loop -- a 409 conflict answer
+    // (sheet changed after this workspace was opened) shows the same warning
+    // as before and, on OK, resends ONCE with conflict_force=1.
+    let forcedOnce = false;
     try {
+        for (;;) {
         const res = await fetch('/api/requests/update', {
             method: 'POST',
             body: finalData
@@ -18833,6 +18819,18 @@ async function twSaveWorkspace() {
         if (res.status === 413) throw new Error('the attached pic(s) are too large for the server (HTTP 413) — remove one or use smaller pics, then save again');
         let data;
         try { data = await res.json(); } catch (err) { throw new Error('Server returned an invalid response (HTTP ' + res.status + ').'); }
+        // v25: server-side conflict answer -- same warning text and contract
+        // as the old pre-save GET check. Cancel stops the save (the finally
+        // below restores the buttons).
+        if (res.status === 409 && data && data.conflict && !forcedOnce) {
+            const cfWhen = new Date(Number(data.sheet_mtime || 0)).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            if (!(await uiConfirm('⚠️ Heads-up: this ticket was updated in the sheet AFTER you opened it (last change: ' + cfWhen + ').\n\nOK = overwrite with your version anyway\nCancel = stop, so you can close and reopen it fresh first'))) {
+                return false;
+            }
+            forcedOnce = true;
+            finalData.set('conflict_force', '1');
+            continue;
+        }
         // Phase 10.29 (Ahmed): the backend now aborts the WHOLE save when any
         // attachment fails to upload (502 + failed_files) instead of silently
         // skipping the file. Surface that as a longer WARNING naming the
@@ -18894,6 +18892,7 @@ async function twSaveWorkspace() {
         twCloseWorkspace();
         try { samVibrate('ok'); } catch (e) {}
         return true; // Phase 26: tell the save-state wrapper this save landed
+        }
     } catch (e) {
         ToastManager.show('Failed to save: ' + e.message, e.isUploadAbort ? 'warning' : 'error', e.isUploadAbort ? 9000 : 5000);
         try { samVibrate('err'); } catch (e) {}
@@ -26711,7 +26710,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v24 speed 2026-11-10';
+window.SAM19_BUILD='v25 charge-save 2026-11-10';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
