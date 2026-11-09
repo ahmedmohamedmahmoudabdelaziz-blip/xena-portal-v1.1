@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v23 mirrorfix 2026-11-09"
+XENA_BUILD = "v24 speed 2026-11-10"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -1660,7 +1660,7 @@ def _sheet_toggles(force=False):
         tat = get_tenant_access_token()
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
         headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        res = feishu_session.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()  # v24: keep-alive session (was a fresh cross-border handshake per call)
         if res.get("code") not in (0, None):
             raise RuntimeError(f"bitable returned code {res.get('code')}")
         mmap, rids = {}, {}
@@ -1843,7 +1843,7 @@ def _get_user_permissions_raw(email, name):
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     
     try:
-        res = http_requests.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        res = feishu_session.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()  # v24: keep-alive session (was a fresh cross-border handshake per call)
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
             db_email = extract_field_text(fields.get("Email", "")).lower().strip()
@@ -8377,10 +8377,11 @@ def pull_assigned_ticket():
             },
             "sort": [{"field_name": "Numbering", "desc": True}],
         }
-        return session.post(search_url, json=payload, timeout=12)
-
-    session = http_requests.Session()
-    session.headers.update(headers)
+        # v24 (speed): ride the shared keep-alive feishu_session instead of a
+        # fresh Session per pull -- a brand-new session paid a full cross-border
+        # TCP+TLS handshake (Vercel -> Feishu CN) on EVERY Pull My Ticket click.
+        # Same request, same payload, same timeout; only the connection is reused.
+        return feishu_session.post(search_url, headers=headers, json=payload, timeout=12)
 
     matches = []
     try:
