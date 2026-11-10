@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26c sync-heal 2026-11-11"
+XENA_BUILD = "v26d full-legs 2026-11-11"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -8768,6 +8768,23 @@ def health():
             "age_seconds": (time.time() - _bg_points_sync["updated_at"]) if _bg_points_sync["updated_at"] else None,
             "syncing": _bg_points_sync["syncing"],
         }
+    # v26d: live cross-border probe -- one real authenticated Feishu GET,
+    # timed, so "is the Vercel->CN link slow right now?" is a number, not a
+    # guess. Open endpoint, one Feishu call per view; skipped under MOCK_MODE
+    # so test suites stay hermetic.
+    probe_ms, probe_err = None, None
+    if not MOCK_MODE:
+        _pt = time.monotonic()
+        try:
+            _ptat = get_tenant_access_token()
+            _pres = feishu_session.get(
+                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}",
+                headers={"Authorization": f"Bearer {_ptat}"}, timeout=8)
+            probe_ms = int((time.monotonic() - _pt) * 1000)
+            if _pres.status_code != 200:
+                probe_err = f"http_{_pres.status_code}"
+        except Exception as _pe:
+            probe_err = str(_pe)[:120]
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(), "cairo_ts": cairo_now().isoformat(),
         "cache_entries": len(_cache), "audit_entries": len(audit._queue),
@@ -8777,6 +8794,8 @@ def health():
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
         "redis_healthy": (bool(redis_healthy()) if REDIS_ENABLED else None),  # v26c: the admin-only /api/comments/health needs a live portal session; this one is open, so Redis state is checkable from any browser
+        "feishu_probe_ms": probe_ms,  # v26d: ms for ONE live Feishu GET from this instance (null in mock mode)
+        "feishu_probe_err": probe_err,
         "mock_mode_active": MOCK_MODE,
     })
 
