@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v25 charge-save 2026-11-10"
+XENA_BUILD = "v26 wallet-hint 2026-11-11"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2157,22 +2157,21 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
                 "conditions": [{"field_name": "Agency Code", "operator": "contains", "value": [code]}]
             }
         }
-        search_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/search?automatic_fields=true"
-        
+        # v26 (Ahmed: charge still ~10s): the wallet ROW now rides the same
+        # cached + verified fetch as the charge path (bulk map / per-code key /
+        # live search, exact Agency Code verification either way) instead of
+        # its own raw 30s full-table contains search. Every wallet card load
+        # therefore WARMS the cache the charge then uses, and the record_id
+        # travels back to the client as the charge's tier-0 hint.
         try:
-            resp = http_requests.post(search_url, headers=headers, json=points_payload, timeout=30).json()
-            if resp.get("code") != 0: return {"found": False, "error": f"Feishu API Error: {resp.get('msg')}"}
-            raw_records = resp.get("data", {}).get("items", [])
-            
-            all_records = []
-            for r in raw_records:
-                r_code = extract_field_text(get_field_local(r.get("fields", {}), "Agency Code"))
-                if str(r_code).strip() == str(code).strip():
-                    all_records.append(r)
-
-            if not all_records: return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
+            _wrec = _fetch_wallet_fast(headers, str(code).strip())
+        except RuntimeError as e:
+            return {"found": False, "error": f"Feishu API Error: {e}"}
         except Exception as e:
             return {"found": False, "error": f"Search timeout or connection error: {str(e)}"}
+        if not _wrec:
+            return {"found": False, "error": f"Notice: Agency {code} not found or no records."}
+        all_records = [_wrec]
 
     first = all_records[0].get("fields", {})
 
@@ -2203,7 +2202,11 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
     else:
         try:
             hist_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/search?automatic_fields=true"
-            hist_resp = http_requests.post(hist_url, headers=headers, json=points_payload, timeout=30).json()
+            # v26: keep-alive session + fail-fast retry instead of one raw
+            # 30s attempt (read-only search; the silent-degrade contract is
+            # kept -- a failed history read still yields an empty history).
+            hist_resp = _post_json_retry(hist_url, headers=headers, payload=points_payload,
+                                         timeout=10, tries=2, retry_timeout=15)
             raw_hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
             
             hist_items = []
@@ -2333,6 +2336,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
 
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
+            "record_id": (all_records[0] or {}).get("record_id"),
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "total_points": total_pts, "used_points": used_pts,
             "point_balance": balance, "health_score": health_score,
@@ -2354,6 +2358,7 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
         pace = compute_target_pace_analytics(total_pts_for_target, ytd_target, monthly_target)
         return {
             "found": True, "agency_code": code, "agency_name": agency_name,
+            "record_id": (all_records[0] or {}).get("record_id"),
             "region": region_raw.upper(), "acm": acm_raw.title(),
             "base_points": raw_base_pts * COINS_MULTIPLIER, "health_score": 100, "health_status": "Healthy",
             "privileges_claimed": dict(privileges_claimed),  
@@ -3847,7 +3852,7 @@ def _wallet_search(headers, code):
             return it
     return None
 
-def _fetch_wallet_fast(headers, code):
+def _fetch_wallet_fast(headers, code, hint_rid=None, timing=None):
     """Phase 34b (Ahmed: charge must answer in 5-10s): records/search is the
     slowest leg of the charge flow (~2-4s server-side on the big Agency Points
     table). Cache agency_code -> wallet record_id (Redis, in-mem fallback) and
@@ -3855,61 +3860,102 @@ def _fetch_wallet_fast(headers, code):
     verifies the Agency Code matches EXACTLY, and ANY doubt (cache miss,
     deleted row, code mismatch, network error) falls back to the live search,
     which also re-populates the cache -- the cache can therefore never return
-    the wrong wallet; worst case it costs one wasted GET before the search."""
+    the wrong wallet; worst case it costs one wasted GET before the search.
+    v26 (Ahmed: charge STILL ~10s): tier 0 -- the wallet record_id the client
+    is ALREADY looking at (the workspace wallet card loaded it via
+    /api/search). A direct verified GET on that id removes the full-table
+    search from the charge path even on a cold instance with a dead Redis.
+    Same exact-code verification as every other tier; a stale/wrong hint just
+    falls through to the map / per-code key / live search like any cache miss.
+    timing (optional dict) receives wallet_src (hint|map|key|search) and
+    wallet_s so the route can report where the time actually went."""
     if not code:
         return None
-    key = f"xena:wallet_ref:{code}"
-    # v25 tier 1: the bulk code->record_id map (seeded by the background
-    # points-table sync, shared via one Redis JSON key) -- a pure in-memory
-    # dict hit on a warm instance, ZERO Redis round trip. Falls through to
-    # the per-code key, then the live search, exactly as before.
-    cached_id = _wallet_map_lookup(code)
-    if not cached_id:
-        try:
-            cached = redis_get_json(key)
-            if isinstance(cached, dict):
-                cached_id = cached.get("record_id")
-        except Exception:
-            cached_id = None
-    if cached_id:
-        try:
-            r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cached_id}",
-                            headers=headers, timeout=6, tries=3, retry_timeouts=[8, 12]).json()
-            if r.get("code") == 0:
-                rec = (r.get("data") or {}).get("record") or {}
-                if extract_field_text(get_field_local(rec.get("fields", {}), "Agency Code")).strip() == code:
-                    return rec
-        except Exception:
-            pass
-        try:
-            redis_cmd("DEL", key)
-        except Exception:
-            pass
-        # The map entry that just failed verification may be stale (deleted /
-        # re-created wallet row) -- drop the in-proc entry so the next charge
-        # does not waste a GET on it. The shared Redis map key self-heals on
-        # the next background sync (which re-seeds the whole map).
-        _wallet_map_forget(code)
-    rec = _wallet_search(headers, code)
-    if rec and rec.get("record_id"):
-        try:
-            redis_set_json(key, {"record_id": rec["record_id"]}, ttl=7 * 24 * 3600)
-        except Exception:
-            pass
-        try:
-            with _wallet_ref_map["lock"]:
-                _wallet_ref_map["map"][code] = rec["record_id"]
-        except Exception:
-            pass
-        try:
-            # A search was needed at all => the bulk map was cold here (fresh
-            # serverless instance or the background sync never ran). Kick the
-            # sync so this instance self-warms instead of paying the search
-            # on every charge.
-            ensure_points_sync_started()
-        except Exception:
-            pass
-    return rec
+    _wt0 = time.monotonic()
+    _src = "none"
+    try:
+        key = f"xena:wallet_ref:{code}"
+        candidates = []
+        if hint_rid:
+            candidates.append(("hint", hint_rid))
+        # v25 tier: the bulk code->record_id map (seeded by the background
+        # points-table sync, shared via one Redis JSON key) -- a pure
+        # in-memory dict hit on a warm instance, ZERO Redis round trip.
+        cached_id = _wallet_map_lookup(code)
+        if cached_id:
+            candidates.append(("map", cached_id))
+        else:
+            try:
+                cached = redis_get_json(key)
+                if isinstance(cached, dict) and cached.get("record_id"):
+                    candidates.append(("key", cached.get("record_id")))
+            except Exception:
+                pass
+        seen_rids = set()
+        for cand_src, cand_rid in candidates:
+            if not cand_rid or cand_rid in seen_rids:
+                continue
+            seen_rids.add(cand_rid)
+            try:
+                r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cand_rid}",
+                                headers=headers, timeout=6, tries=3, retry_timeouts=[8, 12]).json()
+                if r.get("code") == 0:
+                    rec = (r.get("data") or {}).get("record") or {}
+                    if extract_field_text(get_field_local(rec.get("fields", {}), "Agency Code")).strip() == code:
+                        _src = cand_src
+                        if cand_src == "hint":
+                            # A client hint verified live -- the mapping is
+                            # fresh, so back-fill the caches: the NEXT charge
+                            # (any instance, any agent) is warm too.
+                            try:
+                                redis_set_json(key, {"record_id": rec["record_id"]}, ttl=7 * 24 * 3600)
+                            except Exception:
+                                pass
+                            try:
+                                with _wallet_ref_map["lock"]:
+                                    _wallet_ref_map["map"][code] = rec["record_id"]
+                            except Exception:
+                                pass
+                        return rec
+            except Exception:
+                pass
+            if cand_src in ("map", "key"):
+                try:
+                    redis_cmd("DEL", key)
+                except Exception:
+                    pass
+                # The map entry that just failed verification may be stale
+                # (deleted / re-created wallet row) -- drop the in-proc entry
+                # so the next charge does not waste a GET on it. The shared
+                # Redis map key self-heals on the next background sync.
+                _wallet_map_forget(code)
+            # A bad HINT just falls through -- it came from the client, so
+            # there is nothing cached to clean up.
+        rec = _wallet_search(headers, code)
+        if rec and rec.get("record_id"):
+            _src = "search"
+            try:
+                redis_set_json(key, {"record_id": rec["record_id"]}, ttl=7 * 24 * 3600)
+            except Exception:
+                pass
+            try:
+                with _wallet_ref_map["lock"]:
+                    _wallet_ref_map["map"][code] = rec["record_id"]
+            except Exception:
+                pass
+            try:
+                # A search was needed at all => the bulk map was cold here (fresh
+                # serverless instance or the background sync never ran). Kick the
+                # sync so this instance self-warms instead of paying the search
+                # on every charge.
+                ensure_points_sync_started()
+            except Exception:
+                pass
+        return rec
+    finally:
+        if timing is not None:
+            timing["wallet_src"] = _src
+            timing["wallet_s"] = round(time.monotonic() - _wt0, 2)
 
 def _wallet_verify_put(wallet_record_id, headers, fields_payload, expected_used, baseline_used=None):
     """Phase 34: PUT the agency wallet with post-failure verification, so a
@@ -4174,6 +4220,8 @@ def update_request():
     inside search_members() -- every "Save & Resolve" call was hitting a plain 404
     instead of ever running any of this handling. Restored here.
     """
+    _t0 = time.monotonic()  # v26: per-leg timing, returned as _timing
+    _t_tat = _t_uploads = _t_conf = _t_put = None
     user = sanitize_text(request.form.get('user', ''))
     record_id = sanitize_text(request.form.get('record_id', ''))
 
@@ -4190,6 +4238,7 @@ def update_request():
     fields = {k: v for k, v in fields.items() if k not in EXCLUDED_UPDATE_FIELDS}
 
     tat = get_tenant_access_token()
+    _t_tat = round(time.monotonic() - _t0, 2)
 
     # v25 (save speed, Ahmed): the defensive attachment merge needs the
     # record's CURRENT fields, and the conflict check needs its
@@ -4281,6 +4330,7 @@ def update_request():
                 files = {'file': (fname, file_bytes, mtype)}  # rebuild for retry
         raise Exception(last_msg)
 
+    _tu = time.monotonic()
     if update_upload_jobs:
         update_tokens = {}  # field_name -> [tokens in attach order]
         failed_uploads = []  # (field_name, filename, error)
@@ -4308,6 +4358,8 @@ def update_request():
                     existing_tokens = [{"file_token": x["file_token"]} for x in existing
                                         if isinstance(x, dict) and x.get("file_token")]
                 fields[field_name] = existing_tokens + tokens
+
+    _t_uploads = round(time.monotonic() - _tu, 2)  # upload-pool wall time (0 for text-only saves)
 
     # v25 late case: the incoming fields carried NO token lists, but the
     # uploads above just created some -- the merge read still has to happen
@@ -4394,7 +4446,8 @@ def update_request():
     if not fields:
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | No changes", ip=ip, severity="Info")
-        return jsonify({"success": True, "unchanged": True})
+        return jsonify({"success": True, "unchanged": True,
+                        "_timing": {"total_s": round(time.monotonic() - _t0, 2), "tat_s": _t_tat}})
 
     # Updating with TAT avoids all permission constraints for agents editing tickets
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
@@ -4417,6 +4470,7 @@ def update_request():
         opened_at_ms = 0
     conflict_force = str(request.form.get('conflict_force', '') or '').strip() == '1'
     if opened_at_ms and not conflict_force:
+        _tc = time.monotonic()
         sheet_mtime = 0
         if _merge_state["ran"] and _merge_state["error"] is None:
             sheet_mtime = _merge_state["mtime"]
@@ -4427,6 +4481,7 @@ def update_request():
                     sheet_mtime = int((((_cf.get("data") or {}).get("record") or {})).get("last_modified_time") or 0)
             except Exception:
                 sheet_mtime = 0  # fail-open -- same contract as the old frontend check
+        _t_conf = round(time.monotonic() - _tc, 2)
         if sheet_mtime and sheet_mtime > opened_at_ms + 5000:
             return jsonify({"success": False, "conflict": True, "sheet_mtime": sheet_mtime}), 409
 
@@ -4438,16 +4493,23 @@ def update_request():
     # we re-read the record and confirm from last_modified_time whether the
     # write landed, so the agent gets the truth instead of a phantom failure.
     save_started_ms = int(time.time() * 1000)
+    _tp = time.monotonic()
     try:
         data = _put_json_retry(url, headers=headers, payload={"fields": fields})
         logger.info("update_feishu_response", record_id=record_id, response=data)
         if data.get("code") == 0:
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+            _t_put = round(time.monotonic() - _tp, 2)
             audit.log(user, "UPDATE_TICKET", f"Record: {record_id}", ip=ip, severity="Info")
             # Phase 10.29: write-through freshness -- saves can change status /
             # claim fields that feed the Live Formula ledger.
             kick_table_resync()
-            return jsonify({"success": True})
+            return jsonify({"success": True,
+                            "_timing": {"total_s": round(time.monotonic() - _t0, 2),
+                                        "tat_s": _t_tat, "uploads_s": _t_uploads,
+                                        "conflict_s": _t_conf, "put_s": _t_put,
+                                        "merge_overlapped": _merge_thread is not None,
+                                        "redis": bool(redis_healthy()) if REDIS_ENABLED else False}})
         return jsonify({"success": False, "error": data.get("msg")})
     except Exception as e:
         logger.error("update_put_failed", record_id=record_id, error=str(e))
@@ -4459,7 +4521,8 @@ def update_request():
                 ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
                 audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | confirmed via re-read after network timeout", ip=ip, severity="Info")
                 kick_table_resync()
-                return jsonify({"success": True, "slow_confirm": True})
+                return jsonify({"success": True, "slow_confirm": True,
+                                "_timing": {"total_s": round(time.monotonic() - _t0, 2), "put_s": round(time.monotonic() - _tp, 2)}})
             return jsonify({"success": False, "error": "Feishu confirmed the save did NOT land -- nothing was written. Please hit Save again."})
         except Exception as e2:
             return jsonify({"success": False, "error": f"Could not reach Feishu to confirm the save ({e2}). Please re-open the ticket to check its state before saving again."})
@@ -4692,11 +4755,17 @@ def agency_points_charge():
     receipt. NEVER writes "Order Action" -- that field is the Base workflow's
     trigger and writing 'Confirm & Charge' to it would double-charge via the
     automation."""
+    _t0 = time.monotonic()
+    _t = {}
     payload = request.get_json(silent=True) or {}
     user = sanitize_text(payload.get('user', ''))
     email = sanitize_text(payload.get('email', ''))
     record_id = sanitize_text(payload.get('record_id', ''))
     agency_code_hint = sanitize_text(payload.get('agency_code', '')).strip()
+    # v26: the wallet card's record_id rides the request as a tier-0 hint --
+    # a direct verified GET instead of the full-table search, even on a cold
+    # instance with a dead Redis. Re-verified server-side (exact code match).
+    wallet_rid_hint = sanitize_text(payload.get('wallet_record_id', '')).strip()
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     if not user:
@@ -4730,6 +4799,7 @@ def agency_points_charge():
             pass
 
     tat = get_tenant_access_token()
+    _t["tat_s"] = round(time.monotonic() - _t0, 2)
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     # 1) Fetch the ticket AND the agency wallet in parallel (the wallet search
@@ -4750,14 +4820,20 @@ def agency_points_charge():
         # Phase 34b (speed): agency-code -> record_id cache turns the slow
         # table search into a ~1s direct GET; live-search fallback on any
         # doubt. Exact Agency Code verification is kept either way.
-        return _fetch_wallet_fast(headers, code)
+        # v26: the wallet card's record_id is the tier-0 hint -- but only for
+        # the code the card actually resolved (a corrected code ignores it).
+        return _fetch_wallet_fast(headers, code,
+                                  hint_rid=(wallet_rid_hint if code == agency_code_hint else None),
+                                  timing=_t)
 
+    _tf = time.monotonic()
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             fut_ticket = pool.submit(_fetch_ticket)
             fut_wallet = pool.submit(_fetch_wallet, agency_code_hint)
             tfields = fut_ticket.result()
             wallet_hint = fut_wallet.result()
+        _t["fetch_s"] = round(time.monotonic() - _tf, 2)
     except Exception as e:
         # Phase 36: raw urllib3 text ("Read timed out (read timeout=10)")
         # made agents think the charge half-happened and hammer retry. A
@@ -4821,10 +4897,12 @@ def agency_points_charge():
         # Phase 34: verified wallet write -- a network timeout re-reads Used
         # Points to decide whether the deduction landed instead of failing
         # blindly (or, worse, double-deducting on a retry).
+        _twp = time.monotonic()
         ok, werr, wstatus = _wallet_verify_put(
             agency_rec['record_id'], headers,
             {"Used Points": _jsnum(charge["new_used_points"]), "Monthly Usage Tracker": charge["new_monthly_tracker"]},
             charge["new_used_points"], baseline_used=used_pts)
+        _t["wallet_put_s"] = round(time.monotonic() - _twp, 2)
         if not ok:
             return jsonify({"success": False, "error": werr}), wstatus
 
@@ -4855,6 +4933,7 @@ def agency_points_charge():
     ticket_write_failed = False
     acm_field, acm_name = None, ""  # Phase 10.38: wallet ACM ride-along (set inside the write)
     if write_ticket:
+        _ttw = time.monotonic()
         try:
             ticket_fields = {"Transaction Receipt": full_receipt,
                              "Latest Usage Tracker": cumulative_tracker,
@@ -4880,6 +4959,7 @@ def agency_points_charge():
         except Exception as e:
             ticket_write_failed = True
             logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
+        _t["ticket_put_s"] = round(time.monotonic() - _ttw, 2)
 
     audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else "") + (f" | ticket ACM synced: {acm_name}" if acm_field else ""), ip=ip, severity="Info")
     result = {"success": True, "duplicate": False,
@@ -4898,6 +4978,13 @@ def agency_points_charge():
             redis_set_json(dup_key, {"sig": dup_sig, "result": result}, ttl=120)
         except Exception:
             pass
+    # v26: per-leg timing + wallet source, so "slow" stops being a guess --
+    # the workspace shows this breakdown after every charge.
+    result["_timing"] = {"total_s": round(time.monotonic() - _t0, 2),
+                         "tat_s": _t.get("tat_s"), "fetch_s": _t.get("fetch_s"),
+                         "wallet_src": _t.get("wallet_src"), "wallet_s": _t.get("wallet_s"),
+                         "wallet_put_s": _t.get("wallet_put_s"), "ticket_put_s": _t.get("ticket_put_s"),
+                         "redis": bool(redis_healthy()) if REDIS_ENABLED else False}
     # Phase 10.29: write-through freshness — the charge just changed the
     # wallet table, so refresh the warm snapshots now instead of waiting up
     # to 3 min for the background loop.
@@ -5007,10 +5094,13 @@ def agency_points_correct_charge():
     segment) and replaces only the last one. The 120s duplicate guard from the
     original charge is invalidated so the correction is never replay-blocked.
     NEVER writes "Order Action" (the Base workflow trigger)."""
+    _t0 = time.monotonic()
+    _t = {}
     payload = request.get_json(silent=True) or {}
     user = sanitize_text(payload.get('user', ''))
     record_id = sanitize_text(payload.get('record_id', ''))
     agency_code_hint = sanitize_text(payload.get('agency_code', '')).strip()
+    wallet_rid_hint = sanitize_text(payload.get('wallet_record_id', '')).strip()  # v26 tier-0 hint
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
     if not user:
@@ -5042,14 +5132,20 @@ def agency_points_correct_charge():
         # Phase 34b (speed): agency-code -> record_id cache turns the slow
         # table search into a ~1s direct GET; live-search fallback on any
         # doubt. Exact Agency Code verification is kept either way.
-        return _fetch_wallet_fast(headers, code)
+        # v26: the wallet card's record_id is the tier-0 hint -- but only for
+        # the code the card actually resolved (a corrected code ignores it).
+        return _fetch_wallet_fast(headers, code,
+                                  hint_rid=(wallet_rid_hint if code == agency_code_hint else None),
+                                  timing=_t)
 
+    _tf = time.monotonic()
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             fut_ticket = pool.submit(_fetch_ticket)
             fut_wallet = pool.submit(_fetch_wallet, agency_code_hint)
             tfields = fut_ticket.result()
             wallet_hint = fut_wallet.result()
+        _t["fetch_s"] = round(time.monotonic() - _tf, 2)
     except Exception as e:
         # Phase 36: raw urllib3 text ("Read timed out (read timeout=10)")
         # made agents think the charge half-happened and hammer retry. A
@@ -5178,6 +5274,10 @@ def agency_points_correct_charge():
     if acm_field:
         result["acm_field"] = acm_field  # Phase 10.38: workspace syncs its ACM control
         result["acm_name"] = acm_name
+    result["_timing"] = {"total_s": round(time.monotonic() - _t0, 2),  # v26
+                         "fetch_s": _t.get("fetch_s"),
+                         "wallet_src": _t.get("wallet_src"), "wallet_s": _t.get("wallet_s"),
+                         "redis": bool(redis_healthy()) if REDIS_ENABLED else False}
     return jsonify(result)
 
 @app.route('/api/requests/submit', methods=['POST'])
@@ -5509,6 +5609,10 @@ def points_records():
         fetch_complete, stop_reason = True, ""
     else:
         all_items, fetch_complete, stop_reason, served_from_cache = get_points_table_snapshot()
+        try:
+            _wallet_map_seed(all_items)  # v26: any Target Board view (re)seeds the charge's wallet map
+        except Exception:
+            pass
 
     if not fetch_complete and not all_items: return jsonify({"error": f"Feishu sync failed: {stop_reason}"}), 502
 
