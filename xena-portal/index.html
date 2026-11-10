@@ -15967,7 +15967,7 @@ async function twApConfirmCharge() {
             if (data._timing) {
                 console.log('[charge timing]', data._timing);
                 const stT = document.getElementById('apgState');
-                if (stT) stT.textContent = `⚡ ${data._timing.total_s}s server-side — wallet ${data._timing.wallet_src || '?'} ${data._timing.wallet_s ?? '?'}s · deduct ${data._timing.wallet_put_s ?? '?'}s · receipt ${data._timing.ticket_put_s ?? '?'}s`;
+                if (stT) stT.textContent = `⚡ ${data._timing.total_s}s server-side — auth ${data._timing.tat_s ?? '?'}s · load ${data._timing.fetch_s ?? '?'}s · wallet ${data._timing.wallet_src || '?'} ${data._timing.wallet_s ?? '?'}s · deduct ${data._timing.wallet_put_s ?? '?'}s · receipt ${data._timing.ticket_put_s ?? '?'}s`;
             }
             if (data.ticket_write_failed) {
                 ToastManager.show('⚠️ Points deducted, but the receipt could not be saved onto the ticket — re-open the ticket to sync it.', 'warning', 8000);
@@ -26728,7 +26728,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v26c sync-heal 2026-11-11';
+window.SAM19_BUILD='v26d full-legs 2026-11-11';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
