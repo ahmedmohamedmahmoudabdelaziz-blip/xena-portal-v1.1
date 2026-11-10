@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26 wallet-hint 2026-11-11"
+XENA_BUILD = "v26c sync-heal 2026-11-11"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2554,7 +2554,7 @@ BACKGROUND_SYNC_MAX_AGE  = 600
 _bg_sync = {
     "requests_items": [], "requests_keys": set(),
     "updated_at": 0, "fetch_complete": True, "stop_reason": "",
-    "syncing": False,
+    "syncing": False, "syncing_since": 0.0,
 }
 _bg_sync_lock = threading.Lock()
 _bg_thread_started = False
@@ -2566,8 +2566,11 @@ BACKGROUND_SYNC_FETCH_BUDGET_SECONDS = 50
 
 def _background_sync_requests_table():
     with _bg_sync_lock:
-        if _bg_sync["syncing"]: return
+        # v26c stuck-flag fix: same freeze-leftover guard as the points sync.
+        if _bg_sync["syncing"] and time.time() - _bg_sync.get("syncing_since", 0.0) < _SYNC_STUCK_SECONDS:
+            return
         _bg_sync["syncing"] = True
+        _bg_sync["syncing_since"] = time.time()
     try:
         # BUG FIX: this used to call fetch_feishu_records with no from_dt AND no time
         # budget, which means "walk the entire table's history, every single cycle,
@@ -2598,6 +2601,7 @@ def _background_sync_requests_table():
     finally:
         with _bg_sync_lock:
             _bg_sync["syncing"] = False
+            _bg_sync["syncing_since"] = 0.0
 
 def _background_sync_loop():
     while True:
@@ -2671,15 +2675,24 @@ def get_requests_table_snapshot(from_dt=None):
     return live_items, live_keys, live_complete, live_reason, False
 
 REDIS_KEY_POINTS_SNAPSHOT = "xena:snapshot:points_table"
-_bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False}
+_SYNC_STUCK_SECONDS = 300  # v26c: a sync "in progress" longer than this is a frozen leftover, not a live fetch
+_bg_points_sync = {"items": [], "updated_at": 0, "fetch_complete": True, "stop_reason": "", "syncing": False, "syncing_since": 0.0}
 _bg_points_lock = threading.Lock()
 _bg_points_thread_started = False
 _bg_points_thread_lock = threading.Lock()
 
 def _background_sync_points_table():
     with _bg_points_lock:
-        if _bg_points_sync["syncing"]: return
+        # v26c stuck-flag fix: a Vercel freeze can kill the sync thread
+        # mid-flight WITHOUT running the finally below, leaving syncing=True
+        # forever -- after that, EVERY sync early-returned and the wallet map
+        # never seeded (live-proven in Ahmed's /api/health: points sync
+        # record_count 0, age None, syncing True). A "syncing" state older
+        # than _SYNC_STUCK_SECONDS is treated as dead and a fresh sync runs.
+        if _bg_points_sync["syncing"] and time.time() - _bg_points_sync.get("syncing_since", 0.0) < _SYNC_STUCK_SECONDS:
+            return
         _bg_points_sync["syncing"] = True
+        _bg_points_sync["syncing_since"] = time.time()
     try:
         items, _keys, complete, reason = fetch_feishu_records(POINTS_TABLE_ID)
         now = time.time()
@@ -2707,6 +2720,7 @@ def _background_sync_points_table():
     finally:
         with _bg_points_lock:
             _bg_points_sync["syncing"] = False
+            _bg_points_sync["syncing_since"] = 0.0
 
 def _background_sync_points_loop():
     while True:
@@ -3786,6 +3800,25 @@ def _warm_tenant_token_once():
         try:
             get_tenant_access_token()
         except Exception:
+            return
+        # v26c (save speed, Ahmed): the first save on a cold instance used to
+        # pay two sequential cross-border /fields fetches (schema + ui types)
+        # before the record PUT -- prewarm them in this same background
+        # thread so a cold instance goes fully warm while the agent reads the
+        # ticket they opened. Same two calls, same caches, same TTLs -- just
+        # moved off the save's critical path.
+        try:
+            _tat = get_tenant_access_token()
+            get_table_schema(REQUESTS_TABLE_ID, _tat, BASE_ID)
+            get_field_ui_types(REQUESTS_TABLE_ID, _tat, BASE_ID)
+        except Exception:
+            pass
+        # v26c: kick the points-table sync too, so the wallet map seeds even
+        # when nobody opens the Target Board first (the loop daemon that used
+        # to do this dies with the instance on Vercel).
+        try:
+            ensure_points_sync_started()
+        except Exception:
             pass
     threading.Thread(target=_w, daemon=True).start()
 
@@ -4354,7 +4387,7 @@ def update_request():
     if update_upload_jobs:
         update_tokens = {}  # field_name -> [tokens in attach order]
         failed_uploads = []  # (field_name, filename, error)
-        with ThreadPoolExecutor(max_workers=min(4, len(update_upload_jobs))) as pool:
+        with ThreadPoolExecutor(max_workers=min(6, len(update_upload_jobs))) as pool:  # v26c: 6 parallel upload lanes -- same calls, same per-field order
             # futures with per-job error capture so every file gets its
             # attempts even when a sibling file fails.
             futures = [pool.submit(_update_upload_one, j) for j in update_upload_jobs]
@@ -8743,6 +8776,7 @@ def health():
         "background_sync": bg_info,
         "points_background_sync": pts_bg_info,
         "redis_enabled": REDIS_ENABLED,
+        "redis_healthy": (bool(redis_healthy()) if REDIS_ENABLED else None),  # v26c: the admin-only /api/comments/health needs a live portal session; this one is open, so Redis state is checkable from any browser
         "mock_mode_active": MOCK_MODE,
     })
 
