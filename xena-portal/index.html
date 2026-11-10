@@ -24165,7 +24165,7 @@ function xdSaveState(st) {
     p.style.display = 'inline-flex';
     p.className = 'save-state-pill ss-' + st;
     if (st === 'saving') p.textContent = '⏳ Saving…';
-    else if (st === 'saved') { const __t = window.__lastSaveTiming; p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ((__t && Date.now() - __t.at < 15000) ? ` · ⏱ ${__t.total_s}s` : ''); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
+    else if (st === 'saved') { const __t = window.__lastSaveTiming; p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ((__t && Date.now() - __t.at < 15000) ? ` · ⏱ ${__t.total_s}s${__t.uploads_s ? ` · pics ${__t.uploads_s}s` : ''}${__t.conflict_s ? ` · chk ${__t.conflict_s}s` : ''}${__t.put_s ? ` · write ${__t.put_s}s` : ''}` : ''); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
     else if (st === 'failed') p.textContent = '⚠️ Save failed — retry';
 }
 // Wrap the two save paths with a POST-spy: the pill only flips to Saved /
@@ -26728,7 +26728,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v26 wallet-hint 2026-11-11';
+window.SAM19_BUILD='v26c sync-heal 2026-11-11';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
