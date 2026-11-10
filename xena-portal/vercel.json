@@ -1,7 +1,7 @@
 {
   "buildCommand": "python fetch_data.py",
   "outputDirectory": "public",
-  "regions": ["sin1"],
+  "regions": ["hkg1"],
   "functions": {
     "api/**/*.py": {
       "maxDuration": 60,
