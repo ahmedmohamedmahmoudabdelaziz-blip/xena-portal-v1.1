@@ -15911,7 +15911,14 @@ async function twApConfirmCharge() {
                 privileges: privs,
                 quantities_input: qtyRaw,
                 target_type: targetRaw,
-                agency_code: agencyCode
+                agency_code: agencyCode,
+                // v26: the wallet card already resolved this agency's wallet
+                // row — hand its record_id to the backend as a tier-0 hint
+                // (one direct verified GET instead of a full-table search,
+                // even on a cold instance). Only sent while the card still
+                // shows the code being charged; the backend re-verifies the
+                // exact Agency Code either way and ignores a stale hint.
+                wallet_record_id: (twApGate.agency && twApGate.agency.record_id && String(twApGate.loadedCode || '') === String(agencyCode)) ? twApGate.agency.record_id : ''
             })
         });
         const data = await res.json().catch(() => ({}));
@@ -15956,6 +15963,12 @@ async function twApConfirmCharge() {
                     'Quantities Input': ''
                 }
             }, data);
+            // v26: show where the charge time actually went (and console for reports).
+            if (data._timing) {
+                console.log('[charge timing]', data._timing);
+                const stT = document.getElementById('apgState');
+                if (stT) stT.textContent = `⚡ ${data._timing.total_s}s server-side — wallet ${data._timing.wallet_src || '?'} ${data._timing.wallet_s ?? '?'}s · deduct ${data._timing.wallet_put_s ?? '?'}s · receipt ${data._timing.ticket_put_s ?? '?'}s`;
+            }
             if (data.ticket_write_failed) {
                 ToastManager.show('⚠️ Points deducted, but the receipt could not be saved onto the ticket — re-open the ticket to sync it.', 'warning', 8000);
             }
@@ -18797,11 +18810,14 @@ async function twSaveWorkspace() {
 
     // v22: compress oversized images BEFORE they enter the request body (see
     // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
+    // v26: all picked images compress in PARALLEL (Promise.all preserves the
+    // attach order) — a 3-pic save used to pay each pic's resize sequentially.
+    const __picJobs = [];
     for (const fInput of form.querySelectorAll('input[type="file"]')) {
-        for (const file of Array.from(fInput.files)) {
-            finalData.append(fInput.name, await samCompressImageFile(file));
-        }
+        for (const file of Array.from(fInput.files)) __picJobs.push([fInput.name, file]);
     }
+    const __pics = await Promise.all(__picJobs.map(async ([n, file]) => await samCompressImageFile(file)));
+    __picJobs.forEach(([n], i) => finalData.append(n, __pics[i]));
 
     // v25: the save POST is a resend-able loop -- a 409 conflict answer
     // (sheet changed after this workspace was opened) shows the same warning
@@ -18842,6 +18858,8 @@ async function twSaveWorkspace() {
             throw err;
         }
         ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : (data.slow_confirm ? 'Ticket saved — the network was slow, but the sheet confirms your changes landed.' : 'Ticket saved successfully.'), 'success');
+        // v26: keep the server-side timing breakdown — the save pill shows it, console keeps it for reports.
+        if (data._timing) { window.__lastSaveTiming = { ...data._timing, at: Date.now() }; console.log('[save timing]', data._timing); }
         // Phase 10.44: the unsent-work draft for this ticket is now on the
         // sheet -- stop restoring it (only on a real save; "nothing changed"
         // leaves the draft alone since the edits never landed).
@@ -24147,7 +24165,7 @@ function xdSaveState(st) {
     p.style.display = 'inline-flex';
     p.className = 'save-state-pill ss-' + st;
     if (st === 'saving') p.textContent = '⏳ Saving…';
-    else if (st === 'saved') { p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
+    else if (st === 'saved') { const __t = window.__lastSaveTiming; p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ((__t && Date.now() - __t.at < 15000) ? ` · ⏱ ${__t.total_s}s` : ''); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
     else if (st === 'failed') p.textContent = '⚠️ Save failed — retry';
 }
 // Wrap the two save paths with a POST-spy: the pill only flips to Saved /
@@ -26710,7 +26728,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v25 charge-save 2026-11-10';
+window.SAM19_BUILD='v26 wallet-hint 2026-11-11';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
