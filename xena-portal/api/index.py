@@ -1830,6 +1830,21 @@ def _get_user_permissions_raw(email, name):
 
     cache_key = cache_make_key("perms", email_clean, name_clean)
     cached = cache_get(cache_key)
+    if not cached and REDIS_ENABLED:
+        # v26b (pull speed for non-admins, Ahmed): the perms cache was in-proc
+        # only, so EVERY cold Vercel instance re-fetched the whole Access table
+        # (~1-2s cross-border) on each teammate's first request -- admins skip
+        # this entirely (hardcoded list), which was part of "3s for me vs 7-8s
+        # for others". Redis copy is shared by all instances and survives cold
+        # starts; same 300s TTL, same toggle check afterwards (off-switch stays
+        # instant). Graceful: Redis down -> in-proc behavior exactly as before.
+        try:
+            _rc = redis_get_json("xena:perms:" + cache_key)
+            if _rc:
+                cached = _rc
+                cache_set(cache_key, _rc, ttl=300)
+        except Exception:
+            pass
     if cached:
         # Phase 12: one Redis toggle per member covers EVERYTHING (login +
         # notifications). Checked AFTER the cache read so a flip lands on the
@@ -1855,6 +1870,11 @@ def _get_user_permissions_raw(email, name):
                 parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
                 result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
                 cache_set(cache_key, result, ttl=300)
+                if REDIS_ENABLED:
+                    try:
+                        redis_set_json("xena:perms:" + cache_key, result, ttl=300)
+                    except Exception:
+                        pass
                 # Phase 12: toggle check on the DB path too — the CACHE keeps
                 # the real permissions (so re-enabling is instant), the toggle
                 # only decides what this request gets.
