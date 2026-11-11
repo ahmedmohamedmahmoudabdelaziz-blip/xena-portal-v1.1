@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26e media-remove 2026-11-11"
+XENA_BUILD = "v26f probes 2026-11-11"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2086,6 +2086,11 @@ def fetch_feishu_records(table_id, from_dt=None, max_seconds=None):
                 stop_reason = "Safely reached pages with all older records."
                 break
 
+            # v26f: brief pause between pages -- the syncs walk thousands of
+            # records on the SAME instance that serves user clicks; a tight
+            # no-sleep loop (12+ pages on the points table) starves foreground
+            # requests of CPU/GIL windows while it parses MB-sized pages.
+            time.sleep(0.15)
             page_token = block.get("page_token")
             if not page_token or not block.get("has_more", False): break
 
@@ -9040,6 +9045,59 @@ def health():
                 probe_err = f"http_{_pres.status_code}"
         except Exception as _pe:
             probe_err = str(_pe)[:120]
+    # v26f (Ahmed, "chk 6.78s / load 5.23s while the probe says 336ms"): the
+    # app-metadata probe above measures the LINK; it says nothing about the
+    # cost of reading ONE RECORD from the Grand Table -- which is what the
+    # save conflict check and the charge ticket read actually do. Time BOTH
+    # record-read shapes side by side on the newest cached record:
+    #   record_get_ms   = classic GET records/{id} (full record, all fields)
+    #   record_batch_ms = POST records/batch_get with field_names=["Numbering"]
+    #                     (lite read -- skips serializing/computing the other
+    #                     ~30 columns incl. formulas)
+    # One /api/health reload then answers "is the per-record read slow
+    # server-side, and is the lite read fast?" with numbers, not guesses.
+    # record_batch_has_mtime verifies batch_get still returns
+    # last_modified_time -- the conflict check depends on it, so the lite
+    # read only replaces the classic one if this comes back true.
+    record_get_ms = record_get_err = record_batch_ms = record_batch_err = None
+    record_batch_has_mtime = None
+    if not MOCK_MODE and probe_err is None and _ptat:
+        try:
+            with _bg_sync_lock:
+                _rid = (_bg_sync["requests_items"][0].get("record_id")
+                        if _bg_sync["requests_items"] else None)
+        except Exception:
+            _rid = None
+        if _rid:
+            try:
+                _rt = time.monotonic()
+                _rres = feishu_session.get(
+                    f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{_rid}",
+                    headers={"Authorization": f"Bearer {_ptat}"}, timeout=10)
+                record_get_ms = int((time.monotonic() - _rt) * 1000)
+                if _rres.status_code != 200:
+                    record_get_err = f"http_{_rres.status_code}"
+            except Exception as _re:
+                record_get_err = str(_re)[:120]
+            try:
+                _bt = time.monotonic()
+                _bres = feishu_session.post(
+                    f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/batch_get",
+                    headers={"Authorization": f"Bearer {_ptat}", "Content-Type": "application/json"},
+                    json={"record_ids": [_rid], "field_names": ["Numbering"], "automatic_fields": False},
+                    timeout=10)
+                record_batch_ms = int((time.monotonic() - _bt) * 1000)
+                if _bres.status_code != 200:
+                    record_batch_err = f"http_{_bres.status_code}"
+                else:
+                    _bj = _bres.json()
+                    if _bj.get("code") != 0:
+                        record_batch_err = f"code_{_bj.get('code')}"
+                    else:
+                        _recs = (_bj.get("data") or {}).get("records") or []
+                        record_batch_has_mtime = bool(_recs and _recs[0].get("last_modified_time"))
+            except Exception as _be:
+                record_batch_err = str(_be)[:120]
     return jsonify({
         "status": "ok", "ts": datetime.utcnow().isoformat(), "cairo_ts": cairo_now().isoformat(),
         "cache_entries": len(_cache), "audit_entries": len(audit._queue),
@@ -9051,6 +9109,11 @@ def health():
         "redis_healthy": (bool(redis_healthy()) if REDIS_ENABLED else None),  # v26c: the admin-only /api/comments/health needs a live portal session; this one is open, so Redis state is checkable from any browser
         "feishu_probe_ms": probe_ms,  # v26d: ms for ONE live Feishu GET from this instance (null in mock mode)
         "feishu_probe_err": probe_err,
+        "record_get_ms": record_get_ms,  # v26f: ONE full record read, timed
+        "record_get_err": record_get_err,
+        "record_batch_ms": record_batch_ms,  # v26f: lite read (batch_get, one field), timed
+        "record_batch_err": record_batch_err,
+        "record_batch_has_mtime": record_batch_has_mtime,
         "mock_mode_active": MOCK_MODE,
     })
 
