@@ -2007,6 +2007,31 @@
             border:1px solid var(--border,var(--border));cursor:zoom-in;background:none;padding:0;
         }
         .img-attach-thumb img{width:100%;height:100%;object-fit:cover}
+        /* v26e (Ahmed, ✕ remove button like the sheet): each attachment thumb
+           lives in a positioned cell so the ✕ can sit on its top-right corner
+           (same idea as the Feishu Base gallery). Click ✕ once = marked for
+           removal (thumb fades + ✕ turns red), click again = undo; the removal
+           only reaches the sheet when Save is hit. */
+        .img-attach-cell{position:relative;display:inline-block;width:60px;height:60px;flex-shrink:0;}
+        .img-attach-rm{position:absolute;top:-7px;right:-7px;width:19px;height:19px;border-radius:50%;
+            background:var(--ink-rgb,var(--ink,#111));background:rgba(17,17,17,.92);color:#fff;border:none;
+            font-size:11px;line-height:1;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
+            z-index:5;box-shadow:0 1px 4px rgba(0,0,0,.45);}
+        .img-attach-rm:hover{background:#000;}
+        .img-attach-cell.removed .img-attach-thumb{opacity:.3;filter:grayscale(1);cursor:default;}
+        .img-attach-cell.removed .img-attach-rm{background:var(--accent-rose,#e5484d);color:#fff;}
+        /* v26e (Ahmed, "why the videos not shown"): video attachments render as a
+           real playable <video> card (controls + metadata preload) instead of a
+           broken image falling back to 📎. Streams through the same /api/attachments
+           proxy, which now relays HTTP Range so seeking works. */
+        .vid-attach-card{position:relative;width:190px;flex-shrink:0;border:1px solid var(--border);
+            border-radius:10px;overflow:hidden;background:#000;}
+        .vid-attach-card video{display:block;width:100%;max-height:150px;background:#000;}
+        .vid-attach-card .vid-name{font-size:.68rem;color:var(--text-muted);padding:4px 7px;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface,#111);}
+        .vid-attach-card .img-attach-rm{top:5px;right:5px;}
+        .vid-attach-card.removed{opacity:.35;}
+        .vid-attach-card.removed video{pointer-events:none;}
         /* Phase 10.6 (Ahmed): tiny N / O / OO visual tag group above every pic in
            the "NID & Otherapp Screen" field (Agency Creation; Phase 10.20 extended
            it to BD Creation and to the Submit Request / Audit form dropzones) --
@@ -18098,6 +18123,38 @@ function picTagPick(btn) {
 // when the field is currently empty (e.g. NID & Otherapp Screen on a request that
 // was created without it). Rendering is driven by the schema's ui_type now, not by
 // "does this field already have a value", so the upload control always shows up.
+// v26e (Ahmed, "why the videos not shown"): a video attachment (by mimetype
+// or file extension) renders as a real playable card, not a broken <img>.
+function twIsVideoAttachment(f) {
+    const mt = String((f && f.mimetype) || '').toLowerCase();
+    if (mt.startsWith('video/')) return true;
+    const nm = String((f && f.name) || '').toLowerCase();
+    return /\.(mp4|mov|webm|avi|mkv|m4v|3gp|mpg|mpeg|wmv|flv)$/.test(nm);
+}
+
+// v26e (Ahmed, ✕ remove button like the sheet): toggle one attachment's
+// "will be removed on Save" state. Nothing is sent until Save & Resolve --
+// the ✕ just marks it here. Click again to undo.
+function twToggleAttachmentRemove(btn) {
+    const wrap = btn.closest('[data-attachment-field]');
+    if (!wrap) return;
+    const cell = btn.closest('.img-attach-cell') || btn.closest('.vid-attach-card');
+    const token = btn.dataset.token || '';
+    if (!token) return;
+    let removed = {};
+    try { removed = JSON.parse(wrap.dataset.attachmentRemoved || '{}'); } catch (e) {}
+    if (removed[token]) {
+        delete removed[token];
+        if (cell) cell.classList.remove('removed');
+        btn.title = 'Remove this attachment on save';
+    } else {
+        removed[token] = 1;
+        if (cell) cell.classList.add('removed');
+        btn.title = 'Undo remove (keep this attachment)';
+    }
+    wrap.dataset.attachmentRemoved = JSON.stringify(removed);
+}
+
 function twRenderAttachmentControl(wrap, label, key, meta, value) {
     const arr = Array.isArray(value) ? value.filter(f => f && typeof f === 'object' && f.file_token) : [];
     const fieldIdQS = meta?.field_id ? `&field_id=${encodeURIComponent(meta.field_id)}` : '';
@@ -18108,16 +18165,35 @@ function twRenderAttachmentControl(wrap, label, key, meta, value) {
     if (arr.length > 0) {
         // One gallery per attachment field, stashed on lightboxGalleries so all of this
         // field's pictures can be paged through with Next/Prev inside the lightbox.
+        // v26e: only IMAGE attachments join the lightbox gallery -- videos render
+        // as their own playable <video> cards (no OCR/zoom machinery applies).
         const galleryId = `tw-${key.replace(/[^a-zA-Z0-9]/g, '')}-${Math.random().toString(36).slice(2, 8)}`;
-        const gallery = arr.map(f => ({
+        const gallery = arr.filter(f => !twIsVideoAttachment(f)).map(f => ({
             src: `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`,
             filename: f.name || 'attachment'
         }));
         lightboxGalleries[galleryId] = gallery;
-        html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
-        gallery.forEach((g, idx) => {
-            const thumbBtn = `<button type="button" class="img-attach-thumb" data-gallery-id="${galleryId}" data-gallery-index="${idx}" onclick="openImageLightboxFromThumb(this)" title="Click to preview"><img src="${g.src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
-            html += tagThisField ? `<div class="pic-tag-wrap">${picTagGroupHtml()}${thumbBtn}</div>` : thumbBtn;
+        // v26e: image gallery indexes are positions in the FILTERED list, so
+        // thumbs carry their own running index instead of the raw array's.
+        let gIdx = 0;
+        html += `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">`;
+        arr.forEach((f) => {
+            const src = `/api/attachments/${f.file_token}?user=${encodeURIComponent(loggedUser)}&email=${encodeURIComponent(loggedEmail)}${fieldIdQS}`;
+            if (twIsVideoAttachment(f)) {
+                // v26e: playable video card + the same ✕ remove button.
+                html += `<div class="vid-attach-card" data-token="${escHtml(f.file_token)}">
+                    <video controls preload="metadata" src="${src}"></video>
+                    <div class="vid-name">🎬 ${escHtml(f.name || 'video')}</div>
+                    <button type="button" class="img-attach-rm" data-field="${escHtml(key)}" data-token="${escHtml(f.file_token)}" onclick="twToggleAttachmentRemove(this)" title="Remove this attachment on save">✕</button>
+                </div>`;
+                return;
+            }
+            const myIdx = gIdx++;
+            const thumbBtn = `<button type="button" class="img-attach-thumb" data-gallery-id="${galleryId}" data-gallery-index="${myIdx}" onclick="openImageLightboxFromThumb(this)" title="Click to preview"><img src="${src}" loading="lazy" onerror="this.closest('button').innerHTML='📎';this.closest('button').removeAttribute('onclick');this.closest('button').style.cursor='default';" style="width:100%;height:100%;object-fit:cover;"></button>`;
+            // v26e: the thumb sits in a positioned cell so the ✕ remove button
+            // can live on its top-right corner (same UI as the Feishu Base sheet).
+            const cell = `<span class="img-attach-cell" data-token="${escHtml(f.file_token)}">${thumbBtn}<button type="button" class="img-attach-rm" data-field="${escHtml(key)}" data-token="${escHtml(f.file_token)}" onclick="twToggleAttachmentRemove(this)" title="Remove this attachment on save">✕</button></span>`;
+            html += tagThisField ? `<div class="pic-tag-wrap">${picTagGroupHtml()}${cell}</div>` : cell;
         });
         html += `</div>`;
     } else {
@@ -18130,8 +18206,12 @@ function twRenderAttachmentControl(wrap, label, key, meta, value) {
     // twRunVerify can resend them alongside any newly uploaded files -- the backend
     // merges the two instead of replacing, but only if the existing ones are actually
     // included in the save payload. See twCollectFields().
+    // v26e: attachmentRemoved holds the ✕-marked tokens ({token: 1}); they are
+    // stripped from what gets saved and shipped in the attachment_removals
+    // payload so the backend removes them from the sheet too.
     wrap.dataset.attachmentField = key;
     wrap.dataset.attachmentExisting = JSON.stringify(arr.map(f => ({ file_token: f.file_token })));
+    wrap.dataset.attachmentRemoved = '{}';
     return wrap;
 }
 
@@ -18604,17 +18684,25 @@ function twCollectFields(form) {
     // Phase 10.12 (fast save): ONLY when the agent actually picked new files
     // for that field. An untouched attachment field sends nothing at all --
     // re-shipping the same tokens forced Feishu to reprocess every image on
-    // the row and was a big part of the save time. (There is no removal UI,
-    // so "unchanged" and "removed" can't be confused here.)
+    // the row and was a big part of the save time.
+    // v26e (Ahmed, ✕ remove): a field ALSO ships its kept token list when the
+    // agent ✕-removed something -- the kept list is what the backend writes
+    // (full-replace, removed tokens excluded on both ends). When the kept list
+    // ends up empty (every attachment removed) the field itself is omitted and
+    // the attachment_removals payload alone drives a surgical removal.
     form.querySelectorAll('[data-attachment-field]').forEach(el => {
         const hasNewFiles = !!el.querySelector('input[type="file"]')?.files?.length;
-        if (!hasNewFiles) { delete fields[el.dataset.attachmentField]; return; }
-        try {
-            const existing = JSON.parse(el.dataset.attachmentExisting || '[]');
-            if (Array.isArray(existing) && existing.length > 0) {
-                fields[el.dataset.attachmentField] = existing;
-            }
-        } catch (e) { /* ignore malformed stash, nothing to merge */ }
+        let removedToks = [];
+        try { removedToks = Object.keys(JSON.parse(el.dataset.attachmentRemoved || '{}')); } catch (e) {}
+        let existing = [];
+        try { existing = JSON.parse(el.dataset.attachmentExisting || '[]'); } catch (e) {}
+        const kept = existing.filter(x => x && x.file_token && removedToks.indexOf(x.file_token) < 0);
+        if (!hasNewFiles && !removedToks.length) { delete fields[el.dataset.attachmentField]; return; }
+        if (kept.length > 0) {
+            fields[el.dataset.attachmentField] = kept;
+        } else {
+            delete fields[el.dataset.attachmentField]; // all removed -- removals payload carries it
+        }
     });
     // Member picker fields ("Done by", "Mentioned Person" -- see twRenderMemberPicker).
     // The picked user is stashed as `[{"id": open_id}]` JSON on the control-group's
@@ -18668,6 +18756,21 @@ function twCollectFields(form) {
     return fields;
 }
 
+// v26e (Ahmed, ✕ remove): {field_name: [file_token, ...]} for every attachment
+// the agent ✕-marked in the workspace. Posted alongside `fields` as the
+// `attachment_removals` form part; the backend strips those tokens from the
+// write, excludes them from the defensive union, and surgically removes them
+// (v3 remove_attachments) for cells that would otherwise end up empty.
+function twCollectRemovals(form) {
+    const removals = {};
+    form.querySelectorAll('[data-attachment-field]').forEach(el => {
+        let toks = [];
+        try { toks = Object.keys(JSON.parse(el.dataset.attachmentRemoved || '{}')); } catch (e) {}
+        if (toks.length) removals[el.dataset.attachmentField] = toks;
+    });
+    return removals;
+}
+
 // Normalizes a form value OR a raw Feishu field value into one comparable
 // string: arrays (multi-select, users, attachments, rich text) become a
 // sorted "|" join of their ids/tokens/texts; scalars become trimmed strings.
@@ -18689,7 +18792,7 @@ function twNormForCompare(v) {
 function twWsHasUnsavedEdits() {
     const form = document.getElementById('tw-form');
     if (!form || !twOrigFields) return false;
-    try { return Object.keys(twCollectFields(form)).length > 0; } catch (e) { return false; }
+    try { return Object.keys(twCollectFields(form)).length > 0 || Object.keys(twCollectRemovals(form)).length > 0; } catch (e) { return false; }
 }
 
 async function twSaveWorkspace() {
@@ -18807,6 +18910,11 @@ async function twSaveWorkspace() {
     // v25: stamp when this workspace was opened -- the backend compares it
     // against the sheet's last_modified_time for the conflict check.
     finalData.append('opened_at', String(twOpenedAt || 0));
+    // v26e (Ahmed, ✕ remove): ship the ✕-marked tokens so the backend removes
+    // them from the sheet (kept-list write, or surgical v3 removal for cells
+    // that end up empty). Resends on the 409 conflict loop keep it too.
+    const __removals = twCollectRemovals(form);
+    if (Object.keys(__removals).length) finalData.append('attachment_removals', JSON.stringify(__removals));
 
     // v22: compress oversized images BEFORE they enter the request body (see
     // samCompressImageFile) so the POST stays under Vercel's ~4.5MB cap.
@@ -18857,7 +18965,8 @@ async function twSaveWorkspace() {
             err.isUploadAbort = !!(data.failed_files && data.failed_files.length);
             throw err;
         }
-        ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : (data.slow_confirm ? 'Ticket saved — the network was slow, but the sheet confirms your changes landed.' : 'Ticket saved successfully.'), 'success');
+        if (data.removed_files) ToastManager.show(`Ticket saved — ${data.removed_files} attachment${data.removed_files === 1 ? '' : 's'} removed.`, 'success');
+        else ToastManager.show(data.unchanged ? 'Nothing changed — the sheet is already up to date.' : (data.slow_confirm ? 'Ticket saved — the network was slow, but the sheet confirms your changes landed.' : 'Ticket saved successfully.'), 'success');
         // v26: keep the server-side timing breakdown — the save pill shows it, console keeps it for reports.
         if (data._timing) { window.__lastSaveTiming = { ...data._timing, at: Date.now() }; console.log('[save timing]', data._timing); }
         // Phase 10.44: the unsent-work draft for this ticket is now on the
@@ -18932,6 +19041,11 @@ async function twRunVerify() {
         finalData.append('user', loggedUser);
         finalData.append('record_id', recordId);
         finalData.append('fields', JSON.stringify(fields));
+        // v26e (Ahmed, ✕ remove): Run Duplicate Check goes through the same
+        // save endpoint first -- carry the ✕-marked tokens so the push step
+        // removes them exactly like Save & Resolve does.
+        const __rvRemovals = twCollectRemovals(form);
+        if (Object.keys(__rvRemovals).length) finalData.append('attachment_removals', JSON.stringify(__rvRemovals));
 
         // ISSUE 5 FIX (push-wait-fetch): step 1, push the edited fields and make sure
         // the push itself actually succeeded before waiting on Feishu to recalculate.
@@ -24165,7 +24279,7 @@ function xdSaveState(st) {
     p.style.display = 'inline-flex';
     p.className = 'save-state-pill ss-' + st;
     if (st === 'saving') p.textContent = '⏳ Saving…';
-    else if (st === 'saved') { const __t = window.__lastSaveTiming; p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ((__t && Date.now() - __t.at < 15000) ? ` · ⏱ ${__t.total_s}s${__t.uploads_s ? ` · pics ${__t.uploads_s}s` : ''}${__t.conflict_s ? ` · chk ${__t.conflict_s}s` : ''}${__t.put_s ? ` · write ${__t.put_s}s` : ''}` : ''); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
+    else if (st === 'saved') { const __t = window.__lastSaveTiming; p.textContent = '✅ Saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ((__t && Date.now() - __t.at < 15000) ? ` · ⏱ ${__t.total_s}s${__t.uploads_s ? ` · pics ${__t.uploads_s}s` : ''}${__t.remove_s ? ` · rm ${__t.remove_s}s` : ''}${__t.conflict_s ? ` · chk ${__t.conflict_s}s` : ''}${__t.put_s ? ` · write ${__t.put_s}s` : ''}` : ''); xdSaveStateTimer = setTimeout(() => xdSaveState('idle'), 4000); }
     else if (st === 'failed') p.textContent = '⚠️ Save failed — retry';
 }
 // Wrap the two save paths with a POST-spy: the pill only flips to Saved /
@@ -26728,7 +26842,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v26d full-legs 2026-11-11';
+window.SAM19_BUILD='v26e media-remove 2026-11-11';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
