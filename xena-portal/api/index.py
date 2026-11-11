@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26h pull-hotfix 2026-11-12"
+XENA_BUILD = "v26i pull-live 2026-11-12"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -9172,49 +9172,15 @@ def pull_assigned_ticket():
     matches = []
     user_clean = user.strip().lower()
 
-    # v26g: serve the pull from the warm background snapshot -- the SAME data
-    # Ahmed's dashboards read, refreshed every 180s and re-kicked after every
-    # portal write. The per-agent live full-field search below (2-6s on the
-    # Grand Table) becomes the cold-cache fallback only. Filtering is
-    # identical: status contains "In Progress" (either column alias) AND
-    # Assigned Member contains the agent's name, newest 20 by Numbering.
-    # v26h HOTFIX: an EMPTY snapshot result NEVER answers the pull -- even a
-    # current-cycle snapshot is up to 180s old, and a ticket assigned minutes
-    # ago must never be hidden by any cache. Zero matches here falls through
-    # to the live search, which alone gets to say "no tickets". Agents WITH
-    # tickets (Ahmed's case: "let them pull like me") get the instant path;
-    # agents without pay exactly the pre-v26g live search -- never worse.
-    served_from_snapshot = False
-    _snap = _pull_snapshot_warm()
-    if _snap is not None:
-        _items, _complete = _snap
-        _filtered = []
-        for it in _items:
-            _f = it.get("fields", {})
-            if "in progress" not in extract_field_text(get_field_local(_f, "Request Status", "Status")).lower():
-                continue
-            if user_clean not in extract_field_text(_f.get("Assigned Member", "")).lower():
-                continue
-            _filtered.append(it)
-            _harvest_person_names(_f)  # Phase 10.47: free name-resolution seed
-        def _num_key(it):
-            try:
-                return int(re.sub(r"\D", "", extract_field_text(it.get("fields", {}).get("Numbering", ""))) or "0")
-            except Exception:
-                return 0
-        _filtered.sort(key=_num_key, reverse=True)
-        if _filtered:
-            for it in _filtered[:20]:
-                t = build_ticket_payload(it)
-                # Same full_fields prefetch seed as the live path -- opening a
-                # pulled ticket still needs zero extra Feishu calls.
-                t["full_fields"] = it.get("fields", {})
-                matches.append(t)
-            served_from_snapshot = True
-            logger.info("pull_assigned_snapshot_served", user=user, tickets=len(matches))
-
-    if not served_from_snapshot:
-      try:
+    # v26i (Ahmed, 2026-11-12 -- "no make this live not from snap nooooo live
+    # only"): the pull has NO snapshot tier at all. Every Pull My Ticket click
+    # runs the live filtered search below -- the exact code path that was
+    # "perfect" for Ahmed pre-v26g. The background sync keeps running (the
+    # dashboards read it) but this route never touches it: "no tickets" is
+    # always a real-time answer from Feishu, and a ticket assigned seconds ago
+    # is always pullable. (_pull_snapshot_warm stays in the file -- nothing
+    # calls it anymore.)
+    try:
         resp = _search("Request Status")
         data = resp.json()
         if data.get("code") == 1254045:
@@ -9248,7 +9214,7 @@ def pull_assigned_ticket():
                 matches.append(t)
         else:
             logger.error("pull_assigned_failed", error=data.get("msg"))
-      except Exception as e:
+    except Exception as e:
         logger.error("pull_assigned_failed", error=str(e))
 
     return jsonify({"tickets": matches})
