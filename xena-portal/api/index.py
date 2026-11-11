@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26d full-legs 2026-11-11"
+XENA_BUILD = "v26e media-remove 2026-11-11"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -1807,6 +1807,67 @@ def _access_gate():
     except Exception:
         return  # never break a request over the gate itself
 
+def _fetch_user_permissions_db(email_clean, name_clean, cache_key):
+    """v26e (pull speed for everyone, Ahmed: "make them exactly like me"):
+    the Access-table lookup, extracted so the synchronous first-fetch path and
+    the new stale-while-revalidate background refresh share ONE identical
+    implementation. Returns the parsed result dict on a match, else None.
+    Writes the in-proc + Redis fresh copies (300s, as before) AND a long-lived
+    "stale" copy (24h) that serves pull-auth instantly on later cold misses."""
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+
+    try:
+        res = feishu_session.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()  # v24: keep-alive session (was a fresh cross-border handshake per call)
+        for item in res.get("data", {}).get("items", []):
+            fields = item.get("fields", {})
+            db_email = extract_field_text(fields.get("Email", "")).lower().strip()
+            db_person = extract_field_text(fields.get("Person", "")).lower().strip()
+
+            if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
+                modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
+                parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
+                parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
+                result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
+                cache_set(cache_key, result, ttl=300)
+                if REDIS_ENABLED:
+                    try:
+                        redis_set_json("xena:perms:" + cache_key, result, ttl=300)
+                        redis_set_json("xena:perms_stale:" + cache_key, result, ttl=86400)
+                    except Exception:
+                        pass
+                return result
+    except Exception:
+        pass
+    return None
+
+_perms_refresh_inflight = set()
+_perms_refresh_lock = threading.Lock()
+
+def _perms_bg_refresh(email_clean, name_clean, cache_key):
+    """v26e: refresh an expired permission entry in the BACKGROUND while the
+    stale copy serves the current request instantly. One refresh per key at
+    a time (in-flight set) -- no stampede of Access-table fetches when the
+    whole team pulls at once after a cold start. Best-effort: any failure
+    here must never break the request that triggered it."""
+    try:
+        with _perms_refresh_lock:
+            if cache_key in _perms_refresh_inflight:
+                return
+            _perms_refresh_inflight.add(cache_key)
+        def _do():
+            try:
+                _fetch_user_permissions_db(email_clean, name_clean, cache_key)
+            except Exception:
+                pass
+            finally:
+                with _perms_refresh_lock:
+                    _perms_refresh_inflight.discard(cache_key)
+        threading.Thread(target=_do, daemon=True).start()
+    except Exception:
+        pass
+
 def _get_user_permissions_raw(email, name):
     name_clean = name.strip().lower() if name else ""
     email_clean = email.strip().lower() if email else ""
@@ -1853,36 +1914,40 @@ def _get_user_permissions_raw(email, name):
             return _TOGGLED_OFF_PERMS()
         return cached
 
-    tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
-    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
-    
-    try:
-        res = feishu_session.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()  # v24: keep-alive session (was a fresh cross-border handshake per call)
-        for item in res.get("data", {}).get("items", []):
-            fields = item.get("fields", {})
-            db_email = extract_field_text(fields.get("Email", "")).lower().strip()
-            db_person = extract_field_text(fields.get("Person", "")).lower().strip()
-            
-            if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
-                modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
-                parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
-                parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
-                result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
-                cache_set(cache_key, result, ttl=300)
-                if REDIS_ENABLED:
-                    try:
-                        redis_set_json("xena:perms:" + cache_key, result, ttl=300)
-                    except Exception:
-                        pass
-                # Phase 12: toggle check on the DB path too — the CACHE keeps
-                # the real permissions (so re-enabling is instant), the toggle
-                # only decides what this request gets.
-                if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
-                    return _TOGGLED_OFF_PERMS()
-                return result
-    except Exception: pass
-    
+    # v26e (pull speed for everyone, Ahmed: "make them exactly like me"):
+    # fresh caches expire after 300s, and a teammate who pulls less often than
+    # that paid the FULL Access-table fetch (~1-2s+ cross-border) on EVERY
+    # pull -- admins never pay it (hardcoded list), which was the real "fast
+    # for me, slow for them" gap. Stale-while-revalidate: the 24h stale copy
+    # in Redis serves this pull in ~cache-hit time while a background thread
+    # refreshes the entry, so the expensive fetch moves OFF the request
+    # path entirely. Accuracy is preserved: the Access-table edit still
+    # lands on the next refresh (the background fetch runs immediately), and
+    # the off-switch toggle stays INSTANT (it is checked above on every
+    # request, independent of any cache).
+    _stale = None
+    if REDIS_ENABLED:
+        try:
+            _stale = redis_get_json("xena:perms_stale:" + cache_key)
+        except Exception:
+            _stale = None
+    if _stale:
+        _perms_bg_refresh(email_clean, name_clean, cache_key)
+        if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
+            return _TOGGLED_OFF_PERMS()
+        return _stale
+
+    # Cold path (first pull ever / Redis empty): fetch synchronously, exactly
+    # as before -- v26e only extracted the lookup into _fetch_user_permissions_db.
+    result = _fetch_user_permissions_db(email_clean, name_clean, cache_key)
+    if result is not None:
+        # Phase 12: toggle check on the DB path too — the CACHE keeps
+        # the real permissions (so re-enabling is instant), the toggle
+        # only decides what this request gets.
+        if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
+            return _TOGGLED_OFF_PERMS()
+        return result
+
     fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
     return fallback
 
@@ -4259,6 +4324,85 @@ def lark_ocr_extract():
         logger.error("lark_ocr_failed", error=str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
+# ════════════════════════════════════════════════════════════════════
+# v26e (Ahmed: "add an X on the attachment so I can remove a pic"): surgical
+# removal of specific file tokens from a record's attachment cells -- the
+# portal twin of the Base UI's own remove button. Two live-verified layers:
+#   primary  : Feishu's dedicated v3 remove_attachments endpoint (one call,
+#              any number of fields/tokens; full-replace write semantics are
+#              never touched, and the field NAME is accepted directly);
+#   fallback : v1 full-replace write of the kept-token list (live-verified:
+#              writing [] legally clears the cell), used only if v3 rejects
+#              the app's credentials.
+# Idempotent: tokens already absent from the cell count as success.
+# ════════════════════════════════════════════════════════════════════
+def _remove_record_attachments(record_id, removed_map, tat, field_types=None):
+    """removed_map: {field_name: [file_token, ...]}. Returns
+    (ok: bool, err: str|None, failed_fields: list, took_s: float)."""
+    _tr = time.monotonic()
+    clean = {}
+    for fname, tokens in (removed_map or {}).items():
+        if not isinstance(fname, str) or not isinstance(tokens, list):
+            continue
+        if field_types is not None and field_types.get(fname) != "Attachment":
+            continue  # removals may only ever touch Attachment-typed cells
+        toks = [t for t in tokens if isinstance(t, str) and t]
+        if toks:
+            clean[fname] = toks
+    if not clean:
+        return True, None, [], round(time.monotonic() - _tr, 2)
+
+    # ---- primary: v3 remove_attachments (dedicated, surgical) ----
+    try:
+        body = {"attachments": {record_id: {f: [{"file_token": t} for t in toks]
+                                           for f, toks in clean.items()}}}
+        v3 = feishu_session.post(
+            f"https://open.feishu.cn/open-apis/base/v3/bases/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/remove_attachments",
+            headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+            json=body, timeout=15)
+        v3j = v3.json() if v3.status_code == 200 else {}
+        if v3.status_code == 200 and v3j.get("code", 0) == 0:
+            return True, None, [], round(time.monotonic() - _tr, 2)
+        _v3_err = f"v3 code {v3j.get('code', v3.status_code)}: {str(v3j.get('msg') or v3j)[:160]}"
+        logger.warn("attachment_remove_v3_failed", record_id=record_id, error=_v3_err)
+    except Exception as e:
+        _v3_err = f"v3 call failed: {e}"
+        logger.warn("attachment_remove_v3_failed", record_id=record_id, error=_v3_err)
+
+    # ---- fallback: v1 kept-list full-replace write ----
+    rec_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}"
+    try:
+        cur = _feishu_get(rec_url, headers={"Authorization": f"Bearer {tat}"},
+                          timeout=8, tries=2, retry_timeout=12).json()
+        cur_fields = ((cur.get("data") or {}).get("record") or {}).get("fields") or {}
+        out_fields, failed, touched = {}, [], False
+        for fname, toks in clean.items():
+            cell = cur_fields.get(fname)
+            current = [{"file_token": x["file_token"]} for x in cell
+                       if isinstance(x, dict) and x.get("file_token")] \
+                      if isinstance(cell, list) else []
+            removed_set = set(toks)
+            kept = [t for t in current if t["file_token"] not in removed_set]
+            if removed_set.isdisjoint({t["file_token"] for t in current}):
+                continue  # tokens already absent -- idempotent success for this field
+            touched = True
+            out_fields[fname] = kept  # [] is a legal clear (live-verified)
+        if not touched:
+            return True, None, [], round(time.monotonic() - _tr, 2)
+        if not out_fields:
+            return True, None, [], round(time.monotonic() - _tr, 2)
+        data = _put_json_retry(rec_url,
+                               headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                               payload={"fields": out_fields})
+        if data.get("code") == 0:
+            return True, None, [], round(time.monotonic() - _tr, 2)
+        failed = list(out_fields.keys())
+        return False, f"kept-list write failed: {data.get('msg')}", failed, round(time.monotonic() - _tr, 2)
+    except Exception as e:
+        logger.error("attachment_remove_fallback_failed", record_id=record_id, error=str(e))
+        return False, f"removal failed: {e}", list(clean.keys()), round(time.monotonic() - _tr, 2)
+
+
 @app.route('/api/requests/update', methods=['POST'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def update_request():
@@ -4289,6 +4433,38 @@ def update_request():
         return jsonify({"success": False, "error": f"Invalid fields JSON: {str(e)}"}), 400
 
     fields = {k: v for k, v in fields.items() if k not in EXCLUDED_UPDATE_FIELDS}
+
+    # v26e (attachment removal, Ahmed): the frontend now has a ✕ button on every
+    # attachment thumb. `attachment_removals` arrives as {field_name: [file_token,...]}
+    # for everything the agent removed. Three effects below:
+    #   1. removed tokens are stripped from any outgoing token list right here;
+    #   2. removed tokens are excluded from the defensive union so it can never
+    #      re-add what the agent just deleted (its append-only contract ends here);
+    #   3. fields whose kept list ends up empty (agent removed EVERY attachment in
+    #      the cell) are removed surgically via v3 remove_attachments -- a plain
+    #      [] write would also clear, but the v3 call is one atomic, field-exact
+    #      operation with a v1 kept-list fallback built in (see helper above).
+    try:
+        attachment_removals = json.loads(request.form.get('attachment_removals', '{}') or '{}')
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Invalid attachment_removals JSON: {str(e)}"}), 400
+    if not isinstance(attachment_removals, dict):
+        attachment_removals = {}
+    attachment_removals = {
+        k: [t for t in (v if isinstance(v, list) else []) if isinstance(t, str) and t]
+        for k, v in attachment_removals.items() if isinstance(k, str)
+    }
+    attachment_removals = {k: v for k, v in attachment_removals.items() if v}
+    for _rk in list(fields.keys()):
+        _rset = set(attachment_removals.get(_rk) or [])
+        if _rset and isinstance(fields[_rk], list):
+            _kept = [x for x in fields[_rk]
+                     if not (isinstance(x, dict) and x.get("file_token") in _rset)]
+            if len(_kept) != len(fields[_rk]):
+                if _kept:
+                    fields[_rk] = _kept
+                else:
+                    del fields[_rk]  # cell ends empty -> surgical removal below
 
     tat = get_tenant_access_token()
     _t_tat = round(time.monotonic() - _t0, 2)
@@ -4464,11 +4640,14 @@ def update_request():
     # list of file tokens (only Attachment fields ever look like that), fetch
     # the record ONCE and union the tokens currently on the sheet into the
     # write: sheet order first, then any new tokens, deduped by file_token.
-    # Attachments are append-only in this workspace (there is no removal UI),
-    # so the union can never fight a legitimate removal. Cost: one extra read,
+    # Attachments are append-only in this workspace EXCEPT for the v26e ✕
+    # removal button, handled via the attachment_removals exclusion below. Cost: one extra read,
     # and only on saves that actually touch attachments. If that read fails we
     # abort BEFORE the PUT (all-or-nothing, same contract as Phase 10.29) --
     # a blind write is exactly how the images were lost.
+    # v26e: the union is append-only EXCEPT for tokens named in
+    # attachment_removals (the workspace's new ✕ button) -- those are
+    # excluded on both sides so a removal is never resurrected.
     # v25: the read itself ran in the background thread started before the
     # uploads (or synchronously in the late case) -- here we just join it,
     # keep the all-or-nothing abort contract, and do the same union.
@@ -4488,6 +4667,11 @@ def update_request():
             sheet_tokens = [{"file_token": x["file_token"]} for x in on_sheet
                             if isinstance(x, dict) and x.get("file_token")] \
                            if isinstance(on_sheet, list) else []
+            # v26e: never union back a token the agent just removed -- the
+            # removal payload is the one thing allowed to LOSE tokens.
+            _rset = set(attachment_removals.get(k) or [])
+            if _rset:
+                sheet_tokens = [t for t in sheet_tokens if t["file_token"] not in _rset]
             seen = {t["file_token"] for t in sheet_tokens}
             fields[k] = sheet_tokens + [t for t in fields[k] if t["file_token"] not in seen]
 
@@ -4496,7 +4680,9 @@ def update_request():
     # new files were picked). When nothing changed the payload arrives empty --
     # skip the Feishu PUT entirely (saves the write AND the Base recalculation
     # it triggers, which was most of the save time) and tell the client.
-    if not fields:
+    # v26e: a removal-only save (fields empty, attachment_removals present) is
+    # NOT "unchanged" -- it must reach the surgical removal below.
+    if not fields and not attachment_removals:
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
         audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | No changes", ip=ip, severity="Info")
         return jsonify({"success": True, "unchanged": True,
@@ -4538,6 +4724,51 @@ def update_request():
         if sheet_mtime and sheet_mtime > opened_at_ms + 5000:
             return jsonify({"success": False, "conflict": True, "sheet_mtime": sheet_mtime}), 409
 
+    # v26e (attachment removal, surgical): removal fields whose kept list is NOT
+    # being written by the PUT below (agent removed every attachment in the cell,
+    # so the outgoing token list ended up empty and was dropped) go through the
+    # v3 remove_attachments API here -- one atomic, field-exact call, with a v1
+    # kept-list fallback inside the helper. Runs AFTER the conflict check (a
+    # removal is a write; the same sheet-changed-since-open protection applies)
+    # and BEFORE the PUT, keeping the all-or-nothing abort contract: on failure
+    # nothing is written and the agent just hits Save again. Fields that ARE in
+    # the outgoing PUT never reach this path -- their full-replace write already
+    # drops the removed tokens (excluded in the union above).
+    _t_remove = 0.0
+    _removed_files = 0
+    _surgical = {}
+    for _rk, _toks in attachment_removals.items():
+        if not _is_token_list(fields.get(_rk)):
+            _surgical[_rk] = _toks
+    if _surgical:
+        _trm = time.monotonic()
+        # field_types may legitimately be unavailable (cold cache) -- pass
+        # None so the helper treats it as "no type info, allow" instead of
+        # silently dropping the agent's ✕ (the guard exists for garbage
+        # clients naming non-Attachment fields, not for cache cold starts).
+        _rok, _rerr, _rfailed, _ = _remove_record_attachments(record_id, _surgical, tat, field_types or None)
+        _t_remove = round(time.monotonic() - _trm, 2)
+        if not _rok:
+            logger.error("attachment_removal_failed", record_id=record_id,
+                         fields=_rfailed, error=str(_rerr))
+            return jsonify({"success": False,
+                            "error": f"Could not remove the selected attachment(s) ({', '.join(_rfailed)}): {_rerr}. Nothing was saved -- please hit Save again.",
+                            "failed_fields": _rfailed}), 502
+        _removed_files = sum(len(v) for v in _surgical.values())
+        logger.info("attachment_removal_ok", record_id=record_id, removed=_removed_files)
+
+    # v26e: removal-only save -- the surgical removal above was the whole write.
+    # No PUT needed (an empty-fields PUT would be a pointless Base recalc).
+    if not fields:
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
+        audit.log(user, "UPDATE_TICKET", f"Record: {record_id} | Removed {_removed_files} attachment(s)", ip=ip, severity="Info")
+        kick_table_resync()
+        return jsonify({"success": True, "removed_files": _removed_files,
+                        "_timing": {"total_s": round(time.monotonic() - _t0, 2),
+                                    "tat_s": _t_tat, "remove_s": _t_remove,
+                                    "conflict_s": _t_conf, "uploads_s": _t_uploads,
+                                    "redis": bool(redis_healthy()) if REDIS_ENABLED else False}})
+
     logger.info("update_fields_payload", record_id=record_id, fields=fields)
     # Phase 34: the save PUT now rides the retry helper -- a cross-border spike
     # past 15s used to kill the whole save even though Feishu often finished
@@ -4558,9 +4789,11 @@ def update_request():
             # claim fields that feed the Live Formula ledger.
             kick_table_resync()
             return jsonify({"success": True,
+                            "removed_files": _removed_files,
                             "_timing": {"total_s": round(time.monotonic() - _t0, 2),
                                         "tat_s": _t_tat, "uploads_s": _t_uploads,
                                         "conflict_s": _t_conf, "put_s": _t_put,
+                                        "remove_s": _t_remove,
                                         "merge_overlapped": _merge_thread is not None,
                                         "redis": bool(redis_healthy()) if REDIS_ENABLED else False}})
         return jsonify({"success": False, "error": data.get("msg")})
@@ -8319,6 +8552,19 @@ def proxy_attachment(file_token):
         tat = get_tenant_access_token()
         url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
         headers = {"Authorization": f"Bearer {tat}"}
+        # v26e (videos, Ahmed): the workspace now renders <video> elements for
+        # video attachments, and browsers stream/seek videos with HTTP Range
+        # requests ("give me bytes 0-1023", "bytes=1048576-"). This proxy used
+        # to always return the WHOLE file with 200 -- a <video> would stall
+        # until every byte crossed the border and seeking was impossible.
+        # The browser's Range header is now passed straight through to Feishu
+        # (whose media endpoint speaks Range natively -- 206 + Content-Range),
+        # and the partial response is relayed with its status and Content-Range
+        # so the video plays and scrubs like any normal site. If Feishu ever
+        # ignores the header we just relay the 200 full body as before.
+        range_header = request.headers.get("Range")
+        if range_header:
+            headers["Range"] = range_header
 
         # ROOT CAUSE (Issue 8): with Advanced Permissions enabled on the base, Feishu's
         # media download endpoint requires an "extra" param identifying which Bitable
@@ -8337,12 +8583,12 @@ def proxy_attachment(file_token):
             return feishu_session.get(url, headers=headers, params=params, timeout=20, stream=True)
 
         resp = _attempt(with_extra=True)
-        if resp.status_code != 200 and field_id:
+        if resp.status_code not in (200, 206) and field_id:
             # Fall back without the extra param, in case advanced permissions aren't
             # actually enabled and the unnecessary param is what's causing the failure.
             resp = _attempt(with_extra=False)
 
-        if resp.status_code != 200:
+        if resp.status_code not in (200, 206):
             logger.error("attachment_proxy_failed", file_token=file_token, field_id=field_id, status=resp.status_code, body=resp.text[:300])
             return jsonify({"error": "Could not fetch attachment"}), 502
         # SPEED FIX (Live Ticket Queue feels slow to open/re-open): a given file_token's
@@ -8352,8 +8598,17 @@ def proxy_attachment(file_token):
         # Feishu from scratch, even for the exact same ticket seconds apart. Purely
         # additive: doesn't change what's returned or any existing behavior, just lets
         # the browser reuse what it already downloaded instead of asking again.
-        response = Response(resp.content, content_type=resp.headers.get("Content-Type", "application/octet-stream"))
-        response.headers["Cache-Control"] = "private, max-age=86400, immutable"
+        # v26e: streamed now (iter_content) so a 206 partial body relays lazily,
+        # and the browser is told Range works (Accept-Ranges) so it dares to seek.
+        response = Response(resp.iter_content(chunk_size=64 * 1024),
+                            status=resp.status_code,
+                            content_type=resp.headers.get("Content-Type", "application/octet-stream"))
+        response.headers["Accept-Ranges"] = "bytes"
+        if resp.status_code == 206 and resp.headers.get("Content-Range"):
+            response.headers["Content-Range"] = resp.headers["Content-Range"]
+            response.headers["Cache-Control"] = "private, max-age=86400"
+        else:
+            response.headers["Cache-Control"] = "private, max-age=86400, immutable"
         return response
     except Exception as e:
         logger.error("attachment_proxy_failed", file_token=file_token, error=str(e))
