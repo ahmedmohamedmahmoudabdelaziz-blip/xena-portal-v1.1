@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26f probes 2026-11-11"
+XENA_BUILD = "v26g lite-reads 2026-11-12"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2295,8 +2295,24 @@ def fetch_agency_data(code, query_type="points", allowed_acms=None, allowed_regs
             # v26: keep-alive session + fail-fast retry instead of one raw
             # 30s attempt (read-only search; the silent-degrade contract is
             # kept -- a failed history read still yields an empty history).
-            hist_resp = _post_json_retry(hist_url, headers=headers, payload=points_payload,
+            # v26g: ask Feishu for ONLY the columns the history loop reads
+            # (schema-pruned aliases) -- this full-field search was 2-5s of
+            # the wallet card's 8-10s. On any error with field_names set,
+            # retry the exact same search WITHOUT it, precisely as before.
+            _hist_payload = points_payload
+            try:
+                _hschema = get_table_schema(REQUESTS_TABLE_ID, tat, BASE_ID)
+                _hwanted = [f for f in HISTORY_LITE_FIELDS if f in _hschema] if _hschema else []
+                if _hwanted:
+                    _hist_payload = dict(points_payload)
+                    _hist_payload["field_names"] = _hwanted
+            except Exception:
+                _hist_payload = points_payload
+            hist_resp = _post_json_retry(hist_url, headers=headers, payload=_hist_payload,
                                          timeout=10, tries=2, retry_timeout=15)
+            if hist_resp.get("code") != 0 and _hist_payload is not points_payload:
+                hist_resp = _post_json_retry(hist_url, headers=headers, payload=points_payload,
+                                             timeout=10, tries=2, retry_timeout=15)
             raw_hist_items = hist_resp.get("data", {}).get("items", []) if hist_resp.get("code") == 0 else []
             
             hist_items = []
@@ -3960,6 +3976,89 @@ def _wallet_map_forget(code):
     except Exception:
         pass
 
+
+# v26g (Ahmed, 2026-11-12 -- "pull still very slow for others / the points
+# wallet took 8-10s to show"): LITE RECORD READS. Ahmed's own /api/health
+# probes proved the Vercel->Feishu link is FAST (feishu_probe_ms 336) while
+# every FULL-record read on the Grand Table / Agency Points table burns
+# 1.5-7s INSIDE Feishu (serializing ~30 columns incl. formulas, per record,
+# per call). records/batch_get with an explicit field_names list is the SAME
+# read with a far lighter answer -- same record, same values, much less
+# server work.
+#
+# SAFETY CONTRACT (accuracy is never traded for speed):
+#   * requested field names are pruned against the cached table schema, so a
+#     renamed / aliased column can never error the call;
+#   * ANY anomaly (network error, non-zero code, missing record, missing
+#     last_modified_time when required, empty pruned list, unknown schema)
+#     returns None and the caller falls back to the classic full-record GET
+#     it always used -- the lite path is only ever a faster equivalent,
+#     never a different answer.
+WALLET_LITE_FIELDS = [
+    "Agency Code", "Agency Name", "Name", "Region", "Agency Region",
+    "Acm Name (PK)", "Acm Name (IN)", "Acm", "Assigned Member",
+    "# Total Points", "Total Points", "Total", "Used Points", "Used",
+    "Point Balance", "Balance", "Base Points", "base_points",
+    "Monthly Usage Tracker",
+    "Target whole check", "target_whole_check", "YTD Target", "Target Whole Check",
+]
+
+CHARGE_TICKET_LITE_FIELDS = [
+    "Numbering", "Agency Code", "Region",
+    "Agency Point Privilege", "Quantities Input", "Target Type",
+    "Transaction Receipt", "Latest Usage Tracker",
+]
+
+# v26g: everything the agency history loop in fetch_agency_data() reads
+# (aliases included; pruned against the live schema before use).
+HISTORY_LITE_FIELDS = [
+    "Numbering", "Agency Code",
+    "Submitted on Copy", "Submitted on", "Created Time",
+    "Request Type", "Type", "Status", "Request Status", "Target Type",
+    "Point Balance", "Agency Point Privilege", "Privilege", "Agency Privilege",
+    "Counter", "Qty", "Quantities Input", "Latest Usage Tracker",
+    "User ID", "User Id", "Rejected Ids", "Rejected ID", "Rejected IDs", "Rejected Id",
+]
+
+def _record_lite_get(table_id, record_id, field_names, headers,
+                     need_mtime=False, timeout=6, tries=2, retry_timeouts=None,
+                     required_fields=None):
+    """v26g: read ONE record via records/batch_get restricted to `field_names`
+    (much cheaper server-side than the classic full-record GET on the big
+    tables). Returns a classic-shaped record dict {record_id, fields,
+    last_modified_time} or None on ANY doubt -- every caller falls back to
+    the classic GET it always used, so behavior never changes when the lite
+    read is unavailable. `required_fields` must survive schema pruning
+    (e.g. Agency Code for the wallet's exact-match verification)."""
+    try:
+        tok = (headers.get("Authorization") or "").replace("Bearer", "").strip()
+        schema = get_table_schema(table_id, tok, BASE_ID) if tok else set()
+        if not schema:
+            return None  # schema unknown -> classic read (zero risk)
+        wanted = [f for f in field_names if f in schema]
+        if not wanted:
+            return None
+        for rf in (required_fields or []):
+            if rf not in wanted:
+                return None
+        r = _post_json_retry(
+            f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/batch_get",
+            headers=headers,
+            payload={"record_ids": [record_id], "field_names": wanted,
+                     "automatic_fields": False},
+            timeout=timeout, tries=tries, retry_timeouts=retry_timeouts)
+        if r.get("code") != 0:
+            return None
+        recs = (r.get("data") or {}).get("records") or []
+        if not recs:
+            return None
+        rec = recs[0]
+        if need_mtime and not rec.get("last_modified_time"):
+            return None
+        return rec
+    except Exception:
+        return None
+
 def _wallet_search(headers, code):
     """Live Agency Points table search by exact Agency Code (read-only, so a
     cross-border spike gets one automatic retry)."""
@@ -4020,10 +4119,18 @@ def _fetch_wallet_fast(headers, code, hint_rid=None, timing=None):
                 continue
             seen_rids.add(cand_rid)
             try:
-                r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cand_rid}",
-                                headers=headers, timeout=6, tries=3, retry_timeouts=[8, 12]).json()
-                if r.get("code") == 0:
-                    rec = (r.get("data") or {}).get("record") or {}
+                # v26g: lite read first (batch_get, wallet columns only) --
+                # same record, same exact-code verification, ~30 columns
+                # lighter. None on any doubt -> classic full GET below.
+                rec = _record_lite_get(POINTS_TABLE_ID, cand_rid, WALLET_LITE_FIELDS,
+                                       headers, timeout=6, tries=2, retry_timeouts=[8],
+                                       required_fields=("Agency Code",))
+                if rec is None:
+                    r = _feishu_get(f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{POINTS_TABLE_ID}/records/{cand_rid}",
+                                    headers=headers, timeout=6, tries=3, retry_timeouts=[8, 12]).json()
+                    if r.get("code") == 0:
+                        rec = (r.get("data") or {}).get("record") or {}
+                if rec:
                     if extract_field_text(get_field_local(rec.get("fields", {}), "Agency Code")).strip() == code:
                         _src = cand_src
                         if cand_src == "hint":
@@ -4097,10 +4204,17 @@ def _wallet_verify_put(wallet_record_id, headers, fields_payload, expected_used,
 
     def _read_used():
         try:
-            r = _feishu_get(url, headers=headers, timeout=6, tries=2, retry_timeout=8).json()
-            if r.get("code") != 0:
-                return None
-            f = ((r.get("data") or {}).get("record") or {}).get("fields", {})
+            # v26g: lite read first (2 columns instead of ~30).
+            _lr = _record_lite_get(POINTS_TABLE_ID, wallet_record_id,
+                                   ["Used Points", "Used"], headers,
+                                   timeout=6, tries=2, retry_timeouts=[8])
+            if _lr is not None:
+                f = _lr.get("fields", {})
+            else:
+                r = _feishu_get(url, headers=headers, timeout=6, tries=2, retry_timeout=8).json()
+                if r.get("code") != 0:
+                    return None
+                f = ((r.get("data") or {}).get("record") or {}).get("fields", {})
             txt = extract_field_text(get_field_local(f, "Used Points", "Used"))
             if not str(txt).strip():
                 return None
@@ -4493,15 +4607,27 @@ def update_request():
     _merge_state = {"ran": False, "fields": None, "mtime": 0, "error": None}
     def _merge_fetch():
         try:
-            cur_resp = feishu_session.get(
-                f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
-                headers={"Authorization": f"Bearer {tat}"}, timeout=15)
-            cur_data = cur_resp.json()
-            if cur_data.get("code") != 0:
-                raise Exception(cur_data.get("msg") or "record fetch failed")
-            rec = (cur_data.get("data") or {}).get("record") or {}
-            _merge_state["fields"] = rec.get("fields") or {}
-            _merge_state["mtime"] = int(rec.get("last_modified_time") or 0)
+            # v26g: lite read first -- only the attachment columns actually
+            # being written (plus last_modified_time for the conflict check).
+            # None on any doubt -> classic full GET below, unchanged.
+            _mfields = [k for k, v in fields.items() if _is_token_list(v)]
+            _lite = _record_lite_get(
+                REQUESTS_TABLE_ID, record_id, _mfields,
+                {"Authorization": f"Bearer {tat}"},
+                need_mtime=True, timeout=8, tries=2, retry_timeouts=[12]) if _mfields else None
+            if _lite is not None:
+                _merge_state["fields"] = _lite.get("fields") or {}
+                _merge_state["mtime"] = int(_lite.get("last_modified_time") or 0)
+            else:
+                cur_resp = feishu_session.get(
+                    f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/{record_id}",
+                    headers={"Authorization": f"Bearer {tat}"}, timeout=15)
+                cur_data = cur_resp.json()
+                if cur_data.get("code") != 0:
+                    raise Exception(cur_data.get("msg") or "record fetch failed")
+                rec = (cur_data.get("data") or {}).get("record") or {}
+                _merge_state["fields"] = rec.get("fields") or {}
+                _merge_state["mtime"] = int(rec.get("last_modified_time") or 0)
         except Exception as e:
             _merge_state["error"] = e
         finally:
@@ -4719,12 +4845,21 @@ def update_request():
         if _merge_state["ran"] and _merge_state["error"] is None:
             sheet_mtime = _merge_state["mtime"]
         else:
-            try:
-                _cf = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=8).json()
-                if _cf.get("code") == 0:
-                    sheet_mtime = int((((_cf.get("data") or {}).get("record") or {})).get("last_modified_time") or 0)
-            except Exception:
-                sheet_mtime = 0  # fail-open -- same contract as the old frontend check
+            # v26g: lite mtime read first (batch_get, 1 column + mtime) --
+            # this leg was 6.78s as a full-record GET on Ahmed's own probe.
+            # None on any doubt -> classic GET below, same fail-open contract.
+            _lite = _record_lite_get(REQUESTS_TABLE_ID, record_id, ["Numbering"],
+                                     {"Authorization": f"Bearer {tat}"},
+                                     need_mtime=True, timeout=6, tries=2, retry_timeouts=[8])
+            if _lite is not None:
+                sheet_mtime = int(_lite.get("last_modified_time") or 0)
+            else:
+                try:
+                    _cf = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=8).json()
+                    if _cf.get("code") == 0:
+                        sheet_mtime = int((((_cf.get("data") or {}).get("record") or {})).get("last_modified_time") or 0)
+                except Exception:
+                    sheet_mtime = 0  # fail-open -- same contract as the old frontend check
         _t_conf = round(time.monotonic() - _tc, 2)
         if sheet_mtime and sheet_mtime > opened_at_ms + 5000:
             return jsonify({"success": False, "conflict": True, "sheet_mtime": sheet_mtime}), 409
@@ -5097,6 +5232,16 @@ def agency_points_charge():
     #    uses the agency_code hint from the client; verified against the ticket
     #    below).
     def _fetch_ticket():
+        # v26g: lite read first (only the 8 columns the charge flow reads) --
+        # the full-record GET was the 5.23s "load" leg on Ahmed's own probe.
+        # Any doubt -> classic GET below, unchanged.
+        _lite = _record_lite_get(REQUESTS_TABLE_ID, record_id,
+                                 CHARGE_TICKET_LITE_FIELDS,
+                                 {"Authorization": f"Bearer {tat}"},
+                                 timeout=6, tries=2, retry_timeouts=[8],
+                                 required_fields=("Agency Code",))
+        if _lite is not None:
+            return _lite.get("fields", {})
         # Phase 34: the Vercel->Feishu-CN link regularly spikes past 10s, and a
         # single 10s attempt with NO retry turned those spikes into "Charge
         # failed: Read timed out (read timeout=10)" -- dying BEFORE anything
@@ -5409,6 +5554,16 @@ def agency_points_correct_charge():
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
 
     def _fetch_ticket():
+        # v26g: lite read first (only the 8 columns the charge flow reads) --
+        # the full-record GET was the 5.23s "load" leg on Ahmed's own probe.
+        # Any doubt -> classic GET below, unchanged.
+        _lite = _record_lite_get(REQUESTS_TABLE_ID, record_id,
+                                 CHARGE_TICKET_LITE_FIELDS,
+                                 {"Authorization": f"Bearer {tat}"},
+                                 timeout=6, tries=2, retry_timeouts=[8],
+                                 required_fields=("Agency Code",))
+        if _lite is not None:
+            return _lite.get("fields", {})
         # Phase 34: the Vercel->Feishu-CN link regularly spikes past 10s, and a
         # single 10s attempt with NO retry turned those spikes into "Charge
         # failed: Read timed out (read timeout=10)" -- dying BEFORE anything
@@ -8933,6 +9088,54 @@ def rewards_mark():
                     "requested": len(clean_ids), "failures": failures})
 
 
+
+def _pull_snapshot_warm():
+    """v26g (Ahmed, "the pull still very slow for others -- let them exactly
+    like me"): return (items, fetch_complete) from an ALREADY-WARM snapshot
+    tier only -- the same background table snapshot Ahmed's own dashboards
+    read. Never blocks on a cold full-table fetch: when nothing is warm the
+    caller falls back to the live filtered search it always used. Kicks the
+    background sync when the warm copy is aging so the next pull is fresh."""
+    try:
+        local_data = load_local_json("requests.json")
+        local_age = local_json_age_seconds("requests.json")
+        if local_data and (local_age is None or local_age < LOCAL_SNAPSHOT_MAX_AGE_SECONDS):
+            return local_data, True
+    except Exception:
+        pass
+    try:
+        ensure_background_sync_started()
+    except Exception:
+        pass
+    with _bg_sync_lock:
+        items = _bg_sync["requests_items"]
+        updated_at = _bg_sync["updated_at"]
+        complete = _bg_sync["fetch_complete"]
+    if items and (time.time() - updated_at) < BACKGROUND_SYNC_MAX_AGE:
+        if (time.time() - updated_at) > BACKGROUND_SYNC_INTERVAL:
+            try:
+                threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+            except Exception:
+                pass
+        return items, complete
+    if REDIS_ENABLED:
+        try:
+            cached = redis_get_json(REDIS_KEY_REQUESTS_SNAPSHOT)
+            if cached and cached.get("items") and (time.time() - cached.get("updated_at", 0)) < BACKGROUND_SYNC_MAX_AGE:
+                try:
+                    threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+                except Exception:
+                    pass
+                return cached["items"], bool(cached.get("fetch_complete", True))
+        except Exception:
+            pass
+    # Nothing warm -- make sure a sync is at least running for the next pull.
+    try:
+        threading.Thread(target=_background_sync_requests_table, daemon=True).start()
+    except Exception:
+        pass
+    return None
+
 @app.route('/api/tickets/pull-assigned', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def pull_assigned_ticket():
@@ -8973,7 +9176,49 @@ def pull_assigned_ticket():
         return feishu_session.post(search_url, headers=headers, json=payload, timeout=12)
 
     matches = []
-    try:
+    user_clean = user.strip().lower()
+
+    # v26g: serve the pull from the warm background snapshot -- the SAME data
+    # Ahmed's dashboards read, refreshed every 180s and re-kicked after every
+    # portal write. The per-agent live full-field search below (2-6s on the
+    # Grand Table) becomes the cold-cache fallback only. Filtering is
+    # identical: status contains "In Progress" (either column alias) AND
+    # Assigned Member contains the agent's name, newest 20 by Numbering.
+    # A PARTIAL snapshot that shows nothing for this agent cannot prove the
+    # agent has no tickets (old rows may sit outside the fetched window), so
+    # that case alone falls through to the live search -- the exact
+    # no-ticket answer is preserved.
+    served_from_snapshot = False
+    _snap = _pull_snapshot_warm()
+    if _snap is not None:
+        _items, _complete = _snap
+        _filtered = []
+        for it in _items:
+            _f = it.get("fields", {})
+            if "in progress" not in extract_field_text(get_field_local(_f, "Request Status", "Status")).lower():
+                continue
+            if user_clean not in extract_field_text(_f.get("Assigned Member", "")).lower():
+                continue
+            _filtered.append(it)
+            _harvest_person_names(_f)  # Phase 10.47: free name-resolution seed
+        def _num_key(it):
+            try:
+                return int(re.sub(r"\D", "", extract_field_text(it.get("fields", {}).get("Numbering", ""))) or "0")
+            except Exception:
+                return 0
+        _filtered.sort(key=_num_key, reverse=True)
+        if _filtered or _complete:
+            for it in _filtered[:20]:
+                t = build_ticket_payload(it)
+                # Same full_fields prefetch seed as the live path -- opening a
+                # pulled ticket still needs zero extra Feishu calls.
+                t["full_fields"] = it.get("fields", {})
+                matches.append(t)
+            served_from_snapshot = True
+            logger.info("pull_assigned_snapshot_served", user=user, tickets=len(matches))
+
+    if not served_from_snapshot:
+      try:
         resp = _search("Request Status")
         data = resp.json()
         if data.get("code") == 1254045:
@@ -8981,8 +9226,6 @@ def pull_assigned_ticket():
             data = resp.json()
         if data.get("code") == 0:
             items = data.get("data", {}).get("items", [])
-            user_clean = user.strip().lower()
-            
             filtered_items = []
             for it in items:
                 assigned_member = extract_field_text(it.get("fields", {}).get("Assigned Member", "")).lower()
@@ -9009,7 +9252,7 @@ def pull_assigned_ticket():
                 matches.append(t)
         else:
             logger.error("pull_assigned_failed", error=data.get("msg"))
-    except Exception as e:
+      except Exception as e:
         logger.error("pull_assigned_failed", error=str(e))
 
     return jsonify({"tickets": matches})
