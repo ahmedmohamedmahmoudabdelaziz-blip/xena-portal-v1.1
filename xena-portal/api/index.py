@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v27 bind 2026-11-13"
+XENA_BUILD = "v27.1 bind-owner 2026-11-13"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2016,9 +2016,10 @@ def _bind_grant_from_access_row(email_clean, name_clean):
     return False
 
 def has_bind_access(email, name):
-    """True ONLY when the member's Access-row Modules carry the 'bind' key.
-    Fail-closed on any error. The member on/off toggle still wins (a disabled
-    member keeps no access). MOCK_MODE grants it so local dev shows the tab."""
+    """True when the member's Access-row Modules carry the 'bind' key -- OR the
+    caller is the OWNER (hardcoded super-admin), v27.1. Fail-closed on any
+    error. The member on/off toggle still wins (a disabled member keeps no
+    access). MOCK_MODE grants it so local dev shows the tab."""
     try:
         if MOCK_MODE:
             return True
@@ -2031,31 +2032,26 @@ def has_bind_access(email, name):
         perms = get_user_permissions(email, name)   # preview-aware, cached
         if "bind" in (perms.get("modules") or []):
             return True
-        # Not granted via the (parsed) Access row. One case remains unchecked:
-        # HARDCODED super-admins (ADMIN_USERS) take a perms path that never
-        # reads the Access table -- their row's 'bind' grant is looked up here.
-        # Guarded by the REAL caller's admin status so a forged X-Preview-As
-        # from a non-admin can never point this lookup at someone else's row.
+        # v27.1 (Ahmed 2026-11-13): "i mean the others, i am the owner" -- the
+        # OWNER (hardcoded super-admin in ADMIN_USERS) always sees Bind without
+        # any toggle; everyone else, including other admins, needs the 'bind'
+        # toggle on their Manage Agents row. The owner check runs on the
+        # EFFECTIVE identity so a preview of a toggle-less member still hides
+        # the tab (preview must show what the target sees), and it is guarded
+        # by the REAL caller's admin status so a forged X-Preview-As from a
+        # non-admin can never borrow the owner's bypass.
         real = _get_user_permissions_raw(email_clean, name_clean)
         if not (real.get("is_super_admin") or "admin" in (real.get("modules") or [])):
             return False
-        eff_email, eff_name = email_clean, name_clean
+        eff_name = name_clean
         try:
             if request.path.startswith("/api/") and not request.path.startswith("/api/admin/"):
                 tgt = sanitize_text(request.headers.get("X-Preview-As", ""), 200).strip().lower()
                 if tgt:
-                    eff_email = eff_name = tgt
+                    eff_name = tgt   # preview header carries the target identity; never the owner
         except RuntimeError:
             pass
-        if not any(a == eff_name for a in ADMIN_USERS):
-            return False   # row-based identity: 'bind' would already be in its modules
-        ck = cache_make_key("bindgrant", eff_email, eff_name)
-        cached = cache_get(ck)
-        if cached is not None:
-            return bool(cached.get("grant"))
-        grant = _bind_grant_from_access_row(eff_email, eff_name)
-        cache_set(ck, {"grant": grant}, ttl=300)
-        return grant
+        return any(a == eff_name for a in ADMIN_USERS)
     except Exception:
         return False
 
