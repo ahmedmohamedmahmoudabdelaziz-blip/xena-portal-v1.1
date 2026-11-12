@@ -14326,10 +14326,11 @@ function configureSidebarAndCards() {
     const grpAudition = document.getElementById('navGrpAudition');
     if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule, navAuditionAttendance, navAuditionExec].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
-    // v27 (Ahmed): Bind group — TOGGLE-ONLY. hasExactMod() secretly ORs
-    // isAdmin, so this gate reads userModules DIRECTLY: without the 'bind'
-    // toggle the tab is hidden EVEN FOR ADMINS.
-    const bindAllowed = (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('bind'));
+    // v27.1 (Ahmed): Bind group — the OWNER (super-admin) always sees it;
+    // everyone else, EVEN OTHER ADMINS, needs the 'bind' toggle. The toggle
+    // side reads userModules DIRECTLY (hasExactMod secretly ORs isAdmin).
+    const bindAllowed = (typeof isAdmin !== 'undefined' && isAdmin)
+        || (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('bind'));
     const navBindQueue = document.getElementById('nav-bind-queue');
     const navBindQuery = document.getElementById('nav-bind-query');
     if (navBindQueue) navBindQueue.style.display = bindAllowed ? '' : 'none';
@@ -27165,7 +27166,7 @@ async function bwSave(){
     }finally{ btn.disabled=false; btn.textContent='💾 Save'; }
 }
 
-window.SAM19_BUILD='v27 bind 2026-11-13';
+window.SAM19_BUILD='v27.1 bind-owner 2026-11-13';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
