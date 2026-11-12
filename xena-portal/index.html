@@ -3427,6 +3427,23 @@ html{background:var(--bg);min-height:100%}
                 </div>
             </div>
 
+            <!-- v27 (Ahmed): Bind group — SA Bind Requests. TOGGLE-ONLY:
+                 hidden without the 'bind' module, even for admins. -->
+            <div class="nav-group" id="navGrpBind" style="display:none">
+                <div style="height:1px;background:rgba(var(--ink-rgb),0.05);margin:8px 16px 4px"></div>
+                <div class="nav-group-header" onclick="toggleNavGroup('navGrpBind','navBodyBind')">
+                    <span>
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        <span>Bind</span>
+                    </span>
+                    <span class="nav-arr" id="navArrBind">›</span>
+                </div>
+                <div class="nav-group-body" id="navBodyBind">
+                    <div class="nav-item" id="nav-bind-queue" onclick="openInTab('bind-queue')"><span>Live Bind Queue</span></div>
+                    <div class="nav-item" id="nav-bind-query" onclick="openInTab('bind-query')"><span>Query Bind Requests</span></div>
+                </div>
+            </div>
+
             <div class="nav-group" id="navGrpAdmin" style="display:none">
                 <div style="height:1px;background:rgba(var(--ink-rgb),0.05);margin:8px 16px 4px"></div>
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAdmin','navBodyAdmin')">
@@ -4271,6 +4288,15 @@ html{background:var(--bg);min-height:100%}
                             </div>
                             <label class="switch"><input type="checkbox" id="mod_comments"><span class="slider"></span></label>
                         </div>
+                        <!-- v27 (Ahmed): 🔗 Bind Requests — toggle-ONLY gate.
+                             Even admins do NOT see the Bind tab without it. -->
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>🔗 Bind Requests</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Shows the Bind tab (Live Bind Queue + Query Bind Requests) for SA bind requests. Off = hidden even for admins.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_bind"><span class="slider"></span></label>
+                        </div>
                         </div>
                         <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
                         <div class="admin-modules-grid">
@@ -4894,6 +4920,91 @@ html{background:var(--bg);min-height:100%}
                         <p style="font-size:0.9rem; margin-top:8px;">Try searching by a different field or verify your spelling.</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- v27 (Ahmed): Live Bind Queue — bind requests with an empty
+                 "handled by", auto-loaded on open (one search per open/click). -->
+            <div id="pg-bind-queue" style="display:none">
+                <div class="card" style="margin-bottom:24px; padding-bottom:28px;">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        Live Bind Queue
+                    </h3>
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <span id="bqResultCount" style="font-size:.95rem;color:var(--text-muted); font-weight:500;">Loading unhandled bind requests…</span>
+                        <button class="btn btn-secondary" onclick="bqLoad(true)" style="height:40px;">⟳ Refresh</button>
+                    </div>
+                    <div style="font-size:.85rem;color:var(--text-muted);margin-top:12px;">Bind requests with an empty “handled by” — newest first. Click a request to open its workspace.</div>
+                </div>
+                <div id="bqResults" class="qy-grid"></div>
+                <div id="bqEmpty" style="display:none;text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
+                    <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.6;">🎉</div>
+                    <p style="font-size:1.1rem; font-weight:500;">All caught up — no unhandled bind requests.</p>
+                </div>
+            </div>
+
+            <!-- v27 (Ahmed): Query Bind Requests — same shape as Universal
+                 Request Query; request number / User ID / Contact ID. Zero-cost
+                 open: nothing is fetched until Search is clicked. -->
+            <div id="pg-bind-query" style="display:none">
+                <div class="card" style="margin-bottom:24px; padding-bottom:32px;">
+                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        Query Bind Requests
+                    </h3>
+                    <div class="control-grid" style="grid-template-columns: 2fr 4fr 2fr; align-items:end; gap:20px;">
+                        <div class="control-group">
+                            <label>Search By</label>
+                            <select id="bqySearchField" style="background:var(--surface-hover); border-color:var(--border-hover);" onchange="document.getElementById('bqyValueLabel').textContent=this.options[this.selectedIndex].text+' Value'">
+                                <option value="number">Request Number</option>
+                                <option value="user_id">User ID</option>
+                                <option value="contact_id">Contact ID</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label id="bqyValueLabel">Request Number Value</label>
+                            <input type="text" id="bqySearchValue" placeholder="Type the value to search…" style="background:var(--surface-hover); border-color:var(--border-hover);" onkeydown="if(event.key==='Enter')bqRunQuery()">
+                        </div>
+                        <div class="control-group">
+                            <button class="btn btn-primary" onclick="bqRunQuery()" style="height:48px; font-size:1.05rem;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                    <div style="font-size:.85rem;color:var(--text-muted);margin-top:16px; display:flex; align-items:center; gap:8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        Searches every bind request ever submitted for this value — no date limit.
+                    </div>
+                </div>
+                <div class="card" style="background:transparent; border:none; padding:0; box-shadow:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                        <span id="bqyResultCount" style="font-size:1rem;color:var(--text-muted); font-weight:500;">Awaiting search criteria...</span>
+                        <span id="bqySpinner" style="display:none;color:var(--accent-cyan); font-weight:600;">⏳ Searching bind requests…</span>
+                    </div>
+                    <div id="bqyResults" class="qy-grid"></div>
+                    <div id="bqyEmpty" style="display:none;text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
+                        <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.5;">
+                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
+                        <p style="font-size:1.1rem; font-weight:500;">No bind requests found for that value.</p>
+                        <p style="font-size:0.9rem; margin-top:8px;">Try a different field or double-check the value.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v27 (Ahmed): Bind Request Workspace — same idea as the Audit
+                 workspace: full read-only details, duplicate check on User ID,
+                 attachments, and the handle action bar. Filled by bwRender(). -->
+            <div id="pg-bind-workspace" style="display:none">
+                <div class="card" style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <button class="btn btn-secondary" onclick="bwBack()" style="height:40px;">← Back</button>
+                        <h3 id="bwTitle" style="margin:0;color:var(--accent-cyan);">🔗 Bind Request</h3>
+                        <span id="bwStatusChip" style="font-size:.85rem;"></span>
+                    </div>
+                </div>
+                <div id="bwBody"></div>
             </div>
 
             <div id="pg-agency-list" style="display:none">
@@ -6132,7 +6243,10 @@ const pageTitlesMap = {
     'rewards': 'Rewards',
     'admin-preview': 'Preview Agent View',
     'audition-status': 'Audition Status',
-    'audition-schedule': 'Audition Schedule'
+    'audition-schedule': 'Audition Schedule',
+    'bind-queue': 'Live Bind Queue',
+    'bind-query': 'Query Bind Requests',
+    'bind-workspace': 'Bind Request Workspace'
 };
 
 const zhPageTitlesMap = {
@@ -6160,12 +6274,15 @@ const zhPageTitlesMap = {
     'rewards': '奖励',
     'admin-preview': '预览成员视图',
     'audition-status': '状态管理',
-    'audition-schedule': '审核排班'
+    'audition-schedule': '审核排班',
+    'bind-queue': '绑定实时队列',
+    'bind-query': '绑定请求查询',
+    'bind-workspace': '绑定请求工作台'
 };
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-audition-attendance','pg-audition-exec','pg-rewards'];
+const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-audition-attendance','pg-audition-exec','pg-rewards','pg-bind-queue','pg-bind-query','pg-bind-workspace'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -6458,6 +6575,17 @@ function executePageLogic(page) {
     } else if(page==='query'){
         document.getElementById('pg-query').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
+    } else if(page==='bind-queue'){
+        document.getElementById('pg-bind-queue').style.display='block';
+        _expandNavGroup('navBodyBind','navArrBind');
+        bqLoad(); // v27: the Live Bind Queue auto-loads on open
+    } else if(page==='bind-query'){
+        document.getElementById('pg-bind-query').style.display='block';
+        _expandNavGroup('navBodyBind','navArrBind');
+        // zero-cost open: the agent clicks Search (bqRunQuery)
+    } else if(page==='bind-workspace'){
+        document.getElementById('pg-bind-workspace').style.display='block';
+        _expandNavGroup('navBodyBind','navArrBind');
     } else if(page==='agency-list'){
         document.getElementById('pg-agency-list').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
@@ -9323,6 +9451,11 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     const cmtCb=document.getElementById('mod_comments');
     if (cmtCb) cmtCb.checked = m.includes('comments') || m.includes('admin'); // Phase 13
 
+    // v27: bind is TOGGLE-ONLY — NO admin auto-check, per Ahmed ("if he don't
+    // have the toggle active will not see it even he is admin").
+    const bindCb=document.getElementById('mod_bind');
+    if (bindCb) bindCb.checked = m.split(',').map(s=>s.trim()).includes('bind');
+
     document.getElementById('modAdmin').checked=m.includes('admin');
 
     pTargetAcm.setValues(parseGranular(acmsRaw,'target'));
@@ -10939,7 +11072,7 @@ function resetAgentForm() {
     document.getElementById('modAdmin').checked = false;
     // Phase 10.13.1/10.14: these three live in admin-toggle switches now (not
     // inside .sub-opt-lbl), so the generic clear below doesn't reach them.
-    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
@@ -11000,6 +11133,7 @@ async function confirmSaveRole() {
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
     if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
     if (document.getElementById('mod_comments')?.checked) modules.push('comments'); // Phase 13
+    if (document.getElementById('mod_bind')?.checked) modules.push('bind'); // v27
     // Roles never carry "admin" themselves -- admin is a person-level grant, not a
     // reusable role preset.
 
@@ -11111,6 +11245,7 @@ async function addAgent() {
     if (document.getElementById('mod_export_data')?.checked) modules.push('export_data');
     if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
     if (document.getElementById('mod_comments')?.checked) modules.push('comments'); // Phase 13
+    if (document.getElementById('mod_bind')?.checked) modules.push('bind'); // v27
     
     document.getElementById('adminBtnSubmit').innerText='Saving...';
 
@@ -11149,7 +11284,7 @@ async function addAgent() {
         ToastManager.show(identities.length > 1 ? `${successCount} agents saved successfully.` : 'Agent saved successfully.', 'success');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
-        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
     }
     document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
@@ -14190,6 +14325,17 @@ function configureSidebarAndCards() {
     if (navAuditionExec) navAuditionExec.style.display = (isAdmin || hasExactMod('audition_status') || hasExactMod('audition_access')) ? '' : 'none';
     const grpAudition = document.getElementById('navGrpAudition');
     if (grpAudition) grpAudition.style.display = [navAuditionStatus, navAuditionSchedule, navAuditionAttendance, navAuditionExec].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    // v27 (Ahmed): Bind group — TOGGLE-ONLY. hasExactMod() secretly ORs
+    // isAdmin, so this gate reads userModules DIRECTLY: without the 'bind'
+    // toggle the tab is hidden EVEN FOR ADMINS.
+    const bindAllowed = (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('bind'));
+    const navBindQueue = document.getElementById('nav-bind-queue');
+    const navBindQuery = document.getElementById('nav-bind-query');
+    if (navBindQueue) navBindQueue.style.display = bindAllowed ? '' : 'none';
+    if (navBindQuery) navBindQuery.style.display = bindAllowed ? '' : 'none';
+    const grpBind = document.getElementById('navGrpBind');
+    if (grpBind) grpBind.style.display = [navBindQueue, navBindQuery].some(el => el && el.style.display !== 'none') ? '' : 'none';
 
     if (isAdmin) {
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
@@ -26842,7 +26988,184 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 </style>
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
-window.SAM19_BUILD='v26i pull-live 2026-11-12';
+
+// ═══ v27 (Ahmed 2026-11-13): BIND module — Live Bind Queue / Query Bind Requests / Bind Workspace ═══
+let bwCurrent=null, bwReturnTo='bind-queue', bqMetaCache=null;
+const BW_REJECT_FALLBACK=['all information correct','correct bind number and recharge','correct bind number and device','correct device and recharge','As per approval','all information wrong','need the main device','Missing Info or incorrect Answer','wrong NID ','wrong bind number and device ','wrong device and recharge ','wrong bind number and recharge','missing stolen evidence ','new number is linked with another account','invalid stolen evidence ',"invalid, we don't support sharing information",'let the user contact us from same id ','has a successful bind request in last 15 days','blacklist','New number already binded','Wrong Number formats','Account not linked to another bind way','Banned Acsount'];
+
+function bqQS(){ return 'user='+encodeURIComponent(loggedUser)+'&email='+encodeURIComponent(loggedEmail); }
+function bqFmtTime(ms){ const n=Number(ms); if(!n) return '—'; try{ return new Date(n).toLocaleString(); }catch(e){ return String(ms); } }
+async function bqMeta(){
+    if(bqMetaCache) return bqMetaCache;
+    try{
+        const r=await fetch('/api/bind/meta?'+bqQS());
+        const d=await r.json();
+        if(r.ok&&d.success){ bqMetaCache=d; return d; }
+    }catch(e){}
+    return null;
+}
+function bqCardHtml(it){
+    const chips=[];
+    if(it.region) chips.push('🌍 '+escHtml(it.region));
+    if(it.user_type) chips.push(escHtml(it.user_type));
+    if(it.reason) chips.push(escHtml(it.reason));
+    const stat=it.status?escHtml(it.status):'new';
+    const hb=it.handled_by?' · handled by '+escHtml(it.handled_by):'';
+    return '<div class="card" style="cursor:pointer;margin-bottom:14px;" onclick="bwOpen(\''+escHtml(it.record_id)+'\')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        +'<div style="font-weight:700;font-size:1.05rem;">#'+escHtml(it.numbering||'?')+' <span style="color:var(--text-muted);font-weight:500;">User '+escHtml(it.user_id||'—')+'</span></div>'
+        +'<span style="font-size:.78rem;color:var(--text-muted);">'+stat+hb+'</span></div>'
+        +'<div style="margin-top:8px;font-size:.85rem;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap;">'
+        +'<span>📇 Contact: '+escHtml(it.contact_id||'—')+'</span>'+chips.map(c=>'<span>'+c+'</span>').join('')+'</div>'
+        +'<div style="margin-top:8px;font-size:.78rem;color:var(--text-muted);">by '+escHtml(it.submitted_by||'—')+' · '+bqFmtTime(it.submitted_on)+'</div>'
+        +'</div>';
+}
+async function bqLoad(manual){
+    const grid=document.getElementById('bqResults'); if(!grid) return;
+    const cnt=document.getElementById('bqResultCount'), empty=document.getElementById('bqEmpty');
+    cnt.textContent='⏳ Loading unhandled bind requests…'; empty.style.display='none'; grid.innerHTML='';
+    try{
+        const r=await fetch('/api/bind/queue?'+bqQS());
+        const d=await r.json();
+        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+        const items=d.requests||[];
+        cnt.textContent=items.length?('📋 '+items.length+' unhandled bind request'+(items.length>1?'s':'')+' — newest first'):'';
+        if(!items.length){ empty.style.display='block'; return; }
+        grid.innerHTML=items.map(bqCardHtml).join('');
+        if(manual) ToastManager.show('🔄 Queue refreshed','success',2500);
+    }catch(e){
+        cnt.textContent='⚠️ '+(e.message||e);
+        ToastManager.show('Bind queue failed: '+(e.message||e),'error',9000);
+    }
+}
+async function bqRunQuery(){
+    const f=document.getElementById('bqySearchField').value;
+    const v=(document.getElementById('bqySearchValue').value||'').trim();
+    if(!v){ ToastManager.show('Type a value to search.','warning'); return; }
+    const cnt=document.getElementById('bqyResultCount'), spin=document.getElementById('bqySpinner'),
+          grid=document.getElementById('bqyResults'), empty=document.getElementById('bqyEmpty');
+    cnt.textContent=''; spin.style.display='inline'; grid.innerHTML=''; empty.style.display='none';
+    try{
+        const r=await fetch('/api/bind/query?field='+encodeURIComponent(f)+'&value='+encodeURIComponent(v)+'&'+bqQS());
+        const d=await r.json();
+        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+        const items=d.results||[];
+        cnt.textContent=items.length?('✅ '+items.length+' bind request'+(items.length>1?'s':'')+' found'):'';
+        if(!items.length) empty.style.display='block';
+        else grid.innerHTML=items.map(bqCardHtml).join('');
+    }catch(e){
+        cnt.textContent='⚠️ '+(e.message||e);
+        ToastManager.show('Bind query failed: '+(e.message||e),'error',9000);
+    }finally{ spin.style.display='none'; }
+}
+async function bwOpen(recordId){
+    if(typeof activeTabId!=='undefined'&&activeTabId&&activeTabId!=='bind-workspace') bwReturnTo=activeTabId;
+    openInTab('bind-workspace');
+    document.getElementById('bwTitle').textContent='⏳ Opening bind request…';
+    document.getElementById('bwStatusChip').innerHTML='';
+    document.getElementById('bwBody').innerHTML='<div style="padding:50px;text-align:center;color:var(--text-muted);">⏳ Loading from Feishu…</div>';
+    bqMeta();
+    try{
+        const r=await fetch('/api/bind/single?record_id='+encodeURIComponent(recordId)+'&'+bqQS());
+        const d=await r.json();
+        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+        bwCurrent=d;
+        if(!bqMetaCache) await bqMeta();
+        bwRender(d);
+    }catch(e){
+        document.getElementById('bwBody').innerHTML='<div class="card" style="padding:30px;text-align:center;color:#fda4af;">⚠️ '+escHtml(e.message||String(e))+'</div>';
+    }
+}
+function bwBack(){ openInTab(bwReturnTo||'bind-queue'); }
+function bwRender(d){
+    const b=d.brief||{};
+    document.getElementById('bwTitle').textContent='🔗 Bind Request #'+(b.numbering||'?');
+    const chip=document.getElementById('bwStatusChip');
+    chip.innerHTML=b.status
+        ? '<span style="background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.35);color:#6ee7b7;border-radius:10px;padding:3px 10px;">'+escHtml(b.status)+(b.handled_by?' · '+escHtml(b.handled_by):'')+'</span>'
+        : '<span style="background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.35);color:#fcd34d;border-radius:10px;padding:3px 10px;">unhandled</span>';
+    const rows=[['User ID',b.user_id],['Contact ID',b.contact_id],['Region',b.region],['User Type',b.user_type],
+        ['Reason of Bind Request',b.reason],['New Phone Number',b.new_phone],
+        ['Bind Method (past 3/6 months)',b.bind_method],['Main Login Device (past 6 months)',b.main_device],
+        ['Applier Note',b.applier_note],['Submitted By',b.submitted_by],['Submitted On',bqFmtTime(b.submitted_on)],
+        ['Status',b.status],['Handled By',b.handled_by],['Reject Reason',b.reject_reason],['Comment',b.comment]];
+    let html='<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:14px;color:var(--accent-cyan);">Request Details</h4>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">'
+        +rows.map(function(kv){ return '<div><div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">'+kv[0]+'</div><div style="font-size:.95rem;word-break:break-word;">'+(kv[1]?escHtml(String(kv[1])):'<span style="color:var(--text-muted)">—</span>')+'</div></div>'; }).join('')
+        +'</div></div>';
+    html+=bwDupHtml(d);
+    html+=bwAttachHtml(d.attachments||[]);
+    const statusOpts=(bqMetaCache&&bqMetaCache.status_options&&bqMetaCache.status_options.length)?bqMetaCache.status_options:['done','reject'];
+    const rrOpts=(bqMetaCache&&bqMetaCache.reject_reasons&&bqMetaCache.reject_reasons.length)?bqMetaCache.reject_reasons:BW_REJECT_FALLBACK;
+    html+='<div class="card"><h4 style="margin-bottom:14px;color:var(--accent-cyan);">Handle This Request</h4>'
+        +'<div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;gap:16px;">'
+        +'<div class="control-group"><label>Status</label><select id="bwStatusSel"><option value="">— pick —</option>'+statusOpts.map(o=>'<option value="'+escHtml(o)+'">'+escHtml(o)+'</option>').join('')+'</select></div>'
+        +'<div class="control-group" id="bwRejectWrap" style="display:none;"><label>Reject Reason</label><select id="bwRejectSel">'+rrOpts.map(o=>'<option value="'+escHtml(o)+'">'+escHtml(o)+'</option>').join('')+'</select></div>'
+        +'</div>'
+        +'<div class="control-group" style="margin-top:14px;"><label>Comment (optional)</label><textarea id="bwComment" rows="2" placeholder="Note for the record…" style="background:var(--surface-hover);border-color:var(--border-hover);"></textarea></div>'
+        +'<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><button class="btn btn-primary" id="bwSaveBtn" onclick="bwSave()">💾 Save</button>'
+        +'<span style="font-size:.8rem;color:var(--text-muted)">Saving stamps handled-by with your name and removes the request from the Live Queue.</span></div></div>';
+    document.getElementById('bwBody').innerHTML=html;
+    const sel=document.getElementById('bwStatusSel');
+    if(b.status&&statusOpts.includes(b.status)) sel.value=b.status;
+    sel.addEventListener('change',function(){ document.getElementById('bwRejectWrap').style.display=(sel.value==='reject')?'':'none'; });
+    if(sel.value==='reject') document.getElementById('bwRejectWrap').style.display='';
+}
+function bwDupHtml(d){
+    const b=d.brief||{}, dups=d.duplicates||[];
+    const sheet=(b.sheet_dup_check||'').trim();
+    let inner;
+    if(dups.length){
+        inner='<div style="background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.4);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:#fda4af;font-weight:600;">⚠️ '+dups.length+' other bind request'+(dups.length>1?'s':'')+' with the SAME User ID ('+escHtml(b.user_id||'')+')</div>'
+            +dups.map(function(p){ return '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;" onclick="bwOpen(\''+escHtml(p.record_id)+'\')"><span>#'+escHtml(p.numbering||'?')+' · '+(p.status?escHtml(p.status):'new')+(p.handled_by?' · '+escHtml(p.handled_by):'')+'</span><span style="color:var(--text-muted);font-size:.8rem;">'+bqFmtTime(p.submitted_on)+'</span></div>'; }).join('');
+    }else{
+        inner='<div style="background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.35);border-radius:10px;padding:12px 14px;color:#6ee7b7;font-weight:600;">✅ No other bind request uses this User ID'+(b.user_id?' ('+escHtml(b.user_id)+')':'')+'</div>';
+    }
+    if(sheet) inner+='<div style="margin-top:10px;font-size:.8rem;color:var(--text-muted);"><b>Sheet “Duplicated Check” column:</b> '+escHtml(sheet)+'</div>';
+    return '<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:12px;color:var(--accent-cyan);">🔁 Duplicate Check — User ID</h4>'+inner+'</div>';
+}
+function bwAttachHtml(groups){
+    if(!groups.length) return '<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:8px;color:var(--accent-cyan);">📎 Attachments</h4><div style="color:var(--text-muted);font-size:.85rem;">No attachments on this request.</div></div>';
+    const qs=bqQS();
+    let html='<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:12px;color:var(--accent-cyan);">📎 Attachments</h4>';
+    groups.forEach(function(g){
+        html+='<div style="margin-bottom:14px;"><div style="font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+escHtml(g.field)+'</div><div style="display:flex;flex-wrap:wrap;gap:12px;">';
+        g.pics.forEach(function(f){
+            const src=f.url+(f.url.indexOf('?')>=0?'&':'?')+qs;
+            const isImg=/^image\//i.test(f.type||'')||/\.(jpe?g|png|gif|webp|heic)$/i.test(f.name||'');
+            const isVid=/^video\//i.test(f.type||'')||/\.(mp4|mov|webm|mkv)$/i.test(f.name||'');
+            if(isImg) html+='<a href="'+src+'" target="_blank" rel="noopener" title="'+escHtml(f.name)+'"><img src="'+src+'" loading="lazy" style="width:140px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"></a>';
+            else if(isVid) html+='<video controls preload="metadata" src="'+src+'" style="width:220px;border-radius:8px;border:1px solid var(--border);"></video>';
+            else html+='<a href="'+src+'" target="_blank" rel="noopener" style="font-size:.85rem;">📎 '+escHtml(f.name)+'</a>';
+        });
+        html+='</div></div>';
+    });
+    return html+'</div>';
+}
+async function bwSave(){
+    if(typeof previewMode!=='undefined'&&previewMode){ ToastManager.show('Preview mode — saving is disabled.','warning'); return; }
+    if(!bwCurrent||!bwCurrent.brief||!bwCurrent.brief.record_id) return;
+    const status=(document.getElementById('bwStatusSel').value||'').trim();
+    const rr=(document.getElementById('bwRejectSel').value||'').trim();
+    const cmt=(document.getElementById('bwComment').value||'').trim();
+    if(!status){ ToastManager.show('Pick a Status first.','warning'); return; }
+    if(status==='reject'&&!rr){ ToastManager.show('Pick a Reject Reason.','warning'); return; }
+    const btn=document.getElementById('bwSaveBtn'); btn.disabled=true; btn.textContent='Saving…';
+    try{
+        const r=await fetch('/api/bind/handle',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({user:loggedUser,email:loggedEmail,record_id:bwCurrent.brief.record_id,status:status,reject_reason:(status==='reject'?rr:''),comment:cmt})});
+        const d=await r.json();
+        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+        ToastManager.show('✅ Saved — handled by '+d.handled_by,'success',6000);
+        const rid=bwCurrent.brief.record_id;
+        await bwOpen(rid);
+        if(bwReturnTo==='bind-queue') bqLoad();
+    }catch(e){
+        ToastManager.show('Save failed: '+(e.message||e),'error',9000);
+    }finally{ btn.disabled=false; btn.textContent='💾 Save'; }
+}
+
+window.SAM19_BUILD='v27 bind 2026-11-13';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
