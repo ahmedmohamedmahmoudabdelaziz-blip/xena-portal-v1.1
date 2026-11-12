@@ -37,12 +37,24 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v26i pull-live 2026-11-12"
+XENA_BUILD = "v27 bind 2026-11-13"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
 POINTS_TABLE_ID   = "tbl6LYUxGi8tlkJH"
 ACCESS_TABLE_ID   = "tbl3wweYCpmDmDSx"
+
+# ─── v27 (Bind Requests tab, Ahmed 2026-11-13) ───
+# The "SA Bind Requests" base is a SEPARATE app from the Grand Table -- the
+# portal's Feishu app must be a collaborator (edit) on it or every /api/bind/*
+# call fails with a permission error (the routes surface a hint when so).
+BIND_BASE_ID      = "Avovb2Pw9aC50js5kfJcqqMbn2g"
+BIND_TABLE_ID     = "tbl5s3TnDqoXQRK1"
+BIND_ATTACHMENT_FIELDS = [   # (field name, field_id) -- rendered in the Bind workspace
+    ("picture of their National ID card", "fld02s4jPv"),
+    ("payment receipt of recharge happened 1 week ago (including date and amount).", "fldRKMVMxw"),
+    ("receipt of last withdraw （including date and amount）", "fldvyhwe68"),
+]
 ROSTER_TABLE_ID   = "tblvA2Y4Z4j7Jwbr"   # Agent Roster (Phase 11 presence system)
 AUDIT_TABLE_ID    = os.environ.get("AUDIT_TABLE_ID", "tbldHA5AeKy55BEB")
 FORM_ID = os.environ.get("LARK_FORM_ID", "shrcnKiM5Nd35n4nP0IP2o1Y8Lb")
@@ -1979,6 +1991,74 @@ def get_user_permissions(email, name):
             return _get_user_permissions_raw(target, target)
     return _get_user_permissions_raw(email, name)
 
+# ─── v27 (Bind Requests, Ahmed 2026-11-13): toggle-ONLY access ───
+# "Bind access is given only and only if by toggle ... even he is admin" --
+# NO admin/super-admin auto-grant anywhere in the Bind path. The toggle is
+# the 'bind' module key in the member's Access-table row (Manage Agents has a
+# dedicated switch for it). One wrinkle: hardcoded super-admins (ADMIN_USERS)
+# take a path in _get_user_permissions_raw that never reads the Access table,
+# so their row's 'bind' grant needs a dedicated, cached lookup here.
+def _bind_grant_from_access_row(email_clean, name_clean):
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
+    try:
+        res = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                                 params={"page_size": 500}, timeout=15).json()
+        for item in res.get("data", {}).get("items", []):
+            fields = item.get("fields", {})
+            db_email = extract_field_text(fields.get("Email", "")).lower().strip()
+            db_person = extract_field_text(fields.get("Person", "")).lower().strip()
+            if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
+                modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
+                return "bind" in modules
+    except Exception:
+        pass
+    return False
+
+def has_bind_access(email, name):
+    """True ONLY when the member's Access-row Modules carry the 'bind' key.
+    Fail-closed on any error. The member on/off toggle still wins (a disabled
+    member keeps no access). MOCK_MODE grants it so local dev shows the tab."""
+    try:
+        if MOCK_MODE:
+            return True
+        email_clean = (email or "").strip().lower()
+        name_clean = (name or "").strip().lower()
+        if not email_clean and not name_clean:
+            return False
+        if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
+            return False
+        perms = get_user_permissions(email, name)   # preview-aware, cached
+        if "bind" in (perms.get("modules") or []):
+            return True
+        # Not granted via the (parsed) Access row. One case remains unchecked:
+        # HARDCODED super-admins (ADMIN_USERS) take a perms path that never
+        # reads the Access table -- their row's 'bind' grant is looked up here.
+        # Guarded by the REAL caller's admin status so a forged X-Preview-As
+        # from a non-admin can never point this lookup at someone else's row.
+        real = _get_user_permissions_raw(email_clean, name_clean)
+        if not (real.get("is_super_admin") or "admin" in (real.get("modules") or [])):
+            return False
+        eff_email, eff_name = email_clean, name_clean
+        try:
+            if request.path.startswith("/api/") and not request.path.startswith("/api/admin/"):
+                tgt = sanitize_text(request.headers.get("X-Preview-As", ""), 200).strip().lower()
+                if tgt:
+                    eff_email = eff_name = tgt
+        except RuntimeError:
+            pass
+        if not any(a == eff_name for a in ADMIN_USERS):
+            return False   # row-based identity: 'bind' would already be in its modules
+        ck = cache_make_key("bindgrant", eff_email, eff_name)
+        cached = cache_get(ck)
+        if cached is not None:
+            return bool(cached.get("grant"))
+        grant = _bind_grant_from_access_row(eff_email, eff_name)
+        cache_set(ck, {"grant": grant}, ttl=300)
+        return grant
+    except Exception:
+        return False
+
 def generate_executive_insights(stats, cmp_stats=None):
     insights = []
     
@@ -3201,6 +3281,16 @@ def check_auth():
     username = sanitize_text(request.args.get('user',''))
     email    = sanitize_text(request.args.get('email',''))
     perms    = get_user_permissions(email, username)
+    # v27 (Bind): the toggle-only bind grant must reach the frontend as a
+    # module key so the nav can gate on it -- incl. hardcoded super-admins,
+    # whose Access-row grant never reaches their hardcoded module list.
+    # Copy before mutating: perms may be the shared cached object.
+    try:
+        if has_bind_access(email, username) and "bind" not in (perms.get("modules") or []):
+            perms = dict(perms)
+            perms["modules"] = list(perms.get("modules") or []) + ["bind"]
+    except Exception:
+        pass
     return jsonify(perms)
 
 @app.route('/api/search', methods=['GET', 'POST'])
@@ -7030,6 +7120,319 @@ def live_queue():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+# ═══ v27 (Ahmed 2026-11-13): BIND REQUESTS tab ═══
+# New sidebar group "Bind" with Live Bind Queue + Query Bind Requests, backed
+# by the SA Bind Requests base (BIND_BASE_ID -- a DIFFERENT app from the Grand
+# Table). Access is toggle-ONLY (module key 'bind'): not even admins see it
+# without the toggle (has_bind_access above; Manage Agents has the switch).
+#
+# "The live queue will be by search and will show the requests that has
+# handled by empty" -> one records/search with isEmpty on 'handled by', fired
+# when the agent opens the page or clicks Refresh (NO polling).
+
+def _bind_err_hint(data):
+    """Permission errors on the bind base mean the portal's Feishu app is not
+    a collaborator on the SA Bind Requests base -- say so plainly."""
+    msg = (data or {}).get("msg") or "Feishu error"
+    code = (data or {}).get("code")
+    if code in (1254043, 1254036, 1254004, 99991672, 99991663, 99991661):
+        msg += " -- the portal's Feishu app likely has no access to the SA Bind Requests base; add it as a collaborator (edit) on that base."
+    return msg
+
+def _bind_search(payload, timeout=12):
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/search"
+    resp = feishu_session.post(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                               params={"automatic_fields": "true"}, json=payload, timeout=timeout)
+    return resp.json()
+
+def _bind_person_name(field_data):
+    if isinstance(field_data, list) and field_data and isinstance(field_data[0], dict):
+        return str(field_data[0].get("name") or field_data[0].get("en_name") or "")
+    return extract_field_text(field_data)
+
+def _bind_row_brief(item):
+    f = item.get("fields", {}) or {}
+    submitted = f.get("提交时间")
+    return {
+        "record_id":    item.get("record_id"),
+        "numbering":    extract_field_text(f.get("编号")),
+        # sheet values sometimes carry a leading space -- always serve trimmed
+        "user_id":      extract_field_text(f.get("User ID")).strip(),
+        "contact_id":   extract_field_text(f.get("Contact ID")).strip(),
+        "region":       extract_field_text(f.get("Region")),
+        "user_type":    extract_field_text(f.get("User Type")),
+        "reason":       extract_field_text(f.get("Reason of Bind Request 2")),
+        "new_phone":    extract_field_text(f.get("new phone number（eg：+92 3123456789）")).strip(),
+        "status":       extract_field_text(f.get("Status")),
+        "handled_by":   extract_field_text(f.get("handled by")),
+        "reject_reason":extract_field_text(f.get("Reject Reason")),
+        "comment":      extract_field_text(f.get("comment")),
+        "submitted_by": _bind_person_name(f.get("Submitted By")),
+        "submitted_on": submitted if isinstance(submitted, (int, float)) else extract_field_text(submitted),
+    }
+
+def _bind_user_id_duplicates(record_id, user_id, max_pages=3):
+    """"duplicated check work on User ID" -- every OTHER bind request carrying
+    the same User ID. 'contains' narrows server-side; the exact (trimmed)
+    match happens here so lookalike IDs never false-positive. Self excluded."""
+    user_id = (user_id or "").strip()
+    if not user_id:
+        return []
+    dups, page_token = [], None
+    for _ in range(max_pages):
+        payload = {"page_size": 100,
+                   "filter": {"conjunction": "and", "conditions": [
+                       {"field_name": "User ID", "operator": "contains", "value": [user_id]}]},
+                   "sort": [{"field_name": "编号", "desc": True}]}
+        if page_token:
+            payload["page_token"] = page_token
+        data = _bind_search(payload)
+        if data.get("code") != 0:
+            break
+        body = data.get("data", {}) or {}
+        for item in body.get("items", []) or []:
+            if item.get("record_id") == record_id:
+                continue
+            row = _bind_row_brief(item)
+            if row["user_id"] == user_id:
+                dups.append(row)
+        if body.get("has_more") and body.get("page_token"):
+            page_token = body["page_token"]
+        else:
+            break
+    return dups
+
+def _bind_attachments(fields):
+    groups = []
+    for fname, fid in BIND_ATTACHMENT_FIELDS:
+        pics = []
+        for it in (fields.get(fname) or []):
+            if isinstance(it, dict) and it.get("file_token"):
+                pics.append({"name": it.get("name", "file"), "type": it.get("type", ""),
+                             "url": f"/api/attachments/{it['file_token']}?field_id={fid}&table_id={BIND_TABLE_ID}"})
+        if pics:
+            groups.append({"field": fname, "pics": pics})
+    return groups
+
+@app.route('/api/bind/meta', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_meta():
+    """Select options for the Bind workspace action bar (Status / Reject
+    Reason / handled by), read from the live table meta so sheet-side option
+    edits reach the portal. Cached 300s."""
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    if MOCK_MODE:
+        return jsonify({"success": True, "status_options": ["done", "reject"],
+                        "reject_reasons": ["all information correct"], "handled_by_options": []})
+    ck = cache_make_key("bindmeta")
+    cached = cache_get(ck)
+    if cached:
+        return jsonify(dict(cached))
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/fields"
+    try:
+        res = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"},
+                                 params={"page_size": 100}, timeout=12).json()
+        if res.get("code") != 0:
+            return jsonify({"success": False, "error": _bind_err_hint(res)}), 400
+        out = {"success": True, "status_options": [], "reject_reasons": [], "handled_by_options": []}
+        for fld in res.get("data", {}).get("items", []) or []:
+            opts = [o.get("name") for o in ((fld.get("property") or {}).get("options") or []) if o.get("name")]
+            if fld.get("field_name") == "Status":
+                out["status_options"] = opts
+            elif fld.get("field_name") == "Reject Reason":
+                out["reject_reasons"] = opts
+            elif fld.get("field_name") == "handled by":
+                out["handled_by_options"] = opts
+        cache_set(ck, out, ttl=300)
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/bind/queue', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_queue():
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    if MOCK_MODE:
+        return jsonify({"success": True, "requests": [], "total": 0})
+    payload = {"page_size": 100,
+               "filter": {"conjunction": "and", "conditions": [
+                   {"field_name": "handled by", "operator": "isEmpty", "value": []}]},
+               "sort": [{"field_name": "编号", "desc": True}]}
+    try:
+        data = _bind_search(payload)
+        if data.get("code") != 0:
+            return jsonify({"success": False, "error": _bind_err_hint(data)}), 400
+        body = data.get("data", {}) or {}
+        rows = [_bind_row_brief(it) for it in (body.get("items") or [])]
+        audit.log(user, "BIND_QUEUE_VIEW", f"{len(rows)} unhandled bind requests",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+        return jsonify({"success": True, "requests": rows, "total": body.get("total", len(rows))})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/bind/query', methods=['GET'])
+@rate_limit(*RATE_LIMIT_SEARCH)
+def bind_query():
+    """Query Bind Requests -- "options simliar to Universal Request Query":
+    request number / User ID / Contact ID. NOTE: the auto-number 编号 column
+    rejects 'contains' (1254018 InvalidFilter) -- number search uses 'is'."""
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    field = sanitize_text(request.args.get('field',''), 40).strip().lower()
+    value = sanitize_text(request.args.get('value',''), 120).strip()
+    if not value:
+        return jsonify({"success": False, "error": "Enter a value to search."}), 400
+    if field == "number":
+        conditions = [{"field_name": "编号", "operator": "is", "value": [value]}]
+        exact_key = None
+    elif field == "user_id":
+        conditions = [{"field_name": "User ID", "operator": "contains", "value": [value]}]
+        exact_key = "user_id"
+    elif field == "contact_id":
+        conditions = [{"field_name": "Contact ID", "operator": "contains", "value": [value]}]
+        exact_key = "contact_id"
+    else:
+        return jsonify({"success": False, "error": "Unknown search field."}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "results": [], "count": 0})
+    rows, page_token, pages = [], None, 0
+    try:
+        while pages < 5:
+            payload = {"page_size": 100,
+                       "filter": {"conjunction": "and", "conditions": conditions},
+                       "sort": [{"field_name": "编号", "desc": True}]}
+            if page_token:
+                payload["page_token"] = page_token
+            data = _bind_search(payload)
+            if data.get("code") != 0:
+                return jsonify({"success": False, "error": _bind_err_hint(data)}), 400
+            body = data.get("data", {}) or {}
+            for item in body.get("items", []) or []:
+                row = _bind_row_brief(item)
+                if exact_key and row[exact_key] != value:   # contains is substring -- keep exact matches only
+                    continue
+                rows.append(row)
+            pages += 1
+            if field == "number" or not (body.get("has_more") and body.get("page_token")):
+                break
+            page_token = body["page_token"]
+        audit.log(user, "BIND_QUERY", f"{field}={value} -> {len(rows)}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+        return jsonify({"success": True, "results": rows, "count": len(rows)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/bind/single', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_single():
+    """Full record for the Bind workspace + the User-ID duplicate check +
+    attachment groups (proxy URLs carry table_id so the extra bitablePerm
+    targets the BIND base, not the Grand Table)."""
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    record_id = sanitize_text(request.args.get('record_id',''))
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "record": {"record_id": record_id, "fields": {}},
+                        "brief": {"record_id": record_id}, "attachments": [], "duplicates": [], "dup_count": 0})
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
+    try:
+        resp = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=12)
+        data = resp.json()
+        if data.get("code") != 0:
+            return jsonify({"success": False, "error": _bind_err_hint(data)}), 400
+        record = (data.get("data") or {}).get("record") or {}
+        fields = record.get("fields") or {}
+        brief = _bind_row_brief({"record_id": record_id, "fields": fields})
+        dup_field = fields.get("Duplicated Check")   # formula column: {"type":1,"value":[segments]}
+        if isinstance(dup_field, dict) and "value" in dup_field:
+            brief["sheet_dup_check"] = extract_field_text(dup_field.get("value"))
+        else:
+            brief["sheet_dup_check"] = extract_field_text(dup_field)
+        brief["bind_method"]  = extract_field_text(fields.get("Any Bind Method in the past 3/6 months (pls fill up phone number if number login)"))
+        brief["main_device"]  = extract_field_text(fields.get("Main Login Device in past 6 months （better to provide more than 1 devices）"))
+        brief["applier_note"] = extract_field_text(fields.get("Applier Note"))
+        dups = _bind_user_id_duplicates(record_id, brief["user_id"])
+        return jsonify({"success": True, "record": {"record_id": record_id, "fields": fields}, "brief": brief,
+                        "attachments": _bind_attachments(fields), "duplicates": dups, "dup_count": len(dups)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/bind/handle', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_handle():
+    """Workspace Save: writes handled by (the agent) + Status (+ Reject Reason
+    when rejecting) + comment. 'handled by'/'Status'/'Reject Reason' are
+    single-selects -- Bitable auto-creates a missing option on write, so a new
+    agent name just works. The agent's name is mapped onto an EXISTING
+    handled-by option when one is a case-insensitive substring of their Lark
+    name ('Ahmed Samurai' -> 'Samurai'), keeping the sheet's option list tidy."""
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user','') or request.form.get('user',''))
+    email = sanitize_text(body.get('email','') or request.form.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    record_id = sanitize_text(body.get('record_id','') or request.form.get('record_id',''))
+    status    = sanitize_text(body.get('status','') or request.form.get('status',''), 40).strip().lower()
+    reject_reason = sanitize_text(body.get('reject_reason','') or request.form.get('reject_reason',''), 200).strip()
+    comment   = sanitize_text(body.get('comment','') or request.form.get('comment',''), 1000).strip()
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    if status not in ("done", "reject"):
+        return jsonify({"success": False, "error": "Status must be done or reject."}), 400
+    if status == "reject" and not reject_reason:
+        return jsonify({"success": False, "error": "Reject Reason is required when rejecting."}), 400
+    handled_by = (user or "").strip() or (email or "").strip()
+    if MOCK_MODE:
+        return jsonify({"success": True, "handled_by": handled_by})
+    try:
+        hb_options = []
+        cached_meta = cache_get(cache_make_key("bindmeta"))
+        if cached_meta:
+            hb_options = cached_meta.get("handled_by_options") or []
+        low = handled_by.lower()
+        for opt in hb_options:
+            o = str(opt).strip()
+            # exact match first, then option-contained-in-name -- never the
+            # reverse ("us" must not collapse onto "usman")
+            if o and o.lower() == low:
+                handled_by = o
+                break
+            if o and len(o) >= 3 and o.lower() in low:
+                handled_by = o
+                break
+        fields = {"handled by": handled_by, "Status": status}
+        if reject_reason:
+            fields["Reject Reason"] = reject_reason
+        if comment:
+            fields["comment"] = comment
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
+        resp = feishu_session.put(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                                  json={"fields": fields}, timeout=12)
+        data = resp.json()
+        if data.get("code") != 0:
+            return jsonify({"success": False, "error": _bind_err_hint(data)}), 400
+        audit.log(user, "BIND_HANDLE", f"record={record_id} status={status}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+        return jsonify({"success": True, "handled_by": handled_by})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/new-request/agency-info', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
 def new_request_agency_info():
@@ -8705,9 +9108,17 @@ def proxy_attachment(file_token):
     user = sanitize_text(request.args.get('user',''))
     email = sanitize_text(request.args.get('email',''))
     field_id = sanitize_text(request.args.get('field_id', ''))
+    # v27 (Bind): attachments can now belong to the SA Bind Requests base too.
+    # table_id is whitelisted (never caller-arbitrary) and bind-base files
+    # additionally require the bind toggle.
+    table_id = sanitize_text(request.args.get('table_id', ''))
+    if table_id not in (REQUESTS_TABLE_ID, BIND_TABLE_ID):
+        table_id = REQUESTS_TABLE_ID
     perms = get_user_permissions(email, user)
     if not perms.get("modules") and not perms.get("is_super_admin"):
         return jsonify({"error": "Access denied"}), 403
+    if table_id == BIND_TABLE_ID and not has_bind_access(email, user):
+        return jsonify({"error": "Access denied: Bind access required."}), 403
     try:
         tat = get_tenant_access_token()
         url = f"https://open.feishu.cn/open-apis/drive/v1/medias/{file_token}/download"
@@ -8735,7 +9146,7 @@ def proxy_attachment(file_token):
             if with_extra and field_id:
                 params["extra"] = json.dumps({
                     "bitablePerm": {
-                        "tableId": REQUESTS_TABLE_ID,
+                        "tableId": table_id,
                         "attachmentToken": file_token,
                         "fieldId": field_id,
                     }
