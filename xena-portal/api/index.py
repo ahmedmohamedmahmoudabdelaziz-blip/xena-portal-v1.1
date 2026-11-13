@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v27.1 bind-owner 2026-11-13"
+XENA_BUILD = "v28 bind-redesign 2026-11-13"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -7147,6 +7147,17 @@ def _bind_person_name(field_data):
         return str(field_data[0].get("name") or field_data[0].get("en_name") or "")
     return extract_field_text(field_data)
 
+
+def _bind_reason_pair(f):
+    """The sheet's reason columns: some bases carry both "Reason of Bind Request"
+    and the optional "Reason of Bind Request 2"; the SA base's answers landed in
+    the second one. Returns (reason, reason2) with a sane split either way."""
+    r1 = extract_field_text(f.get("Reason of Bind Request")).strip()
+    r2 = extract_field_text(f.get("Reason of Bind Request 2")).strip()
+    if r1:
+        return r1, r2
+    return r2, ""
+
 def _bind_row_brief(item):
     f = item.get("fields", {}) or {}
     submitted = f.get("提交时间")
@@ -7158,8 +7169,12 @@ def _bind_row_brief(item):
         "contact_id":   extract_field_text(f.get("Contact ID")).strip(),
         "region":       extract_field_text(f.get("Region")),
         "user_type":    extract_field_text(f.get("User Type")),
-        "reason":       extract_field_text(f.get("Reason of Bind Request 2")),
+        "reason":       _bind_reason_pair(f)[0],
+        "reason2":      _bind_reason_pair(f)[1],
         "new_phone":    extract_field_text(f.get("new phone number（eg：+92 3123456789）")).strip(),
+        "bind_method":  extract_field_text(f.get("Any Bind Method in the past 3/6 months (pls fill up phone number if number login)")),
+        "main_device":  extract_field_text(f.get("Main Login Device in past 6 months （better to provide more than 1 devices）")),
+        "applier_note": extract_field_text(f.get("Applier Note")),
         "status":       extract_field_text(f.get("Status")),
         "handled_by":   extract_field_text(f.get("handled by")),
         "reject_reason":extract_field_text(f.get("Reject Reason")),
@@ -7428,6 +7443,407 @@ def bind_handle():
         return jsonify({"success": True, "handled_by": handled_by})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+# ─── v28 (Bind workspace redesign, Ahmed 2026-11-13, comment 7707451103541038012) ───
+# "complete the Bind request page inside my website's existing workspace ...
+#  The website must own request loading, attachments, decision fields and saving."
+# Normalized request view per the handoff's WEBSITE-AI-INSTRUCTIONS.md shape and an
+# ordered save ported from the extension's tested bind-save.js: decision details
+# first (Status, then Reject Reason, then Comment -- each written alone and
+# read-back-verified), a two-second pause, a re-check, and a CHANGED Handled by as
+# the final write. Handled by is never sent after a failed or uncertain save.
+
+BIND_REASON_GROUPS = {   # status -> reason option names (from the sheet owner's groups)
+    "done": ["all information correct", "correct bind number and recharge",
+             "correct bind number and device", "correct device and recharge", "As per approval"],
+    "reject": ["need the main device", "all information wrong", "Missing Info or incorrect Answer",
+               "missing stolen evidence", "let the user contact us from same id",
+               "has a successful bind request in last 15 days", "blacklist",
+               "new number is linked with another account", "invalid stolen evidence",
+               "Wrong Number formats", "Banned Account"],
+}
+
+def _bind_reason_status_values(label):
+    """Which Status values a reason option belongs to. Unknown/new options return
+    None = shown for every status (never invent a restriction the sheet doesn't state)."""
+    key = re.sub(r"\s+", " ", str(label or "").strip().lower())
+    for status, names in BIND_REASON_GROUPS.items():
+        if any(re.sub(r"\s+", " ", n.strip().lower()) == key for n in names):
+            return [status]
+    return None
+
+def _bind_fields_meta(live=False):
+    """field_name -> {id, type, options[]}. Cached briefly unless live=True (the
+    ordered save ALWAYS re-reads the schema so sheet-side edits win)."""
+    if not live:
+        cached = cache_get(cache_make_key("bindfields28"))
+        if cached:
+            return cached
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/fields"
+    res = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"},
+                             params={"page_size": 100}, timeout=12).json()
+    if res.get("code") != 0:
+        raise RuntimeError(_bind_err_hint(res))
+    meta = {}
+    for fld in (res.get("data") or {}).get("items", []) or []:
+        meta[fld.get("field_name")] = {
+            "id": fld.get("field_id"),
+            "type": fld.get("type"),
+            "options": [o.get("name") for o in ((fld.get("property") or {}).get("options") or [])
+                        if isinstance(o.get("name"), str)],
+        }
+    if not live:
+        cache_set(cache_make_key("bindfields28"), meta, ttl=60)
+    return meta
+
+def _bind_user_type_key(user_type):
+    t = str(user_type or "").lower()
+    if "agency" in t or "coin" in t:
+        return "agency_manager"
+    if "host" in t or "anchor" in t:
+        return "host"
+    return "supporter"
+
+def _bind_att_category(field_name):
+    n = str(field_name or "").lower()
+    if "national" in n or "nid" in n or "cnic" in n or "id card" in n:
+        return "nid"
+    if "withdraw" in n:
+        return "wallet"
+    if "recharge" in n or "payment" in n:
+        return "recharge"
+    return "other"
+
+def _bind_record_version(fields):
+    """Detects 'the record changed since the agent loaded it' without trusting any
+    client state: a digest over the decision fields + evidence tokens + submit time."""
+    import hashlib
+    parts = {
+        "status":  extract_field_text(fields.get("Status")),
+        "reason":  extract_field_text(fields.get("Reject Reason")),
+        "comment": extract_field_text(fields.get("comment")),
+        "handled": extract_field_text(fields.get("handled by")),
+        "time":    fields.get("提交时间"),
+        "files":   sorted(str(it.get("file_token"))
+                          for fname, _ in BIND_ATTACHMENT_FIELDS
+                          for it in (fields.get(fname) or []) if isinstance(it, dict)),
+    }
+    return hashlib.sha256(json.dumps(parts, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:24]
+
+def _bind_get_record(record_id):
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
+    data = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"}, timeout=12).json()
+    if data.get("code") != 0:
+        raise RuntimeError(_bind_err_hint(data))
+    return ((data.get("data") or {}).get("record") or {})
+
+def _bind_put_fields(record_id, fields_payload):
+    """One field per call so a rejected value names its own field. HTTP 200 with a
+    Feishu error code (e.g. 1254062) is still a failure."""
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
+    resp = feishu_session.put(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                              json={"fields": fields_payload}, timeout=12)
+    data = resp.json()
+    if data.get("code") != 0:
+        raise ValueError(f"{_bind_err_hint(data)} (code {data.get('code')})")
+    return data
+
+def _bind_map_handled_by(name, options):
+    """The agent's Lark name onto an EXISTING handled-by option: exact first, then
+    option-contained-in-name (len>=3, never the reverse). A genuinely new agent name
+    is returned as-is -- Bitable auto-creates the option (v27 behavior, the sheet's
+    workflow depends on the agent's own name landing)."""
+    low = (name or "").strip().lower()
+    for opt in options or []:
+        o = str(opt).strip()
+        if o and o.lower() == low:
+            return o
+    for opt in options or []:
+        o = str(opt).strip()
+        if o and len(o) >= 3 and o.lower() in low:
+            return o
+    return (name or "").strip()
+
+def _bind_normalized_view(record_id, fields, meta, caller_name=""):
+    """The handoff's normalized request view -- the ONLY shape the v28 workspace
+    renders. Decision values come from the live record; fieldSchema from live meta
+    (reason options carry statusValues so the page filters by Status without ever
+    sending arbitrary text to a single-select)."""
+    brief = _bind_row_brief({"record_id": record_id, "fields": fields})
+    dup_field = fields.get("Duplicated Check")
+    if isinstance(dup_field, dict) and "value" in dup_field:
+        brief["sheet_dup_check"] = extract_field_text(dup_field.get("value"))
+    else:
+        brief["sheet_dup_check"] = extract_field_text(dup_field)
+    attachments = []
+    for fname, fid in BIND_ATTACHMENT_FIELDS:
+        for it in (fields.get(fname) or []):
+            if not (isinstance(it, dict) and it.get("file_token")):
+                continue
+            mime = str(it.get("type") or "")
+            name = str(it.get("name") or "file")
+            kind = ("video" if mime.startswith("video/") or re.search(r"\.(mp4|mov|m4v|webm|avi|mkv|3gp)$", name, re.I)
+                    else "image" if mime.startswith("image/") or re.search(r"\.(jpe?g|png|gif|webp|heic|bmp)$", name, re.I)
+                    else "file")
+            url = f"/api/attachments/{it['file_token']}?field_id={fid}&table_id={BIND_TABLE_ID}"
+            attachments.append({"id": it["file_token"], "name": name,
+                                "category": _bind_att_category(fname), "kind": kind,
+                                "url": url, "thumbnailUrl": url})
+    # Related = every OTHER request with the same User ID (the radar's data too).
+    dups, complete = [], True
+    try:
+        raw = _bind_user_id_duplicates(record_id, brief["user_id"])
+        complete = len(raw) < 300   # _bind_user_id_duplicates caps at 3 pages x 100
+        for p in raw:
+            dups.append({"recordId": p["record_id"], "number": p["numbering"],
+                         "status": p["status"] or "new",
+                         "relation": "same User ID" + (" (earlier)" if str(p["numbering"]) < str(brief["numbering"]) else " (later)"),
+                         "note": (("handled by " + p["handled_by"]) if p["handled_by"] else "unhandled") +
+                                 " · " + (p["submitted_by"] or "—")})
+    except Exception:
+        complete = False
+    def opts(name, with_status=False):
+        out = []
+        for o in (meta.get(name) or {}).get("options", []):
+            item = {"value": o, "label": o}
+            if with_status:
+                sv = _bind_reason_status_values(o)
+                if sv:
+                    item["statusValues"] = sv
+            out.append(item)
+        return out
+    hb_options = opts("handled by")
+    mapped_self = _bind_map_handled_by(caller_name, (meta.get("handled by") or {}).get("options", []))
+    if mapped_self:
+        # caller first, always labelled (you) -- even when the caller is an existing option
+        hb_options = [o for o in hb_options if o["value"] != mapped_self]
+        hb_options.insert(0, {"value": mapped_self, "label": mapped_self + " (you)"})
+    submitted = fields.get("提交时间")
+    try:
+        submitted_at = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(submitted) / 1000)) if submitted else ""
+    except Exception:
+        submitted_at = str(submitted or "")
+    return {
+        "recordId": record_id,
+        "recordVersion": _bind_record_version(fields),
+        "number": brief["numbering"],
+        "userId": brief["user_id"],
+        "contactId": brief["contact_id"],
+        "region": brief["region"] or "PK",
+        "userType": _bind_user_type_key(brief["user_type"]),
+        "userTypeLabel": brief["user_type"],
+        "statusLabel": brief["status"] or "Awaiting review",
+        "submittedBy": brief["submitted_by"],
+        "submittedAt": submitted_at,
+        "reason": brief["reason"],
+        "reason2": brief["reason2"],
+        "applierNote": brief["applier_note"],
+        "sheetDupCheck": brief["sheet_dup_check"],
+        "answers": {
+            "previousBinding": brief["bind_method"],
+            "newPhone": brief["new_phone"],
+            "devices": brief["main_device"],
+            "walletReceipt": "",
+            "rechargeReceipt": "",
+        },
+        "attachments": attachments,
+        "related": dups,
+        "relatedComplete": complete,
+        "decision": {
+            "status": brief["status"],
+            "reason": brief["reject_reason"],
+            "comment": brief["comment"],
+            "handledBy": brief["handled_by"],
+        },
+        "fieldSchema": {
+            "status":    {"editor": "singleSelect", "options": opts("Status")},
+            "reason":    {"editor": "singleSelect", "options": opts("Reject Reason", with_status=True)},
+            "comment":   {"editor": "text"},
+            "handledBy": {"editor": "singleSelect", "options": hb_options},
+        },
+    }
+
+@app.route('/api/bind/pictures', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_pictures():
+    """Card-level "View Pictures": attachment groups for one bind request without
+    opening its workspace (same idea as /api/requests/pictures)."""
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    record_id = sanitize_text(request.args.get('record_id',''))
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "groups": []})
+    try:
+        record = _bind_get_record(record_id)
+        return jsonify({"success": True, "groups": _bind_attachments(record.get("fields") or {})})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/bind/request', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_request_view():
+    """The v28 workspace's one-call load: normalized request view (details, answers,
+    categorized attachments, related same-User-ID requests, current decision values
+    and the live field schema)."""
+    user  = sanitize_text(request.args.get('user',''))
+    email = sanitize_text(request.args.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    record_id = sanitize_text(request.args.get('record_id',''))
+    if not record_id:
+        return jsonify({"success": False, "error": "Missing record_id"}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "request": {"recordId": record_id, "recordVersion": "mock",
+                        "number": "1", "userId": "15743845", "contactId": "15743845", "region": "PK",
+                        "userType": "host", "statusLabel": "Awaiting review", "answers": {},
+                        "attachments": [], "related": [], "decision": {}, "fieldSchema": {
+                            "status": {"editor": "singleSelect", "options": [{"value": "done", "label": "done"}, {"value": "reject", "label": "reject"}]},
+                            "reason": {"editor": "singleSelect", "options": [{"value": "all information correct", "label": "all information correct", "statusValues": ["done"]}]},
+                            "comment": {"editor": "text"},
+                            "handledBy": {"editor": "singleSelect", "options": [{"value": "Samurai", "label": "Samurai"}]}}}})
+    try:
+        record = _bind_get_record(record_id)
+        if not record:
+            return jsonify({"success": False, "error": "Request not found."}), 404
+        meta = _bind_fields_meta()
+        view = _bind_normalized_view(record_id, record.get("fields") or {}, meta, caller_name=user)
+        audit.log(user, "BIND_REQUEST_VIEW", f"record={record_id} #{view.get('number')}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+        return jsonify({"success": True, "request": view})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+class _BindStageError(Exception):
+    """A save that stopped at a known step. 'confirmed' lists fields verified on the
+    sheet; stage 'uncertain' means a write may or may not have landed (never retried
+    automatically)."""
+    def __init__(self, stage, message, confirmed=None, http=409):
+        super().__init__(message)
+        self.stage, self.confirmed, self.http = stage, confirmed or [], http
+
+def _bind_verify_fields(record_id, expect, label):
+    """Read-back until every expected field text matches (3 tries, short backoff)."""
+    for attempt in range(3):
+        fields = (_bind_get_record(record_id).get("fields") or {})
+        bad = [fname for fname, want in expect.items()
+               if extract_field_text(fields.get(fname)).strip() != str(want).strip()]
+        if not bad:
+            return fields
+        if attempt < 2:
+            time.sleep(0.25 * (attempt + 1))
+    raise _BindStageError("unconfirmed",
+        f"The sheet did not retain {', '.join(bad)} after saving. Further writes were stopped -- refresh the request.")
+
+@app.route('/api/bind/save', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def bind_save():
+    """Ordered decision save (ported from the extension's tested bind-save.js):
+    refresh schema+record -> stale check -> Status -> Reject Reason -> Comment
+    (each verified) -> wait 2s -> re-verify -> CHANGED Handled by last. Handled by
+    is never sent after a failed or uncertain save; unchanged Handled by is never
+    re-sent. The client keeps its draft on any failure."""
+    body = request.get_json(silent=True) or {}
+    user  = sanitize_text(body.get('user',''))
+    email = sanitize_text(body.get('email',''))
+    if not has_bind_access(email, user):
+        return jsonify({"success": False, "error": "Access denied: Bind access required."}), 403
+    record_id = sanitize_text(body.get('recordId',''))
+    client_version = sanitize_text(body.get('recordVersion',''), 64)
+    values = body.get('values') or {}
+    status_in  = sanitize_text(values.get('status',''), 60).strip()
+    reason_in  = sanitize_text(values.get('reason',''), 300).strip()
+    comment_in = sanitize_text(values.get('comment',''), 2000)
+    handled_in = sanitize_text(values.get('handledBy',''), 120).strip()
+    if not record_id or not client_version:
+        return jsonify({"success": False, "stage": "validation", "error": "Missing recordId or recordVersion."}), 400
+    if not status_in:
+        return jsonify({"success": False, "stage": "validation", "error": "Choose a Status before saving."}), 400
+    if MOCK_MODE:
+        return jsonify({"success": True, "state": "confirmed", "handledBySent": bool(handled_in),
+                        "record": {"recordId": record_id, "recordVersion": "mock2",
+                                   "decision": {"status": status_in, "reason": reason_in,
+                                                "comment": comment_in, "handledBy": handled_in}}})
+    confirmed = []
+    try:
+        meta = _bind_fields_meta(live=True)          # always fresh on save
+        fields = (_bind_get_record(record_id).get("fields") or {})
+        if _bind_record_version(fields) != client_version:
+            raise _BindStageError("stale", "This request changed in the sheet since you opened it. Refresh and review before saving.")
+        # -- canonicalize against the LIVE schema: never send arbitrary text to a select
+        st_opts = (meta.get("Status") or {}).get("options", [])
+        status = next((o for o in st_opts if o.strip().lower() == status_in.lower()), None)
+        if status is None:
+            raise _BindStageError("schema", f"Status '{status_in}' is no longer an option in the sheet. Refresh the request.")
+        reason = None
+        if reason_in:
+            rr_opts = (meta.get("Reject Reason") or {}).get("options", [])
+            reason = next((o for o in rr_opts if o.strip().lower() == reason_in.lower()), None)  # keeps the sheet's exact spelling incl. edge spaces
+            if reason is None:
+                raise _BindStageError("schema", f"Reject Reason '{reason_in}' is no longer an option in the sheet. Refresh the request.")
+            grp = _bind_reason_status_values(reason)
+            if grp and status.lower() not in grp:
+                raise _BindStageError("schema", f"'{reason}' does not belong to Status '{status}'. Pick a matching reason.")
+        hb_opts = (meta.get("handled by") or {}).get("options", [])
+        handled_by = _bind_map_handled_by(handled_in, hb_opts) if handled_in else ""
+        cur = {
+            "Status":        extract_field_text(fields.get("Status")).strip(),
+            "Reject Reason": extract_field_text(fields.get("Reject Reason")).strip(),
+            "comment":       extract_field_text(fields.get("comment")).strip(),
+            "handled by":    extract_field_text(fields.get("handled by")).strip(),
+        }
+        # -- 1) Status first (dependent reason options read the committed Status)
+        if status.lower() != cur["Status"].lower():
+            _bind_put_fields(record_id, {"Status": status})
+            _bind_verify_fields(record_id, {"Status": status}, "Status")
+            confirmed.append("Status")
+        # -- 2) Reject Reason, one write alone
+        if reason is not None and reason.strip() != cur["Reject Reason"]:
+            _bind_put_fields(record_id, {"Reject Reason": reason})
+            _bind_verify_fields(record_id, {"Reject Reason": reason}, "Reject Reason")
+            confirmed.append("Reject Reason")
+        # -- 3) Comment, one write alone
+        if comment_in.strip() != cur["comment"]:
+            _bind_put_fields(record_id, {"comment": comment_in})
+            _bind_verify_fields(record_id, {"comment": comment_in.strip()}, "Comment")
+            confirmed.append("Comment")
+        # -- 4) Handled by LAST, only when changed, after a 2s pause + re-check
+        handled_sent = False
+        if handled_by and handled_by.strip() != cur["handled by"]:
+            time.sleep(2)
+            expect = {"Status": status}
+            if reason is not None:
+                expect["Reject Reason"] = reason
+            expect["comment"] = comment_in.strip()
+            _bind_verify_fields(record_id, expect, "decision details")
+            _bind_put_fields(record_id, {"handled by": handled_by})
+            _bind_verify_fields(record_id, {"handled by": handled_by}, "Handled by")
+            handled_sent = True
+            confirmed.append("Handled by")
+        audit.log(user, "BIND_SAVE", f"record={record_id} status={status} confirmed={confirmed}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Info")
+        fresh = _bind_get_record(record_id).get("fields") or {}
+        view = _bind_normalized_view(record_id, fresh, meta, caller_name=user)
+        return jsonify({"success": True, "state": "confirmed", "handledBySent": handled_sent, "record": view})
+    except _BindStageError as e:
+        audit.log(user, "BIND_SAVE_FAIL", f"record={record_id} stage={e.stage} confirmed={e.confirmed}: {e}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
+        return jsonify({"success": False, "stage": e.stage, "confirmed": e.confirmed, "error": str(e)}), e.http
+    except ValueError as e:   # a write was answered with a Feishu error code -> that field did NOT land
+        audit.log(user, "BIND_SAVE_FAIL", f"record={record_id} rejected: {e}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
+        return jsonify({"success": False, "stage": "rejected", "confirmed": confirmed, "error": str(e)}), 502
+    except Exception as e:    # network/timeout mid-write -> outcome unknown, never auto-retried
+        audit.log(user, "BIND_SAVE_UNCERTAIN", f"record={record_id} confirmed={confirmed}: {e}",
+                  ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
+        return jsonify({"success": False, "stage": "uncertain", "confirmed": confirmed,
+                        "error": f"The save outcome is uncertain ({e}). Refresh the request to see what landed before retrying -- your draft is kept."}), 500
 
 @app.route('/api/new-request/agency-info', methods=['GET'])
 @rate_limit(*RATE_LIMIT_RECORDS)
