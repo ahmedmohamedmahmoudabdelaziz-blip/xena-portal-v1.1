@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v28.2 bind-workspace-parity 2026-11-14"
+XENA_BUILD = "v28.3 bind-v3-save-actionbar 2026-11-14"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -7426,15 +7426,27 @@ def bind_handle():
             if o and len(o) >= 3 and o.lower() in low:
                 handled_by = o
                 break
+        if reject_reason:
+            # v28.3: snap onto the sheet's VERBATIM option (the reference-options
+            # field keeps edge spaces, e.g. "wrong NID ") -- exact spelling is what
+            # the v3 API accepts. Falls back to the typed text when the meta cache
+            # has no option list (the workspace save path does the same snapping
+            # against the live schema).
+            rr_options = (cached_meta or {}).get("reject_reasons") or []
+            reject_reason = next((o for o in rr_options
+                                  if str(o).strip().lower() == reject_reason.lower()),
+                                 reject_reason)
         fields = {"handled by": handled_by, "Status": status}
         if reject_reason:
             fields["Reject Reason"] = reject_reason
         if comment:
             fields["comment"] = comment
         tat = get_tenant_access_token()
-        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
-        resp = feishu_session.put(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
-                                  json={"fields": fields}, timeout=12)
+        # v28.3: Base v3 PATCH -- the only record-write API that supports the
+        # sheet's reference-options (dynamic) Reject Reason field.
+        url = f"https://open.feishu.cn/open-apis/base/v3/bases/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
+        resp = feishu_session.patch(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                                    json={"fields": _bind_v3_fields(fields)}, timeout=12)
         data = resp.json()
         if data.get("code") != 0:
             return jsonify({"success": False, "error": _bind_err_hint(data)}), 400
@@ -7539,13 +7551,30 @@ def _bind_get_record(record_id):
         raise RuntimeError(_bind_err_hint(data))
     return ((data.get("data") or {}).get("record") or {})
 
+# v28.3 (Ahmed, comment 7707708961192938801): the sheet's Reject Reason field keeps
+# its REFERENCED options (dynamic from the "Table" table) -- the OLD Bitable v1
+# record-write API cannot write such fields at all (every value shape fails with
+# 1254062 SingleSelectFieldConvFail; proven live on a real record by option name AND
+# by option id). The NEW Base v3 API writes them fine (verified live: a PATCH with a
+# plain value landed on the dynamic field). ALL bind record writes go through v3 now.
+# v3 CellValue shapes (matching the proven roster v3 writer): select = ["Option"]
+# array; text stays a plain string.
+BIND_V3_SELECT_FIELDS = {"Status", "Reject Reason", "handled by"}
+
+def _bind_v3_fields(fields_payload):
+    """Shape v1-style plain-string select values into the v3 array CellValue."""
+    out = {}
+    for k, v in (fields_payload or {}).items():
+        out[k] = [v] if (k in BIND_V3_SELECT_FIELDS and isinstance(v, str)) else v
+    return out
+
 def _bind_put_fields(record_id, fields_payload):
     """One field per call so a rejected value names its own field. HTTP 200 with a
     Feishu error code (e.g. 1254062) is still a failure."""
     tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
-    resp = feishu_session.put(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
-                              json={"fields": fields_payload}, timeout=12)
+    url = f"https://open.feishu.cn/open-apis/base/v3/bases/{BIND_BASE_ID}/tables/{BIND_TABLE_ID}/records/{record_id}"
+    resp = feishu_session.patch(url, headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                                json={"fields": _bind_v3_fields(fields_payload)}, timeout=12)
     data = resp.json()
     if data.get("code") != 0:
         if data.get("code") == 1254062:
@@ -7554,11 +7583,9 @@ def _bind_put_fields(record_id, fields_payload):
             except Exception:
                 fname = ""
             raise ValueError(
-                "Feishu rejected this write: the single-select field '"
+                "Feishu rejected the value for '"
                 + (fname or "?")
-                + "' is set to referenced options (\u5f15\u7528\u9009\u9879) and Feishu does not allow API writes to it (code 1254062). Fix it in the Base: open the field settings for '"
-                + (fname or "that field")
-                + "', switch the option source from referenced to custom options (keep the same option list), then save again."
+                + "' (code 1254062): it must exactly match an existing option of the field -- pick one from the list and save again."
             )
         raise ValueError(f"{_bind_err_hint(data)} (code {data.get('code')})")
     return data
