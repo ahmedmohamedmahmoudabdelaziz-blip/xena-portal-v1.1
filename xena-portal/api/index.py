@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v28.1 bind-live-parity 2026-11-13"
+XENA_BUILD = "v28.2 bind-workspace-parity 2026-11-14"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -7548,6 +7548,18 @@ def _bind_put_fields(record_id, fields_payload):
                               json={"fields": fields_payload}, timeout=12)
     data = resp.json()
     if data.get("code") != 0:
+        if data.get("code") == 1254062:
+            try:
+                fname = next(iter(fields_payload))
+            except Exception:
+                fname = ""
+            raise ValueError(
+                "Feishu rejected this write: the single-select field '"
+                + (fname or "?")
+                + "' is set to referenced options (\u5f15\u7528\u9009\u9879) and Feishu does not allow API writes to it (code 1254062). Fix it in the Base: open the field settings for '"
+                + (fname or "that field")
+                + "', switch the option source from referenced to custom options (keep the same option list), then save again."
+            )
         raise ValueError(f"{_bind_err_hint(data)} (code {data.get('code')})")
     return data
 
