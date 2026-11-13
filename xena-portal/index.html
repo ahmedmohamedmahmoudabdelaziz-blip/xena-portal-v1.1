@@ -2028,6 +2028,32 @@
         .bw-radar-summary{font-size:.92rem;color:var(--text-muted);}
         .bw-radar-sheet{margin-top:8px;font-size:.8rem;color:var(--text-muted);}
         .bw-radar-panel .qy-grid{margin-top:14px;}
+
+        /* v28.4 (Ahmed): duplicates live IN the page -- a banner above the
+           workspace, slim green when clean, auto-expanded rose with full
+           cards on matches; the chevron folds it. Step-rail dots mirror
+           each section's tone; the final bar sticks to the bottom with a
+           live draft echo; the top grid gives verification more room. */
+        .bw-radar-panel{padding:0;}
+        .bw-radar-head{display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;background:transparent;border:none;cursor:pointer;text-align:left;font:inherit;color:inherit;}
+        .bw-radar-head:hover{background:rgba(255,255,255,.03);}
+        .bw-radar-ico{font-size:1.05rem;flex:none;}
+        .bw-radar-head-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+        .bw-radar-chevron{flex:none;color:var(--text-muted);transition:transform .25s;font-size:.8rem;}
+        .bw-radar-panel:has(.bw-radar-body.open) .bw-radar-chevron{transform:rotate(180deg);}
+        .bw-radar-body{display:none;padding:2px 18px 18px;}
+        .bw-radar-body.open{display:block;}
+        .bw-radar-panel .bw-radar-body .qy-grid{margin-top:10px;}
+        #bwRoot .bw-nav a{display:inline-flex;align-items:center;gap:8px;}
+        .bw-step-dot{width:9px;height:9px;border-radius:50%;background:var(--bw-line);flex:none;display:inline-block;transition:background .3s,box-shadow .3s;}
+        .bw-step-dot.bw-ok{background:var(--accent-green);box-shadow:0 0 8px rgba(0,230,118,.55);}
+        .bw-step-dot.bw-warn{background:var(--accent-amber);box-shadow:0 0 8px rgba(255,184,0,.55);}
+        .bw-step-dot.bw-bad{background:var(--accent-rose);box-shadow:0 0 8px rgba(255,77,109,.55);}
+        #bwRoot .bw-topgrid{grid-template-columns:minmax(300px,.92fr) minmax(390px,1.08fr);}
+        @media(max-width:1150px){#bwRoot .bw-topgrid{grid-template-columns:1fr;}}
+        #bwRoot .bw-final{position:sticky;bottom:14px;z-index:6;box-shadow:0 18px 44px rgba(0,0,0,.42);}
+        #bwRoot .bw-draft-echo{margin:10px 0 0;font-size:.8rem;color:var(--accent-green);font-weight:600;}
+        @media(max-width:640px){#bwRoot .bw-final{bottom:8px;}}
         /* shimmer skeletons while the queue loads (no more dead text) */
         .bq-skel{border-radius:18px;height:150px;background:linear-gradient(100deg,var(--surface) 30%,var(--surface-hover) 50%,var(--surface) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;border:1px solid var(--border);}
         @keyframes bqSkel{from{background-position:180% 0;}to{background-position:-20% 0;}}
@@ -5142,9 +5168,17 @@ html{background:var(--bg);min-height:100%}
                     </div>
                 </div>
                 <div id="bwRadarPanel" class="bw-radar-panel" style="display:none;">
-                    <div id="bwRadarSummary" class="bw-radar-summary">Open a request to scan for duplicates.</div>
-                    <div id="bwRadarSheet" class="bw-radar-sheet"></div>
-                    <div id="bwRadarResults" class="qy-grid"></div>
+                    <button type="button" class="bw-radar-head" id="bwRadarHead" onclick="bwRadarToggle()" title="Show / hide the duplicate list">
+                        <span class="bw-radar-ico">&#128225;</span>
+                        <span class="bw-radar-head-text">
+                            <span id="bwRadarSummary" class="bw-radar-summary">Open a request to scan for duplicates.</span>
+                            <span id="bwRadarSheet" class="bw-radar-sheet"></span>
+                        </span>
+                        <span class="bw-radar-chevron" id="bwRadarChevron">&#9662;</span>
+                    </button>
+                    <div id="bwRadarBody" class="bw-radar-body">
+                        <div id="bwRadarResults" class="qy-grid"></div>
+                    </div>
                 </div>
                 <div id="bwRoot"></div>
             </div>
@@ -6474,8 +6508,36 @@ function setActiveTab(page) {
     // Ticket tab, which mounts the draft without a stash) means nothing is
     // parked -- clear a stale flag so a later module click can't misfire.
     if (page === 'ticket-workspace') { twWsParked = false; twWsParkedKey = null; }
-    // v28.2 (Ahmed): NO bind auto-restore -- clicking the origin tab always
-    // shows the list; the workspace reopens only from an explicit Open click.
+    // v28.4 (Ahmed, comment 7707733343751638033): BIND workspace keep-alive --
+    // the mirror of the ticket pattern above ("when go to another tab and
+    // return the request is closed" was the bug; v28.2's no-restore rule
+    // caused it). The bind workspace is a SINGLE instance owned by the tab it
+    // was opened from (bwReturnTo):
+    //   A) arriving at the origin tab from a DIFFERENT page while a request
+    //      is open -> land back on the workspace exactly as left;
+    //   B) clicking the origin tab (or ← Back) while viewing the workspace ->
+    //      deliberate park: show the list, keep the instance warm;
+    //   C) arriving while parked -> show the list this once, consume the
+    //      park (the NEXT arrival restores);
+    //   D) landing on the workspace page by any path clears the park.
+    // Closing the origin tab DESTROYS the workspace (see closeTab).
+    if (page !== 'bind-workspace' && typeof bwCurrentId !== 'undefined') {
+        const viewingBindWs = activeTabId === 'bind-workspace' &&
+            typeof bwReturnTo !== 'undefined' && bwReturnTo === page;
+        const bindOpen = typeof bwInstance !== 'undefined' && !!bwInstance && !!bwCurrentId;
+        if (viewingBindWs) {
+            bwWsParked = true; // B -- deliberate park
+        } else if (!window.__xdRestoringLayout && activeTabId !== page && bindOpen &&
+                   bwReturnTo === page) {
+            if (bwWsParked) {
+                bwWsParked = false; // C -- consume the park, show the list once
+            } else {
+                openInTab('bind-workspace'); // A -- restore, zero requests
+                return;
+            }
+        }
+    }
+    if (page === 'bind-workspace' && typeof bwWsParked !== 'undefined') bwWsParked = false; // D
     activeTabId = page;
     renderTabs();
 
@@ -6527,6 +6589,17 @@ function closeTab(page, event) {
             delete twWsTabs[mk];
             if (typeof xdSessionDropWs === 'function') xdSessionDropWs(mk);
         }
+    }
+
+    // v28.4 (Ahmed): closing the bind ORIGIN tab is a deliberate exit --
+    // "when close the tab the request still shown" was the bug. The origin tab
+    // IS the request's visible tab (it stays highlighted while the workspace
+    // is open), so the open request is destroyed with it -- even while the
+    // agent is looking at the workspace -- and can never reappear.
+    if (typeof bwCurrentId !== 'undefined' && bwCurrentId &&
+        typeof bwReturnTo !== 'undefined' && bwReturnTo === page &&
+        typeof bwDestroyWorkspace === 'function') {
+        bwDestroyWorkspace();
     }
 
     if (activeTabId === page) {
@@ -27197,21 +27270,25 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    const blank=()=>({status:'not_run',data:null,meta:{},seq:-1});
    const keys=()=>['currentBindings','phoneHistory','activity','devices',...(['agency_manager','coin_seller'].includes(request?.userType)?['identity']:['wallet','recharge'].filter(k=>setup?.checks?.includes(k)))];
    const context=()=>({workspaceId,recordId:request.recordId,userId:request.userId,region:request.region,revision});
-   const options=(key,status=draft.status)=>{let opts=request?.fieldSchema?.[key]?.options||[];return key==='reason'?opts.filter(x=>!x.statusValues||x.statusValues.includes(status)):opts;};
-   const field=(key,label,wide=false)=>{const spec=request.fieldSchema[key],value=draft[key]??'';if(!spec)return `<div class="bw-wide bw-field-hint">${esc(label)} is unavailable. Refresh the website’s field schema.</div>`;const text=spec.editor==='text';return `<div class="${wide?'bw-wide':''}"><label for="${workspaceId}-${key}">${esc(label)}</label>${text?(key==='comment'?`<textarea id="${workspaceId}-${key}" data-draft="${key}">${esc(value)}</textarea>`:`<input id="${workspaceId}-${key}" data-draft="${key}" value="${esc(value)}">`):`<select id="${workspaceId}-${key}" data-draft="${key}" ${spec.editor==='multiSelect'?'multiple':''}><option value="">Choose ${esc(label.toLowerCase())}</option>${options(key).map(o=>`<option value="${esc(o.value)}" ${(Array.isArray(value)?value.includes(o.value):value===o.value)?'selected':''}>${esc(o.label)}</option>`).join('')}</select>`}${key==='reason'?'<p class="bw-field-hint">Options follow the selected status and current sheet schema.</p>':''}</div>`;};
+   const options=(key,status=draft.status)=>{let opts=request?.fieldSchema?.[key]?.options||[];if(key!=='reason')return opts;if(!status)return [];return opts.filter(x=>!x.statusValues||x.statusValues.includes(status));};
+   const field=(key,label,wide=false)=>{const spec=request.fieldSchema[key],value=draft[key]??'';if(!spec)return `<div class="bw-wide bw-field-hint">${esc(label)} is unavailable. Refresh the website’s field schema.</div>`;const text=spec.editor==='text';return `<div class="${wide?'bw-wide':''}"><label for="${workspaceId}-${key}">${esc(label)}</label>${text?(key==='comment'?`<textarea id="${workspaceId}-${key}" data-draft="${key}">${esc(value)}</textarea>`:`<input id="${workspaceId}-${key}" data-draft="${key}" value="${esc(value)}">`):`<select id="${workspaceId}-${key}" data-draft="${key}" ${spec.editor==='multiSelect'?'multiple':''}><option value="">${key==='reason'&&!draft.status?'← Choose a Status first':'Choose '+esc(label.toLowerCase())}</option>${options(key).map(o=>`<option value="${esc(o.value)}" ${(Array.isArray(value)?value.includes(o.value):value===o.value)?'selected':''}>${esc(o.label)}</option>`).join('')}</select>`}${key==='reason'?'<p class="bw-field-hint">The list follows the selected Status — done and reject reasons never mix.</p>':''}</div>`;};
    function evidence(list){return list?.length?`<div class="bw-evidence">${list.map(a=>`<button type="button" data-evidence="${esc(a.id)}" aria-label="Preview ${esc(a.name)}">${a.kind!=='video'&&safeUrl(a.thumbnailUrl||a.url)?`<img loading="lazy" src="${esc(safeUrl(a.thumbnailUrl||a.url))}" alt="${esc(a.name)}">`:`<span class="bw-file-icon">${a.kind==='video'?'▷':'▧'}</span>`}<span>${esc(a.name)}</span></button>`).join('')}</div>`:'<p class="bw-sub">No evidence attached for this part.</p>';}
    function answer(key){if(key==='currentBindings'||key==='phoneHistory')return `Previous bind: ${request.answers.previousBinding||'Not provided'}\nRequested new phone: ${request.answers.newPhone||'Not provided'}`;if(key==='activity'||key==='devices')return request.answers.devices||'No device answer supplied';if(key==='identity')return `NID entered from evidence: ${setup.nid||'Not entered'}`;return `${request.answers[key+'Receipt']||'See receipt evidence'}\nRequested period: ${setup.ranges[key]?.startDate||'—'} → ${setup.ranges[key]?.endDate||'—'}`;}
    function section(key){const d=DEFS[key];return `<section class="bw-card bw-section" id="${workspaceId}-${key}" data-bind-section="${key}"><header class="bw-card-head"><div class="bw-titlegroup"><span class="bw-index">${esc(d[0])}</span><div><h2>${esc(d[1])}</h2><p class="bw-sub">${esc(d[2])}</p></div></div><div data-section-status>${chip('not_run')}</div></header><aside class="bw-answer"><small>User’s answer</small><p data-section-answer>${esc(answer(key))}</p></aside><div class="bw-result" data-section-result></div></section>`;}
    function setupHtml(){if(['agency_manager','coin_seller'].includes(request.userType))return `<div><label for="${workspaceId}-nid">National ID from the evidence <span class="bw-required">Required</span></label><input id="${workspaceId}-nid" data-setup="nid" value="${esc(setup.nid)}" placeholder="Enter the NID shown in the image" autocomplete="off"><p class="bw-sub">Enter the evidence value before starting. The dashboard check remains read-only.</p></div>`;return `<div class="bw-setup">${['wallet','recharge'].map(k=>`<div class="bw-range"><label><input type="checkbox" data-check="${k}" ${setup.checks.includes(k)?'checked':''}> ${k==='wallet'?'Wallet / withdrawals':'Recharge / Xcoins'}</label><div class="bw-date-grid" data-range="${k}" ${!setup.checks.includes(k)?'hidden':''}>${['startDate','endDate'].map((f,i)=>`<div><label for="${workspaceId}-${k}-${f}">${i?'To':'From'} <span class="bw-required">Required</span></label><input type="date" id="${workspaceId}-${k}-${f}" data-date-kind="${k}" data-date-key="${f}" value="${esc(setup.ranges[k]?.[f]||'')}"></div>`).join('')}</div></div>`).join('')}</div><p class="bw-sub">Choose either check or both. Each uses its own date range in dashboard time. Past days include 23:59:59; today’s available cutoff must be shown.</p>`;}
    function render(){
      if(disposed)return;
-     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}">${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison">Comparison</a><a href="#${workspaceId}-final">Final review</a></nav><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
-     if(request){paintReplies();keys().forEach(paintSection);paintOverview();root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x.dataset.hb===draft.handledBy));}
+     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}"><i class="bw-step-dot" data-nav-dot="${k}"></i>${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison"><i class="bw-step-dot" data-nav-dot="comparison"></i>Comparison</a><a href="#${workspaceId}-decision"><i class="bw-step-dot" data-nav-dot="decision"></i>Decision</a><a href="#${workspaceId}-final">✓ Final review</a></nav><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p><p class="bw-draft-echo" data-draft-echo></p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
+     if(request){paintReplies();keys().forEach(paintSection);paintOverview();paintDecisionDot();paintDraftEcho();root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x.dataset.hb===draft.handledBy));}
    }
    function message(text){const e=root.querySelector('[data-message]');if(e)e.textContent=text||'';}
+   // v28.4: live step-rail dots + the sticky bar's draft echo
+   function paintDecisionDot(){const dd=root.querySelector('[data-nav-dot="decision"]');if(dd)dd.className='bw-step-dot '+((draft.status&&draft.reason)?'bw-ok':(draft.status||draft.reason||(draft.comment||'').trim()||draft.handledBy)?'bw-warn':'');}
+   function paintDraftEcho(){const e=root.querySelector('[data-draft-echo]');if(!e)return;const bits=[];if(draft.status)bits.push('Status: '+draft.status);if(draft.reason)bits.push(draft.reason);if(draft.handledBy)bits.push('Handled by: '+draft.handledBy);e.textContent=bits.length?bits.join(' · '):'No decision drafted yet';}
    function paintReplies(query=''){const e=root.querySelector('[data-replies]');if(e)e.innerHTML=(adapters.quickReplies||[]).filter(x=>x.toLowerCase().includes(query.toLowerCase())).map(x=>`<button type="button" class="bw-btn bw-quiet" data-reply="${esc(x)}">${esc(x)}</button>`).join('')||'<p class="bw-sub">No matching reply.</p>';}
    function paintSection(key){
      const e=root.querySelector(`[data-bind-section="${key}"]`);if(!e)return;const s=sections[key]||blank(),d=s.data||{},result=e.querySelector('[data-section-result]');e.querySelector('[data-section-status]').innerHTML=chip(s.status);e.querySelector('[data-section-answer]').textContent=answer(key);
+     const nd=root.querySelector('[data-nav-dot="'+key+'"]');if(nd)nd.className='bw-step-dot '+tone(s.status); // v28.4: the step rail lights up live
      if(s.status==='not_run'||s.status==='running'){result.innerHTML=`<div class="bw-not-run">${s.status==='running'?'<span class="bw-busy-dot"></span>':'<span class="bw-status-dot"></span>'}${s.status==='running'?'Checking this part on the dashboard…':'Results will appear here after you click Check dashboard.'}</div>`;return;}
      if(['error','cancelled'].includes(s.status)){result.innerHTML=`<p class="${tone(s.status)}">${esc(s.error||STATUS[s.status])}</p><p class="bw-sub">This is not a clean or matching result.</p>`;return;}
      let body='';
@@ -27226,7 +27303,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
      if(s.status==='partial')body+=`<p class="bw-sub bw-warn">${esc(s.error||s.meta?.note||'Only part of the data was verified. Do not infer a mismatch from missing rows.')}</p>`;
      body+=`<p class="bw-sub">${esc(s.meta?.source||'Dashboard')} · ${esc(s.meta?.checkedAt?new Date(s.meta.checkedAt).toLocaleTimeString(): 'Time unavailable')}</p>`;result.innerHTML=body;
    }
-   function paintOverview(){if(!request)return;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length;root.querySelector('[data-progress]').style.width=`${Math.round(done/all.length*100)}%`;root.querySelector('[data-run-count]').textContent=`${done} / ${all.length} checks complete`;const result=root.querySelector('[data-comparison]');const rows=comparison(request,setup,sections),count=k=>rows.filter(x=>x.verdict===k).length;result.innerHTML=`<div class="bw-counts"><span class="bw-ok"><b>${count('match')}</b> Match</span><span class="bw-warn"><b>${count('review')}</b> To review</span><span class="bw-bad"><b>${count('no_match')}</b> No match</span><span class="bw-muted">Info does not count as a match.</span></div><div class="bw-table-wrap"><table class="bw-compare"><thead><tr><th>Check</th><th>User’s answer</th><th>Dashboard finding</th><th>Result</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.answer)}</div>`).join(''):esc(r.answer||'Not provided')}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.actual)}</div>`).join(''):esc(r.actual)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${chip(x.verdict,x.verdict==='match'?'Match':'To review')}</div>`).join(''):chip(r.verdict,{match:'Match',review:'To review',no_match:'No match',info:'Info'}[r.verdict])}<small>${esc(r.note)}</small></td></tr>`).join('')}</tbody></table></div>`;}
+   function paintOverview(){if(!request)return;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length;root.querySelector('[data-progress]').style.width=`${Math.round(done/all.length*100)}%`;root.querySelector('[data-run-count]').textContent=`${done} / ${all.length} checks complete`;const result=root.querySelector('[data-comparison]');const rows=comparison(request,setup,sections),count=k=>rows.filter(x=>x.verdict===k).length;const cd=root.querySelector('[data-nav-dot="comparison"]');if(cd)cd.className='bw-step-dot '+(count('no_match')?'bw-bad':count('review')?'bw-warn':count('match')?'bw-ok':'');result.innerHTML=`<div class="bw-counts"><span class="bw-ok"><b>${count('match')}</b> Match</span><span class="bw-warn"><b>${count('review')}</b> To review</span><span class="bw-bad"><b>${count('no_match')}</b> No match</span><span class="bw-muted">Info does not count as a match.</span></div><div class="bw-table-wrap"><table class="bw-compare"><thead><tr><th>Check</th><th>User’s answer</th><th>Dashboard finding</th><th>Result</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.answer)}</div>`).join(''):esc(r.answer||'Not provided')}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.actual)}</div>`).join(''):esc(r.actual)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${chip(x.verdict,x.verdict==='match'?'Match':'To review')}</div>`).join(''):chip(r.verdict,{match:'Match',review:'To review',no_match:'No match',info:'Info'}[r.verdict])}<small>${esc(r.note)}</small></td></tr>`).join('')}</tbody></table></div>`;}
    function setBusy(on){root.querySelector('[data-criteria]').disabled=on;root.querySelector('[data-action=check]').disabled=on;root.querySelector('[data-action=stop]').hidden=!on;root.querySelector('[data-action=review-save]').disabled=on;}
    function invalidate(){revision++;stop('Inputs changed. Run the checks again for these values.');sections=Object.fromEntries(keys().map(k=>[k,blank()]));keys().forEach(paintSection);paintOverview();root.querySelector('[data-run-label]').textContent='Inputs changed · fresh check required';}
    function validation(){if(!/^\d{3,20}$/.test(request.userId)||!['PK','IN'].includes(request.region))return 'The request needs a valid User ID and region.';if(['agency_manager','coin_seller'].includes(request.userType))return setup.nid.trim()?'':'Enter the National ID from the evidence before checking.';if(!setup.checks.length)return 'Choose Wallet, Xcoins, or both.';for(const k of setup.checks){const r=setup.ranges[k];if(!validDate(r?.startDate)||!validDate(r?.endDate)||r.startDate>r.endDate)return `${k==='wallet'?'Wallet':'Xcoins'}: choose a valid date range.`;}return '';}
@@ -27256,7 +27333,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    function reviewSave(){if(active||saving)return;const issue=decisionIssue();if(issue){message(issue);root.querySelector('[data-bind-decision]').scrollIntoView({block:'start'});return;}const diffs=Object.keys(draft).filter(k=>JSON.stringify(draft[k])!==JSON.stringify(request.decision?.[k]??''));if(!diffs.length)return message('There are no changes to save.');const incomplete=keys().some(k=>!['complete','empty'].includes(sections[k]?.status));const o=dialog('Review changes to request #'+request.number,table(['Field','Before','After'],diffs.map(k=>[k,request.decision?.[k]||'Not set',draft[k]||'Cleared']))+`<p class="bw-sub">The website saves and verifies decision details, waits two seconds, then sends a changed Handled by value to trigger the workflow.</p>${incomplete?'<label class="bw-warning-ack"><input type="checkbox" data-manual-ack> I reviewed the missing or incomplete dashboard checks manually.</label>':''}<p class="bw-live-error" data-save-error role="alert"></p>`,btn('Back to editing','close-dialog')+btn('Confirm & save','confirm-save',true,incomplete?'disabled':''));o.querySelector('[data-manual-ack]')?.addEventListener('change',e=>o.querySelector('[data-action=confirm-save]').disabled=!e.target.checked);}
    async function save(){if(saving||!overlay)return;if(!adapters.saveDecision)return overlay.querySelector('[data-save-error]').textContent='Saving is not connected. Your draft is kept.';const issue=decisionIssue();if(issue)return overlay.querySelector('[data-save-error]').textContent=issue;const captured=context(),values=clone(draft),o=overlay;saveController=new AbortController();saving=true;o.querySelectorAll('button,input').forEach(x=>x.disabled=true);const error=o.querySelector('[data-save-error]');try{const result=await adapters.saveDecision({recordId:request.recordId,recordVersion:request.recordVersion,values},{signal:saveController.signal,onProgress:t=>{error.className='bw-sub';error.textContent=t;}});if(!result||result.state!=='confirmed'||!result.record||result.record.recordId!==captured.recordId)throw Error('The save outcome was not verified. Refresh this request before retrying.');if(disposed)return;request={...request,...clone(result.record)};if(result.fieldSchema)request.fieldSchema=clone(result.fieldSchema);draft={...values,...request.decision};saving=false;closeDialog();render();message(result.demo?'Saved in this preview only. No website or sheet was changed.':'Saved and verified. Handled by was processed after the decision details.');root.querySelector('[data-save-status]').textContent=result.demo?'Demo save confirmed':'Saved and re-read successfully';}catch(e){if(disposed)return;error.className='bw-live-error';error.textContent=e.message||'Save failed. Your draft has been kept.';saving=false;o.querySelectorAll('[data-action=close-dialog]').forEach(x=>x.disabled=false);/* Unknown writes have no automatic retry button. */}finally{saving=false;}}
    const onSubmit=e=>{if(e.target.matches('[data-request-form]')){e.preventDefault();void load(new FormData(e.target).get('requestNumber').trim());}};
-   const onInput=e=>{const t=e.target;if(t.dataset.draft){draft[t.dataset.draft]=t.multiple?[...t.selectedOptions].map(o=>o.value):t.value;if(t.dataset.draft==='status'){if(!options('reason',t.value).some(x=>x.value===draft.reason))draft.reason='';const reason=root.querySelector('[data-draft=reason]');reason.innerHTML='<option value="">Choose a reason</option>'+options('reason',t.value).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');reason.value=draft.reason;}return;}if(t.matches('[data-reply-search]'))paintReplies(t.value);if(t.dataset.setup){setup[t.dataset.setup]=t.value;invalidate();}if(t.dataset.dateKind){setup.ranges[t.dataset.dateKind]??={};setup.ranges[t.dataset.dateKind][t.dataset.dateKey]=t.value;invalidate();}};
+   const onInput=e=>{const t=e.target;if(t.dataset.draft){draft[t.dataset.draft]=t.multiple?[...t.selectedOptions].map(o=>o.value):t.value;paintDecisionDot();paintDraftEcho();if(t.dataset.draft==='status'){if(!options('reason',t.value).some(x=>x.value===draft.reason))draft.reason='';const reason=root.querySelector('[data-draft=reason]');reason.innerHTML='<option value="">'+(t.value?'Choose a reason':'← Choose a Status first')+'</option>'+options('reason',t.value).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');reason.value=draft.reason;paintDecisionDot();paintDraftEcho();}return;}if(t.matches('[data-reply-search]'))paintReplies(t.value);if(t.dataset.setup){setup[t.dataset.setup]=t.value;invalidate();}if(t.dataset.dateKind){setup.ranges[t.dataset.dateKind]??={};setup.ranges[t.dataset.dateKind][t.dataset.dateKey]=t.value;invalidate();}};
    const onChange=e=>{const t=e.target;if(t.dataset.check){setup.checks=t.checked?[...new Set([...setup.checks,t.dataset.check])]:setup.checks.filter(k=>k!==t.dataset.check);invalidate();render();}};
    const onClick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.dataset.evidence){void preview(b.dataset.evidence);return;}if(b.dataset.reply){draft.comment=[draft.comment,b.dataset.reply].filter(Boolean).join('\n');root.querySelector('[data-draft=comment]').value=draft.comment;return;}if(b.dataset.hb){draft.handledBy=b.dataset.hb;const hsel=root.querySelector('[data-draft=handledBy]');if(hsel){hsel.value=b.dataset.hb;}root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x===b));return;}const a=b.dataset.action;if(a==='check')void check();if(a==='stop')stop();if(a==='review-save')reviewSave();if(a==='confirm-save')void save();if(a==='close-dialog')closeDialog();};
    root.addEventListener('submit',onSubmit);root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('click',onClick);render();
@@ -27305,6 +27382,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 
 /* ──── portal adapters + queue/query cards + duplicate radar (v28) ──── */
 let bwInstance=null, bwCurrentId=null, bwCurrentView=null, bwReturnTo='bind-queue', bwOpenSeq=0;
+let bwWsParked=false; // v28.4: deliberate park -- user clicked the origin tab / Back while viewing the workspace
 const bwViewCache={};
 let bwRadarMatches=[];
 const BW_QUICK_REPLIES=[
@@ -27662,8 +27740,33 @@ async function bwOpen(recordId){
     }
 }
 function bwBack(){
-    // v28.2 (Ahmed): Back just shows the origin list -- no park/restore.
+    // v28.4 (Ahmed): Back is a DELIBERATE park -- the origin tab keeps the
+    // workspace instance warm, and setActiveTab case B marks it parked so the
+    // list shows. Returning to the tab later restores the open request.
+    bwWsParked=true;
     openInTab(bwReturnTo||'bind-queue');
+}
+/* v28.4 (Ahmed): deliberate exit -- the origin tab's ✕ closed. Dispose the
+   mounted instance and drop every trace of the open request so it can never
+   reappear on tab-hopping. A save in flight refuses disposal (the component
+   throws); we then keep everything alive rather than corrupt the save. */
+function bwDestroyWorkspace(){
+    if(bwInstance){
+        try{ bwInstance.dispose(); }
+        catch(e){ return false; } // save in flight -- keep the workspace alive
+        bwInstance=null;
+    }
+    bwCurrentId=null; bwCurrentView=null; bwWsParked=false;
+    bwRadarMatches=[];
+    const t=document.getElementById('bwTitle'); if(t) t.textContent='Bind Request';
+    const c=document.getElementById('bwStatusChip'); if(c) c.innerHTML='';
+    const p=document.getElementById('bwRadarPanel'); if(p){ p.style.display='none'; p.classList.remove('clean'); }
+    const pb=document.getElementById('bwRadarBody'); if(pb) pb.classList.remove('open');
+    const f=document.getElementById('bwRadarFab'); if(f) f.classList.remove('alert');
+    const b=document.getElementById('bwRadarBadge'); if(b){ b.style.display='none'; b.textContent=''; }
+    openTabs=openTabs.filter(function(x){ return x!=='bind-workspace'; });
+    if(activeTabId==='bind-workspace') activeTabId=bwReturnTo||'bind-queue';
+    return true;
 }
 function bwAfterOpen(view){
     if(!view) return;
@@ -27682,8 +27785,13 @@ async function bwRadarScan(view){
           results=document.getElementById('bwRadarResults'),
           sheet=document.getElementById('bwRadarSheet'),
           fab=document.getElementById('bwRadarFab');
-    panel.style.display='none'; panel.classList.remove('clean');
+    const body=document.getElementById('bwRadarBody');
+    // v28.4 (Ahmed): the duplicate watch lives IN the page -- the banner is
+    // always visible while a request is open; matches auto-expand it.
+    panel.style.display='block'; panel.classList.remove('clean');
+    if(body) body.classList.remove('open');
     results.innerHTML='';
+    summary.textContent='\u23f3 Scanning for duplicates\u2026';
     if(fab) fab.classList.remove('alert');
     if(badge){ badge.style.display='none'; badge.textContent=''; }
     bwRadarMatches=[];
@@ -27741,7 +27849,7 @@ async function bwRadarScan(view){
             +(view.relatedComplete===false?' <span style="font-size:.75rem;color:var(--text-muted);">(User ID list may be incomplete)</span>':'')
             +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed)</span>':'');
         bwRadarRender();
-        panel.style.display='block'; // duplicates auto-reveal the panel
+        if(body) body.classList.add('open'); // duplicates auto-expand the banner
     }else{
         panel.classList.add('clean');
         summary.innerHTML='<span style="color:var(--accent-green);font-weight:600;">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
@@ -27765,16 +27873,16 @@ function bwToggleTopbar(expand){
 
 function bwRadarToggle(){
     const panel=document.getElementById('bwRadarPanel');
-    if(!panel) return;
-    if(panel.style.display==='none'){
-        if(bwRadarMatches.length&&!document.getElementById('bwRadarResults').innerHTML) bwRadarRender();
-        panel.style.display='block';
-    }else{
-        panel.style.display='none';
-    }
+    if(!panel||panel.style.display==='none') return;
+    const body=document.getElementById('bwRadarBody');
+    if(!body) return;
+    const open=!body.classList.contains('open');
+    if(open&&bwRadarMatches.length&&!document.getElementById('bwRadarResults').innerHTML) bwRadarRender();
+    body.classList.toggle('open',open);
+    if(open) panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-window.SAM19_BUILD='v28.3 bind-v3-save-actionbar 2026-11-14';
+window.SAM19_BUILD='v28.4 bind-keepalive-dupbar-redesign 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
