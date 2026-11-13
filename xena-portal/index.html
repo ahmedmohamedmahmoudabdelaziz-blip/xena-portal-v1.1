@@ -1810,7 +1810,7 @@
             .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
             /* 10.37/10.38: beat the dock-anchor ID rules above so the narrow
                fallback still wins on small screens (both bubbles). */
-            #twRadarMsg,#awsRadarMsg{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            #twRadarMsg,#awsRadarMsg,#bwRadarMsg{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
             .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
             @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         }
@@ -1961,7 +1961,7 @@
         .bwx-topbar .twx-radar-dock{width:52px;height:52px;}
         .bwx-topbar .twx-fab{width:52px;height:52px;font-size:1.3rem;}
         /* ─── v28.3 (Ahmed): the action bar collapses into the ⚡ icon (LTQ parity) ─── */
-        #pg-bind-workspace{padding-top:88px;}
+        #pg-bind-workspace{padding-top:30px;}
         .bwx-dock .twx-fab{width:52px;height:52px;font-size:1.3rem;}
         @media (max-width:900px){
             #pg-bind-workspace{padding-top:14px;}
@@ -2021,19 +2021,20 @@
         .bw-radar-fab.alert{border-color:var(--accent-rose);background:rgba(255,77,109,.16);animation:bwRadarPulse 1.6s ease-in-out infinite;}
         @keyframes bwRadarPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,109,.35);}50%{box-shadow:0 0 0 9px rgba(255,77,109,0);}}
         .bw-radar-fab .bw-radar-badge{position:absolute;top:-6px;right:-6px;margin-left:0;vertical-align:0;}
-        .bw-radar-summary{font-size:.92rem;color:var(--text-muted);}
-        .bw-radar-sheet{margin-top:2px;font-size:.8rem;color:var(--text-muted);}
-
-        /* v28.5 (Ahmed): duplicates open as a MODAL from the header fab
-           (ticket-workspace parity) -- nothing floats inside the page; the
-           nav rail and the final bar are static, integrated parts of the
-           flow, restyled to feel crafted instead of distracting. */
-        .bw-radar-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(4,6,10,.72);backdrop-filter:blur(6px);}
-        .bw-radar-dialog{width:min(880px,100%);max-height:82vh;overflow:auto;border-radius:20px;padding:20px 22px;background:linear-gradient(160deg,color-mix(in srgb,var(--accent-amber) 7%,var(--surface)),var(--surface) 42%);border:1px solid color-mix(in srgb,var(--accent-amber) 45%,var(--border));box-shadow:0 30px 80px rgba(0,0,0,.6);}
-        .bw-radar-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:700;font-size:1.05rem;color:var(--accent-amber);margin-bottom:10px;}
-        .bw-radar-x{border:1px solid var(--border);background:var(--surface-hover);color:var(--text-muted);border-radius:9px;width:32px;height:32px;font-size:.85rem;cursor:pointer;flex:none;}
-        .bw-radar-x:hover{color:var(--text);border-color:var(--accent-amber);}
-        .bw-radar-meta{display:flex;flex-direction:column;gap:3px;margin-bottom:14px;}
+        /* v28.6 (Ahmed): the bind radar is the ticket radar verbatim -- a
+           verdict bubble glued to the 📡 icon plus the shared bottom drawer
+           for the rich match cards. No custom modal anymore. */
+        #bwRadarMsg{right:auto;left:calc(50% + 207px);top:16px;width:min(190px, calc(100vw - 32px));border-radius:16px 16px 16px 4px;transform-origin:bottom left;}
+        body.sidebar-collapsed #bwRadarMsg{left:calc(50% + 75px);}
+        #bwDupDrawer #bwRadarResults{display:grid;flex:1;min-height:0;align-content:start;}
+        /* v28.6: ticket-style guided steps rail fills the workspace top */
+        #bwRoot .twx-steps{margin:2px 0 20px;background:color-mix(in srgb,var(--bw-card) 88%,transparent);border:1px solid var(--bw-line);border-radius:16px;}
+        #bwRoot .twx-step.alert{border-color:rgba(255,77,109,.5);color:var(--accent-rose);background:rgba(255,77,109,.10);}
+        #bwRoot .twx-step.alert .twx-step-dot{background:var(--accent-rose);color:#fff;}
+        /* v28.6: numbered section badges, the ticket workspace's look */
+        #bwRoot .bw-index{border:0;border-radius:10px;width:28px;height:28px;color:#0b0e13;font-weight:800;font-size:.78rem;box-shadow:0 3px 10px rgba(0,0,0,.3);margin-top:0;}
+        #bwRoot .bw-h2num{display:flex;align-items:center;gap:12px;}
+        #bwRoot .bw-h2num .twx-sec-num{flex:none;}
         #bwRoot .bw-nav{position:static;margin:22px 0 18px;padding:8px;border:1px solid var(--bw-line);border-radius:18px;background:color-mix(in srgb,var(--bw-card) 82%,transparent);}
         #bwRoot .bw-nav a{display:inline-flex;align-items:center;gap:8px;}
         .bw-step-dot{width:9px;height:9px;border-radius:50%;background:var(--bw-line);flex:none;display:inline-block;transition:background .3s,box-shadow .3s;}
@@ -2048,7 +2049,7 @@
         #bwRoot .bw-card{transition:border-color .25s,box-shadow .25s;}
         #bwRoot .bw-card:hover{border-color:color-mix(in srgb,var(--bw-accent) 32%,var(--bw-line));box-shadow:0 14px 36px rgba(0,0,0,.32);}
         #bwRoot .bw-head h1{background:linear-gradient(92deg,var(--bw-text) 35%,var(--accent-cyan));-webkit-background-clip:text;background-clip:text;color:transparent;}
-        #bwRoot .bw-index{background:linear-gradient(135deg,color-mix(in srgb,var(--bw-accent) 22%,var(--bw-card)),var(--bw-card));border-color:color-mix(in srgb,var(--bw-accent) 38%,var(--bw-line));}
+        /* v28.6: .bw-index colors now come inline per section (ticket-style numbered badges) */
         /* shimmer skeletons while the queue loads (no more dead text) */
         .bq-skel{border-radius:18px;height:150px;background:linear-gradient(100deg,var(--surface) 30%,var(--surface-hover) 50%,var(--surface) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;border:1px solid var(--border);}
         @keyframes bqSkel{from{background-position:180% 0;}to{background-position:-20% 0;}}
@@ -2719,7 +2720,7 @@ option{background:var(--surface);color:var(--text)}
     #twNoteText{min-height:120px;}
     /* 3) Duplicate-radar bubble: capped height so a long verdict can never
           cover half the phone screen; it scrolls internally instead. */
-    #twRadarMsg,#awsRadarMsg{max-height:calc(42 * var(--vh));}
+    #twRadarMsg,#awsRadarMsg,#bwRadarMsg{max-height:calc(42 * var(--vh));}
     /* 4) Draft-save toast: keep clear of the bottom-right FAB stack. */
     .drf-badge{top:118px;bottom:auto;right:12px;}
 }
@@ -2808,7 +2809,7 @@ option{background:var(--surface);color:var(--text)}
  .twx-collapse-btn{grid-column:1/-1}.twx-sec-title{font-size:16px!important;margin-bottom:14px!important}
  #twNotePop{top:auto!important;left:8px!important;right:8px!important;bottom:72px!important;width:auto!important;max-height:calc(55 * var(--vh));transform:none!important;background:var(--surface)}
  #twNoteText{font-size:16px;min-height:110px}.twn-close{min-width:40px;min-height:36px}
- #twPreviewPanel,#twRadarMsg,#awsRadarMsg{left:8px!important;right:8px!important;width:auto!important;max-width:none!important;top:auto!important;bottom:74px!important;max-height:calc(55 * var(--vh));transform:none!important;overflow-y:auto}
+ #twPreviewPanel,#twRadarMsg,#awsRadarMsg,#bwRadarMsg{left:8px!important;right:8px!important;width:auto!important;max-width:none!important;top:auto!important;bottom:74px!important;max-height:calc(55 * var(--vh));transform:none!important;overflow-y:auto}
  #cmnPanel,#cmtModal{max-width:calc(100vw - 16px);box-sizing:border-box}#cmnPanel{left:8px;right:8px;width:auto;top:52px;max-height:calc(var(--samurai-vh,calc(100 * var(--vh))) - 64px)}
  .img-lightbox-main{padding:0 6px;gap:6px;flex-direction:column}.img-lightbox-stage{width:100%;height:calc(65 * var(--vh));flex:auto}
  .img-lightbox-toolbar{top:8px;right:8px;gap:4px;flex-wrap:wrap;max-width:75%}.img-lightbox-counter{top:8px;left:8px}
@@ -5158,24 +5159,21 @@ html{background:var(--bg);min-height:100%}
                             </div>
                         </div>
                     </div>
-                    <div class="twx-radar-dock">
-                        <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
+                    <div class="twx-radar-dock" id="bwRadarDock">
+                        <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarFabClick()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
+                        <div class="twx-radar-msg" id="bwRadarMsg" onclick="bwRadarToggleMatches(true)" title="Review the matching requests"></div>
                     </div>
                 </div>
-                <!-- v28.5 (Ahmed): duplicates open as a MODAL from the header fab --
-                     ticket-workspace parity, nothing sits in the page flow. -->
-                <div class="bw-radar-modal" id="bwRadarModal" style="display:none;" onclick="if(event.target===this)bwRadarToggle(false)">
-                    <div class="bw-radar-dialog" role="dialog" aria-label="Duplicate radar">
-                        <div class="bw-radar-dialog-head">
-                            <span>&#128225; Duplicate Radar — matching requests</span>
-                            <button type="button" class="bw-radar-x" onclick="bwRadarToggle(false)" title="Close">✕</button>
-                        </div>
-                        <div class="bw-radar-meta">
-                            <div id="bwRadarSummary" class="bw-radar-summary">Open a request to scan for duplicates.</div>
-                            <div id="bwRadarSheet" class="bw-radar-sheet"></div>
-                        </div>
-                        <div id="bwRadarResults" class="qy-grid"></div>
+                <!-- v28.6 (Ahmed): the bind radar is IDENTICAL to the ticket
+                     workspace radar -- verdict bubble glued to the 📡 icon, click
+                     opens the shared bottom drawer of rich match cards. -->
+                <div id="bwDupDrawer" class="aws-dup-drawer">
+                    <div class="aws-dup-drawer-head">
+                        <span>📡 Duplicate Radar — matching bind requests</span>
+                        <button type="button" class="aws-dup-close" onclick="bwRadarToggleMatches(false)" title="Close">×</button>
                     </div>
+                    <div id="bwRadarResults" class="qy-grid aws-dup-results" onscroll="awsDupUpdateMore('bwDupDrawer')"></div>
+                    <div class="aws-dup-more">▼ Scroll — more matches below</div>
                 </div>
                 <div id="bwRoot"></div>
             </div>
@@ -7503,7 +7501,7 @@ document.addEventListener('DOMContentLoaded', () => enhanceAllSelects());
 // to <body> once at load. Every script addresses them by id, nothing reads
 // their parent, so the move is invisible to the rest of the app.
 document.addEventListener('DOMContentLoaded', () => {
-    ['twRadarMsg', 'awsRadarMsg'].forEach(id => {
+    ['twRadarMsg', 'awsRadarMsg', 'bwRadarMsg'].forEach(id => {
         const el = document.getElementById(id);
         if (el && el.parentElement !== document.body) document.body.appendChild(el);
     });
@@ -19594,6 +19592,20 @@ function twxRadarSyncVisibility() {
             twxRadarPositionMsg(awMsg); // 10.38: re-glue to the audit 📡 icon on restore
         }
     }
+    // v28.6: the bind radar bubble follows the same owner rule — visible only
+    // while the bind-workspace page is the active tab; remembered and
+    // restored on tab switches, exactly like the ticket/audit bubbles.
+    const bwMsg = document.getElementById('bwRadarMsg');
+    if (bwMsg && bwMsg.innerHTML.trim()) {
+        if (activePage !== 'bind-workspace') {
+            if (bwMsg.classList.contains('open')) bwMsg.dataset.wsWasOpen = '1';
+            bwMsg.classList.remove('open');
+        } else if (bwMsg.dataset.wsWasOpen === '1') {
+            delete bwMsg.dataset.wsWasOpen;
+            bwMsg.classList.add('open');
+            twxRadarPositionMsg(bwMsg); // re-glue to the bind 📡 icon on restore
+        }
+    }
 }
 
 // Phase 10.37 (Ahmed): "move the message of duplicated to right to be next
@@ -19613,7 +19625,7 @@ function twxRadarPositionMsg(msg) {
     // Phase 10.38: each bubble glues to ITS OWN 📡 dock -- the audit bubble
     // (#awsRadarMsg) anchors to the single-circle #awsRadarDock, the
     // workspace bubble to #twRadarDock. Same math otherwise.
-    const dock = document.getElementById(msg.id === 'awsRadarMsg' ? 'awsRadarDock' : 'twRadarDock');
+    const dock = document.getElementById(msg.id === 'awsRadarMsg' ? 'awsRadarDock' : (msg.id === 'bwRadarMsg' ? 'bwRadarDock' : 'twRadarDock'));
     if (!dock) return; // CSS fallback (50% + 244px / + 170px) covers this
     const r = dock.getBoundingClientRect();
     if (!r.width && !r.height) { // dock's page is hidden (tab switch mid-resize) — CSS fallback, never glue to (8,0)
@@ -19636,7 +19648,7 @@ function twxRadarPositionMsg(msg) {
 }
 // 10.38: reposition whichever bubble is open (workspace AND audit).
 function twxRadarRepositionAll() {
-    ['twRadarMsg', 'awsRadarMsg'].forEach(id => {
+    ['twRadarMsg', 'awsRadarMsg', 'bwRadarMsg'].forEach(id => {
         const m = document.getElementById(id);
         if (m && m.classList.contains('open')) twxRadarPositionMsg(m);
     });
@@ -25912,7 +25924,7 @@ window.addEventListener('resize', function () {
   if(m.classList.contains('samurai-slim')!==!!clean)m.classList.toggle('samurai-slim',!!clean);
   if(!clean&&m.classList.contains('samurai-expanded'))m.classList.remove('samurai-expanded');
  }
- ['twRadarMsg','awsRadarMsg'].forEach(id=>{
+ ['twRadarMsg','awsRadarMsg','bwRadarMsg'].forEach(id=>{
   const m=document.getElementById(id);if(!m)return;
   new MutationObserver(()=>slim(m)).observe(m,{childList:true,attributes:true,attributeFilter:['class']});
   m.addEventListener('click',e=>{if(m.classList.contains('samurai-slim')&&!e.target.closest('.twx-radar-msg-x'))m.classList.toggle('samurai-expanded');},true);
@@ -27263,7 +27275,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
  function mount(root,adapters={}){
    if(!(root instanceof Element))throw Error('A workspace root is required.');
    const workspaceId='bind-'+crypto.randomUUID();root.classList.add('bw');root.dataset.bindWorkspace=workspaceId;
-   let request=null,setup=null,draft={},sections={},revision=0,active=null,loading=null,saving=false,disposed=false,overlay=null,previousFocus=null,saveController=null;const draftCache=new Map();
+   let request=null,setup=null,draft={},sections={},revision=0,active=null,loading=null,saving=false,disposed=false,overlay=null,previousFocus=null,saveController=null,savedOk=false;const draftCache=new Map();
    const blank=()=>({status:'not_run',data:null,meta:{},seq:-1});
    const keys=()=>['currentBindings','phoneHistory','activity','devices',...(['agency_manager','coin_seller'].includes(request?.userType)?['identity']:['wallet','recharge'].filter(k=>setup?.checks?.includes(k)))];
    const context=()=>({workspaceId,recordId:request.recordId,userId:request.userId,region:request.region,revision});
@@ -27271,16 +27283,21 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    const field=(key,label,wide=false)=>{const spec=request.fieldSchema[key],value=draft[key]??'';if(!spec)return `<div class="bw-wide bw-field-hint">${esc(label)} is unavailable. Refresh the website’s field schema.</div>`;const text=spec.editor==='text';return `<div class="${wide?'bw-wide':''}"><label for="${workspaceId}-${key}">${esc(label)}</label>${text?(key==='comment'?`<textarea id="${workspaceId}-${key}" data-draft="${key}">${esc(value)}</textarea>`:`<input id="${workspaceId}-${key}" data-draft="${key}" value="${esc(value)}">`):`<select id="${workspaceId}-${key}" data-draft="${key}" ${spec.editor==='multiSelect'?'multiple':''}><option value="">${key==='reason'&&!draft.status?'← Choose a Status first':'Choose '+esc(label.toLowerCase())}</option>${options(key).map(o=>`<option value="${esc(o.value)}" ${(Array.isArray(value)?value.includes(o.value):value===o.value)?'selected':''}>${esc(o.label)}</option>`).join('')}</select>`}${key==='reason'?'<p class="bw-field-hint">The list follows the selected Status — done and reject reasons never mix.</p>':''}</div>`;};
    function evidence(list){return list?.length?`<div class="bw-evidence">${list.map(a=>`<button type="button" data-evidence="${esc(a.id)}" aria-label="Preview ${esc(a.name)}">${a.kind!=='video'&&safeUrl(a.thumbnailUrl||a.url)?`<img loading="lazy" src="${esc(safeUrl(a.thumbnailUrl||a.url))}" alt="${esc(a.name)}">`:`<span class="bw-file-icon">${a.kind==='video'?'▷':'▧'}</span>`}<span>${esc(a.name)}</span></button>`).join('')}</div>`:'<p class="bw-sub">No evidence attached for this part.</p>';}
    function answer(key){if(key==='currentBindings'||key==='phoneHistory')return `Previous bind: ${request.answers.previousBinding||'Not provided'}\nRequested new phone: ${request.answers.newPhone||'Not provided'}`;if(key==='activity'||key==='devices')return request.answers.devices||'No device answer supplied';if(key==='identity')return `NID entered from evidence: ${setup.nid||'Not entered'}`;return `${request.answers[key+'Receipt']||'See receipt evidence'}\nRequested period: ${setup.ranges[key]?.startDate||'—'} → ${setup.ranges[key]?.endDate||'—'}`;}
-   function section(key){const d=DEFS[key];return `<section class="bw-card bw-section" id="${workspaceId}-${key}" data-bind-section="${key}"><header class="bw-card-head"><div class="bw-titlegroup"><span class="bw-index">${esc(d[0])}</span><div><h2>${esc(d[1])}</h2><p class="bw-sub">${esc(d[2])}</p></div></div><div data-section-status>${chip('not_run')}</div></header><aside class="bw-answer"><small>User’s answer</small><p data-section-answer>${esc(answer(key))}</p></aside><div class="bw-result" data-section-result></div></section>`;}
+   const IXCOLORS=['var(--accent-cyan)','var(--accent-purple)','var(--accent-amber)','var(--accent-rose)','var(--accent-green)','#8ab4ff'];
+   function section(key,idx){const d=DEFS[key];return `<section class="bw-card bw-section" id="${workspaceId}-${key}" data-bind-section="${key}"><header class="bw-card-head"><div class="bw-titlegroup"><span class="bw-index" style="background:${IXCOLORS[idx%IXCOLORS.length]}">${esc(d[0])}</span><div><h2>${esc(d[1])}</h2><p class="bw-sub">${esc(d[2])}</p></div></div><div data-section-status>${chip('not_run')}</div></header><aside class="bw-answer"><small>User’s answer</small><p data-section-answer>${esc(answer(key))}</p></aside><div class="bw-result" data-section-result></div></section>`;}
    function setupHtml(){if(['agency_manager','coin_seller'].includes(request.userType))return `<div><label for="${workspaceId}-nid">National ID from the evidence <span class="bw-required">Required</span></label><input id="${workspaceId}-nid" data-setup="nid" value="${esc(setup.nid)}" placeholder="Enter the NID shown in the image" autocomplete="off"><p class="bw-sub">Enter the evidence value before starting. The dashboard check remains read-only.</p></div>`;return `<div class="bw-setup">${['wallet','recharge'].map(k=>`<div class="bw-range"><label><input type="checkbox" data-check="${k}" ${setup.checks.includes(k)?'checked':''}> ${k==='wallet'?'Wallet / withdrawals':'Recharge / Xcoins'}</label><div class="bw-date-grid" data-range="${k}" ${!setup.checks.includes(k)?'hidden':''}>${['startDate','endDate'].map((f,i)=>`<div><label for="${workspaceId}-${k}-${f}">${i?'To':'From'} <span class="bw-required">Required</span></label><input type="date" id="${workspaceId}-${k}-${f}" data-date-kind="${k}" data-date-key="${f}" value="${esc(setup.ranges[k]?.[f]||'')}"></div>`).join('')}</div></div>`).join('')}</div><p class="bw-sub">Choose either check or both. Each uses its own date range in dashboard time. Past days include 23:59:59; today’s available cutoff must be shown.</p>`;}
    function render(){
      if(disposed)return;
-     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}"><i class="bw-step-dot" data-nav-dot="${k}"></i>${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison"><i class="bw-step-dot" data-nav-dot="comparison"></i>Comparison</a><a href="#${workspaceId}-decision"><i class="bw-step-dot" data-nav-dot="decision"></i>Decision</a><a href="#${workspaceId}-final">✓ Final review</a></nav><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p><p class="bw-draft-echo" data-draft-echo></p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
-     if(request){paintReplies();keys().forEach(paintSection);paintOverview();paintDecisionDot();paintDraftEcho();root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x.dataset.hb===draft.handledBy));}
+     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="twx-steps" id="bwSteps" aria-label="Guided review steps"><button type="button" class="twx-step" data-bwstep="1" onclick="bwStepGo(1)"><span class="twx-step-dot">1</span><span class="twx-step-label">Review</span></button><button type="button" class="twx-step" data-bwstep="2" onclick="bwStepGo(2)"><span class="twx-step-dot">2</span><span class="twx-step-label">Duplicates</span></button><button type="button" class="twx-step" data-bwstep="3" onclick="bwStepGo(3)"><span class="twx-step-dot">3</span><span class="twx-step-label">Verify</span></button><button type="button" class="twx-step" data-bwstep="4" onclick="bwStepGo(4)"><span class="twx-step-dot">4</span><span class="twx-step-label">Compare</span></button><button type="button" class="twx-step" data-bwstep="5" onclick="bwStepGo(5)"><span class="twx-step-dot">5</span><span class="twx-step-label">Decide</span></button><button type="button" class="twx-step" data-bwstep="6" onclick="bwStepGo(6)"><span class="twx-step-dot">6</span><span class="twx-step-label">Save</span></button></div><div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-amber);">3</span>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}"><i class="bw-step-dot" data-nav-dot="${k}"></i>${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison"><i class="bw-step-dot" data-nav-dot="comparison"></i>Comparison</a><a href="#${workspaceId}-decision"><i class="bw-step-dot" data-nav-dot="decision"></i>Decision</a><a href="#${workspaceId}-final">✓ Final review</a></nav><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-purple);">4</span>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-rose);">5</span>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-green);">6</span>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p><p class="bw-draft-echo" data-draft-echo></p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
+     if(request){paintReplies();keys().forEach(paintSection);paintOverview();paintDecisionDot();paintSteps();paintDraftEcho();root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x.dataset.hb===draft.handledBy));}
    }
    function message(text){const e=root.querySelector('[data-message]');if(e)e.textContent=text||'';}
    // v28.4: live step-rail dots + the sticky bar's draft echo
-   function paintDecisionDot(){const dd=root.querySelector('[data-nav-dot="decision"]');if(dd)dd.className='bw-step-dot '+((draft.status&&draft.reason)?'bw-ok':(draft.status||draft.reason||(draft.comment||'').trim()||draft.handledBy)?'bw-warn':'');}
+   function paintDecisionDot(){const dd=root.querySelector('[data-nav-dot="decision"]');if(dd)dd.className='bw-step-dot '+((draft.status&&draft.reason)?'bw-ok':(draft.status||draft.reason||(draft.comment||'').trim()||draft.handledBy)?'bw-warn':'');paintSteps();}
+   // v28.6 (Ahmed): the ticket-style guided steps rail, painted live from the
+   // same workspace state as the dots (radar arrives via window.bwRadarState).
+   function paintSteps(){const bar=document.getElementById('bwSteps');if(!bar||!request)return;const all=keys(),verified=all.length>0&&all.every(k=>['complete','empty'].includes(sections[k]?.status));const decided=!!(draft.status&&draft.reason);const rs=window.bwRadarState||'';const st=[true,rs==='clean'||rs==='hits',verified,verified,decided,savedOk];const firstTodo=st.findIndex(x=>!x);bar.querySelectorAll('.twx-step').forEach(function(b,i){b.classList.toggle('done',!!st[i]);b.classList.toggle('current',i===firstTodo||(firstTodo===-1&&i===st.length-1));b.classList.toggle('alert',i===1&&rs==='hits');const dot=b.querySelector('.twx-step-dot');if(dot)dot.textContent=st[i]?'✓':String(i+1);});}
+   window.bwStepsRefresh=function(){try{paintSteps();}catch(e){}};
    function paintDraftEcho(){const e=root.querySelector('[data-draft-echo]');if(!e)return;const bits=[];if(draft.status)bits.push('Status: '+draft.status);if(draft.reason)bits.push(draft.reason);if(draft.handledBy)bits.push('Handled by: '+draft.handledBy);e.textContent=bits.length?bits.join(' · '):'No decision drafted yet';}
    function paintReplies(query=''){const e=root.querySelector('[data-replies]');if(e)e.innerHTML=(adapters.quickReplies||[]).filter(x=>x.toLowerCase().includes(query.toLowerCase())).map(x=>`<button type="button" class="bw-btn bw-quiet" data-reply="${esc(x)}">${esc(x)}</button>`).join('')||'<p class="bw-sub">No matching reply.</p>';}
    function paintSection(key){
@@ -27300,7 +27317,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
      if(s.status==='partial')body+=`<p class="bw-sub bw-warn">${esc(s.error||s.meta?.note||'Only part of the data was verified. Do not infer a mismatch from missing rows.')}</p>`;
      body+=`<p class="bw-sub">${esc(s.meta?.source||'Dashboard')} · ${esc(s.meta?.checkedAt?new Date(s.meta.checkedAt).toLocaleTimeString(): 'Time unavailable')}</p>`;result.innerHTML=body;
    }
-   function paintOverview(){if(!request)return;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length;root.querySelector('[data-progress]').style.width=`${Math.round(done/all.length*100)}%`;root.querySelector('[data-run-count]').textContent=`${done} / ${all.length} checks complete`;const result=root.querySelector('[data-comparison]');const rows=comparison(request,setup,sections),count=k=>rows.filter(x=>x.verdict===k).length;const cd=root.querySelector('[data-nav-dot="comparison"]');if(cd)cd.className='bw-step-dot '+(count('no_match')?'bw-bad':count('review')?'bw-warn':count('match')?'bw-ok':'');result.innerHTML=`<div class="bw-counts"><span class="bw-ok"><b>${count('match')}</b> Match</span><span class="bw-warn"><b>${count('review')}</b> To review</span><span class="bw-bad"><b>${count('no_match')}</b> No match</span><span class="bw-muted">Info does not count as a match.</span></div><div class="bw-table-wrap"><table class="bw-compare"><thead><tr><th>Check</th><th>User’s answer</th><th>Dashboard finding</th><th>Result</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.answer)}</div>`).join(''):esc(r.answer||'Not provided')}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.actual)}</div>`).join(''):esc(r.actual)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${chip(x.verdict,x.verdict==='match'?'Match':'To review')}</div>`).join(''):chip(r.verdict,{match:'Match',review:'To review',no_match:'No match',info:'Info'}[r.verdict])}<small>${esc(r.note)}</small></td></tr>`).join('')}</tbody></table></div>`;}
+   function paintOverview(){if(!request)return;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length;root.querySelector('[data-progress]').style.width=`${Math.round(done/all.length*100)}%`;root.querySelector('[data-run-count]').textContent=`${done} / ${all.length} checks complete`;const result=root.querySelector('[data-comparison]');const rows=comparison(request,setup,sections),count=k=>rows.filter(x=>x.verdict===k).length;const cd=root.querySelector('[data-nav-dot="comparison"]');if(cd)cd.className='bw-step-dot '+(count('no_match')?'bw-bad':count('review')?'bw-warn':count('match')?'bw-ok':'');result.innerHTML=`<div class="bw-counts"><span class="bw-ok"><b>${count('match')}</b> Match</span><span class="bw-warn"><b>${count('review')}</b> To review</span><span class="bw-bad"><b>${count('no_match')}</b> No match</span><span class="bw-muted">Info does not count as a match.</span></div><div class="bw-table-wrap"><table class="bw-compare"><thead><tr><th>Check</th><th>User’s answer</th><th>Dashboard finding</th><th>Result</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.answer)}</div>`).join(''):esc(r.answer||'Not provided')}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.actual)}</div>`).join(''):esc(r.actual)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${chip(x.verdict,x.verdict==='match'?'Match':'To review')}</div>`).join(''):chip(r.verdict,{match:'Match',review:'To review',no_match:'No match',info:'Info'}[r.verdict])}<small>${esc(r.note)}</small></td></tr>`).join('')}</tbody></table></div>`;paintSteps();}
    function setBusy(on){root.querySelector('[data-criteria]').disabled=on;root.querySelector('[data-action=check]').disabled=on;root.querySelector('[data-action=stop]').hidden=!on;root.querySelector('[data-action=review-save]').disabled=on;}
    function invalidate(){revision++;stop('Inputs changed. Run the checks again for these values.');sections=Object.fromEntries(keys().map(k=>[k,blank()]));keys().forEach(paintSection);paintOverview();root.querySelector('[data-run-label]').textContent='Inputs changed · fresh check required';}
    function validation(){if(!/^\d{3,20}$/.test(request.userId)||!['PK','IN'].includes(request.region))return 'The request needs a valid User ID and region.';if(['agency_manager','coin_seller'].includes(request.userType))return setup.nid.trim()?'':'Enter the National ID from the evidence before checking.';if(!setup.checks.length)return 'Choose Wallet, Xcoins, or both.';for(const k of setup.checks){const r=setup.ranges[k];if(!validDate(r?.startDate)||!validDate(r?.endDate)||r.startDate>r.endDate)return `${k==='wallet'?'Wallet':'Xcoins'}: choose a valid date range.`;}return '';}
@@ -27321,14 +27338,14 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    }
    async function check(){if(active||saving)return;const issue=validation();root.querySelector('[data-setup-error]').textContent=issue;if(issue)return;if(typeof adapters.runDashboard!=='function'){message('The dashboard connection is unavailable. Enable the compatible extension and try again.');return;}const run={runId:crypto.randomUUID(),context:context(),keys:keys(),controller:new AbortController()};active=run;sections=Object.fromEntries(run.keys.map(k=>[k,blank()]));run.keys.forEach(paintSection);paintOverview();setBusy(true);root.querySelector('[data-run-label]').textContent='Checking dashboard · results appear below';message('');try{await adapters.runDashboard({protocolVersion:1,runId:run.runId,context:clone(run.context),userType:request.userType,checks:[...run.keys],ranges:clone(setup.ranges)},{signal:run.controller.signal,onUpdate:acceptUpdate});if(active!==run)return;for(const k of run.keys)if(['not_run','running'].includes(sections[k].status))sections[k]={...sections[k],status:'error',error:'No final result returned for this check.'};const partial=run.keys.some(k=>!['complete','empty'].includes(sections[k].status));root.querySelector('[data-run-label]').textContent=partial?'Finished with items to review':'Dashboard check complete';}catch(e){if(active!==run)return;run.keys.forEach(k=>{if(['not_run','running'].includes(sections[k].status))sections[k]={...sections[k],status:'error',error:e.message||'Connection failed'};});root.querySelector('[data-run-label]').textContent='Check incomplete · review the errors';}finally{if(active===run){active=null;setBusy(false);run.keys.forEach(paintSection);paintOverview();}}}
    function stop(text='Stopped. Completed results are kept; unfinished checks are cancelled.'){if(!active)return;const run=active;active=null;run.controller.abort();run.keys.forEach(k=>{if(['not_run','running'].includes(sections[k].status))sections[k]={...sections[k],status:'cancelled'};});if(!disposed&&request){setBusy(false);run.keys.forEach(paintSection);paintOverview();root.querySelector('[data-run-label]').textContent=text;}}
-   function open(value){if(saving)throw Error('Wait for the current save outcome before switching requests.');if(!value?.recordId||!value?.answers||!value?.fieldSchema)throw Error('The website did not return a complete request view.');stop();closeDialog();if(request)draftCache.set(request.recordId,{values:clone(draft),setup:clone(setup)});request=clone(value);request.attachments=request.attachments||[];revision++;const kept=draftCache.get(request.recordId);setup=kept?.setup||{nid:request.setup?.nid||'',checks:request.setup?.checks||(['agency_manager','coin_seller'].includes(request.userType)?[]:[request.userType==='host'?'wallet':'recharge']),ranges:request.setup?.ranges||{wallet:{startDate:'',endDate:''},recharge:{startDate:'',endDate:''}}};draft=kept?.values||{status:'',reason:'',comment:'',handledBy:'',...request.decision};sections=Object.fromEntries(keys().map(k=>[k,blank()]));render();if(kept)message('Your working draft was restored. Review the current field options before saving.');}
+   function open(value){if(saving)throw Error('Wait for the current save outcome before switching requests.');if(!value?.recordId||!value?.answers||!value?.fieldSchema)throw Error('The website did not return a complete request view.');stop();closeDialog();if(request)draftCache.set(request.recordId,{values:clone(draft),setup:clone(setup)});request=clone(value);request.attachments=request.attachments||[];revision++;const kept=draftCache.get(request.recordId);setup=kept?.setup||{nid:request.setup?.nid||'',checks:request.setup?.checks||(['agency_manager','coin_seller'].includes(request.userType)?[]:[request.userType==='host'?'wallet':'recharge']),ranges:request.setup?.ranges||{wallet:{startDate:'',endDate:''},recharge:{startDate:'',endDate:''}}};savedOk=false;draft=kept?.values||{status:'',reason:'',comment:'',handledBy:'',...request.decision};sections=Object.fromEntries(keys().map(k=>[k,blank()]));render();if(kept)message('Your working draft was restored. Review the current field options before saving.');}
    async function load(number){if(saving)return;if(!/^\d+$/.test(number))return message('Enter a request number.');if(typeof adapters.loadRequest!=='function')return message('Open a Bind request from the website’s Live Queue.');loading?.abort();const controller=new AbortController();loading=controller;stop();message('Loading this request…');try{const value=await adapters.loadRequest(number,{signal:controller.signal});if(loading!==controller||controller.signal.aborted||disposed)return;open(value);}catch(e){if(loading===controller&&!controller.signal.aborted)message(e.message||'Request could not be loaded.');}finally{if(loading===controller)loading=null;}}
    function closeDialog(){if(saving)return;overlay?.remove();overlay=null;previousFocus?.focus();}
    function dialog(title,body,footer='',viewer=false){closeDialog();previousFocus=document.activeElement;overlay=document.createElement('div');overlay.className='bw-overlay'+(viewer?' bw-viewer':'');overlay.innerHTML=`<section class="bw-dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}" tabindex="-1"><header><h2>${esc(title)}</h2>${btn('Close','close-dialog')}</header>${body}${footer?`<footer>${footer}</footer>`:''}</section>`;root.append(overlay);overlay.querySelector('section').focus();overlay.addEventListener('keydown',e=>{if(e.key==='Escape'&&!saving){e.preventDefault();closeDialog();}if(e.key==='Tab'){const nodes=[...overlay.querySelectorAll('button:not(:disabled),input,select,textarea,a[href]')].filter(x=>x.getClientRects().length);if(!nodes.length)return;const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===overlay.querySelector('section'))){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});return overlay;}
    async function preview(id){const attachment=request.attachments.find(x=>x.id===id);if(!attachment)return;if(adapters.openEvidence){await adapters.openEvidence(attachment,{recordId:request.recordId});return;}const o=dialog(attachment.name,'<p class="bw-sub">Opening evidence…</p>','',true);try{const file=adapters.resolveAttachment?await adapters.resolveAttachment(attachment):attachment;if(overlay!==o)return;const url=safeUrl(file.url);if(!url)throw Error('The original preview is unavailable. Use the website’s authorised attachment viewer.');const body=o.querySelector('.bw-dialog');body.insertAdjacentHTML('beforeend',`<div class="bw-tools">${attachment.kind==='video'?'':`${btn('−','zoom-out')}${btn('+','zoom-in')}${btn('↶','rotate-left')}${btn('↷','rotate-right')}${btn('Fit','fit-image')}`}</div><div class="bw-view-stage">${attachment.kind==='video'?`<video src="${esc(url)}" controls preload="metadata"></video>`:`<img src="${esc(url)}" alt="${esc(attachment.name)}" draggable="false">`}</div><p class="bw-sub">${esc(file.previewNote||'Preview stays inside the current workspace. Use the website’s existing OCR viewer in production.')}</p>`);body.querySelector('p').remove();let zoom=1,angle=0,x=0,y=0,drag=null;const img=body.querySelector('img'),stage=body.querySelector('.bw-view-stage');const paint=()=>{if(img)img.style.transform=`translate(${x}px,${y}px) rotate(${angle}deg) scale(${zoom})`;};o.addEventListener('click',e=>{const a=e.target.closest('[data-action]')?.dataset.action;if(a==='zoom-in')zoom=Math.min(5,zoom+.25);if(a==='zoom-out')zoom=Math.max(.25,zoom-.25);if(a==='rotate-left')angle-=90;if(a==='rotate-right')angle+=90;if(a==='fit-image'){zoom=1;angle=0;x=y=0;}paint();});stage.onpointerdown=e=>{if(!img)return;drag={x:e.clientX-x,y:e.clientY-y};stage.setPointerCapture(e.pointerId);};stage.onpointermove=e=>{if(drag){x=e.clientX-drag.x;y=e.clientY-drag.y;paint();}};stage.onpointerup=()=>{drag=null;};stage.onpointercancel=()=>{drag=null;};}catch(e){if(overlay===o)o.querySelector('p').textContent=e.message;}}
    function decisionIssue(){for(const key of ['status','reason','comment','handledBy']){const spec=request.fieldSchema[key],value=draft[key];if(!spec)return 'The current decision field schema is incomplete.';if(spec.editor!=='text'&&(Array.isArray(value)?value:[value]).filter(Boolean).some(v=>!options(key).some(o=>o.value===v)))return `${key}: this option is no longer available.`;}if(!draft.status||!draft.reason)return 'Choose Status and its Decision / Reject reason.';if(draft.handledBy&&!String(draft.comment||'').trim())return 'Fill Comment before setting Handled by.';return '';}
    function reviewSave(){if(active||saving)return;const issue=decisionIssue();if(issue){message(issue);root.querySelector('[data-bind-decision]').scrollIntoView({block:'start'});return;}const diffs=Object.keys(draft).filter(k=>JSON.stringify(draft[k])!==JSON.stringify(request.decision?.[k]??''));if(!diffs.length)return message('There are no changes to save.');const incomplete=keys().some(k=>!['complete','empty'].includes(sections[k]?.status));const o=dialog('Review changes to request #'+request.number,table(['Field','Before','After'],diffs.map(k=>[k,request.decision?.[k]||'Not set',draft[k]||'Cleared']))+`<p class="bw-sub">The website saves and verifies decision details, waits two seconds, then sends a changed Handled by value to trigger the workflow.</p>${incomplete?'<label class="bw-warning-ack"><input type="checkbox" data-manual-ack> I reviewed the missing or incomplete dashboard checks manually.</label>':''}<p class="bw-live-error" data-save-error role="alert"></p>`,btn('Back to editing','close-dialog')+btn('Confirm & save','confirm-save',true,incomplete?'disabled':''));o.querySelector('[data-manual-ack]')?.addEventListener('change',e=>o.querySelector('[data-action=confirm-save]').disabled=!e.target.checked);}
-   async function save(){if(saving||!overlay)return;if(!adapters.saveDecision)return overlay.querySelector('[data-save-error]').textContent='Saving is not connected. Your draft is kept.';const issue=decisionIssue();if(issue)return overlay.querySelector('[data-save-error]').textContent=issue;const captured=context(),values=clone(draft),o=overlay;saveController=new AbortController();saving=true;o.querySelectorAll('button,input').forEach(x=>x.disabled=true);const error=o.querySelector('[data-save-error]');try{const result=await adapters.saveDecision({recordId:request.recordId,recordVersion:request.recordVersion,values},{signal:saveController.signal,onProgress:t=>{error.className='bw-sub';error.textContent=t;}});if(!result||result.state!=='confirmed'||!result.record||result.record.recordId!==captured.recordId)throw Error('The save outcome was not verified. Refresh this request before retrying.');if(disposed)return;request={...request,...clone(result.record)};if(result.fieldSchema)request.fieldSchema=clone(result.fieldSchema);draft={...values,...request.decision};saving=false;closeDialog();render();message(result.demo?'Saved in this preview only. No website or sheet was changed.':'Saved and verified. Handled by was processed after the decision details.');root.querySelector('[data-save-status]').textContent=result.demo?'Demo save confirmed':'Saved and re-read successfully';}catch(e){if(disposed)return;error.className='bw-live-error';error.textContent=e.message||'Save failed. Your draft has been kept.';saving=false;o.querySelectorAll('[data-action=close-dialog]').forEach(x=>x.disabled=false);/* Unknown writes have no automatic retry button. */}finally{saving=false;}}
+   async function save(){if(saving||!overlay)return;if(!adapters.saveDecision)return overlay.querySelector('[data-save-error]').textContent='Saving is not connected. Your draft is kept.';const issue=decisionIssue();if(issue)return overlay.querySelector('[data-save-error]').textContent=issue;const captured=context(),values=clone(draft),o=overlay;saveController=new AbortController();saving=true;o.querySelectorAll('button,input').forEach(x=>x.disabled=true);const error=o.querySelector('[data-save-error]');try{const result=await adapters.saveDecision({recordId:request.recordId,recordVersion:request.recordVersion,values},{signal:saveController.signal,onProgress:t=>{error.className='bw-sub';error.textContent=t;}});if(!result||result.state!=='confirmed'||!result.record||result.record.recordId!==captured.recordId)throw Error('The save outcome was not verified. Refresh this request before retrying.');if(disposed)return;request={...request,...clone(result.record)};if(result.fieldSchema)request.fieldSchema=clone(result.fieldSchema);draft={...values,...request.decision};savedOk=true;saving=false;closeDialog();render();message(result.demo?'Saved in this preview only. No website or sheet was changed.':'Saved and verified. Handled by was processed after the decision details.');root.querySelector('[data-save-status]').textContent=result.demo?'Demo save confirmed':'Saved and re-read successfully';}catch(e){if(disposed)return;error.className='bw-live-error';error.textContent=e.message||'Save failed. Your draft has been kept.';saving=false;o.querySelectorAll('[data-action=close-dialog]').forEach(x=>x.disabled=false);/* Unknown writes have no automatic retry button. */}finally{saving=false;}}
    const onSubmit=e=>{if(e.target.matches('[data-request-form]')){e.preventDefault();void load(new FormData(e.target).get('requestNumber').trim());}};
    const onInput=e=>{const t=e.target;if(t.dataset.draft){draft[t.dataset.draft]=t.multiple?[...t.selectedOptions].map(o=>o.value):t.value;paintDecisionDot();paintDraftEcho();if(t.dataset.draft==='status'){if(!options('reason',t.value).some(x=>x.value===draft.reason))draft.reason='';const reason=root.querySelector('[data-draft=reason]');reason.innerHTML='<option value="">'+(t.value?'Choose a reason':'← Choose a Status first')+'</option>'+options('reason',t.value).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');reason.value=draft.reason;paintDecisionDot();paintDraftEcho();}return;}if(t.matches('[data-reply-search]'))paintReplies(t.value);if(t.dataset.setup){setup[t.dataset.setup]=t.value;invalidate();}if(t.dataset.dateKind){setup.ranges[t.dataset.dateKind]??={};setup.ranges[t.dataset.dateKind][t.dataset.dateKey]=t.value;invalidate();}};
    const onChange=e=>{const t=e.target;if(t.dataset.check){setup.checks=t.checked?[...new Set([...setup.checks,t.dataset.check])]:setup.checks.filter(k=>k!==t.dataset.check);invalidate();render();}};
@@ -27757,8 +27774,10 @@ function bwDestroyWorkspace(){
     bwRadarMatches=[];
     const t=document.getElementById('bwTitle'); if(t) t.textContent='Bind Request';
     const c=document.getElementById('bwStatusChip'); if(c) c.innerHTML='';
-    const p=document.getElementById('bwRadarModal'); if(p) p.style.display='none';
+    const p=document.getElementById('bwDupDrawer'); if(p) p.classList.remove('open');
     const rr=document.getElementById('bwRadarResults'); if(rr) rr.innerHTML='';
+    if(typeof bwRadarSetMsg==='function') bwRadarSetMsg('',false);
+    window.bwRadarState='';
     const f=document.getElementById('bwRadarFab'); if(f) f.classList.remove('alert');
     const b=document.getElementById('bwRadarBadge'); if(b){ b.style.display='none'; b.textContent=''; }
     openTabs=openTabs.filter(function(x){ return x!=='bind-workspace'; });
@@ -27772,21 +27791,64 @@ function bwAfterOpen(view){
     bwRadarScan(view);
 }
 
-/* v28.1 (Ahmed): the duplicate radar is a 📡 ICON in the workspace header with
-   a match badge (like the ticket workspace's fab). Clicking it toggles the
-   panel; duplicates auto-reveal it. User-ID matches come free with the loaded
-   request view, Contact ID adds one query call. */
+/* v28.6 (Ahmed): "are you see this is same like the other ????" -- the bind
+   radar IS the ticket-workspace radar now: a 📡 fab with a count badge, a
+   persistent red-gradient verdict BUBBLE glued to the icon (its own ✕ is the
+   only thing that dismisses it), and a click that opens the shared bottom
+   drawer of rich match cards. User-ID matches come free with the loaded
+   request view; Contact ID adds one query call. */
+function bwRadarSetMsg(html, show, state){
+    const msg=document.getElementById('bwRadarMsg');
+    if(!msg) return;
+    // PERSISTENT bubble -- the ✕ is the ONLY dismiss; outside clicks and
+    // Escape close the drawer only (exact ticket-workspace contract).
+    msg.innerHTML=html?'<button type="button" class="twx-radar-msg-x" onclick="event.stopPropagation();bwRadarDismissMsg()" title="Dismiss">✕</button>'+html:'';
+    msg.classList.toggle('open',!!show&&!!html);
+    if(show&&html){ delete msg.dataset.wsWasOpen; twxRadarPositionMsg(msg); }
+    else if(!show){ delete msg.dataset.wsWasOpen; }
+    msg.classList.toggle('scanning',state==='scanning');
+}
+function bwRadarDismissMsg(){
+    const msg=document.getElementById('bwRadarMsg');
+    if(msg){ msg.classList.remove('open'); delete msg.dataset.wsWasOpen; }
+}
+// 📡 circle click: matches already loaded -> re-show the (maybe ✕-dismissed)
+// verdict bubble and toggle the review drawer; nothing loaded yet -> scan.
+function bwRadarFabClick(){
+    if(bwRadarMatches&&bwRadarMatches.length){
+        const msg=document.getElementById('bwRadarMsg');
+        if(msg&&msg.innerHTML.trim()){ msg.classList.add('open'); twxRadarPositionMsg(msg); }
+        bwRadarToggleMatches();
+    } else if(bwCurrentView){ bwRadarScan(bwCurrentView); }
+    else if(typeof ToastManager!=='undefined') ToastManager.show('Open a bind request first — the radar scans its User ID / Contact ID.','warning');
+}
+// Matches open in the shared bottom drawer (#bwDupDrawer, .aws-dup-drawer
+// verbatim) -- the page layout never shifts. Cards reuse bqCardHtml (the
+// same rich qy-card family as the ticket drawer's auditDupCardHtml).
+function bwRadarToggleMatches(forceOpen){
+    const drawer=document.getElementById('bwDupDrawer');
+    const resultsEl=document.getElementById('bwRadarResults');
+    if(!drawer||!resultsEl) return;
+    const open=forceOpen===true?true:forceOpen===false?false:!drawer.classList.contains('open');
+    if(!open){ drawer.classList.remove('open'); return; }
+    if(!bwRadarMatches.length) return;
+    bwRadarRender();
+    drawer.classList.add('open');
+    requestAnimationFrame(function(){ awsDupUpdateMore('bwDupDrawer'); });
+}
 async function bwRadarScan(view){
     if(!view) return;
-    const summary=document.getElementById('bwRadarSummary'), badge=document.getElementById('bwRadarBadge'),
+    const badge=document.getElementById('bwRadarBadge'),
           results=document.getElementById('bwRadarResults'),
-          sheet=document.getElementById('bwRadarSheet'),
-          fab=document.getElementById('bwRadarFab');
-    // v28.5 (Ahmed): duplicates open as a modal from the header fab --
-    // ticket-workspace parity, nothing sits in the page flow.
-    const modal=document.getElementById('bwRadarModal'); if(modal) modal.style.display='none';
-    results.innerHTML='';
-    summary.textContent='\u23f3 Scanning for duplicates\u2026';
+          fab=document.getElementById('bwRadarFab'),
+          drawer=document.getElementById('bwDupDrawer');
+    if(drawer) drawer.classList.remove('open');
+    if(results) results.innerHTML='';
+    if(fab){ fab.classList.remove('alert'); fab.classList.add('scanning'); }
+    if(badge){ badge.style.display='none'; badge.textContent=''; }
+    window.bwRadarState='scanning';
+    if(window.bwStepsRefresh) window.bwStepsRefresh();
+    bwRadarSetMsg('<span class="twx-radar-scan">⏳ Scanning User ID / Contact ID against every other bind request…</span>',true,'scanning');
     if(fab) fab.classList.remove('alert');
     if(badge){ badge.style.display='none'; badge.textContent=''; }
     bwRadarMatches=[];
@@ -27801,7 +27863,6 @@ async function bwRadarScan(view){
     let contactErr=false;
     const cid=(view.contactId||'').trim(), uid=(view.userId||'').trim();
     if(cid&&cid!==uid){
-        if(!byKey.size) summary.textContent='⏳ Scanning User ID + Contact ID…';
         try{
             const r=await fetch('/api/bind/query?field=contact_id&value='+encodeURIComponent(cid)+'&'+bqQS());
             const d=await r.json();
@@ -27823,7 +27884,7 @@ async function bwRadarScan(view){
     // the radar cards show the full Query-style detail. Capped at 6.
     const bwSparse=bwRadarMatches.filter(function(m){return m.brief&&m.brief.user_id===undefined&&m.brief.numbering;}).slice(0,6);
     if(bwSparse.length){
-        summary.textContent='⏳ Loading duplicate details…';
+        bwRadarSetMsg('<span class="twx-radar-scan">⏳ Loading duplicate details…</span>',true,'scanning');
         await Promise.all(bwSparse.map(async function(m){
             try{
                 const r=await fetch('/api/bind/query?field=number&value='+encodeURIComponent(m.brief.numbering)+'&'+bqQS());
@@ -27835,19 +27896,40 @@ async function bwRadarScan(view){
             }catch(e){/* keep the minimal brief */}
         }));
     }
-    sheet.innerHTML=(view.sheetDupCheck&&String(view.sheetDupCheck).trim())?('Sheet “Duplicated Check”: '+escHtml(view.sheetDupCheck)):'';
+    const sheetLine=(view.sheetDupCheck&&String(view.sheetDupCheck).trim())?('<div class="twx-radar-sheet">📋 Sheet “Duplicated Check”: '+escHtml(view.sheetDupCheck)+'</div>'):'';
     const n=bwRadarMatches.length;
+    if(fab) fab.classList.remove('scanning');
     if(n){
         if(badge){ badge.style.display='inline-grid'; badge.textContent=n; }
         if(fab) fab.classList.add('alert');
-        summary.innerHTML='<span style="color:var(--accent-rose);font-weight:600;">⚠️ '+n+' other request'+(n>1?'s':'')+' share this User ID / Contact ID</span>'
-            +(view.relatedComplete===false?' <span style="font-size:.75rem;color:var(--text-muted);">(User ID list may be incomplete)</span>':'')
-            +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed)</span>':'');
+        // ticket parity: one verdict line per field that matched.
+        const byField=new Map();
+        bwRadarMatches.forEach(function(m){
+            (m.matchedOn&&m.matchedOn.length?m.matchedOn:['User ID']).forEach(function(f){
+                if(!byField.has(f)) byField.set(f,[]);
+                byField.get(f).push('#'+((m.brief&&m.brief.numbering)||'?'));
+            });
+        });
+        let hitLines='';
+        byField.forEach(function(nums,f){
+            const shown=nums.slice(0,3).join(', ')+(nums.length>3?' + '+(nums.length-3)+' more':'');
+            hitLines+='<div class="aws-dup-hit">🔴 <b>'+escHtml(f)+'</b> in bind request: '+escHtml(shown)+'</div>';
+        });
+        const extra=(view.relatedComplete===false?' <span style="font-size:.75rem;opacity:.85;">(User ID list may be incomplete)</span>':'')
+            +(contactErr?' <span style="font-size:.75rem;">(Contact ID scan failed)</span>':'');
+        bwRadarSetMsg('<div class="aws-dup-verdict">'+hitLines+sheetLine+extra
+            +'<div class="aws-dup-cta">👆 Click to review the '+n+' matching request'+(n>1?'s':'')+'</div></div>', true, 'hits');
         bwRadarRender();
+        window.bwRadarState='hits';
     }else{
-        summary.innerHTML='<span style="color:var(--accent-green);font-weight:600;">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
-            +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed — User ID result comes from the loaded request)</span>':'');
+        if(badge){ badge.style.display='none'; badge.textContent=''; }
+        if(fab) fab.classList.remove('alert');
+        bwRadarSetMsg('<span class="aws-dup-clean">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
+            +sheetLine
+            +(contactErr?' <span style="font-size:.75rem;">(Contact ID scan failed — User ID result comes from the loaded request)</span>':''), true, 'clean');
+        window.bwRadarState='clean';
     }
+    if(window.bwStepsRefresh) window.bwStepsRefresh();
 }
 function bwRadarRender(){
     const results=document.getElementById('bwRadarResults');
@@ -27864,15 +27946,37 @@ function bwToggleTopbar(expand){
     w.classList.toggle('chat-collapsed',!open);
 }
 
-function bwRadarToggle(show){
-    const modal=document.getElementById('bwRadarModal');
-    if(!modal) return;
-    const open=show===undefined?modal.style.display==='none':!!show;
-    if(open&&bwRadarMatches.length&&!document.getElementById('bwRadarResults').innerHTML) bwRadarRender();
-    modal.style.display=open?'flex':'none';
+// v28.6: guided-steps rail clicks — jump to the section and pulse it,
+// exactly like the ticket workspace's twStepGo. Step 2 (Duplicates) drives
+// the radar itself: matches -> toggle the drawer; none yet -> run the scan.
+function bwStepGo(n){
+    const root=document.getElementById('bwRoot');
+    if(n===2){ bwRadarFabClick(); return; }
+    const sel={1:'[data-bind-request-details]',3:'.bw-check',4:'[data-bind-section="comparison"]',5:'[data-bind-decision]',6:'.bw-final'}[n];
+    const el=root&&sel?root.querySelector(sel):null;
+    if(!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+    el.classList.add('twx-pulse');
+    setTimeout(function(){ el.classList.remove('twx-pulse'); },1700);
 }
+// The verdict bubble is PERSISTENT — outside clicks and Escape close ONLY the
+// match-cards drawer, never the bubble (its own ✕ dismisses it). Same
+// contract as the ticket drawer; clicks inside the dock/drawer/bubble are
+// left alone.
+document.addEventListener('click', function(e){
+    const drawer=document.getElementById('bwDupDrawer');
+    if(!drawer) return;
+    const inside=e.target.closest&&(e.target.closest('#bwRadarDock')||e.target.closest('#bwDupDrawer')||e.target.closest('#bwRadarMsg'));
+    if(inside) return;
+    if(drawer.classList.contains('open')) drawer.classList.remove('open');
+});
+document.addEventListener('keydown', function(e){
+    if(e.key!=='Escape') return;
+    const drawer=document.getElementById('bwDupDrawer');
+    if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
+});
 
-window.SAM19_BUILD='v28.5 bind-radar-modal-staticflow 2026-11-14';
+window.SAM19_BUILD='v28.6 bind-ticket-parity-steps-radar 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
