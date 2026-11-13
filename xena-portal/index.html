@@ -1957,6 +1957,30 @@
         #bwRoot{--portal-header-height:64px}
         .bq-match-chip{display:inline-block;font-size:.72rem;font-weight:700;color:var(--accent-amber);background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:3px 8px;border-radius:12px;}
         .bw-radar-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:700;vertical-align:2px;margin-left:4px;}
+
+        /* ─── v28.1 (Ahmed): bind pages wear the Live Queue visual language ─── */
+        .bq-hero{margin-bottom:22px;}
+        /* rich cards (Query + radar): per-type accent bar, glow, pill type */
+        .qy-card.bq-rich::before{background:linear-gradient(90deg,var(--ltq-accent,var(--accent-cyan)),transparent 75%);height:3px;}
+        .qy-card.bq-rich:hover{border-color:var(--ltq-accent,var(--accent-cyan));box-shadow:0 14px 36px rgba(0,0,0,.35),0 0 0 1px var(--ltq-accent,var(--accent-cyan));}
+        .qy-card.bq-rich .qy-card-num{color:var(--ltq-accent,var(--accent-cyan));}
+        .qy-card.bq-rich .qy-card-type{display:inline-block;margin-top:6px;font-size:.72rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ltq-accent,var(--accent-cyan));background:color-mix(in srgb,var(--ltq-accent,var(--accent-cyan)) 10%,transparent);border:1px solid color-mix(in srgb,var(--ltq-accent,var(--accent-cyan)) 32%,transparent);padding:3px 10px;border-radius:12px;}
+        /* duplicate radar = header icon + badge toggling a styled panel */
+        .bw-radar-fab{position:relative;width:48px;height:48px;flex:none;border-radius:50%;border:1px solid rgba(255,77,109,.45);background:color-mix(in srgb,var(--surface) 72%,transparent);color:var(--accent-rose);font-size:1.3rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;box-shadow:0 4px 12px rgba(255,77,109,.12),0 2px 8px rgba(0,0,0,.4);transition:transform .2s,box-shadow .2s;}
+        .bw-radar-fab:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(255,77,109,.3),0 6px 18px rgba(255,77,109,.22);}
+        .bw-radar-fab.alert{border-color:var(--accent-rose);background:rgba(255,77,109,.16);animation:bwRadarPulse 1.6s ease-in-out infinite;}
+        @keyframes bwRadarPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,109,.35);}50%{box-shadow:0 0 0 9px rgba(255,77,109,0);}}
+        .bw-radar-fab .bw-radar-badge{position:absolute;top:-6px;right:-6px;margin-left:0;vertical-align:0;}
+        .bw-radar-panel{position:relative;overflow:hidden;margin-bottom:20px;padding:20px 22px;border-radius:16px;background:linear-gradient(145deg,rgba(255,77,109,.07),var(--surface) 55%);border:1px solid rgba(255,77,109,.3);animation:ltqCardIn .35s cubic-bezier(.2,.9,.3,1.2) backwards;}
+        .bw-radar-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent-rose),transparent 70%);}
+        .bw-radar-panel.clean{background:linear-gradient(145deg,rgba(0,230,118,.06),var(--surface) 55%);border-color:rgba(0,230,118,.3);}
+        .bw-radar-panel.clean::before{background:linear-gradient(90deg,var(--accent-green),transparent 70%);}
+        .bw-radar-summary{font-size:.92rem;color:var(--text-muted);}
+        .bw-radar-sheet{margin-top:8px;font-size:.8rem;color:var(--text-muted);}
+        .bw-radar-panel .qy-grid{margin-top:14px;}
+        /* shimmer skeletons while the queue loads (no more dead text) */
+        .bq-skel{border-radius:18px;height:150px;background:linear-gradient(100deg,var(--surface) 30%,var(--surface-hover) 50%,var(--surface) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;border:1px solid var(--border);}
+        @keyframes bqSkel{from{background-position:180% 0;}to{background-position:-20% 0;}}
         .bw-file-overlay{position:fixed;inset:0;z-index:10001;background:rgba(4,6,10,.85);display:flex;align-items:center;justify-content:center;padding:20px;}
         .bw-file-box{width:min(960px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}
         .bw-file-box header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:.9rem;color:var(--text);}
@@ -4953,21 +4977,27 @@ html{background:var(--bg);min-height:100%}
             <!-- v27 (Ahmed): Live Bind Queue — bind requests with an empty
                  "handled by", auto-loaded on open (one search per open/click). -->
             <div id="pg-bind-queue" style="display:none">
-                <div class="card" style="margin-bottom:24px; padding-bottom:28px;">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                        Live Bind Queue
-                    </h3>
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                        <span id="bqResultCount" style="font-size:.95rem;color:var(--text-muted); font-weight:500;">Loading unhandled bind requests…</span>
-                        <button class="btn btn-secondary" onclick="bqLoad(true)" style="height:40px;">⟳ Refresh</button>
+                <!-- v28.1 (Ahmed): Live Bind Queue wears the Live Ticket Queue's
+                     visual language -- gradient hero + compact ltq-cards. -->
+                <div class="ltq-hero bq-hero">
+                    <div class="ltq-hero-left">
+                        <div class="ltq-hero-icon">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="ltq-title">Live Bind Queue</h3>
+                            <p class="ltq-subtitle">Bind requests with an empty “handled by” — newest first. Click a card to open its workspace instantly.</p>
+                        </div>
                     </div>
-                    <div style="font-size:.85rem;color:var(--text-muted);margin-top:12px;">Bind requests with an empty “handled by” — newest first. Click a request to open its workspace.</div>
+                    <div class="ltq-hero-right">
+                        <span id="bqResultCount" class="ltq-count-badge">Loading…</span>
+                        <button class="ltq-pull-btn" onclick="bqLoad(true)"><span class="ltq-pull-icon">⟳</span> Refresh</button>
+                    </div>
                 </div>
-                <div id="bqResults" class="qy-grid"></div>
-                <div id="bqEmpty" style="display:none;text-align:center;padding:60px 0;color:var(--text-muted); background:var(--surface); border:1px dashed var(--border); border-radius:16px;">
-                    <div style="font-size:2.5rem;margin-bottom:16px; opacity:0.6;">🎉</div>
-                    <p style="font-size:1.1rem; font-weight:500;">All caught up — no unhandled bind requests.</p>
+                <div id="bqResults" class="ltq-grid"></div>
+                <div id="bqEmpty" class="ltq-empty" style="display:none;">
+                    <div style="font-size:2.5rem;margin-bottom:18px; opacity:0.6;">🎉</div>
+                    <p style="font-size:1.25rem; font-weight:600;">All caught up — no unhandled bind requests.</p>
                 </div>
             </div>
 
@@ -4975,11 +5005,18 @@ html{background:var(--bg);min-height:100%}
                  Request Query; request number / User ID / Contact ID. Zero-cost
                  open: nothing is fetched until Search is clicked. -->
             <div id="pg-bind-query" style="display:none">
+                <div class="ltq-hero bq-hero">
+                    <div class="ltq-hero-left">
+                        <div class="ltq-hero-icon">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="ltq-title">Query Bind Requests</h3>
+                            <p class="ltq-subtitle">Search every bind request ever submitted — by request number, User ID or Contact ID.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="card" style="margin-bottom:24px; padding-bottom:32px;">
-                    <h3 style="color:var(--accent-cyan);margin-bottom:24px; display:flex; align-items:center; gap:8px;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                        Query Bind Requests
-                    </h3>
                     <div class="control-grid" style="grid-template-columns: 2fr 4fr 2fr; align-items:end; gap:20px;">
                         <div class="control-group">
                             <label>Search By</label>
@@ -5021,25 +5058,31 @@ html{background:var(--bg);min-height:100%}
                 </div>
             </div>
 
-            <!-- v28 (Ahmed): Bind Request Workspace — the handoff component mounts
-                 into #bwRoot and owns details/evidence/checks/decision/save; the
-                 duplicate radar card above it is portal-side (User ID + Contact ID). -->
+            <!-- v28.1 (Ahmed): Bind Request Workspace — gradient hero header like
+                 the ticket workspace, the duplicate radar is a 📡 ICON with a badge
+                 (click toggles the panel; duplicates auto-reveal it), and the handoff
+                 component mounts into #bwRoot. -->
             <div id="pg-bind-workspace" style="display:none">
-                <div class="card" style="margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                        <button class="btn btn-secondary" onclick="bwBack()" style="height:40px;">← Back</button>
-                        <h3 id="bwTitle" style="margin:0;color:var(--accent-cyan);">🔗 Bind Request</h3>
+                <div class="ltq-hero bq-hero">
+                    <div class="ltq-hero-left">
+                        <button class="btn btn-secondary" onclick="bwBack()" style="height:42px;flex:none;">← Back</button>
+                        <div class="ltq-hero-icon">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="ltq-title" id="bwTitle">Bind Request</h3>
+                            <p class="ltq-subtitle">Review the evidence, run the checks, then save the decision — Status, reason and comment are verified one field at a time.</p>
+                        </div>
+                    </div>
+                    <div class="ltq-hero-right">
                         <span id="bwStatusChip" style="font-size:.85rem;"></span>
+                        <button type="button" class="bw-radar-fab" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="bw-radar-badge" style="display:none;"></span></button>
                     </div>
                 </div>
-                <div class="card" id="bwRadarCard" style="margin-bottom:20px;display:none;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                        <h4 style="margin:0;color:var(--accent-cyan);">📡 Duplicate Radar <span id="bwRadarBadge" class="bw-radar-badge" style="display:none;"></span></h4>
-                        <button class="btn btn-secondary" id="bwRadarToggleBtn" onclick="bwRadarToggle()" style="height:36px;display:none;">👀 View matches</button>
-                    </div>
-                    <div id="bwRadarSummary" style="margin-top:10px;font-size:.9rem;color:var(--text-muted);">Open a request to scan for duplicates.</div>
-                    <div id="bwRadarSheet" style="margin-top:8px;font-size:.8rem;color:var(--text-muted);"></div>
-                    <div id="bwRadarResults" class="qy-grid" style="margin-top:14px;display:none;"></div>
+                <div id="bwRadarPanel" class="bw-radar-panel" style="display:none;">
+                    <div id="bwRadarSummary" class="bw-radar-summary">Open a request to scan for duplicates.</div>
+                    <div id="bwRadarSheet" class="bw-radar-sheet"></div>
+                    <div id="bwRadarResults" class="qy-grid"></div>
                 </div>
                 <div id="bwRoot"></div>
             </div>
@@ -6369,11 +6412,31 @@ function setActiveTab(page) {
     // Ticket tab, which mounts the draft without a stash) means nothing is
     // parked -- clear a stale flag so a later module click can't misfire.
     if (page === 'ticket-workspace') { twWsParked = false; twWsParkedKey = null; }
+    // v28.1 (Ahmed, video): the bind workspace parks/restores exactly like the
+    // ticket workspace. The component is a keep-alive singleton (bwInstance),
+    // so a restore costs ZERO requests -- the request is still on screen.
+    if (page === 'bind-queue' || page === 'bind-query') {
+        const bwOrigin = (typeof bwReturnTo !== 'undefined') ? bwReturnTo : 'bind-queue';
+        if (activeTabId === 'bind-workspace' && page === bwOrigin) {
+            window.__bwWsParked = true; // B -- clicked the origin tab while viewing the workspace: show the list
+        } else if (!window.__xdRestoringLayout && activeTabId !== page && page === bwOrigin &&
+                   typeof bwInstance !== 'undefined' && bwInstance && bwCurrentId) {
+            if (window.__bwWsParked) {
+                window.__bwWsParked = false; // C -- deliberate park consumed once
+            } else {
+                openInTab('bind-workspace'); // A -- restore the open request
+                return;
+            }
+        }
+    }
+    if (page === 'bind-workspace') window.__bwWsParked = false; // D
     activeTabId = page;
     renderTabs();
 
     document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active', 'active-nav'));
-    const navEl = document.getElementById('nav-' + page);
+    // v28.1: the bind workspace has no nav item -- highlight its origin.
+    const bwNavPage = (page === 'bind-workspace' && typeof bwReturnTo !== 'undefined') ? bwReturnTo : page;
+    const navEl = document.getElementById('nav-' + bwNavPage);
     if(navEl) navEl.classList.add('active', 'active-nav');
 
     executePageLogic(page);
@@ -6437,7 +6500,7 @@ function closeTab(page, event) {
         // does (twWsTabs['create']), independent of the mounted workspace's
         // twCreateMode flag.
         const draftAlive = typeof twWsTabs !== 'undefined' && !!(twWsTabs['create'] && twWsTabs['create'].node);
-        const ownsTab = p => !(p === 'ticket-workspace' && !draftAlive);
+        const ownsTab = p => !(p === 'ticket-workspace' && !draftAlive) && p !== 'bind-workspace'; // v28.1: bind workspace never owns a tab
         const candidates = openTabs.filter(ownsTab);
         activeTabId = candidates.length ? candidates[candidates.length - 1] : 'welcome';
     }
@@ -6466,7 +6529,9 @@ function renderTabs() {
     // 'ticket-workspace' entry in openTabs, so ← Back hid the tab and the
     // module auto-remount brought it back -- the exact close/reappear flicker
     // Ahmed caught on his recording.
-    const pagesToRender = openTabs.filter(p => p !== 'ticket-workspace');
+    // v28.1: the bind workspace owns no tab either -- its origin tab
+    // (bwReturnTo) stays highlighted while it is the active page.
+    const pagesToRender = openTabs.filter(p => p !== 'ticket-workspace' && p !== 'bind-workspace');
     if (draftAlive) {
         const at = openTabs.indexOf('ticket-workspace');
         if (at >= 0) pagesToRender.splice(Math.min(at, pagesToRender.length), 0, 'ticket-workspace');
@@ -6482,7 +6547,8 @@ function renderTabs() {
         const isActive = page === 'ticket-workspace'
             ? (page === activeTabId && typeof twWsActiveKey !== 'undefined' && twWsActiveKey === 'create')
             : (page === activeTabId ||
-               (activeTabId === 'ticket-workspace' && typeof twReturnTo !== 'undefined' && page === twReturnTo));
+               (activeTabId === 'ticket-workspace' && typeof twReturnTo !== 'undefined' && page === twReturnTo) ||
+               (activeTabId === 'bind-workspace' && typeof bwReturnTo !== 'undefined' && page === bwReturnTo));
 
         const tabEl = document.createElement('div');
         tabEl.className = `tab-item ${isActive ? 'active' : ''}`;
@@ -7176,6 +7242,12 @@ function enhanceSelect(select) {
     // Skip selects explicitly opted out (e.g. extremely simple 2-3-option
     // toggles where a searchable panel would be overkill) via data-no-search.
     if (select.hasAttribute('data-no-search')) return;
+    // v28.1 (Ahmed, video): the bind handoff component (#bwRoot) tracks its
+    // draft on the native 'input' event, but this wrapper only dispatches
+    // 'change' -- so Status / Reason picks never reached the draft (save
+    // blocked with "Choose Status and its Decision / Reject reason." and the
+    // reason list never rebuilt on status change). #bwRoot selects stay NATIVE.
+    if (select.closest && select.closest('#bwRoot')) return;
     select.dataset.ssEnhanced = '1';
     select.classList.add('ss-native-hidden');
 
@@ -27205,11 +27277,72 @@ const BW_QUICK_REPLIES=[
 function bqQS(){ return 'user='+encodeURIComponent(loggedUser)+'&email='+encodeURIComponent(loggedEmail); }
 function bqFmtTime(ms){ const n=Number(ms); if(!n) return '—'; try{ return new Date(n).toLocaleString(); }catch(e){ return String(ms); } }
 
+/* v28.1 (Ahmed): the Live Bind Queue renders COMPACT Live-Queue cards — type
+   pill, request number, the big User ID, who submitted it, a one-line reason.
+   The full-info card (View Pictures / Open Workspace) lives in Query + the
+   duplicate radar only — never in the live queue. */
+function bqQueueCardHtml(it, i){
+    const rid=escHtml(it.record_id||'');
+    const type=(it.user_type||'Bind Request').toString().replace(/_/g,' ').trim()+(it.region?(' · '+String(it.region).toUpperCase()):'');
+    const color=ltqTypeColor(it.user_type||'Bind Request');
+    const num=it.numbering?('#'+it.numbering):('#'+String(it.record_id||'').slice(-6));
+    const main=it.user_id||it.contact_id||num;
+    return '<div class="ltq-card" style="--ltq-accent:'+color+';animation-delay:'+Math.min((i||0)*60,480)+'ms" onclick="bqCardOpen(this, \''+rid+'\')" onmouseenter="bwPrefetch(\''+rid+'\', true)">'
+        +'<div class="ltq-card-top">'
+        +'<span class="ltq-card-type">'+escHtml(type)+'</span>'
+        +'<span class="ltq-card-num">'+escHtml(num)+'</span>'
+        +'<button type="button" class="ltq-copy" title="Copy request number" onclick="event.stopPropagation();samCopyText(\''+escHtml(num)+'\', this)">⧉</button>'
+        +'</div>'
+        +'<div class="ltq-card-main">'+escHtml(main)+'</div>'
+        +'<div class="ltq-card-sub">👤 '+escHtml(it.submitted_by||'Unknown')+'</div>'
+        +(it.reason?'<div class="ltq-card-sub" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📋 '+escHtml(it.reason)+'</div>':'')
+        +'<span class="ltq-card-open">Open →</span>'
+        +'</div>';
+}
+function bqCardOpen(cardEl, recordId){
+    if(!cardEl||cardEl.classList.contains('opening')) return;
+    cardEl.classList.add('opening');
+    const hint=cardEl.querySelector('.ltq-card-open');
+    const old=hint?hint.innerHTML:'';
+    if(hint) hint.innerHTML='<span class="ltq-mini-spinner"></span> Opening…';
+    Promise.resolve(bwOpen(recordId)).finally(function(){
+        cardEl.classList.remove('opening');
+        if(hint) hint.innerHTML=old||'Open →';
+    });
+}
+/* v28.1: hover/queue prefetch warms bwViewCache so a click paints instantly —
+   max 3 fetches in flight, hover jumps the queue (same discipline as the Live
+   Queue's twPrefetchTicket). */
+const bwPrefetchJobs={}; let bwPfActive=0; const bwPfQueue=[];
+function bwPrefetch(recordId, priority){
+    if(!recordId||bwPrefetchJobs[recordId]) return;
+    const cached=bwViewCache[recordId];
+    if(cached&&Date.now()-cached.ts<60000) return; // fresh enough
+    const job={recordId:recordId};
+    bwPrefetchJobs[recordId]=new Promise(function(resolve){ job.resolve=resolve; });
+    if(priority) bwPfQueue.unshift(job); else bwPfQueue.push(job);
+    bwPfPump();
+}
+function bwPfPump(){
+    while(bwPfActive<3&&bwPfQueue.length){
+        const job=bwPfQueue.shift(); bwPfActive++;
+        bwFetchView(job.recordId).then(function(view){
+            view=bwAuthedView(view);
+            bwViewCache[job.recordId]={view:view, ts:Date.now()};
+            job.resolve(view);
+        }).catch(function(){
+            delete bwPrefetchJobs[job.recordId];
+            job.resolve(null);
+        }).finally(function(){ bwPfActive--; bwPfPump(); });
+    }
+}
+
 /* Universal-Query-style rich card — queue, query AND duplicate radar all render
    the same card: full ticket details + View Pictures / Open Workspace actions. */
 function bqCardHtml(it, matchedOn){
     const rid=escHtml(it.record_id||'');
-    let h='<div class="qy-card">'
+    const accent=ltqTypeColor(it.user_type||'Bind Request'); // v28.1: per-type accent
+    let h='<div class="qy-card bq-rich" style="--ltq-accent:'+accent+'">'
         +'<div class="qy-card-head"><div>'
         +'<div class="qy-card-num">#'+escHtml(it.numbering||'—')+'</div>'
         +'<div class="qy-card-type">'+escHtml([it.user_type,it.region].filter(Boolean).join(' · ')||'Bind Request')+'</div>'
@@ -27277,17 +27410,21 @@ async function bqViewPictures(recordId, btn){
 async function bqLoad(manual){
     const grid=document.getElementById('bqResults'); if(!grid) return;
     const cnt=document.getElementById('bqResultCount'), empty=document.getElementById('bqEmpty');
-    cnt.textContent='⏳ Loading unhandled bind requests…'; empty.style.display='none'; grid.innerHTML='';
+    cnt.textContent='Loading…'; empty.style.display='none';
+    grid.innerHTML='<div class="bq-skel"></div><div class="bq-skel"></div><div class="bq-skel"></div>';
     try{
         const r=await fetch('/api/bind/queue?'+bqQS());
         const d=await r.json();
         if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
         const items=d.requests||[];
-        cnt.textContent=items.length?('📋 '+items.length+' unhandled bind request'+(items.length>1?'s':'')+' — newest first'):'';
-        if(!items.length){ empty.style.display='block'; return; }
-        grid.innerHTML=items.map(function(it){ return bqCardHtml(it); }).join('');
+        cnt.textContent=items.length?(items.length+' unhandled'):'0 unhandled';
+        if(!items.length){ grid.innerHTML=''; empty.style.display='block'; return; }
+        grid.innerHTML=items.map(function(it,i){ return bqQueueCardHtml(it,i); }).join('');
+        // v28.1: warm the workspace cache in the background (Live-Queue speed)
+        items.forEach(function(it){ bwPrefetch(it.record_id); });
         if(manual) ToastManager.show('🔄 Queue refreshed','success',2500);
     }catch(e){
+        grid.innerHTML='';
         cnt.textContent='⚠️ '+(e.message||e);
         ToastManager.show('Bind queue failed: '+(e.message||e),'error',9000);
     }
@@ -27325,6 +27462,17 @@ function bwMount(){
         saveDecision: bwSaveDecision,
         openEvidence: bwOpenEvidence,
         quickReplies: BW_QUICK_REPLIES
+    });
+    // v28.1: the handoff component tracks drafts on the native 'input' event,
+    // which the searchable-select wrapper never fires -- unwrap any select that
+    // somehow got enhanced inside #bwRoot (enhanceSelect guards on #bwRoot, so
+    // this should find nothing; it is belt & braces for older cached pages).
+    root.querySelectorAll('.ss-wrapper').forEach(function(w){
+        const sel=w.querySelector('select'); if(!sel) return;
+        w.parentNode.insertBefore(sel,w);
+        delete sel.dataset.ssEnhanced;
+        sel.classList.remove('ss-native-hidden');
+        w.remove();
     });
     return bwInstance;
 }
@@ -27434,7 +27582,17 @@ async function bwOpen(recordId){
         document.getElementById('bwStatusChip').innerHTML='';
     }
     try{
-        const view=bwAuthedView(await bwFetchView(recordId));
+        // v28.1: if a hover/queue prefetch is still in flight, await IT instead
+        // of firing a second /api/bind/request; a settled prefetch already
+        // painted from bwViewCache and we still refresh fresh below.
+        const pf=bwPrefetchJobs[recordId];
+        let view;
+        if(pf&&!bwViewCache[recordId]){
+            view=await pf;
+            if(!view) throw new Error('Bind request failed to load.');
+        }else{
+            view=bwAuthedView(await bwFetchView(recordId));
+        }
         bwViewCache[recordId]={view:view, ts:Date.now()};
         if(mySeq!==bwOpenSeq) return;
         const cur=inst.getState();
@@ -27454,7 +27612,12 @@ async function bwOpen(recordId){
         }
     }
 }
-function bwBack(){ openInTab(bwReturnTo||'bind-queue'); }
+function bwBack(){
+    // v28.1: Back = park the workspace and show the origin list (same-tab,
+    // exactly like the ticket workspace's Back).
+    window.__bwWsParked=true;
+    openInTab(bwReturnTo||'bind-queue');
+}
 function bwAfterOpen(view){
     if(!view) return;
     document.getElementById('bwTitle').textContent='🔗 Bind Request #'+(view.number||'?');
@@ -27462,15 +27625,20 @@ function bwAfterOpen(view){
     bwRadarScan(view);
 }
 
-/* Duplicate radar — works like the audit radar: User ID matches come free with
-   the loaded request view, Contact ID adds one query call; cards show matches. */
+/* v28.1 (Ahmed): the duplicate radar is a 📡 ICON in the workspace header with
+   a match badge (like the ticket workspace's fab). Clicking it toggles the
+   panel; duplicates auto-reveal it. User-ID matches come free with the loaded
+   request view, Contact ID adds one query call. */
 async function bwRadarScan(view){
-    const card=document.getElementById('bwRadarCard'); if(!card||!view) return;
-    card.style.display='block';
+    const panel=document.getElementById('bwRadarPanel'); if(!panel||!view) return;
     const summary=document.getElementById('bwRadarSummary'), badge=document.getElementById('bwRadarBadge'),
-          results=document.getElementById('bwRadarResults'), toggleBtn=document.getElementById('bwRadarToggleBtn'),
-          sheet=document.getElementById('bwRadarSheet');
-    results.style.display='none'; results.innerHTML=''; toggleBtn.style.display='none';
+          results=document.getElementById('bwRadarResults'),
+          sheet=document.getElementById('bwRadarSheet'),
+          fab=document.getElementById('bwRadarFab');
+    panel.style.display='none'; panel.classList.remove('clean');
+    results.innerHTML='';
+    if(fab) fab.classList.remove('alert');
+    if(badge){ badge.style.display='none'; badge.textContent=''; }
     bwRadarMatches=[];
     const myId=view.recordId;
     const byKey=new Map();
@@ -27502,38 +27670,37 @@ async function bwRadarScan(view){
     bwRadarMatches=Array.from(byKey.values());
     sheet.innerHTML=(view.sheetDupCheck&&String(view.sheetDupCheck).trim())?('Sheet “Duplicated Check”: '+escHtml(view.sheetDupCheck)):'';
     const n=bwRadarMatches.length;
-    badge.style.display=n?'inline-grid':'none'; badge.textContent=n;
     if(n){
+        if(badge){ badge.style.display='inline-grid'; badge.textContent=n; }
+        if(fab) fab.classList.add('alert');
         summary.innerHTML='<span style="color:var(--accent-rose);font-weight:600;">⚠️ '+n+' other request'+(n>1?'s':'')+' share this User ID / Contact ID</span>'
             +(view.relatedComplete===false?' <span style="font-size:.75rem;color:var(--text-muted);">(User ID list may be incomplete)</span>':'')
             +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed)</span>':'');
-        toggleBtn.style.display='inline-block';
-        bwRadarRender(); // show the duplicated ticket cards right away
+        bwRadarRender();
+        panel.style.display='block'; // duplicates auto-reveal the panel
     }else{
+        panel.classList.add('clean');
         summary.innerHTML='<span style="color:var(--accent-green);font-weight:600;">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
             +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed — User ID result comes from the loaded request)</span>':'');
     }
 }
 function bwRadarRender(){
-    const results=document.getElementById('bwRadarResults'), btn=document.getElementById('bwRadarToggleBtn');
+    const results=document.getElementById('bwRadarResults');
     if(!results) return;
     results.innerHTML=bwRadarMatches.map(function(m){ return bqCardHtml(m.brief, m.matchedOn); }).join('');
-    results.style.display='grid';
-    if(btn) btn.textContent='🙈 Hide matches';
 }
 function bwRadarToggle(){
-    const results=document.getElementById('bwRadarResults'), btn=document.getElementById('bwRadarToggleBtn');
-    if(!results) return;
-    if(results.style.display==='none'){
-        if(!results.innerHTML) bwRadarRender();
-        else{ results.style.display='grid'; if(btn) btn.textContent='🙈 Hide matches'; }
+    const panel=document.getElementById('bwRadarPanel');
+    if(!panel) return;
+    if(panel.style.display==='none'){
+        if(bwRadarMatches.length&&!document.getElementById('bwRadarResults').innerHTML) bwRadarRender();
+        panel.style.display='block';
     }else{
-        results.style.display='none';
-        if(btn) btn.textContent='👀 View '+bwRadarMatches.length+' match'+(bwRadarMatches.length>1?'es':'');
+        panel.style.display='none';
     }
 }
 
-window.SAM19_BUILD='v28 bind-redesign 2026-11-13';
+window.SAM19_BUILD='v28.1 bind-live-parity 2026-11-13';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
