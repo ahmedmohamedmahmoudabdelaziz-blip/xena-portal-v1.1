@@ -1937,6 +1937,34 @@
             .main-content{margin-left: 0;}
             .chart-box,.kpi-card{border:1px solid #ccc;page-break-inside:avoid}
         }
+        /* ═══ v28: Bind workspace — handoff component styles, tokens remapped
+           onto the portal theme vars so light/dark follow the portal ═══ */
+        /* Embed these scoped styles inside the existing portal; keep its shell/navigation. */
+        .bw{color-scheme:dark;--bw-bg:var(--bg);--bw-card:var(--surface);--bw-inner:var(--surface-inset);--bw-line:var(--border);--bw-text:var(--text);--bw-muted:var(--text-muted);--bw-accent:var(--accent-cyan);--bw-accent-ink:#05242e;--bw-ok:#7ddba8;--bw-warn:#e7bf7d;--bw-bad:#ed9d9d;--bw-info:#9ec7f0;color:var(--bw-text);font:14px/1.55 Inter,'Segoe UI',system-ui,sans-serif;min-width:0;--bw-radius:12px}
+        html[data-theme=light] .bw,.bw[data-theme=light]{color-scheme:light;--bw-accent-ink:#fff;--bw-ok:#23744f;--bw-warn:#8c5917;--bw-bad:#ac3c40;--bw-info:#355f8d}
+        .bw *{box-sizing:border-box}.bw [hidden]{display:none!important}.bw button,.bw input,.bw select,.bw textarea{font:inherit;color:inherit}.bw button{cursor:pointer}.bw a{color:inherit}.bw h1,.bw h2,.bw h3,.bw p{margin:0}.bw h1{font-size:30px;font-weight:650;letter-spacing:-.035em;line-height:1.2}.bw h2{font-size:19px;letter-spacing:-.02em;line-height:1.35;font-weight:650}.bw h3{font-size:15px;font-weight:650}.bw small{font-size:12px}.bw code,.bw .bw-number{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}.bw button:focus-visible,.bw input:focus-visible,.bw select:focus-visible,.bw textarea:focus-visible,.bw a:focus-visible{outline:2px solid var(--bw-accent);outline-offset:3px}
+        .bw-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px}.bw-kicker{color:var(--bw-muted);font-size:11px;font-weight:650;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px}.bw-sub{color:var(--bw-muted);font-size:13px;margin-top:8px!important;line-height:1.65}.bw-load{display:flex;gap:8px;align-items:center}.bw-load input{width:140px}.bw input,.bw select,.bw textarea{background:var(--bw-inner);border:1px solid var(--bw-line);border-radius:8px;padding:10px 12px;max-width:100%;min-width:0}.bw input,.bw select{min-height:42px}.bw textarea{resize:vertical;min-height:84px;width:100%}.bw button:disabled{opacity:.45;cursor:not-allowed}.bw label{display:block;color:var(--bw-muted);font-size:12px;margin-bottom:6px}.bw-btn{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:40px;padding:9px 14px;background:var(--bw-card);border:1px solid var(--bw-line);border-radius:8px;font-weight:600;white-space:nowrap}.bw-btn:hover:not(:disabled){border-color:var(--bw-muted);background:var(--bw-inner)}.bw-btn.bw-primary{background:var(--bw-accent);border-color:var(--bw-accent);color:var(--bw-accent-ink)}.bw-btn.bw-primary:hover:not(:disabled){filter:brightness(1.06);background:var(--bw-accent)}.bw-btn.bw-quiet{background:transparent;min-height:32px;padding:5px 8px;font-size:12px}.bw-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bw-grow{flex:1;min-width:0}.bw-card{background:var(--bw-card);border:1px solid var(--bw-line);border-radius:var(--bw-radius);min-width:0;overflow:hidden}.bw-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:22px 24px 18px;border-bottom:1px solid var(--bw-line)}.bw-card-body{padding:22px 24px}.bw-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bw-line);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;color:var(--bw-muted);white-space:nowrap}.bw-chip:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}.bw-ok{color:var(--bw-ok)!important}.bw-warn{color:var(--bw-warn)!important}.bw-bad{color:var(--bw-bad)!important}.bw-info{color:var(--bw-info)!important}.bw-muted{color:var(--bw-muted)}.bw-empty{padding:48px 24px;text-align:center;border:1px dashed var(--bw-line);border-radius:12px}.bw-empty p{color:var(--bw-muted);margin:10px auto 0;max-width:540px}.bw-banner{padding:12px 16px;margin:0 0 16px;border-left:3px solid var(--bw-accent);background:var(--bw-inner);border-radius:0 8px 8px 0;font-size:13px}.bw-banner:empty{display:none}
+        .bw-topgrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr);gap:20px;align-items:start}.bw-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}.bw-value small{display:block;color:var(--bw-muted);font-size:11px;margin-bottom:4px}.bw-value div{font-size:14px;white-space:pre-line;overflow-wrap:anywhere}.bw-value.bw-wide{grid-column:1/-1}.bw-note{border-top:1px solid var(--bw-line);margin-top:18px;padding-top:16px}.bw-note small{display:block;color:var(--bw-muted);margin-bottom:5px}.bw-note p{white-space:pre-line}.bw-evidence{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.bw-evidence button{background:var(--bw-inner);border:1px solid var(--bw-line);border-radius:9px;overflow:hidden;text-align:left;width:116px;padding:0}.bw-evidence img{display:block;width:100%;height:82px;object-fit:contain;background:var(--bw-bg)}.bw-evidence span{display:block;padding:8px 9px;font-size:11px;line-height:1.4;overflow-wrap:anywhere}.bw-evidence .bw-file-icon{display:grid;place-items:center;font-size:26px;height:82px;color:var(--bw-muted)}.bw details summary{cursor:pointer;color:var(--bw-muted);font-size:12px;padding:10px 0}.bw-related{margin-top:16px;background:var(--bw-inner);border-radius:8px;padding:0 12px}.bw-related-row{padding:10px 0;border-top:1px solid var(--bw-line);font-size:12px}.bw-form-grid{display:grid;grid-template-columns:1fr;gap:14px}.bw-form-grid select{width:100%}.bw-decision-summary{display:flex;gap:12px;justify-content:space-between;border-top:1px solid var(--bw-line);padding:14px 24px;font-size:11px;color:var(--bw-muted)}.bw-replies{border-top:1px solid var(--bw-line);padding-top:8px}.bw-reply-list{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow:auto;margin-top:8px}.bw-reply-list button{text-align:left;white-space:normal;font-weight:400}.bw-replies input{width:100%;font-size:12px}.bw-field-hint{font-size:11px;color:var(--bw-muted);margin-top:5px}.bw-required{margin-inline-start:4px;color:var(--bw-warn)}
+        .bw-check{margin-top:20px}.bw-check .bw-card-head{align-items:center}.bw-setup{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}.bw-range{border:1px solid var(--bw-line);background:var(--bw-inner);border-radius:9px;padding:14px 16px}.bw-range>label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--bw-text);margin:0}.bw input[type=checkbox]{min-height:0;accent-color:var(--bw-accent);width:16px;height:16px;padding:0}.bw-date-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.bw-date-grid input{width:100%;font-size:12px;padding:8px}.bw-run-summary{display:flex;align-items:center;gap:16px;padding:14px 24px;border-top:1px solid var(--bw-line);color:var(--bw-muted);font-size:12px}.bw-progress{height:4px;background:var(--bw-line);border-radius:4px;flex:1;overflow:hidden}.bw-progress i{display:block;background:var(--bw-accent);height:100%;width:0;transition:width .2s}.bw-nav{position:sticky;top:var(--portal-header-height,0px);z-index:4;display:flex;gap:4px;overflow:auto;margin:22px 0 16px;padding:10px 0;background:var(--bw-bg);border-bottom:1px solid var(--bw-line);scrollbar-width:thin}.bw-nav a{font-size:12px;text-decoration:none;white-space:nowrap;padding:8px 10px;border-radius:7px}.bw-nav a:hover{background:var(--bw-card);color:var(--bw-accent)}.bw-section{margin-bottom:16px;scroll-margin-top:calc(var(--portal-header-height,0px) + 72px)}.bw-index{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--bw-line);border-radius:8px;color:var(--bw-accent);font-size:12px;flex-shrink:0;margin-top:2px}.bw-titlegroup{display:flex;gap:12px;align-items:flex-start}.bw-section .bw-card-head{padding:20px 24px}.bw-answer{padding:15px 24px;background:var(--bw-inner);border-bottom:1px solid var(--bw-line);display:flex;gap:20px}.bw-answer>small{color:var(--bw-muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-top:2px;min-width:92px}.bw-answer>p{font-size:13px;white-space:pre-line;overflow-wrap:anywhere}.bw-result{padding:22px 24px;min-height:90px}.bw-not-run{display:flex;gap:10px;align-items:center;color:var(--bw-muted);font-size:13px;padding:8px 0}.bw-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.bw-result-grid .bw-value div{font-size:17px}.bw-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.bw-stat{padding:4px 16px 4px 0}.bw-stat+.bw-stat{border-left:1px solid var(--bw-line);padding-left:24px}.bw-stat strong{display:block;font-size:36px;font-weight:600;letter-spacing:-.05em;font-variant-numeric:tabular-nums}.bw-stat small{color:var(--bw-muted)}.bw-table-wrap{max-width:100%;overflow:auto;scrollbar-width:thin}.bw table{border-collapse:collapse;width:100%;font-size:12px}.bw th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:600;color:var(--bw-muted);padding:12px;border-bottom:1px solid var(--bw-line);background:var(--bw-inner);white-space:nowrap}.bw td{padding:14px 12px;border-bottom:1px solid var(--bw-line);vertical-align:top;white-space:pre-line;line-height:1.6}.bw tr:last-child td{border-bottom:0}.bw td small{display:block;font-size:11px;color:var(--bw-muted);margin-top:3px}.bw-table-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:12px;color:var(--bw-muted);font-size:11px}.bw-compare td:first-child{width:19%;font-weight:600}.bw-compare td{min-width:150px}.bw-device-answer+.bw-device-answer{margin-top:9px;padding-top:9px;border-top:1px dashed var(--bw-line)}.bw-counts{display:flex;gap:20px;align-items:center;font-size:12px;flex-wrap:wrap;margin:0 0 18px}.bw-counts b{font-size:22px;margin-right:5px;font-variant-numeric:tabular-nums;font-weight:600}.bw-final{margin-top:20px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid var(--bw-line);border-radius:12px;background:var(--bw-card)}.bw-final h3{margin-bottom:4px}.bw-final p{font-size:12px;color:var(--bw-muted)}.bw-status-dot{height:7px;width:7px;border-radius:50%;background:var(--bw-muted);display:inline-block;margin-right:7px}.bw-scroll-top{scroll-margin-top:80px}
+        .bw-overlay{position:fixed;inset:0;z-index:10000;background:#070d17c9;display:flex;align-items:center;justify-content:center;padding:24px}.bw-dialog{width:min(640px,100%);max-height:90vh;overflow:auto;background:var(--bw-card);border:1px solid var(--bw-line);border-radius:14px;padding:24px;box-shadow:0 24px 70px #0005}.bw-dialog header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.bw-dialog footer{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.bw-dialog .bw-warning-ack{display:flex;align-items:flex-start;gap:10px;font-size:12px;margin-top:16px;color:var(--bw-warn)}.bw-viewer .bw-dialog{width:min(1100px,100%)}.bw-view-stage{height:min(62vh,650px);overflow:hidden;background:var(--bw-bg);display:grid;place-items:center;touch-action:none;position:relative}.bw-view-stage img{max-height:80%;max-width:80%;object-fit:contain;user-select:none;cursor:grab}.bw-view-stage video{max-width:100%;max-height:100%}.bw-viewer .bw-tools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.bw-live-error{color:var(--bw-bad);font-size:12px;white-space:pre-line;margin-top:10px}.bw-live-error:empty{display:none}.bw-busy-dot{width:8px;height:8px;border-radius:50%;background:var(--bw-accent);animation:bw-pulse 1s ease infinite alternate}@keyframes bw-pulse{to{opacity:.3}}.bw-countline{font-size:12px;color:var(--bw-muted);margin-bottom:12px}
+        @media(max-width:1100px){.bw-topgrid{grid-template-columns:minmax(0,1.4fr) minmax(290px,1fr)}.bw-card-head,.bw-card-body,.bw-result{padding:18px}.bw-answer{padding:14px 18px}.bw h1{font-size:26px}.bw-form-grid{gap:12px}}
+        @media(max-width:850px){.bw-head{align-items:flex-start;flex-direction:column}.bw-load{width:100%}.bw-load input{flex:1;width:100%;min-width:80px}.bw-topgrid{grid-template-columns:1fr}.bw-form-grid{grid-template-columns:1fr 1fr}.bw-form-grid .bw-wide{grid-column:1/-1}.bw-setup{grid-template-columns:1fr}.bw-final{align-items:flex-start}.bw-section .bw-card-head{padding:18px}.bw-table-wrap table{min-width:580px}.bw-overlay{padding:12px}.bw-dialog{padding:18px}.bw-check .bw-card-head{align-items:flex-start;flex-wrap:wrap}}
+        @media(max-width:480px){.bw h1{font-size:25px}.bw h2{font-size:18px}.bw-meta{gap:14px}.bw-form-grid{grid-template-columns:1fr}.bw-answer{display:block}.bw-answer>small{display:block;margin-bottom:6px}.bw-result-grid{grid-template-columns:1fr}.bw-card-head{gap:10px}.bw-chip{font-size:10px}.bw-final{flex-direction:column}.bw-final .bw-btn{width:100%}.bw-run-summary{padding:14px;flex-wrap:wrap}.bw-run-summary .bw-progress{min-width:100px}.bw-dialog footer{flex-wrap:wrap}.bw-dialog footer button{flex:1}.bw-head{gap:16px}}
+        @media(prefers-reduced-motion:reduce){.bw *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+        /* v28: portal extras — duplicate radar, match chip, in-page video/file modal */
+        #bwRoot{--portal-header-height:64px}
+        .bq-match-chip{display:inline-block;font-size:.72rem;font-weight:700;color:var(--accent-amber);background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:3px 8px;border-radius:12px;}
+        .bw-radar-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:700;vertical-align:2px;margin-left:4px;}
+        .bw-file-overlay{position:fixed;inset:0;z-index:10001;background:rgba(4,6,10,.85);display:flex;align-items:center;justify-content:center;padding:20px;}
+        .bw-file-box{width:min(960px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}
+        .bw-file-box header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:.9rem;color:var(--text);}
+        .bw-file-box video{display:block;width:100%;max-height:72vh;background:#000;}
+        .bw-file-box .bw-btn{display:inline-flex;gap:8px;align-items:center;min-height:38px;padding:8px 14px;background:var(--surface-inset);border:1px solid var(--border);border-radius:8px;font-weight:600;color:var(--text);text-decoration:none;cursor:pointer;}
+        .bw-file-box .bw-btn:hover{border-color:var(--text-muted);}
+        #pg-bind-workspace .qy-grid{margin-top:0;}
+        @media(max-width:600px){.bw-file-overlay{padding:8px;}.bw-file-box video{max-height:60vh;}}
         /* ISSUE 2 FIX: image lightbox/modal (replaces target="_blank" attachment links) */
         /* Phase 27 (Ahmed): translucent blurred backdrop instead of a solid
            screen, so the page behind the open image stays visible. */
@@ -4993,9 +5021,9 @@ html{background:var(--bg);min-height:100%}
                 </div>
             </div>
 
-            <!-- v27 (Ahmed): Bind Request Workspace — same idea as the Audit
-                 workspace: full read-only details, duplicate check on User ID,
-                 attachments, and the handle action bar. Filled by bwRender(). -->
+            <!-- v28 (Ahmed): Bind Request Workspace — the handoff component mounts
+                 into #bwRoot and owns details/evidence/checks/decision/save; the
+                 duplicate radar card above it is portal-side (User ID + Contact ID). -->
             <div id="pg-bind-workspace" style="display:none">
                 <div class="card" style="margin-bottom:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -5004,7 +5032,16 @@ html{background:var(--bg);min-height:100%}
                         <span id="bwStatusChip" style="font-size:.85rem;"></span>
                     </div>
                 </div>
-                <div id="bwBody"></div>
+                <div class="card" id="bwRadarCard" style="margin-bottom:20px;display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <h4 style="margin:0;color:var(--accent-cyan);">📡 Duplicate Radar <span id="bwRadarBadge" class="bw-radar-badge" style="display:none;"></span></h4>
+                        <button class="btn btn-secondary" id="bwRadarToggleBtn" onclick="bwRadarToggle()" style="height:36px;display:none;">👀 View matches</button>
+                    </div>
+                    <div id="bwRadarSummary" style="margin-top:10px;font-size:.9rem;color:var(--text-muted);">Open a request to scan for duplicates.</div>
+                    <div id="bwRadarSheet" style="margin-top:8px;font-size:.8rem;color:var(--text-muted);"></div>
+                    <div id="bwRadarResults" class="qy-grid" style="margin-top:14px;display:none;"></div>
+                </div>
+                <div id="bwRoot"></div>
             </div>
 
             <div id="pg-agency-list" style="display:none">
@@ -6586,6 +6623,7 @@ function executePageLogic(page) {
     } else if(page==='bind-workspace'){
         document.getElementById('pg-bind-workspace').style.display='block';
         _expandNavGroup('navBodyBind','navArrBind');
+        if(typeof bwMount==='function') bwMount(); // v28: empty state + load form
     } else if(page==='agency-list'){
         document.getElementById('pg-agency-list').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
@@ -26990,37 +27028,252 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
 <script id="samurai-mobile-v19-js">
 /* ═════════ Samurai v19 — Phase C + fixes (2026-11-05) ═════════ */
 
-// ═══ v27 (Ahmed 2026-11-13): BIND module — Live Bind Queue / Query Bind Requests / Bind Workspace ═══
-let bwCurrent=null, bwReturnTo='bind-queue', bqMetaCache=null;
-const BW_REJECT_FALLBACK=['all information correct','correct bind number and recharge','correct bind number and device','correct device and recharge','As per approval','all information wrong','need the main device','Missing Info or incorrect Answer','wrong NID ','wrong bind number and device ','wrong device and recharge ','wrong bind number and recharge','missing stolen evidence ','new number is linked with another account','invalid stolen evidence ',"invalid, we don't support sharing information",'let the user contact us from same id ','has a successful bind request in last 15 days','blacklist','New number already binded','Wrong Number formats','Account not linked to another bind way','Banned Acsount'];
+// ═══ v28 (Ahmed 2026-11-13): BIND redesign — handoff workspace component + real portal adapters ═══
+// bind-workspace.js + bind-extension-bridge.js from Ahmed's handoff ZIP embedded
+// VERBATIM (only change: bridge HOST -> location.origin). The portal adapters wire
+// the component to the REAL website functions: one-call /api/bind/request load,
+// in-page lightbox/video evidence (with OCR), ordered /api/bind/save, quick
+// replies, rich Universal-Query-style cards and the duplicate radar. Extension
+// 3.57.0 does NOT implement samurai.bind.v1 yet — Check dashboard ends in the
+// honest "no compatible extension" state until it does.
+
+/* ──── begin handoff component (bind-workspace.js, verbatim) ──── */
+/* Website-owned Bind workspace. No chrome.*, Feishu credentials or automatic fetch. */
+(function(global){
+ 'use strict';
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const clone=x=>JSON.parse(JSON.stringify(x));
+ const sameContext=(a,b)=>a&&b&&['workspaceId','recordId','userId','region','revision'].every(k=>a[k]===b[k]);
+ const STATES=new Set(['running','complete','empty','partial','error','cancelled']);
+ const DEFS={currentBindings:['01','Current phone & sign-in methods','What is linked to this account now.'],phoneHistory:['02','Previous phone bindings','Earlier numbers, kept separate from current bindings.'],activity:['03','Account activity','Login volume and the total number of device records.'],devices:['04','Devices & login details','Model names, raw codes and login activity together.'],identity:['05','Agency manager · National ID','Evidence and the saved agency identity, side by side.'],wallet:['05','Wallet balance records','Withdrawal evidence beside the selected wallet period.'],recharge:['06','Recharge / Xcoins records','Recharge evidence beside its own selected period.']};
+ const STATUS={not_run:'Not checked',running:'Checking',complete:'Complete',empty:'No records',partial:'Partial result',error:'Could not verify',cancelled:'Cancelled'};
+ const tone=s=>['complete','match'].includes(s)?'bw-ok':['error','no_match'].includes(s)?'bw-bad':['partial','review'].includes(s)?'bw-warn':'bw-muted';
+ const chip=(s,label)=>`<span class="bw-chip ${tone(s)}">${esc(label||STATUS[s]||s)}</span>`;
+ const btn=(text,action,primary=false,extra='')=>`<button type="button" class="bw-btn ${primary?'bw-primary':''}" data-action="${action}" ${extra}>${esc(text)}</button>`;
+ const val=(label,value,wide=false)=>`<div class="bw-value ${wide?'bw-wide':''}"><small>${esc(label)}</small><div>${esc(value||'Not provided')}</div></div>`;
+ const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+ const phone=(v,region)=>{let s=String(v||'').replace(/\D/g,'').replace(/^0+/,'');return s.length===10?({PK:'92',IN:'91'}[region]||'')+s:s;};
+ const suppliedPhones=v=>(String(v||'').match(/\+?\d[\d ()-]{6,}\d/g)||[]).map(x=>x.trim());
+ const validDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&!Number.isNaN(Date.parse(v+'T00:00:00Z'))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v;
+ const safeUrl=s=>{try{const u=new URL(s,location.href);return ['https:','http:','blob:'].includes(u.protocol)||/^data:image\/(?:png|jpeg|webp|svg\+xml);/i.test(s)?u.href:'';}catch{return '';}};
+ const table=(head,rows)=>`<div class="bw-table-wrap"><table><thead><tr>${head.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${esc(x??'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ const sectionData=s=>s&&['complete','empty','partial'].includes(s.status)?s.data:null;
+ function comparison(request,setup,sections){
+   const rows=[],cur=sectionData(sections.currentBindings),hist=sectionData(sections.phoneHistory),dev=sectionData(sections.devices);
+   rows.push({label:'Current sign-in methods',answer:'Current account state',actual:cur?[...(cur.methods||[]),...(cur.phones||[])].join(' · '):'Not verified',verdict:'info',note:'Current bindings are separate from historical phone records.'});
+   const expected=suppliedPhones(request.answers.previousBinding),matches=expected.filter(x=>(hist?.rows||[]).some(r=>phone(x,request.region)===phone(r.phone,request.region)));
+   rows.push({label:'Previous phone binding',answer:request.answers.previousBinding,actual:hist?(hist.rows||[]).map(r=>r.phone).join('\n')||'No records':'Not verified',verdict:!expected.length?'info':matches.length?'match':hist&&sections.phoneHistory.status!=='partial'?'no_match':'review',note:matches.length?'Found in phone history. This does not mean it is still linked.':hist?'Check the available history and its coverage.':'Run the phone-history check.'});
+   const linked=cur?.phoneComplete!==false&&(cur?.phones||[]).some(x=>phone(x,request.region)===phone(request.answers.newPhone,request.region));
+   rows.push({label:'Requested new phone',answer:request.answers.newPhone,actual:!cur||cur.phoneComplete===false?'Current phone unavailable or masked':linked?'Already linked to this account':'Not listed among this account’s current phones',verdict:linked?'review':'info',note:'This check does not prove whether another account uses this number.'});
+   const answers=String(request.answers.devices||'').split(/\n|[,;|]|\s+and\s+/i).map(x=>x.trim()).filter(Boolean);
+   const items=answers.map(answer=>{const hit=(dev?.rows||[]).find(r=>[r.modelCode,r.modelName,...(r.aliases||[])].filter(Boolean).some(v=>norm(v)===norm(answer)));return {answer,actual:hit?[hit.modelCode,hit.modelName].filter(Boolean).join(' → '):dev?'No exact match in the returned rows':'Not verified',verdict:hit?'match':dev&&sections.devices.status!=='partial'?'review':'review',note:hit?'Verified exact name or supplied alias.':'A similar name or incomplete model lookup needs review.'};});
+   rows.push({label:'Main login devices',answer:request.answers.devices,items,actual:'',verdict:items.length&&items.every(x=>x.verdict==='match')?'match':'review',note:'Verify each reported device against the account’s device history.'});
+   if(['agency_manager','coin_seller'].includes(request.userType)){const x=sectionData(sections.identity);rows.push({label:'National ID',answer:setup.nid,actual:x?.found?x.nationalId:'Not verified',verdict:x?.found&&x.nationalId&&setup.nid?(norm(x.nationalId)===norm(setup.nid)?'match':'no_match'):'review',note:x?.managerName||'Compare against the evidence image.'});}
+   for(const k of ['wallet','recharge'])if(setup.checks.includes(k)){const x=sectionData(sections[k]);rows.push({label:k==='wallet'?'Withdrawal receipt':'Recharge receipt',answer:request.answers[k+'Receipt']||'See attached receipt',actual:x?`${x.rows?.length||0} records returned · ${x.appliedRange?.start||''} → ${x.appliedRange?.end||''}`:'Not verified',verdict:'review',note:'Compare date, amount and transaction details with the receipt; loaded records alone are not a match.'});}
+   return rows;
+ }
+ function mount(root,adapters={}){
+   if(!(root instanceof Element))throw Error('A workspace root is required.');
+   const workspaceId='bind-'+crypto.randomUUID();root.classList.add('bw');root.dataset.bindWorkspace=workspaceId;
+   let request=null,setup=null,draft={},sections={},revision=0,active=null,loading=null,saving=false,disposed=false,overlay=null,previousFocus=null,saveController=null;const draftCache=new Map();
+   const blank=()=>({status:'not_run',data:null,meta:{},seq:-1});
+   const keys=()=>['currentBindings','phoneHistory','activity','devices',...(['agency_manager','coin_seller'].includes(request?.userType)?['identity']:['wallet','recharge'].filter(k=>setup?.checks?.includes(k)))];
+   const context=()=>({workspaceId,recordId:request.recordId,userId:request.userId,region:request.region,revision});
+   const options=(key,status=draft.status)=>{let opts=request?.fieldSchema?.[key]?.options||[];return key==='reason'?opts.filter(x=>!x.statusValues||x.statusValues.includes(status)):opts;};
+   const field=(key,label,wide=false)=>{const spec=request.fieldSchema[key],value=draft[key]??'';if(!spec)return `<div class="bw-wide bw-field-hint">${esc(label)} is unavailable. Refresh the website’s field schema.</div>`;const text=spec.editor==='text';return `<div class="${wide?'bw-wide':''}"><label for="${workspaceId}-${key}">${esc(label)}</label>${text?(key==='comment'?`<textarea id="${workspaceId}-${key}" data-draft="${key}">${esc(value)}</textarea>`:`<input id="${workspaceId}-${key}" data-draft="${key}" value="${esc(value)}">`):`<select id="${workspaceId}-${key}" data-draft="${key}" ${spec.editor==='multiSelect'?'multiple':''}><option value="">Choose ${esc(label.toLowerCase())}</option>${options(key).map(o=>`<option value="${esc(o.value)}" ${(Array.isArray(value)?value.includes(o.value):value===o.value)?'selected':''}>${esc(o.label)}</option>`).join('')}</select>`}${key==='reason'?'<p class="bw-field-hint">Options follow the selected status and current sheet schema.</p>':''}</div>`;};
+   function evidence(list){return list?.length?`<div class="bw-evidence">${list.map(a=>`<button type="button" data-evidence="${esc(a.id)}" aria-label="Preview ${esc(a.name)}">${a.kind!=='video'&&safeUrl(a.thumbnailUrl||a.url)?`<img loading="lazy" src="${esc(safeUrl(a.thumbnailUrl||a.url))}" alt="${esc(a.name)}">`:`<span class="bw-file-icon">${a.kind==='video'?'▷':'▧'}</span>`}<span>${esc(a.name)}</span></button>`).join('')}</div>`:'<p class="bw-sub">No evidence attached for this part.</p>';}
+   function answer(key){if(key==='currentBindings'||key==='phoneHistory')return `Previous bind: ${request.answers.previousBinding||'Not provided'}\nRequested new phone: ${request.answers.newPhone||'Not provided'}`;if(key==='activity'||key==='devices')return request.answers.devices||'No device answer supplied';if(key==='identity')return `NID entered from evidence: ${setup.nid||'Not entered'}`;return `${request.answers[key+'Receipt']||'See receipt evidence'}\nRequested period: ${setup.ranges[key]?.startDate||'—'} → ${setup.ranges[key]?.endDate||'—'}`;}
+   function section(key){const d=DEFS[key];return `<section class="bw-card bw-section" id="${workspaceId}-${key}" data-bind-section="${key}"><header class="bw-card-head"><div class="bw-titlegroup"><span class="bw-index">${esc(d[0])}</span><div><h2>${esc(d[1])}</h2><p class="bw-sub">${esc(d[2])}</p></div></div><div data-section-status>${chip('not_run')}</div></header><aside class="bw-answer"><small>User’s answer</small><p data-section-answer>${esc(answer(key))}</p></aside><div class="bw-result" data-section-result></div></section>`;}
+   function setupHtml(){if(['agency_manager','coin_seller'].includes(request.userType))return `<div><label for="${workspaceId}-nid">National ID from the evidence <span class="bw-required">Required</span></label><input id="${workspaceId}-nid" data-setup="nid" value="${esc(setup.nid)}" placeholder="Enter the NID shown in the image" autocomplete="off"><p class="bw-sub">Enter the evidence value before starting. The dashboard check remains read-only.</p></div>`;return `<div class="bw-setup">${['wallet','recharge'].map(k=>`<div class="bw-range"><label><input type="checkbox" data-check="${k}" ${setup.checks.includes(k)?'checked':''}> ${k==='wallet'?'Wallet / withdrawals':'Recharge / Xcoins'}</label><div class="bw-date-grid" data-range="${k}" ${!setup.checks.includes(k)?'hidden':''}>${['startDate','endDate'].map((f,i)=>`<div><label for="${workspaceId}-${k}-${f}">${i?'To':'From'} <span class="bw-required">Required</span></label><input type="date" id="${workspaceId}-${k}-${f}" data-date-kind="${k}" data-date-key="${f}" value="${esc(setup.ranges[k]?.[f]||'')}"></div>`).join('')}</div></div>`).join('')}</div><p class="bw-sub">Choose either check or both. Each uses its own date range in dashboard time. Past days include 23:59:59; today’s available cutoff must be shown.</p>`;}
+   function render(){
+     if(disposed)return;
+     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section></div><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}">${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison">Comparison</a><a href="#${workspaceId}-final">Final review</a></nav><div data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
+     if(request){paintReplies();keys().forEach(paintSection);paintOverview();}
+   }
+   function message(text){const e=root.querySelector('[data-message]');if(e)e.textContent=text||'';}
+   function paintReplies(query=''){const e=root.querySelector('[data-replies]');if(e)e.innerHTML=(adapters.quickReplies||[]).filter(x=>x.toLowerCase().includes(query.toLowerCase())).map(x=>`<button type="button" class="bw-btn bw-quiet" data-reply="${esc(x)}">${esc(x)}</button>`).join('')||'<p class="bw-sub">No matching reply.</p>';}
+   function paintSection(key){
+     const e=root.querySelector(`[data-bind-section="${key}"]`);if(!e)return;const s=sections[key]||blank(),d=s.data||{},result=e.querySelector('[data-section-result]');e.querySelector('[data-section-status]').innerHTML=chip(s.status);e.querySelector('[data-section-answer]').textContent=answer(key);
+     if(s.status==='not_run'||s.status==='running'){result.innerHTML=`<div class="bw-not-run">${s.status==='running'?'<span class="bw-busy-dot"></span>':'<span class="bw-status-dot"></span>'}${s.status==='running'?'Checking this part on the dashboard…':'Results will appear here after you click Check dashboard.'}</div>`;return;}
+     if(['error','cancelled'].includes(s.status)){result.innerHTML=`<p class="${tone(s.status)}">${esc(s.error||STATUS[s.status])}</p><p class="bw-sub">This is not a clean or matching result.</p>`;return;}
+     let body='';
+     if(key==='currentBindings')body=`<div class="bw-result-grid">${val('Current phone numbers',(d.phones||[]).join('\n')||(d.phoneComplete===false?'Unavailable / masked':'No phone binding shown'))}${val('Sign-in methods',(d.methods||[]).join(' · ')||'None shown')}</div><p class="bw-sub">Only provider names are needed for Google, Facebook, TikTok and other methods.</p>`;
+     if(key==='phoneHistory')body=table(['Phone number','Device / model','Bound at','Source','Device ID'],(d.rows||[]).map(r=>[r.phone,r.model,r.boundAt,r.source,r.deviceId]));
+     if(key==='activity')body=`<div class="bw-stats"><div class="bw-stat"><small>Total logins</small><strong>${d.totalLogins==null?'—':esc(Number(d.totalLogins).toLocaleString())}</strong><small>${esc(d.periodLabel||'Period not verified')}</small></div><div class="bw-stat"><small>Devices on account</small><strong>${d.deviceCount==null?'—':esc(Number(d.deviceCount).toLocaleString())}</strong><small>Dashboard total, not the displayed row count</small></div></div>`;
+     if(key==='devices')body=table(['Device / model','Device ID','Logins','First opened','Last opened','IP / country'],(d.rows||[]).map(r=>[[r.modelName||'Model name unverified',r.modelCode].filter(Boolean).join('\n'),r.deviceId,r.loginCount??'Not verified',r.firstOpened,r.lastOpened,[r.ip,r.country].filter(Boolean).join('\n')]));
+     if(key==='identity')body=d.found?`<div class="bw-result-grid">${val('Agency manager',d.managerName)}${val('National ID',d.nationalId)}${val('Agency',d.agencyId+' · '+d.agencyName)}${val('Manager ID',d.managerId)}</div>${evidence(request.attachments.filter(x=>x.category==='nid'))}`:'<p>No saved agency found for this manager in the selected region.</p>';
+     if(key==='wallet'||key==='recharge')body=`${evidence(request.attachments.filter(x=>x.category===key))}<p class="bw-countline" style="margin-top:16px">Applied dashboard time: ${esc(d.appliedRange?.start||'Not verified')} → ${esc(d.appliedRange?.end||'Not verified')}${d.cutoff?' · Today’s available cutoff':''}</p>${key==='wallet'?table(['Created time','Change type','Amount','Balance','Cash out status','Reference'],(d.rows||[]).map(r=>[r.time,r.type,r.amount,r.balance,r.status,r.reference])):table(['Operation time','Recharge type','Amount','Balance','Reference'],(d.rows||[]).map(r=>[r.time,r.type,r.amount,r.balance,r.reference]))}<p class="bw-sub">${key==='wallet'?'Wallet activity can include salary and other changes; inspect Change Type and Cash Out Status.':`${d.selectedTypes??'Unverified'} recharge types selected. Compare the receipt, not only the row count.`}</p>`;
+     if(['phoneHistory','devices','wallet','recharge'].includes(key))body+=`<div class="bw-table-meta"><span>${(d.rows||[]).length} / ${esc(d.total??'?')} records returned</span><span>${s.status==='partial'?'Coverage incomplete':'Checked coverage complete'}</span></div>`;
+     if(s.status==='empty')body+='<p class="bw-sub">Search completed with no returned records. This is different from a failed check.</p>';
+     if(s.status==='partial')body+=`<p class="bw-sub bw-warn">${esc(s.error||s.meta?.note||'Only part of the data was verified. Do not infer a mismatch from missing rows.')}</p>`;
+     body+=`<p class="bw-sub">${esc(s.meta?.source||'Dashboard')} · ${esc(s.meta?.checkedAt?new Date(s.meta.checkedAt).toLocaleTimeString(): 'Time unavailable')}</p>`;result.innerHTML=body;
+   }
+   function paintOverview(){if(!request)return;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length;root.querySelector('[data-progress]').style.width=`${Math.round(done/all.length*100)}%`;root.querySelector('[data-run-count]').textContent=`${done} / ${all.length} checks complete`;const result=root.querySelector('[data-comparison]');const rows=comparison(request,setup,sections),count=k=>rows.filter(x=>x.verdict===k).length;result.innerHTML=`<div class="bw-counts"><span class="bw-ok"><b>${count('match')}</b> Match</span><span class="bw-warn"><b>${count('review')}</b> To review</span><span class="bw-bad"><b>${count('no_match')}</b> No match</span><span class="bw-muted">Info does not count as a match.</span></div><div class="bw-table-wrap"><table class="bw-compare"><thead><tr><th>Check</th><th>User’s answer</th><th>Dashboard finding</th><th>Result</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.answer)}</div>`).join(''):esc(r.answer||'Not provided')}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${esc(x.actual)}</div>`).join(''):esc(r.actual)}</td><td>${r.items?r.items.map(x=>`<div class="bw-device-answer">${chip(x.verdict,x.verdict==='match'?'Match':'To review')}</div>`).join(''):chip(r.verdict,{match:'Match',review:'To review',no_match:'No match',info:'Info'}[r.verdict])}<small>${esc(r.note)}</small></td></tr>`).join('')}</tbody></table></div>`;}
+   function setBusy(on){root.querySelector('[data-criteria]').disabled=on;root.querySelector('[data-action=check]').disabled=on;root.querySelector('[data-action=stop]').hidden=!on;root.querySelector('[data-action=review-save]').disabled=on;}
+   function invalidate(){revision++;stop('Inputs changed. Run the checks again for these values.');sections=Object.fromEntries(keys().map(k=>[k,blank()]));keys().forEach(paintSection);paintOverview();root.querySelector('[data-run-label]').textContent='Inputs changed · fresh check required';}
+   function validation(){if(!/^\d{3,20}$/.test(request.userId)||!['PK','IN'].includes(request.region))return 'The request needs a valid User ID and region.';if(['agency_manager','coin_seller'].includes(request.userType))return setup.nid.trim()?'':'Enter the National ID from the evidence before checking.';if(!setup.checks.length)return 'Choose Wallet, Xcoins, or both.';for(const k of setup.checks){const r=setup.ranges[k];if(!validDate(r?.startDate)||!validDate(r?.endDate)||r.startDate>r.endDate)return `${k==='wallet'?'Wallet':'Xcoins'}: choose a valid date range.`;}return '';}
+   function acceptUpdate(event){
+     if(!active||disposed||event?.runId!==active.runId||!sameContext(event.context,active.context)||!active.keys.includes(event.section)||!STATES.has(event.status)||!Number.isSafeInteger(event.seq)||event.seq<0)return false;
+     const old=sections[event.section]||blank();if(event.seq<=old.seq)return false;
+     try{
+       if(JSON.stringify(event).length>1000000)return false;
+       const d=event.data,k=event.section;if(['complete','empty','partial'].includes(event.status)){
+         if(!d||typeof d!=='object'||Array.isArray(d))return false;
+         if(['phoneHistory','devices','wallet','recharge'].includes(k)&&(!Array.isArray(d.rows)||d.rows.length>5000||d.rows.some(r=>!r||typeof r!=='object'||Array.isArray(r))))return false;
+         if(k==='currentBindings'&&(!Array.isArray(d.methods)||!Array.isArray(d.phones)||[...d.methods,...d.phones].some(x=>typeof x!=='string')))return false;
+         if(k==='devices'&&d.rows.some(r=>r.aliases!=null&&!Array.isArray(r.aliases)))return false;
+         if(k==='identity'&&d.found&&d.managerId!==request.userId)return false;
+       }
+       sections[k]={status:event.status,data:clone(d||null),meta:clone(event.meta||{}),error:String(event.error||'').slice(0,2000),seq:event.seq};paintSection(k);paintOverview();return true;
+     }catch{return false;}
+   }
+   async function check(){if(active||saving)return;const issue=validation();root.querySelector('[data-setup-error]').textContent=issue;if(issue)return;if(typeof adapters.runDashboard!=='function'){message('The dashboard connection is unavailable. Enable the compatible extension and try again.');return;}const run={runId:crypto.randomUUID(),context:context(),keys:keys(),controller:new AbortController()};active=run;sections=Object.fromEntries(run.keys.map(k=>[k,blank()]));run.keys.forEach(paintSection);paintOverview();setBusy(true);root.querySelector('[data-run-label]').textContent='Checking dashboard · results appear below';message('');try{await adapters.runDashboard({protocolVersion:1,runId:run.runId,context:clone(run.context),userType:request.userType,checks:[...run.keys],ranges:clone(setup.ranges)},{signal:run.controller.signal,onUpdate:acceptUpdate});if(active!==run)return;for(const k of run.keys)if(['not_run','running'].includes(sections[k].status))sections[k]={...sections[k],status:'error',error:'No final result returned for this check.'};const partial=run.keys.some(k=>!['complete','empty'].includes(sections[k].status));root.querySelector('[data-run-label]').textContent=partial?'Finished with items to review':'Dashboard check complete';}catch(e){if(active!==run)return;run.keys.forEach(k=>{if(['not_run','running'].includes(sections[k].status))sections[k]={...sections[k],status:'error',error:e.message||'Connection failed'};});root.querySelector('[data-run-label]').textContent='Check incomplete · review the errors';}finally{if(active===run){active=null;setBusy(false);run.keys.forEach(paintSection);paintOverview();}}}
+   function stop(text='Stopped. Completed results are kept; unfinished checks are cancelled.'){if(!active)return;const run=active;active=null;run.controller.abort();run.keys.forEach(k=>{if(['not_run','running'].includes(sections[k].status))sections[k]={...sections[k],status:'cancelled'};});if(!disposed&&request){setBusy(false);run.keys.forEach(paintSection);paintOverview();root.querySelector('[data-run-label]').textContent=text;}}
+   function open(value){if(saving)throw Error('Wait for the current save outcome before switching requests.');if(!value?.recordId||!value?.answers||!value?.fieldSchema)throw Error('The website did not return a complete request view.');stop();closeDialog();if(request)draftCache.set(request.recordId,{values:clone(draft),setup:clone(setup)});request=clone(value);request.attachments=request.attachments||[];revision++;const kept=draftCache.get(request.recordId);setup=kept?.setup||{nid:request.setup?.nid||'',checks:request.setup?.checks||(['agency_manager','coin_seller'].includes(request.userType)?[]:[request.userType==='host'?'wallet':'recharge']),ranges:request.setup?.ranges||{wallet:{startDate:'',endDate:''},recharge:{startDate:'',endDate:''}}};draft=kept?.values||{status:'',reason:'',comment:'',handledBy:'',...request.decision};sections=Object.fromEntries(keys().map(k=>[k,blank()]));render();if(kept)message('Your working draft was restored. Review the current field options before saving.');}
+   async function load(number){if(saving)return;if(!/^\d+$/.test(number))return message('Enter a request number.');if(typeof adapters.loadRequest!=='function')return message('Open a Bind request from the website’s Live Queue.');loading?.abort();const controller=new AbortController();loading=controller;stop();message('Loading this request…');try{const value=await adapters.loadRequest(number,{signal:controller.signal});if(loading!==controller||controller.signal.aborted||disposed)return;open(value);}catch(e){if(loading===controller&&!controller.signal.aborted)message(e.message||'Request could not be loaded.');}finally{if(loading===controller)loading=null;}}
+   function closeDialog(){if(saving)return;overlay?.remove();overlay=null;previousFocus?.focus();}
+   function dialog(title,body,footer='',viewer=false){closeDialog();previousFocus=document.activeElement;overlay=document.createElement('div');overlay.className='bw-overlay'+(viewer?' bw-viewer':'');overlay.innerHTML=`<section class="bw-dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}" tabindex="-1"><header><h2>${esc(title)}</h2>${btn('Close','close-dialog')}</header>${body}${footer?`<footer>${footer}</footer>`:''}</section>`;root.append(overlay);overlay.querySelector('section').focus();overlay.addEventListener('keydown',e=>{if(e.key==='Escape'&&!saving){e.preventDefault();closeDialog();}if(e.key==='Tab'){const nodes=[...overlay.querySelectorAll('button:not(:disabled),input,select,textarea,a[href]')].filter(x=>x.getClientRects().length);if(!nodes.length)return;const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===overlay.querySelector('section'))){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});return overlay;}
+   async function preview(id){const attachment=request.attachments.find(x=>x.id===id);if(!attachment)return;if(adapters.openEvidence){await adapters.openEvidence(attachment,{recordId:request.recordId});return;}const o=dialog(attachment.name,'<p class="bw-sub">Opening evidence…</p>','',true);try{const file=adapters.resolveAttachment?await adapters.resolveAttachment(attachment):attachment;if(overlay!==o)return;const url=safeUrl(file.url);if(!url)throw Error('The original preview is unavailable. Use the website’s authorised attachment viewer.');const body=o.querySelector('.bw-dialog');body.insertAdjacentHTML('beforeend',`<div class="bw-tools">${attachment.kind==='video'?'':`${btn('−','zoom-out')}${btn('+','zoom-in')}${btn('↶','rotate-left')}${btn('↷','rotate-right')}${btn('Fit','fit-image')}`}</div><div class="bw-view-stage">${attachment.kind==='video'?`<video src="${esc(url)}" controls preload="metadata"></video>`:`<img src="${esc(url)}" alt="${esc(attachment.name)}" draggable="false">`}</div><p class="bw-sub">${esc(file.previewNote||'Preview stays inside the current workspace. Use the website’s existing OCR viewer in production.')}</p>`);body.querySelector('p').remove();let zoom=1,angle=0,x=0,y=0,drag=null;const img=body.querySelector('img'),stage=body.querySelector('.bw-view-stage');const paint=()=>{if(img)img.style.transform=`translate(${x}px,${y}px) rotate(${angle}deg) scale(${zoom})`;};o.addEventListener('click',e=>{const a=e.target.closest('[data-action]')?.dataset.action;if(a==='zoom-in')zoom=Math.min(5,zoom+.25);if(a==='zoom-out')zoom=Math.max(.25,zoom-.25);if(a==='rotate-left')angle-=90;if(a==='rotate-right')angle+=90;if(a==='fit-image'){zoom=1;angle=0;x=y=0;}paint();});stage.onpointerdown=e=>{if(!img)return;drag={x:e.clientX-x,y:e.clientY-y};stage.setPointerCapture(e.pointerId);};stage.onpointermove=e=>{if(drag){x=e.clientX-drag.x;y=e.clientY-drag.y;paint();}};stage.onpointerup=()=>{drag=null;};stage.onpointercancel=()=>{drag=null;};}catch(e){if(overlay===o)o.querySelector('p').textContent=e.message;}}
+   function decisionIssue(){for(const key of ['status','reason','comment','handledBy']){const spec=request.fieldSchema[key],value=draft[key];if(!spec)return 'The current decision field schema is incomplete.';if(spec.editor!=='text'&&(Array.isArray(value)?value:[value]).filter(Boolean).some(v=>!options(key).some(o=>o.value===v)))return `${key}: this option is no longer available.`;}if(!draft.status||!draft.reason)return 'Choose Status and its Decision / Reject reason.';if(draft.handledBy&&!String(draft.comment||'').trim())return 'Fill Comment before setting Handled by.';return '';}
+   function reviewSave(){if(active||saving)return;const issue=decisionIssue();if(issue){message(issue);root.querySelector('[data-bind-decision]').scrollIntoView({block:'start'});return;}const diffs=Object.keys(draft).filter(k=>JSON.stringify(draft[k])!==JSON.stringify(request.decision?.[k]??''));if(!diffs.length)return message('There are no changes to save.');const incomplete=keys().some(k=>!['complete','empty'].includes(sections[k]?.status));const o=dialog('Review changes to request #'+request.number,table(['Field','Before','After'],diffs.map(k=>[k,request.decision?.[k]||'Not set',draft[k]||'Cleared']))+`<p class="bw-sub">The website saves and verifies decision details, waits two seconds, then sends a changed Handled by value to trigger the workflow.</p>${incomplete?'<label class="bw-warning-ack"><input type="checkbox" data-manual-ack> I reviewed the missing or incomplete dashboard checks manually.</label>':''}<p class="bw-live-error" data-save-error role="alert"></p>`,btn('Back to editing','close-dialog')+btn('Confirm & save','confirm-save',true,incomplete?'disabled':''));o.querySelector('[data-manual-ack]')?.addEventListener('change',e=>o.querySelector('[data-action=confirm-save]').disabled=!e.target.checked);}
+   async function save(){if(saving||!overlay)return;if(!adapters.saveDecision)return overlay.querySelector('[data-save-error]').textContent='Saving is not connected. Your draft is kept.';const issue=decisionIssue();if(issue)return overlay.querySelector('[data-save-error]').textContent=issue;const captured=context(),values=clone(draft),o=overlay;saveController=new AbortController();saving=true;o.querySelectorAll('button,input').forEach(x=>x.disabled=true);const error=o.querySelector('[data-save-error]');try{const result=await adapters.saveDecision({recordId:request.recordId,recordVersion:request.recordVersion,values},{signal:saveController.signal,onProgress:t=>{error.className='bw-sub';error.textContent=t;}});if(!result||result.state!=='confirmed'||!result.record||result.record.recordId!==captured.recordId)throw Error('The save outcome was not verified. Refresh this request before retrying.');if(disposed)return;request={...request,...clone(result.record)};if(result.fieldSchema)request.fieldSchema=clone(result.fieldSchema);draft={...values,...request.decision};saving=false;closeDialog();render();message(result.demo?'Saved in this preview only. No website or sheet was changed.':'Saved and verified. Handled by was processed after the decision details.');root.querySelector('[data-save-status]').textContent=result.demo?'Demo save confirmed':'Saved and re-read successfully';}catch(e){if(disposed)return;error.className='bw-live-error';error.textContent=e.message||'Save failed. Your draft has been kept.';saving=false;o.querySelectorAll('[data-action=close-dialog]').forEach(x=>x.disabled=false);/* Unknown writes have no automatic retry button. */}finally{saving=false;}}
+   const onSubmit=e=>{if(e.target.matches('[data-request-form]')){e.preventDefault();void load(new FormData(e.target).get('requestNumber').trim());}};
+   const onInput=e=>{const t=e.target;if(t.dataset.draft){draft[t.dataset.draft]=t.multiple?[...t.selectedOptions].map(o=>o.value):t.value;if(t.dataset.draft==='status'){if(!options('reason',t.value).some(x=>x.value===draft.reason))draft.reason='';const reason=root.querySelector('[data-draft=reason]');reason.innerHTML='<option value="">Choose a reason</option>'+options('reason',t.value).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');reason.value=draft.reason;}return;}if(t.matches('[data-reply-search]'))paintReplies(t.value);if(t.dataset.setup){setup[t.dataset.setup]=t.value;invalidate();}if(t.dataset.dateKind){setup.ranges[t.dataset.dateKind]??={};setup.ranges[t.dataset.dateKind][t.dataset.dateKey]=t.value;invalidate();}};
+   const onChange=e=>{const t=e.target;if(t.dataset.check){setup.checks=t.checked?[...new Set([...setup.checks,t.dataset.check])]:setup.checks.filter(k=>k!==t.dataset.check);invalidate();render();}};
+   const onClick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.dataset.evidence){void preview(b.dataset.evidence);return;}if(b.dataset.reply){draft.comment=[draft.comment,b.dataset.reply].filter(Boolean).join('\n');root.querySelector('[data-draft=comment]').value=draft.comment;return;}const a=b.dataset.action;if(a==='check')void check();if(a==='stop')stop();if(a==='review-save')reviewSave();if(a==='confirm-save')void save();if(a==='close-dialog')closeDialog();};
+   root.addEventListener('submit',onSubmit);root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('click',onClick);render();
+   return {open,load,stop,acceptUpdate,getState:()=>clone({request,setup,draft,sections,revision,active:active?{runId:active.runId,context:active.context}:null}),dispose(){if(saving)throw Error('Wait for the save result before removing the workspace.');stop();loading?.abort();closeDialog();disposed=true;root.removeEventListener('submit',onSubmit);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);root.removeEventListener('click',onClick);root.replaceChildren();}};
+ }
+ global.SamuraiBindWorkspace=Object.freeze({mount,comparison});
+})(window);
+
+/* ──── end handoff component ──── */
+
+/* ──── begin handoff bridge (bind-extension-bridge.js, HOST=location.origin) ──── */
+/* Proposed v1 WEBSITE adapter. Extension 3.57.0 does not implement this protocol yet.
+   See EXTENSION-CONTRACT.md before connecting a production extension. */
+(function(global){
+ 'use strict';
+ const PROTOCOL='samurai.bind.v1',HOST=location.origin;
+ const equal=(a,b)=>a&&b&&['workspaceId','recordId','userId','region','revision'].every(k=>a[k]===b[k]);
+ function create({handshakeMs=3000,inactivityMs=150000,totalMs=12*60*1000}={}){
+  return function runDashboard(request,{signal,onUpdate}){
+   return new Promise((resolve,reject)=>{
+    if(location.origin!==HOST)return reject(Error('The Bind connection is only available in the Samurai portal.'));
+    if(signal.aborted)return reject(new DOMException('Stopped','AbortError'));
+    let finished=false,started=false,idle,total;const helloId=crypto.randomUUID();
+    const base={protocol:PROTOCOL,source:'samurai-bind-page',runId:request.runId,context:request.context};
+    const send=(type,extra={})=>window.postMessage({...base,type,...extra},HOST);
+    const close=(error,result)=>{if(finished)return;finished=true;clearTimeout(idle);clearTimeout(total);window.removeEventListener('message',receive);signal.removeEventListener('abort',abort);error?reject(error):resolve(result);};
+    const arm=ms=>{clearTimeout(idle);idle=setTimeout(()=>{if(started)send('CANCEL');close(Error(started?'The dashboard stopped reporting progress. Completed sections are kept.':'A compatible extension did not respond. Enable or update it, refresh this page and try again.'));},ms);};
+    const abort=()=>{send('CANCEL');close(new DOMException('Stopped','AbortError'));};
+    const receive=e=>{
+     const m=e.data;if(e.source!==window||e.origin!==HOST||!m||m.protocol!==PROTOCOL||m.source!=='samurai-bind-extension'||m.runId!==request.runId||!equal(m.context,request.context))return;
+     if(m.type==='READY'&&!started){if(m.helloId!==helloId||m.protocolVersion!==1||!Array.isArray(m.capabilities)||!m.capabilities.includes('bind.dashboard.read'))return;started=true;arm(inactivityMs);total=setTimeout(()=>{send('CANCEL');close(Error('The check exceeded its time limit. Review the completed results.'));},totalMs);send('START',{payload:request});return;}
+     if(!started)return;
+     if(m.type==='HEARTBEAT'){arm(inactivityMs);return;}
+     if(m.type==='SECTION'){if(!request.checks.includes(m.section)||!Number.isSafeInteger(m.seq)||m.seq<0||!['running','complete','empty','partial','error','cancelled'].includes(m.status))return;arm(inactivityMs);onUpdate({runId:m.runId,context:m.context,section:m.section,seq:m.seq,status:m.status,data:m.data,meta:m.meta,error:m.error});return;}
+     if(m.type==='FINISHED'){close(null,{status:m.status});return;}
+     if(m.type==='FAILED')close(Error(String(m.error||'The dashboard check failed.').slice(0,2000)));
+    };
+    window.addEventListener('message',receive);signal.addEventListener('abort',abort,{once:true});arm(handshakeMs);send('HELLO',{helloId,protocolVersion:1});
+   });
+  };
+ }
+ global.SamuraiBindExtensionBridge=Object.freeze({create});
+})(window);
+
+/* ──── end handoff bridge ──── */
+
+/* ──── portal adapters + queue/query cards + duplicate radar (v28) ──── */
+let bwInstance=null, bwCurrentId=null, bwCurrentView=null, bwReturnTo='bind-queue', bwOpenSeq=0;
+const bwViewCache={};
+let bwRadarMatches=[];
+const BW_QUICK_REPLIES=[
+    'Verified: the reported main device appears in the account login history.',
+    'Verified: the previous bind number appears in the phone record.',
+    'Verified: the receipt matches wallet records in the selected period.',
+    'Verified: the receipt matches recharge records in the selected period.',
+    'The reported device was not found in the returned login history — checked the available coverage.',
+    'The previous number was not found in the returned phone history — checked the available coverage.',
+    'Evidence is missing or unreadable — asked the user for a clearer photo.',
+    'The new number is already linked to another account.',
+    'Duplicate of an earlier bind request — handled under the earlier ticket.',
+    'NID does not match the saved agency manager identity.'
+];
 
 function bqQS(){ return 'user='+encodeURIComponent(loggedUser)+'&email='+encodeURIComponent(loggedEmail); }
 function bqFmtTime(ms){ const n=Number(ms); if(!n) return '—'; try{ return new Date(n).toLocaleString(); }catch(e){ return String(ms); } }
-async function bqMeta(){
-    if(bqMetaCache) return bqMetaCache;
+
+/* Universal-Query-style rich card — queue, query AND duplicate radar all render
+   the same card: full ticket details + View Pictures / Open Workspace actions. */
+function bqCardHtml(it, matchedOn){
+    const rid=escHtml(it.record_id||'');
+    let h='<div class="qy-card">'
+        +'<div class="qy-card-head"><div>'
+        +'<div class="qy-card-num">#'+escHtml(it.numbering||'—')+'</div>'
+        +'<div class="qy-card-type">'+escHtml([it.user_type,it.region].filter(Boolean).join(' · ')||'Bind Request')+'</div>'
+        +'</div><span class="qy-status-pill '+qyStatusClass(it.status)+'">'+escHtml(it.status||'new')+'</span></div>';
+    if(matchedOn&&matchedOn.length) h+='<div style="margin-bottom:8px;"><span class="bq-match-chip">Matched on: '+escHtml(matchedOn.join(', '))+'</span></div>';
+    h+=qyRow('User ID',it.user_id)
+      +qyRow('Contact ID',it.contact_id)
+      +qyRow('Reason of Bind Request',it.reason)
+      +qyRow('Reason 2',it.reason2)
+      +qyRow('New Phone Number',it.new_phone)
+      +qyRow('Bind Method (3/6 months)',it.bind_method)
+      +qyRow('Main Login Device',it.main_device)
+      +qyRow('Applier Note',it.applier_note)
+      +qyRow('Submitted By',it.submitted_by)
+      +qyRow('Submitted On',bqFmtTime(it.submitted_on))
+      +qyRow('Handled By',it.handled_by)
+      +qyRow('Reject Reason',it.reject_reason)
+      +qyRow('Comment',it.comment);
+    if(rid) h+='<div class="qy-card-actions">'
+        +'<button type="button" class="qy-act-btn qy-act-pics" onclick="bqViewPictures(\''+rid+'\', this)">🖼️ View Pictures</button>'
+        +'<button type="button" class="qy-act-btn qy-act-open" onclick="bwOpen(\''+rid+'\')">🎫 Open Workspace</button>'
+        +'</div><div class="qy-pics" id="bqPics-'+rid+'" style="display:none"></div>';
+    return h+'</div>';
+}
+
+/* Card-level pictures for bind requests — /api/bind/pictures, images go to the
+   in-page lightbox (zoom/rotate/pan/OCR), videos play in the in-page modal. */
+async function bqViewPictures(recordId, btn){
+    const box=document.getElementById('bqPics-'+recordId);
+    if(!box) return;
+    if(box.dataset.loaded==='1'){ box.style.display=box.style.display==='none'?'block':'none'; return; }
+    btn.disabled=true; const orig=btn.textContent; btn.textContent='⏳ Loading pictures…';
     try{
-        const r=await fetch('/api/bind/meta?'+bqQS());
+        const r=await fetch('/api/bind/pictures?record_id='+encodeURIComponent(recordId)+'&'+bqQS());
         const d=await r.json();
-        if(r.ok&&d.success){ bqMetaCache=d; return d; }
-    }catch(e){}
-    return null;
+        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+        const groups=d.groups||[];
+        if(!groups.length){ box.innerHTML='<div class="qy-pics-empty">📭 No pictures attached to this request.</div>'; }
+        else{
+            box.innerHTML=groups.map(function(g,gi){
+                const isVid=function(p){ return /^video\//i.test(p.type||'')||/\.(mp4|mov|m4v|webm|mkv|3gp)$/i.test(p.name||''); };
+                const imgs=g.pics.filter(function(p){ return !isVid(p); });
+                const vids=g.pics.filter(isVid);
+                const gid='bq-'+recordId+'-'+gi;
+                lightboxGalleries[gid]=imgs.map(function(p){ return {src:p.url+(p.url.includes('?')?'&':'?')+bqQS(), filename:p.name||'attachment'}; });
+                return '<div class="qy-pics-group"><div class="qy-pics-field">'+escHtml(g.field)+'</div><div class="qy-pics-thumbs">'
+                    +imgs.map(function(p,pi){
+                        const src=p.url+(p.url.includes('?')?'&':'?')+bqQS();
+                        return '<button type="button" class="qy-pic-thumb" data-gallery-id="'+gid+'" data-gallery-index="'+pi+'" onclick="openImageLightboxFromThumb(this)" title="'+escHtml(p.name||'attachment')+'"><img src="'+src+'" alt="'+escHtml(p.name||'attachment')+'" loading="lazy"></button>';
+                    }).join('')
+                    +vids.map(function(p){
+                        const src=p.url+(p.url.includes('?')?'&':'?')+bqQS();
+                        return '<button type="button" class="qy-act-btn" style="align-self:center;" onclick="bwFileModal(\''+escHtml(src)+'\', \''+escHtml(p.name||'video')+'\', \'video\')">▶ '+escHtml(p.name||'video')+'</button>';
+                    }).join('')
+                    +'</div></div>';
+            }).join('');
+        }
+        box.dataset.loaded='1'; box.style.display='block'; btn.textContent='🖼️ Hide Pictures';
+    }catch(e){
+        ToastManager.show('Could not load pictures: '+(e.message||e),'error');
+        btn.textContent=orig;
+    }finally{ btn.disabled=false; }
 }
-function bqCardHtml(it){
-    const chips=[];
-    if(it.region) chips.push('🌍 '+escHtml(it.region));
-    if(it.user_type) chips.push(escHtml(it.user_type));
-    if(it.reason) chips.push(escHtml(it.reason));
-    const stat=it.status?escHtml(it.status):'new';
-    const hb=it.handled_by?' · handled by '+escHtml(it.handled_by):'';
-    return '<div class="card" style="cursor:pointer;margin-bottom:14px;" onclick="bwOpen(\''+escHtml(it.record_id)+'\')">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
-        +'<div style="font-weight:700;font-size:1.05rem;">#'+escHtml(it.numbering||'?')+' <span style="color:var(--text-muted);font-weight:500;">User '+escHtml(it.user_id||'—')+'</span></div>'
-        +'<span style="font-size:.78rem;color:var(--text-muted);">'+stat+hb+'</span></div>'
-        +'<div style="margin-top:8px;font-size:.85rem;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap;">'
-        +'<span>📇 Contact: '+escHtml(it.contact_id||'—')+'</span>'+chips.map(c=>'<span>'+c+'</span>').join('')+'</div>'
-        +'<div style="margin-top:8px;font-size:.78rem;color:var(--text-muted);">by '+escHtml(it.submitted_by||'—')+' · '+bqFmtTime(it.submitted_on)+'</div>'
-        +'</div>';
-}
+
 async function bqLoad(manual){
     const grid=document.getElementById('bqResults'); if(!grid) return;
     const cnt=document.getElementById('bqResultCount'), empty=document.getElementById('bqEmpty');
@@ -27032,7 +27285,7 @@ async function bqLoad(manual){
         const items=d.requests||[];
         cnt.textContent=items.length?('📋 '+items.length+' unhandled bind request'+(items.length>1?'s':'')+' — newest first'):'';
         if(!items.length){ empty.style.display='block'; return; }
-        grid.innerHTML=items.map(bqCardHtml).join('');
+        grid.innerHTML=items.map(function(it){ return bqCardHtml(it); }).join('');
         if(manual) ToastManager.show('🔄 Queue refreshed','success',2500);
     }catch(e){
         cnt.textContent='⚠️ '+(e.message||e);
@@ -27043,6 +27296,7 @@ async function bqRunQuery(){
     const f=document.getElementById('bqySearchField').value;
     const v=(document.getElementById('bqySearchValue').value||'').trim();
     if(!v){ ToastManager.show('Type a value to search.','warning'); return; }
+    const fieldLabel={number:'Request Number',user_id:'User ID',contact_id:'Contact ID'}[f]||f;
     const cnt=document.getElementById('bqyResultCount'), spin=document.getElementById('bqySpinner'),
           grid=document.getElementById('bqyResults'), empty=document.getElementById('bqyEmpty');
     cnt.textContent=''; spin.style.display='inline'; grid.innerHTML=''; empty.style.display='none';
@@ -27053,120 +27307,233 @@ async function bqRunQuery(){
         const items=d.results||[];
         cnt.textContent=items.length?('✅ '+items.length+' bind request'+(items.length>1?'s':'')+' found'):'';
         if(!items.length) empty.style.display='block';
-        else grid.innerHTML=items.map(bqCardHtml).join('');
+        else grid.innerHTML=items.map(function(it){ return bqCardHtml(it,[fieldLabel]); }).join('');
     }catch(e){
         cnt.textContent='⚠️ '+(e.message||e);
         ToastManager.show('Bind query failed: '+(e.message||e),'error',9000);
     }finally{ spin.style.display='none'; }
 }
+
+/* ── component mount + real adapters ── */
+function bwMount(){
+    if(bwInstance) return bwInstance;
+    const root=document.getElementById('bwRoot');
+    if(!root||!window.SamuraiBindWorkspace) return null;
+    bwInstance=SamuraiBindWorkspace.mount(root,{
+        loadRequest: bwLoadByNumber,
+        runDashboard: SamuraiBindExtensionBridge.create(),
+        saveDecision: bwSaveDecision,
+        openEvidence: bwOpenEvidence,
+        quickReplies: BW_QUICK_REPLIES
+    });
+    return bwInstance;
+}
+async function bwFetchView(recordId, signal){
+    const r=await fetch('/api/bind/request?record_id='+encodeURIComponent(recordId)+'&'+bqQS(),{signal:signal});
+    const d=await r.json().catch(function(){ return {}; });
+    if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+    if(!d.request||!d.request.recordId||!d.request.fieldSchema) throw new Error('The website returned an incomplete request view.');
+    return d.request;
+}
+/* Attachment URLs need the portal session query args — bake them in once so the
+   component's own thumbnails and the lightbox both load authorised originals. */
+function bwAuthedView(view){
+    const qs=bqQS();
+    (view.attachments||[]).forEach(function(a){
+        if(a.url&&a.url.indexOf('user=')<0) a.url=a.url+(a.url.includes('?')?'&':'?')+qs;
+        if(a.thumbnailUrl&&a.thumbnailUrl.indexOf('user=')<0) a.thumbnailUrl=a.thumbnailUrl+(a.thumbnailUrl.includes('?')?'&':'?')+qs;
+    });
+    return view;
+}
+async function bwLoadByNumber(number, opts){
+    const signal=opts&&opts.signal;
+    const r=await fetch('/api/bind/query?field=number&value='+encodeURIComponent(number)+'&'+bqQS(),{signal:signal});
+    const d=await r.json().catch(function(){ return {}; });
+    if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
+    const hit=(d.results||[])[0];
+    if(!hit) throw new Error('No bind request with number '+number+'.');
+    const view=bwAuthedView(await bwFetchView(hit.record_id, signal));
+    bwViewCache[hit.record_id]={view:view, ts:Date.now()};
+    bwCurrentId=hit.record_id; bwCurrentView=view;
+    setTimeout(function(){ bwAfterOpen(view); },0);
+    return view;
+}
+async function bwSaveDecision(payload, opts){
+    if(typeof previewMode!=='undefined'&&previewMode) throw new Error('Preview mode — saving is disabled.');
+    opts=opts||{};
+    if(opts.onProgress) opts.onProgress('Saving Status, reason and comment — verified one field at a time…');
+    const r=await fetch('/api/bind/save',{method:'POST',headers:{'Content-Type':'application/json'},signal:opts.signal,
+        body:JSON.stringify({user:loggedUser,email:loggedEmail,recordId:payload.recordId,recordVersion:payload.recordVersion,values:payload.values})});
+    const d=await r.json().catch(function(){ return {}; });
+    if(!r.ok||!d.success){
+        const stage=d.stage?(' ['+d.stage+']'):'';
+        const conf=(d.confirmed&&d.confirmed.length)?(' Confirmed on the sheet so far: '+d.confirmed.join(', ')+'.'):'';
+        throw new Error((d.error||('HTTP '+r.status))+stage+conf);
+    }
+    if(opts.onProgress) opts.onProgress(d.handledBySent?'Verified — Handled by was sent last.':'Verified — Handled by unchanged, not re-sent.');
+    if(d.record&&d.record.recordId){
+        bwViewCache[d.record.recordId]={view:d.record, ts:Date.now()};
+        bwCurrentView=d.record;
+        setTimeout(function(){ bwAfterOpen(d.record); },0);
+    }
+    return d;
+}
+/* Evidence opens INSIDE the workspace: images -> the portal lightbox (zoom /
+   rotate / fit / pan / OCR), videos + other files -> the in-page modal. */
+function bwOpenEvidence(att){
+    try{
+        if(att.kind==='video'){ bwFileModal(att.url, att.name, 'video'); return; }
+        if(att.kind==='image'){
+            const imgs=((bwCurrentView&&bwCurrentView.attachments)||[att]).filter(function(a){ return a.kind==='image'; });
+            const gallery=imgs.map(function(a){ return {src:a.url, filename:a.name}; });
+            let idx=imgs.findIndex(function(a){ return a.id===att.id; }); if(idx<0) idx=0;
+            openImageLightboxGallery(gallery, idx);
+            return;
+        }
+        bwFileModal(att.url, att.name, 'file');
+    }catch(e){ ToastManager.show('Could not open the attachment: '+(e.message||e),'error',6000); }
+}
+function bwFileModal(url, name, kind){
+    bwCloseFileModal();
+    const ov=document.createElement('div');
+    ov.className='bw-file-overlay'; ov.id='bwFileOverlay';
+    ov.innerHTML='<div class="bw-file-box"><header><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(name)+'</span>'
+        +'<button type="button" class="bw-btn" onclick="bwCloseFileModal()">✕ Close</button></header>'
+        +(kind==='video'
+            ? '<video controls autoplay preload="metadata" src="'+escHtml(url)+'"></video>'
+            : '<div style="padding:34px;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">📎</div><p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px;">This file type is shared as a download.</p><a class="bw-btn" href="'+escHtml(url)+'" download="'+escHtml(name)+'">⬇ Download '+escHtml(name)+'</a></div>')
+        +'</div>';
+    ov.addEventListener('click',function(e){ if(e.target===ov) bwCloseFileModal(); });
+    document.addEventListener('keydown', bwFileEsc);
+    document.body.appendChild(ov);
+}
+function bwFileEsc(e){ if(e.key==='Escape') bwCloseFileModal(); }
+function bwCloseFileModal(){
+    const ov=document.getElementById('bwFileOverlay');
+    if(ov){ const v=ov.querySelector('video'); if(v){ try{v.pause();}catch(e){} v.removeAttribute('src'); v.load(); } ov.remove(); }
+    document.removeEventListener('keydown', bwFileEsc);
+}
+
+/* Open a request: cached view paints instantly (Live-Queue-fast), the fresh view
+   arrives in the background and only replaces the screen when the record actually
+   changed and no dashboard run / save is in flight. */
 async function bwOpen(recordId){
+    if(!recordId) return;
     if(typeof activeTabId!=='undefined'&&activeTabId&&activeTabId!=='bind-workspace') bwReturnTo=activeTabId;
     openInTab('bind-workspace');
-    document.getElementById('bwTitle').textContent='⏳ Opening bind request…';
-    document.getElementById('bwStatusChip').innerHTML='';
-    document.getElementById('bwBody').innerHTML='<div style="padding:50px;text-align:center;color:var(--text-muted);">⏳ Loading from Feishu…</div>';
-    bqMeta();
+    const inst=bwMount(); if(!inst) return;
+    const mySeq=++bwOpenSeq;
+    const st=inst.getState();
+    const cached=bwViewCache[recordId];
+    const sameOpen=!!(st.request&&st.request.recordId===recordId);
+    if(!sameOpen&&cached&&!st.active){
+        try{ inst.open(cached.view); bwCurrentId=recordId; bwCurrentView=cached.view; bwAfterOpen(cached.view); }
+        catch(e){ /* a save is in progress — keep the current screen */ }
+    } else if(!sameOpen&&!cached){
+        document.getElementById('bwTitle').textContent='⏳ Opening bind request…';
+        document.getElementById('bwStatusChip').innerHTML='';
+    }
     try{
-        const r=await fetch('/api/bind/single?record_id='+encodeURIComponent(recordId)+'&'+bqQS());
-        const d=await r.json();
-        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
-        bwCurrent=d;
-        if(!bqMetaCache) await bqMeta();
-        bwRender(d);
+        const view=bwAuthedView(await bwFetchView(recordId));
+        bwViewCache[recordId]={view:view, ts:Date.now()};
+        if(mySeq!==bwOpenSeq) return;
+        const cur=inst.getState();
+        if(cur.active) return; // dashboard run in progress — keep the fresh copy cached only
+        if(sameOpen&&cur.request&&cur.request.recordVersion===view.recordVersion){ bwCurrentView=view; return; }
+        try{
+            inst.open(view);
+            bwCurrentId=recordId; bwCurrentView=view; bwAfterOpen(view);
+        }catch(e){
+            if(!cached&&!sameOpen) ToastManager.show('Could not refresh the request: '+(e.message||e),'warning',6000);
+        }
     }catch(e){
-        document.getElementById('bwBody').innerHTML='<div class="card" style="padding:30px;text-align:center;color:#fda4af;">⚠️ '+escHtml(e.message||String(e))+'</div>';
+        if(mySeq!==bwOpenSeq) return;
+        if(!cached&&!sameOpen){
+            document.getElementById('bwTitle').textContent='🔗 Bind Request';
+            ToastManager.show('Bind request failed to load: '+(e.message||e),'error',9000);
+        }
     }
 }
 function bwBack(){ openInTab(bwReturnTo||'bind-queue'); }
-function bwRender(d){
-    const b=d.brief||{};
-    document.getElementById('bwTitle').textContent='🔗 Bind Request #'+(b.numbering||'?');
-    const chip=document.getElementById('bwStatusChip');
-    chip.innerHTML=b.status
-        ? '<span style="background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.35);color:#6ee7b7;border-radius:10px;padding:3px 10px;">'+escHtml(b.status)+(b.handled_by?' · '+escHtml(b.handled_by):'')+'</span>'
-        : '<span style="background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.35);color:#fcd34d;border-radius:10px;padding:3px 10px;">unhandled</span>';
-    const rows=[['User ID',b.user_id],['Contact ID',b.contact_id],['Region',b.region],['User Type',b.user_type],
-        ['Reason of Bind Request',b.reason],['New Phone Number',b.new_phone],
-        ['Bind Method (past 3/6 months)',b.bind_method],['Main Login Device (past 6 months)',b.main_device],
-        ['Applier Note',b.applier_note],['Submitted By',b.submitted_by],['Submitted On',bqFmtTime(b.submitted_on)],
-        ['Status',b.status],['Handled By',b.handled_by],['Reject Reason',b.reject_reason],['Comment',b.comment]];
-    let html='<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:14px;color:var(--accent-cyan);">Request Details</h4>'
-        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">'
-        +rows.map(function(kv){ return '<div><div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">'+kv[0]+'</div><div style="font-size:.95rem;word-break:break-word;">'+(kv[1]?escHtml(String(kv[1])):'<span style="color:var(--text-muted)">—</span>')+'</div></div>'; }).join('')
-        +'</div></div>';
-    html+=bwDupHtml(d);
-    html+=bwAttachHtml(d.attachments||[]);
-    const statusOpts=(bqMetaCache&&bqMetaCache.status_options&&bqMetaCache.status_options.length)?bqMetaCache.status_options:['done','reject'];
-    const rrOpts=(bqMetaCache&&bqMetaCache.reject_reasons&&bqMetaCache.reject_reasons.length)?bqMetaCache.reject_reasons:BW_REJECT_FALLBACK;
-    html+='<div class="card"><h4 style="margin-bottom:14px;color:var(--accent-cyan);">Handle This Request</h4>'
-        +'<div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;gap:16px;">'
-        +'<div class="control-group"><label>Status</label><select id="bwStatusSel"><option value="">— pick —</option>'+statusOpts.map(o=>'<option value="'+escHtml(o)+'">'+escHtml(o)+'</option>').join('')+'</select></div>'
-        +'<div class="control-group" id="bwRejectWrap" style="display:none;"><label>Reject Reason</label><select id="bwRejectSel">'+rrOpts.map(o=>'<option value="'+escHtml(o)+'">'+escHtml(o)+'</option>').join('')+'</select></div>'
-        +'</div>'
-        +'<div class="control-group" style="margin-top:14px;"><label>Comment (optional)</label><textarea id="bwComment" rows="2" placeholder="Note for the record…" style="background:var(--surface-hover);border-color:var(--border-hover);"></textarea></div>'
-        +'<div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><button class="btn btn-primary" id="bwSaveBtn" onclick="bwSave()">💾 Save</button>'
-        +'<span style="font-size:.8rem;color:var(--text-muted)">Saving stamps handled-by with your name and removes the request from the Live Queue.</span></div></div>';
-    document.getElementById('bwBody').innerHTML=html;
-    const sel=document.getElementById('bwStatusSel');
-    if(b.status&&statusOpts.includes(b.status)) sel.value=b.status;
-    sel.addEventListener('change',function(){ document.getElementById('bwRejectWrap').style.display=(sel.value==='reject')?'':'none'; });
-    if(sel.value==='reject') document.getElementById('bwRejectWrap').style.display='';
-}
-function bwDupHtml(d){
-    const b=d.brief||{}, dups=d.duplicates||[];
-    const sheet=(b.sheet_dup_check||'').trim();
-    let inner;
-    if(dups.length){
-        inner='<div style="background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.4);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:#fda4af;font-weight:600;">⚠️ '+dups.length+' other bind request'+(dups.length>1?'s':'')+' with the SAME User ID ('+escHtml(b.user_id||'')+')</div>'
-            +dups.map(function(p){ return '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;" onclick="bwOpen(\''+escHtml(p.record_id)+'\')"><span>#'+escHtml(p.numbering||'?')+' · '+(p.status?escHtml(p.status):'new')+(p.handled_by?' · '+escHtml(p.handled_by):'')+'</span><span style="color:var(--text-muted);font-size:.8rem;">'+bqFmtTime(p.submitted_on)+'</span></div>'; }).join('');
-    }else{
-        inner='<div style="background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.35);border-radius:10px;padding:12px 14px;color:#6ee7b7;font-weight:600;">✅ No other bind request uses this User ID'+(b.user_id?' ('+escHtml(b.user_id)+')':'')+'</div>';
-    }
-    if(sheet) inner+='<div style="margin-top:10px;font-size:.8rem;color:var(--text-muted);"><b>Sheet “Duplicated Check” column:</b> '+escHtml(sheet)+'</div>';
-    return '<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:12px;color:var(--accent-cyan);">🔁 Duplicate Check — User ID</h4>'+inner+'</div>';
-}
-function bwAttachHtml(groups){
-    if(!groups.length) return '<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:8px;color:var(--accent-cyan);">📎 Attachments</h4><div style="color:var(--text-muted);font-size:.85rem;">No attachments on this request.</div></div>';
-    const qs=bqQS();
-    let html='<div class="card" style="margin-bottom:20px;"><h4 style="margin-bottom:12px;color:var(--accent-cyan);">📎 Attachments</h4>';
-    groups.forEach(function(g){
-        html+='<div style="margin-bottom:14px;"><div style="font-size:.78rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+escHtml(g.field)+'</div><div style="display:flex;flex-wrap:wrap;gap:12px;">';
-        g.pics.forEach(function(f){
-            const src=f.url+(f.url.indexOf('?')>=0?'&':'?')+qs;
-            const isImg=/^image\//i.test(f.type||'')||/\.(jpe?g|png|gif|webp|heic)$/i.test(f.name||'');
-            const isVid=/^video\//i.test(f.type||'')||/\.(mp4|mov|webm|mkv)$/i.test(f.name||'');
-            if(isImg) html+='<a href="'+src+'" target="_blank" rel="noopener" title="'+escHtml(f.name)+'"><img src="'+src+'" loading="lazy" style="width:140px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"></a>';
-            else if(isVid) html+='<video controls preload="metadata" src="'+src+'" style="width:220px;border-radius:8px;border:1px solid var(--border);"></video>';
-            else html+='<a href="'+src+'" target="_blank" rel="noopener" style="font-size:.85rem;">📎 '+escHtml(f.name)+'</a>';
-        });
-        html+='</div></div>';
-    });
-    return html+'</div>';
-}
-async function bwSave(){
-    if(typeof previewMode!=='undefined'&&previewMode){ ToastManager.show('Preview mode — saving is disabled.','warning'); return; }
-    if(!bwCurrent||!bwCurrent.brief||!bwCurrent.brief.record_id) return;
-    const status=(document.getElementById('bwStatusSel').value||'').trim();
-    const rr=(document.getElementById('bwRejectSel').value||'').trim();
-    const cmt=(document.getElementById('bwComment').value||'').trim();
-    if(!status){ ToastManager.show('Pick a Status first.','warning'); return; }
-    if(status==='reject'&&!rr){ ToastManager.show('Pick a Reject Reason.','warning'); return; }
-    const btn=document.getElementById('bwSaveBtn'); btn.disabled=true; btn.textContent='Saving…';
-    try{
-        const r=await fetch('/api/bind/handle',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({user:loggedUser,email:loggedEmail,record_id:bwCurrent.brief.record_id,status:status,reject_reason:(status==='reject'?rr:''),comment:cmt})});
-        const d=await r.json();
-        if(!r.ok||!d.success) throw new Error(d.error||('HTTP '+r.status));
-        ToastManager.show('✅ Saved — handled by '+d.handled_by,'success',6000);
-        const rid=bwCurrent.brief.record_id;
-        await bwOpen(rid);
-        if(bwReturnTo==='bind-queue') bqLoad();
-    }catch(e){
-        ToastManager.show('Save failed: '+(e.message||e),'error',9000);
-    }finally{ btn.disabled=false; btn.textContent='💾 Save'; }
+function bwAfterOpen(view){
+    if(!view) return;
+    document.getElementById('bwTitle').textContent='🔗 Bind Request #'+(view.number||'?');
+    document.getElementById('bwStatusChip').innerHTML='<span class="qy-status-pill '+qyStatusClass(view.statusLabel)+'">'+escHtml(view.statusLabel||'Awaiting review')+'</span>';
+    bwRadarScan(view);
 }
 
-window.SAM19_BUILD='v27.1 bind-owner 2026-11-13';
+/* Duplicate radar — works like the audit radar: User ID matches come free with
+   the loaded request view, Contact ID adds one query call; cards show matches. */
+async function bwRadarScan(view){
+    const card=document.getElementById('bwRadarCard'); if(!card||!view) return;
+    card.style.display='block';
+    const summary=document.getElementById('bwRadarSummary'), badge=document.getElementById('bwRadarBadge'),
+          results=document.getElementById('bwRadarResults'), toggleBtn=document.getElementById('bwRadarToggleBtn'),
+          sheet=document.getElementById('bwRadarSheet');
+    results.style.display='none'; results.innerHTML=''; toggleBtn.style.display='none';
+    bwRadarMatches=[];
+    const myId=view.recordId;
+    const byKey=new Map();
+    (view.related||[]).forEach(function(r){
+        if(!r.recordId||r.recordId===myId) return;
+        byKey.set(r.recordId,{recordId:r.recordId,
+            brief:{record_id:r.recordId, numbering:r.number, status:(r.status&&r.status!=='new')?r.status:''},
+            matchedOn:['User ID']});
+    });
+    let contactErr=false;
+    const cid=(view.contactId||'').trim(), uid=(view.userId||'').trim();
+    if(cid&&cid!==uid){
+        if(!byKey.size) summary.textContent='⏳ Scanning User ID + Contact ID…';
+        try{
+            const r=await fetch('/api/bind/query?field=contact_id&value='+encodeURIComponent(cid)+'&'+bqQS());
+            const d=await r.json();
+            if(r.ok&&d.success){
+                (d.results||[]).forEach(function(it){
+                    if(!it.record_id||it.record_id===myId) return;
+                    if(!byKey.has(it.record_id)) byKey.set(it.record_id,{recordId:it.record_id, brief:it, matchedOn:[]});
+                    const m=byKey.get(it.record_id);
+                    m.brief=it; // the full card beats the minimal related entry
+                    if(m.matchedOn.indexOf('Contact ID')<0) m.matchedOn.push('Contact ID');
+                    if((it.user_id||'').trim()&&((it.user_id||'').trim()===uid)&&m.matchedOn.indexOf('User ID')<0) m.matchedOn.unshift('User ID');
+                });
+            } else contactErr=true;
+        }catch(e){ contactErr=true; }
+    }
+    bwRadarMatches=Array.from(byKey.values());
+    sheet.innerHTML=(view.sheetDupCheck&&String(view.sheetDupCheck).trim())?('Sheet “Duplicated Check”: '+escHtml(view.sheetDupCheck)):'';
+    const n=bwRadarMatches.length;
+    badge.style.display=n?'inline-grid':'none'; badge.textContent=n;
+    if(n){
+        summary.innerHTML='<span style="color:var(--accent-rose);font-weight:600;">⚠️ '+n+' other request'+(n>1?'s':'')+' share this User ID / Contact ID</span>'
+            +(view.relatedComplete===false?' <span style="font-size:.75rem;color:var(--text-muted);">(User ID list may be incomplete)</span>':'')
+            +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed)</span>':'');
+        toggleBtn.style.display='inline-block';
+        bwRadarRender(); // show the duplicated ticket cards right away
+    }else{
+        summary.innerHTML='<span style="color:var(--accent-green);font-weight:600;">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
+            +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed — User ID result comes from the loaded request)</span>':'');
+    }
+}
+function bwRadarRender(){
+    const results=document.getElementById('bwRadarResults'), btn=document.getElementById('bwRadarToggleBtn');
+    if(!results) return;
+    results.innerHTML=bwRadarMatches.map(function(m){ return bqCardHtml(m.brief, m.matchedOn); }).join('');
+    results.style.display='grid';
+    if(btn) btn.textContent='🙈 Hide matches';
+}
+function bwRadarToggle(){
+    const results=document.getElementById('bwRadarResults'), btn=document.getElementById('bwRadarToggleBtn');
+    if(!results) return;
+    if(results.style.display==='none'){
+        if(!results.innerHTML) bwRadarRender();
+        else{ results.style.display='grid'; if(btn) btn.textContent='🙈 Hide matches'; }
+    }else{
+        results.style.display='none';
+        if(btn) btn.textContent='👀 View '+bwRadarMatches.length+' match'+(bwRadarMatches.length>1?'es':'');
+    }
+}
+
+window.SAM19_BUILD='v28 bind-redesign 2026-11-13';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
