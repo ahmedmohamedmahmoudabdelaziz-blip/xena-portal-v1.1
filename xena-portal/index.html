@@ -2021,39 +2021,34 @@
         .bw-radar-fab.alert{border-color:var(--accent-rose);background:rgba(255,77,109,.16);animation:bwRadarPulse 1.6s ease-in-out infinite;}
         @keyframes bwRadarPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,109,.35);}50%{box-shadow:0 0 0 9px rgba(255,77,109,0);}}
         .bw-radar-fab .bw-radar-badge{position:absolute;top:-6px;right:-6px;margin-left:0;vertical-align:0;}
-        .bw-radar-panel{position:relative;overflow:hidden;margin-bottom:20px;padding:20px 22px;border-radius:16px;background:linear-gradient(145deg,rgba(255,77,109,.07),var(--surface) 55%);border:1px solid rgba(255,77,109,.3);animation:ltqCardIn .35s cubic-bezier(.2,.9,.3,1.2) backwards;}
-        .bw-radar-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent-rose),transparent 70%);}
-        .bw-radar-panel.clean{background:linear-gradient(145deg,rgba(0,230,118,.06),var(--surface) 55%);border-color:rgba(0,230,118,.3);}
-        .bw-radar-panel.clean::before{background:linear-gradient(90deg,var(--accent-green),transparent 70%);}
         .bw-radar-summary{font-size:.92rem;color:var(--text-muted);}
-        .bw-radar-sheet{margin-top:8px;font-size:.8rem;color:var(--text-muted);}
-        .bw-radar-panel .qy-grid{margin-top:14px;}
+        .bw-radar-sheet{margin-top:2px;font-size:.8rem;color:var(--text-muted);}
 
-        /* v28.4 (Ahmed): duplicates live IN the page -- a banner above the
-           workspace, slim green when clean, auto-expanded rose with full
-           cards on matches; the chevron folds it. Step-rail dots mirror
-           each section's tone; the final bar sticks to the bottom with a
-           live draft echo; the top grid gives verification more room. */
-        .bw-radar-panel{padding:0;}
-        .bw-radar-head{display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;background:transparent;border:none;cursor:pointer;text-align:left;font:inherit;color:inherit;}
-        .bw-radar-head:hover{background:rgba(255,255,255,.03);}
-        .bw-radar-ico{font-size:1.05rem;flex:none;}
-        .bw-radar-head-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
-        .bw-radar-chevron{flex:none;color:var(--text-muted);transition:transform .25s;font-size:.8rem;}
-        .bw-radar-panel:has(.bw-radar-body.open) .bw-radar-chevron{transform:rotate(180deg);}
-        .bw-radar-body{display:none;padding:2px 18px 18px;}
-        .bw-radar-body.open{display:block;}
-        .bw-radar-panel .bw-radar-body .qy-grid{margin-top:10px;}
+        /* v28.5 (Ahmed): duplicates open as a MODAL from the header fab
+           (ticket-workspace parity) -- nothing floats inside the page; the
+           nav rail and the final bar are static, integrated parts of the
+           flow, restyled to feel crafted instead of distracting. */
+        .bw-radar-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(4,6,10,.72);backdrop-filter:blur(6px);}
+        .bw-radar-dialog{width:min(880px,100%);max-height:82vh;overflow:auto;border-radius:20px;padding:20px 22px;background:linear-gradient(160deg,color-mix(in srgb,var(--accent-amber) 7%,var(--surface)),var(--surface) 42%);border:1px solid color-mix(in srgb,var(--accent-amber) 45%,var(--border));box-shadow:0 30px 80px rgba(0,0,0,.6);}
+        .bw-radar-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:700;font-size:1.05rem;color:var(--accent-amber);margin-bottom:10px;}
+        .bw-radar-x{border:1px solid var(--border);background:var(--surface-hover);color:var(--text-muted);border-radius:9px;width:32px;height:32px;font-size:.85rem;cursor:pointer;flex:none;}
+        .bw-radar-x:hover{color:var(--text);border-color:var(--accent-amber);}
+        .bw-radar-meta{display:flex;flex-direction:column;gap:3px;margin-bottom:14px;}
+        #bwRoot .bw-nav{position:static;margin:22px 0 18px;padding:8px;border:1px solid var(--bw-line);border-radius:18px;background:color-mix(in srgb,var(--bw-card) 82%,transparent);}
         #bwRoot .bw-nav a{display:inline-flex;align-items:center;gap:8px;}
         .bw-step-dot{width:9px;height:9px;border-radius:50%;background:var(--bw-line);flex:none;display:inline-block;transition:background .3s,box-shadow .3s;}
-        .bw-step-dot.bw-ok{background:var(--accent-green);box-shadow:0 0 8px rgba(0,230,118,.55);}
+        .bw-step-dot.bw-ok{background:var(--accent-green);box-shadow:0 0 8px rgba(0,230,118,.55);animation:bwDotPulse 2.4s ease-in-out infinite;}
         .bw-step-dot.bw-warn{background:var(--accent-amber);box-shadow:0 0 8px rgba(255,184,0,.55);}
         .bw-step-dot.bw-bad{background:var(--accent-rose);box-shadow:0 0 8px rgba(255,77,109,.55);}
+        @keyframes bwDotPulse{0%,100%{box-shadow:0 0 6px rgba(0,230,118,.4);}50%{box-shadow:0 0 13px rgba(0,230,118,.8);}}
         #bwRoot .bw-topgrid{grid-template-columns:minmax(300px,.92fr) minmax(390px,1.08fr);}
         @media(max-width:1150px){#bwRoot .bw-topgrid{grid-template-columns:1fr;}}
-        #bwRoot .bw-final{position:sticky;bottom:14px;z-index:6;box-shadow:0 18px 44px rgba(0,0,0,.42);}
+        #bwRoot .bw-final{position:static;margin-top:26px;box-shadow:0 12px 32px rgba(0,0,0,.28);}
         #bwRoot .bw-draft-echo{margin:10px 0 0;font-size:.8rem;color:var(--accent-green);font-weight:600;}
-        @media(max-width:640px){#bwRoot .bw-final{bottom:8px;}}
+        #bwRoot .bw-card{transition:border-color .25s,box-shadow .25s;}
+        #bwRoot .bw-card:hover{border-color:color-mix(in srgb,var(--bw-accent) 32%,var(--bw-line));box-shadow:0 14px 36px rgba(0,0,0,.32);}
+        #bwRoot .bw-head h1{background:linear-gradient(92deg,var(--bw-text) 35%,var(--accent-cyan));-webkit-background-clip:text;background-clip:text;color:transparent;}
+        #bwRoot .bw-index{background:linear-gradient(135deg,color-mix(in srgb,var(--bw-accent) 22%,var(--bw-card)),var(--bw-card));border-color:color-mix(in srgb,var(--bw-accent) 38%,var(--bw-line));}
         /* shimmer skeletons while the queue loads (no more dead text) */
         .bq-skel{border-radius:18px;height:150px;background:linear-gradient(100deg,var(--surface) 30%,var(--surface-hover) 50%,var(--surface) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;border:1px solid var(--border);}
         @keyframes bqSkel{from{background-position:180% 0;}to{background-position:-20% 0;}}
@@ -5167,16 +5162,18 @@ html{background:var(--bg);min-height:100%}
                         <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
                     </div>
                 </div>
-                <div id="bwRadarPanel" class="bw-radar-panel" style="display:none;">
-                    <button type="button" class="bw-radar-head" id="bwRadarHead" onclick="bwRadarToggle()" title="Show / hide the duplicate list">
-                        <span class="bw-radar-ico">&#128225;</span>
-                        <span class="bw-radar-head-text">
-                            <span id="bwRadarSummary" class="bw-radar-summary">Open a request to scan for duplicates.</span>
-                            <span id="bwRadarSheet" class="bw-radar-sheet"></span>
-                        </span>
-                        <span class="bw-radar-chevron" id="bwRadarChevron">&#9662;</span>
-                    </button>
-                    <div id="bwRadarBody" class="bw-radar-body">
+                <!-- v28.5 (Ahmed): duplicates open as a MODAL from the header fab --
+                     ticket-workspace parity, nothing sits in the page flow. -->
+                <div class="bw-radar-modal" id="bwRadarModal" style="display:none;" onclick="if(event.target===this)bwRadarToggle(false)">
+                    <div class="bw-radar-dialog" role="dialog" aria-label="Duplicate radar">
+                        <div class="bw-radar-dialog-head">
+                            <span>&#128225; Duplicate Radar — matching requests</span>
+                            <button type="button" class="bw-radar-x" onclick="bwRadarToggle(false)" title="Close">✕</button>
+                        </div>
+                        <div class="bw-radar-meta">
+                            <div id="bwRadarSummary" class="bw-radar-summary">Open a request to scan for duplicates.</div>
+                            <div id="bwRadarSheet" class="bw-radar-sheet"></div>
+                        </div>
                         <div id="bwRadarResults" class="qy-grid"></div>
                     </div>
                 </div>
@@ -27760,8 +27757,8 @@ function bwDestroyWorkspace(){
     bwRadarMatches=[];
     const t=document.getElementById('bwTitle'); if(t) t.textContent='Bind Request';
     const c=document.getElementById('bwStatusChip'); if(c) c.innerHTML='';
-    const p=document.getElementById('bwRadarPanel'); if(p){ p.style.display='none'; p.classList.remove('clean'); }
-    const pb=document.getElementById('bwRadarBody'); if(pb) pb.classList.remove('open');
+    const p=document.getElementById('bwRadarModal'); if(p) p.style.display='none';
+    const rr=document.getElementById('bwRadarResults'); if(rr) rr.innerHTML='';
     const f=document.getElementById('bwRadarFab'); if(f) f.classList.remove('alert');
     const b=document.getElementById('bwRadarBadge'); if(b){ b.style.display='none'; b.textContent=''; }
     openTabs=openTabs.filter(function(x){ return x!=='bind-workspace'; });
@@ -27780,16 +27777,14 @@ function bwAfterOpen(view){
    panel; duplicates auto-reveal it. User-ID matches come free with the loaded
    request view, Contact ID adds one query call. */
 async function bwRadarScan(view){
-    const panel=document.getElementById('bwRadarPanel'); if(!panel||!view) return;
+    if(!view) return;
     const summary=document.getElementById('bwRadarSummary'), badge=document.getElementById('bwRadarBadge'),
           results=document.getElementById('bwRadarResults'),
           sheet=document.getElementById('bwRadarSheet'),
           fab=document.getElementById('bwRadarFab');
-    const body=document.getElementById('bwRadarBody');
-    // v28.4 (Ahmed): the duplicate watch lives IN the page -- the banner is
-    // always visible while a request is open; matches auto-expand it.
-    panel.style.display='block'; panel.classList.remove('clean');
-    if(body) body.classList.remove('open');
+    // v28.5 (Ahmed): duplicates open as a modal from the header fab --
+    // ticket-workspace parity, nothing sits in the page flow.
+    const modal=document.getElementById('bwRadarModal'); if(modal) modal.style.display='none';
     results.innerHTML='';
     summary.textContent='\u23f3 Scanning for duplicates\u2026';
     if(fab) fab.classList.remove('alert');
@@ -27849,9 +27844,7 @@ async function bwRadarScan(view){
             +(view.relatedComplete===false?' <span style="font-size:.75rem;color:var(--text-muted);">(User ID list may be incomplete)</span>':'')
             +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed)</span>':'');
         bwRadarRender();
-        if(body) body.classList.add('open'); // duplicates auto-expand the banner
     }else{
-        panel.classList.add('clean');
         summary.innerHTML='<span style="color:var(--accent-green);font-weight:600;">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
             +(contactErr?' <span style="font-size:.75rem;color:var(--text-muted);">(Contact ID scan failed — User ID result comes from the loaded request)</span>':'');
     }
@@ -27871,18 +27864,15 @@ function bwToggleTopbar(expand){
     w.classList.toggle('chat-collapsed',!open);
 }
 
-function bwRadarToggle(){
-    const panel=document.getElementById('bwRadarPanel');
-    if(!panel||panel.style.display==='none') return;
-    const body=document.getElementById('bwRadarBody');
-    if(!body) return;
-    const open=!body.classList.contains('open');
+function bwRadarToggle(show){
+    const modal=document.getElementById('bwRadarModal');
+    if(!modal) return;
+    const open=show===undefined?modal.style.display==='none':!!show;
     if(open&&bwRadarMatches.length&&!document.getElementById('bwRadarResults').innerHTML) bwRadarRender();
-    body.classList.toggle('open',open);
-    if(open) panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    modal.style.display=open?'flex':'none';
 }
 
-window.SAM19_BUILD='v28.4 bind-keepalive-dupbar-redesign 2026-11-14';
+window.SAM19_BUILD='v28.5 bind-radar-modal-staticflow 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
