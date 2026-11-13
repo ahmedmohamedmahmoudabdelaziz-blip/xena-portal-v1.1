@@ -1960,6 +1960,12 @@
         .bwx-topbar .tw-head-meta{font-size:.82rem;color:var(--text-muted);}
         .bwx-topbar .twx-radar-dock{width:52px;height:52px;}
         .bwx-topbar .twx-fab{width:52px;height:52px;font-size:1.3rem;}
+        /* ─── v28.3 (Ahmed): the action bar collapses into the ⚡ icon (LTQ parity) ─── */
+        #pg-bind-workspace{padding-top:88px;}
+        .bwx-dock .twx-fab{width:52px;height:52px;font-size:1.3rem;}
+        @media (max-width:900px){
+            #pg-bind-workspace{padding-top:14px;}
+        }
         /* elegant component cards: soft gradient, lift on hover */
         #bwRoot .bw-card{border-radius:18px;background:linear-gradient(165deg,color-mix(in srgb,var(--bw-card) 92%,var(--accent-cyan) 4%),var(--bw-card) 45%);box-shadow:0 10px 30px rgba(0,0,0,.22);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;}
         #bwRoot .bw-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--bw-accent) 38%,var(--bw-line));box-shadow:0 16px 40px rgba(0,0,0,.3);}
@@ -2758,7 +2764,7 @@ option{background:var(--surface);color:var(--text)}
  .welcome-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.welcome-card{padding:14px 10px}.welcome-card-desc{font-size:12px}
  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-card{min-width:0;padding:12px}
  .table-wrap,.ti-table-wrap,.rw-table-wrap,.aws-table-wrap,.sch-grid-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
- #twxDock,#awsDock,body.sidebar-collapsed #twxDock,body.sidebar-collapsed #awsDock{top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;flex-direction:row!important;align-items:center;gap:10px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);box-shadow:0 5px 22px #0003;width:max-content;max-width:calc(100vw - 20px)}
+ #twxDock,#awsDock,#bwxDock,body.sidebar-collapsed #twxDock,body.sidebar-collapsed #awsDock,body.sidebar-collapsed #bwxDock{top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;flex-direction:row!important;align-items:center;gap:10px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);box-shadow:0 5px 22px #0003;width:max-content;max-width:calc(100vw - 20px)}
  .twx-topbar-wrapper{width:44px;height:44px}.twx-radar-dock{width:44px;height:44px}
  .twx-fab{width:44px!important;height:44px!important;min-width:44px;border:0!important;background:#ffbf83!important;color:#38220f!important;font-size:20px;box-shadow:none!important;backdrop-filter:none!important;transition:transform .15s!important}
  .twx-fab:not(.xena-transfer-fab){font-size:0!important}
@@ -5112,21 +5118,27 @@ html{background:var(--bg);min-height:100%}
                  round 📡 twx-fab with a badge (click toggles the panel; duplicates
                  auto-reveal it), and the handoff component mounts into #bwRoot. -->
             <div id="pg-bind-workspace" style="display:none">
-                <!-- v28.2 (Ahmed): the bind workspace header IS the ticket
-                     workspace's action bar -- the same sticky gradient .twx-topbar
-                     (real Back button + gradient title) and the 📡 radar as the
-                     same round .twx-fab with its badge. -->
-                <div class="twx-topbar bwx-topbar">
-                    <button class="btn btn-outline twx-back" onclick="bwBack()">← Back to Queue</button>
-                    <div class="twx-head-center">
-                        <h3 id="bwTitle" class="twx-title">Bind Request</h3>
-                        <div class="tw-head-meta">Review the evidence, run the checks, then save the decision — verified one field at a time.</div>
-                    </div>
-                    <div class="twx-actions">
-                        <span id="bwStatusChip" style="font-size:.85rem;"></span>
-                        <div class="twx-radar-dock">
-                            <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
+                <!-- v28.3 (Ahmed): the action bar is now an ICON that opens on click --
+                     exactly the Live Ticket Queue pattern: the ⚡ fab expands the
+                     gradient .twx-topbar (Back + status + ✖ Close), the 📡 radar
+                     sits beside it in the same fixed dock, always reachable. -->
+                <div class="twx-dock bwx-dock" id="bwxDock">
+                    <div class="twx-topbar-wrapper chat-collapsed" id="bwxTopbarWrap">
+                        <button type="button" class="twx-fab" onclick="bwToggleTopbar()" title="Open the workspace action bar">⚡</button>
+                        <div class="twx-topbar bwx-topbar">
+                            <button class="btn btn-outline twx-back" onclick="bwBack()">← Back to Queue</button>
+                            <div class="twx-head-center">
+                                <h3 id="bwTitle" class="twx-title">Bind Request</h3>
+                                <div class="tw-head-meta">Review the evidence, run the checks, then save the decision — verified one field at a time.</div>
+                            </div>
+                            <div class="twx-actions">
+                                <span id="bwStatusChip" style="font-size:.85rem;"></span>
+                                <button type="button" class="twx-collapse-btn" onclick="bwToggleTopbar(false)" title="Collapse the action bar">✖ Close</button>
+                            </div>
                         </div>
+                    </div>
+                    <div class="twx-radar-dock">
+                        <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
                     </div>
                 </div>
                 <div id="bwRadarPanel" class="bw-radar-panel" style="display:none;">
@@ -27605,6 +27617,7 @@ async function bwOpen(recordId){
     if(!recordId) return;
     if(typeof activeTabId!=='undefined'&&activeTabId&&activeTabId!=='bind-workspace') bwReturnTo=activeTabId;
     openInTab('bind-workspace');
+    bwToggleTopbar(false); // v28.3: the action bar opens collapsed -- click ⚡ to expand (LTQ parity)
     const inst=bwMount(); if(!inst) return;
     const mySeq=++bwOpenSeq;
     const st=inst.getState();
@@ -27740,6 +27753,16 @@ function bwRadarRender(){
     if(!results) return;
     results.innerHTML=bwRadarMatches.map(function(m){ return bqCardHtml(m.brief, m.matchedOn); }).join('');
 }
+// v28.3 (Ahmed): the action bar is an icon that opens on click -- the same
+// ⚡ toggle as the Live Ticket Queue workspace (twToggleTopbar). The bar starts
+// collapsed; ✖ Close or the ⚡ icon collapses it again.
+function bwToggleTopbar(expand){
+    const w=document.getElementById('bwxTopbarWrap');
+    if(!w) return;
+    const open=expand===undefined?w.classList.contains('chat-collapsed'):!!expand;
+    w.classList.toggle('chat-collapsed',!open);
+}
+
 function bwRadarToggle(){
     const panel=document.getElementById('bwRadarPanel');
     if(!panel) return;
@@ -27751,7 +27774,7 @@ function bwRadarToggle(){
     }
 }
 
-window.SAM19_BUILD='v28.2 bind-workspace-parity 2026-11-14';
+window.SAM19_BUILD='v28.3 bind-v3-save-actionbar 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
