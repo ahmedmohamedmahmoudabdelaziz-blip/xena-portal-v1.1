@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v28.3 bind-v3-save-actionbar 2026-11-14"
+XENA_BUILD = "v28.4 bind-keepalive-dupbar-redesign 2026-11-14"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -7465,20 +7465,80 @@ def bind_handle():
 # read-back-verified), a two-second pause, a re-check, and a CHANGED Handled by as
 # the final write. Handled by is never sent after a failed or uncertain save.
 
-BIND_REASON_GROUPS = {   # status -> reason option names (from the sheet owner's groups)
+# v28.4 (Ahmed, comment 7707733343751638033): "why the the all rejected reason
+# appare no matter it done or rejected???" -- the hardcoded groups below never
+# matched the sheet's REAL option spellings (trailing spaces, "Banned Acsount",
+# 7 reject options that exist only on the field), so most options got
+# statusValues=None and showed for every status. The sheet's referenced-options
+# SOURCE TABLE (BIND_REASON_SOURCE_TABLE: "Category 1" = done/reject,
+# "Category 2" = reason) is the owner's living grouping and now wins; the
+# hardcoded snapshot below covers every current option as a fallback.
+BIND_REASON_SOURCE_TABLE = "tbl0eKvAZSsfDXPJ"
+
+BIND_REASON_GROUPS = {   # status -> reason option names (snapshot of the sheet, fallback)
     "done": ["all information correct", "correct bind number and recharge",
              "correct bind number and device", "correct device and recharge", "As per approval"],
     "reject": ["need the main device", "all information wrong", "Missing Info or incorrect Answer",
                "missing stolen evidence", "let the user contact us from same id",
                "has a successful bind request in last 15 days", "blacklist",
                "new number is linked with another account", "invalid stolen evidence",
-               "Wrong Number formats", "Banned Account"],
+               "Wrong Number formats", "Banned Account", "Banned Acsount",
+               "wrong NID", "wrong bind number and device", "wrong device and recharge",
+               "wrong bind number and recharge", "invalid, we don't support sharing information",
+               "New number already binded", "Account not linked to another bind way"],
 }
 
+def _bind_reason_source_map():
+    """Owner-maintained reason grouping from the sheet's referenced-options source
+    table: {normalized reason name: 'done'|'reject'}. Cached 5 min; {} on error
+    (the hardcoded BIND_REASON_GROUPS fallback then decides)."""
+    ck = cache_make_key("bindreasonsrc284")
+    try:
+        cached = cache_get(ck)
+        if cached is not None:
+            return cached
+    except Exception:
+        pass
+    out = {}
+    try:
+        tat = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BIND_BASE_ID}/tables/{BIND_REASON_SOURCE_TABLE}/records"
+        params = {"page_size": 100}
+        for _ in range(5):  # 17 rows today; page loop is belt & braces
+            res = feishu_session.get(url, headers={"Authorization": f"Bearer {tat}"},
+                                     params=params, timeout=12).json()
+            if res.get("code") != 0:
+                break
+            data = res.get("data") or {}
+            for it in (data.get("items") or []):
+                f = (it or {}).get("fields") or {}
+                cat = extract_field_text(f.get("Category 1")).strip().lower()
+                name = re.sub(r"\s+", " ", extract_field_text(f.get("Category 2")).strip().lower())
+                if not name:
+                    continue
+                if "reject" in cat:
+                    out[name] = "reject"
+                elif "done" in cat:
+                    out[name] = "done"
+            if not data.get("has_more"):
+                break
+            params["page_token"] = data.get("page_token")
+    except Exception:
+        pass
+    try:
+        cache_set(ck, out, ttl=300)
+    except Exception:
+        pass
+    return out
+
 def _bind_reason_status_values(label):
-    """Which Status values a reason option belongs to. Unknown/new options return
-    None = shown for every status (never invent a restriction the sheet doesn't state)."""
+    """Which Status values a reason option belongs to. The sheet's source table
+    is the source of truth; the hardcoded snapshot is the fallback. Unknown/new
+    options return None = shown for every status (never invent a restriction)."""
     key = re.sub(r"\s+", " ", str(label or "").strip().lower())
+    src = _bind_reason_source_map()
+    if key in src:
+        return [src[key]]
     for status, names in BIND_REASON_GROUPS.items():
         if any(re.sub(r"\s+", " ", n.strip().lower()) == key for n in names):
             return [status]
