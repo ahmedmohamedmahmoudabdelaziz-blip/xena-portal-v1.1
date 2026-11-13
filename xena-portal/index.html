@@ -1953,6 +1953,50 @@
         @media(prefers-reduced-motion:reduce){.bw *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 
+        /* ─── v28.2 (Ahmed): workspace parity + elegant section redesign ─── */
+        /* header = the ticket workspace's twx-topbar shape */
+        .bwx-topbar{margin-bottom:22px;}
+        .bwx-topbar .twx-head-center{flex:1;text-align:center;}
+        .bwx-topbar .tw-head-meta{font-size:.82rem;color:var(--text-muted);}
+        .bwx-topbar .twx-radar-dock{width:52px;height:52px;}
+        .bwx-topbar .twx-fab{width:52px;height:52px;font-size:1.3rem;}
+        /* elegant component cards: soft gradient, lift on hover */
+        #bwRoot .bw-card{border-radius:18px;background:linear-gradient(165deg,color-mix(in srgb,var(--bw-card) 92%,var(--accent-cyan) 4%),var(--bw-card) 45%);box-shadow:0 10px 30px rgba(0,0,0,.22);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;}
+        #bwRoot .bw-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--bw-accent) 38%,var(--bw-line));box-shadow:0 16px 40px rgba(0,0,0,.3);}
+        #bwRoot .bw-card-head h2{background:linear-gradient(90deg,#7ee7ff,var(--accent-cyan) 55%,var(--primary));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:800;}
+        #bwRoot .bw-kicker{color:var(--accent-cyan);opacity:.85;}
+        #bwRoot .bw-topgrid .bw-check{margin-top:0;}
+        /* sections 01 + 02 side by side, the rest full width */
+        #bwRoot .bw-sect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;}
+        #bwRoot .bw-sect-grid .bw-section{margin-bottom:0;}
+        #bwRoot .bw-sect-grid .bw-section:nth-child(n+3){grid-column:1/-1;}
+        @media(max-width:1100px){#bwRoot .bw-sect-grid{grid-template-columns:1fr;}}
+        /* gradient index chips */
+        #bwRoot .bw-index{width:34px;height:34px;border-radius:11px;border:1px solid color-mix(in srgb,var(--bw-accent) 45%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--bw-accent) 22%,transparent),color-mix(in srgb,var(--primary) 14%,transparent));color:var(--accent-cyan);font-weight:800;}
+        /* pill nav */
+        #bwRoot .bw-nav{border-bottom:0;gap:8px;padding:12px 4px;}
+        #bwRoot .bw-nav a{border:1px solid var(--bw-line);border-radius:999px;padding:7px 14px;background:var(--bw-card);color:var(--bw-muted);font-weight:600;}
+        #bwRoot .bw-nav a:hover{border-color:var(--bw-accent);color:var(--bw-accent);background:color-mix(in srgb,var(--bw-accent) 8%,var(--bw-card));}
+        /* Audit action at the end -- purple frame; final footer -- green frame */
+        #bwRoot [data-bind-decision]{margin-top:22px;border:1px solid color-mix(in srgb,var(--accent-purple) 45%,var(--bw-line));box-shadow:0 12px 34px rgba(139,92,246,.14);}
+        #bwRoot [data-bind-decision] .bw-card-head h2{background:linear-gradient(90deg,#c4b5fd,var(--accent-purple));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+        #bwRoot .bw-final{border-radius:18px;border:1px solid color-mix(in srgb,var(--accent-green) 45%,var(--bw-line));background:linear-gradient(135deg,color-mix(in srgb,var(--accent-green) 7%,var(--bw-card)),var(--bw-card) 60%);}
+        /* Samurai (blue) / Noora (pink) quick-assign buttons */
+        #bwRoot .bw-hb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+        #bwRoot .bw-hb-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bw-muted);}
+        #bwRoot .bw-hb-btn{min-height:38px;padding:8px 20px;border-radius:999px;font-weight:800;font-size:.86rem;border:1.5px solid transparent;background:var(--bw-inner);color:var(--bw-text);transition:all .15s ease;}
+        #bwRoot .bw-hb-btn.bw-hb-blue{border-color:rgba(77,163,255,.5);color:#7fb8ff;background:rgba(77,163,255,.09);}
+        #bwRoot .bw-hb-btn.bw-hb-blue:hover{background:rgba(77,163,255,.18);transform:translateY(-1px);}
+        #bwRoot .bw-hb-btn.bw-hb-blue.active{background:rgba(77,163,255,.9);color:#06182e;box-shadow:0 0 16px rgba(77,163,255,.4);}
+        #bwRoot .bw-hb-btn.bw-hb-pink{border-color:rgba(255,122,200,.5);color:#ff9ed2;background:rgba(255,122,200,.09);}
+        #bwRoot .bw-hb-btn.bw-hb-pink:hover{background:rgba(255,122,200,.18);transform:translateY(-1px);}
+        #bwRoot .bw-hb-btn.bw-hb-pink.active{background:rgba(255,122,200,.9);color:#2e0618;box-shadow:0 0 16px rgba(255,122,200,.4);}
+        /* rounder chips/buttons/tables, softer answer band */
+        #bwRoot .bw-chip{border-radius:999px;}
+        #bwRoot .bw-btn{border-radius:10px;}
+        #bwRoot .bw-table-wrap{border:1px solid var(--bw-line);border-radius:12px;overflow:hidden;}
+        #bwRoot .bw-answer{background:color-mix(in srgb,var(--bw-inner) 82%,var(--accent-cyan) 4%);}
+
         /* v28: portal extras — duplicate radar, match chip, in-page video/file modal */
         #bwRoot{--portal-header-height:64px}
         .bq-match-chip{display:inline-block;font-size:.72rem;font-weight:700;color:var(--accent-amber);background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:3px 8px;border-radius:12px;}
@@ -4990,9 +5034,14 @@ html{background:var(--bg);min-height:100%}
                         </div>
                     </div>
                     <div class="ltq-hero-right">
-                        <span id="bqResultCount" class="ltq-count-badge">Loading…</span>
-                        <button class="ltq-pull-btn" onclick="bqLoad(true)"><span class="ltq-pull-icon">⟳</span> Refresh</button>
+                        <span id="bqResultCount" class="ltq-count-badge">Idle</span>
+                        <button class="ltq-pull-btn" onclick="bqLoad(true)"><span class="ltq-pull-icon">🔍</span> Load Requests</button>
                     </div>
+                </div>
+                <div id="bqIdle" class="ltq-empty">
+                    <div style="font-size:2.5rem;margin-bottom:18px; opacity:0.6;">🔍</div>
+                    <p style="font-size:1.25rem; font-weight:600;">Nothing loads until you click Load Requests.</p>
+                    <p style="opacity:.7;">One click pulls every unhandled bind request — the queue never refreshes on its own.</p>
                 </div>
                 <div id="bqResults" class="ltq-grid"></div>
                 <div id="bqEmpty" class="ltq-empty" style="display:none;">
@@ -5058,25 +5107,26 @@ html{background:var(--bg);min-height:100%}
                 </div>
             </div>
 
-            <!-- v28.1 (Ahmed): Bind Request Workspace — gradient hero header like
-                 the ticket workspace, the duplicate radar is a 📡 ICON with a badge
-                 (click toggles the panel; duplicates auto-reveal it), and the handoff
-                 component mounts into #bwRoot. -->
+            <!-- v28.2 (Ahmed): Bind Request Workspace — the header IS the ticket
+                 workspace's twx-topbar action bar, the duplicate radar is the same
+                 round 📡 twx-fab with a badge (click toggles the panel; duplicates
+                 auto-reveal it), and the handoff component mounts into #bwRoot. -->
             <div id="pg-bind-workspace" style="display:none">
-                <div class="ltq-hero bq-hero">
-                    <div class="ltq-hero-left">
-                        <button class="btn btn-secondary" onclick="bwBack()" style="height:42px;flex:none;">← Back</button>
-                        <div class="ltq-hero-icon">
-                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                        </div>
-                        <div>
-                            <h3 class="ltq-title" id="bwTitle">Bind Request</h3>
-                            <p class="ltq-subtitle">Review the evidence, run the checks, then save the decision — Status, reason and comment are verified one field at a time.</p>
-                        </div>
+                <!-- v28.2 (Ahmed): the bind workspace header IS the ticket
+                     workspace's action bar -- the same sticky gradient .twx-topbar
+                     (real Back button + gradient title) and the 📡 radar as the
+                     same round .twx-fab with its badge. -->
+                <div class="twx-topbar bwx-topbar">
+                    <button class="btn btn-outline twx-back" onclick="bwBack()">← Back to Queue</button>
+                    <div class="twx-head-center">
+                        <h3 id="bwTitle" class="twx-title">Bind Request</h3>
+                        <div class="tw-head-meta">Review the evidence, run the checks, then save the decision — verified one field at a time.</div>
                     </div>
-                    <div class="ltq-hero-right">
+                    <div class="twx-actions">
                         <span id="bwStatusChip" style="font-size:.85rem;"></span>
-                        <button type="button" class="bw-radar-fab" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="bw-radar-badge" style="display:none;"></span></button>
+                        <div class="twx-radar-dock">
+                            <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarToggle()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
+                        </div>
                     </div>
                 </div>
                 <div id="bwRadarPanel" class="bw-radar-panel" style="display:none;">
@@ -6412,24 +6462,8 @@ function setActiveTab(page) {
     // Ticket tab, which mounts the draft without a stash) means nothing is
     // parked -- clear a stale flag so a later module click can't misfire.
     if (page === 'ticket-workspace') { twWsParked = false; twWsParkedKey = null; }
-    // v28.1 (Ahmed, video): the bind workspace parks/restores exactly like the
-    // ticket workspace. The component is a keep-alive singleton (bwInstance),
-    // so a restore costs ZERO requests -- the request is still on screen.
-    if (page === 'bind-queue' || page === 'bind-query') {
-        const bwOrigin = (typeof bwReturnTo !== 'undefined') ? bwReturnTo : 'bind-queue';
-        if (activeTabId === 'bind-workspace' && page === bwOrigin) {
-            window.__bwWsParked = true; // B -- clicked the origin tab while viewing the workspace: show the list
-        } else if (!window.__xdRestoringLayout && activeTabId !== page && page === bwOrigin &&
-                   typeof bwInstance !== 'undefined' && bwInstance && bwCurrentId) {
-            if (window.__bwWsParked) {
-                window.__bwWsParked = false; // C -- deliberate park consumed once
-            } else {
-                openInTab('bind-workspace'); // A -- restore the open request
-                return;
-            }
-        }
-    }
-    if (page === 'bind-workspace') window.__bwWsParked = false; // D
+    // v28.2 (Ahmed): NO bind auto-restore -- clicking the origin tab always
+    // shows the list; the workspace reopens only from an explicit Open click.
     activeTabId = page;
     renderTabs();
 
@@ -6681,7 +6715,7 @@ function executePageLogic(page) {
     } else if(page==='bind-queue'){
         document.getElementById('pg-bind-queue').style.display='block';
         _expandNavGroup('navBodyBind','navArrBind');
-        bqLoad(); // v27: the Live Bind Queue auto-loads on open
+        // v28.2 (Ahmed): nothing loads until the agent clicks Load Requests
     } else if(page==='bind-query'){
         document.getElementById('pg-bind-query').style.display='block';
         _expandNavGroup('navBodyBind','navArrBind');
@@ -27159,8 +27193,8 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    function setupHtml(){if(['agency_manager','coin_seller'].includes(request.userType))return `<div><label for="${workspaceId}-nid">National ID from the evidence <span class="bw-required">Required</span></label><input id="${workspaceId}-nid" data-setup="nid" value="${esc(setup.nid)}" placeholder="Enter the NID shown in the image" autocomplete="off"><p class="bw-sub">Enter the evidence value before starting. The dashboard check remains read-only.</p></div>`;return `<div class="bw-setup">${['wallet','recharge'].map(k=>`<div class="bw-range"><label><input type="checkbox" data-check="${k}" ${setup.checks.includes(k)?'checked':''}> ${k==='wallet'?'Wallet / withdrawals':'Recharge / Xcoins'}</label><div class="bw-date-grid" data-range="${k}" ${!setup.checks.includes(k)?'hidden':''}>${['startDate','endDate'].map((f,i)=>`<div><label for="${workspaceId}-${k}-${f}">${i?'To':'From'} <span class="bw-required">Required</span></label><input type="date" id="${workspaceId}-${k}-${f}" data-date-kind="${k}" data-date-key="${f}" value="${esc(setup.ranges[k]?.[f]||'')}"></div>`).join('')}</div></div>`).join('')}</div><p class="bw-sub">Choose either check or both. Each uses its own date range in dashboard time. Past days include 23:59:59; today’s available cutoff must be shown.</p>`;}
    function render(){
      if(disposed)return;
-     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section></div><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}">${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison">Comparison</a><a href="#${workspaceId}-final">Final review</a></nav><div data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
-     if(request){paintReplies();keys().forEach(paintSection);paintOverview();}
+     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><p class="bw-sub">Submitted by ${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true)}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}">${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison">Comparison</a><a href="#${workspaceId}-final">Final review</a></nav><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
+     if(request){paintReplies();keys().forEach(paintSection);paintOverview();root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x.dataset.hb===draft.handledBy));}
    }
    function message(text){const e=root.querySelector('[data-message]');if(e)e.textContent=text||'';}
    function paintReplies(query=''){const e=root.querySelector('[data-replies]');if(e)e.innerHTML=(adapters.quickReplies||[]).filter(x=>x.toLowerCase().includes(query.toLowerCase())).map(x=>`<button type="button" class="bw-btn bw-quiet" data-reply="${esc(x)}">${esc(x)}</button>`).join('')||'<p class="bw-sub">No matching reply.</p>';}
@@ -27212,7 +27246,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    const onSubmit=e=>{if(e.target.matches('[data-request-form]')){e.preventDefault();void load(new FormData(e.target).get('requestNumber').trim());}};
    const onInput=e=>{const t=e.target;if(t.dataset.draft){draft[t.dataset.draft]=t.multiple?[...t.selectedOptions].map(o=>o.value):t.value;if(t.dataset.draft==='status'){if(!options('reason',t.value).some(x=>x.value===draft.reason))draft.reason='';const reason=root.querySelector('[data-draft=reason]');reason.innerHTML='<option value="">Choose a reason</option>'+options('reason',t.value).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');reason.value=draft.reason;}return;}if(t.matches('[data-reply-search]'))paintReplies(t.value);if(t.dataset.setup){setup[t.dataset.setup]=t.value;invalidate();}if(t.dataset.dateKind){setup.ranges[t.dataset.dateKind]??={};setup.ranges[t.dataset.dateKind][t.dataset.dateKey]=t.value;invalidate();}};
    const onChange=e=>{const t=e.target;if(t.dataset.check){setup.checks=t.checked?[...new Set([...setup.checks,t.dataset.check])]:setup.checks.filter(k=>k!==t.dataset.check);invalidate();render();}};
-   const onClick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.dataset.evidence){void preview(b.dataset.evidence);return;}if(b.dataset.reply){draft.comment=[draft.comment,b.dataset.reply].filter(Boolean).join('\n');root.querySelector('[data-draft=comment]').value=draft.comment;return;}const a=b.dataset.action;if(a==='check')void check();if(a==='stop')stop();if(a==='review-save')reviewSave();if(a==='confirm-save')void save();if(a==='close-dialog')closeDialog();};
+   const onClick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.dataset.evidence){void preview(b.dataset.evidence);return;}if(b.dataset.reply){draft.comment=[draft.comment,b.dataset.reply].filter(Boolean).join('\n');root.querySelector('[data-draft=comment]').value=draft.comment;return;}if(b.dataset.hb){draft.handledBy=b.dataset.hb;const hsel=root.querySelector('[data-draft=handledBy]');if(hsel){hsel.value=b.dataset.hb;}root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x===b));return;}const a=b.dataset.action;if(a==='check')void check();if(a==='stop')stop();if(a==='review-save')reviewSave();if(a==='confirm-save')void save();if(a==='close-dialog')closeDialog();};
    root.addEventListener('submit',onSubmit);root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('click',onClick);render();
    return {open,load,stop,acceptUpdate,getState:()=>clone({request,setup,draft,sections,revision,active:active?{runId:active.runId,context:active.context}:null}),dispose(){if(saving)throw Error('Wait for the save result before removing the workspace.');stop();loading?.abort();closeDialog();disposed=true;root.removeEventListener('submit',onSubmit);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);root.removeEventListener('click',onClick);root.replaceChildren();}};
  }
@@ -27409,7 +27443,9 @@ async function bqViewPictures(recordId, btn){
 
 async function bqLoad(manual){
     const grid=document.getElementById('bqResults'); if(!grid) return;
-    const cnt=document.getElementById('bqResultCount'), empty=document.getElementById('bqEmpty');
+    const cnt=document.getElementById('bqResultCount'), empty=document.getElementById('bqEmpty'),
+          idle=document.getElementById('bqIdle');
+    if(idle) idle.style.display='none'; // v28.2 (Ahmed): manual-only loading
     cnt.textContent='Loading…'; empty.style.display='none';
     grid.innerHTML='<div class="bq-skel"></div><div class="bq-skel"></div><div class="bq-skel"></div>';
     try{
@@ -27613,9 +27649,7 @@ async function bwOpen(recordId){
     }
 }
 function bwBack(){
-    // v28.1: Back = park the workspace and show the origin list (same-tab,
-    // exactly like the ticket workspace's Back).
-    window.__bwWsParked=true;
+    // v28.2 (Ahmed): Back just shows the origin list -- no park/restore.
     openInTab(bwReturnTo||'bind-queue');
 }
 function bwAfterOpen(view){
@@ -27668,6 +27702,23 @@ async function bwRadarScan(view){
         }catch(e){ contactErr=true; }
     }
     bwRadarMatches=Array.from(byKey.values());
+    // v28.2 (Ahmed): User-ID matches from view.related carry only a minimal
+    // brief (record_id/numbering/status) -- hydrate them by request number so
+    // the radar cards show the full Query-style detail. Capped at 6.
+    const bwSparse=bwRadarMatches.filter(function(m){return m.brief&&m.brief.user_id===undefined&&m.brief.numbering;}).slice(0,6);
+    if(bwSparse.length){
+        summary.textContent='⏳ Loading duplicate details…';
+        await Promise.all(bwSparse.map(async function(m){
+            try{
+                const r=await fetch('/api/bind/query?field=number&value='+encodeURIComponent(m.brief.numbering)+'&'+bqQS());
+                const d=await r.json();
+                if(r.ok&&d.success){
+                    const full=(d.results||[]).find(function(x){return x.record_id===m.recordId;})||(d.results||[])[0];
+                    if(full) m.brief=full;
+                }
+            }catch(e){/* keep the minimal brief */}
+        }));
+    }
     sheet.innerHTML=(view.sheetDupCheck&&String(view.sheetDupCheck).trim())?('Sheet “Duplicated Check”: '+escHtml(view.sheetDupCheck)):'';
     const n=bwRadarMatches.length;
     if(n){
@@ -27700,7 +27751,7 @@ function bwRadarToggle(){
     }
 }
 
-window.SAM19_BUILD='v28.1 bind-live-parity 2026-11-13';
+window.SAM19_BUILD='v28.2 bind-workspace-parity 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
