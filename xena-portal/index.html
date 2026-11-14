@@ -5326,10 +5326,9 @@ html{background:var(--bg);min-height:100%}
                             </div>
                         </div>
                     </div>
-                    <div class="twx-radar-dock" id="bwRadarDock">
-                        <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarFabClick()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
-                        <div class="twx-radar-msg" id="bwRadarMsg" onclick="bwRadarToggleMatches(true)" title="Review the matching requests"></div>
-                    </div>
+                    <!-- v29.2 (Ahmed): the case plate sits immediately LEFT of the 📡 icon.
+                         Click the plate -> the drop-down case panel opens; click it again
+                         (or anywhere outside / Esc) -> it hides. -->
                     <!-- v29.1 (Ahmed): the case card is a compact rectangular plate docked
                          beside the ⚡ / 📡 icons — a stable shape that never covers the
                          content. Click it to drop down the full request snapshot. -->
@@ -5340,6 +5339,10 @@ html{background:var(--bg);min-height:100%}
                             <span class="bwx-plate-caret">▾</span>
                         </button>
                         <div class="bwx-case-panel" id="bwxCasePanel" hidden></div>
+                    </div>
+                    <div class="twx-radar-dock" id="bwRadarDock">
+                        <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarFabClick()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
+                        <div class="twx-radar-msg" id="bwRadarMsg" onclick="bwRadarToggleMatches(true)" title="Review the matching requests"></div>
                     </div>
                 </div>
                 <!-- v28.6 (Ahmed): the bind radar is IDENTICAL to the ticket
@@ -28276,7 +28279,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v29.1 case-plate-dock 2026-11-14';
+window.SAM19_BUILD='v29.2 case-plate-left 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
