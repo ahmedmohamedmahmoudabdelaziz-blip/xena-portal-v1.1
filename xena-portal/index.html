@@ -5312,6 +5312,17 @@ html{background:var(--bg);min-height:100%}
                      gradient .twx-topbar (Back + status + ✖ Close), the 📡 radar
                      sits beside it in the same fixed dock, always reachable. -->
                 <div class="twx-dock bwx-dock" id="bwxDock">
+                    <!-- v29.3 (Ahmed): the case plate is the LEFTMOST dock item — left of the
+                         ⚡ icon. Click it -> the drop-down case panel opens; click it again
+                         (or anywhere outside / Esc) -> it hides. -->
+<div class="bwx-case-dock" id="bwxCaseDock" hidden>
+                        <button type="button" class="bwx-case-plate" id="bwxCasePlate" onclick="bwCasePlateToggle()" aria-expanded="false" title="Case card — open the request snapshot">
+                            <svg class="bwx-plate-ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="bwx-ring-bg" cx="18" cy="18" r="15.5"></circle><circle class="bwx-ring-val" id="bwxPlateRing" cx="18" cy="18" r="15.5" style="stroke-dasharray:97.39;stroke-dashoffset:97.39"></circle></svg>
+                            <span class="bwx-plate-txt"><small id="bwxPlateNum">Case</small><strong id="bwxPlateUid">—</strong></span>
+                            <span class="bwx-plate-caret">▾</span>
+                        </button>
+                        <div class="bwx-case-panel" id="bwxCasePanel" hidden></div>
+                    </div>
                     <div class="twx-topbar-wrapper chat-collapsed" id="bwxTopbarWrap">
                         <button type="button" class="twx-fab" onclick="bwToggleTopbar()" title="Open the workspace action bar">⚡</button>
                         <div class="twx-topbar bwx-topbar">
@@ -5325,20 +5336,6 @@ html{background:var(--bg);min-height:100%}
                                 <button type="button" class="twx-collapse-btn" onclick="bwToggleTopbar(false)" title="Collapse the action bar">✖ Close</button>
                             </div>
                         </div>
-                    </div>
-                    <!-- v29.2 (Ahmed): the case plate sits immediately LEFT of the 📡 icon.
-                         Click the plate -> the drop-down case panel opens; click it again
-                         (or anywhere outside / Esc) -> it hides. -->
-                    <!-- v29.1 (Ahmed): the case card is a compact rectangular plate docked
-                         beside the ⚡ / 📡 icons — a stable shape that never covers the
-                         content. Click it to drop down the full request snapshot. -->
-                    <div class="bwx-case-dock" id="bwxCaseDock" hidden>
-                        <button type="button" class="bwx-case-plate" id="bwxCasePlate" onclick="bwCasePlateToggle()" aria-expanded="false" title="Case card — open the request snapshot">
-                            <svg class="bwx-plate-ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="bwx-ring-bg" cx="18" cy="18" r="15.5"></circle><circle class="bwx-ring-val" id="bwxPlateRing" cx="18" cy="18" r="15.5" style="stroke-dasharray:97.39;stroke-dashoffset:97.39"></circle></svg>
-                            <span class="bwx-plate-txt"><small id="bwxPlateNum">Case</small><strong id="bwxPlateUid">—</strong></span>
-                            <span class="bwx-plate-caret">▾</span>
-                        </button>
-                        <div class="bwx-case-panel" id="bwxCasePanel" hidden></div>
                     </div>
                     <div class="twx-radar-dock" id="bwRadarDock">
                         <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab" onclick="bwRadarFabClick()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge" class="twx-radar-badge" style="display:none;"></span></button>
@@ -28279,7 +28276,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v29.2 case-plate-left 2026-11-14';
+window.SAM19_BUILD='v29.3 case-plate-leftmost 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
