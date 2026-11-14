@@ -1810,7 +1810,7 @@
             .twx-radar-msg{top:40px;left:auto;right:12px;transform:none;border-radius:16px 16px 4px 16px;transform-origin:top right;}
             /* 10.37/10.38: beat the dock-anchor ID rules above so the narrow
                fallback still wins on small screens (both bubbles). */
-            #twRadarMsg,#awsRadarMsg,#bwRadarMsg{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
+            #twRadarMsg,#awsRadarMsg,#bwRadarMsg,#bwRadarMsg2{left:auto;right:12px;top:40px;width:min(210px, calc(100vw - 32px));border-radius:16px 16px 4px 16px;transform-origin:top right;}
             .twx-radar-msg.open{animation:twxRadarMsgInNarrow .24s cubic-bezier(0.2, 0.9, 0.3, 1.2);}
             @keyframes twxRadarMsgInNarrow{from{opacity:0;transform:translateY(-10px) scale(.85);}to{opacity:1;transform:translateY(0) scale(1);}}
         }
@@ -1990,127 +1990,127 @@
         .bwx-btnq{flex:1;background:var(--surface-inset);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;min-height:34px;padding:5px 10px;cursor:pointer;transition:border-color .15s ease,color .15s ease;}
         .bwx-btnq:hover{border-color:var(--accent-cyan);color:var(--accent-cyan);}
         @media(max-width:900px){.bwx-case-panel{top:auto;bottom:calc(100% + 10px);}.bwx-plate-txt,.bwx-plate-caret{display:none;}.bwx-case-plate{width:52px;justify-content:center;padding:0;}}
-        #bwRoot .bw-case-id{display:flex;align-items:center;gap:8px;}
-        #bwRoot .bw-case-id>small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bw-muted);}
-        #bwRoot .bw-case-uid{font-family:inherit;font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--bw-text);background:var(--bw-inner);border:1px solid var(--bw-line);border-radius:8px;padding:8px 12px;min-height:40px;cursor:pointer;}
-        #bwRoot .bw-case-uid:hover{border-color:var(--bw-accent);color:var(--bw-accent);}
-        #bwRoot .bw-ring{width:34px;height:34px;transform:rotate(-90deg);}
-        #bwRoot .bw-ring circle{fill:none;stroke-width:3.4;}
-        #bwRoot .bw-ring-bg{stroke:var(--bw-line);}
-        #bwRoot .bw-ring-val{stroke:var(--accent-green);stroke-linecap:round;transition:stroke-dashoffset .35s ease;}
-        #bwRoot .bw-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 18px;}
-        #bwRoot .bw-board-tile{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:72px;padding:10px 12px;text-align:left;background:var(--bw-card);border:1px solid var(--bw-line);border-radius:12px;cursor:pointer;color:var(--bw-text);font-family:inherit;transition:border-color .15s ease,transform .15s ease;}
-        #bwRoot .bw-board-tile:hover{border-color:var(--bw-accent);transform:translateY(-1px);}
-        #bwRoot .bw-board-top{display:flex;align-items:center;justify-content:space-between;width:100%;}
-        #bwRoot .bw-board-num{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--bw-muted);}
-        #bwRoot .bw-board-mark{font-size:18px;line-height:1;font-weight:800;color:var(--bw-muted);}
-        #bwRoot .bw-board-name{font-size:12px;font-weight:700;}
-        #bwRoot .bw-board-word{font-size:10.5px;color:var(--bw-muted);}
-        #bwRoot .bw-board-tile[data-state=complete]{border-color:color-mix(in srgb,var(--bw-ok) 45%,var(--bw-line));}
-        #bwRoot .bw-board-tile[data-state=complete] .bw-board-mark{color:var(--bw-ok);}
-        #bwRoot .bw-board-tile[data-state=empty]{border-color:color-mix(in srgb,var(--bw-info) 45%,var(--bw-line));}
-        #bwRoot .bw-board-tile[data-state=empty] .bw-board-mark{color:var(--bw-info);}
-        #bwRoot .bw-board-tile[data-state=partial]{border-color:color-mix(in srgb,var(--bw-warn) 45%,var(--bw-line));}
-        #bwRoot .bw-board-tile[data-state=partial] .bw-board-mark{color:var(--bw-warn);}
-        #bwRoot .bw-board-tile[data-state=error],#bwRoot .bw-board-tile[data-state=cancelled]{border-color:color-mix(in srgb,var(--bw-bad) 45%,var(--bw-line));}
-        #bwRoot .bw-board-tile[data-state=error] .bw-board-mark,#bwRoot .bw-board-tile[data-state=cancelled] .bw-board-mark{color:var(--bw-bad);}
-        #bwRoot .bw-board-tile[data-state=running] .bw-board-mark{color:var(--bw-accent);}
-        #bwRoot .bw-vs{display:grid;grid-template-columns:1fr;}
-        #bwRoot .bw-vs .bw-answer{border-bottom:1px solid var(--bw-line);align-items:baseline;}
-        #bwRoot .bw-vs .bw-answer>small{display:block;margin-bottom:6px;}
-        #bwRoot .bw-vs .bw-result{min-width:0;overflow-wrap:anywhere;}
-        @media(max-width:850px){#bwRoot .bw-board{grid-template-columns:repeat(2,minmax(0,1fr));}}
-        #bwRoot .bw-snapshot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px;}
-        #bwRoot .bw-snap{border:1px solid var(--bw-line);border-radius:14px;padding:14px 16px;background:var(--bw-inner);display:flex;flex-direction:column;gap:6px;}
-        #bwRoot .bw-snap>small{color:var(--bw-muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase;}
-        #bwRoot .bw-snap>strong{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
-        #bwRoot .bw-vip-none>strong{color:var(--bw-muted);opacity:.75;font-size:16px;}
-        #bwRoot .bw-vip-grey>strong{color:var(--bw-muted);}
-        #bwRoot .bw-vip-bronze>strong{color:#d29a5b;}
-        #bwRoot .bw-vip-cyan>strong{color:var(--accent-cyan);}
-        #bwRoot .bw-vip-gold>strong{background:linear-gradient(90deg,#c9a227,#f5d76e);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-        #bwRoot .bw-vipchip-grey{color:var(--bw-muted)!important;}
-        #bwRoot .bw-vipchip-bronze{color:#d29a5b!important;border-color:color-mix(in srgb,#d29a5b 45%,var(--bw-line));}
-        #bwRoot .bw-vipchip-cyan{color:var(--accent-cyan)!important;border-color:color-mix(in srgb,var(--accent-cyan) 45%,var(--bw-line));}
-        #bwRoot .bw-vipchip-gold{color:#e8c65a!important;border-color:color-mix(in srgb,#e0c05a 55%,var(--bw-line));}
-        @media(max-width:480px){#bwRoot .bw-snapshot{grid-template-columns:1fr;}}
-        #bwRoot .bw-methods{display:flex;flex-wrap:wrap;gap:8px;}
-        #bwRoot .bw-method{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bw-line);background:var(--bw-inner);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;}
-        #bwRoot .bw-method>i{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--bw-card);border:1px solid var(--bw-line);font-style:normal;font-size:11px;font-weight:800;color:var(--bw-accent);}
-        #bwRoot .bw-phones{display:flex;flex-direction:column;gap:8px;}
-        #bwRoot .bw-phone{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-        #bwRoot .bw-phone>b{font-variant-numeric:tabular-nums;font-size:15px;letter-spacing:.02em;}
-        #bwRoot .bw-copy{min-height:40px;padding:6px 14px;font-size:12px;border-radius:8px;border:1px solid var(--bw-line);background:var(--bw-card);color:var(--bw-muted);cursor:pointer;font-family:inherit;font-weight:600;}
-        #bwRoot .bw-copy:hover{color:var(--bw-accent);border-color:var(--bw-accent);}
-        #bwRoot .bw-copy.copied{color:var(--bw-ok);border-color:var(--bw-ok);}
-        #bwRoot .bw-skel{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
-        #bwRoot .bw-skel i{display:block;height:14px;border-radius:7px;background:linear-gradient(100deg,var(--bw-inner) 30%,var(--bw-card) 50%,var(--bw-inner) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;}
-        #bwRoot .bw-skel i:nth-child(2){width:82%;}
-        #bwRoot .bw-skel i:nth-child(3){width:64%;}
-        #bwRoot .bw-stale{align-items:center;gap:10px;padding:12px 16px;margin:0 0 16px;border:1px solid color-mix(in srgb,var(--bw-warn) 45%,var(--bw-line));border-left:4px solid var(--bw-warn);border-radius:12px;background:color-mix(in srgb,var(--bw-warn) 8%,var(--bw-card));color:var(--bw-warn);font-size:13px;font-weight:600;}
-        #bwRoot .bw-stale:not([hidden]){display:flex;}
-        #bwRoot .bw-norec{border:1px dashed var(--bw-line);border-radius:10px;padding:10px 14px;background:var(--bw-inner);}
-        #bwRoot .bw-recheck{min-height:40px;white-space:nowrap;}
-        #bwRoot .bw-keys p{margin:6px 0;font-size:13px;}
-        #bwRoot .bw-keys b{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border:1px solid var(--bw-line);border-radius:6px;background:var(--bw-inner);font-size:11px;margin-right:8px;}
-        #bwRoot .bw-section{scroll-margin-top:calc(var(--portal-header-height,64px) + 84px);}
-        #bwRoot button:focus-visible,#bwRoot a:focus-visible,#bwRoot input:focus-visible,#bwRoot select:focus-visible,#bwRoot textarea:focus-visible{outline:2px solid var(--bw-accent);outline-offset:2px;}
-        #bwRoot.bw-compact .bw-card-head{padding:14px 18px 12px;}
-        #bwRoot.bw-compact .bw-card-body{padding:14px 18px;}
-        #bwRoot.bw-compact .bw-result{padding:14px 18px;min-height:60px;}
-        #bwRoot.bw-compact .bw-vs .bw-answer{padding:10px 18px;}
-        #bwRoot.bw-compact .bw-snap{padding:10px 12px;}
-        #bwRoot.bw-compact .bw-snap>strong{font-size:19px;}
-        #bwRoot.bw-compact .bw-board-tile{min-height:56px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-case-id{display:flex;align-items:center;gap:8px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-case-id>small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bw-muted);}
+        :is(#bwRoot,#bwQueryRoot) .bw-case-uid{font-family:inherit;font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--bw-text);background:var(--bw-inner);border:1px solid var(--bw-line);border-radius:8px;padding:8px 12px;min-height:40px;cursor:pointer;}
+        :is(#bwRoot,#bwQueryRoot) .bw-case-uid:hover{border-color:var(--bw-accent);color:var(--bw-accent);}
+        :is(#bwRoot,#bwQueryRoot) .bw-ring{width:34px;height:34px;transform:rotate(-90deg);}
+        :is(#bwRoot,#bwQueryRoot) .bw-ring circle{fill:none;stroke-width:3.4;}
+        :is(#bwRoot,#bwQueryRoot) .bw-ring-bg{stroke:var(--bw-line);}
+        :is(#bwRoot,#bwQueryRoot) .bw-ring-val{stroke:var(--accent-green);stroke-linecap:round;transition:stroke-dashoffset .35s ease;}
+        :is(#bwRoot,#bwQueryRoot) .bw-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 18px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:72px;padding:10px 12px;text-align:left;background:var(--bw-card);border:1px solid var(--bw-line);border-radius:12px;cursor:pointer;color:var(--bw-text);font-family:inherit;transition:border-color .15s ease,transform .15s ease;}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile:hover{border-color:var(--bw-accent);transform:translateY(-1px);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-top{display:flex;align-items:center;justify-content:space-between;width:100%;}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-num{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--bw-muted);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-mark{font-size:18px;line-height:1;font-weight:800;color:var(--bw-muted);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-name{font-size:12px;font-weight:700;}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-word{font-size:10.5px;color:var(--bw-muted);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=complete]{border-color:color-mix(in srgb,var(--bw-ok) 45%,var(--bw-line));}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=complete] .bw-board-mark{color:var(--bw-ok);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=empty]{border-color:color-mix(in srgb,var(--bw-info) 45%,var(--bw-line));}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=empty] .bw-board-mark{color:var(--bw-info);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=partial]{border-color:color-mix(in srgb,var(--bw-warn) 45%,var(--bw-line));}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=partial] .bw-board-mark{color:var(--bw-warn);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=error],:is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=cancelled]{border-color:color-mix(in srgb,var(--bw-bad) 45%,var(--bw-line));}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=error] .bw-board-mark,:is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=cancelled] .bw-board-mark{color:var(--bw-bad);}
+        :is(#bwRoot,#bwQueryRoot) .bw-board-tile[data-state=running] .bw-board-mark{color:var(--bw-accent);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vs{display:grid;grid-template-columns:1fr;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vs .bw-answer{border-bottom:1px solid var(--bw-line);align-items:baseline;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vs .bw-answer>small{display:block;margin-bottom:6px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vs .bw-result{min-width:0;overflow-wrap:anywhere;}
+        @media(max-width:850px){:is(#bwRoot,#bwQueryRoot) .bw-board{grid-template-columns:repeat(2,minmax(0,1fr));}}
+        :is(#bwRoot,#bwQueryRoot) .bw-snapshot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-snap{border:1px solid var(--bw-line);border-radius:14px;padding:14px 16px;background:var(--bw-inner);display:flex;flex-direction:column;gap:6px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-snap>small{color:var(--bw-muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase;}
+        :is(#bwRoot,#bwQueryRoot) .bw-snap>strong{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vip-none>strong{color:var(--bw-muted);opacity:.75;font-size:16px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vip-grey>strong{color:var(--bw-muted);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vip-bronze>strong{color:#d29a5b;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vip-cyan>strong{color:var(--accent-cyan);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vip-gold>strong{background:linear-gradient(90deg,#c9a227,#f5d76e);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vipchip-grey{color:var(--bw-muted)!important;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vipchip-bronze{color:#d29a5b!important;border-color:color-mix(in srgb,#d29a5b 45%,var(--bw-line));}
+        :is(#bwRoot,#bwQueryRoot) .bw-vipchip-cyan{color:var(--accent-cyan)!important;border-color:color-mix(in srgb,var(--accent-cyan) 45%,var(--bw-line));}
+        :is(#bwRoot,#bwQueryRoot) .bw-vipchip-gold{color:#e8c65a!important;border-color:color-mix(in srgb,#e0c05a 55%,var(--bw-line));}
+        @media(max-width:480px){:is(#bwRoot,#bwQueryRoot) .bw-snapshot{grid-template-columns:1fr;}}
+        :is(#bwRoot,#bwQueryRoot) .bw-methods{display:flex;flex-wrap:wrap;gap:8px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-method{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bw-line);background:var(--bw-inner);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;}
+        :is(#bwRoot,#bwQueryRoot) .bw-method>i{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--bw-card);border:1px solid var(--bw-line);font-style:normal;font-size:11px;font-weight:800;color:var(--bw-accent);}
+        :is(#bwRoot,#bwQueryRoot) .bw-phones{display:flex;flex-direction:column;gap:8px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-phone{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+        :is(#bwRoot,#bwQueryRoot) .bw-phone>b{font-variant-numeric:tabular-nums;font-size:15px;letter-spacing:.02em;}
+        :is(#bwRoot,#bwQueryRoot) .bw-copy{min-height:40px;padding:6px 14px;font-size:12px;border-radius:8px;border:1px solid var(--bw-line);background:var(--bw-card);color:var(--bw-muted);cursor:pointer;font-family:inherit;font-weight:600;}
+        :is(#bwRoot,#bwQueryRoot) .bw-copy:hover{color:var(--bw-accent);border-color:var(--bw-accent);}
+        :is(#bwRoot,#bwQueryRoot) .bw-copy.copied{color:var(--bw-ok);border-color:var(--bw-ok);}
+        :is(#bwRoot,#bwQueryRoot) .bw-skel{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-skel i{display:block;height:14px;border-radius:7px;background:linear-gradient(100deg,var(--bw-inner) 30%,var(--bw-card) 50%,var(--bw-inner) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;}
+        :is(#bwRoot,#bwQueryRoot) .bw-skel i:nth-child(2){width:82%;}
+        :is(#bwRoot,#bwQueryRoot) .bw-skel i:nth-child(3){width:64%;}
+        :is(#bwRoot,#bwQueryRoot) .bw-stale{align-items:center;gap:10px;padding:12px 16px;margin:0 0 16px;border:1px solid color-mix(in srgb,var(--bw-warn) 45%,var(--bw-line));border-left:4px solid var(--bw-warn);border-radius:12px;background:color-mix(in srgb,var(--bw-warn) 8%,var(--bw-card));color:var(--bw-warn);font-size:13px;font-weight:600;}
+        :is(#bwRoot,#bwQueryRoot) .bw-stale:not([hidden]){display:flex;}
+        :is(#bwRoot,#bwQueryRoot) .bw-norec{border:1px dashed var(--bw-line);border-radius:10px;padding:10px 14px;background:var(--bw-inner);}
+        :is(#bwRoot,#bwQueryRoot) .bw-recheck{min-height:40px;white-space:nowrap;}
+        :is(#bwRoot,#bwQueryRoot) .bw-keys p{margin:6px 0;font-size:13px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-keys b{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border:1px solid var(--bw-line);border-radius:6px;background:var(--bw-inner);font-size:11px;margin-right:8px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-section{scroll-margin-top:calc(var(--portal-header-height,64px) + 84px);}
+        :is(#bwRoot,#bwQueryRoot) button:focus-visible,:is(#bwRoot,#bwQueryRoot) a:focus-visible,:is(#bwRoot,#bwQueryRoot) input:focus-visible,:is(#bwRoot,#bwQueryRoot) select:focus-visible,:is(#bwRoot,#bwQueryRoot) textarea:focus-visible{outline:2px solid var(--bw-accent);outline-offset:2px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-card-head{padding:14px 18px 12px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-card-body{padding:14px 18px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-result{padding:14px 18px;min-height:60px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-vs .bw-answer{padding:10px 18px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-snap{padding:10px 12px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-snap>strong{font-size:19px;}
+        :is(#bwRoot,#bwQueryRoot).bw-compact .bw-board-tile{min-height:56px;}
 
         /* ─── v28.8 (Ahmed): pill column gone + sections full width (dashboard side
            takes the space), static case strip, pic-style comparison cards,
            decision fields in the ticket workspace's control-group look ─── */
-        #bwRoot .bw-counts span{padding:8px 16px;border-radius:999px;border:1px solid transparent;}
-        #bwRoot .bw-counts .bw-ok{border-color:color-mix(in srgb,var(--bw-ok2) 72%,var(--bw-card));background:color-mix(in srgb,var(--bw-ok2) 22%,var(--bw-card));color:var(--bw-ok2)!important;}
-        #bwRoot .bw-counts .bw-warn{border-color:color-mix(in srgb,var(--bw-warn2) 72%,var(--bw-card));background:color-mix(in srgb,var(--bw-warn2) 22%,var(--bw-card));color:var(--bw-warn2)!important;}
-        #bwRoot .bw-counts .bw-bad{border-color:color-mix(in srgb,var(--bw-bad2) 72%,var(--bw-card));background:color-mix(in srgb,var(--bw-bad2) 22%,var(--bw-card));color:var(--bw-bad2)!important;}
-        #bwRoot .bw-counts .bw-muted{background:transparent;border-style:dashed;}
-        #bwRoot .bw-cmp-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--bw-muted);margin-bottom:8px;}
-        #bwRoot .bw-cmp-val{font-size:13px;white-space:pre-line;overflow-wrap:anywhere;font-weight:400;}
-        #bwRoot .bw-cmp-chip{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border-radius:999px;border:1px solid var(--bw-line);background:var(--bw-inner);font-size:12.5px;font-weight:600;white-space:pre-line;overflow-wrap:anywhere;}
-        #bwRoot .bw-cmp-chip.bw-cmp-hit{border-color:color-mix(in srgb,var(--bw-ok2) 70%,var(--bw-card));color:var(--bw-ok2);background:color-mix(in srgb,var(--bw-ok2) 16%,var(--bw-card));font-weight:700;}
-        #bwRoot .bw-vcard{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;border:1px solid var(--bw-line);margin-bottom:8px;background:var(--bw-inner);min-width:170px;}
-        #bwRoot .bw-vcard:last-child{margin-bottom:0;}
-        #bwRoot .bw-vcard-ic{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:800;border:1px solid currentColor;}
-        #bwRoot .bw-vcard-tx{min-width:0;}
-        #bwRoot .bw-vcard-tx b{display:block;font-size:12.5px;}
-        #bwRoot .bw-vcard-tx small{display:block;margin-top:2px;font-size:11px;color:var(--bw-muted);line-height:1.5;}
-        #bwRoot .bw-vcard-match{border-color:color-mix(in srgb,var(--bw-ok2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-ok2) 17%,var(--bw-card));}
-        #bwRoot .bw-vcard-match .bw-vcard-ic{color:var(--bw-ok2);background:color-mix(in srgb,var(--bw-ok2) 24%,var(--bw-card));border-color:var(--bw-ok2);}
-        #bwRoot .bw-vcard-match .bw-vcard-tx b{color:var(--bw-ok2);}
-        #bwRoot .bw-vcard-review{border-color:color-mix(in srgb,var(--bw-warn2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-warn2) 17%,var(--bw-card));}
-        #bwRoot .bw-vcard-review .bw-vcard-ic{color:var(--bw-warn2);background:color-mix(in srgb,var(--bw-warn2) 24%,var(--bw-card));border-color:var(--bw-warn2);}
-        #bwRoot .bw-vcard-review .bw-vcard-tx b{color:var(--bw-warn2);}
-        #bwRoot .bw-vcard-nomatch{border-color:color-mix(in srgb,var(--bw-bad2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-bad2) 17%,var(--bw-card));}
-        #bwRoot .bw-vcard-nomatch .bw-vcard-ic{color:var(--bw-bad2);background:color-mix(in srgb,var(--bw-bad2) 24%,var(--bw-card));border-color:var(--bw-bad2);}
-        #bwRoot .bw-vcard-nomatch .bw-vcard-tx b{color:var(--bw-bad2);}
-        #bwRoot .bw-vcard-info{border-color:color-mix(in srgb,var(--bw-info2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-info2) 17%,var(--bw-card));}
-        #bwRoot .bw-vcard-info .bw-vcard-ic{color:var(--bw-info2);background:color-mix(in srgb,var(--bw-info2) 24%,var(--bw-card));border-color:var(--bw-info2);}
-        #bwRoot .bw-vcard-info .bw-vcard-tx b{color:var(--bw-info2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-counts span{padding:8px 16px;border-radius:999px;border:1px solid transparent;}
+        :is(#bwRoot,#bwQueryRoot) .bw-counts .bw-ok{border-color:color-mix(in srgb,var(--bw-ok2) 72%,var(--bw-card));background:color-mix(in srgb,var(--bw-ok2) 22%,var(--bw-card));color:var(--bw-ok2)!important;}
+        :is(#bwRoot,#bwQueryRoot) .bw-counts .bw-warn{border-color:color-mix(in srgb,var(--bw-warn2) 72%,var(--bw-card));background:color-mix(in srgb,var(--bw-warn2) 22%,var(--bw-card));color:var(--bw-warn2)!important;}
+        :is(#bwRoot,#bwQueryRoot) .bw-counts .bw-bad{border-color:color-mix(in srgb,var(--bw-bad2) 72%,var(--bw-card));background:color-mix(in srgb,var(--bw-bad2) 22%,var(--bw-card));color:var(--bw-bad2)!important;}
+        :is(#bwRoot,#bwQueryRoot) .bw-counts .bw-muted{background:transparent;border-style:dashed;}
+        :is(#bwRoot,#bwQueryRoot) .bw-cmp-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--bw-muted);margin-bottom:8px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-cmp-val{font-size:13px;white-space:pre-line;overflow-wrap:anywhere;font-weight:400;}
+        :is(#bwRoot,#bwQueryRoot) .bw-cmp-chip{display:inline-block;margin:0 6px 6px 0;padding:5px 12px;border-radius:999px;border:1px solid var(--bw-line);background:var(--bw-inner);font-size:12.5px;font-weight:600;white-space:pre-line;overflow-wrap:anywhere;}
+        :is(#bwRoot,#bwQueryRoot) .bw-cmp-chip.bw-cmp-hit{border-color:color-mix(in srgb,var(--bw-ok2) 70%,var(--bw-card));color:var(--bw-ok2);background:color-mix(in srgb,var(--bw-ok2) 16%,var(--bw-card));font-weight:700;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;border:1px solid var(--bw-line);margin-bottom:8px;background:var(--bw-inner);min-width:170px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard:last-child{margin-bottom:0;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-ic{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:800;border:1px solid currentColor;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-tx{min-width:0;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-tx b{display:block;font-size:12.5px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-tx small{display:block;margin-top:2px;font-size:11px;color:var(--bw-muted);line-height:1.5;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-match{border-color:color-mix(in srgb,var(--bw-ok2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-ok2) 17%,var(--bw-card));}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-match .bw-vcard-ic{color:var(--bw-ok2);background:color-mix(in srgb,var(--bw-ok2) 24%,var(--bw-card));border-color:var(--bw-ok2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-match .bw-vcard-tx b{color:var(--bw-ok2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-review{border-color:color-mix(in srgb,var(--bw-warn2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-warn2) 17%,var(--bw-card));}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-review .bw-vcard-ic{color:var(--bw-warn2);background:color-mix(in srgb,var(--bw-warn2) 24%,var(--bw-card));border-color:var(--bw-warn2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-review .bw-vcard-tx b{color:var(--bw-warn2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-nomatch{border-color:color-mix(in srgb,var(--bw-bad2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-bad2) 17%,var(--bw-card));}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-nomatch .bw-vcard-ic{color:var(--bw-bad2);background:color-mix(in srgb,var(--bw-bad2) 24%,var(--bw-card));border-color:var(--bw-bad2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-nomatch .bw-vcard-tx b{color:var(--bw-bad2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-info{border-color:color-mix(in srgb,var(--bw-info2) 68%,var(--bw-card));background:color-mix(in srgb,var(--bw-info2) 17%,var(--bw-card));}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-info .bw-vcard-ic{color:var(--bw-info2);background:color-mix(in srgb,var(--bw-info2) 24%,var(--bw-card));border-color:var(--bw-info2);}
+        :is(#bwRoot,#bwQueryRoot) .bw-vcard-info .bw-vcard-tx b{color:var(--bw-info2);}
         /* decision fields -- the ticket workspace's .control-group look */
-        #bwRoot [data-bind-decision] label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--bw-muted);margin-bottom:8px;}
-        #bwRoot [data-bind-decision] select,#bwRoot [data-bind-decision] input,#bwRoot [data-bind-decision] textarea{width:100%;padding:12px 14px;background:var(--bw-inner);border:1px solid var(--bw-line);border-radius:10px;color:var(--bw-text);font-size:.95rem;font-family:inherit;transition:border-color .2s,box-shadow .2s;}
-        #bwRoot [data-bind-decision] select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%239aa8b8' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;cursor:pointer;}
-        #bwRoot [data-bind-decision] select[multiple]{appearance:auto;-webkit-appearance:listbox;background-image:none;padding-right:12px;cursor:default;}
-        #bwRoot [data-bind-decision] select:hover,#bwRoot [data-bind-decision] input:hover,#bwRoot [data-bind-decision] textarea:hover{border-color:var(--accent-cyan);}
-        #bwRoot [data-bind-decision] select:focus,#bwRoot [data-bind-decision] input:focus,#bwRoot [data-bind-decision] textarea:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1);}
-        #bwRoot [data-bind-decision] select option{background:var(--bw-card);color:var(--bw-text);}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] label{display:block;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--bw-muted);margin-bottom:8px;}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] select,:is(#bwRoot,#bwQueryRoot) [data-bind-decision] input,:is(#bwRoot,#bwQueryRoot) [data-bind-decision] textarea{width:100%;padding:12px 14px;background:var(--bw-inner);border:1px solid var(--bw-line);border-radius:10px;color:var(--bw-text);font-size:.95rem;font-family:inherit;transition:border-color .2s,box-shadow .2s;}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%239aa8b8' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;cursor:pointer;}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] select[multiple]{appearance:auto;-webkit-appearance:listbox;background-image:none;padding-right:12px;cursor:default;}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] select:hover,:is(#bwRoot,#bwQueryRoot) [data-bind-decision] input:hover,:is(#bwRoot,#bwQueryRoot) [data-bind-decision] textarea:hover{border-color:var(--accent-cyan);}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] select:focus,:is(#bwRoot,#bwQueryRoot) [data-bind-decision] input:focus,:is(#bwRoot,#bwQueryRoot) [data-bind-decision] textarea:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1);}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] select option{background:var(--bw-card);color:var(--bw-text);}
 
         /* ─── v29.0 (Ahmed, comment 7707878418527816707): recognizable user-answer
            panel, highlighted Submitted-by tile, query-tab card highlight ─── */
-        #bwRoot .bw-vs .bw-answer{margin:12px 16px 10px;padding:12px 16px;background:linear-gradient(90deg,color-mix(in srgb,var(--bw-accent) 13%,var(--bw-card)),color-mix(in srgb,var(--bw-accent) 3%,var(--bw-card)));border:1px solid color-mix(in srgb,var(--bw-accent) 40%,var(--bw-line));border-left:4px solid var(--bw-accent);border-radius:10px 12px 12px 10px;}
-        #bwRoot .bw-vs .bw-answer>small{color:var(--bw-accent);font-weight:800;}
-        #bwRoot .bw-submitted{display:flex;align-items:center;gap:12px;margin-top:18px;border:1px solid color-mix(in srgb,var(--bw-accent) 42%,var(--bw-line));background:linear-gradient(90deg,color-mix(in srgb,var(--bw-accent) 12%,var(--bw-card)),color-mix(in srgb,var(--bw-accent) 3%,var(--bw-card)));border-radius:12px;padding:12px 16px;}
-        #bwRoot .bw-submitted-ic{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--bw-accent);color:var(--bw-accent-ink);font-size:17px;}
-        #bwRoot .bw-submitted small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bw-accent);font-weight:800;}
-        #bwRoot .bw-submitted b{display:block;font-size:15px;font-weight:800;}
-        #bwRoot .bw-submitted>div>span{display:block;font-size:11px;color:var(--bw-muted);margin-top:2px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vs .bw-answer{margin:12px 16px 10px;padding:12px 16px;background:linear-gradient(90deg,color-mix(in srgb,var(--bw-accent) 13%,var(--bw-card)),color-mix(in srgb,var(--bw-accent) 3%,var(--bw-card)));border:1px solid color-mix(in srgb,var(--bw-accent) 40%,var(--bw-line));border-left:4px solid var(--bw-accent);border-radius:10px 12px 12px 10px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-vs .bw-answer>small{color:var(--bw-accent);font-weight:800;}
+        :is(#bwRoot,#bwQueryRoot) .bw-submitted{display:flex;align-items:center;gap:12px;margin-top:18px;border:1px solid color-mix(in srgb,var(--bw-accent) 42%,var(--bw-line));background:linear-gradient(90deg,color-mix(in srgb,var(--bw-accent) 12%,var(--bw-card)),color-mix(in srgb,var(--bw-accent) 3%,var(--bw-card)));border-radius:12px;padding:12px 16px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-submitted-ic{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--bw-accent);color:var(--bw-accent-ink);font-size:17px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-submitted small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--bw-accent);font-weight:800;}
+        :is(#bwRoot,#bwQueryRoot) .bw-submitted b{display:block;font-size:15px;font-weight:800;}
+        :is(#bwRoot,#bwQueryRoot) .bw-submitted>div>span{display:block;font-size:11px;color:var(--bw-muted);margin-top:2px;}
         @keyframes bqHiPulse{0%{box-shadow:0 0 0 0 rgba(255,176,46,.55);}100%{box-shadow:0 0 0 16px rgba(255,176,46,0);}}
         .qy-card.bq-hl{border-color:#ffb02e;animation:bqHiPulse 1.3s ease-out 2;}
         
@@ -2126,47 +2126,49 @@
         .bwx-topbar .twx-fab{width:52px;height:52px;font-size:1.3rem;}
         /* ─── v28.3 (Ahmed): the action bar collapses into the ⚡ icon (LTQ parity) ─── */
         #pg-bind-workspace{padding-top:30px;}
+        #pg-bind-query.bwq-ws{padding-top:30px;} /* v29.4: query-tab workspace dock clearance */
         .bwx-dock .twx-fab{width:52px;height:52px;font-size:1.3rem;}
         @media (max-width:900px){
             #pg-bind-workspace{padding-top:14px;}
+            #pg-bind-query.bwq-ws{padding-top:14px;}
         }
         /* elegant component cards: soft gradient, lift on hover */
-        #bwRoot .bw-card{border-radius:18px;background:linear-gradient(165deg,color-mix(in srgb,var(--bw-card) 92%,var(--accent-cyan) 4%),var(--bw-card) 45%);box-shadow:0 10px 30px rgba(0,0,0,.22);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;}
-        #bwRoot .bw-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--bw-accent) 38%,var(--bw-line));box-shadow:0 16px 40px rgba(0,0,0,.3);}
-        #bwRoot .bw-card-head h2{background:linear-gradient(90deg,#7ee7ff,var(--accent-cyan) 55%,var(--primary));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:800;}
-        #bwRoot .bw-kicker{color:var(--accent-cyan);opacity:.85;}
-        #bwRoot .bw-topgrid .bw-check{margin-top:0;}
+        :is(#bwRoot,#bwQueryRoot) .bw-card{border-radius:18px;background:linear-gradient(165deg,color-mix(in srgb,var(--bw-card) 92%,var(--accent-cyan) 4%),var(--bw-card) 45%);box-shadow:0 10px 30px rgba(0,0,0,.22);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;}
+        :is(#bwRoot,#bwQueryRoot) .bw-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--bw-accent) 38%,var(--bw-line));box-shadow:0 16px 40px rgba(0,0,0,.3);}
+        :is(#bwRoot,#bwQueryRoot) .bw-card-head h2{background:linear-gradient(90deg,#7ee7ff,var(--accent-cyan) 55%,var(--primary));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:800;}
+        :is(#bwRoot,#bwQueryRoot) .bw-kicker{color:var(--accent-cyan);opacity:.85;}
+        :is(#bwRoot,#bwQueryRoot) .bw-topgrid .bw-check{margin-top:0;}
         /* v28.8 (Ahmed): every section full width -- the dashboard side gets the space it needs */
-        #bwRoot .bw-sect-grid{display:grid;grid-template-columns:1fr;gap:20px;align-items:start;}
-        #bwRoot .bw-sect-grid .bw-section{margin-bottom:0;}
+        :is(#bwRoot,#bwQueryRoot) .bw-sect-grid{display:grid;grid-template-columns:1fr;gap:20px;align-items:start;}
+        :is(#bwRoot,#bwQueryRoot) .bw-sect-grid .bw-section{margin-bottom:0;}
         /* gradient index chips */
-        #bwRoot .bw-index{width:34px;height:34px;border-radius:11px;border:1px solid color-mix(in srgb,var(--bw-accent) 45%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--bw-accent) 22%,transparent),color-mix(in srgb,var(--primary) 14%,transparent));color:var(--accent-cyan);font-weight:800;}
+        :is(#bwRoot,#bwQueryRoot) .bw-index{width:34px;height:34px;border-radius:11px;border:1px solid color-mix(in srgb,var(--bw-accent) 45%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--bw-accent) 22%,transparent),color-mix(in srgb,var(--primary) 14%,transparent));color:var(--accent-cyan);font-weight:800;}
         /* pill nav */
-        #bwRoot .bw-nav{border-bottom:0;gap:8px;padding:12px 4px;}
-        #bwRoot .bw-nav a{border:1px solid var(--bw-line);border-radius:999px;padding:7px 14px;background:var(--bw-card);color:var(--bw-muted);font-weight:600;}
-        #bwRoot .bw-nav a:hover{border-color:var(--bw-accent);color:var(--bw-accent);background:color-mix(in srgb,var(--bw-accent) 8%,var(--bw-card));}
+        :is(#bwRoot,#bwQueryRoot) .bw-nav{border-bottom:0;gap:8px;padding:12px 4px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-nav a{border:1px solid var(--bw-line);border-radius:999px;padding:7px 14px;background:var(--bw-card);color:var(--bw-muted);font-weight:600;}
+        :is(#bwRoot,#bwQueryRoot) .bw-nav a:hover{border-color:var(--bw-accent);color:var(--bw-accent);background:color-mix(in srgb,var(--bw-accent) 8%,var(--bw-card));}
         /* Audit action at the end -- purple frame; final footer -- green frame */
-        #bwRoot [data-bind-decision]{margin-top:22px;border:1px solid color-mix(in srgb,var(--accent-purple) 45%,var(--bw-line));box-shadow:0 12px 34px rgba(139,92,246,.14);}
-        #bwRoot [data-bind-decision] .bw-card-head h2{background:linear-gradient(90deg,#c4b5fd,var(--accent-purple));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-        #bwRoot .bw-final{border-radius:18px;border:1px solid color-mix(in srgb,var(--accent-green) 45%,var(--bw-line));background:linear-gradient(135deg,color-mix(in srgb,var(--accent-green) 7%,var(--bw-card)),var(--bw-card) 60%);}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision]{margin-top:22px;border:1px solid color-mix(in srgb,var(--accent-purple) 45%,var(--bw-line));box-shadow:0 12px 34px rgba(139,92,246,.14);}
+        :is(#bwRoot,#bwQueryRoot) [data-bind-decision] .bw-card-head h2{background:linear-gradient(90deg,#c4b5fd,var(--accent-purple));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+        :is(#bwRoot,#bwQueryRoot) .bw-final{border-radius:18px;border:1px solid color-mix(in srgb,var(--accent-green) 45%,var(--bw-line));background:linear-gradient(135deg,color-mix(in srgb,var(--accent-green) 7%,var(--bw-card)),var(--bw-card) 60%);}
         /* Samurai (blue) / Noora (pink) quick-assign buttons */
-        #bwRoot .bw-hb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-        #bwRoot .bw-hb-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bw-muted);}
-        #bwRoot .bw-hb-btn{min-height:38px;padding:8px 20px;border-radius:999px;font-weight:800;font-size:.86rem;border:1.5px solid transparent;background:var(--bw-inner);color:var(--bw-text);transition:all .15s ease;}
-        #bwRoot .bw-hb-btn.bw-hb-blue{border-color:rgba(77,163,255,.5);color:#7fb8ff;background:rgba(77,163,255,.09);}
-        #bwRoot .bw-hb-btn.bw-hb-blue:hover{background:rgba(77,163,255,.18);transform:translateY(-1px);}
-        #bwRoot .bw-hb-btn.bw-hb-blue.active{background:rgba(77,163,255,.9);color:#06182e;box-shadow:0 0 16px rgba(77,163,255,.4);}
-        #bwRoot .bw-hb-btn.bw-hb-pink{border-color:rgba(255,122,200,.5);color:#ff9ed2;background:rgba(255,122,200,.09);}
-        #bwRoot .bw-hb-btn.bw-hb-pink:hover{background:rgba(255,122,200,.18);transform:translateY(-1px);}
-        #bwRoot .bw-hb-btn.bw-hb-pink.active{background:rgba(255,122,200,.9);color:#2e0618;box-shadow:0 0 16px rgba(255,122,200,.4);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bw-muted);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn{min-height:38px;padding:8px 20px;border-radius:999px;font-weight:800;font-size:.86rem;border:1.5px solid transparent;background:var(--bw-inner);color:var(--bw-text);transition:all .15s ease;}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn.bw-hb-blue{border-color:rgba(77,163,255,.5);color:#7fb8ff;background:rgba(77,163,255,.09);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn.bw-hb-blue:hover{background:rgba(77,163,255,.18);transform:translateY(-1px);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn.bw-hb-blue.active{background:rgba(77,163,255,.9);color:#06182e;box-shadow:0 0 16px rgba(77,163,255,.4);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn.bw-hb-pink{border-color:rgba(255,122,200,.5);color:#ff9ed2;background:rgba(255,122,200,.09);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn.bw-hb-pink:hover{background:rgba(255,122,200,.18);transform:translateY(-1px);}
+        :is(#bwRoot,#bwQueryRoot) .bw-hb-btn.bw-hb-pink.active{background:rgba(255,122,200,.9);color:#2e0618;box-shadow:0 0 16px rgba(255,122,200,.4);}
         /* rounder chips/buttons/tables, softer answer band */
-        #bwRoot .bw-chip{border-radius:999px;}
-        #bwRoot .bw-btn{border-radius:10px;}
-        #bwRoot .bw-table-wrap{border:1px solid var(--bw-line);border-radius:12px;overflow:auto;}
-        #bwRoot .bw-answer{background:color-mix(in srgb,var(--bw-inner) 82%,var(--accent-cyan) 4%);}
+        :is(#bwRoot,#bwQueryRoot) .bw-chip{border-radius:999px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-btn{border-radius:10px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-table-wrap{border:1px solid var(--bw-line);border-radius:12px;overflow:auto;}
+        :is(#bwRoot,#bwQueryRoot) .bw-answer{background:color-mix(in srgb,var(--bw-inner) 82%,var(--accent-cyan) 4%);}
 
         /* v28: portal extras — duplicate radar, match chip, in-page video/file modal */
-        #bwRoot{--portal-header-height:64px}
+        :is(#bwRoot,#bwQueryRoot){--portal-header-height:64px}
         .bq-match-chip{display:inline-block;font-size:.72rem;font-weight:700;color:var(--accent-amber);background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);padding:3px 8px;border-radius:12px;}
         .bw-radar-badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--accent-rose);color:#fff;font-size:.72rem;font-weight:700;vertical-align:2px;margin-left:4px;}
 
@@ -2186,31 +2188,31 @@
         /* v28.6 (Ahmed): the bind radar is the ticket radar verbatim -- a
            verdict bubble glued to the 📡 icon plus the shared bottom drawer
            for the rich match cards. No custom modal anymore. */
-        #bwRadarMsg{right:auto;left:calc(50% + 207px);top:16px;width:min(190px, calc(100vw - 32px));border-radius:16px 16px 16px 4px;transform-origin:bottom left;}
-        body.sidebar-collapsed #bwRadarMsg{left:calc(50% + 75px);}
-        #bwDupDrawer #bwRadarResults{display:grid;flex:1;min-height:0;align-content:start;}
+        #bwRadarMsg,#bwRadarMsg2{right:auto;left:calc(50% + 207px);top:16px;width:min(190px, calc(100vw - 32px));border-radius:16px 16px 16px 4px;transform-origin:bottom left;}
+        body.sidebar-collapsed #bwRadarMsg,body.sidebar-collapsed #bwRadarMsg2{left:calc(50% + 75px);}
+        #bwDupDrawer #bwRadarResults,#bwDupDrawer2 #bwRadarResults2{display:grid;flex:1;min-height:0;align-content:start;}
         /* v28.6: ticket-style guided steps rail fills the workspace top */
-        #bwRoot .twx-steps{margin:2px 0 20px;background:color-mix(in srgb,var(--bw-card) 88%,transparent);border:1px solid var(--bw-line);border-radius:16px;}
-        #bwRoot .twx-step.alert{border-color:rgba(255,77,109,.5);color:var(--accent-rose);background:rgba(255,77,109,.10);}
-        #bwRoot .twx-step.alert .twx-step-dot{background:var(--accent-rose);color:#fff;}
+        :is(#bwRoot,#bwQueryRoot) .twx-steps{margin:2px 0 20px;background:color-mix(in srgb,var(--bw-card) 88%,transparent);border:1px solid var(--bw-line);border-radius:16px;}
+        :is(#bwRoot,#bwQueryRoot) .twx-step.alert{border-color:rgba(255,77,109,.5);color:var(--accent-rose);background:rgba(255,77,109,.10);}
+        :is(#bwRoot,#bwQueryRoot) .twx-step.alert .twx-step-dot{background:var(--accent-rose);color:#fff;}
         /* v28.6: numbered section badges, the ticket workspace's look */
-        #bwRoot .bw-index{border:0;border-radius:10px;width:28px;height:28px;color:#0b0e13;font-weight:800;font-size:.78rem;box-shadow:0 3px 10px rgba(0,0,0,.3);margin-top:0;}
-        #bwRoot .bw-h2num{display:flex;align-items:center;gap:12px;}
-        #bwRoot .bw-h2num .twx-sec-num{flex:none;}
-        #bwRoot .bw-nav{position:static;margin:22px 0 18px;padding:8px;border:1px solid var(--bw-line);border-radius:18px;background:color-mix(in srgb,var(--bw-card) 82%,transparent);}
-        #bwRoot .bw-nav a{display:inline-flex;align-items:center;gap:8px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-index{border:0;border-radius:10px;width:28px;height:28px;color:#0b0e13;font-weight:800;font-size:.78rem;box-shadow:0 3px 10px rgba(0,0,0,.3);margin-top:0;}
+        :is(#bwRoot,#bwQueryRoot) .bw-h2num{display:flex;align-items:center;gap:12px;}
+        :is(#bwRoot,#bwQueryRoot) .bw-h2num .twx-sec-num{flex:none;}
+        :is(#bwRoot,#bwQueryRoot) .bw-nav{position:static;margin:22px 0 18px;padding:8px;border:1px solid var(--bw-line);border-radius:18px;background:color-mix(in srgb,var(--bw-card) 82%,transparent);}
+        :is(#bwRoot,#bwQueryRoot) .bw-nav a{display:inline-flex;align-items:center;gap:8px;}
         .bw-step-dot{width:9px;height:9px;border-radius:50%;background:var(--bw-line);flex:none;display:inline-block;transition:background .3s,box-shadow .3s;}
         .bw-step-dot.bw-ok{background:var(--accent-green);box-shadow:0 0 8px rgba(0,230,118,.55);animation:bwDotPulse 2.4s ease-in-out infinite;}
         .bw-step-dot.bw-warn{background:var(--accent-amber);box-shadow:0 0 8px rgba(255,184,0,.55);}
         .bw-step-dot.bw-bad{background:var(--accent-rose);box-shadow:0 0 8px rgba(255,77,109,.55);}
         @keyframes bwDotPulse{0%,100%{box-shadow:0 0 6px rgba(0,230,118,.4);}50%{box-shadow:0 0 13px rgba(0,230,118,.8);}}
-        #bwRoot .bw-topgrid{grid-template-columns:minmax(300px,.92fr) minmax(390px,1.08fr);}
-        @media(max-width:1150px){#bwRoot .bw-topgrid{grid-template-columns:1fr;}}
-        #bwRoot .bw-final{position:static;margin-top:26px;box-shadow:0 12px 32px rgba(0,0,0,.28);}
-        #bwRoot .bw-draft-echo{margin:10px 0 0;font-size:.8rem;color:var(--accent-green);font-weight:600;}
-        #bwRoot .bw-card{transition:border-color .25s,box-shadow .25s;}
-        #bwRoot .bw-card:hover{border-color:color-mix(in srgb,var(--bw-accent) 32%,var(--bw-line));box-shadow:0 14px 36px rgba(0,0,0,.32);}
-        #bwRoot .bw-head h1{background:linear-gradient(92deg,var(--bw-text) 35%,var(--accent-cyan));-webkit-background-clip:text;background-clip:text;color:transparent;}
+        :is(#bwRoot,#bwQueryRoot) .bw-topgrid{grid-template-columns:minmax(300px,.92fr) minmax(390px,1.08fr);}
+        @media(max-width:1150px){:is(#bwRoot,#bwQueryRoot) .bw-topgrid{grid-template-columns:1fr;}}
+        :is(#bwRoot,#bwQueryRoot) .bw-final{position:static;margin-top:26px;box-shadow:0 12px 32px rgba(0,0,0,.28);}
+        :is(#bwRoot,#bwQueryRoot) .bw-draft-echo{margin:10px 0 0;font-size:.8rem;color:var(--accent-green);font-weight:600;}
+        :is(#bwRoot,#bwQueryRoot) .bw-card{transition:border-color .25s,box-shadow .25s;}
+        :is(#bwRoot,#bwQueryRoot) .bw-card:hover{border-color:color-mix(in srgb,var(--bw-accent) 32%,var(--bw-line));box-shadow:0 14px 36px rgba(0,0,0,.32);}
+        :is(#bwRoot,#bwQueryRoot) .bw-head h1{background:linear-gradient(92deg,var(--bw-text) 35%,var(--accent-cyan));-webkit-background-clip:text;background-clip:text;color:transparent;}
         /* v28.6: .bw-index colors now come inline per section (ticket-style numbered badges) */
         /* shimmer skeletons while the queue loads (no more dead text) */
         .bq-skel{border-radius:18px;height:150px;background:linear-gradient(100deg,var(--surface) 30%,var(--surface-hover) 50%,var(--surface) 70%);background-size:200% 100%;animation:bqSkel 1.2s linear infinite;border:1px solid var(--border);}
@@ -2222,6 +2224,7 @@
         .bw-file-box .bw-btn{display:inline-flex;gap:8px;align-items:center;min-height:38px;padding:8px 14px;background:var(--surface-inset);border:1px solid var(--border);border-radius:8px;font-weight:600;color:var(--text);text-decoration:none;cursor:pointer;}
         .bw-file-box .bw-btn:hover{border-color:var(--text-muted);}
         #pg-bind-workspace .qy-grid{margin-top:0;}
+        #bwQueryShell .qy-grid{margin-top:0;}
         @media(max-width:600px){.bw-file-overlay{padding:8px;}.bw-file-box video{max-height:60vh;}}
         /* ISSUE 2 FIX: image lightbox/modal (replaces target="_blank" attachment links) */
         /* Phase 27 (Ahmed): translucent blurred backdrop instead of a solid
@@ -2887,7 +2890,7 @@ option{background:var(--surface);color:var(--text)}
     #twNoteText{min-height:120px;}
     /* 3) Duplicate-radar bubble: capped height so a long verdict can never
           cover half the phone screen; it scrolls internally instead. */
-    #twRadarMsg,#awsRadarMsg,#bwRadarMsg{max-height:calc(42 * var(--vh));}
+    #twRadarMsg,#awsRadarMsg,#bwRadarMsg,#bwRadarMsg2{max-height:calc(42 * var(--vh));}
     /* 4) Draft-save toast: keep clear of the bottom-right FAB stack. */
     .drf-badge{top:118px;bottom:auto;right:12px;}
 }
@@ -2953,7 +2956,7 @@ option{background:var(--surface);color:var(--text)}
  .welcome-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.welcome-card{padding:14px 10px}.welcome-card-desc{font-size:12px}
  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-card{min-width:0;padding:12px}
  .table-wrap,.ti-table-wrap,.rw-table-wrap,.aws-table-wrap,.sch-grid-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
- #twxDock,#awsDock,#bwxDock,body.sidebar-collapsed #twxDock,body.sidebar-collapsed #awsDock,body.sidebar-collapsed #bwxDock{top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;flex-direction:row!important;align-items:center;gap:10px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);box-shadow:0 5px 22px #0003;width:max-content;max-width:calc(100vw - 20px)}
+ #twxDock,#awsDock,#bwxDock,#bwxDock2,body.sidebar-collapsed #twxDock,body.sidebar-collapsed #awsDock,body.sidebar-collapsed #bwxDock,body.sidebar-collapsed #bwxDock2{top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;flex-direction:row!important;align-items:center;gap:10px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);box-shadow:0 5px 22px #0003;width:max-content;max-width:calc(100vw - 20px)}
  .twx-topbar-wrapper{width:44px;height:44px}.twx-radar-dock{width:44px;height:44px}
  .twx-fab{width:44px!important;height:44px!important;min-width:44px;border:0!important;background:#ffbf83!important;color:#38220f!important;font-size:20px;box-shadow:none!important;backdrop-filter:none!important;transition:transform .15s!important}
  .twx-fab:not(.xena-transfer-fab){font-size:0!important}
@@ -2976,7 +2979,7 @@ option{background:var(--surface);color:var(--text)}
  .twx-collapse-btn{grid-column:1/-1}.twx-sec-title{font-size:16px!important;margin-bottom:14px!important}
  #twNotePop{top:auto!important;left:8px!important;right:8px!important;bottom:72px!important;width:auto!important;max-height:calc(55 * var(--vh));transform:none!important;background:var(--surface)}
  #twNoteText{font-size:16px;min-height:110px}.twn-close{min-width:40px;min-height:36px}
- #twPreviewPanel,#twRadarMsg,#awsRadarMsg,#bwRadarMsg{left:8px!important;right:8px!important;width:auto!important;max-width:none!important;top:auto!important;bottom:74px!important;max-height:calc(55 * var(--vh));transform:none!important;overflow-y:auto}
+ #twPreviewPanel,#twRadarMsg,#awsRadarMsg,#bwRadarMsg,#bwRadarMsg2{left:8px!important;right:8px!important;width:auto!important;max-width:none!important;top:auto!important;bottom:74px!important;max-height:calc(55 * var(--vh));transform:none!important;overflow-y:auto}
  #cmnPanel,#cmtModal{max-width:calc(100vw - 16px);box-sizing:border-box}#cmnPanel{left:8px;right:8px;width:auto;top:52px;max-height:calc(var(--samurai-vh,calc(100 * var(--vh))) - 64px)}
  .img-lightbox-main{padding:0 6px;gap:6px;flex-direction:column}.img-lightbox-stage{width:100%;height:calc(65 * var(--vh));flex:auto}
  .img-lightbox-toolbar{top:8px;right:8px;gap:4px;flex-wrap:wrap;max-width:75%}.img-lightbox-counter{top:8px;left:8px}
@@ -5249,6 +5252,7 @@ html{background:var(--bg);min-height:100%}
                  Request Query; request number / User ID / Contact ID. Zero-cost
                  open: nothing is fetched until Search is clicked. -->
             <div id="pg-bind-query" style="display:none">
+                <div id="bwQuerySearchUI">
                 <div class="ltq-hero bq-hero">
                     <div class="ltq-hero-left">
                         <div class="ltq-hero-icon">
@@ -5300,6 +5304,52 @@ html{background:var(--bg);min-height:100%}
                         <p style="font-size:0.9rem; margin-top:8px;">Try a different field or double-check the value.</p>
                     </div>
                 </div>
+                </div><!-- /#bwQuerySearchUI -->
+
+            <!-- v29.4 (Ahmed, comment 7707903760743288112): the QUERY BIND
+                 workspace shell — a SECOND, fully independent bind workspace
+                 that lives inside the Query Bind Requests tab. "Open in Query
+                 tab" lands here directly; the Live-queue workspace page
+                 (#pg-bind-workspace) is a separate instance, never touched. -->
+            <div id="bwQueryShell" style="display:none">
+                <div class="twx-dock bwx-dock" id="bwxDock2">
+                    <div class="bwx-case-dock" id="bwxCaseDock2" hidden>
+                        <button type="button" class="bwx-case-plate" id="bwxCasePlate2" onclick="bwCasePlateToggle2()" aria-expanded="false" title="Case card — open the request snapshot">
+                            <svg class="bwx-plate-ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="bwx-ring-bg" cx="18" cy="18" r="15.5"></circle><circle class="bwx-ring-val" id="bwxPlateRing2" cx="18" cy="18" r="15.5" style="stroke-dasharray:97.39;stroke-dashoffset:97.39"></circle></svg>
+                            <span class="bwx-plate-txt"><small id="bwxPlateNum2">Case</small><strong id="bwxPlateUid2">—</strong></span>
+                            <span class="bwx-plate-caret">▾</span>
+                        </button>
+                        <div class="bwx-case-panel" id="bwxCasePanel2" hidden></div>
+                    </div>
+                    <div class="twx-topbar-wrapper chat-collapsed" id="bwxTopbarWrap2">
+                        <button type="button" class="twx-fab" onclick="bwToggleTopbar2()" title="Open the workspace action bar">⚡</button>
+                        <div class="twx-topbar bwx-topbar">
+                            <button class="btn btn-outline twx-back" onclick="bwBack2()">← Back to Search</button>
+                            <div class="twx-head-center">
+                                <h3 id="bwTitle2" class="twx-title">Bind Request</h3>
+                                <div class="tw-head-meta">Review the evidence, run the checks, then save the decision — verified one field at a time.</div>
+                            </div>
+                            <div class="twx-actions">
+                                <span id="bwStatusChip2" style="font-size:.85rem;"></span>
+                                <button type="button" class="twx-collapse-btn" onclick="bwToggleTopbar2(false)" title="Collapse the action bar">✖ Close</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="twx-radar-dock" id="bwRadarDock2">
+                        <button type="button" class="twx-fab twx-fab-radar" id="bwRadarFab2" onclick="bwRadarFabClick2()" title="Duplicate Radar — other requests sharing this User ID / Contact ID">📡<span id="bwRadarBadge2" class="twx-radar-badge" style="display:none;"></span></button>
+                        <div class="twx-radar-msg" id="bwRadarMsg2" onclick="bwRadarToggleMatches2(true)" title="Review the matching requests"></div>
+                    </div>
+                </div>
+                <div id="bwDupDrawer2" class="aws-dup-drawer">
+                    <div class="aws-dup-drawer-head">
+                        <span>📡 Duplicate Radar — matching bind requests</span>
+                        <button type="button" class="aws-dup-close" onclick="bwRadarToggleMatches2(false)" title="Close">×</button>
+                    </div>
+                    <div id="bwRadarResults2" class="qy-grid aws-dup-results" onscroll="awsDupUpdateMore('bwDupDrawer2')"></div>
+                    <div class="aws-dup-more">▼ Scroll — more matches below</div>
+                </div>
+                <div id="bwQueryRoot"></div>
+            </div>
             </div>
 
             <!-- v28.2 (Ahmed): Bind Request Workspace — the header IS the ticket
@@ -6711,6 +6761,25 @@ function setActiveTab(page) {
         }
     }
     if (page === 'bind-workspace' && typeof bwWsParked !== 'undefined') bwWsParked = false; // D
+    // v29.4 (Ahmed): the QUERY bind workspace (channel 2) lives INSIDE the
+    // bind-query page, so keep-alive shows/hides the shell, never the tab:
+    //   B) clicking the Query tab while its workspace is showing -> park and
+    //      show the search list (the instance stays warm);
+    //   C) arriving while parked -> show the search list once, consume it;
+    //   A) arriving with an open, unparked request -> the shell reappears
+    //      exactly as left (zero re-render, zero requests).
+    if (page === 'bind-query' && typeof bwCurrentId2 !== 'undefined' && bwCurrentId2 &&
+        typeof bwQueryShowShell === 'function') {
+        const __qsh = document.getElementById('bwQueryShell');
+        const __qOpen = !!(__qsh && __qsh.style.display === 'block');
+        if (activeTabId === 'bind-query' && __qOpen) {
+            bwWsParked2 = true; bwQueryShowShell(false); // B -- deliberate park
+        } else if (bwWsParked2) {
+            bwWsParked2 = false; bwQueryShowShell(false); // C -- consume the park
+        } else {
+            bwQueryShowShell(true); // A -- restore, zero requests
+        }
+    }
     activeTabId = page;
     renderTabs();
 
@@ -6773,6 +6842,12 @@ function closeTab(page, event) {
         typeof bwReturnTo !== 'undefined' && bwReturnTo === page &&
         typeof bwDestroyWorkspace === 'function') {
         bwDestroyWorkspace();
+    }
+    // v29.4 (Ahmed): closing the Query Bind tab destroys its own workspace
+    // (channel 2) -- a deliberate exit, it can never reappear on tab-hopping.
+    if (page === 'bind-query' && typeof bwCurrentId2 !== 'undefined' && bwCurrentId2 &&
+        typeof bwDestroyWorkspace2 === 'function') {
+        bwDestroyWorkspace2();
     }
 
     if (activeTabId === page) {
@@ -7539,7 +7614,7 @@ function enhanceSelect(select) {
     // 'change' -- so Status / Reason picks never reached the draft (save
     // blocked with "Choose Status and its Decision / Reject reason." and the
     // reason list never rebuilt on status change). #bwRoot selects stay NATIVE.
-    if (select.closest && select.closest('#bwRoot')) return;
+    if (select.closest && select.closest('#bwRoot,#bwQueryRoot')) return;
     select.dataset.ssEnhanced = '1';
     select.classList.add('ss-native-hidden');
 
@@ -17968,7 +18043,8 @@ function openImageLightboxGallery(gallery, index) {
     // dashboard result while the pic is open. Other pages keep the blurred scrim.
     try {
         const bwPg = document.getElementById('pg-bind-workspace');
-        overlay.classList.toggle('lb-clear', !!(bwPg && bwPg.style.display === 'block'));
+        const bwQs = document.getElementById('bwQueryShell'); // v29.4: the query-tab workspace keeps the clear-behind rule too
+        overlay.classList.toggle('lb-clear', !!((bwPg && bwPg.style.display === 'block') || (bwQs && bwQs.style.display === 'block')));
     } catch (_) {}
     lightboxInitDrag();
     lightboxInitFitZoom();
@@ -19792,6 +19868,18 @@ function twxRadarSyncVisibility() {
             twxRadarPositionMsg(bwMsg); // re-glue to the bind 📡 icon on restore
         }
     }
+    // v29.4: the query-tab bind bubble (channel 2) follows the bind-query page.
+    const bwMsg2 = document.getElementById('bwRadarMsg2');
+    if (bwMsg2 && bwMsg2.innerHTML.trim()) {
+        if (activePage !== 'bind-query') {
+            if (bwMsg2.classList.contains('open')) bwMsg2.dataset.wsWasOpen = '1';
+            bwMsg2.classList.remove('open');
+        } else if (bwMsg2.dataset.wsWasOpen === '1') {
+            delete bwMsg2.dataset.wsWasOpen;
+            bwMsg2.classList.add('open');
+            twxRadarPositionMsg(bwMsg2); // re-glue to the query 📡 icon on restore
+        }
+    }
 }
 
 // Phase 10.37 (Ahmed): "move the message of duplicated to right to be next
@@ -19811,7 +19899,7 @@ function twxRadarPositionMsg(msg) {
     // Phase 10.38: each bubble glues to ITS OWN 📡 dock -- the audit bubble
     // (#awsRadarMsg) anchors to the single-circle #awsRadarDock, the
     // workspace bubble to #twRadarDock. Same math otherwise.
-    const dock = document.getElementById(msg.id === 'awsRadarMsg' ? 'awsRadarDock' : (msg.id === 'bwRadarMsg' ? 'bwRadarDock' : 'twRadarDock'));
+    const dock = document.getElementById(msg.id === 'awsRadarMsg' ? 'awsRadarDock' : (msg.id === 'bwRadarMsg' ? 'bwRadarDock' : (msg.id === 'bwRadarMsg2' ? 'bwRadarDock2' : 'twRadarDock')));
     if (!dock) return; // CSS fallback (50% + 244px / + 170px) covers this
     const r = dock.getBoundingClientRect();
     if (!r.width && !r.height) { // dock's page is hidden (tab switch mid-resize) — CSS fallback, never glue to (8,0)
@@ -27478,6 +27566,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
  function mount(root,adapters={}){
    if(!(root instanceof Element))throw Error('A workspace root is required.');
    const workspaceId='bind-'+crypto.randomUUID();root.classList.add('bw');root.dataset.bindWorkspace=workspaceId;
+   const chSfx=root.id==='bwQueryRoot'?'2':'';const chEl=id=>document.getElementById(id+chSfx); // v29.4: shell-scoped dock lookups
    let request=null,setup=null,draft={},sections={},revision=0,active=null,loading=null,saving=false,disposed=false,overlay=null,previousFocus=null,saveController=null,savedOk=false;const draftCache=new Map();
    const blank=()=>({status:'not_run',data:null,meta:{},seq:-1});
    let staleFlag=false,navIdx=-1; // v28.7: stale banner + keyboard section index
@@ -27492,7 +27581,7 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    function setupHtml(){if(['agency_manager','coin_seller'].includes(request.userType))return `<div><label for="${workspaceId}-nid">National ID from the evidence <span class="bw-required">Required</span></label><input id="${workspaceId}-nid" data-setup="nid" value="${esc(setup.nid)}" placeholder="Enter the NID shown in the image" autocomplete="off"><p class="bw-sub">Enter the evidence value before starting. The dashboard check remains read-only.</p></div>`;return `<div class="bw-setup">${['wallet','recharge'].map(k=>`<div class="bw-range"><label><input type="checkbox" data-check="${k}" ${setup.checks.includes(k)?'checked':''}> ${k==='wallet'?'Wallet / withdrawals':'Recharge / Xcoins'}</label><div class="bw-date-grid" data-range="${k}" ${!setup.checks.includes(k)?'hidden':''}>${['startDate','endDate'].map((f,i)=>`<div><label for="${workspaceId}-${k}-${f}">${i?'To':'From'} <span class="bw-required">Required</span></label><input type="date" id="${workspaceId}-${k}-${f}" data-date-kind="${k}" data-date-key="${f}" value="${esc(setup.ranges[k]?.[f]||'')}"></div>`).join('')}</div></div>`).join('')}</div><p class="bw-sub">Choose either check or both. Each uses its own date range in dashboard time. Past days include 23:59:59; today’s available cutoff must be shown.</p>`;}
    function render(){
      if(disposed)return;
-     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="twx-steps" id="bwSteps" aria-label="Guided review steps"><button type="button" class="twx-step" data-bwstep="1" onclick="bwStepGo(1)"><span class="twx-step-dot">1</span><span class="twx-step-label">Review</span></button><button type="button" class="twx-step" data-bwstep="2" onclick="bwStepGo(2)"><span class="twx-step-dot">2</span><span class="twx-step-label">Duplicates</span></button><button type="button" class="twx-step" data-bwstep="3" onclick="bwStepGo(3)"><span class="twx-step-dot">3</span><span class="twx-step-label">Verify</span></button><button type="button" class="twx-step" data-bwstep="4" onclick="bwStepGo(4)"><span class="twx-step-dot">4</span><span class="twx-step-label">Compare</span></button><button type="button" class="twx-step" data-bwstep="5" onclick="bwStepGo(5)"><span class="twx-step-dot">5</span><span class="twx-step-label">Decide</span></button><button type="button" class="twx-step" data-bwstep="6" onclick="bwStepGo(6)"><span class="twx-step-dot">6</span><span class="twx-step-label">Save</span></button></div><div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><div class="bw-submitted"><span class="bw-submitted-ic">👤</span><div><small>Submitted by</small><b>${esc(request.submittedBy||'—')}</b><span>${esc(request.submittedAt||'—')}</span></div></div></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-amber);">3</span>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true,'aria-keyshortcuts="c"')}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}"><i class="bw-step-dot" data-nav-dot="${k}"></i>${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison"><i class="bw-step-dot" data-nav-dot="comparison"></i>Comparison</a><a href="#${workspaceId}-decision"><i class="bw-step-dot" data-nav-dot="decision"></i>Decision</a><a href="#${workspaceId}-final">✓ Final review</a></nav>${boardHtml()}<div class="bw-stale" data-stale hidden>Stale — inputs changed. Re-run the checks for the new values.</div><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-purple);">4</span>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-rose);">5</span>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-green);">6</span>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p><p class="bw-draft-echo" data-draft-echo></p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
+     root.innerHTML=`<header class="bw-head"><div><div class="bw-kicker">Account ownership · Bind requests</div><h1>${request?'Review request #'+esc(request.number):'Bind request workspace'}</h1><p class="bw-sub">${request?`User ${esc(request.userId)} · ${esc(request.userType.replaceAll('_',' '))} · ${esc(request.region)}`:'Load one request when you are ready. Dashboard checks start separately.'}</p></div><form class="bw-load" data-request-form><label class="bw-muted" for="${workspaceId}-number">Request #</label><input id="${workspaceId}-number" name="requestNumber" aria-label="Request number" inputmode="numeric" pattern="[0-9]+" required value="${esc(request?.number||adapters.exampleNumber||'')}"><button type="submit" class="bw-btn" ${saving?'disabled':''}>${request?'Load request':'Open request'}</button></form></header><div class="bw-banner" data-message role="status" aria-live="polite"></div>${!request?'<section class="bw-empty"><h2>One request. One place to review it.</h2><p>Details, evidence, dashboard findings and your decision stay in this workspace. Nothing is loaded or checked automatically.</p></section>':`<div class="twx-steps" id="bwSteps" aria-label="Guided review steps"><button type="button" class="twx-step" data-bwstep="1" onclick="bwStepGo(1,this)"><span class="twx-step-dot">1</span><span class="twx-step-label">Review</span></button><button type="button" class="twx-step" data-bwstep="2" onclick="bwStepGo(2,this)"><span class="twx-step-dot">2</span><span class="twx-step-label">Duplicates</span></button><button type="button" class="twx-step" data-bwstep="3" onclick="bwStepGo(3,this)"><span class="twx-step-dot">3</span><span class="twx-step-label">Verify</span></button><button type="button" class="twx-step" data-bwstep="4" onclick="bwStepGo(4,this)"><span class="twx-step-dot">4</span><span class="twx-step-label">Compare</span></button><button type="button" class="twx-step" data-bwstep="5" onclick="bwStepGo(5,this)"><span class="twx-step-dot">5</span><span class="twx-step-label">Decide</span></button><button type="button" class="twx-step" data-bwstep="6" onclick="bwStepGo(6,this)"><span class="twx-step-dot">6</span><span class="twx-step-label">Save</span></button></div><div class="bw-topgrid"><section class="bw-card" data-bind-request-details><header class="bw-card-head"><div><div class="bw-kicker">Request details</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-cyan);">1</span>The user’s information</h2></div>${chip('info',request.statusLabel||'Awaiting review')}</header><div class="bw-card-body"><div class="bw-meta">${val('User ID',request.userId)}${val('Contact ID',request.contactId)}${val('Previous bind number / method',request.answers.previousBinding)}${val('Requested new phone',request.answers.newPhone)}${val('Main login devices',request.answers.devices,true)}</div><div class="bw-note"><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div>${request.reason2?`<div class="bw-note"><small>Reason of Bind Request 2</small><p>${esc(request.reason2)}</p></div>`:''}<div class="bw-note"><small>Applier note</small><p>${esc(request.applierNote||'Not provided')}</p></div><div class="bw-note"><div class="bw-row"><h3>Request evidence</h3><small class="bw-muted">${request.attachments.length} files · preview here</small></div>${evidence(request.attachments.filter(a=>a.category===(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}<details><summary>Other attachments</summary>${evidence(request.attachments.filter(a=>a.category!==(['agency_manager','coin_seller'].includes(request.userType)?'nid':request.userType==='host'?'wallet':'recharge')))}</details></div><details class="bw-related"><summary>Related requests · ${request.related?.length||0} returned ${request.relatedComplete===false?'· incomplete':''}</summary>${(request.related||[]).map(x=>`<div class="bw-related-row"><b>#${esc(x.number)}</b> · ${esc(x.status)} · ${esc(x.relation)}<p class="bw-sub">${esc(x.note)}</p></div>`).join('')||'<p class="bw-sub">No related requests returned by the website query.</p>'}</details><div class="bw-submitted"><span class="bw-submitted-ic">👤</span><div><small>Submitted by</small><b>${esc(request.submittedBy||'—')}</b><span>${esc(request.submittedAt||'—')}</span></div></div></div></section><section class="bw-card bw-check"><header class="bw-card-head"><div><div class="bw-kicker">Dashboard verification</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-amber);">3</span>Choose what to check</h2></div><div class="bw-row">${btn('Stop','stop',false,'hidden')}${btn('Check dashboard','check',true,'aria-keyshortcuts="c"')}</div></header><div class="bw-card-body"><fieldset data-criteria style="border:0;margin:0;padding:0">${setupHtml()}</fieldset><p class="bw-live-error" data-setup-error role="alert"></p></div><div class="bw-run-summary"><span data-run-label>Not started · waiting for your click</span><div class="bw-progress"><i data-progress></i></div><span data-run-count>0 checks complete</span></div></section></div><nav class="bw-nav" aria-label="Bind review sections">${keys().map(k=>`<a href="#${workspaceId}-${k}"><i class="bw-step-dot" data-nav-dot="${k}"></i>${esc(DEFS[k][1].replace('Current phone & sign-in methods','Current bindings').replace('Previous phone bindings','Phone history').replace('Devices & login details','Devices').replace('Wallet balance records','Wallet').replace('Recharge / Xcoins records','Xcoins').replace('Agency manager · National ID','National ID'))}</a>`).join('')}<a href="#${workspaceId}-comparison"><i class="bw-step-dot" data-nav-dot="comparison"></i>Comparison</a><a href="#${workspaceId}-decision"><i class="bw-step-dot" data-nav-dot="decision"></i>Decision</a><a href="#${workspaceId}-final">✓ Final review</a></nav>${boardHtml()}<div class="bw-stale" data-stale hidden>Stale — inputs changed. Re-run the checks for the new values.</div><div class="bw-sect-grid" data-bind-sections>${keys().map(section).join('')}</div><section class="bw-card bw-section" id="${workspaceId}-comparison" data-bind-section="comparison"><header class="bw-card-head"><div><div class="bw-kicker">Before you decide</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-purple);">4</span>Ticket answers vs dashboard</h2><p class="bw-sub">Review the user’s answers alongside the verified account records.</p></div></header><div class="bw-result" data-comparison></div></section><section class="bw-card bw-scroll-top" data-bind-decision id="${workspaceId}-decision"><header class="bw-card-head"><div><div class="bw-kicker">Audit action</div><h2 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-rose);">5</span>Your decision</h2></div>${chip('info','Decision draft')}</header><div class="bw-card-body"><div class="bw-form-grid">${field('status','Status')}${field('reason','Decision / Reject reason')}${field('comment','Comment',true)}${request.fieldSchema.comment?.editor==='text'?`<details class="bw-replies bw-wide"><summary>Quick replies · append to comment</summary><input type="search" data-reply-search placeholder="Search phone, device, receipt…" aria-label="Search quick replies"><div class="bw-reply-list" data-replies></div></details>`:''}<div class="bw-wide bw-hb-row"><span class="bw-hb-label">Quick assign</span><button type="button" class="bw-hb-btn bw-hb-blue" data-hb="Samurai">Samurai</button><button type="button" class="bw-hb-btn bw-hb-pink" data-hb="Noora">Noora</button></div>${field('handledBy','Handled by',true)}</div><p class="bw-sub">Your draft stays here while you check. Review all changes at the end before saving.</p></div><div class="bw-decision-summary"><span>Decision details first</span><span>Handled by sent last</span></div></section><footer class="bw-final" id="${workspaceId}-final"><div><h3 class="bw-h2num"><span class="twx-sec-num" style="background:var(--accent-green);">6</span>Review, then save</h3><p data-save-status>Check the findings and your decision. Nothing has been saved yet.</p><p class="bw-draft-echo" data-draft-echo></p></div>${btn('Review changes & save','review-save',true)}</footer>`}`;
      syncCaseDock();if(request){paintReplies();keys().forEach(paintSection);paintOverview();paintDecisionDot();paintSteps();paintDraftEcho();root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x.dataset.hb===draft.handledBy));}
    }
    function message(text){const e=root.querySelector('[data-message]');if(e)e.textContent=text||'';}
@@ -27500,17 +27589,18 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    function paintDecisionDot(){const dd=root.querySelector('[data-nav-dot="decision"]');if(dd)dd.className='bw-step-dot '+((draft.status&&draft.reason)?'bw-ok':(draft.status||draft.reason||(draft.comment||'').trim()||draft.handledBy)?'bw-warn':'');paintSteps();}
    // v28.6 (Ahmed): the ticket-style guided steps rail, painted live from the
    // same workspace state as the dots (radar arrives via window.bwRadarState).
-   function paintSteps(){const bar=document.getElementById('bwSteps');if(!bar||!request)return;const all=keys(),verified=all.length>0&&all.every(k=>['complete','empty'].includes(sections[k]?.status));const decided=!!(draft.status&&draft.reason);const rs=window.bwRadarState||'';const st=[true,rs==='clean'||rs==='hits',verified,verified,decided,savedOk];const firstTodo=st.findIndex(x=>!x);bar.querySelectorAll('.twx-step').forEach(function(b,i){b.classList.toggle('done',!!st[i]);b.classList.toggle('current',i===firstTodo||(firstTodo===-1&&i===st.length-1));b.classList.toggle('alert',i===1&&rs==='hits');const dot=b.querySelector('.twx-step-dot');if(dot)dot.textContent=st[i]?'✓':String(i+1);});}
+   function paintSteps(){const bar=root.querySelector('#bwSteps');if(!bar||!request)return;const all=keys(),verified=all.length>0&&all.every(k=>['complete','empty'].includes(sections[k]?.status));const decided=!!(draft.status&&draft.reason);const rs=(chSfx==='2'?(window.bwRadarState2||''):(window.bwRadarState||''));const st=[true,rs==='clean'||rs==='hits',verified,verified,decided,savedOk];const firstTodo=st.findIndex(x=>!x);bar.querySelectorAll('.twx-step').forEach(function(b,i){b.classList.toggle('done',!!st[i]);b.classList.toggle('current',i===firstTodo||(firstTodo===-1&&i===st.length-1));b.classList.toggle('alert',i===1&&rs==='hits');const dot=b.querySelector('.twx-step-dot');if(dot)dot.textContent=st[i]?'✓':String(i+1);});}
    window.bwStepsRefresh=function(){try{paintSteps();}catch(e){}};
+   window.bwStepsRefreshFns=window.bwStepsRefreshFns||{};window.bwStepsRefreshFns[chSfx==='2'?2:1]=window.bwStepsRefresh; // v29.4: per-channel step rails
    // ─── v28.7 (Ahmed): evidence bench — case strip, verdict board, per-section re-check,
    //    stale banner, keyboard flow, copy summary, density. check()/stop()/invalidate()
    //    stay untouched; every addition rides on the existing paint cycle. ───
    function casePanelHtml(){const compact=root.classList.contains('bw-compact');return `<div class="bwx-cp" data-case-strip><div class="bwx-cp-head"><div class="bwx-cp-id"><small>User ID</small><button type="button" class="bwx-cp-uid" data-copy="${esc(request.userId)}" title="Copy the User ID">${esc(request.userId)}</button></div><div class="bwx-cp-prog"><svg class="bwx-ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="bwx-ring-bg" cx="18" cy="18" r="15.5"></circle><circle class="bwx-ring-val" data-ring cx="18" cy="18" r="15.5" style="stroke-dasharray:97.39;stroke-dashoffset:97.39"></circle></svg><span data-ring-label>0 / ${keys().length} checks</span></div></div><div class="bwx-cp-chips"><span class="bwx-chip bwx-chip-info">${esc(request.region)}</span><span class="bwx-chip">${esc(request.userType.replaceAll('_',' '))}</span><span class="bwx-chip">#${esc(request.number)}</span><span data-case-vip></span><span data-case-active></span></div><div class="bwx-cp-note" data-case-reason><small>Reason of Bind Request</small><p>${esc(request.reason||'Not provided')}</p></div><div class="bwx-cp-note" data-case-sub><small>Submitted by</small><p>${esc(request.submittedBy||'—')} · ${esc(request.submittedAt||'—')}</p></div><div class="bwx-cp-actions"><button type="button" class="bwx-btnq" data-action="copy-summary" title="Copy a plain-text summary for the ticket">Copy summary</button><button type="button" class="bwx-btnq" data-action="density" aria-pressed="${compact?'true':'false'}" title="Toggle compact / comfortable spacing">${compact?'Comfortable view':'Compact view'}</button><button type="button" class="bwx-btnq" data-action="keys-help" title="Keyboard shortcuts">?</button></div></div>`;}
    // v29.1: mirror the case card into the dock plate + panel (outside #bwRoot)
-   function syncCaseDock(){const dock=document.getElementById('bwxCaseDock');if(!dock)return;if(!request){dock.hidden=true;return;}dock.hidden=false;const num=document.getElementById('bwxPlateNum');if(num)num.textContent='Request #'+request.number;const uid=document.getElementById('bwxPlateUid');if(uid)uid.textContent=request.userId;const panel=document.getElementById('bwxCasePanel');if(panel)panel.innerHTML=casePanelHtml();paintCaseStrip();}
+   function syncCaseDock(){const dock=chEl('bwxCaseDock');if(!dock)return;if(!request){dock.hidden=true;return;}dock.hidden=false;const num=chEl('bwxPlateNum');if(num)num.textContent='Request #'+request.number;const uid=chEl('bwxPlateUid');if(uid)uid.textContent=request.userId;const panel=chEl('bwxCasePanel');if(panel)panel.innerHTML=casePanelHtml();paintCaseStrip();}
    const BOARD_NAMES={currentBindings:'Current bindings',phoneHistory:'Phone history',activity:'Activity',devices:'Devices',identity:'National ID',wallet:'Wallet',recharge:'Xcoins'};
    function boardHtml(){return `<section class="bw-board" data-verdict-board aria-label="Section verdicts">${keys().map(k=>`<button type="button" class="bw-board-tile" data-board="${k}" data-state="not_run" title="Jump to ${esc(DEFS[k][1])}"><span class="bw-board-top"><span class="bw-board-num">${esc(DEFS[k][0])}</span><span class="bw-board-mark" data-board-mark="${k}">–</span></span><span class="bw-board-name">${esc(BOARD_NAMES[k]||DEFS[k][1])}</span><span class="bw-board-word" data-board-word="${k}">Not checked</span></button>`).join('')}</section>`;}
-   function paintCaseStrip(){const cs=document.querySelector('#bwxCasePanel [data-case-strip]');if(!cs||!request)return;const cur=sectionData(sections.currentBindings);const vip=cs.querySelector('[data-case-vip]');if(vip)vip.innerHTML=!cur?'':cur.vipLevel==null?'<span class="bwx-chip">VIP · Not shown</span>':`<span class="bwx-chip bwx-vipchip-${vipTier(cur.vipLevel)}">${esc(cur.vipLabel||('VIP LV.'+cur.vipLevel))}</span>`;const la=cs.querySelector('[data-case-active]');if(la)la.innerHTML=!cur?'':`<span class="bwx-chip" title="Dashboard time">Last active · ${esc(cur.lastActiveAt||'Not shown')}</span>`;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length,C=2*Math.PI*15.5,off=String(C*(1-(all.length?done/all.length:0)));[cs.querySelector('[data-ring]'),document.getElementById('bwxPlateRing')].forEach(ring=>{if(ring){ring.style.strokeDasharray=String(C);ring.style.strokeDashoffset=off;}});const rl=cs.querySelector('[data-ring-label]');if(rl)rl.textContent=done+' / '+all.length+' checks';const pt=document.getElementById('bwxCasePlate');if(pt)pt.title='Case card · '+done+' / '+all.length+' checks — open the request snapshot';}
+   function paintCaseStrip(){const __pn=chEl('bwxCasePanel');const cs=__pn?__pn.querySelector('[data-case-strip]'):null;if(!cs||!request)return;const cur=sectionData(sections.currentBindings);const vip=cs.querySelector('[data-case-vip]');if(vip)vip.innerHTML=!cur?'':cur.vipLevel==null?'<span class="bwx-chip">VIP · Not shown</span>':`<span class="bwx-chip bwx-vipchip-${vipTier(cur.vipLevel)}">${esc(cur.vipLabel||('VIP LV.'+cur.vipLevel))}</span>`;const la=cs.querySelector('[data-case-active]');if(la)la.innerHTML=!cur?'':`<span class="bwx-chip" title="Dashboard time">Last active · ${esc(cur.lastActiveAt||'Not shown')}</span>`;const all=keys(),done=all.filter(k=>['complete','empty'].includes(sections[k]?.status)).length,C=2*Math.PI*15.5,off=String(C*(1-(all.length?done/all.length:0)));[cs.querySelector('[data-ring]'),chEl('bwxPlateRing')].forEach(ring=>{if(ring){ring.style.strokeDasharray=String(C);ring.style.strokeDashoffset=off;}});const rl=cs.querySelector('[data-ring-label]');if(rl)rl.textContent=done+' / '+all.length+' checks';const pt=chEl('bwxCasePlate');if(pt)pt.title='Case card · '+done+' / '+all.length+' checks — open the request snapshot';}
    function paintBoard(){const b=root.querySelector('[data-verdict-board]');if(!b)return;const M={complete:'\u2713',empty:'\u25e6',partial:'\u26a0',error:'\u2717',cancelled:'\u2717',running:'\u2026',not_run:'\u2013'},W={complete:'Complete',empty:'No records',partial:'Partial result',error:'Could not verify',cancelled:'Cancelled',running:'Checking\u2026',not_run:'Not checked'};keys().forEach(k=>{const t=b.querySelector('[data-board="'+k+'"]');if(!t)return;const st=sections[k]?.status||'not_run';t.dataset.state=st;const mk=t.querySelector('[data-board-mark="'+k+'"]');if(mk)mk.textContent=M[st]||'\u2013';const wd=t.querySelector('[data-board-word="'+k+'"]');if(wd)wd.textContent=W[st]||st;});}
    function paintStale(){const el=root.querySelector('[data-stale]');if(!el)return;if(active)staleFlag=false;el.hidden=!staleFlag;}
    function markStale(){const had=keys().some(k=>sections[k]&&sections[k].status!=='not_run');invalidate();staleFlag=staleFlag||had;paintStale();}
@@ -27573,8 +27663,8 @@ body:has(.img-lightbox-overlay.active) #twNotePop{z-index:10070!important}
    const onInput=e=>{const t=e.target;if(t.dataset.draft){draft[t.dataset.draft]=t.multiple?[...t.selectedOptions].map(o=>o.value):t.value;paintDecisionDot();paintDraftEcho();if(t.dataset.draft==='status'){if(!options('reason',t.value).some(x=>x.value===draft.reason))draft.reason='';const reason=root.querySelector('[data-draft=reason]');reason.innerHTML='<option value="">'+(t.value?'Choose a reason':'← Choose a Status first')+'</option>'+options('reason',t.value).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');reason.value=draft.reason;paintDecisionDot();paintDraftEcho();}return;}if(t.matches('[data-reply-search]'))paintReplies(t.value);if(t.dataset.setup){setup[t.dataset.setup]=t.value;markStale();}if(t.dataset.dateKind){setup.ranges[t.dataset.dateKind]??={};setup.ranges[t.dataset.dateKind][t.dataset.dateKey]=t.value;markStale();}};
    const onChange=e=>{const t=e.target;if(t.dataset.check){setup.checks=t.checked?[...new Set([...setup.checks,t.dataset.check])]:setup.checks.filter(k=>k!==t.dataset.check);markStale();render();}};
    const onClick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.dataset.evidence){void preview(b.dataset.evidence);return;}if(b.dataset.reply){draft.comment=[draft.comment,b.dataset.reply].filter(Boolean).join('\n');root.querySelector('[data-draft=comment]').value=draft.comment;return;}if(b.dataset.hb){draft.handledBy=b.dataset.hb;const hsel=root.querySelector('[data-draft=handledBy]');if(hsel){hsel.value=b.dataset.hb;}root.querySelectorAll('[data-hb]').forEach(x=>x.classList.toggle('active',x===b));return;}if(b.dataset.copy){copyText(b.dataset.copy,b);return;}if(b.dataset.recheck){void recheck(b.dataset.recheck);return;}if(b.dataset.board){navIdx=keys().indexOf(b.dataset.board);root.querySelector('[data-bind-section="'+b.dataset.board+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});return;}const a=b.dataset.action;if(a==='copy-summary'){copySummary(b);return;}if(a==='density'){const on=root.classList.toggle('bw-compact');b.setAttribute('aria-pressed',on?'true':'false');b.textContent=on?'Comfortable view':'Compact view';return;}if(a==='keys-help'){keysHelp();return;}if(a==='check')void check();if(a==='stop')stop();if(a==='review-save')reviewSave();if(a==='confirm-save')void save();if(a==='close-dialog')closeDialog();};
-   root.addEventListener('submit',onSubmit);root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('click',onClick);const casePanelEl=document.getElementById('bwxCasePanel');if(casePanelEl)casePanelEl.addEventListener('click',onClick);root.addEventListener('keydown',onKey);render();
-   return {open,load,stop,acceptUpdate,getState:()=>clone({request,setup,draft,sections,revision,active:active?{runId:active.runId,context:active.context}:null}),dispose(){if(saving)throw Error('Wait for the save result before removing the workspace.');stop();loading?.abort();closeDialog();const __cp=document.getElementById('bwxCasePanel');if(__cp){__cp.hidden=true;__cp.innerHTML='';__cp.removeEventListener('click',onClick);}const __cd=document.getElementById('bwxCaseDock');if(__cd)__cd.hidden=true;const __pb=document.getElementById('bwxCasePlate');if(__pb)__pb.setAttribute('aria-expanded','false');disposed=true;root.removeEventListener('submit',onSubmit);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);root.removeEventListener('click',onClick);root.removeEventListener('keydown',onKey);root.replaceChildren();}};
+   root.addEventListener('submit',onSubmit);root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('click',onClick);const casePanelEl=chEl('bwxCasePanel');if(casePanelEl)casePanelEl.addEventListener('click',onClick);root.addEventListener('keydown',onKey);render();
+   return {open,load,stop,acceptUpdate,getState:()=>clone({request,setup,draft,sections,revision,active:active?{runId:active.runId,context:active.context}:null}),dispose(){if(saving)throw Error('Wait for the save result before removing the workspace.');stop();loading?.abort();closeDialog();const __cp=chEl('bwxCasePanel');if(__cp){__cp.hidden=true;__cp.innerHTML='';__cp.removeEventListener('click',onClick);}const __cd=chEl('bwxCaseDock');if(__cd)__cd.hidden=true;const __pb=chEl('bwxCasePlate');if(__pb)__pb.setAttribute('aria-expanded','false');disposed=true;root.removeEventListener('submit',onSubmit);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);root.removeEventListener('click',onClick);root.removeEventListener('keydown',onKey);root.replaceChildren();}};
  }
  global.SamuraiBindWorkspace=Object.freeze({mount,comparison});
 })(window);
@@ -27622,6 +27712,16 @@ let bwInstance=null, bwCurrentId=null, bwCurrentView=null, bwReturnTo='bind-queu
 let bwWsParked=false; // v28.4: deliberate park -- user clicked the origin tab / Back while viewing the workspace
 const bwViewCache={};
 let bwRadarMatches=[];
+// v29.4 (Ahmed, comment 7707903760743288112): a SECOND, fully independent
+// workspace instance for the Query Bind Requests tab -- "the two work space
+// in the live bind and query bind are connected and only one open and let
+// the other get out so make them not connected". Channel 1 = the Live-queue
+// workspace page (#pg-bind-workspace); channel 2 = the query workspace
+// (#bwQueryShell inside #pg-bind-query). Separate instance, separate current
+// request, separate radar matches -- only the view cache is shared.
+let bwInstance2=null, bwCurrentId2=null, bwCurrentView2=null, bwOpenSeq2=0;
+let bwWsParked2=false;
+let bwRadarMatches2=[];
 const BW_QUICK_REPLIES=[
     'Verified: the reported main device appears in the account login history.',
     'Verified: the previous bind number appears in the phone record.',
@@ -27724,7 +27824,7 @@ function bqCardHtml(it, matchedOn, openMode){
       +qyRow('Comment',it.comment);
     if(rid) h+='<div class="qy-card-actions">'
         +'<button type="button" class="qy-act-btn qy-act-pics" onclick="bqViewPictures(\''+rid+'\', this)">🖼️ View Pictures</button>'
-        +(openMode==='querytab'?'<button type="button" class="qy-act-btn qy-act-open" onclick="bqOpenQueryTab(\''+rid+'\', \''+escHtml(it.numbering||'')+'\')">🔍 Open in Query tab</button>'+'<button type="button" class="qy-act-btn qy-act-open" onclick="bwOpen(\''+rid+'\')">🎫 Open Workspace</button>':'<button type="button" class="qy-act-btn qy-act-open" onclick="bwOpen(\''+rid+'\')">🎫 Open Workspace</button>')
+        +(openMode==='querytab'?'<button type="button" class="qy-act-btn qy-act-open" onclick="bqOpenQueryTab(\''+rid+'\', \''+escHtml(it.numbering||'')+'\')">🔍 Open in Query tab</button>':openMode==='queryws'?'<button type="button" class="qy-act-btn qy-act-open" onclick="bwOpen2(\''+rid+'\')">🎫 Open Workspace</button>':'<button type="button" class="qy-act-btn qy-act-open" onclick="bwOpen(\''+rid+'\')">🎫 Open Workspace</button>')
         +'</div><div class="qy-pics" id="bqPics-'+rid+'" style="display:none"></div>';
     return h+'</div>';
 }
@@ -27824,7 +27924,7 @@ async function bqRunQuery(){
         const items=d.results||[];
         cnt.textContent=items.length?('✅ '+items.length+' bind request'+(items.length>1?'s':'')+' found'):'';
         if(!items.length) empty.style.display='block';
-        else grid.innerHTML=items.map(function(it){ return bqCardHtml(it,[fieldLabel]); }).join('');
+        else grid.innerHTML=items.map(function(it){ return bqCardHtml(it,[fieldLabel],'queryws'); }).join('');
         // v29.0: arrived from a duplicate's "Open in Query tab" -- pulse that card
         if(window.__bqHighlightRid){
             const hl=grid.querySelector('.qy-card[data-rid="'+String(window.__bqHighlightRid).replace(/[^\w-]/g,'')+'"]');
@@ -27879,7 +27979,7 @@ function bwAuthedView(view){
     });
     return view;
 }
-async function bwLoadByNumber(number, opts){
+async function bwLoadByNumber(number, opts, ch){
     const signal=opts&&opts.signal;
     const r=await fetch('/api/bind/query?field=number&value='+encodeURIComponent(number)+'&'+bqQS(),{signal:signal});
     const d=await r.json().catch(function(){ return {}; });
@@ -27888,11 +27988,11 @@ async function bwLoadByNumber(number, opts){
     if(!hit) throw new Error('No bind request with number '+number+'.');
     const view=bwAuthedView(await bwFetchView(hit.record_id, signal));
     bwViewCache[hit.record_id]={view:view, ts:Date.now()};
-    bwCurrentId=hit.record_id; bwCurrentView=view;
-    setTimeout(function(){ bwAfterOpen(view); },0);
+    if(ch===2){ bwCurrentId2=hit.record_id; bwCurrentView2=view; } else { bwCurrentId=hit.record_id; bwCurrentView=view; }
+    setTimeout(function(){ if(ch===2) bwAfterOpen2(view); else bwAfterOpen(view); },0);
     return view;
 }
-async function bwSaveDecision(payload, opts){
+async function bwSaveDecision(payload, opts, ch){
     if(typeof previewMode!=='undefined'&&previewMode) throw new Error('Preview mode — saving is disabled.');
     opts=opts||{};
     if(opts.onProgress) opts.onProgress('Saving Status, reason and comment — verified one field at a time…');
@@ -27907,8 +28007,8 @@ async function bwSaveDecision(payload, opts){
     if(opts.onProgress) opts.onProgress(d.handledBySent?'Verified — Handled by was sent last.':'Verified — Handled by unchanged, not re-sent.');
     if(d.record&&d.record.recordId){
         bwViewCache[d.record.recordId]={view:d.record, ts:Date.now()};
-        bwCurrentView=d.record;
-        setTimeout(function(){ bwAfterOpen(d.record); },0);
+        if(ch===2){ bwCurrentView2=d.record; } else { bwCurrentView=d.record; }
+        setTimeout(function(){ if(ch===2) bwAfterOpen2(d.record); else bwAfterOpen(d.record); },0);
     }
     // v28.8 (Ahmed): "why when the save happen successful the tkt not closed?"
     // -- a verified save CLOSES the request: destroy the workspace, land back
@@ -27916,9 +28016,14 @@ async function bwSaveDecision(payload, opts){
     // finishes painting its success state first.
     setTimeout(function(){
         try{
-            if(!bwDestroyWorkspace()) return; // a new save/run started meanwhile
-            setActiveTab(bwReturnTo||'bind-queue');
-            ToastManager.show('✅ Saved — bind request #'+(d.record&&d.record.number||'')+' is closed.','success',6000);
+            if(ch===2){
+                if(!bwDestroyWorkspace2()) return; // a new save/run started meanwhile
+                ToastManager.show('✅ Saved — bind request #'+(d.record&&d.record.number||'')+' is closed.','success',6000);
+            }else{
+                if(!bwDestroyWorkspace()) return; // a new save/run started meanwhile
+                setActiveTab(bwReturnTo||'bind-queue');
+                ToastManager.show('✅ Saved — bind request #'+(d.record&&d.record.number||'')+' is closed.','success',6000);
+            }
             if(typeof bqLoad==='function') bqLoad();
         }catch(e){ console.warn('post-save close', e); }
     },1200);
@@ -27926,11 +28031,12 @@ async function bwSaveDecision(payload, opts){
 }
 /* Evidence opens INSIDE the workspace: images -> the portal lightbox (zoom /
    rotate / fit / pan / OCR), videos + other files -> the in-page modal. */
-function bwOpenEvidence(att){
+function bwOpenEvidence(att, viewOverride){
     try{
+        const cv=viewOverride||bwCurrentView;
         if(att.kind==='video'){ bwFileModal(att.url, att.name, 'video'); return; }
         if(att.kind==='image'){
-            const imgs=((bwCurrentView&&bwCurrentView.attachments)||[att]).filter(function(a){ return a.kind==='image'; });
+            const imgs=((cv&&cv.attachments)||[att]).filter(function(a){ return a.kind==='image'; });
             const gallery=imgs.map(function(a){ return {src:a.url, filename:a.name}; });
             let idx=imgs.findIndex(function(a){ return a.id===att.id; }); if(idx<0) idx=0;
             openImageLightboxGallery(gallery, idx);
@@ -28011,25 +28117,290 @@ async function bwOpen(recordId){
         }
     }
 }
-/* v29.0 (Ahmed, comment 7707878418527816707): "why it open the workspace in
-   new browser tkt ?? i said new query bind request tab in same website tab" --
-   a radar duplicate now opens the QUERY BIND REQUESTS page as a topbar tab in
-   THIS browser tab: no new browser tab, no site reload, the open workspace
-   stays put (v28.4 keep-alive). The search pre-fills with the duplicate's
-   request number and runs; its card gets the bq-hl pulse highlight. */
-function bqOpenQueryTab(recordId, number){
-    if(!recordId&&!number) return;
-    window.__bqHighlightRid=recordId||'';
+/* ─── v29.4 (Ahmed, comment 7707903760743288112): CHANNEL 2 -- the Query tab's
+   own workspace. "the two work space in the live bind and query bind are
+   connected and only one open and let the other get out so make them not
+   connected". Everything below mirrors the channel-1 functions with its own
+   instance state, its own dock/panel/radar (suffix-2 IDs) and its own radar
+   matches -- the Live-queue workspace is never touched. ─── */
+function bwQueryShowShell(on){
+    const sh=document.getElementById('bwQueryShell'), ui=document.getElementById('bwQuerySearchUI'), pg=document.getElementById('pg-bind-query');
+    if(sh) sh.style.display=on?'block':'none';
+    if(ui) ui.style.display=on?'none':'block';
+    if(pg) pg.classList.toggle('bwq-ws',!!on);
+}
+function bwMount2(){
+    if(bwInstance2) return bwInstance2;
+    const root=document.getElementById('bwQueryRoot');
+    if(!root||!window.SamuraiBindWorkspace) return null;
+    bwInstance2=SamuraiBindWorkspace.mount(root,{
+        loadRequest: function(n,o){ return bwLoadByNumber(n,o,2); },
+        runDashboard: SamuraiBindExtensionBridge.create(),
+        saveDecision: function(p,o){ return bwSaveDecision(p,o,2); },
+        openEvidence: function(att){ bwOpenEvidence(att, bwCurrentView2); },
+        quickReplies: BW_QUICK_REPLIES
+    });
+    root.querySelectorAll('.ss-wrapper').forEach(function(w){
+        const sel=w.querySelector('select'); if(!sel) return;
+        w.parentNode.insertBefore(sel,w);
+        delete sel.dataset.ssEnhanced;
+        sel.classList.remove('ss-native-hidden');
+        w.remove();
+    });
+    return bwInstance2;
+}
+/* Open a request in the QUERY tab's own workspace -- the same cached-instant
+   paint discipline as bwOpen, but nothing here touches channel 1. */
+async function bwOpen2(recordId){
+    if(!recordId) return;
     openInTab('bind-query');
-    const fld=document.getElementById('bqySearchField');
-    const inp=document.getElementById('bqySearchValue');
-    if(fld&&inp){
-        fld.value=number?'number':'user_id';
-        const lbl=document.getElementById('bqyValueLabel');
-        if(lbl) lbl.textContent=fld.options[fld.selectedIndex].text+' Value';
-        inp.value=number||recordId;
+    bwWsParked2=false; // the open below wins over any deliberate park
+    bwQueryShowShell(true);
+    bwToggleTopbar2(false); // action bar opens collapsed (channel-1 parity)
+    const inst=bwMount2(); if(!inst) return;
+    const mySeq=++bwOpenSeq2;
+    const st=inst.getState();
+    const cached=bwViewCache[recordId];
+    const sameOpen=!!(st.request&&st.request.recordId===recordId);
+    if(!sameOpen&&cached&&!st.active){
+        try{ inst.open(cached.view); bwCurrentId2=recordId; bwCurrentView2=cached.view; bwAfterOpen2(cached.view); }
+        catch(e){ /* a save is in progress — keep the current screen */ }
+    } else if(!sameOpen&&!cached){
+        document.getElementById('bwTitle2').textContent='⏳ Opening bind request…';
+        document.getElementById('bwStatusChip2').innerHTML='';
     }
-    if(typeof bqRunQuery==='function') bqRunQuery();
+    try{
+        const pf=bwPrefetchJobs[recordId];
+        let view;
+        if(pf&&!bwViewCache[recordId]){
+            view=await pf;
+            if(!view) throw new Error('Bind request failed to load.');
+        }else{
+            view=bwAuthedView(await bwFetchView(recordId));
+        }
+        bwViewCache[recordId]={view:view, ts:Date.now()};
+        if(mySeq!==bwOpenSeq2) return;
+        const cur=inst.getState();
+        if(cur.active) return; // dashboard run in progress — keep the fresh copy cached only
+        if(sameOpen&&cur.request&&cur.request.recordVersion===view.recordVersion){ bwCurrentView2=view; return; }
+        try{
+            inst.open(view);
+            bwCurrentId2=recordId; bwCurrentView2=view; bwAfterOpen2(view);
+        }catch(e){
+            if(!cached&&!sameOpen) ToastManager.show('Could not refresh the request: '+(e.message||e),'warning',6000);
+        }
+    }catch(e){
+        if(mySeq!==bwOpenSeq2) return;
+        if(!cached&&!sameOpen){
+            document.getElementById('bwTitle2').textContent='🔗 Bind Request';
+            ToastManager.show('Bind request failed to load: '+(e.message||e),'error',9000);
+        }
+    }
+}
+function bwBack2(){
+    // deliberate park -- back to the search list, the instance stays warm
+    bwWsParked2=true;
+    bwQueryShowShell(false);
+}
+function bwDestroyWorkspace2(){
+    if(bwInstance2){
+        try{ bwInstance2.dispose(); }
+        catch(e){ return false; } // save in flight -- keep the workspace alive
+        bwInstance2=null;
+    }
+    bwCurrentId2=null; bwCurrentView2=null; bwWsParked2=false;
+    bwRadarMatches2=[];
+    const t=document.getElementById('bwTitle2'); if(t) t.textContent='Bind Request';
+    const c=document.getElementById('bwStatusChip2'); if(c) c.innerHTML='';
+    const p=document.getElementById('bwDupDrawer2'); if(p) p.classList.remove('open');
+    const rr=document.getElementById('bwRadarResults2'); if(rr) rr.innerHTML='';
+    bwRadarSetMsg2('',false);
+    window.bwRadarState2='';
+    const f=document.getElementById('bwRadarFab2'); if(f) f.classList.remove('alert');
+    const cd=document.getElementById('bwxCaseDock2'); if(cd) cd.hidden=true;
+    const cp=document.getElementById('bwxCasePanel2'); if(cp){ cp.hidden=true; cp.innerHTML=''; }
+    const b=document.getElementById('bwRadarBadge2'); if(b){ b.style.display='none'; b.textContent=''; }
+    bwQueryShowShell(false);
+    return true;
+}
+function bwAfterOpen2(view){
+    if(!view) return;
+    document.getElementById('bwTitle2').textContent='🔗 Bind Request #'+(view.number||'?');
+    document.getElementById('bwStatusChip2').innerHTML='<span class="qy-status-pill '+qyStatusClass(view.statusLabel)+'">'+escHtml(view.statusLabel||'Awaiting review')+'</span>';
+    bwRadarScan2(view);
+}
+function bwToggleTopbar2(expand){
+    const w=document.getElementById('bwxTopbarWrap2');
+    if(!w) return;
+    const open=expand===undefined?w.classList.contains('chat-collapsed'):!!expand;
+    w.classList.toggle('chat-collapsed',!open);
+}
+function bwCasePlateToggle2(show){
+    const panel=document.getElementById('bwxCasePanel2');
+    const plate=document.getElementById('bwxCasePlate2');
+    if(!panel||!plate) return;
+    const open=show===undefined?panel.hidden:!!show;
+    panel.hidden=!open;
+    plate.setAttribute('aria-expanded',open?'true':'false');
+}
+function bwRadarSetMsg2(html, show, state){
+    const msg=document.getElementById('bwRadarMsg2');
+    if(!msg) return;
+    // same contract as channel 1: the ✕ is the ONLY dismiss
+    msg.innerHTML=html?'<button type="button" class="twx-radar-msg-x" onclick="event.stopPropagation();bwRadarDismissMsg2()" title="Dismiss">✕</button>'+html:'';
+    msg.classList.toggle('open',!!show&&!!html);
+    if(show&&html){ delete msg.dataset.wsWasOpen; twxRadarPositionMsg(msg); }
+    else if(!show){ delete msg.dataset.wsWasOpen; }
+    msg.classList.toggle('scanning',state==='scanning');
+}
+function bwRadarDismissMsg2(){
+    const msg=document.getElementById('bwRadarMsg2');
+    if(msg){ msg.classList.remove('open'); delete msg.dataset.wsWasOpen; }
+}
+function bwRadarFabClick2(){
+    if(bwRadarMatches2&&bwRadarMatches2.length){
+        const msg=document.getElementById('bwRadarMsg2');
+        if(msg&&msg.innerHTML.trim()){ msg.classList.add('open'); twxRadarPositionMsg(msg); }
+        bwRadarToggleMatches2();
+    } else if(bwCurrentView2){ bwRadarScan2(bwCurrentView2); }
+    else if(typeof ToastManager!=='undefined') ToastManager.show('Open a bind request first — the radar scans its User ID / Contact ID.','warning');
+}
+function bwRadarToggleMatches2(forceOpen){
+    const drawer=document.getElementById('bwDupDrawer2');
+    const resultsEl=document.getElementById('bwRadarResults2');
+    if(!drawer||!resultsEl) return;
+    const open=forceOpen===true?true:forceOpen===false?false:!drawer.classList.contains('open');
+    if(!open){ drawer.classList.remove('open'); return; }
+    if(!bwRadarMatches2.length) return;
+    bwRadarRender2();
+    drawer.classList.add('open');
+    requestAnimationFrame(function(){ awsDupUpdateMore('bwDupDrawer2'); });
+}
+async function bwRadarScan2(view){
+    if(!view) return;
+    const badge=document.getElementById('bwRadarBadge2'),
+          results=document.getElementById('bwRadarResults2'),
+          fab=document.getElementById('bwRadarFab2'),
+          drawer=document.getElementById('bwDupDrawer2');
+    if(drawer) drawer.classList.remove('open');
+    if(results) results.innerHTML='';
+    if(fab){ fab.classList.remove('alert'); fab.classList.add('scanning'); }
+    if(badge){ badge.style.display='none'; badge.textContent=''; }
+    window.bwRadarState2='scanning';
+    if(window.bwStepsRefreshFns&&window.bwStepsRefreshFns[2]) window.bwStepsRefreshFns[2]();
+    bwRadarSetMsg2('<span class="twx-radar-scan">⏳ Scanning User ID / Contact ID against every other bind request…</span>',true,'scanning');
+    if(fab) fab.classList.remove('alert');
+    if(badge){ badge.style.display='none'; badge.textContent=''; }
+    bwRadarMatches2=[];
+    const myId=view.recordId;
+    const byKey=new Map();
+    (view.related||[]).forEach(function(r){
+        if(!r.recordId||r.recordId===myId) return;
+        byKey.set(r.recordId,{recordId:r.recordId,
+            brief:{record_id:r.recordId, numbering:r.number, status:(r.status&&r.status!=='new')?r.status:''},
+            matchedOn:['User ID']});
+    });
+    let contactErr=false;
+    const cid=(view.contactId||'').trim(), uid=(view.userId||'').trim();
+    if(cid&&cid!==uid){
+        try{
+            const r=await fetch('/api/bind/query?field=contact_id&value='+encodeURIComponent(cid)+'&'+bqQS());
+            const d=await r.json();
+            if(r.ok&&d.success){
+                (d.results||[]).forEach(function(it){
+                    if(!it.record_id||it.record_id===myId) return;
+                    if(!byKey.has(it.record_id)) byKey.set(it.record_id,{recordId:it.record_id, brief:it, matchedOn:[]});
+                    const m=byKey.get(it.record_id);
+                    m.brief=it; // the full card beats the minimal related entry
+                    if(m.matchedOn.indexOf('Contact ID')<0) m.matchedOn.push('Contact ID');
+                    if((it.user_id||'').trim()&&((it.user_id||'').trim()===uid)&&m.matchedOn.indexOf('User ID')<0) m.matchedOn.unshift('User ID');
+                });
+            } else contactErr=true;
+        }catch(e){ contactErr=true; }
+    }
+    bwRadarMatches2=Array.from(byKey.values());
+    const bwSparse=bwRadarMatches2.filter(function(m){return m.brief&&m.brief.user_id===undefined&&m.brief.numbering;}).slice(0,6);
+    if(bwSparse.length){
+        bwRadarSetMsg2('<span class="twx-radar-scan">⏳ Loading duplicate details…</span>',true,'scanning');
+        await Promise.all(bwSparse.map(async function(m){
+            try{
+                const r=await fetch('/api/bind/query?field=number&value='+encodeURIComponent(m.brief.numbering)+'&'+bqQS());
+                const d=await r.json();
+                if(r.ok&&d.success){
+                    const full=(d.results||[]).find(function(x){return x.record_id===m.recordId;})||(d.results||[])[0];
+                    if(full) m.brief=full;
+                }
+            }catch(e){/* keep the minimal brief */}
+        }));
+    }
+    const sheetLine=(view.sheetDupCheck&&String(view.sheetDupCheck).trim())?('<div class="twx-radar-sheet">📋 Sheet “Duplicated Check”: '+escHtml(view.sheetDupCheck)+'</div>'):'';
+    const n=bwRadarMatches2.length;
+    if(fab) fab.classList.remove('scanning');
+    if(n){
+        if(badge){ badge.style.display='inline-grid'; badge.textContent=n; }
+        if(fab) fab.classList.add('alert');
+        const byField=new Map();
+        bwRadarMatches2.forEach(function(m){
+            (m.matchedOn&&m.matchedOn.length?m.matchedOn:['User ID']).forEach(function(f){
+                if(!byField.has(f)) byField.set(f,[]);
+                byField.get(f).push('#'+((m.brief&&m.brief.numbering)||'?'));
+            });
+        });
+        let hitLines='';
+        byField.forEach(function(nums,f){
+            const shown=nums.slice(0,3).join(', ')+(nums.length>3?' + '+(nums.length-3)+' more':'');
+            hitLines+='<div class="aws-dup-hit">🔴 <b>'+escHtml(f)+'</b> in bind request: '+escHtml(shown)+'</div>';
+        });
+        const extra=(view.relatedComplete===false?' <span style="font-size:.75rem;opacity:.85;">(User ID list may be incomplete)</span>':'')
+            +(contactErr?' <span style="font-size:.75rem;">(Contact ID scan failed)</span>':'');
+        bwRadarSetMsg2('<div class="aws-dup-verdict">'+hitLines+sheetLine+extra
+            +'<div class="aws-dup-cta">👆 Click to review the '+n+' matching request'+(n>1?'s':'')+'</div></div>', true, 'hits');
+        bwRadarRender2();
+        window.bwRadarState2='hits';
+    }else{
+        if(badge){ badge.style.display='none'; badge.textContent=''; }
+        if(fab) fab.classList.remove('alert');
+        bwRadarSetMsg2('<span class="aws-dup-clean">🟢 No duplicates</span> — no other bind request shares this User ID'+(cid&&cid!==uid?' or Contact ID':'')+'.'
+            +sheetLine
+            +(contactErr?' <span style="font-size:.75rem;">(Contact ID scan failed — User ID result comes from the loaded request)</span>':''), true, 'clean');
+        window.bwRadarState2='clean';
+    }
+    if(window.bwStepsRefreshFns&&window.bwStepsRefreshFns[2]) window.bwStepsRefreshFns[2]();
+}
+function bwRadarRender2(){
+    const results=document.getElementById('bwRadarResults2');
+    if(!results) return;
+    results.innerHTML=bwRadarMatches2.map(function(m){ return bqCardHtml(m.brief, m.matchedOn, 'querytab'); }).join('');
+}
+// v29.4 channel-2 closers: outside click / Esc close ONLY the query shell's
+// drawer and case panel -- the channel-1 handlers stay untouched.
+document.addEventListener('click',function(e){
+    const panel=document.getElementById('bwxCasePanel2');
+    if(panel&&!panel.hidden){
+        if(!(e.target.closest && e.target.closest('.bwx-case-dock'))) bwCasePlateToggle2(false);
+    }
+    const drawer=document.getElementById('bwDupDrawer2');
+    if(drawer&&drawer.classList.contains('open')){
+        const inside=e.target.closest&&(e.target.closest('#bwRadarDock2')||e.target.closest('#bwDupDrawer2')||e.target.closest('#bwRadarMsg2'));
+        if(!inside) drawer.classList.remove('open');
+    }
+});
+document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape') return;
+    bwCasePlateToggle2(false);
+    const drawer=document.getElementById('bwDupDrawer2');
+    if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
+});
+
+/* v29.4 (Ahmed, comment 7707903760743288112): "i mean by open in query tab
+   to open the tab and show the workspace immediately not search first and
+   then i choose to open the request" -- a duplicate opens DIRECTLY in the
+   Query tab's own independent workspace (channel 2): no pre-filled search,
+   no highlight, no extra click, and the Live-queue workspace is never
+   touched. */
+function bqOpenQueryTab(recordId, number){
+    if(!recordId) return;
+    bwOpen2(recordId);
 }
 function bwBack(){
     // v28.4 (Ahmed): Back is a DELIBERATE park -- the origin tab keeps the
@@ -28127,7 +28498,7 @@ async function bwRadarScan(view){
     if(fab){ fab.classList.remove('alert'); fab.classList.add('scanning'); }
     if(badge){ badge.style.display='none'; badge.textContent=''; }
     window.bwRadarState='scanning';
-    if(window.bwStepsRefresh) window.bwStepsRefresh();
+    if(window.bwStepsRefreshFns&&window.bwStepsRefreshFns[1]) window.bwStepsRefreshFns[1](); else if(window.bwStepsRefresh) window.bwStepsRefresh();
     bwRadarSetMsg('<span class="twx-radar-scan">⏳ Scanning User ID / Contact ID against every other bind request…</span>',true,'scanning');
     if(fab) fab.classList.remove('alert');
     if(badge){ badge.style.display='none'; badge.textContent=''; }
@@ -28209,7 +28580,7 @@ async function bwRadarScan(view){
             +(contactErr?' <span style="font-size:.75rem;">(Contact ID scan failed — User ID result comes from the loaded request)</span>':''), true, 'clean');
         window.bwRadarState='clean';
     }
-    if(window.bwStepsRefresh) window.bwStepsRefresh();
+    if(window.bwStepsRefreshFns&&window.bwStepsRefreshFns[1]) window.bwStepsRefreshFns[1](); else if(window.bwStepsRefresh) window.bwStepsRefresh();
 }
 function bwRadarRender(){
     const results=document.getElementById('bwRadarResults');
@@ -28249,15 +28620,19 @@ if(!window.__bwxCaseDocBound){
 // v28.6: guided-steps rail clicks — jump to the section and pulse it,
 // exactly like the ticket workspace's twStepGo. Step 2 (Duplicates) drives
 // the radar itself: matches -> toggle the drawer; none yet -> run the scan.
-function bwStepGo(n){
-    const root=document.getElementById('bwRoot');
-    if(n===2){ bwRadarFabClick(); return; }
+function bwStepGo(n, el){
+    // v29.4: the steps rail lives inside the component root -- resolve WHICH
+    // workspace (channel 1 #bwRoot / channel 2 #bwQueryRoot) from the clicked
+    // step so the Query tab's rail drives the Query tab's radar.
+    const root=el&&el.closest?el.closest('.bw'):document.getElementById('bwRoot');
+    const isQ=!!(root&&root.id==='bwQueryRoot');
+    if(n===2){ if(isQ) bwRadarFabClick2(); else bwRadarFabClick(); return; }
     const sel={1:'[data-bind-request-details]',3:'.bw-check',4:'[data-bind-section="comparison"]',5:'[data-bind-decision]',6:'.bw-final'}[n];
-    const el=root&&sel?root.querySelector(sel):null;
-    if(!el) return;
-    el.scrollIntoView({behavior:'smooth',block:'start'});
-    el.classList.add('twx-pulse');
-    setTimeout(function(){ el.classList.remove('twx-pulse'); },1700);
+    const t=root&&sel?root.querySelector(sel):null;
+    if(!t) return;
+    t.scrollIntoView({behavior:'smooth',block:'start'});
+    t.classList.add('twx-pulse');
+    setTimeout(function(){ t.classList.remove('twx-pulse'); },1700);
 }
 // The verdict bubble is PERSISTENT — outside clicks and Escape close ONLY the
 // match-cards drawer, never the bubble (its own ✕ dismisses it). Same
@@ -28276,7 +28651,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v29.3 case-plate-leftmost 2026-11-14';
+window.SAM19_BUILD='v29.4 dual-bind-workspaces 2026-11-14';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
