@@ -4,6 +4,39 @@
     <meta charset="UTF-8">
 <script>window.__sdeb=function(f,ms){var t=0;return function(){if(t)return;t=setTimeout(function(){t=0;try{f()}catch(e){console.error(e)}},ms||120)}};</script>
 <script>try{const t=localStorage.getItem('xenaTheme');document.documentElement.dataset.theme=['light','dark'].includes(t)?t:(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}catch(e){}</script>
+<script>
+/* v29.7 (Ahmed, comment 7708532830233431072): source-protection deterrents.
+   Honest scope: a browser must receive the page to render it, so no web app can
+   make saving / view-source technically impossible -- the real protection is
+   that every /api/* call needs a live, expiring session (a saved copy shows the
+   login wall and zero data). These guards close the casual paths: right-click,
+   Ctrl+S / Ctrl+U, F12 and the devtools shortcuts. */
+(function(){
+  function secToast(msg){
+    try{
+      var t=document.getElementById('xenaSecToast');
+      if(!t){t=document.createElement('div');t.id='xenaSecToast';
+        t.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:99999;background:#1a1f2e;color:#e6ecf5;border:1px solid rgba(255,92,108,.5);border-left:4px solid #ff5c6c;padding:10px 18px;border-radius:10px;font:600 13px/1.4 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.45);opacity:0;transition:opacity .25s;pointer-events:none;';
+        (document.body||document.documentElement).appendChild(t);}
+      t.textContent=msg;t.style.opacity='1';
+      clearTimeout(t._h);t._h=setTimeout(function(){t.style.opacity='0';},2200);
+    }catch(e){}
+  }
+  document.addEventListener('contextmenu',function(e){
+    var el=e.target;
+    if(el&&el.closest&&el.closest('input,textarea,select,[contenteditable="true"]'))return;
+    e.preventDefault();secToast('\u{1F512} Right-click is disabled on this portal.');
+  });
+  document.addEventListener('keydown',function(e){
+    var k=(e.key||'').toLowerCase(),mod=e.ctrlKey||e.metaKey,f12=e.keyCode===123;
+    if(f12||(mod&&(k==='s'||k==='u'))||(mod&&e.shiftKey&&['i','j','c','k'].indexOf(k)>-1)){
+      e.preventDefault();e.stopPropagation();
+      secToast(f12||(mod&&e.shiftKey)?'\u{1F512} Developer tools are disabled on this portal.':(k==='s'?'\u{1F512} Saving this page is disabled — the portal is live-only.':'\u{1F512} View-source is disabled on this portal.'));
+      return false;
+    }
+  },true);
+})();
+</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audition Dashboard</title>
     <!-- Favicon -->
@@ -28751,7 +28784,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v29.6 auditlog-device-usertype 2026-11-14';
+window.SAM19_BUILD='v29.7 source-protect 2026-11-16';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
