@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v29.6 auditlog-device-usertype 2026-11-14"
+XENA_BUILD = "v29.7 source-protect 2026-11-16"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -3023,6 +3023,15 @@ def get_points_table_snapshot():
 
 
 app = Flask(__name__)
+
+# v29.7 (Ahmed, comment 7708532830233431072): baseline security headers on every
+# API response. The static index.html gets the same headers via vercel.json.
+@app.after_request
+def _security_headers(resp):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return resp
 
 # Phase 51: blanket access gate — runs on every /api request (see the
 # definition above for the full rationale and the exempt list).
