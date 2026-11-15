@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v29.5 answer-value-highlight 2026-11-14"
+XENA_BUILD = "v29.6 auditlog-device-usertype 2026-11-14"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -1361,6 +1361,33 @@ def parse_monthly_target_field(raw_value):
     ytd_target = sum(m["value"] for m in monthly[:current_month_idx+1] if m["status"] == "value" and m["value"])
     return monthly, ytd_target
 
+def _classify_device(ua):
+    """Compact 'Kind · OS · Browser' label from a User-Agent, e.g.
+    'PC · Windows · Chrome' or 'Phone · Android · Chrome'. Empty UA -> ''."""
+    u = (ua or "").lower()
+    if not u:
+        return ""
+    tablet = any(k in u for k in ("ipad", "tablet"))
+    mobile = any(k in u for k in ("mobile", "iphone", "ipod", "android", "windows phone", "blackberry"))
+    kind = "Tablet" if tablet else ("Phone" if mobile else "PC")
+    if "windows" in u: os_ = "Windows"
+    elif "android" in u: os_ = "Android"
+    elif "iphone" in u or "ipad" in u or "ios" in u: os_ = "iOS"
+    elif "mac os" in u or "macos" in u or "macintosh" in u: os_ = "macOS"
+    elif "linux" in u: os_ = "Linux"
+    else: os_ = ""
+    if "edg/" in u or " edge" in u: br = "Edge"
+    elif "firefox" in u: br = "Firefox"
+    elif "chrome" in u or "chromium" in u: br = "Chrome"
+    elif "safari" in u: br = "Safari"
+    else: br = ""
+    parts = [x for x in (os_, br) if x]
+    return kind + (" · " + " · ".join(parts) if parts else "")
+
+# One-time lazy check/create of the "Device" text column on the audit table,
+# so older tables keep writing fine even before the column exists.
+_AUDIT_DEVICE_FIELD = {"checked": False, "ok": False}
+
 class AuditLogger:
     def __init__(self):
         self._queue = []
@@ -1368,6 +1395,12 @@ class AuditLogger:
 
     def log(self, actor, action, target, details="", ip="", severity="Info", blocking=False):
         full_target = f"{target} | {details}" if details else target
+        try:
+            from flask import request as _req, has_request_context
+            ua = _req.headers.get("User-Agent", "") if has_request_context() else ""
+        except Exception:
+            ua = ""
+        device = _classify_device(ua)
         entry = {
             # NOTE: audit entries are only ever readable by admins (see the
             # is_super_admin checks on every /api/admin/* route), so we log full,
@@ -1376,6 +1409,7 @@ class AuditLogger:
             # actually authorized to read it.
             "actor": actor or "Unknown", "action": action, "target": full_target,
             "ip": ip, "severity": severity, "ts": datetime.utcnow().isoformat(),
+            "device": device, "ua": ua[:200],
         }
         logger.info("audit", **entry)
         if AUDIT_TABLE_ID and not MOCK_MODE:
@@ -1397,6 +1431,26 @@ class AuditLogger:
             self._queue.append(entry)
             if len(self._queue) > 500: self._queue = self._queue[-500:]
 
+    def _ensure_device_field(self, tat):
+        if _AUDIT_DEVICE_FIELD["checked"]:
+            return _AUDIT_DEVICE_FIELD["ok"]
+        _AUDIT_DEVICE_FIELD["checked"] = True
+        try:
+            url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/fields"
+            hdrs = {"Authorization": f"Bearer {tat}"}
+            res = http_requests.get(url, headers=hdrs, timeout=8).json()
+            names = [f.get("field_name") for f in res.get("data", {}).get("items", [])]
+            if "Device" in names:
+                _AUDIT_DEVICE_FIELD["ok"] = True
+                return True
+            created = http_requests.post(url, headers={**hdrs, "Content-Type": "application/json"},
+                                         json={"field_name": "Device", "type": 1}, timeout=8).json()
+            _AUDIT_DEVICE_FIELD["ok"] = created.get("code") == 0
+        except Exception as e:
+            logger.error("audit_device_field_failed", error=str(e))
+            _AUDIT_DEVICE_FIELD["ok"] = False
+        return _AUDIT_DEVICE_FIELD["ok"]
+
     def _write_feishu(self, entry):
         try:
             tat = get_tenant_access_token()
@@ -1410,6 +1464,8 @@ class AuditLogger:
                 "IP Address": entry["ip"],
                 "Severity": entry["severity"]
             }}
+            if self._ensure_device_field(tat):
+                payload["fields"]["Device"] = entry.get("device", "")
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
         except Exception as e:
             logger.error("audit_write_failed", error=str(e))
@@ -3832,6 +3888,7 @@ def audit_logs():
     q_action = sanitize_text(request.args.get('action','')).lower()
     q_search = sanitize_text(request.args.get('search','')).lower()  # free-text over target/action/actor
     q_sev    = sanitize_text(request.args.get('severity','')).lower()
+    q_device = sanitize_text(request.args.get('device','')).lower()  # pc / phone / tablet
     q_from   = sanitize_text(request.args.get('from',''))  # ISO date, inclusive
     q_to     = sanitize_text(request.args.get('to',''))    # ISO date, inclusive
 
@@ -3862,7 +3919,8 @@ def audit_logs():
                     "action": extract_field_text(f.get("Action", "")),
                     "target": extract_field_text(f.get("Target", "")),
                     "ip": extract_field_text(f.get("IP Address", "")),
-                    "severity": extract_field_text(f.get("Severity", "Info"))
+                    "severity": extract_field_text(f.get("Severity", "Info")),
+                    "device": extract_field_text(f.get("Device", ""))
                 })
             logs.sort(key=lambda x: x["ts"], reverse=True)
         except Exception as e:
@@ -3873,6 +3931,7 @@ def audit_logs():
         if q_actor  and q_actor  not in (l.get("actor","") or "").lower(): return False
         if q_action and q_action not in (l.get("action","") or "").lower(): return False
         if q_sev    and q_sev    != (l.get("severity","") or "").lower(): return False
+        if q_device and not (l.get("device","") or "").lower().startswith(q_device): return False
         if q_search:
             hay = " ".join([l.get("actor",""), l.get("action",""), l.get("target",""), l.get("ip","")]).lower()
             if q_search not in hay: return False
