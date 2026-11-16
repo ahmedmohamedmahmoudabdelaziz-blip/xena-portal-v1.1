@@ -37,6 +37,51 @@
   },true);
 })();
 </script>
+<script>
+/* v30.0 Phase 1 (spec 1.3): APP_STATE + PermissionGuard - the RBAC core,
+   loaded before any UI module initializes. APP_STATE.currentUser.permissions
+   holds the member's resolved feature-permission array ('*' wildcard for super
+   admins), populated the moment /api/auth/me returns and swapped during
+   Preview Agent View. Fail-closed: empty until proven. Every feature from
+   Phase 2 onward renders and executes only behind can()/guard(). */
+window.APP_STATE = window.APP_STATE || { currentUser: { permissions: [], featureRole: null } };
+const PermissionGuard = {
+  can(permKey) {
+    const perms = window.APP_STATE?.currentUser?.permissions || [];
+    return perms.includes('*') || perms.includes(permKey);
+  },
+  canAny(permKeys = []) {
+    return permKeys.some((key) => this.can(key));
+  },
+  guard(permKey, callback, onDenied) {
+    return (...args) => {
+      if (!this.can(permKey)) {
+        if (typeof onDenied === 'function') onDenied(permKey);
+        else window.xenaAccessDenied(permKey);
+        return null;
+      }
+      return callback(...args);
+    };
+  },
+  applyToDOM(root = document) {
+    root.querySelectorAll('[data-perm]').forEach((el) => {
+      const required = el.getAttribute('data-perm');
+      if (!required) return;
+      /* 'key1|key2' = ANY of the listed keys satisfies the gate. */
+      if (!required.split('|').some((k) => this.can(k.trim()))) {
+        el.remove();
+      }
+    });
+  }
+};
+window.PermissionGuard = PermissionGuard;
+/* Spec 1.1 #2: restricted actions surface an ACCESS_DENIED toast, never a
+   silent no-op - the shared deny handler for guard(). */
+window.xenaAccessDenied = function (what) {
+  try { ToastManager.show('Access denied - missing permission' + (what ? ': ' + what : ''), 'error', 3500); }
+  catch (e) { console.warn('ACCESS_DENIED', what); }
+};
+</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audition Dashboard</title>
     <!-- Favicon -->
@@ -1082,6 +1127,67 @@
         .edit-btn:hover{background:var(--accent-cyan);color:#000}
         .del-btn{background:rgba(255,77,109,.1);color:var(--accent-rose);border:1px solid rgba(255,77,109,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500;transition:.2s;font-family:inherit;font-size:.85rem}
         .del-btn:hover{background:var(--accent-rose);color:#000}
+
+        /* v30.0 Phase 1: Feature Access & Permissions matrix (spec 1.4) */
+        .fp-subtabs{display:flex;gap:8px;margin:-6px 0 18px;flex-wrap:wrap}
+        .fp-subtab{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--text-muted);padding:8px 16px;border-radius:10px;cursor:pointer;font:600 .84rem/1 inherit;transition:.2s}
+        .fp-subtab:hover{color:var(--text);border-color:rgba(0,212,255,.5)}
+        .fp-subtab.active{background:rgba(3,209,130,.14);border-color:rgba(3,209,130,.45);color:var(--accent-green)}
+        .fp-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+        .fp-wrap{display:grid;grid-template-columns:minmax(230px,290px) 1fr;gap:16px;align-items:start}
+        .fp-left{display:flex;flex-direction:column;gap:10px;position:sticky;top:10px}
+        .fp-modes{display:flex;gap:6px}
+        .fp-mode{flex:1;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:7px 10px;border-radius:8px;cursor:pointer;font:600 .78rem/1.2 inherit}
+        .fp-mode.active{border-color:rgba(0,212,255,.5);color:var(--accent-cyan);background:rgba(0,212,255,.08)}
+        .fp-search{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.84rem}
+        .fp-list{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow-y:auto;padding-right:2px}
+        .fp-target{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;background:transparent;border:1px solid var(--border);border-radius:10px;padding:9px 12px;cursor:pointer;transition:.15s;color:var(--text);font-family:inherit}
+        .fp-target:hover{border-color:rgba(0,212,255,.45)}
+        .fp-target.sel{border-color:rgba(3,209,130,.55);background:rgba(3,209,130,.09);box-shadow:0 0 0 1px rgba(3,209,130,.25)}
+        .fp-t-name{font-weight:700;font-size:.86rem}
+        .fp-badge{font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:999px}
+        .fp-badge.inh{background:rgba(154,164,178,.12);color:var(--text-muted)}
+        .fp-badge.ovr{background:rgba(255,201,77,.14);color:#ffc94d;border:1px solid rgba(255,201,77,.3)}
+        .fp-pill{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(0,212,255,.1);color:var(--accent-cyan);border:1px solid rgba(0,212,255,.25)}
+        .fp-pill.full{background:rgba(3,209,130,.12);color:var(--accent-green);border-color:rgba(3,209,130,.4)}
+        .fp-right{border:1px solid var(--border);border-radius:14px;padding:14px;background:rgba(255,255,255,.015)}
+        .fp-empty{padding:30px;text-align:center;color:var(--text-muted);font-size:.85rem}
+        .fp-rhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid var(--border)}
+        .fp-rname{font-weight:800;font-size:1rem}
+        .fp-rsub{color:var(--text-muted);font-size:.74rem;margin-top:2px}
+        .fp-rolesel{font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:8px;font-weight:600}
+        .fp-rolesel select{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.8rem}
+        .fp-rolesel-role{background:rgba(185,103,255,.09);border:1px solid rgba(185,103,255,.3);color:var(--accent-purple);padding:7px 12px;border-radius:9px;max-width:420px}
+        .fp-acc{border:1px solid var(--border);border-radius:11px;margin-bottom:8px;overflow:hidden}
+        .fp-acc-head{width:100%;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.025);border:0;padding:10px 12px;cursor:pointer;color:var(--text);font:700 .85rem/1 inherit}
+        .fp-acc-arrow{display:inline-block;transition:.2s;color:var(--accent-cyan);font-size:.7rem}
+        .fp-acc.open .fp-acc-arrow{transform:rotate(90deg)}
+        .fp-acc-title{flex:1;text-align:left}
+        .fp-acc-count{font-size:.7rem;font-weight:700;color:var(--text-muted);background:rgba(255,255,255,.05);padding:3px 9px;border-radius:999px}
+        .fp-acc-body{padding:4px 6px 8px}
+        .fp-row{display:flex;align-items:center;gap:12px;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.05)}
+        .fp-row:last-child{border-bottom:0}
+        .fp-row.off .fp-row-name{color:var(--text-muted)}
+        .fp-row-main{flex:1;min-width:0}
+        .fp-row-name{font-weight:700;font-size:.84rem}
+        .fp-row-key code{font-size:.72rem;color:var(--accent-cyan);background:rgba(0,212,255,.08);padding:1px 7px;border-radius:6px;font-family:ui-monospace,monospace}
+        .fp-row-desc{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+        .fp-ov{font-size:.66rem;font-weight:800;padding:1px 7px;border-radius:999px;margin-left:6px}
+        .ov-add{background:rgba(3,209,130,.14);color:var(--accent-green)}
+        .ov-del{background:rgba(255,77,109,.14);color:var(--accent-rose)}
+        .fp-reset{background:rgba(255,201,77,.12);border:1px solid rgba(255,201,77,.35);color:#ffc94d;width:30px;height:30px;border-radius:8px;cursor:pointer;font:700 .85rem/1 inherit}
+        .fp-reset:hover{background:rgba(255,201,77,.25)}
+        .fp-sw{position:relative;display:inline-block;flex-shrink:0;width:40px;height:22px}
+        .fp-sw input{position:absolute;opacity:0;inset:0;width:100%;height:100%;cursor:pointer;margin:0;z-index:1}
+        .fp-sw-track{display:block;width:40px;height:22px;border-radius:999px;background:rgba(154,164,178,.25);border:1px solid rgba(154,164,178,.35);position:relative;transition:.2s;pointer-events:none}
+        .fp-sw-track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#9aa4b2;transition:.2s}
+        .fp-sw input:checked + .fp-sw-track{background:rgba(3,209,130,.35);border-color:rgba(3,209,130,.6)}
+        .fp-sw input:checked + .fp-sw-track::after{left:20px;background:var(--accent-green)}
+        .fp-savebar{display:flex;align-items:center;gap:10px;justify-content:flex-end;padding-top:12px;margin-top:4px;border-top:1px solid var(--border);flex-wrap:wrap}
+        .fp-dirty{font-size:.74rem;font-weight:700;color:var(--text-muted);margin-right:auto}
+        .fp-dirty.show{color:#ffc94d}
+        .fp-savebar [disabled]{opacity:.45;cursor:not-allowed}
+        @media (max-width:900px){.fp-wrap{grid-template-columns:1fr}.fp-left{position:static}}
 
         /* ═══ Phase 10.18: Current Active Agents — elegant agent cards ═══
            Deterministic-gradient initial avatar + Lark name (Person field,
@@ -4558,6 +4664,16 @@ html{background:var(--bg);min-height:100%}
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-admin"></use></svg>
                         Manage Agents
                     </h3>
+                    <!-- v30.0 Phase 1 (spec 1.4): the Manage Agents page now has two
+                         sub-tabs. "Module Access" is the classic per-module grant
+                         console; "Feature Access & Permissions" swaps in the RBAC
+                         matrix (31 keys x Role Templates x per-user overrides),
+                         lazy-loaded on first open - zero requests until clicked. -->
+                    <div class="fp-subtabs" id="fpSubtabBar">
+                        <button type="button" class="fp-subtab active" id="fpSubtabBtnModules" onclick="fpShowSub('modules')">&#129518; Module Access</button>
+                        <button type="button" class="fp-subtab" id="fpSubtabBtnFeatures" onclick="fpShowSub('features')">&#128272; Feature Access &amp; Permissions</button>
+                    </div>
+                    <div id="adminAgentsFeaturePane" style="display:none"></div>
                     <div class="admin-form">
                         <div class="card" style="background:rgba(185,103,255,.06);border:1px solid rgba(185,103,255,.25);margin-bottom:4px">
                             <h4 style="color:var(--accent-purple);margin-bottom:10px">⚡ Quick Setup</h4>
@@ -11366,6 +11482,314 @@ async function schReqSubmit() {
 }
 
 
+// ═══ v30.0 Phase 1 (spec 1.4): Feature Access & Permissions matrix ═══
+// The RBAC admin console. Lazy-loads the first time the "🔐 Feature Access &
+// Permissions" sub-tab is opened inside Manage Agents; ONE GET carries the
+// 31-key registry + per-role resolved defaults + per-member override state.
+// Saving POSTs one target's {role, grant, revoke} — the backend validates the
+// keys, writes the Access row, logs ACCESS_CHANGE (before/after) and clears
+// the permission cache. All onclick handlers use ARRAY INDEXES (never string
+// interpolation into attributes), so names/emails with quotes stay safe.
+const FP = { loaded:false, loading:false, registry:[], regMap:{}, groups:[], roles:{}, users:[], roleNames:[], roleLevels:{}, mode:'roles', sel:null, q:'', draft:null, dirty:false, openGroups:{}, _uids:[] };
+
+function fpShowSub(which) {
+    const pane = document.getElementById('adminAgentsFeaturePane');
+    if (!pane) return;
+    const form = pane.nextElementSibling; // the classic .admin-form block
+    const bm = document.getElementById('fpSubtabBtnModules'), bf = document.getElementById('fpSubtabBtnFeatures');
+    if (bm) bm.classList.toggle('active', which === 'modules');
+    if (bf) bf.classList.toggle('active', which === 'features');
+    if (which === 'features') {
+        if (form) form.style.display = 'none';
+        pane.style.display = '';
+        if (!FP.loaded && !FP.loading) fpRenderIdle();
+    } else {
+        pane.style.display = 'none';
+        if (form) form.style.display = '';
+    }
+}
+
+function fpRenderIdle() {
+    const pane = document.getElementById('adminAgentsFeaturePane');
+    if (!pane) return;
+    pane.innerHTML = `
+        <div class="card" style="background:rgba(3,209,130,.05);border:1px solid rgba(3,209,130,.22);margin-bottom:16px">
+            <h4 style="color:var(--accent-green);margin-bottom:10px">🔐 Feature Access &amp; Permissions</h4>
+            <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:14px">The enterprise RBAC matrix: 31 granular permission keys across 7 module groups, resolved per member as <b>Role-Template defaults + individual grant/revoke overrides</b>. Every feature the portal gains is gated on these keys at both the UI and API layers — nothing is exposed without permission, and every toggle save writes an ACCESS_CHANGE entry to the Audit Log.</p>
+            <button type="button" class="btn btn-primary" onclick="fpLoad()" style="max-width:340px">🔄 Load Feature Access Matrix</button>
+        </div>`;
+}
+
+async function fpLoad() {
+    const pane = document.getElementById('adminAgentsFeaturePane');
+    if (!pane || FP.loading) return;
+    FP.loading = true;
+    pane.innerHTML = `<div style="padding:30px;text-align:center;color:var(--text-muted)">Loading the feature-permission matrix…</div>`;
+    try {
+        const res = await fetch('/api/admin/feature-permissions', { headers: { 'X-User-Name': loggedUser, 'X-User-Email': loggedEmail } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        FP.registry = d.registry || [];
+        FP.regMap = {}; FP.registry.forEach(r => { FP.regMap[r.key] = r; });
+        FP.groups = []; FP.registry.forEach(r => { if (FP.groups.indexOf(r.module) < 0) FP.groups.push(r.module); });
+        FP.roles = d.roles || {};
+        FP.users = d.users || [];
+        FP.roleNames = d.role_names || Object.keys(FP.roles);
+        FP.roleLevels = d.role_levels || {};
+        FP.loaded = true; FP.loading = false;
+        if (!FP.sel) { FP.mode = 'roles'; FP.sel = FP.roleNames[0] || null; }
+        fpSelect(FP.sel, FP.mode, true);
+    } catch (e) {
+        FP.loading = false;
+        pane.innerHTML = `<div class="card" style="border:1px solid rgba(255,92,108,.35)"><h4 style="color:var(--accent-rose)">Could not load the matrix</h4><p style="color:var(--text-muted);font-size:.85rem">${String(e.message || e)}</p><button type="button" class="btn-sm btn-outline" onclick="fpRenderIdle()">↩ Back</button></div>`;
+    }
+}
+
+function fpSelectByRole(i) { if (FP.roleNames[i]) fpSelect(FP.roleNames[i], 'roles'); }
+function fpSelectByUser(i) { if (FP._uids[i]) fpSelect(FP._uids[i], 'users'); }
+function fpToggleGroupIdx(i) { const g = FP.groups[i]; if (!g) return; FP.openGroups[g] = !FP.openGroups[g]; fpRenderRight(); }
+
+function fpSelect(target, mode, force) {
+    if (!FP.loaded) return;
+    if (!force && FP.draft && FP.dirty) {
+        if (!confirm('Discard unsaved permission changes for this target?')) return;
+    }
+    FP.mode = mode || FP.mode;
+    FP.sel = target;
+    FP.dirty = false;
+    if (FP.mode === 'roles') {
+        const adj = FP.roles[target] || { grant: [], revoke: [] };
+        FP.draft = { kind: 'role', target: target, label: target, role: target,
+                     grant: new Set(adj.grant || []), revoke: new Set(adj.revoke || []), superAdmin: false };
+    } else {
+        const u = FP.users.find(x => (x.email || x.person) === target) || { role: 'Agent', grant: [], revoke: [] };
+        FP.draft = { kind: 'user', target: u.email || target, label: u.person || u.email || target,
+                     role: u.role || 'Agent', grant: new Set(u.grant || []), revoke: new Set(u.revoke || []),
+                     superAdmin: !!u.superAdmin };
+    }
+    FP.openGroups = {}; FP.openGroups[FP.groups[0]] = true;
+    fpRender();
+}
+
+function fpRender() {
+    const pane = document.getElementById('adminAgentsFeaturePane');
+    if (!pane) return;
+    pane.innerHTML = `
+      <div class="fp-head">
+        <div>
+          <h4 style="color:var(--accent-green);margin:0 0 4px">🔐 Feature Access &amp; Permissions</h4>
+          <div style="color:var(--text-muted);font-size:.78rem">31 keys · 7 module groups · Role Templates merged with individual overrides — every save writes an ACCESS_CHANGE audit entry.</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-sm btn-outline" onclick="FP.loaded=false;fpRenderIdle()" title="Reload the matrix from the server">🔄 Reload</button>
+        </div>
+      </div>
+      <div class="fp-wrap">
+        <div class="fp-left">${fpLeftInner()}</div>
+        <div class="fp-right" id="fpRightPane">${fpRightHtml()}</div>
+      </div>`;
+}
+
+function fpLeftInner() {
+    const rolesActive = FP.mode === 'roles';
+    const modeBtns = `
+      <div class="fp-modes">
+        <button type="button" class="fp-mode ${rolesActive ? 'active' : ''}" onclick="fpSelectByRole(0)">🏷️ Role Templates</button>
+        <button type="button" class="fp-mode ${!rolesActive ? 'active' : ''}" onclick="fpSelectByUser(0)">👥 Individual Users</button>
+      </div>`;
+    if (rolesActive) {
+        const rows = FP.roleNames.map((r, i) => {
+            const cnt = ((FP.roles[r] || {}).keys || []).length;
+            const sel = FP.sel === r ? 'sel' : '';
+            return `<button type="button" class="fp-target ${sel}" onclick="fpSelectByRole(${i})">
+                <span class="fp-t-name">${escHtml(r)}</span>
+                <span class="fp-pill ${cnt >= 31 ? 'full' : ''}">${cnt} / 31 keys</span>
+            </button>`;
+        }).join('');
+        return modeBtns + `<div class="fp-list">${rows}</div>`;
+    }
+    const q = FP.q.toLowerCase();
+    const list = FP.users.filter(u => {
+        const s = ((u.person || '') + ' ' + (u.email || '')).toLowerCase();
+        return !q || s.indexOf(q) >= 0;
+    });
+    FP._uids = list.map(u => u.email || u.person);
+    const rows = list.map((u, i) => {
+        const sel = FP.sel === (u.email || u.person) ? 'sel' : '';
+        const cnt = u.superAdmin ? '👑 all (*)' : ((u.effective || []).length + ' keys');
+        return `<button type="button" class="fp-target ${sel}" onclick="fpSelectByUser(${i})">
+            <span class="fp-t-name">${escHtml(u.person || u.email)}</span>
+            <span class="fp-badge ${u.override ? 'ovr' : 'inh'}">${u.override ? '✏️ Custom Override' : '↳ Inherited from Role'}</span>
+            <span class="fp-pill ${u.superAdmin ? 'full' : ''}">${cnt}</span>
+        </button>`;
+    }).join('');
+    return modeBtns + `<input class="fp-search" type="text" placeholder="🔎 Search agents by name or email…" value="${escHtml(FP.q)}" oninput="FP.q=this.value;fpRefreshList()">`
+        + `<div class="fp-list">${rows || '<div style="color:var(--text-muted);font-size:.8rem;padding:8px">No agents match.</div>'}</div>`;
+}
+
+function fpRefreshList() {
+    const el = document.querySelector('.fp-left');
+    if (!el) return;
+    const hadFocus = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('fp-search');
+    el.innerHTML = fpLeftInner();
+    if (hadFocus) {
+        const i = el.querySelector('.fp-search');
+        if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+    }
+}
+
+function fpRoleBase(role, key) {
+    const meta = FP.regMap[key];
+    if (!meta) return false;
+    const lv = FP.roleLevels[role] || 'agent';
+    return lv === 'admin' || meta.levels.indexOf('all') >= 0 || meta.levels.indexOf(lv) >= 0;
+}
+
+function fpBase(key) {
+    if (!FP.draft) return false;
+    if (FP.draft.kind === 'role') return fpRoleBase(FP.draft.role, key);
+    const rk = (FP.roles[FP.draft.role] || {}).keys || [];
+    return rk.indexOf(key) >= 0;
+}
+
+function fpEff(key) {
+    if (!FP.draft) return false;
+    if (FP.draft.revoke.has(key)) return false;
+    if (FP.draft.grant.has(key)) return true;
+    return fpBase(key);
+}
+
+function fpSetKey(key, on) {
+    if (!FP.draft) return;
+    const base = fpBase(key);
+    if (on) {
+        FP.draft.revoke.delete(key);
+        if (!base) FP.draft.grant.add(key); else FP.draft.grant.delete(key);
+    } else {
+        FP.draft.grant.delete(key);
+        if (base) FP.draft.revoke.add(key); else FP.draft.revoke.delete(key);
+    }
+    FP.dirty = true;
+    fpRenderRight();
+}
+
+function fpResetKey(key) {
+    if (!FP.draft) return;
+    FP.draft.grant.delete(key); FP.draft.revoke.delete(key);
+    FP.dirty = true;
+    fpRenderRight();
+}
+
+function fpResetAll() {
+    if (!FP.draft) return;
+    FP.draft.grant.clear(); FP.draft.revoke.clear();
+    FP.dirty = true;
+    fpRenderRight();
+}
+
+function fpRoleChange(role) {
+    if (!FP.draft || !role) return;
+    FP.draft.role = role;
+    FP.dirty = true;
+    fpRenderRight();
+}
+
+function fpRowHtml(r) {
+    const d = FP.draft; if (!d) return '';
+    const on = fpEff(r.key);
+    const granted = d.grant.has(r.key), revoked = d.revoke.has(r.key);
+    const badge = granted ? '<span class="fp-ov ov-add">＋ granted</span>' : (revoked ? '<span class="fp-ov ov-del">− revoked</span>' : '');
+    const hasOvr = (d.kind === 'user' && (granted || revoked));
+    const ki = FP.registry.indexOf(r);
+    const reset = hasOvr ? `<button type="button" class="fp-reset" onclick="fpResetKey(FP.registry[${ki}].key)" title="Reset to ${escHtml(d.role)} default">↩</button>` : '';
+    return `
+    <div class="fp-row ${on ? '' : 'off'}">
+        <label class="fp-sw" title="${on ? 'ON — click to revoke' : 'OFF — click to grant'}">
+            <input type="checkbox" ${on ? 'checked' : ''} onchange="fpSetKey(FP.registry[${ki}].key, this.checked)">
+            <span class="fp-sw-track"></span>
+        </label>
+        <div class="fp-row-main">
+            <div class="fp-row-name">${escHtml(r.name)}${badge}</div>
+            <div class="fp-row-key"><code>${escHtml(r.key)}</code></div>
+            <div class="fp-row-desc">${escHtml(r.desc)}</div>
+        </div>
+        ${reset}
+    </div>`;
+}
+
+function fpRightHtml() {
+    if (!FP.draft) return '<div class="fp-empty">Pick a target on the left.</div>';
+    const d = FP.draft;
+    const roleSel = d.kind === 'user'
+        ? `<label class="fp-rolesel">Role Template:
+               <select onchange="fpRoleChange(this.value)">
+                   ${FP.roleNames.map(r => `<option value="${escHtml(r)}" ${r === d.role ? 'selected' : ''}>${escHtml(r)}</option>`).join('')}
+               </select>
+           </label>`
+        : `<span class="fp-rolesel fp-rolesel-role">🏷️ Role Template — changes apply to everyone inheriting ${escHtml(d.role)} without their own override.</span>`;
+    const effCount = FP.registry.filter(r => fpEff(r.key)).length;
+    const groups = FP.groups.map((g, gi) => {
+        const keys = FP.registry.filter(r => r.module === g);
+        const open = !!FP.openGroups[g];
+        const rows = keys.map(r => fpRowHtml(r)).join('');
+        return `
+        <div class="fp-acc ${open ? 'open' : ''}">
+            <button type="button" class="fp-acc-head" onclick="fpToggleGroupIdx(${gi})">
+                <span class="fp-acc-arrow">▶</span>
+                <span class="fp-acc-title">${escHtml(g)}</span>
+                <span class="fp-acc-count">${keys.filter(r => fpEff(r.key)).length} / ${keys.length} on</span>
+            </button>
+            <div class="fp-acc-body" style="display:${open ? '' : 'none'}">${rows}</div>
+        </div>`;
+    }).join('');
+    const saveBar = `
+        <div class="fp-savebar">
+            <div class="fp-dirty ${FP.dirty ? 'show' : ''}">${FP.dirty ? '● Unsaved changes' : 'All changes saved'}</div>
+            ${d.kind === 'user' ? `<button type="button" class="btn-sm btn-outline" onclick="fpResetAll()">↩ Reset all to role defaults</button>` : ''}
+            <button type="button" class="btn-sm btn-outline" onclick="fpSelect(FP.sel, FP.mode, true)" ${FP.dirty ? '' : 'disabled'}>Discard</button>
+            <button type="button" class="btn btn-primary" style="padding:8px 18px" onclick="fpSave()" ${FP.dirty ? '' : 'disabled'}>💾 Save permissions</button>
+        </div>`;
+    return `
+        <div class="fp-rhead">
+            <div>
+                <div class="fp-rname">${d.kind === 'role' ? '🏷️ ' : '👤 '}${escHtml(d.label)}</div>
+                <div class="fp-rsub">${effCount} of 31 keys effective${d.superAdmin ? ' · 👑 super admin (wildcard *)' : ''}</div>
+            </div>
+            ${roleSel}
+        </div>
+        ${groups}
+        ${saveBar}`;
+}
+
+function fpRenderRight() {
+    const el = document.getElementById('fpRightPane');
+    if (el) el.innerHTML = fpRightHtml();
+}
+
+async function fpSave() {
+    if (!FP.draft || !FP.dirty) return;
+    const d = FP.draft;
+    const body = { kind: d.kind, target: d.target, grant: Array.from(d.grant), revoke: Array.from(d.revoke) };
+    if (d.kind === 'user') body.role = d.role;
+    try {
+        const res = await fetch('/api/admin/feature-permissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-User-Name': loggedUser, 'X-User-Email': loggedEmail },
+            body: JSON.stringify(body)
+        });
+        const j = await res.json();
+        if (!res.ok || !j.success) throw new Error(j.error || ('HTTP ' + res.status));
+        ToastManager.show(`✅ Permissions saved for ${d.label} — ACCESS_CHANGE logged.`, 'success', 4000);
+        const keepSel = FP.sel, keepMode = FP.mode;
+        FP.loaded = false; FP.loading = false; // force a clean reload of the matrix
+        await fpLoad();
+        FP.mode = keepMode; FP.sel = keepSel;
+        fpSelect(keepSel, keepMode, true);
+    } catch (e) {
+        ToastManager.show('Save failed: ' + (e.message || e), 'error', 8000);
+    }
+}
+
 let latestAdminRoles = [];  // role presets only
 // Phase 10.34 (Ahmed): Manage Agents no longer auto-loads on open. The page
 // opens to an idle state with an explicit "Load agents" button; only a click
@@ -14051,7 +14475,7 @@ async function pvStart(email) {
         // that, with a top-level fallback so older backends still work.
         const permsBlock = data.permissions || data;
         const targetMods = Array.isArray(permsBlock.modules) ? permsBlock.modules : String(permsBlock.modules || '').split(',');
-        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, openTabs: openTabs.slice(), activeTab: activeTabId, userPermissions: userPermissions };
+        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, openTabs: openTabs.slice(), activeTab: activeTabId, userPermissions: userPermissions, featurePerms: (APP_STATE.currentUser.permissions || []).slice() };
         previewMode = true;
         previewTargetEmail = email; // Phase 10.26: the fetch wrapper stamps API calls with this
         userModules = targetMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
@@ -14061,6 +14485,10 @@ async function pvStart(email) {
         // exactly as the target's own login would (the backend filters the
         // data itself via X-Preview-As).
         userPermissions = { is_super_admin: !!permsBlock.is_super_admin, modules: userModules.slice(), permissions: permsBlock.permissions || {} };
+        // v30.0 RBAC: preview swaps the feature permissions too, so PermissionGuard
+        // checks reflect exactly what the target would see.
+        APP_STATE.currentUser.permissions = Array.isArray(permsBlock.feature_perms) ? permsBlock.feature_perms : [];
+        APP_STATE.currentUser.featureRole = permsBlock.feature_role || null;
         pvShowBanner(email);
         enforceLocks();
         configureSidebarAndCards();
@@ -14085,6 +14513,7 @@ function pvExit() {
         userModules = previewSaved.modules;
         isAdmin = previewSaved.isAdmin;
         userPermissions = previewSaved.userPermissions || userPermissions; // Phase 10.26: restore own region/ACM scope
+        APP_STATE.currentUser.permissions = previewSaved.featurePerms || []; // v30.0 RBAC: restore own feature keys
         savedTabs = previewSaved.openTabs || null;
         savedActive = previewSaved.activeTab || null;
         previewSaved = null;
@@ -22984,6 +23413,12 @@ if (loggedUser&&loggedUat) {
         .then(r=>r.json())
         .then(d=>{
             userPermissions = d;
+            // v30.0 RBAC: resolved feature permissions land in APP_STATE the
+            // moment auth is known, then one data-perm strip pass runs over
+            // the DOM (Phase 2+ features gate every render behind these keys).
+            APP_STATE.currentUser.permissions = Array.isArray(d.feature_perms) ? d.feature_perms : [];
+            APP_STATE.currentUser.featureRole = d.feature_role || null;
+            try { PermissionGuard.applyToDOM(); } catch (e) {}
             userModules = d.modules || [];
             isAdmin = !!d.is_super_admin;
 
@@ -23042,6 +23477,7 @@ if (loggedUser&&loggedUat) {
             console.error(e);
             ToastManager.show('Could not verify your access. Please refresh the page.', 'error', 10000);
             userPermissions = { is_super_admin:false, modules:[] };
+            APP_STATE.currentUser.permissions = []; // v30.0 RBAC: fail-closed - zero feature keys
             userModules = [];
             isAdmin = false;
             enforceExportLocks();
@@ -28784,7 +29220,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v29.7 source-protect 2026-11-16';
+window.SAM19_BUILD='v30.0 rbac-phase1 2026-11-16';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
