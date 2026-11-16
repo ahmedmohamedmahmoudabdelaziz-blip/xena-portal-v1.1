@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.5 devtools-unlocked 2026-11-17"
+XENA_BUILD = "v34.1.6 kb-backfill-budget 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17115,7 +17115,7 @@ def _kb_fetch_page(tat, page_token="", filter_obj=None, sort_desc=False):
         data = feishu_session.post(
             url, headers={"Authorization": "Bearer %s" % tat,
                           "Content-Type": "application/json"},
-            json=payload, timeout=45).json()
+            json=payload, timeout=20).json()   # v34.1.6: fail fast, a hung fetch must not eat the whole call budget
     except Exception as e:
         return [], "", "network: %s" % e
     if data.get("code") != 0:
@@ -17199,6 +17199,9 @@ def knowledge_backfill():
                         "assets": len(_kb_assets()), "note": "backfill already complete"})
     tat = get_tenant_access_token()
     files_flushed, errors = [], []
+    table_exhausted = False   # v34.1.6: ONLY a completed page with no next
+                              # token means exhaustion -- an empty page_token
+                              # alone also describes "broke mid-first-page".
     try:
         for _ in range(pages):
             if time.time() - t0 > budget:
@@ -17207,7 +17210,16 @@ def knowledge_backfill():
             if ferr:
                 errors.append(ferr)
                 break
+            page_done = True
             for item in items:
+                if time.time() - t0 > budget:
+                    # v34.1.6: stop MID-page so the call always returns before
+                    # Vercel's 60s kill (a killed function never reaches the
+                    # state save below and the page's work is lost). page_token
+                    # is NOT advanced, so the next call re-processes this page
+                    # -- batch lines are keyed by record id, so that is safe.
+                    page_done = False
+                    break
                 rid = item.get("record_id") or ""
                 line = _kb_ticket_line(item.get("fields") or {})
                 flushed, aerr = _kb_append_line(st, rid, line)
@@ -17217,12 +17229,14 @@ def knowledge_backfill():
                     break
                 if flushed:
                     files_flushed.append(flushed)
-            st["page_token"] = nxt
-            if errors or not nxt:
+            if page_done:
+                st["page_token"] = nxt
+                table_exhausted = not nxt
+            if errors or not page_done or not nxt:
                 break
             time.sleep(0.15)   # same GIL-yield pause the other big syncs use
         # Final flush of a partially-filled open batch only when the table is exhausted.
-        if not st["page_token"] and not errors:
+        if table_exhausted and not errors:
             if st.get("open_batch"):
                 fn = st["open_batch"]
                 flushed, aerr = _kb_flush(st, fn, _kb_batch_load(fn))
