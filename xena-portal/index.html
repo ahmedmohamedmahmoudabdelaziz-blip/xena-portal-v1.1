@@ -30747,7 +30747,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.2 select-hotfix-kb-build 2026-11-17';
+window.SAM19_BUILD='v34.1.3 chat-poll-kbfix 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32521,10 +32521,15 @@ function xaFreshness(){
       if(!d.backfill_done){
         hint.textContent = 'KB is still being built \u2014 answers may be incomplete';
         if(xaIsAdmin()){
-          hint.appendChild(document.createTextNode(' \u00B7 '));
+          hint.appendChild(document.createTextNode(' · '));
           var kbBtn = document.createElement('button');
           kbBtn.type = 'button'; kbBtn.className = 'xaKbBtn';
-          kbBtn.textContent = '\u2699 Build KB now';
+          // v34.1.3: while a build loop is running in THIS tab, re-renders
+          // show its live state instead of a fresh enabled button (that is
+          // how parallel loops stacked into the 429 wall).
+          kbBtn.textContent = kbRunning ? (kbStatusText || '⏳ Building KB…') : '⚙ Build KB now';
+          kbBtn.disabled = kbRunning;
+          if(!kbRunning && d.last_error){ kbBtn.title = String(d.last_error).slice(0, 300); }
           kbBtn.onclick = function(){ xaKbBuild(kbBtn); };
           hint.appendChild(kbBtn);
         } else {
@@ -32538,6 +32543,8 @@ function xaFreshness(){
     })
     .catch(function(){});
 }
+var kbRunning = false;
+var kbStatusText = '';
 function xaIsAdmin(){
   // isAdmin is a top-level `let` in the main app script: a shared global
   // LEXICAL binding (bare identifier), NOT a window property -- same
@@ -32547,33 +32554,58 @@ function xaIsAdmin(){
 function xaKbBuild(btn){
   // Admin-only one-click KB backfill: loops the resumable route with a
   // Vercel-Hobby-safe budget until done:true. No DevTools / paste needed.
-  if(btn.disabled) return;
+  // v34.1.3: kbRunning makes the loop SINGLE-FLIGHT per tab (xaFreshness
+  // re-renders used to hand out fresh enabled buttons while old loops kept
+  // running -> parallel loops stacked into the route's own rate limit);
+  // >=12s between call starts keeps one loop under that limit; a 429 now
+  // AUTO-RESUMES instead of dying on "Build failed"; the server's last_error
+  // is surfaced on the button (title + text) so a real failure is readable.
+  if(kbRunning) return;
+  kbRunning = true;
   btn.disabled = true;
-  var iters = 0, lastN = -1, stall = 0;
+  var iters = 0, lastN = -1, stall = 0, rateHits = 0;
+  var finish = function(txt, retryable){
+    btn.textContent = txt;
+    kbStatusText = txt;
+    kbRunning = false;
+    btn.disabled = !retryable;
+  };
   var tick = function(){
     iters++;
     fetch('/api/knowledge/backfill?pages=4&max_seconds=45', {
       method:'POST',
       headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
     }).then(function(r){
-      if(r.status === 401 || r.status === 403){ btn.textContent = '\u2699 Admin only'; return null; }
-      if(!r.ok){ btn.textContent = '\u2699 Build failed \u2014 tap to retry'; btn.disabled = false; return null; }
+      if(r.status === 401 || r.status === 403){ finish('⚙ Admin only', false); return null; }
+      if(r.status === 429){
+        rateHits++;
+        if(rateHits >= 3){ finish('⚙ Server busy — tap to retry', true); return null; }
+        btn.textContent = '⏳ Server busy — auto-retry…';
+        kbStatusText = btn.textContent;
+        setTimeout(tick, 40000);
+        return null;
+      }
+      if(!r.ok){ finish('⚙ Build failed — tap to retry', true); return null; }
+      rateHits = 0;
       return r.json();
     }).then(function(d){
       if(!d) return;
-      if(d.done){ btn.textContent = '\u2705 KB ready'; setTimeout(xaFreshness, 1500); return; }
+      if(d.done){ finish('✅ KB ready', false); setTimeout(xaFreshness, 1500); return; }
       var n = d.processed || 0;
+      var err = (d.errors && d.errors.length ? d.errors[d.errors.length - 1] : (d.last_error || ''));
+      if(err){ btn.title = String(err).slice(0, 300); }
       if(n === lastN){ stall++; } else { stall = 0; lastN = n; }
-      btn.textContent = '\u23F3 Building KB\u2026 ' + n + ' tickets';
-      if(stall >= 2){ btn.textContent = '\u2699 Build stalled \u2014 tap to retry'; btn.disabled = false; return; }
-      if(iters >= 30){ btn.textContent = '\u2699 Paused \u2014 tap to continue'; btn.disabled = false; return; }
-      setTimeout(tick, 2000);
+      btn.textContent = '⏳ Building KB… ' + n + ' tickets';
+      kbStatusText = btn.textContent;
+      if(stall >= 2){ finish(err ? ('⚙ Error: ' + String(err).slice(0, 60)) : '⚙ Build stalled — tap to retry', true); return; }
+      if(iters >= 30){ finish('⚙ Paused — tap to continue', true); return; }
+      setTimeout(tick, 12000);
     }).catch(function(){
-      btn.textContent = '\u2699 Network error \u2014 tap to retry';
-      btn.disabled = false;
+      finish('⚙ Network error — tap to retry', true);
     });
   };
-  btn.textContent = '\u23F3 Building KB\u2026';
+  btn.textContent = '⏳ Building KB…';
+  kbStatusText = btn.textContent;
   tick();
 }
 function addMsg(text, who, isErr){
@@ -32685,12 +32717,44 @@ async function send(){
       body: JSON.stringify({message:text, session_id:sessionId||undefined, personality:personaSel.value})
     });
     var data = await res.json().catch(function(){ return {}; });
-    typing.remove();
-    if(res.ok && data.reply){
+    if(res.status === 202 && data.pending && data.agent_chat_id){
+      // v34.1.3: the agent is still thinking past the server's 48s window
+      // (Vercel Hobby kills functions at 60s — that was the HTTP 504 on rule
+      // questions). The backend handed us the agent_chat_id; poll the result
+      // route every ~4s instead of dying.
       if(data.session_id){ sessionId = data.session_id; localStorage.setItem('xenaChatSess', sessionId); }
-      addMsg(data.reply, 'bot');
-    }else{
-      addMsg(data.error || ('The assistant did not answer (HTTP ' + res.status + '). Try again.'), 'bot', true);
+      var note = document.createElement('div');
+      note.style.cssText = 'font-size:11px;opacity:.65;margin-top:4px';
+      note.textContent = 'Still thinking…';
+      typing.appendChild(note);
+      var polls = 0;
+      while(polls < 40){
+        polls++;
+        await new Promise(function(r2){ setTimeout(r2, 4000); });
+        if(polls === 8){ note.textContent = 'Still working on it…'; }
+        if(polls === 20){ note.textContent = 'Almost there…'; }
+        var rr = await fetch('/api/chat/result?agent_chat_id=' + encodeURIComponent(data.agent_chat_id) + '&session_id=' + encodeURIComponent(sessionId || ''), {
+          headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
+        });
+        var rd = await rr.json().catch(function(){ return {}; });
+        if(rr.status === 202 && rd.pending){ continue; }
+        typing.remove();
+        if(rr.ok && rd.reply){ addMsg(rd.reply, 'bot'); }
+        else{ addMsg(rd.error || ('The assistant did not answer (HTTP ' + rr.status + '). Try again.'), 'bot', true); }
+        busy = false; sendBtn.disabled = false;
+        inputEl.focus();
+        return;
+      }
+      typing.remove();
+      addMsg('The assistant is taking unusually long — please try again in a moment.', 'bot', true);
+    } else {
+      typing.remove();
+      if(res.ok && data.reply){
+        if(data.session_id){ sessionId = data.session_id; localStorage.setItem('xenaChatSess', sessionId); }
+        addMsg(data.reply, 'bot');
+      }else{
+        addMsg(data.error || ('The assistant did not answer (HTTP ' + res.status + '). Try again.'), 'bot', true);
+      }
     }
   }catch(e){
     typing.remove();

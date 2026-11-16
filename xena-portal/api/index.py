@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.2 select-hotfix-kb-build 2026-11-17"
+XENA_BUILD = "v34.1.3 chat-poll-kbfix 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17213,7 +17213,7 @@ def knowledge_backfill():
             st["backfill_done"] = True
             st["last_sync_ms"] = int(time.time() * 1000)
     finally:
-        st["errors"] = (st.get("errors") or []) + errors
+        st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
     done = st["backfill_done"] and not errors
     try:
@@ -17224,7 +17224,8 @@ def knowledge_backfill():
         pass
     return jsonify({"done": done, "processed": st["processed"],
                     "files_written": files_flushed, "assets_total": len(_kb_assets()),
-                    "errors": errors, "hint": "re-invoke until done:true"})
+                    "errors": errors, "last_error": (errors or (st.get("errors") or [""]))[-1],
+                    "hint": "re-invoke until done:true"})
 
 @app.route('/api/knowledge/sync', methods=['GET', 'POST'])
 @rate_limit(12, 60)
@@ -17336,7 +17337,7 @@ def knowledge_sync():
                     files_updated.append(fn)
         st["last_sync_ms"] = now_ms
     finally:
-        st["errors"] = (st.get("errors") or []) + errors
+        st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
     try:
         audit.log(admin_name or "cron", "KNOWLEDGE_SYNC",
@@ -17372,6 +17373,7 @@ def knowledge_freshness():
     st = _kb_state()
     return jsonify({"backfill_done": st["backfill_done"],
                     "last_sync_ms": st["last_sync_ms"],
+                    "last_error": (st.get("errors") or [""])[-1],
                     "processed": st["processed"], "mock": MOCK_MODE})
 
 # ---------------- v34.0 PART 2: Aily chat proxy ----------------
@@ -17470,11 +17472,11 @@ def _aily_chat_stream(tat, message, session_id):
         raise RuntimeError("stream returned no text")
     return reply, sid, acid
 
-def _aily_chat_poll(tat, message, session_id):
-    """Fallback: async chat + poll agent_chats/{id}. NOTE: the poll leg needs
-    the aily:agent_chat:read scope (需审核) -- if Feishu says permission
-    denied we surface NEED_CHAT_READ_SCOPE so the admin can enable exactly
-    that one scope."""
+def _aily_chat_create(tat, message, session_id):
+    """POST /agents/{id}/chats WITHOUT stream (async mode). Returns
+    (agent_chat_id, session_id) in ~1s; the agent keeps thinking server-side
+    and the reply is read back via _aily_chat_await. Needs only the
+    aily:agent_chat:write scope."""
     url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/chats" % AILY_AGENT_ID
     body = {"user_message": {"content": [{"type": "text", "text": message}]}}
     if session_id:
@@ -17488,8 +17490,16 @@ def _aily_chat_poll(tat, message, session_id):
     acid, sid = data.get("agent_chat_id"), data.get("session_id") or session_id or ""
     if not acid:
         raise RuntimeError("chat create returned no agent_chat_id")
+    return acid, sid
+
+def _aily_chat_await(tat, acid, budget):
+    """Poll agent_chats/{id} until the run completes. Returns the reply text
+    (may be "" when the run completed with no text), or None when the agent is
+    STILL RUNNING after `budget` seconds -- callers then hand a 202 to the
+    widget. Raises PermissionError when the aily:agent_chat:read scope
+    (需审核) is missing, RuntimeError on a failed run."""
     poll_url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/agent_chats/%s" % (AILY_AGENT_ID, acid)
-    deadline = time.time() + 45
+    deadline = time.time() + budget
     while time.time() < deadline:
         time.sleep(2)
         try:
@@ -17509,8 +17519,19 @@ def _aily_chat_poll(tat, message, session_id):
             reply = max(texts, key=len).strip() if texts else ""
             if not reply and status.lower() == "failed":
                 raise RuntimeError("agent run failed: %s" % str(pdata)[:200])
-            return reply, sid, acid
-    raise TimeoutError("agent reply timed out after 45s")
+            return reply
+    return None
+
+def _aily_chat_poll(tat, message, session_id):
+    """Legacy wrapper kept for the old call path/pins: create + block up to 45s.
+    NOTE: the poll leg needs the aily:agent_chat:read scope -- if Feishu says
+    permission denied we surface NEED_CHAT_READ_SCOPE so the admin can enable
+    exactly that one scope."""
+    acid, sid = _aily_chat_create(tat, message, session_id)
+    reply = _aily_chat_await(tat, acid, 45)
+    if reply is None:
+        raise TimeoutError("agent reply timed out after 45s")
+    return reply, sid, acid
 
 @app.route('/api/chat', methods=['POST'])
 @rate_limit(15, 60)
@@ -17544,20 +17565,42 @@ def aily_chat():
     tat = _aily_tenant_token()
     if not tat:
         return jsonify({"error": "AILY chat is not configured on the server (FEISHU_APP_ID/SECRET missing)."}), 503
-    via = "stream"
-    try:
-        reply, session_id, acid = _aily_chat_stream(tat, message, session_id)
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 502
-    except Exception as e:
-        logger.warn("aily_chat_stream_failed", error=str(e)[:200])
-        via = "poll"
+    reply, acid, via = "", "", "poll"
+    no_read_scope = bool(redis_get_json("xena:aily_no_read_scope"))
+    if not no_read_scope:
+        # v34.1.3: poll-mode FIRST. Chat create returns in ~1s; we await up to
+        # 48s -- INSIDE the Vercel Hobby 60s function cap that killed long
+        # (rule/KB-search) answers with HTTP 504 in stream mode. Longer agent
+        # runs get a 202 the widget polls via /api/chat/result. The poll leg
+        # needs aily:agent_chat:read; if Feishu denies it we cache that fact
+        # for 10 min and fall back to stream mode (60s cap applies there).
         try:
-            reply, session_id, acid = _aily_chat_poll(tat, message, session_id)
+            acid, session_id = _aily_chat_create(tat, message, session_id)
+            reply = _aily_chat_await(tat, acid, 48)
+            if reply is None:
+                if session_id:
+                    redis_set_json(skey, {"session_id": session_id,
+                                          "personality": personality or stored.get("personality") or ""},
+                                   ttl=CHAT_SESSION_TTL)
+                return jsonify({"pending": True, "agent_chat_id": acid,
+                                "session_id": session_id}), 202
+        except PermissionError:
+            # NOTE: the chat was already created, so the stream fallback below
+            # re-sends the message once -- only until the read scope is enabled.
+            redis_set_json("xena:aily_no_read_scope", {"since": int(time.time())}, ttl=600)
+            no_read_scope = True
+            reply = ""
+        except Exception as e:
+            logger.warn("aily_chat_poll_mode_failed", error=str(e)[:200])
+            return jsonify({"error": "The assistant is busy right now -- try again in a moment."}), 502
+    if no_read_scope:
+        via = "stream"
+        try:
+            reply, session_id, acid = _aily_chat_stream(tat, message, session_id)
         except PermissionError as e:
             return jsonify({"error": str(e)}), 502
-        except Exception as e2:
-            logger.error("aily_chat_poll_failed", error=str(e2)[:200])
+        except Exception as e:
+            logger.error("aily_chat_stream_failed", error=str(e)[:200])
             return jsonify({"error": "The assistant is busy right now -- try again in a moment."}), 502
     if session_id:
         redis_set_json(skey, {"session_id": session_id,
@@ -17569,6 +17612,37 @@ def aily_chat():
         except Exception:
             pass
     return jsonify({"reply": reply, "session_id": session_id, "via": via})
+
+
+@app.route('/api/chat/result', methods=['GET'])
+@rate_limit(40, 60)
+def aily_chat_result():
+    """v34.1.3: widget polling leg for long agent runs. /api/chat returns 202
+    {pending, agent_chat_id, session_id} when the agent is still thinking at
+    the 48s mark; the widget polls this route every ~4s. Each call awaits at
+    most 8s, far inside the Vercel Hobby 60s function cap."""
+    email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    if not email or "@" not in email:
+        return jsonify({"error": "Sign in to use the assistant."}), 401
+    acid = sanitize_text(request.args.get("agent_chat_id", ""), 120)
+    sid  = sanitize_text(request.args.get("session_id", ""), 120)
+    if not acid:
+        return jsonify({"error": "agent_chat_id is required"}), 400
+    if MOCK_MODE:
+        return jsonify({"reply": "[mock] delayed answer", "session_id": sid or "mock_session_1", "via": "mock"})
+    tat = _aily_tenant_token()
+    if not tat:
+        return jsonify({"error": "AILY chat is not configured on the server."}), 503
+    try:
+        reply = _aily_chat_await(tat, acid, 8)
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 502
+    except Exception as e:
+        logger.warn("aily_chat_result_failed", error=str(e)[:200])
+        return jsonify({"error": "The assistant is busy right now -- try again in a moment."}), 502
+    if reply is None:
+        return jsonify({"pending": True, "agent_chat_id": acid, "session_id": sid}), 202
+    return jsonify({"reply": reply, "session_id": sid, "via": "poll"})
 
 
 if __name__ == '__main__':
