@@ -8894,7 +8894,7 @@ function enhanceSelect(select) {
     // 'change' -- so Status / Reason picks never reached the draft (save
     // blocked with "Choose Status and its Decision / Reject reason." and the
     // reason list never rebuilt on status change). #bwRoot selects stay NATIVE.
-    if (select.closest && select.closest('#bwRoot,#bwQueryRoot')) return;
+    if (select.closest && select.closest('#bwRoot,#bwQueryRoot,#xaChatRoot')) return;
     select.dataset.ssEnhanced = '1';
     select.classList.add('ss-native-hidden');
 
@@ -30747,7 +30747,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.1 chat-fab-hotfix 2026-11-17';
+window.SAM19_BUILD='v34.1.2 select-hotfix-kb-build 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32381,6 +32381,9 @@ xa4SettingsEnsure(false);
 #xaChatSend{background:linear-gradient(135deg,#6d28d9,#2563eb);color:#fff}
 #xaChatSend:disabled{opacity:.45;cursor:not-allowed}
 .xaChatHint{font-size:11px;color:#64748b;text-align:center;padding:4px 0 6px;background:#0b1220}
+.xaKbBtn{margin-left:4px;padding:1px 8px;font-size:11px;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.18);color:#c4b5fd;cursor:pointer}
+.xaKbBtn:hover:not(:disabled){background:rgba(124,58,237,.35)}
+.xaKbBtn:disabled{opacity:.75;cursor:default}
 #xaChatPanel.xaWide{width:min(720px,calc(100vw - 24px))}
 .xaPara{margin:0 0 8px}.xaPara:last-child{margin-bottom:0}
 .xaEnt{display:inline-block;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.4);color:#7dd3fc;
@@ -32400,11 +32403,11 @@ xa4SettingsEnsure(false);
   <div id="xaChatPanel" role="dialog" aria-label="Audition Assistance">
     <div class="xaChatHead">
       <span class="xaChatTitle">🤺 Audition Assistance</span>
-      <select id="xaChatPersona" title="Personality">
+      <select id="xaChatPersona" title="Personality" data-no-search>
         <option value="samurai">🗡 Samurai</option>
         <option value="noora">🌸 Noora</option>
       </select>
-      <select id="xaChatLang" title="Voice language">
+      <select id="xaChatLang" title="Voice language" data-no-search>
         <option value="auto">🌐 Auto</option>
         <option value="ar">العربية</option>
         <option value="ur">اردو</option>
@@ -32515,12 +32518,63 @@ function xaFreshness(){
       if(!d) return;
       var hint = document.getElementById('xaChatHint');
       if(!hint) return;
-      if(!d.backfill_done){ hint.textContent = 'KB is still being built \u2014 answers may be incomplete \u00B7 voice supported'; return; }
+      if(!d.backfill_done){
+        hint.textContent = 'KB is still being built \u2014 answers may be incomplete';
+        if(xaIsAdmin()){
+          hint.appendChild(document.createTextNode(' \u00B7 '));
+          var kbBtn = document.createElement('button');
+          kbBtn.type = 'button'; kbBtn.className = 'xaKbBtn';
+          kbBtn.textContent = '\u2699 Build KB now';
+          kbBtn.onclick = function(){ xaKbBuild(kbBtn); };
+          hint.appendChild(kbBtn);
+        } else {
+          hint.appendChild(document.createTextNode(' \u00B7 voice supported'));
+        }
+        return;
+      }
       var mins = d.last_sync_ms ? Math.max(0, Math.round((Date.now() - d.last_sync_ms) / 60000)) : null;
       var fresh = mins === null ? 'KB ready' : (mins < 1 ? 'KB updated just now' : (mins < 60 ? 'KB updated ' + mins + ' min ago' : 'KB updated ' + Math.round(mins / 60) + ' h ago'));
       hint.textContent = fresh + ' \u00B7 voice supported';
     })
     .catch(function(){});
+}
+function xaIsAdmin(){
+  // isAdmin is a top-level `let` in the main app script: a shared global
+  // LEXICAL binding (bare identifier), NOT a window property -- same
+  // lesson as loggedEmail in the v34.1.1 fab hotfix.
+  try{ return (typeof isAdmin !== 'undefined' && !!isAdmin) || !!window.isAdmin; }catch(e){ return false; }
+}
+function xaKbBuild(btn){
+  // Admin-only one-click KB backfill: loops the resumable route with a
+  // Vercel-Hobby-safe budget until done:true. No DevTools / paste needed.
+  if(btn.disabled) return;
+  btn.disabled = true;
+  var iters = 0, lastN = -1, stall = 0;
+  var tick = function(){
+    iters++;
+    fetch('/api/knowledge/backfill?pages=4&max_seconds=45', {
+      method:'POST',
+      headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
+    }).then(function(r){
+      if(r.status === 401 || r.status === 403){ btn.textContent = '\u2699 Admin only'; return null; }
+      if(!r.ok){ btn.textContent = '\u2699 Build failed \u2014 tap to retry'; btn.disabled = false; return null; }
+      return r.json();
+    }).then(function(d){
+      if(!d) return;
+      if(d.done){ btn.textContent = '\u2705 KB ready'; setTimeout(xaFreshness, 1500); return; }
+      var n = d.processed || 0;
+      if(n === lastN){ stall++; } else { stall = 0; lastN = n; }
+      btn.textContent = '\u23F3 Building KB\u2026 ' + n + ' tickets';
+      if(stall >= 2){ btn.textContent = '\u2699 Build stalled \u2014 tap to retry'; btn.disabled = false; return; }
+      if(iters >= 30){ btn.textContent = '\u2699 Paused \u2014 tap to continue'; btn.disabled = false; return; }
+      setTimeout(tick, 2000);
+    }).catch(function(){
+      btn.textContent = '\u2699 Network error \u2014 tap to retry';
+      btn.disabled = false;
+    });
+  };
+  btn.textContent = '\u23F3 Building KB\u2026';
+  tick();
 }
 function addMsg(text, who, isErr){
   var d = document.createElement('div');
