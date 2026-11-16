@@ -1189,6 +1189,100 @@ window.xenaAccessDenied = function (what) {
         .fp-savebar [disabled]{opacity:.45;cursor:not-allowed}
         @media (max-width:900px){.fp-wrap{grid-template-columns:1fr}.fp-left{position:static}}
 
+        /* ═══ v31.0 Phase 2: Command Palette (Ctrl+K) · Hotkey HUD (?) · Undo toast ═══
+           Spec §3.1/3.2/3.4. Every surface below is permission-gated at RUNTIME
+           through PermissionGuard (ux.command_palette / ux.hotkeys /
+           ux.optimistic_undo); restricted agents never see these nodes at all
+           because cpOpen()/hudToggle() refuse to build them. */
+        .cmdk-back{position:fixed;inset:0;z-index:9998;display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 24px;background:rgba(4,6,12,.58);-webkit-backdrop-filter:blur(10px) saturate(1.15);backdrop-filter:blur(10px) saturate(1.15);animation:cmdkFade .16s ease}
+        .cmdk-back.open{display:flex}
+        @keyframes cmdkFade{from{opacity:0}to{opacity:1}}
+        .cmdk-panel{width:620px;max-width:100%;max-height:480px;display:flex;flex-direction:column;overflow:hidden;border-radius:18px;border:1px solid rgba(0,212,255,.32);background:linear-gradient(165deg,rgba(30,34,48,.96),rgba(16,18,28,.98));box-shadow:0 28px 70px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04) inset;animation:cmdkIn .2s cubic-bezier(.2,.9,.3,1.2)}
+        @keyframes cmdkIn{from{transform:translateY(-14px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+        .cmdk-in-wrap{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(var(--ink-rgb),.08);flex-shrink:0}
+        .cmdk-glyph{font-size:1.15rem;line-height:1;filter:drop-shadow(0 0 6px rgba(0,212,255,.55))}
+        .cmdk-input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);font-size:1.02rem;font-weight:600;letter-spacing:.2px;font-family:inherit}
+        .cmdk-input::placeholder{color:var(--text-muted);font-weight:500}
+        .cmdk-badge{flex-shrink:0;padding:4px 10px;border-radius:999px;font-size:.7rem;font-weight:800;letter-spacing:.4px;text-transform:uppercase;background:rgba(var(--ink-rgb),.07);border:1px solid rgba(var(--ink-rgb),.18);color:var(--text-muted);white-space:nowrap}
+        .cmdk-badge.hit{background:rgba(0,212,255,.16);border-color:rgba(0,212,255,.5);color:var(--accent-cyan);box-shadow:0 0 14px rgba(0,212,255,.22)}
+        .cmdk-badge.amb{background:rgba(255,184,0,.15);border-color:rgba(255,184,0,.5);color:var(--accent-amber)}
+        .cmdk-body{flex:1;overflow-y:auto;padding:8px 8px 10px;overscroll-behavior:contain}
+        .cmdk-sec-h{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;font-size:.68rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)}
+        .cmdk-sec-h .cmdk-sec-line{flex:1;height:1px;background:rgba(var(--ink-rgb),.1)}
+        .cmdk-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;cursor:pointer;border:1px solid transparent;transition:background .13s,border-color .13s,transform .13s}
+        .cmdk-row:hover{background:rgba(var(--ink-rgb),.05)}
+        .cmdk-row.sel{background:rgba(0,212,255,.11);border-color:rgba(0,212,255,.42);transform:translateX(2px)}
+        .cmdk-row-ico{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:9px;font-size:.95rem;background:rgba(var(--ink-rgb),.06);border:1px solid rgba(var(--ink-rgb),.1)}
+        .cmdk-row-main{flex:1;min-width:0}
+        .cmdk-row-t{font-size:.9rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cmdk-row-s{font-size:.73rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cmdk-kbd{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:700;color:var(--text);background:rgba(var(--ink-rgb),.08);border:1px solid rgba(var(--ink-rgb),.2);border-bottom-width:2px;white-space:nowrap}
+        .cmdk-row.sel .cmdk-kbd{background:rgba(0,212,255,.2);border-color:rgba(0,212,255,.55);color:#04222b}
+        .cmdk-foot{flex-shrink:0;display:flex;align-items:center;gap:14px;padding:10px 16px;border-top:1px solid rgba(var(--ink-rgb),.08);font-size:.71rem;color:var(--text-muted);flex-wrap:wrap;background:rgba(var(--ink-rgb),.02)}
+        .cmdk-foot .cmdk-kbd{padding:2px 5px;font-size:.64rem}
+        .cmdk-empty{padding:30px 18px;text-align:center;color:var(--text-muted);font-size:.87rem;line-height:1.6}
+        .cmdk-empty b{color:var(--text);display:block;margin-bottom:6px;font-size:.95rem}
+
+        /* Hotkey HUD (?): cheat-sheet listing only PERMITTED shortcuts. */
+        .hk-hud-back{position:fixed;inset:0;z-index:9998;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(4,6,12,.58);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+        .hk-hud-back.open{display:flex}
+        .hk-hud{width:560px;max-width:100%;max-height:min(640px,86vh);display:flex;flex-direction:column;overflow:hidden;border-radius:18px;border:1px solid rgba(185,103,255,.34);background:linear-gradient(165deg,rgba(32,30,48,.96),rgba(16,16,26,.98));box-shadow:0 28px 70px rgba(0,0,0,.6)}
+        .hk-hud-h{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid rgba(var(--ink-rgb),.08);flex-shrink:0}
+        .hk-hud-title{font-size:1.02rem;font-weight:800;color:var(--text);letter-spacing:.3px}
+        .hk-hud-sub{font-size:.74rem;color:var(--text-muted);margin-top:2px}
+        .hk-hud-x{margin-left:auto;flex-shrink:0;width:30px;height:30px;border-radius:9px;border:1px solid rgba(var(--ink-rgb),.16);background:rgba(var(--ink-rgb),.05);color:var(--text-muted);font-size:1.05rem;cursor:pointer;line-height:1}
+        .hk-hud-x:hover{color:var(--accent-rose);border-color:rgba(255,77,109,.5)}
+        .hk-hud-body{flex:1;overflow-y:auto;padding:6px 10px 14px;overscroll-behavior:contain}
+        .hk-grp{padding:12px 10px 4px;font-size:.68rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--accent-purple);opacity:.92}
+        .hk-line{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:9px}
+        .hk-line:hover{background:rgba(var(--ink-rgb),.045)}
+        .hk-keys{flex-shrink:0;display:flex;align-items:center;gap:5px;min-width:132px}
+        .hk-keys .cmdk-kbd{font-size:.7rem;padding:3px 8px}
+        .hk-desc{font-size:.84rem;color:var(--text);line-height:1.45}
+        .hk-desc small{display:block;color:var(--text-muted);font-size:.73rem;margin-top:2px}
+        .hk-hud-foot{flex-shrink:0;padding:10px 20px;border-top:1px solid rgba(var(--ink-rgb),.08);font-size:.72rem;color:var(--text-muted);background:rgba(var(--ink-rgb),.02)}
+
+        /* 5-second grace-period undo toast (ux.optimistic_undo). */
+        .cp-undo{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px 16px;border-radius:12px;border:1px solid rgba(255,184,0,.42);background:linear-gradient(160deg,rgba(46,40,22,.98),rgba(24,22,18,.99));box-shadow:0 8px 24px rgba(0,0,0,.34);animation:toast-in .3s ease;overflow:hidden;max-width:380px}
+        .cp-undo-ico{font-size:1.1rem;line-height:1.2;flex-shrink:0}
+        .cp-undo-body{flex:1;min-width:0;font-size:.87rem;color:var(--text);line-height:1.45}
+        .cp-undo-body b{color:var(--accent-amber)}
+        .cp-undo-btn{flex-shrink:0;align-self:center;padding:6px 14px;border-radius:9px;border:1px solid rgba(255,184,0,.6);background:rgba(255,184,0,.18);color:var(--accent-amber);font-size:.78rem;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:.15s}
+        .cp-undo-btn:hover{background:rgba(255,184,0,.32);box-shadow:0 0 14px rgba(255,184,0,.3)}
+        .cp-undo-btn[disabled]{opacity:.45;cursor:not-allowed}
+        .cp-undo-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:linear-gradient(90deg,var(--accent-amber),var(--accent-rose));transform-origin:left center;animation:cpUndoBar 5s linear forwards}
+        .cp-undo-bar.done{animation:none;transform:scaleX(0)}
+        @keyframes cpUndoBar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+        /* J/K row cursor highlight — applies to any registered list container. */
+        .hk-cursor{outline:2px solid var(--accent-cyan)!important;outline-offset:-2px;box-shadow:0 0 0 3px rgba(0,212,255,.18),0 10px 26px rgba(0,0,0,.3)!important;border-color:rgba(0,212,255,.55)!important;transition:outline-color .12s,box-shadow .12s}
+        .hk-cursor::after{content:'';position:absolute;left:-2px;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--accent-cyan);box-shadow:0 0 10px var(--accent-cyan)}
+
+        /* Header latency pill (ux.sync_telemetry — Phase 4 wiring, node shipped
+           now so the header layout is final; hidden until telemetry is enabled). */
+        .sync-pill{display:none;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.2px;border:1px solid rgba(0,230,118,.42);background:rgba(0,230,118,.12);color:var(--accent-green);white-space:nowrap}
+        .sync-pill.on{display:inline-flex}
+        .sync-pill .sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;flex-shrink:0}
+        .sync-pill.warn{border-color:rgba(255,184,0,.45);background:rgba(255,184,0,.12);color:var(--accent-amber)}
+        .sync-pill.bad{border-color:rgba(255,77,109,.45);background:rgba(255,77,109,.12);color:var(--accent-rose)}
+
+        @media (max-width:640px){
+            .cmdk-back{padding:6vh 10px 16px}
+            .cmdk-panel{max-height:min(70vh,520px);border-radius:14px}
+            .cmdk-in-wrap{padding:13px 14px;gap:9px}
+            .cmdk-input{font-size:.94rem}
+            .cmdk-badge{font-size:.62rem;padding:3px 8px}
+            .cmdk-foot{gap:8px 12px;font-size:.67rem;padding:8px 12px}
+            .cmdk-row{padding:10px;gap:9px}
+            .cmdk-row-ico{width:26px;height:26px;font-size:.85rem}
+            .cmdk-kbd{font-size:.62rem}
+            .hk-hud{max-height:86vh}
+            .hk-hud-h{padding:14px 15px}
+            .hk-line{flex-wrap:wrap;gap:6px}
+            .hk-keys{min-width:0}
+            .cp-undo{max-width:calc(100vw - 20px)}
+        }
+
         /* ═══ Phase 10.18: Current Active Agents — elegant agent cards ═══
            Deterministic-gradient initial avatar + Lark name (Person field,
            zero extra request cost) with the email underneath. Real Lark
@@ -3621,6 +3715,43 @@ html{background:var(--bg);min-height:100%}
         <g id="icon-admin"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g>
     </defs>
 </svg>
+
+<!-- ═══ v31.0 Phase 2: Command Palette (Ctrl+K) + Hotkey HUD (?) ═══
+     Spec §3.1 / §3.2. Both surfaces are rendered on demand by the Phase-2
+     module further down; nothing here is visible until a permitted user
+     triggers it (PermissionGuard: ux.command_palette / ux.hotkeys). -->
+<div class="cmdk-back" id="cmdkOverlay" onclick="if(event.target===this) cpClose()">
+    <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="cmdk-in-wrap">
+            <span class="cmdk-glyph">⌘</span>
+            <input class="cmdk-input" id="cmdkInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Paste a Ticket #, Agency Code or User ID — or type > for commands">
+            <span class="cmdk-badge" id="cmdkBadge">Ready</span>
+        </div>
+        <div class="cmdk-body" id="cmdkResults"><div class="cmdk-empty"><b>Start typing</b>Ticket #, Agency Code, User ID — or <code>&gt;</code> for navigation commands.</div></div>
+        <div class="cmdk-foot">
+            <span><span class="cmdk-kbd">↑↓</span> move</span>
+            <span><span class="cmdk-kbd">Enter</span> run</span>
+            <span><span class="cmdk-kbd">Alt+A</span> audit</span>
+            <span><span class="cmdk-kbd">Alt+D</span> radar</span>
+            <span><span class="cmdk-kbd">Alt+C</span> copy</span>
+            <span style="margin-left:auto"><span class="cmdk-kbd">Esc</span> close</span>
+        </div>
+    </div>
+</div>
+
+<div class="hk-hud-back" id="hotkeyHudOverlay" onclick="if(event.target===this) hudClose()">
+    <div class="hk-hud" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+        <div class="hk-hud-h">
+            <div>
+                <div class="hk-hud-title">⌨️ Keyboard Shortcuts</div>
+                <div class="hk-hud-sub" id="hkHudSub">Only shortcuts your permissions allow are listed here.</div>
+            </div>
+            <button type="button" class="hk-hud-x" onclick="hudClose()" aria-label="Close">×</button>
+        </div>
+        <div class="hk-hud-body" id="hotkeyHudBody"></div>
+        <div class="hk-hud-foot">Press <span class="cmdk-kbd">?</span> again or <span class="cmdk-kbd">Esc</span> to close · single-letter keys stay inactive while you type in a field.</div>
+    </div>
+</div>
 
 <div id="toastContainer"></div>
 
@@ -7452,27 +7583,820 @@ const ToastManager = {
     }
 };
 
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-        clearActiveFilters();
+
+/* ══ v31.0 Phase 2 module: palette + hotkeys + undo (spec §3.1/3.2/3.4) ══ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 2 — COMMAND PALETTE (Ctrl+K / ⌘K) + INSTANT ENTITY ROUTING
+   Spec §3.1. Gates: ux.command_palette (shell) · ux.entity_routing (classifier)
+   · routing.workspace / routing.audit / routing.duplicate_radar (per action).
+   Every action below calls a REAL portal function -- no placeholder verbs:
+     ticket/user  -> /api/query  -> twOpenWorkspace(record_id)
+     agency       -> openInTab('points') -> fetchAgencyData() (/api/search)
+     audit        -> openInTab('admin-audit') -> loadAuditLog()
+     dup radar    -> openInTab('bind-query')/('query') -> bqRunQuery()/runQuery()
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const CP = { open: false, rows: [], sel: 0, raw: '', ent: null };
+
+function cpCan(k) { try { return !!(window.PermissionGuard && PermissionGuard.can(k)); } catch (e) { return false; } }
+function cpEnabled() { return cpCan('ux.command_palette'); }
+function cpRouting() { return cpCan('ux.entity_routing'); }
+
+/* ── Recent entities: localStorage keyed by the signed-in user (spec §3.1) ── */
+function cpRecentKey() {
+    const uid = (loggedEmail || loggedUser || 'anon').toString().toLowerCase();
+    return 'xena.cmdk.recent.' + uid.replace(/[^a-z0-9@._-]/g, '').slice(0, 60);
+}
+function cpRecentList() {
+    try { const a = JSON.parse(localStorage.getItem(cpRecentKey()) || '[]'); return Array.isArray(a) ? a.slice(0, 5) : []; }
+    catch (e) { return []; }
+}
+function cpRecentPush(kind, value, label) {
+    try {
+        const cur = cpRecentList().filter(x => !(x && x.kind === kind && String(x.value) === String(value)));
+        cur.unshift({ kind: kind, value: String(value), label: label || '', ts: Date.now() });
+        localStorage.setItem(cpRecentKey(), JSON.stringify(cur.slice(0, 5)));
+    } catch (e) {}
+}
+function cpRecentClear() { try { localStorage.removeItem(cpRecentKey()); } catch (e) {} }
+
+/* ── Classifier (spec §3.1, portal-tuned) ─────────────────────────────────────
+   Spec priority is command -> ticket -> agency -> user -> ambiguous. Two portal
+   realities shape the regexes:
+     * The portal's agency codes are NUMERIC (backend sanitize_agency_code:
+       ^\d{3,8}$), so "AGY-209" is the only unambiguous agency form; a bare
+       4-5 digit string stays ambiguous exactly as the spec requires.
+     * Real User IDs in the Base are 8 digits, so bare 6-8 digits resolve to
+       User ID -- and ALSO offer the agency actions, because a 6-8 digit string
+       is simultaneously a legal agency code. Nothing is guessed: both readings
+       are rendered and the agent picks with ↑/↓.
+   Copy-paste labels ("UID:", "ID:", "Ticket #", "Agency:", "Numbering:") are
+   stripped before classification, per spec. */
+/* Each entry carries the entity kind it IMPLIES, so stripping a label never
+   destroys the classification signal ("Ticket #386" -> value 386, kind ticket). */
+const CP_LABEL_STRIP = [
+    { re: /^\s*(?:user\s*id|uid|用户id|用户\s*id)\s*[:#-]\s*/i, hint: 'user' },
+    { re: /^\s*(?:ticket\s*(?:#|no\.?|number)?|tkts?|ticketno|工单|票号)\s*[:#-]\s*/i, hint: 'ticket' },
+    { re: /^\s*(?:agency(?:\s*code)?|agy|机构(?:代码)?|代理商)\s*[:#-]\s*/i, hint: 'agency' },
+    { re: /^\s*(?:numbering|编号|request\s*(?:#|no\.?)?)\s*[:#-]\s*/i, hint: 'numbering' },
+    { re: /^\s*(?:id)\s*[:#-]\s*/i, hint: 'user' },
+];
+
+/* Returns { value, hint }. The hint is what the label TOLD us the value is —
+   it is never inferred from the value's shape. */
+function cpStrip(raw) {
+    let v = String(raw == null ? '' : raw).replace(/\u200b|\u200e|\u200f/g, '').trim();
+    v = v.replace(/\s+/g, ' ');
+    let hint = null;
+    /* Explicit portal prefixes (TKT- / AGY-) must survive stripping: check
+       them FIRST, before any label rule can swallow the prefix as a label. */
+    for (let i = 0; i < CP_LABEL_STRIP.length; i++) {
+        if (CP_LABEL_STRIP[i].re.test(v)) { v = v.replace(CP_LABEL_STRIP[i].re, '').trim(); hint = CP_LABEL_STRIP[i].hint; break; }
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    return { value: v.trim(), hint: hint };
+}
+
+function cmdkClassify(raw) {
+    const stripped = cpStrip(raw);
+    const input = stripped.value;
+    const hint = stripped.hint;
+    if (!input) return { kind: 'empty', value: '', badge: 'Ready', cls: '' };
+
+    /* 1) Command mode */
+    if (/^>\s*(.*)$/.test(input)) {
+        return { kind: 'command', value: (input.match(/^>\s*(.*)$/) || [])[1] || '', badge: 'Commands', cls: 'hit' };
+    }
+
+    /* 2) Ticket — only with an explicit TKT- / # prefix (spec) */
+    let m = input.match(/^(?:TKT-?|tkt-?)\s*(\d{2,7})$/i) || input.match(/^#\s*(\d{2,7})$/);
+    if (m) return { kind: 'ticket', value: m[1], badge: 'Ticket #' + m[1], cls: 'hit' };
+
+    /* 3) Agency — explicit AGY- prefix (numeric codes, portal reality) */
+    m = input.match(/^(?:AGY-?|agy-?)\s*(\d{3,8})$/i);
+    if (m) return { kind: 'agency', value: m[1], badge: 'Agency Code ' + m[1], cls: 'hit' };
+    /* 3b) Agency — the spec's alphanumeric shape. A LETTER is mandatory here:
+       a bare 4-6 digit string must never be claimed as an agency code, because
+       spec §3.1 keeps unprefixed 4-5 digits ambiguous and the portal's real
+       agency codes are numeric-only anyway. */
+    m = input.match(/^([A-Z0-9]{4,6})$/);
+    if (m && /[A-Z]/.test(m[1])) return { kind: 'agency', value: m[1], badge: 'Agency Code ' + m[1], cls: 'hit' };
+
+    /* 3c) A stripped label told us what this is — honour it for any digit
+       string the shape rules above cannot distinguish (e.g. "Agency: 209"
+       is a 3-digit number, which no bare-shape rule may claim). */
+    if (hint && /^\d{2,11}$/.test(input)) {
+        if (hint === 'agency') return { kind: 'agency', value: input, badge: 'Agency Code ' + input, cls: 'hit' };
+        if (hint === 'ticket') return { kind: 'ticket', value: input, badge: 'Ticket #' + input, cls: 'hit' };
+        if (hint === 'user') return { kind: 'user', value: input, badge: 'User ID ' + input, cls: 'hit', dualAgency: input.length <= 8 };
+        if (hint === 'numbering') return { kind: 'ticket', value: input, badge: 'Ticket #' + input, cls: 'hit' };
+    }
+
+    /* 4) User ID — 6..11 digits */
+    m = input.match(/^(\d{6,11})$/);
+    if (m) {
+        const dual = m[1].length <= 8; // 6-8 digits is also a legal agency code
+        return { kind: 'user', value: m[1], badge: 'User ID ' + m[1], cls: 'hit', dualAgency: dual };
+    }
+
+    /* 5) Ambiguous — 4..5 digits, no prefix */
+    m = input.match(/^(\d{4,5})$/);
+    if (m) return { kind: 'ambiguous', value: m[1], badge: 'Agency or Ticket #' + m[1], cls: 'amb' };
+
+    return { kind: 'none', value: input, badge: 'No match', cls: '' };
+}
+
+/* ── Clipboard (always available under ux.entity_routing) ─────────────────── */
+function cpCopy(text, label) {
+    const ok = () => { try { ToastManager.show('📋 Copied ' + label + ': ' + text, 'success', 2500); } catch (e) {} };
+    const fallback = () => {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0';
+            document.body.appendChild(ta); ta.select();
+            const done = document.execCommand('copy'); ta.remove();
+            if (done) ok(); else ToastManager.show('Could not copy — long-press to select manually.', 'warning', 4000);
+        } catch (e) { ToastManager.show('Could not copy on this device.', 'warning', 4000); }
+    };
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok).catch(fallback);
+        else fallback();
+    } catch (e) { fallback(); }
+}
+
+/* ── Entity actions: each returns a promise (or void) and closes the palette ── */
+const CP_QUERY_HEAD = () => '/api/query?user=' + encodeURIComponent(loggedUser || '') + '&email=' + encodeURIComponent(loggedEmail || '');
+
+async function cpQueryTickets(field, value) {
+    const r = await fetch(CP_QUERY_HEAD() + '&field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value));
+    let d = {};
+    try { d = await r.json(); } catch (e) { throw new Error('Server timeout: data too large or still loading'); }
+    if (!r.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    return (d && d.results) || [];
+}
+
+/* Ticket -> Workspace. Resolves the numbering to a real record_id first
+   (the portal has no open-by-number primitive), then hands it to the same
+   twOpenWorkspace() every queue card uses. Needs Query Requests access for
+   the resolution step -- a clear toast (never a silent no-op) if it's absent. */
+async function cpOpenTicket(num) {
+    cpRecentPush('ticket', num, 'Ticket #' + num);
+    try {
+        ToastManager.show('🔎 Resolving Ticket #' + num + '…', 'info', 2200);
+        const rows = await cpQueryTickets('numbering', num);
+        if (!rows.length) { ToastManager.show('No request found for Ticket #' + num + '.', 'warning', 5000); return; }
+        const rid = rows[0].record_id;
+        if (!rid) { ToastManager.show('Ticket #' + num + ' has no record id — cannot open it.', 'warning', 5000); return; }
+        twOpenWorkspace(rid);
+    } catch (e) {
+        const msg = String(e.message || e);
+        ToastManager.show(/access denied/i.test(msg)
+            ? '⚠️ Opening a ticket by number needs Query Requests access — ask an admin to enable it.'
+            : '⚠️ Ticket lookup failed: ' + msg, 'error', 8000);
+    }
+}
+
+/* User -> Workspace. Main-table hit opens the ticket workspace; a miss is
+   reported honestly and the Query tab is pre-filled so the agent can widen
+   the search themselves instead of hitting a dead end. */
+async function cpOpenUser(uid) {
+    cpRecentPush('user', uid, 'User ID ' + uid);
+    try {
+        ToastManager.show('🔎 Resolving User ID ' + uid + '…', 'info', 2200);
+        const rows = await cpQueryTickets('user_id', uid);
+        if (!rows.length) {
+            ToastManager.show('No request found for User ID ' + uid + ' — opening Query so you can widen the search.', 'warning', 6000);
+            cpPrefillQuery('user_id', uid);
+            return;
+        }
+        const rid = rows[0].record_id;
+        if (!rid) { cpPrefillQuery('user_id', uid); return; }
+        twOpenWorkspace(rid);
+        if (rows.length > 1) ToastManager.show('User ID ' + uid + ' has ' + rows.length + ' requests — opened the most recent. Full list is in Query.', 'info', 6000);
+    } catch (e) {
+        const msg = String(e.message || e);
+        ToastManager.show(/access denied/i.test(msg)
+            ? '⚠️ Opening a user by ID needs Query Requests access — ask an admin to enable it.'
+            : '⚠️ User lookup failed: ' + msg, 'error', 8000);
+    }
+}
+
+function cpPrefillQuery(field, value) {
+    try {
+        openInTab('query');
+        const f = document.getElementById('qySearchField'), v = document.getElementById('qySearchValue');
+        if (f) f.value = field;
+        if (v) v.value = value;
+        const lbl = document.getElementById('qyValueLabel');
+        if (lbl && f && f.options[f.selectedIndex]) lbl.textContent = f.options[f.selectedIndex].text + ' Value';
+        if (typeof runQuery === 'function') runQuery();
+    } catch (e) {}
+}
+
+/* Agency -> profile & balance: the portal's own point-check page. */
+function cpOpenAgency(code) {
+    cpRecentPush('agency', code, 'Agency ' + code);
+    try {
+        openInTab('points');
+        const ac = document.getElementById('agencyCode');
+        if (ac) ac.value = code;
+        setTimeout(() => { try { fetchAgencyData(); } catch (e) {} }, 30);
+    } catch (e) { ToastManager.show('⚠️ Could not open the agency page: ' + (e.message || e), 'error', 6000); }
+}
+
+/* Entity -> Audit Log: pre-fills the log's own search box and loads it. */
+function cpAuditLookup(value, kind) {
+    try {
+        openInTab('admin-audit');
+        const s = document.getElementById('alSearch');
+        if (s) s.value = value;
+        setTimeout(() => { try { loadAuditLog(); } catch (e) {} }, 30);
+        ToastManager.show('📋 Audit log filtered by ' + (kind || 'entity') + ' ' + value, 'info', 3500);
+    } catch (e) { ToastManager.show('⚠️ Could not open the audit log: ' + (e.message || e), 'error', 6000); }
+}
+
+/* Entity -> duplicate radar. Users/contacts live in the Bind queue's own
+   duplicate scanner; agencies in the universal Query list (every request for
+   that agency). Both are the portal's real duplicate surfaces. */
+function cpRadar(value, kind) {
+    try {
+        if (kind === 'agency') {
+            openInTab('query');
+            const f = document.getElementById('qySearchField'), v = document.getElementById('qySearchValue');
+            if (f) f.value = 'agency_code';
+            if (v) v.value = value;
+            setTimeout(() => { try { runQuery(); } catch (e) {} }, 30);
+            ToastManager.show('📡 Showing every request for Agency ' + value, 'info', 3500);
+        } else {
+            openInTab('bind-query');
+            const f = document.getElementById('bqySearchField'), v = document.getElementById('bqySearchValue');
+            if (f) f.value = 'user_id';
+            if (v) v.value = value;
+            setTimeout(() => { try { bqRunQuery(); } catch (e) {} }, 30);
+            ToastManager.show('📡 Duplicate scan for User ID ' + value, 'info', 3500);
+        }
+    } catch (e) { ToastManager.show('⚠️ Could not open the duplicate radar: ' + (e.message || e), 'error', 6000); }
+}
+
+/* ── Navigation commands (only ones the sidebar actually exposes) ──────────── */
+function cpNavAllowed(navId) {
+    const el = navId ? document.getElementById(navId) : null;
+    if (!el) return true;
+    let n = el;
+    while (n && n !== document.body) {
+        if (n.style && n.style.display === 'none') return false;
+        n = n.parentElement;
+    }
+    return true;
+}
+function cpCommands() {
+    const c = [
+        { icon: '🧭', title: 'Go to My Work', sub: 'Home dashboard', keys: '', nav: 'nav-my-work', run: () => openInTab('my-work') },
+        { icon: '🎫', title: 'Go to Live Ticket Queue', sub: 'Pending tickets', keys: '', nav: 'nav-live-tickets', run: () => openInTab('live-tickets') },
+        { icon: '🕵️', title: 'Go to Under Investigation', sub: 'Requests in review', keys: '', nav: 'nav-tickets-pending', run: () => openInTab('tickets-pending') },
+        { icon: '🔍', title: 'Go to Query Requests', sub: 'Universal query', keys: '', nav: 'nav-query', run: () => openInTab('query') },
+        { icon: '🔗', title: 'Go to Query Bind Requests', sub: 'Bind duplicate search', keys: '', nav: 'nav-bind-query', run: () => openInTab('bind-query') },
+        { icon: '⚡', title: 'Go to Audit', sub: 'Audit workstation', keys: '', nav: 'nav-audit', run: () => openInTab('audit') },
+        { icon: '📋', title: 'Go to Audit Log', sub: 'Action ledger', keys: '', perm: 'routing.audit', nav: 'nav-admin-audit', run: () => openInTab('admin-audit') },
+        { icon: '🗓️', title: 'Go to Audition Schedule', sub: 'Weekly coverage grid', keys: '', nav: 'nav-audition-schedule', run: () => openInTab('audition-schedule') },
+        { icon: '🎤', title: 'Go to Audition Status', sub: 'Live presence board', keys: '', nav: 'nav-audition-status', run: () => openInTab('audition-status') },
+        { icon: '📊', title: 'Go to Analytics Report', sub: 'Period analytics', keys: '', nav: 'nav-analytics', run: () => openInTab('analytics') },
+        { icon: '🎯', title: 'Go to Check Agency Target', sub: 'Agency target lookup', keys: '', nav: 'nav-target', run: () => openInTab('target') },
+        { icon: '🌗', title: 'Toggle Theme', sub: 'Switch dark / light', keys: '', run: () => { try { toggleTheme(); } catch (e) {} } },
+        { icon: '🧹', title: 'Clear Active Filters', sub: 'Reset analytics filters', keys: '', run: () => { try { clearActiveFilters(); } catch (e) {} } },
+    ];
+    return c.filter(x => (!x.perm || cpCan(x.perm)) && cpNavAllowed(x.nav));
+}
+
+/* ── Row building + render ────────────────────────────────────────────────── */
+function cpBuild() {
+    const rows = [];
+    let head = '';
+    const ent = cmdkClassify(CP.raw);
+    CP.ent = ent;
+
+    const push = (o) => { o._i = rows.length; rows.push(o); };
+
+    if (ent.kind === 'command') {
+        const q = ent.value.toLowerCase();
+        const list = cpCommands().filter(c => !q || (c.title + ' ' + c.sub).toLowerCase().includes(q));
+        head = '<div class="cmdk-sec-h">Commands<span class="cmdk-sec-line"></span>' + list.length + '</div>';
+        list.forEach(c => push({ icon: c.icon, title: c.title, sub: c.sub, keys: '↵', run: c.run }));
+        if (!list.length) head += '<div class="cmdk-empty"><b>No command matches “' + escHtml(ent.value) + '”</b>Type <code>&gt;</code> alone to see the full list.</div>';
+    } else if (ent.kind === 'empty') {
+        const rec = cpRecentList();
+        /* Spec §3.1 names these three explicitly in the empty state; they are
+           appended only if the agent actually has them (cpCommands filters). */
+        const all = cpCommands();
+        const cmds = all.filter(c => /Audit Log|Audition Schedule|Toggle Theme/.test(c.title))
+            .concat(all.filter(c => !/Audit Log|Audition Schedule|Toggle Theme/.test(c.title)).slice(0, 2));
+        head = '';
+        if (rec.length) {
+            head += '<div class="cmdk-sec-h">Recent entities<span class="cmdk-sec-line"></span>' + rec.length + '</div>';
+            rec.forEach(r => {
+                const ico = r.kind === 'ticket' ? '🎫' : r.kind === 'user' ? '👤' : '🏦';
+                push({
+                    icon: ico, title: r.label || (r.kind + ' ' + r.value), sub: 'Saved ' + cpHumanAgo(r.ts), keys: '↵',
+                    run: () => (r.kind === 'ticket' ? cpOpenTicket(r.value) : r.kind === 'user' ? cpOpenUser(r.value) : cpOpenAgency(r.value))
+                });
+            });
+        }
+        head += '<div class="cmdk-sec-h">Quick commands<span class="cmdk-sec-line"></span>' + cmds.length + '</div>';
+        cmds.forEach(c => push({ icon: c.icon, title: c.title, sub: c.sub, keys: '↵', run: c.run }));
+    } else if (ent.kind === 'ticket') {
+        const v = ent.value;
+        head = '<div class="cmdk-sec-h">Ticket #' + escHtml(v) + '<span class="cmdk-sec-line"></span></div>';
+        if (cpCan('routing.workspace')) push({ icon: '🎫', title: 'Open Ticket in Workspace', sub: 'Resolve numbering → open the ticket', keys: '↵', run: () => cpOpenTicket(v) });
+        if (cpCan('routing.audit')) push({ icon: '📋', title: 'Search Ticket in Audit Log', sub: 'Every logged action on this ticket', keys: 'Alt+A', run: () => cpAuditLookup(v, 'Ticket #') });
+        push({ icon: '📋', title: 'Copy Clean Ticket ID', sub: v, keys: 'Alt+C', run: () => cpCopy(v, 'Ticket ID') });
+    } else if (ent.kind === 'agency') {
+        const v = ent.value;
+        head = '<div class="cmdk-sec-h">Agency ' + escHtml(v) + '<span class="cmdk-sec-line"></span></div>';
+        if (cpCan('routing.workspace')) push({ icon: '🏦', title: 'Open Agency Profile & Balance', sub: 'Check Agency Points page, auto-loaded', keys: '↵', run: () => cpOpenAgency(v) });
+        if (cpCan('routing.audit')) push({ icon: '📋', title: 'Filter Audit Log by Agency', sub: 'Audit ledger filtered on ' + v, keys: 'Alt+A', run: () => cpAuditLookup(v, 'Agency') });
+        if (cpCan('routing.duplicate_radar')) push({ icon: '📡', title: 'Scan Agency in Duplicate Radar', sub: 'Query Requests — all requests for this agency', keys: 'Alt+D', run: () => cpRadar(v, 'agency') });
+        push({ icon: '📋', title: 'Copy Clean Agency Code', sub: v, keys: 'Alt+C', run: () => cpCopy(v, 'Agency Code') });
+    } else if (ent.kind === 'user') {
+        const v = ent.value;
+        head = '<div class="cmdk-sec-h">User ID ' + escHtml(v) + '<span class="cmdk-sec-line"></span></div>';
+        if (cpCan('routing.workspace')) push({ icon: '👤', title: 'Open User in Workspace', sub: 'Resolve user → open their request', keys: '↵', run: () => cpOpenUser(v) });
+        if (cpCan('routing.audit')) push({ icon: '📋', title: 'Search Audit Log for User', sub: 'Audit ledger filtered on ' + v, keys: 'Alt+A', run: () => cpAuditLookup(v, 'User ID') });
+        if (cpCan('routing.duplicate_radar')) push({ icon: '📡', title: 'Check Duplicate Radar & Blacklist', sub: 'Bind queue duplicate scan on ' + v, keys: 'Alt+D', run: () => cpRadar(v, 'user') });
+        push({ icon: '📋', title: 'Copy Clean User ID', sub: v, keys: 'Alt+C', run: () => cpCopy(v, 'User ID') });
+        if (ent.dualAgency) {
+            head += '<div class="cmdk-sec-h">Also a valid Agency Code<span class="cmdk-sec-line"></span>' + v + '</div>';
+            if (cpCan('routing.workspace')) push({ icon: '🏦', title: 'Open as Agency Profile & Balance', sub: v + ' also fits the agency code format', keys: '', run: () => cpOpenAgency(v) });
+            if (cpCan('routing.duplicate_radar')) push({ icon: '📡', title: 'Scan as Agency Requests', sub: 'All requests filed under agency ' + v, keys: 'Alt+D', run: () => cpRadar(v, 'agency') });
+        }
+    } else if (ent.kind === 'ambiguous') {
+        const v = ent.value;
+        head = '<div class="cmdk-sec-h">Possible Ticket #' + escHtml(v) + ' or Agency<span class="cmdk-sec-line"></span></div>';
+        if (cpCan('routing.workspace')) {
+            push({ icon: '🎫', title: 'Open as Ticket in Workspace', sub: 'Treat ' + v + ' as a ticket number', keys: '↵', run: () => cpOpenTicket(v) });
+            push({ icon: '🏦', title: 'Open as Agency Profile & Balance', sub: 'Treat ' + v + ' as an agency code', keys: '↵', run: () => cpOpenAgency(v) });
+        }
+        if (cpCan('routing.audit')) push({ icon: '📋', title: 'Search Audit Log for ' + v, sub: 'Matches either reading', keys: 'Alt+A', run: () => cpAuditLookup(v, 'ID') });
+        if (cpCan('routing.duplicate_radar')) push({ icon: '📡', title: 'Scan Agency Requests', sub: 'All requests filed under ' + v, keys: 'Alt+D', run: () => cpRadar(v, 'agency') });
+        push({ icon: '📋', title: 'Copy Clean Number', sub: v, keys: 'Alt+C', run: () => cpCopy(v, 'Number') });
+    } else {
+        head = '<div class="cmdk-empty"><b>No entity detected</b>Try <code>#386</code> for a ticket, <code>AGY-209</code> for an agency, or an 8-digit User ID — or <code>&gt;</code> for commands.</div>';
+    }
+
+    CP.rows = rows;
+    /* per-row index injection — user text NEVER goes into an onclick string */
+    let html = head;
+    if (rows.length) {
+        let out = '';
+        rows.forEach((r, i) => {
+            const kbd = r.keys ? '<span class="cmdk-kbd">' + escHtml(r.keys) + '</span>' : '';
+            out += '<div class="cmdk-row" data-i="' + i + '"><span class="cmdk-row-ico">' + r.icon + '</span>'
+                + '<span class="cmdk-row-main"><span class="cmdk-row-t">' + escHtml(r.title) + '</span>'
+                + (r.sub ? '<span class="cmdk-row-s">' + escHtml(r.sub) + '</span>' : '') + '</span>' + kbd + '</div>';
+        });
+        html += out;
+    }
+    return { html: html, badge: ent.badge, cls: ent.cls, count: rows.length };
+}
+
+function cpHumanAgo(ts) {
+    const d = Date.now() - (ts || 0);
+    if (d < 60000) return 'just now';
+    if (d < 3600000) return Math.floor(d / 60000) + 'm ago';
+    if (d < 86400000) return Math.floor(d / 3600000) + 'h ago';
+    return Math.floor(d / 86400000) + 'd ago';
+}
+
+function cpRender(keepSel) {
+    const box = document.getElementById('cmdkResults');
+    const badgeEl = document.getElementById('cmdkBadge');
+    if (!box) return;
+    const built = cpBuild();
+    box.innerHTML = built.html;
+    if (badgeEl) { badgeEl.className = 'cmdk-badge ' + (built.cls || ''); badgeEl.textContent = built.badge; }
+    if (!keepSel) CP.sel = 0;
+    if (CP.sel >= CP.rows.length) CP.sel = Math.max(0, CP.rows.length - 1);
+    cpPaintSel();
+    box.querySelectorAll('.cmdk-row').forEach(el => {
+        el.onclick = () => { CP.sel = parseInt(el.dataset.i, 10) || 0; cpRunSel(); };
+        el.onmouseenter = () => { CP.sel = parseInt(el.dataset.i, 10) || 0; cpPaintSel(); };
+    });
+}
+
+function cpPaintSel() {
+    const box = document.getElementById('cmdkResults');
+    if (!box) return;
+    box.querySelectorAll('.cmdk-row').forEach((el, i) => {
+        const on = i === CP.sel;
+        el.classList.toggle('sel', on);
+        if (on) { try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+    });
+}
+
+function cpRunSel() {
+    const r = CP.rows[CP.sel];
+    if (!r) return;
+    cpClose();
+    try { const out = r.run(); if (out && out.catch) out.catch(e => ToastManager.show('⚠️ ' + (e.message || e), 'error', 7000)); } catch (e) { ToastManager.show('⚠️ ' + (e.message || e), 'error', 7000); }
+}
+
+/* Alt+A / Alt+D / Alt+C dispatch for the CURRENT entity (spec action hints) */
+function cpAltAction(key) {
+    const ent = CP.ent || cmdkClassify(CP.raw);
+    if (!ent || !ent.value) return false;
+    if (key === 'c') { cpClose(); cpCopy(ent.value, ent.kind === 'ticket' ? 'Ticket ID' : ent.kind === 'agency' ? 'Agency Code' : ent.kind === 'user' ? 'User ID' : 'Number'); return true; }
+    if (key === 'a') {
+        if (!cpCan('routing.audit')) { try { window.xenaAccessDenied('routing.audit'); } catch (e) {} return true; }
+        cpClose(); cpAuditLookup(ent.value, ent.kind === 'agency' ? 'Agency' : ent.kind === 'ticket' ? 'Ticket #' : 'User ID'); return true;
+    }
+    if (key === 'd') {
+        if (!cpCan('routing.duplicate_radar')) { try { window.xenaAccessDenied('routing.duplicate_radar'); } catch (e) {} return true; }
+        cpClose(); cpRadar(ent.value, (ent.kind === 'agency' || ent.dualAgency) ? 'agency' : 'user'); return true;
+    }
+    return false;
+}
+
+/* ── Open / close / toggle ─────────────────────────────────────────────────── */
+function cpIsOpen() { return !!CP.open; }
+
+function cpOpen(prefill) {
+    if (!cpEnabled()) { try { window.xenaAccessDenied('ux.command_palette'); } catch (e) {} return; }
+    const ov = document.getElementById('cmdkOverlay'), inp = document.getElementById('cmdkInput');
+    if (!ov || !inp) return;
+    CP.open = true; CP.raw = ''; CP.sel = 0;
+    if (prefill) { CP.raw = String(prefill); inp.value = CP.raw; } else { inp.value = ''; }
+    cpRender(false);
+    ov.classList.add('open');
+    setTimeout(() => { try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {} }, 30);
+}
+
+function cpClose() {
+    const ov = document.getElementById('cmdkOverlay'), inp = document.getElementById('cmdkInput');
+    CP.open = false;
+    if (ov) ov.classList.remove('open');
+    if (inp) { inp.value = ''; inp.blur(); }
+}
+
+function cpToggle() { if (CP.open) cpClose(); else cpOpen(); }
+
+function cpSetInput(v) {
+    CP.raw = String(v == null ? '' : v);
+    const inp = document.getElementById('cmdkInput');
+    if (inp && inp.value !== CP.raw) inp.value = CP.raw;
+    cpRender(false);
+}
+
+/* ── Palette input wiring: live classification incl. the paste event ────────
+   Spec §3.1: "Whenever the input value changes (especially on paste event)".
+   The paste handler defers to the next tick so the input already holds the
+   pasted text when the classifier runs. */
+(function initCmdkInput() {
+    const bind = () => {
+        const inp = document.getElementById('cmdkInput');
+        if (!inp || inp.dataset.cpBound === '1') return;
+        inp.dataset.cpBound = '1';
+        inp.addEventListener('input', () => cpSetInput(inp.value));
+        inp.addEventListener('paste', () => setTimeout(() => cpSetInput(inp.value), 0));
+        inp.addEventListener('keydown', (e) => {
+            /* keep the palette's own keys from bubbling into the global router */
+            if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp') e.stopPropagation();
+        });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+    else bind();
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 2 — KEYBOARD-FIRST NAVIGATION & HOTKEY HUD (spec §3.2)
+   Gate: ux.hotkeys. Focus-safety rule is enforced in ONE place (hkFocusSafe)
+   and every global single-key path consults it first.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function hkEnabled() { return cpCan('ux.hotkeys'); }
+
+/* Spec §3.2 focus-safety rule: abort single-key shortcuts while the user is
+   typing. Deliberately checks a closed set -- never a generic tag guess. */
+function hkFocusSafe() {
+    const a = document.activeElement;
+    if (!a) return true;
+    const tag = (a.tagName || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
+    if (a.isContentEditable) return false;
+    if (a.getAttribute && a.getAttribute('contenteditable') === 'true') return false;
+    if (a.closest && a.closest('[contenteditable="true"]')) return false;
+    return true;
+}
+
+/* ── J/K row cursor ───────────────────────────────────────────────────────────
+   The portal has six real list containers; the first VISIBLE one that actually
+   holds rows is the "active table/queue" of spec §3.2. Wrapping is intentional:
+   holding J at the bottom loops back to the top instead of dead-ending. */
+const HK_LISTS = [
+    { box: 'ltQueueGrid', row: '.ltq-card', open: (el) => { const r = el.dataset.ltqRid || (el.getAttribute('onclick') || '').match(/'([^']+)'/); if (r) twOpenWorkspace(Array.isArray(r) ? r[1] : r); } },
+    { box: 'bqResults', row: '.qy-card', open: (el) => { const rid = el.dataset.rid; if (rid) bwOpen(rid); } },
+    { box: 'qyResults', row: '.qy-card', open: (el) => { const rid = el.querySelector('[onclick*="qyOpenInWorkspace"]'); if (rid) { const m = (rid.getAttribute('onclick') || '').match(/'([^']+)'/); if (m) qyOpenInWorkspace(m[1]); } } },
+    { box: 'bqyResults', row: '.qy-card', open: (el) => { const rid = el.dataset.rid; if (rid) bwOpen2(rid); } },
+    { box: 'auditLogList', row: '.audit-row-v2', open: null },
+    { box: 'tiResults', row: '.ltq-card, .qy-card', open: null }
+];
+
+let hkListIdx = -1;
+let hkRowIdx = -1;
+
+function hkActiveList() {
+    for (let i = 0; i < HK_LISTS.length; i++) {
+        const cfg = HK_LISTS[i];
+        const box = document.getElementById(cfg.box);
+        if (!box) continue;
+        let vis = true, n = box;
+        while (n && n !== document.body) { if (n.style && n.style.display === 'none') { vis = false; break; } n = n.parentElement; }
+        if (!vis) continue;
+        const rows = box.querySelectorAll(cfg.row);
+        if (rows.length) return { cfg: cfg, box: box, rows: rows, idx: i };
+    }
+    return null;
+}
+
+function hkCursorClear() {
+    document.querySelectorAll('.hk-cursor').forEach(el => el.classList.remove('hk-cursor'));
+}
+
+function hkMove(dir) {
+    if (!hkEnabled()) return false;
+    const L = hkActiveList();
+    if (!L) {
+        if (dir === 1 || dir === -1) {
+            try { ToastManager.show('No list on this page to move through — open a queue or search result first.', 'info', 3000); } catch (e) {}
+        }
+        return false;
+    }
+    hkCursorClear();
+    if (hkListIdx !== L.idx) { hkListIdx = L.idx; hkRowIdx = -1; }
+    const n = L.rows.length;
+    hkRowIdx = (hkRowIdx + dir + n) % n;
+    const el = L.rows[hkRowIdx];
+    if (el) {
+        el.classList.add('hk-cursor');
+        try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    }
+    return true;
+}
+
+function hkOpenCursor() {
+    const L = hkActiveList();
+    if (!L || !L.rows.length) return false;
+    if (hkListIdx !== L.idx || hkRowIdx < 0) return false;
+    const el = L.rows[Math.min(hkRowIdx, L.rows.length - 1)];
+    if (!el) return false;
+    const cfg = L.cfg;
+    if (cfg.open) { cfg.open(el); return true; }
+    /* Containers without an open verb just re-emit the row's own click. */
+    try { el.click(); return true; } catch (e) { return false; }
+}
+
+/* ── Hotkey HUD (?) ──────────────────────────────────────────────────────────
+   Spec §3.2: "dynamically listing only shortcuts for features the user has
+   permission to access" -- so the whole sheet is built from permission checks,
+   never a static list with greyed-out rows. */
+function hudGroups() {
+    const g = [];
+    const base = [];
+    if (cpCan('ux.command_palette')) base.push({ keys: ['Ctrl', 'K'], desc: 'Open the Command Palette', note: 'Paste an entity or type > for commands' });
+    base.push({ keys: ['J'], desc: 'Move down one row', note: 'Active queue / result list' });
+    base.push({ keys: ['K'], desc: 'Move up one row', note: 'Active queue / result list' });
+    base.push({ keys: ['↓'], desc: 'Move down one row', note: 'Same as J' });
+    base.push({ keys: ['↑'], desc: 'Move up one row', note: 'Same as K' });
+    base.push({ keys: ['Enter'], desc: 'Open the highlighted row', note: 'Workspace or inspector' });
+    base.push({ keys: ['Esc'], desc: 'Close the top-most overlay', note: 'Palette, HUD, lightbox, drawer, filters' });
+    base.push({ keys: ['Alt', '1-9'], desc: 'Switch to tab N', note: 'Matches the visible tab bar order' });
+    base.push({ keys: ['Ctrl', 'Enter'], desc: 'Submit & resolve the open form', note: 'Works in the ticket workspace' });
+    base.push({ keys: ['?'], desc: 'Toggle this cheat sheet', note: 'Only permitted shortcuts are listed' });
+    g.push({ name: 'Navigation', items: base });
+
+    if (cpCan('ux.entity_routing')) {
+        const ent = [{ keys: ['Alt', 'C'], desc: 'Copy the clean entity ID', note: 'Ticket / agency / user in the palette' }];
+        if (cpCan('routing.audit')) ent.push({ keys: ['Alt', 'A'], desc: 'Open the audit log for this entity', note: 'From the palette' });
+        if (cpCan('routing.duplicate_radar')) ent.push({ keys: ['Alt', 'D'], desc: 'Run the duplicate radar', note: 'From the palette' });
+        if (cpCan('routing.workspace')) ent.unshift({ keys: ['Enter'], desc: 'Route the entity into its workspace', note: 'From the palette' });
+        g.push({ name: 'Entity routing', items: ent });
+    }
+    if (cpCan('ux.optimistic_undo')) g.push({ name: 'Safety', items: [{ keys: ['↩'], desc: 'Undo the last status change', note: '5-second grace period in the toast' }] });
+    return g;
+}
+
+function hudRender() {
+    const body = document.getElementById('hotkeyHudBody');
+    if (!body) return;
+    const groups = hudGroups();
+    let html = '';
+    groups.forEach(gr => {
+        html += '<div class="hk-grp">' + escHtml(gr.name) + '</div>';
+        gr.items.forEach(it => {
+            const keys = it.keys.map(k => '<span class="cmdk-kbd">' + escHtml(k) + '</span>').join('');
+            html += '<div class="hk-line"><span class="hk-keys">' + keys + '</span>'
+                + '<span class="hk-desc">' + escHtml(it.desc) + (it.note ? '<small>' + escHtml(it.note) + '</small>' : '') + '</span></div>';
+        });
+    });
+    body.innerHTML = html;
+    const sub = document.getElementById('hkHudSub');
+    if (sub) {
+        const n = groups.reduce((a, g) => a + g.items.length, 0);
+        sub.textContent = n + ' shortcut' + (n === 1 ? '' : 's') + ' available to you — restricted keys are simply absent.';
+    }
+}
+
+function hudOpen() {
+    if (!hkEnabled()) { try { window.xenaAccessDenied('ux.hotkeys'); } catch (e) {} return; }
+    const ov = document.getElementById('hotkeyHudOverlay');
+    if (!ov) return;
+    hudRender();
+    ov.classList.add('open');
+}
+function hudClose() { const ov = document.getElementById('hotkeyHudOverlay'); if (ov) ov.classList.remove('open'); }
+function hudIsOpen() { const ov = document.getElementById('hotkeyHudOverlay'); return !!(ov && ov.classList.contains('open')); }
+function hudToggle() { if (hudIsOpen()) hudClose(); else hudOpen(); }
+
+/* ── Esc stack: close exactly ONE top-most layer per press (spec §3.2) ─────── */
+function hkCloseTopOverlay() {
+    /* 1) Command palette */
+    if (cpIsOpen()) { cpClose(); return true; }
+    /* 2) Hotkey HUD */
+    if (hudIsOpen()) { hudClose(); return true; }
+    /* 3) Image lightbox */
+    const lb = document.getElementById('imgLightboxOverlay');
+    if (lb && getComputedStyle(lb).display !== 'none') { try { closeImageLightbox(); return true; } catch (e) {} }
+    /* 4) In-page media modal (video / file preview) */
+    if (document.getElementById('bwFileOverlay')) { try { bwCloseFileModal(); return true; } catch (e) {} }
+    /* 5) Duplicate-radar slide-over drawers (both bind channels) */
+    const d1 = document.getElementById('bwDupDrawer'), d2 = document.getElementById('bwDupDrawer2');
+    if (d2 && d2.classList.contains('open')) { try { bwRadarToggleMatches2(false); return true; } catch (e) {} }
+    if (d1 && d1.classList.contains('open')) { try { bwRadarToggleMatches(false); return true; } catch (e) {} }
+    const ad = document.getElementById('auditDupDrawer');
+    if (ad && ad.classList.contains('open')) { try { auditCloseDupDrawer(); return true; } catch (e) {} }
+    /* 6) Portaled popovers */
+    try { if (typeof ppCloseAnyPortaled === 'function') ppCloseAnyPortaled(); } catch (e) {}
+    return false;
+}
+
+/* ── UndoToast: 5-second grace period (spec §3.4) ────────────────────────────
+   Optimistic UI + a delayed commit. Undo cancels the timer AND the request;
+   leaving the page flushes it so nothing is silently lost. Financial actions
+   never enter this path (they use the synchronous confirm→POST flow). */
+const UndoToast = {
+    active: null,
+    can() { return cpCan('ux.optimistic_undo'); },
+    /* opts: { html, icon, apply(), revert(), commit(), onDone(msg) } */
+    start(opts) {
+        this.flush('pagehide');
+        const ms = 5000;
+        const container = document.getElementById('toastContainer');
+        if (!container) return false;
+        const el = document.createElement('div');
+        el.className = 'cp-undo';
+        el.innerHTML = '<span class="cp-undo-ico">' + (opts.icon || '↩️') + '</span>'
+            + '<span class="cp-undo-body">' + (opts.html || '') + '</span>'
+            + '<button type="button" class="cp-undo-btn">Undo</button>'
+            + '<span class="cp-undo-bar"></span>';
+        container.appendChild(el);
+        const btn = el.querySelector('.cp-undo-btn');
+        const timer = setTimeout(() => { this.flush('timeout'); }, ms);
+        const rec = { el: el, timer: timer, opts: opts };
+        this.active = rec;
+        if (typeof opts.apply === 'function') { try { opts.apply(); } catch (e) {} }
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            clearTimeout(timer);
+            btn.disabled = true;
+            el.querySelector('.cp-undo-bar').classList.add('done');
+            this.active = null;
+            if (typeof opts.revert === 'function') { try { opts.revert(); } catch (e2) {} }
+            try { ToastManager.show('↩️ Undone — nothing was sent.', 'info', 3000); } catch (e3) {}
+            setTimeout(() => { try { el.remove(); } catch (e4) {} }, 260);
+        };
+        return true;
+    },
+    /* Commit now (timer expired, page left, or a newer action superseded it) */
+    flush(reason) {
+        const rec = this.active;
+        if (!rec) return;
+        this.active = null;
+        clearTimeout(rec.timer);
+        try { rec.el.remove(); } catch (e) {}
+        if (typeof rec.opts.commit === 'function') {
+            Promise.resolve()
+                .then(() => rec.opts.commit())
+                .catch(e => { try { ToastManager.show('⚠️ ' + (e && e.message ? e.message : e), 'error', 8000); } catch (e2) {} });
+        }
+    },
+    pending() { return !!this.active; }
+};
+window.UndoToast = UndoToast;
+try {
+    window.addEventListener('pagehide', () => UndoToast.flush('pagehide'));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') UndoToast.flush('hidden'); });
+} catch (e) {}
+
+/* ── Tab jump: Alt+1..9 (spec §3.2) ───────────────────────────────────────────
+   Reads the RENDERED tab bar, so the numbering always matches what the agent
+   actually sees (draft tabs and drag-reordered tabs included). */
+function hkJumpTab(n) {
+    try {
+        const bar = document.getElementById('multiTabBar');
+        if (!bar) return false;
+        const tabs = Array.from(bar.querySelectorAll('.tab-item'));
+        const el = tabs[n - 1];
+        if (!el) return false;
+        el.click();
+        return true;
+    } catch (e) { return false; }
+}
+
+/* ═══ v31.0 Phase 2: the portal's single global keydown router ═══
+   Replaces the v30 listener. Every branch below either (a) opens a Phase-2
+   surface, or (b) hands the keypress back to the pre-existing behaviour so
+   nothing an agent already relied on stops working.
+
+   Ctrl+K is the one behaviour that CHANGES for permitted users: it used to
+   focus the search box, and spec §3.1 gives it to the palette. Users WITHOUT
+   ux.command_palette keep the legacy focus behaviour verbatim — the "standard
+   text filter" fallback the spec relies on. */
+document.addEventListener('keydown', e => {
+    const key = e.key;
+    const ctrl = e.ctrlKey || e.metaKey;
+    const alt = e.altKey;
+    const tgt = e.target;
+
+    /* ── Palette-local keys (must run before the global single-key rules) ── */
+    if (cpIsOpen()) {
+        if (key === 'Escape') { e.preventDefault(); cpClose(); return; }
+        if (key === 'ArrowDown' || (key === 'j' && !ctrl && !alt)) { e.preventDefault(); if (CP.rows.length) { CP.sel = (CP.sel + 1) % CP.rows.length; cpPaintSel(); } return; }
+        if (key === 'ArrowUp' || (key === 'k' && !ctrl && !alt)) { e.preventDefault(); if (CP.rows.length) { CP.sel = (CP.sel - 1 + CP.rows.length) % CP.rows.length; cpPaintSel(); } return; }
+        if (key === 'Enter' && !ctrl) { e.preventDefault(); cpRunSel(); return; }
+        if (alt && (key === 'a' || key === 'A' || key === 'd' || key === 'D' || key === 'c' || key === 'C')) { e.preventDefault(); cpAltAction(key.toLowerCase()); return; }
+        if (ctrl && key === 'k') { e.preventDefault(); cpClose(); return; }
+        return; /* everything else types into the palette input */
+    }
+
+    /* ── Ctrl/⌘ + K → palette (legacy focus fallback for restricted users) ── */
+    if (ctrl && (key === 'k' || key === 'K')) {
+        e.preventDefault();
+        if (cpEnabled()) { cpToggle(); return; }
+        const ac = document.getElementById('agencyCode');
+        if (ac && ac.closest('#standardSearchParams')?.style.display !== 'none') { ac.focus(); ac.select(); }
+        else { document.getElementById('sidebarSearch')?.focus(); }
+        return;
+    }
+
+    /* ── Ctrl/⌘ + Enter → submit the active form (unchanged behaviour) ── */
+    if (ctrl && key === 'Enter') {
         e.preventDefault();
         const qtype = document.getElementById('queryType')?.value;
         if (qtype === 'analytics') generateAnalytics();
         else if (qtype) fetchAgencyData();
+        return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        const ac = document.getElementById('agencyCode');
-        if (ac && ac.closest('#standardSearchParams')?.style.display !== 'none') {
-            ac.focus(); ac.select();
-        } else {
-            document.getElementById('sidebarSearch').focus();
-        }
+
+    /* ── Ctrl/⌘ + D → theme toggle (unchanged behaviour) ── */
+    if (ctrl && (key === 'd' || key === 'D')) { e.preventDefault(); toggleTheme(); return; }
+
+    /* ── Alt+A / Alt+D / Alt+C outside the palette → offer it prefilled ──────
+       (an Alt-only chord, so no conflict with the Ctrl/D single-letter paths) */
+    if (alt && !ctrl && (key === 'a' || key === 'A' || key === 'd' || key === 'D' || key === 'c' || key === 'C')) {
+        if (cpEnabled() && !hkFocusSafe()) return;        /* never hijack typing */
+        if (cpEnabled()) { e.preventDefault(); cpOpen(); return; }
+        return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-        e.preventDefault(); toggleTheme();
+
+    /* ── Esc: one layer per press ── */
+    if (key === 'Escape') {
+        if (hkCloseTopOverlay()) { e.preventDefault(); return; }
+        clearActiveFilters();
+        return;
+    }
+
+    /* ── Single-key shortcuts: hard focus-safety gate (spec §3.2) ── */
+    if (!hkEnabled()) return;
+    if (!hkFocusSafe()) return;
+    if (ctrl || alt || e.metaKey) return;
+
+    if (key === 'j' || key === 'J') { if (hkMove(1)) e.preventDefault(); return; }
+    if (key === 'k' || key === 'K') { if (hkMove(-1)) e.preventDefault(); return; }
+    if (key === 'ArrowDown') { if (hkMove(1)) e.preventDefault(); return; }
+    if (key === 'ArrowUp') { if (hkMove(-1)) e.preventDefault(); return; }
+    if (key === 'Enter') { if (hkOpenCursor()) e.preventDefault(); return; }
+    if (key === '?') { e.preventDefault(); hudToggle(); return; }
+
+    /* Alt+1..9 tab jump (alt arrives before the ctrl||alt early-return above
+       only when it is a plain digit chord, hence the dedicated branch). */
+});
+
+/* Alt+1..9 lives in its own listener so the main router's early returns can't
+   swallow it: chords with altKey + a digit are unambiguous everywhere. */
+document.addEventListener('keydown', e => {
+    if (!(e.altKey && !e.ctrlKey && !e.metaKey)) return;
+    const k = e.key;
+    if (k && k.length === 1 && k >= '1' && k <= '9') {
+        if (!hkEnabled()) return;
+        if (hkJumpTab(parseInt(k, 10))) e.preventDefault();
     }
 });
 
@@ -10324,13 +11248,62 @@ function apCardHtml(a) {
     </div>`;
 }
 
-async function apSetStatus(status, target) {
+/* ═══ 5-SECOND UNDO on status mutations (spec §3.4) ═══
+   Internet-based safety net for the ONE non-financial mutation this page
+   owns: the agent's own presence/status flip. Nothing about the request
+   shape changes -- the POST body, endpoint and audit trail stay identical;
+   only WHEN it fires moves from "immediately" to "after the grace period".
+
+   Not routed through the undo buffer (by design):
+     • team-lead overrides (target set) -- they mutate ANOTHER agent's state,
+       and spec §1.1 forbids optimistic writes on delegated authority;
+     • Preview Agent View (view-only by contract);
+     • users without ux.optimistic_undo -- they keep the synchronous path. */
+function apSetStatus(status, target) {
+    if (target || previewMode || !UndoToast.can() || typeof apBoard === 'undefined' || !apBoard) {
+        return apSetStatusImmediate(status, target);
+    }
+    if (apBusy) return;
+    /* Snapshot the row we are about to flip so Undo can restore it byte-for-byte. */
+    const me = (apBoard.agents || []).find(x => x.is_me);
+    if (!me) return apSetStatusImmediate(status, target);
+    const before = { status: me.status, since_ms: me.since_ms, memory: me.memory };
+    const prevCounts = Object.assign({}, apBoard.counts || {});
+
+    const applyLocal = (st) => {
+        me.status = st;
+        me.since_ms = Date.now();
+        const counts = {};
+        Object.keys(prevCounts).forEach(k => { counts[k] = 0; });
+        (apBoard.agents || []).forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
+        apBoard.counts = counts;
+        apBoard.server_time_ms = apBoard.server_time_ms; apBoardAt = Date.now();
+        apRenderAll();
+    };
+
+    applyLocal(status);
+    const started = UndoToast.start({
+        icon: '🎤',
+        html: 'Status <b>' + escHtml(before.status || '—') + ' → ' + escHtml(status) + '</b>. Not sent yet — <b>5s</b> to undo.',
+        apply: () => applyLocal(status),
+        revert: () => {
+            me.status = before.status; me.since_ms = before.since_ms; me.memory = before.memory;
+            apBoard.counts = prevCounts; apRenderAll();
+        },
+        commit: () => apSetStatusImmediate(status, target || '')
+    });
+    if (!started) return apSetStatusImmediate(status, target);
+}
+
+/* The original write path, unchanged apart from keepalive:true so a commit
+   that fires while the page is being left still reaches the server. */
+async function apSetStatusImmediate(status, target) {
     if (apBusy) return;
     apBusy = true;
     document.querySelectorAll('#pg-audition-status .ap-btn, #pg-audition-status .ap-mini').forEach(b => { b.disabled = true; b.classList.add('ap-busy'); });
     try {
         const r = await fetch('/api/presence/set', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
             body: JSON.stringify({
                 user: loggedUser || '', email: loggedEmail || '',
                 open_id: localStorage.getItem('xenaOpenId') || '',
@@ -29220,7 +30193,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v30.0 rbac-phase1 2026-11-16';
+window.SAM19_BUILD='v31.0 palette-hotkeys-undo 2026-11-16';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
