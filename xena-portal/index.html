@@ -81,6 +81,39 @@ window.xenaAccessDenied = function (what) {
   try { ToastManager.show('Access denied - missing permission' + (what ? ': ' + what : ''), 'error', 3500); }
   catch (e) { console.warn('ACCESS_DENIED', what); }
 };
+/* v32.0 Phase 3 (spec 2.3): workflow trace ids. A trace lives across the rapid
+   burst of mutations ONE workflow makes (claim -> charge -> upload -> done) and
+   rotates after 15s of quiet, so the forensic ledger can group linked events.
+   The fetch wrapper only ADDS an X-Trace-Id header to non-GET /api/ calls that
+   don't already carry one -- methods, payloads and responses pass through
+   untouched. */
+window.XENA_TRACE = { id: null, last: 0 };
+window.xenaTrace = function () {
+  var now = Date.now();
+  if (!window.XENA_TRACE.id || now - window.XENA_TRACE.last > 15000) {
+    window.XENA_TRACE.id = 'TRC-' + String(1000 + Math.floor(Math.random() * 9000));
+  }
+  window.XENA_TRACE.last = now;
+  return window.XENA_TRACE.id;
+};
+(function () {
+  if (window.__xenaFetchTraced) return;
+  window.__xenaFetchTraced = true;
+  var _f = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    try {
+      var url = (typeof input === 'string') ? input : (input && input.url) || '';
+      var method = ((init && init.method) || (typeof input !== 'string' && input && input.method) || 'GET').toUpperCase();
+      if (url.indexOf('/api/') === 0 && method !== 'GET') {
+        init = init ? Object.assign({}, init) : {};
+        var h = new Headers(init.headers || (typeof input !== 'string' && input ? input.headers : undefined) || {});
+        if (!h.has('X-Trace-Id')) h.set('X-Trace-Id', window.xenaTrace());
+        init.headers = h;
+      }
+    } catch (e) {}
+    return _f(input, init);
+  };
+})();
 </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audition Dashboard</title>
@@ -110,8 +143,17 @@ window.xenaAccessDenied = function (what) {
          immutable, max-age=7 days) for performance, so without a version bump on the
          URL itself, browsers/Vercel's edge cache will keep serving the OLD file for
          up to a week even after you deploy a new one. -->
-    <link rel="preload" as="image" media="(min-width: 641px)" href="/api/samurai-image?variant=landscape&v=2">
-    <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait&v=2">
+    <script>
+    // v32.0 instant-boot: only preload the intro artwork when the intro will
+    // actually PLAY this tab-session -- otherwise these two preloads burn
+    // bandwidth on every reload for an image that never shows.
+    try { if (sessionStorage.getItem('xenaIntroPlayed') !== '1') {
+        [['(min-width: 641px)','landscape'],['(max-width: 640px)','portrait']].forEach(function(p){
+            var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image'; l.media = p[0];
+            l.href = '/api/samurai-image?variant=' + p[1] + '&v=2'; document.head.appendChild(l);
+        });
+    } } catch (e) {}
+    </script>
     <style>
         :root {
             --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
@@ -1728,6 +1770,73 @@ window.xenaAccessDenied = function (what) {
         .al-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:.72rem;color:var(--text-muted);}
         .al-meta b{color:var(--text);font-weight:600;}
         @media(max-width:640px){.al-dev{margin-left:0;}}
+
+        /* ─── v32.0 Phase 3: forensic audit ledger (spec §2) ─── */
+        .al-ribbon{position:sticky;top:0;z-index:12;display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;}
+        .al-preset{padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:inherit;font-size:.74rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
+        .al-preset:hover{border-color:var(--border-hover);color:var(--text);}
+        .al-preset.active{background:color-mix(in srgb,var(--accent-cyan) 14%,transparent);border-color:color-mix(in srgb,var(--accent-cyan) 45%,transparent);color:var(--accent-cyan);}
+        .al-ribbon-spacer{flex:1;}
+        .al-verify{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:.74rem;font-weight:700;cursor:pointer;border:1px solid color-mix(in srgb,var(--accent-green) 45%,transparent);background:color-mix(in srgb,var(--accent-green) 10%,transparent);color:var(--accent-green);font-family:inherit;transition:all .15s;}
+        .al-verify:hover{filter:brightness(1.2);}
+        .al-verify.al-verify-bad{border-color:color-mix(in srgb,var(--accent-rose) 50%,transparent);background:color-mix(in srgb,var(--accent-rose) 12%,transparent);color:var(--accent-rose);}
+        .al-verify.al-verify-busy{opacity:.6;cursor:wait;}
+        .al-ledger-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+        table.al-ledger{width:100%;min-width:980px;border-collapse:collapse;font-size:.8rem;}
+        .al-ledger thead th{position:sticky;top:0;z-index:10;background:var(--surface-hover);color:var(--text-muted);text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+        .al-ledger td{padding:0 12px;height:40px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;}
+        .al-ledger td.al-c-diff{max-width:420px;white-space:normal;}
+        .al-row{cursor:pointer;transition:background .12s;}
+        .al-row:hover{background:rgba(255,255,255,.03);}
+        .al-row-child{display:none;}
+        .al-row-child.al-shown{display:table-row;}
+        .al-row-child td:first-child{padding-left:32px;position:relative;}
+        .al-row-child td:first-child::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:1px;background:var(--border-hover);}
+        .al-group-row{cursor:pointer;background:color-mix(in srgb,var(--accent-purple,#a855f7) 5%,transparent);}
+        .al-group-row:hover{background:rgba(255,255,255,.04);}
+        .al-group-caret{display:inline-block;transition:transform .15s;font-size:.68rem;color:var(--text-muted);margin-right:6px;}
+        .al-group-row.open .al-group-caret{transform:rotate(90deg);}
+        .al-ts{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);}
+        .al-cat{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:6px;font-size:.66rem;font-weight:700;border-left:3px solid var(--catc,#8b8fa3);background:color-mix(in srgb,var(--catc,#8b8fa3) 12%,transparent);color:var(--catc,#c8ccd8);white-space:nowrap;}
+        .al-sev-tag{font-size:.62rem;font-weight:800;padding:1px 6px;border-radius:4px;text-transform:uppercase;}
+        .al-sev-tag.sev-warning{color:var(--accent-amber);background:rgba(255,176,46,.12);}
+        .al-sev-tag.sev-critical{color:var(--accent-rose);background:rgba(255,92,108,.12);}
+        .al-actor-cell{display:flex;align-items:center;gap:8px;min-width:0;}
+        .al-avatar{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:.62rem;font-weight:800;background:color-mix(in srgb,var(--accent-cyan) 18%,var(--surface));color:var(--accent-cyan);flex:none;}
+        .al-chip{font-family:monospace;font-size:.72rem;padding:1px 7px;border-radius:5px;background:color-mix(in srgb,var(--accent-cyan) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent-cyan) 30%,transparent);color:var(--accent-cyan);}
+        .al-chip.al-chip-link{cursor:pointer;}
+        .al-chip.al-chip-link:hover{background:color-mix(in srgb,var(--accent-cyan) 22%,transparent);}
+        .al-chip-plain{font-family:monospace;font-size:.72rem;color:var(--text-muted);}
+        .al-diff{display:flex;gap:6px;flex-wrap:wrap;padding:4px 0;}
+        .al-diff-pill{font-size:.7rem;padding:1px 8px;border-radius:6px;background:color-mix(in srgb,var(--text) 5%,transparent);border:1px solid var(--border);color:var(--text-muted);}
+        .al-diff-pill b{color:var(--text);}
+        .al-diff-pill del{opacity:.6;margin:0 2px;}
+        .al-diff-pill strong{color:var(--accent-green);}
+        .al-diff-pill .diff-neg{color:var(--accent-rose);font-weight:700;}
+        .al-diff-pill .diff-pos{color:var(--accent-green);font-weight:700;}
+        .al-trace{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:#a855f7;background:rgba(168,85,247,.1);padding:1px 6px;border-radius:4px;}
+        .al-env{font-size:.72rem;color:var(--text-muted);white-space:nowrap;}
+        /* 440px slide-over forensic inspector (spec §2.2) */
+        .al-insp-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);z-index:10010;opacity:0;pointer-events:none;transition:opacity .2s;}
+        .al-insp-backdrop.open{opacity:1;pointer-events:auto;}
+        .al-insp{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:var(--surface);border-left:1px solid var(--border);z-index:10011;transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column;box-shadow:-18px 0 50px rgba(0,0,0,.45);}
+        .al-insp.open{transform:translateX(0);}
+        .al-insp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border);background:var(--surface-hover);}
+        .al-insp-title{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:800;color:var(--accent-cyan);}
+        .al-insp-sub{font-size:.72rem;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;overflow-wrap:anywhere;}
+        .al-insp-body{flex:1;overflow-y:auto;padding:16px 18px;}
+        .al-insp-sec{margin-bottom:18px;}
+        .al-insp-sec h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin:0 0 8px;}
+        .al-kv{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:.78rem;}
+        .al-kv dt{color:var(--text-muted);}
+        .al-kv dd{margin:0;color:var(--text);overflow-wrap:anywhere;font-family:'JetBrains Mono',monospace;font-size:.74rem;}
+        .al-ftable{width:100%;border-collapse:collapse;font-size:.74rem;}
+        .al-ftable th{text-align:left;color:var(--text-muted);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;padding:5px 8px;border-bottom:1px solid var(--border);}
+        .al-ftable td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;overflow-wrap:anywhere;}
+        .al-ftable td.al-f-from{color:var(--accent-rose);}
+        .al-ftable td.al-f-to{color:var(--accent-green);}
+        .al-raw{background:#0b0c10;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--text-muted);overflow-x:auto;white-space:pre;max-height:300px;overflow-y:auto;}
+        .al-raw-toggle{cursor:pointer;color:var(--accent-cyan);font-size:.76rem;font-weight:600;background:none;border:none;font-family:inherit;padding:0;}
 
         .tab-bar{display:flex;gap:4px;margin-bottom:20px;background:var(--surface-hover);padding:4px;border-radius:10px}
         .tab-btn{flex:1;padding:8px 16px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:500;font-size:.85rem;background:transparent;color:var(--text-muted);transition:all .2s}
@@ -5079,8 +5188,13 @@ html{background:var(--bg);min-height:100%}
             <div id="pg-admin-audit" style="display:none">
                 <div class="card" style="margin-bottom:20px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-                        <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Audit Log</h3>
-                        <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
+                        <h3 style="color:var(--accent-cyan);margin-bottom:0">📋 Forensic Audit Ledger</h3>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                            <button class="al-verify" id="alVerifyBadge" data-perm="audit.verify_chain" onclick="auditVerifyChain()" title="Re-verify the SHA-256 hash chain over the newest entries">🛡️ Verify Ledger</button>
+                            <button class="btn-sm btn-outline" data-perm="audit.export" onclick="auditExport('csv')">⬇️ CSV</button>
+                            <button class="btn-sm btn-outline" data-perm="audit.export" onclick="auditExport('json')">⬇️ JSON</button>
+                            <button class="btn-sm btn-outline" onclick="loadAuditLog()">🔄 Refresh</button>
+                        </div>
                     </div>
                     <div class="control-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr))">
                         <div class="control-group">
@@ -5132,9 +5246,28 @@ html{background:var(--bg);min-height:100%}
                     </div>
                 </div>
                 <div class="card">
+                    <div class="al-ribbon" id="alRibbon">
+                        <button class="al-preset active" onclick="setAuditCategory(this,'')">All Events</button>
+                        <button class="al-preset" onclick="setAuditCategory(this,'point_charge')">Point Deductions</button>
+                        <button class="al-preset" onclick="setAuditCategory(this,'status_override')">Overrides &amp; Rejections</button>
+                        <button class="al-preset" onclick="setAuditCategory(this,'access_change')">Access Changes</button>
+                        <button class="al-preset" onclick="setAuditCategory(this,'security_alert')">Security Alerts</button>
+                        <input type="hidden" id="alCategory" value="">
+                    </div>
                     <div id="auditLogCount" style="font-size:.85rem;color:var(--text-muted);margin-bottom:10px"></div>
                     <div id="auditLogList"><div class="empty-state" style="padding:40px 0"><p>Loading audit log…</p></div></div>
                 </div>
+                <div id="auditInspectorBackdrop" class="al-insp-backdrop" onclick="closeAuditInspector()"></div>
+                <aside id="auditInspector" class="al-insp" aria-label="Forensic diff inspector">
+                    <div class="al-insp-head">
+                        <div style="min-width:0">
+                            <div class="al-insp-title" id="aiTitle">#—</div>
+                            <div class="al-insp-sub" id="aiSub"></div>
+                        </div>
+                        <button class="btn-sm btn-outline" onclick="closeAuditInspector()">✕</button>
+                    </div>
+                    <div class="al-insp-body" id="aiBody"></div>
+                </aside>
             </div>
 
             <!-- ... Analytics ... -->
@@ -8095,7 +8228,7 @@ const HK_LISTS = [
     { box: 'bqResults', row: '.qy-card', open: (el) => { const rid = el.dataset.rid; if (rid) bwOpen(rid); } },
     { box: 'qyResults', row: '.qy-card', open: (el) => { const rid = el.querySelector('[onclick*="qyOpenInWorkspace"]'); if (rid) { const m = (rid.getAttribute('onclick') || '').match(/'([^']+)'/); if (m) qyOpenInWorkspace(m[1]); } } },
     { box: 'bqyResults', row: '.qy-card', open: (el) => { const rid = el.dataset.rid; if (rid) bwOpen2(rid); } },
-    { box: 'auditLogList', row: '.audit-row-v2', open: null },
+    { box: 'auditLogList', row: '.al-row', open: (el) => { const i = parseInt(el.dataset.idx, 10); if (!isNaN(i)) openAuditInspector(i); } },
     { box: 'tiResults', row: '.ltq-card, .qy-card', open: null }
 ];
 
@@ -9697,6 +9830,21 @@ function playSamuraiIntro() {
     if (!intro || !appShell) { if (appShell) appShell.style.display = 'flex'; return; }
     if (!image) { appShell.style.display = 'flex'; return; }
 
+    // v32.0 instant-boot (Ahmed, 2026-11-16: "the tkt queue and audition and bind
+    // and access management took time to appear after reload ... in mobile and pc"):
+    // the cinematic replayed on EVERY reload, holding the whole app shell hidden for
+    // up to ~5.6s. Play it ONCE per browser-tab session; later reloads in the same
+    // tab go straight to the homepage. logout() clears the flag, so a fresh login
+    // still gets the full intro.
+    try {
+        if (sessionStorage.getItem('xenaIntroPlayed') === '1') {
+            intro.classList.remove('playing');
+            appShell.style.display = 'flex';
+            return;
+        }
+        sessionStorage.setItem('xenaIntroPlayed', '1');
+    } catch (e) {}
+
     // Pick the image shot for this device's viewport shape (matches the same
     // 640px breakpoint used elsewhere, and the preload <link media> queries in
     // <head>) -- landscape composition for wide/desktop screens, portrait
@@ -9741,6 +9889,9 @@ function playSamuraiIntro() {
         appShell.style.display = 'flex';
     }
 
+    // v32.0: tap/click anywhere on the intro skips it instantly (mobile + pc).
+    try { intro.addEventListener('pointerdown', revealHomepage, { once: true }); } catch (e) {}
+
     // BUG FIX (ending felt like a hard cut, not a graceful vanish): this used to
     // wait until the very end (revealHomepage, after the fade finished) to set
     // appShell.style.display = 'flex' -- but appShell was also set to display:none
@@ -9758,6 +9909,7 @@ function playSamuraiIntro() {
     function runChoreographedTimeline() {
         SAM_TIMELINE.forEach(stage => {
             samTimers.push(setTimeout(() => {
+                if (revealed) return;  // v32.0: user already tapped to skip
                 intro.classList.add(stage.cls);
                 if (stage.shatter) samShatterTitle();
                 if (stage.cls === 'st-out') showHomepageBehind();
@@ -9774,15 +9926,16 @@ function playSamuraiIntro() {
         // Not loaded yet: show a minimal elegant loading state (not an ugly browser
         // spinner) instead of a black screen, and start the moment it's ready.
         intro.classList.add('playing', 'st-waiting');
-        const onReady = () => { intro.classList.remove('st-waiting'); runChoreographedTimeline(); };
+        const onReady = () => { if (revealed) return; intro.classList.remove('st-waiting'); runChoreographedTimeline(); };
         image.addEventListener('load', onReady, { once: true });
         // If the image fails outright (404, bad network), don't leave the person
         // stuck on a black screen -- reveal the homepage instead.
         image.addEventListener('error', revealHomepage, { once: true });
-        // absolute fallback: if it still hasn't loaded after 6s, reveal anyway.
+        // absolute fallback: if it still hasn't loaded after 2.5s, reveal anyway
+        // (v32.0: was 6s -- too long to stare at a loading dot on a slow link).
         samTimers.push(setTimeout(() => {
             if (!revealed && !(image.complete && image.naturalWidth > 0)) revealHomepage();
-        }, 6000));
+        }, 2500));
     }
 }
 
@@ -9801,6 +9954,7 @@ function logout() {
     });
     localStorage.clear();
     Object.keys(keep).forEach(k => { try { localStorage.setItem(k, keep[k]); } catch (e) {} });
+    try { sessionStorage.removeItem('xenaIntroPlayed'); } catch (e) {}  // v32.0: next login plays the intro again
     location.reload(); 
 }
 
@@ -13255,6 +13409,7 @@ function auditLogParams() {
         action:   document.getElementById('alAction')?.value  || '',
         severity: document.getElementById('alSeverity')?.value|| '',
         device:   document.getElementById('alDevice')?.value  || '',
+        category: document.getElementById('alCategory')?.value|| '',
         from:     document.getElementById('alFrom')?.value    || '',
         to:       document.getElementById('alTo')?.value      || '',
     });
@@ -13275,6 +13430,8 @@ function clearAuditFilters() {
     const actSel = document.getElementById('alAction'); if (actSel) actSel.value = '';
     const sevSel = document.getElementById('alSeverity'); if (sevSel) sevSel.value = '';
     const devSel = document.getElementById('alDevice'); if (devSel) devSel.value = '';
+    const catH = document.getElementById('alCategory'); if (catH) catH.value = '';
+    document.querySelectorAll('#alRibbon .al-preset').forEach((b, i) => b.classList.toggle('active', i === 0));
     loadAuditLog();
 }
 
@@ -13406,6 +13563,243 @@ function auditRelTime(ts){
     return Math.floor(s/86400)+'d ago';
 }
 
+// ═══ v32.0 Phase 3: forensic ledger UI (spec §2) ═══
+const AUDIT_CAT_META = {
+    POINT_CHARGE:    { color: '#f59e0b', label: 'POINT CHARGE' },
+    STATUS_OVERRIDE: { color: '#06b6d4', label: 'STATUS OVERRIDE' },
+    ACCESS_CHANGE:   { color: '#a855f7', label: 'ACCESS CHANGE' },
+    SECURITY_ALERT:  { color: '#f43f5e', label: 'SECURITY ALERT' },
+    SCHEDULE_EDIT:   { color: '#3b82f6', label: 'SCHEDULE EDIT' },
+    GENERAL:         { color: '#8b8fa3', label: 'GENERAL' },
+};
+function auditCatMeta(c){ return AUDIT_CAT_META[(c||'GENERAL').toUpperCase()] || AUDIT_CAT_META.GENERAL; }
+
+function setAuditCategory(btn, cat){
+    const h = document.getElementById('alCategory'); if (h) h.value = cat;
+    document.querySelectorAll('#alRibbon .al-preset').forEach(b => b.classList.toggle('active', b === btn));
+    loadAuditLog();
+}
+
+function auditDiffPills(diff){
+    if (!diff || typeof diff !== 'object') return '';
+    const keys = Object.keys(diff);
+    if (!keys.length) return '';
+    const pills = keys.slice(0, 4).map(k => {
+        const d = diff[k] || {};
+        const fmt = v => Array.isArray(v) ? (v.join(', ') || '—') : (v === undefined || v === null || v === '' ? '—' : String(v));
+        const fv = fmt(d.from), tv = fmt(d.to);
+        let delta = '';
+        const nf = parseFloat(d.from), nt = parseFloat(d.to);
+        if (!isNaN(nf) && !isNaN(nt) && nf !== nt) {
+            const dd = nt - nf;
+            delta = ` <span class="${dd < 0 ? 'diff-neg' : 'diff-pos'}">(${dd > 0 ? '+' : ''}${dd.toLocaleString()})</span>`;
+        }
+        return `<span class="al-diff-pill"><b>${escHtml(k)}:</b> <del>${escHtml(fv)}</del> → <strong>${escHtml(tv)}</strong>${delta}</span>`;
+    });
+    if (keys.length > 4) pills.push(`<span class="al-diff-pill">+${keys.length - 4} more</span>`);
+    return pills.join('');
+}
+
+function auditRouteEntity(text){
+    // spec §2.1 col 4: target chip routes straight to the entity. Only wired
+    // for ticket record ids (Record: recXXX) -- anything else stays plain text.
+    const m = (text || '').match(/Record:\s*([a-zA-Z0-9]+)/);
+    if (m && typeof twOpenWorkspace === 'function') {
+        try { twOpenWorkspace(m[1]); } catch (e) { console.warn('audit route', e); }
+    }
+}
+
+function auditLedgerRow(l, idx, child){
+    const cat = auditCatMeta(l.category);
+    const sevKey = (l.severity || '').toLowerCase();
+    const dev = (l.device || '').trim();
+    const devKind = dev.split('·')[0].trim().toLowerCase();
+    const devIcon = devKind === 'pc' ? '💻' : (devKind === 'phone' || devKind === 'tablet') ? '📱' : '🖥️';
+    const rel = auditRelTime(l.ts);
+    const tsTxt = escHtml((l.ts || '').substring(0, 19).replace('T', ' '));
+    const local = (() => { try { return new Date(l.ts).toLocaleString(); } catch (e) { return ''; } })();
+    const initial = escHtml(((l.actor || '?').trim()[0] || '?').toUpperCase());
+    const diffHtml = auditDiffPills(l.diff);
+    const targetFull = (l.target || '');
+    const targetMain = targetFull.split(' | ')[0];
+    const targetRest = targetFull.includes(' | ') ? targetFull.slice(targetFull.indexOf(' | ') + 3) : '';
+    const canRoute = /Record:\s*[a-zA-Z0-9]+/.test(targetFull) && window.PermissionGuard && PermissionGuard.can('routing.workspace');
+    const chip = targetMain
+        ? (canRoute
+            ? `<span class="al-chip al-chip-link" title="Open entity" onclick="event.stopPropagation();auditRouteEntity('${escapeJSArgs(targetFull)}')">${escHtml(targetMain)}</span>`
+            : `<span class="al-chip">${escHtml(targetMain)}</span>`)
+        : '<span style="color:var(--text-muted)">—</span>';
+    const trace = (l.trace_id || '').trim();
+    return `<tr class="al-row${child ? ' al-row-child' : ''}" data-idx="${idx}">
+        <td class="al-ts" title="${escHtml(rel)}${local ? ' · local: ' + escHtml(local) : ''}">${tsTxt}</td>
+        <td><span class="al-cat" style="--catc:${cat.color}">${auditActionIcon(l.action)} ${cat.label}</span>${sevKey && sevKey !== 'info' ? ` <span class="al-sev-tag sev-${sevKey}">${escHtml(l.severity)}</span>` : ''}</td>
+        <td><div class="al-actor-cell"><span class="al-avatar">${initial}</span><span class="al-actor" title="${escHtml(l.actor || '')}">${escHtml(l.actor || 'Unknown')}</span></div></td>
+        <td title="${escHtml(targetFull)}">${chip}</td>
+        <td class="al-c-diff">${diffHtml ? `<div class="al-diff">${diffHtml}</div>` : `<span class="al-chip-plain">${escHtml(targetRest || l.action || '')}</span>`}</td>
+        <td><span class="al-env" title="${escHtml(dev)}">${dev ? devIcon + ' ' + escHtml(dev.split('·').slice(1).join('·').trim() || devKind) : ''}</span>${trace ? ` <span class="al-trace">${escHtml(trace)}</span>` : ''}</td>
+    </tr>`;
+}
+
+function renderAuditLedger(logs){
+    window.AUDIT_LOGS_CACHE = logs;
+    const canTrace = window.PermissionGuard && PermissionGuard.can('audit.trace_group');
+    const canDiff = window.PermissionGuard && PermissionGuard.can('audit.diff_inspect');
+    let body = '';
+    if (canTrace) {
+        // spec §2.3: consecutive rows sharing a trace_id collapse under a
+        // parent summary row with an expand chevron.
+        const counts = {};
+        logs.forEach(l => { const t = (l.trace_id || '').trim(); if (t) counts[t] = (counts[t] || 0) + 1; });
+        let i = 0;
+        while (i < logs.length) {
+            const t = (logs[i].trace_id || '').trim();
+            if (t && counts[t] > 1) {
+                let j = i;
+                const members = [];
+                while (j < logs.length && (logs[j].trace_id || '').trim() === t) { members.push(j); j++; }
+                const first = logs[i];
+                body += `<tr class="al-group-row" data-trace="${escHtml(t)}">
+                    <td colspan="6"><span class="al-group-caret">▶</span><span class="al-trace">${escHtml(t)}</span> <b>${members.length} linked events</b> <span style="color:var(--text-muted)">· latest: ${escHtml(first.action || '')} by ${escHtml(first.actor || 'Unknown')}</span></td>
+                </tr>`;
+                members.forEach(mi => { body += auditLedgerRow(logs[mi], mi, true).replace('al-row-child"', `al-row-child" data-trace="${escHtml(t)}"`); });
+                i = j;
+            } else {
+                body += auditLedgerRow(logs[i], i, false);
+                i++;
+            }
+        }
+    } else {
+        body = logs.map((l, i) => auditLedgerRow(l, i, false)).join('');
+    }
+    return `<div class="al-ledger-wrap"><table class="al-ledger">
+        <thead><tr>
+            <th style="width:175px">Timestamp</th>
+            <th style="width:150px">Category</th>
+            <th style="width:180px">Actor</th>
+            <th style="width:140px">Target</th>
+            <th>Structured Diff</th>
+            <th style="width:130px">Env &amp; Trace</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+    </table></div>${canDiff ? '' : '<div style="font-size:.72rem;color:var(--text-muted);margin-top:8px">Row-level diff inspection requires the <code>audit.diff_inspect</code> permission.</div>'}`;
+}
+
+// Row click -> slide-over forensic inspector (delegated; spec §2.2).
+document.addEventListener('click', (e) => {
+    const tr = e.target.closest && e.target.closest('#auditLogList tr.al-row');
+    if (!tr) return;
+    const idx = parseInt(tr.dataset.idx, 10);
+    if (!isNaN(idx)) openAuditInspector(idx);
+    const gr = e.target.closest && e.target.closest('#auditLogList tr.al-group-row');
+    if (gr) {
+        const t = gr.dataset.trace;
+        gr.classList.toggle('open');
+        const open = gr.classList.contains('open');
+        document.querySelectorAll(`#auditLogList tr.al-row-child[data-trace="${CSS.escape(t)}"]`)
+            .forEach(r => r.classList.toggle('al-shown', open));
+    }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAuditInspector(); });
+
+function openAuditInspector(idx){
+    if (!(window.PermissionGuard && PermissionGuard.can('audit.diff_inspect'))) {
+        window.xenaAccessDenied('audit.diff_inspect');
+        return;
+    }
+    const l = (window.AUDIT_LOGS_CACHE || [])[idx];
+    if (!l) return;
+    const hash = l.entry_hash || '';
+    const hashShort = hash ? hash.slice(0, 6) + '…' + hash.slice(-4) : '—';
+    document.getElementById('aiTitle').textContent = l.seq_id ? '#LOG-' + String(l.seq_id).padStart(7, '0') : 'LEGACY ENTRY';
+    document.getElementById('aiSub').textContent =
+        [l.trace_id || '', (l.ts || '').substring(0, 19).replace('T', ' ') + ' UTC', hash ? '0x' + hashShort : '']
+            .filter(Boolean).join(' · ');
+    const diff = (l.diff && typeof l.diff === 'object') ? l.diff : {};
+    const keys = Object.keys(diff);
+    const fmtV = v => Array.isArray(v) ? (v.join(', ') || '—') : (v === undefined || v === null || v === '' ? '—' : String(v));
+    const fieldsTable = keys.length
+        ? `<table class="al-ftable"><thead><tr><th>Field</th><th>Previous</th><th>New</th></tr></thead><tbody>${keys.map(k =>
+            `<tr><td><b>${escHtml(k)}</b></td><td class="al-f-from">${escHtml(fmtV(diff[k] && diff[k].from))}</td><td class="al-f-to">${escHtml(fmtV(diff[k] && diff[k].to))}</td></tr>`).join('')}</tbody></table>`
+        : '<div style="color:var(--text-muted);font-size:.78rem">No structured diff stored for this entry (legacy row or read-type action).</div>';
+    const rawPayload = {
+        seq_id: l.seq_id || null, trace_id: l.trace_id || '', category: l.category || '',
+        action: l.action, actor: l.actor, severity: l.severity, ts: l.ts,
+        ip: l.ip, device: l.device, target: l.target,
+        prev_hash: l.prev_hash || '', entry_hash: l.entry_hash || '', diff: l.diff || null,
+    };
+    document.getElementById('aiBody').innerHTML = `
+        <div class="al-insp-sec"><h4>Actor Metadata</h4>
+            <dl class="al-kv">
+                <dt>Actor</dt><dd>${escHtml(l.actor || 'Unknown')}</dd>
+                <dt>IP Address</dt><dd>${escHtml(l.ip || '—')}</dd>
+                <dt>Device</dt><dd>${escHtml(l.device || '—')}</dd>
+                <dt>Category</dt><dd>${escHtml(l.category || 'GENERAL')}</dd>
+                <dt>Severity</dt><dd>${escHtml(l.severity || 'Info')}</dd>
+            </dl>
+        </div>
+        <div class="al-insp-sec"><h4>Changed Fields</h4>${fieldsTable}</div>
+        <div class="al-insp-sec">
+            <details>
+                <summary class="al-raw-toggle">Raw Payload (JSON)</summary>
+                <div class="al-raw">${escHtml(JSON.stringify(rawPayload, null, 2))}</div>
+            </details>
+        </div>`;
+    document.getElementById('auditInspector').classList.add('open');
+    document.getElementById('auditInspectorBackdrop').classList.add('open');
+}
+function closeAuditInspector(){
+    document.getElementById('auditInspector')?.classList.remove('open');
+    document.getElementById('auditInspectorBackdrop')?.classList.remove('open');
+}
+
+async function auditVerifyChain(){
+    const badge = document.getElementById('alVerifyBadge');
+    if (!badge) return;
+    badge.classList.add('al-verify-busy');
+    badge.textContent = '🛡️ Verifying…';
+    try {
+        const res = await fetch('/api/admin/audit-logs/verify?limit=300', { headers: { 'X-User-Name': loggedUser, 'X-User-Email': loggedEmail } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Verification failed.');
+        if (data.ok) {
+            badge.classList.remove('al-verify-bad');
+            badge.textContent = '🛡️ Ledger Verified';
+            ToastManager.show(`Ledger verified: ${data.checked} sealed entries, no gaps, no hash mismatches.`, 'success', 5000);
+        } else {
+            badge.classList.add('al-verify-bad');
+            badge.textContent = '🛡️ CHAIN BROKEN';
+            ToastManager.show(`⚠️ Integrity problem: ${data.gaps.length} sequence gap(s), ${data.broken_links.length} broken link(s), ${data.mismatches.length} hash mismatch(es).`, 'error', 10000);
+        }
+    } catch (e) {
+        badge.textContent = '🛡️ Verify Ledger';
+        ToastManager.show('Verification failed: ' + e.message, 'error', 6000);
+    } finally {
+        badge.classList.remove('al-verify-busy');
+    }
+}
+
+async function auditExport(fmt){
+    try {
+        ToastManager.show('Preparing ' + fmt.toUpperCase() + ' export…', 'info', 2500);
+        const res = await fetch('/api/admin/audit-logs/export?format=' + fmt + '&' + auditLogParams(),
+            { headers: { 'X-User-Name': loggedUser, 'X-User-Email': loggedEmail } });
+        if (!res.ok) {
+            let msg = 'Export failed.';
+            try { const d = await res.json(); msg = d.error || msg; } catch (e) {}
+            throw new Error(msg);
+        }
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'audit-ledger.' + fmt;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+        ToastManager.show('Export downloaded. The export itself was logged to the ledger.', 'success', 5000);
+        setTimeout(loadAuditLog, 2000);  // pick up the AUDIT_EXPORT entry
+    } catch (e) { ToastManager.show(e.message, 'error', 6000); }
+}
+
 async function loadAuditLog() {
     const el=document.getElementById('auditLogList');
     const countEl = document.getElementById('auditLogCount');
@@ -13421,32 +13815,9 @@ async function loadAuditLog() {
         if (countEl) countEl.innerHTML = `${logs.length.toLocaleString()} events` +
             ((devCount.pc+devCount.phone+devCount.tablet)?` &nbsp;·&nbsp; 💻 <b>${devCount.pc}</b> PC &nbsp;·&nbsp; 📱 <b>${devCount.phone+devCount.tablet}</b> mobile`:'');
         if (!logs.length) { el.innerHTML='<div class="empty-state" style="padding:30px 0"><p>No audit events match your filters.</p></div>'; return; }
-        // Full, unmasked actor/target -- audit log is admin-only, masking here
-        // just hid the accountability info the page exists to provide.
-        el.innerHTML=logs.map(l=>{
-            const sevKey=(l.severity||'').toLowerCase();
-            const dev=(l.device||'').trim();
-            const devKind=dev.split('·')[0].trim().toLowerCase();
-            const devIcon=devKind==='pc'?'💻':(devKind==='phone'||devKind==='tablet')?'📱':'🖥️';
-            const devCls=devKind==='pc'?'al-dev-pc':(devKind==='phone'||devKind==='tablet')?'al-dev-phone':'';
-            const rel=auditRelTime(l.ts);
-            return `<div class="audit-row-v2 al-sev-${sevKey}">
-            <div class="al-ic">${auditActionIcon(l.action)}</div>
-            <div class="al-main">
-                <div class="al-top">
-                    <span class="al-actor">${escHtml(l.actor||'Unknown')}</span>
-                    <span class="al-action">${escHtml(l.action||'')}</span>
-                    ${dev?`<span class="al-dev ${devCls}">${devIcon} ${escHtml(dev)}</span>`:''}
-                </div>
-                ${l.target?`<div class="al-target">${escHtml(l.target)}</div>`:''}
-                <div class="al-meta">
-                    <span>🕐 <b>${escHtml((l.ts||'').substring(0,19).replace('T',' '))}</b>${rel?` · ${rel}`:''}</span>
-                    ${l.ip?`<span>🌐 ${escHtml(l.ip)}</span>`:''}
-                    <span>⚠️ ${escHtml(l.severity||'Info')}</span>
-                </div>
-            </div>
-        </div>`;
-        }).join('');
+        // v32.0 Phase 3: high-density forensic ledger (spec §2.1) replaces the
+        // v29.6 floating cards. Full, unmasked actor/target -- admin-only page.
+        el.innerHTML = renderAuditLedger(logs);
     } catch(e) { el.innerHTML='<div style="color:var(--accent-rose)">Failed to load audit log: '+escHtml(e.message)+'</div>'; }
 }
 
@@ -24371,7 +24742,39 @@ function auditRevealDuplicates() {
 if (loggedUser&&loggedUat) {
     document.getElementById('loginOverlay').style.display='none';
     playSamuraiIntro();
-    
+
+    // v32.0 instant-boot (Ahmed, 2026-11-16: "the tkt queue and audition and bind
+    // and access management took time to appear after reload and same for the
+    // shortcut in the main page home"): those sidebar groups and the home
+    // shortcut cards used to render ONLY after the /api/auth/me round-trip
+    // finished (serverless + cross-border Feishu read = seconds). Paint the shell
+    // IMMEDIATELY from this same user's last cached auth snapshot, then reconcile
+    // with the fresh response below. Every action stays server-gated, so a briefly
+    // stale paint can never grant anything the server would deny; the cache is
+    // wiped on logout (localStorage.clear) so a shared device never leaks perms.
+    try {
+        const __acKey = 'xenaAuthCache.' + (loggedEmail || loggedUser).toLowerCase();
+        const __ac = JSON.parse(localStorage.getItem(__acKey) || 'null');
+        const __acd = __ac && __ac.data;
+        if (__acd && __ac.user === loggedUser && __ac.ts && (Date.now() - __ac.ts) < 7*24*3600*1000) {
+            userPermissions = __acd;
+            userModules = __acd.modules || [];
+            isAdmin = !!__acd.is_super_admin;
+            APP_STATE.currentUser.permissions = Array.isArray(__acd.feature_perms) ? __acd.feature_perms : [];
+            APP_STATE.currentUser.featureRole = __acd.feature_role || null;
+            // NOTE: no PermissionGuard.applyToDOM() here on purpose -- it REMOVES
+            // gated elements, so running it off a possibly-stale cache could strip
+            // something the fresh auth would grant. The fresh pass below strips
+            // once, authoritatively. Every Phase 2+ surface also re-checks can()
+            // at click time, so nothing functional leaks in the interim.
+            if (isAdmin || userModules.length > 0) {
+                enforceLocks();
+                configureSidebarAndCards();
+                renderTabs();
+            }
+        }
+    } catch (e) { console.warn('auth cache apply failed', e); }
+
     document.getElementById('sidebarUsername').textContent = loggedUser;
     
     const avatarUrl = localStorage.getItem('xenaAvatar');
@@ -24386,6 +24789,10 @@ if (loggedUser&&loggedUat) {
         .then(r=>r.json())
         .then(d=>{
             userPermissions = d;
+            // v32.0 instant-boot: refresh the snapshot used for the instant
+            // first paint on the NEXT reload (see the boot block above).
+            try { localStorage.setItem('xenaAuthCache.' + (loggedEmail || loggedUser).toLowerCase(),
+                JSON.stringify({ ts: Date.now(), user: loggedUser, data: d })); } catch (e) {}
             // v30.0 RBAC: resolved feature permissions land in APP_STATE the
             // moment auth is known, then one data-perm strip pass runs over
             // the DOM (Phase 2+ features gate every render behind these keys).
@@ -30193,7 +30600,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v31.0 palette-hotkeys-undo 2026-11-16';
+window.SAM19_BUILD='v32.0 forensic-ledger-instant-boot 2026-11-16';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
