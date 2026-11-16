@@ -12,6 +12,10 @@
    login wall and zero data). These guards close the casual paths: right-click,
    Ctrl+S / Ctrl+U, F12 and the devtools shortcuts. */
 (function(){
+  /* v34.1.5 TEMP (Ahmed, comment 7708902565865327891): DevTools UNLOCKED so he
+     can drive the KB build from the console by hand while the KB settles.
+     Re-adding the restriction = flip DEVTOOLS_UNLOCKED back to false + redeploy. */
+  var DEVTOOLS_UNLOCKED=true;
   function secToast(msg){
     try{
       var t=document.getElementById('xenaSecToast');
@@ -29,6 +33,8 @@
   });
   document.addEventListener('keydown',function(e){
     var k=(e.key||'').toLowerCase(),mod=e.ctrlKey||e.metaKey,f12=e.keyCode===123;
+    var devCombo=f12||(mod&&e.shiftKey&&['i','j','c','k'].indexOf(k)>-1);
+    if(devCombo&&DEVTOOLS_UNLOCKED)return;   // v34.1.5 TEMP: let DevTools open
     if(f12||(mod&&(k==='s'||k==='u'))||(mod&&e.shiftKey&&['i','j','c','k'].indexOf(k)>-1)){
       e.preventDefault();e.stopPropagation();
       secToast(f12||(mod&&e.shiftKey)?'\u{1F512} Developer tools are disabled on this portal.':(k==='s'?'\u{1F512} Saving this page is disabled — the portal is live-only.':'\u{1F512} View-source is disabled on this portal.'));
@@ -30747,7 +30753,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.4 kb-envelope-chathang 2026-11-17';
+window.SAM19_BUILD='v34.1.5 devtools-unlocked 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
