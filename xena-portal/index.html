@@ -143,17 +143,8 @@ window.xenaTrace = function () {
          immutable, max-age=7 days) for performance, so without a version bump on the
          URL itself, browsers/Vercel's edge cache will keep serving the OLD file for
          up to a week even after you deploy a new one. -->
-    <script>
-    // v32.0 instant-boot: only preload the intro artwork when the intro will
-    // actually PLAY this tab-session -- otherwise these two preloads burn
-    // bandwidth on every reload for an image that never shows.
-    try { if (sessionStorage.getItem('xenaIntroPlayed') !== '1') {
-        [['(min-width: 641px)','landscape'],['(max-width: 640px)','portrait']].forEach(function(p){
-            var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image'; l.media = p[0];
-            l.href = '/api/samurai-image?variant=' + p[1] + '&v=2'; document.head.appendChild(l);
-        });
-    } } catch (e) {}
-    </script>
+    <link rel="preload" as="image" media="(min-width: 641px)" href="/api/samurai-image?variant=landscape&v=2">
+    <link rel="preload" as="image" media="(max-width: 640px)" href="/api/samurai-image?variant=portrait&v=2">
     <style>
         :root {
             --bg:#0b0c10;--surface:#151621;--surface-hover:#1c1d2b;
@@ -6466,6 +6457,7 @@ html{background:var(--bg);min-height:100%}
                         <button class="btn btn-secondary" id="apRefreshBtn" onclick="apFetchBoard(true)" style="flex:none">🔄 Refresh</button>
                     </div>
                     <div class="ap-counts" id="apCounts"></div>
+                    <div id="apCapWrap" data-perm="audition.status.capacity" style="display:none"></div>
                 </div>
 
                 <div class="card" id="apMyCard" style="display:none;margin-bottom:14px">
@@ -6480,6 +6472,7 @@ html{background:var(--bg);min-height:100%}
                             </div>
                         </div>
                         <div class="ap-btns" id="apBtns"></div>
+                        <div id="apBreakWrap" data-perm="audition.status.timers"></div>
                     </div>
                 </div>
 
@@ -6575,6 +6568,7 @@ html{background:var(--bg);min-height:100%}
                         </div>
                     </div>
                     <div class="sch-grid-wrap" id="schTeamWeekWrap"><table class="sch-grid" id="schGrid"></table></div>
+                    <div id="schCoverWrap" data-perm="audition.schedule.coverage" style="display:none"></div>
                     <div id="xgWrap" style="display:none"></div>
                     <div class="sch-grid-wrap" id="schTeamMonthWrap" style="display:none"><div class="sch-mgrid" id="schMonthGrid"></div></div>
                 </div>
@@ -6753,6 +6747,7 @@ html{background:var(--bg);min-height:100%}
                         <div class="atm-legend" id="atmLegend"></div>
                     </div>
                 </div>
+                <div id="atmKpis" class="xa4-kpis" data-perm="audition.attendance.view" style="display:none"></div>
                 <div id="xapPulse"></div>
                 <div id="atmWarnCard" class="card" style="display:none;margin-bottom:14px"></div>
                 <div id="atmHost">⏳ Loading…</div>
@@ -6801,6 +6796,39 @@ html{background:var(--bg);min-height:100%}
                     <div class="xea-debrief" id="xeaDebrief"><div class="xea-empty">⏳ Loading analytics…</div></div>
                     <div style="margin-top:12px"><button class="btn btn-primary" onclick="xeaPushInsights()">📣 Post debrief to the insights feed</button></div>
                 </div>
+                <!-- v33.0 Phase 4 (spec §4.4): Queue Analytics — compare periods,
+                     TAT funnel, speed-vs-quality quadrant, anomaly radar,
+                     cross-filter chips, drill-down drawer, CSV export. -->
+                <div class="card xea-card" id="xa4Panel" data-perm="audition.analytics.view" style="display:none;grid-column:1/-1">
+                    <div class="ap-head" style="margin-bottom:8px">
+                        <div>
+                            <h4 style="margin-bottom:2px">📊 Queue Analytics</h4>
+                            <p class="xea-hint" style="margin:0">Ticket throughput, speed vs quality, TAT funnel and anomaly radar — straight from the Grand Table.</p>
+                        </div>
+                        <select class="xa4-sel" id="xa4Compare" onchange="xa4AnalyticsLoad(true)">
+                            <option value="off">Compare: Off</option>
+                            <option value="prev">vs Previous period</option>
+                            <option value="month">vs Same period last month</option>
+                        </select>
+                    </div>
+                    <div class="xa4-kpis" id="xa4Kpis" style="margin-bottom:10px"></div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+                        <div>
+                            <div style="font-size:.78rem;font-weight:600;margin-bottom:6px">⏳ TAT funnel (Submitted → Claimed → Resolved)</div>
+                            <div id="xa4Funnel"></div>
+                        </div>
+                        <div>
+                            <div style="font-size:.78rem;font-weight:600;margin-bottom:6px">⚡ Speed vs quality (click a dot to drill down)</div>
+                            <div id="xa4Quad"></div>
+                        </div>
+                    </div>
+                    <div id="xa4AnomWrap" data-perm="audition.analytics.anomalies"></div>
+                    <div id="xa4Chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+                    <div style="font-size:.78rem;font-weight:600;margin:10px 0 6px">👥 Per-agent</div>
+                    <div id="xa4Agents"></div>
+                    <div style="margin-top:10px"><button type="button" class="btn btn-secondary" onclick="xa4Csv()">⬇ Export filtered CSV</button></div>
+                </div>
+                <div id="xa4Drawer"></div>
             </div>
 
             <!-- Phase 10.13 (Ahmed): Preview Agent View -- the Lark Base
@@ -9830,21 +9858,6 @@ function playSamuraiIntro() {
     if (!intro || !appShell) { if (appShell) appShell.style.display = 'flex'; return; }
     if (!image) { appShell.style.display = 'flex'; return; }
 
-    // v32.0 instant-boot (Ahmed, 2026-11-16: "the tkt queue and audition and bind
-    // and access management took time to appear after reload ... in mobile and pc"):
-    // the cinematic replayed on EVERY reload, holding the whole app shell hidden for
-    // up to ~5.6s. Play it ONCE per browser-tab session; later reloads in the same
-    // tab go straight to the homepage. logout() clears the flag, so a fresh login
-    // still gets the full intro.
-    try {
-        if (sessionStorage.getItem('xenaIntroPlayed') === '1') {
-            intro.classList.remove('playing');
-            appShell.style.display = 'flex';
-            return;
-        }
-        sessionStorage.setItem('xenaIntroPlayed', '1');
-    } catch (e) {}
-
     // Pick the image shot for this device's viewport shape (matches the same
     // 640px breakpoint used elsewhere, and the preload <link media> queries in
     // <head>) -- landscape composition for wide/desktop screens, portrait
@@ -9889,9 +9902,6 @@ function playSamuraiIntro() {
         appShell.style.display = 'flex';
     }
 
-    // v32.0: tap/click anywhere on the intro skips it instantly (mobile + pc).
-    try { intro.addEventListener('pointerdown', revealHomepage, { once: true }); } catch (e) {}
-
     // BUG FIX (ending felt like a hard cut, not a graceful vanish): this used to
     // wait until the very end (revealHomepage, after the fade finished) to set
     // appShell.style.display = 'flex' -- but appShell was also set to display:none
@@ -9909,7 +9919,6 @@ function playSamuraiIntro() {
     function runChoreographedTimeline() {
         SAM_TIMELINE.forEach(stage => {
             samTimers.push(setTimeout(() => {
-                if (revealed) return;  // v32.0: user already tapped to skip
                 intro.classList.add(stage.cls);
                 if (stage.shatter) samShatterTitle();
                 if (stage.cls === 'st-out') showHomepageBehind();
@@ -9926,16 +9935,15 @@ function playSamuraiIntro() {
         // Not loaded yet: show a minimal elegant loading state (not an ugly browser
         // spinner) instead of a black screen, and start the moment it's ready.
         intro.classList.add('playing', 'st-waiting');
-        const onReady = () => { if (revealed) return; intro.classList.remove('st-waiting'); runChoreographedTimeline(); };
+        const onReady = () => { intro.classList.remove('st-waiting'); runChoreographedTimeline(); };
         image.addEventListener('load', onReady, { once: true });
         // If the image fails outright (404, bad network), don't leave the person
         // stuck on a black screen -- reveal the homepage instead.
         image.addEventListener('error', revealHomepage, { once: true });
-        // absolute fallback: if it still hasn't loaded after 2.5s, reveal anyway
-        // (v32.0: was 6s -- too long to stare at a loading dot on a slow link).
+        // absolute fallback: if it still hasn't loaded after 6s, reveal anyway.
         samTimers.push(setTimeout(() => {
             if (!revealed && !(image.complete && image.naturalWidth > 0)) revealHomepage();
-        }, 2500));
+        }, 6000));
     }
 }
 
@@ -9954,7 +9962,6 @@ function logout() {
     });
     localStorage.clear();
     Object.keys(keep).forEach(k => { try { localStorage.setItem(k, keep[k]); } catch (e) {} });
-    try { sessionStorage.removeItem('xenaIntroPlayed'); } catch (e) {}  // v32.0: next login plays the intro again
     location.reload(); 
 }
 
@@ -11273,13 +11280,14 @@ setInterval(pvRepaintPresencePills, 30000);
 // Logs and the dispatcher all move together. Reads are coalesced server-
 // side (10s cache); the page auto-refreshes every 30s ONLY while the tab
 // is open and visible, so quota stays flat.
-const AP_STATUSES = ["Online", "On Task", "Working Ticket", "Meeting", "Break", "Offline"];
+const AP_STATUSES = ["Online", "On Task", "Working Ticket", "Meeting", "Break", "Idle", "Offline"];
 const AP_META = {
     "Online":         { c: '#00e676', i: '🟢' },
     "On Task":        { c: '#00d4ff', i: '🎯' },
     "Working Ticket": { c: '#b388ff', i: '🎫' },
     "Meeting":        { c: '#ffab00', i: '📞' },
     "Break":          { c: '#ff8a65', i: '☕' },
+    "Idle":           { c: '#b0bec5', i: '😴' },
     "Offline":        { c: '#90a4ae', i: '⚫' },
 };
 let apBoard = null;      // last /api/presence/board payload
@@ -26985,13 +26993,22 @@ async function atmLoad(force){
         if(host) host.innerHTML='<div class="atm-empty">⚠️ '+escHtml(e.message||String(e))+'</div>';
     }finally{ atmLoading=false; }
 }
-function atmFlagChip(fl,D){
+function atmFlagChip(fl,D,a,ds){
     const t={late:'⏰ Late '+atmMinLabel(D.late_min),
              gap:'🔴 Offline '+atmMinLabel(D.gap_min)+' in shift',
              missing:'⚠️ Missing '+atmMinLabel(D.missing_min),
              early:'↩ Left early '+atmMinLabel(D.early_min),
              no_show:'🚫 Absent — never signed in'}[fl];
-    return t?`<span class="atm-flag ${fl}">${t}</span>`:'';
+    if(!t) return '';
+    /* v33.0 (spec §4.3): exceptions are 1-click resolvable — the chip carries
+       agent/day/kind and opens the excuse resolver; resolved ones get a badge. */
+    const aid=(a&&a.agent_id)||'';
+    const canX=(typeof xa4Can==='function')&&xa4Can('audition.attendance.excuse')&&aid&&ds;
+    const ex=(typeof xa4ExcuseFor==='function'&&aid&&ds)?xa4ExcuseFor(aid,ds,fl):null;
+    const cls='atm-flag '+fl+(canX?' xa4-flag':'');
+    const attrs=canX?` data-xa4-aid="${escHtml(aid)}" data-xa4-name="${escHtml(a.name||'')}" data-xa4-day="${ds}" data-xa4-kind="${fl}" title="Click to resolve this exception"`:'';
+    const badge=ex?` <span class="xa4-exc-badge" title="${escHtml(ex.note||'')}">✔ ${escHtml(ex.reason_label||'Excused')}</span>`:'';
+    return `<span class="${cls}"${attrs}>${t}</span>${badge}`;
 }
 function atmDayRow(a,ds,axis,ticks){
     const D=(a.days||{})[ds]||{};
@@ -27042,7 +27059,7 @@ function atmDayRow(a,ds,axis,ticks){
         if(x.min>=10) gaps+=`<div class="atm-gaplbl" style="left:${p((x.s+x.e)/2)}%">${atmMinLabel(x.min)}</div>`;
     });
     let flags='';
-    (D.flags||[]).forEach(fl=>{ flags+=atmFlagChip(fl,D); });
+    (D.flags||[]).forEach(fl=>{ flags+=atmFlagChip(fl,D,a,ds); });
     // Phase 60b: clean stacked stats -- only non-zero parts, on-task and
     // ticket reported SEPARATELY (they are different statuses).
     let statsLine='';
@@ -27058,6 +27075,16 @@ function atmDayRow(a,ds,axis,ticks){
     }else{
         statsLine=isAbsent?'🚫 Absent — scheduled, never signed in':(isOff?'🌙 Off day':'—');
     }
+    /* v33.0 (spec §4.3): ghosted SCHEDULED strip above the actual strip, and
+       the scrubber data map (XA4.strips) powering the crosshair HUD. */
+    let schedGhost='';
+    if(D.shift&&D.shift.start_min!=null&&D.shift.end_min!=null&&!isOff){
+        schedGhost=`<div class="atm-strip-sched"><div class="xa4-ghost" style="left:${p(D.shift.start_min)}%;width:${p(Math.max(1,D.shift.end_min-D.shift.start_min))}%"></div></div>`;
+    }
+    try{
+        const _X=(window.XA4=window.XA4||{}); _X.strips=_X.strips||{};
+        if(a.agent_id) _X.strips[a.agent_id+'|'+ds]={segments:_runs,gaps:(D.inshift_gaps||[]),axis:axis};
+    }catch(e){}
     const punch=(D.first!=null)?`🕒 ${atmHm(D.first)} → ${(D.last!=null?atmHm(D.last):'now')}`:'';
     return `<div class="atm-day${isToday?' today':''}">
       <div class="atm-day-label">
@@ -27067,7 +27094,7 @@ function atmDayRow(a,ds,axis,ticks){
         ${punch?`<div class="atm-day-punch">${punch}</div>`:''}
       </div>
       <div>
-        <div class="atm-strip">${ticks}${shiftWin}${isOff?'<div class="atm-offday">OFF</div>':''}${segs}${gaps}</div>
+        ${schedGhost}<div class="atm-strip" data-xa4-day="${ds}" data-xa4-aid="${escHtml(a.agent_id||'')}">${ticks}${shiftWin}${isOff?'<div class="atm-offday">OFF</div>':''}${segs}${gaps}</div>
         ${flags?`<div class="atm-flags">${flags}</div>`:''}
       </div>
     </div>`;
@@ -27701,7 +27728,7 @@ function xapWrapStatics() {
             var html = od.apply(this, arguments);
             if (+ds === schDayInt(new Date())) {
                 var nw = new Date(), m = nw.getHours() * 60 + nw.getMinutes();
-                html = html.replace('<div class="atm-strip">', '<div class="atm-strip"><div class="xap-now" data-axis="' + axis + '" style="left:' + (m / axis * 100).toFixed(3) + '%"></div>');
+                html = html.replace(/<div class="atm-strip"[^>]*>/, function (op) { return op + '<div class="xap-now" data-axis="' + axis + '" style="left:' + (m / axis * 100).toFixed(3) + '%"></div>'; });
             }
             return html;
         };
@@ -30600,7 +30627,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v32.0 forensic-ledger-instant-boot 2026-11-16';
+window.SAM19_BUILD='v33.0 audition-suite 2026-11-16';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -31263,6 +31290,928 @@ document.addEventListener('keydown', e => {
     const p = document.getElementById('cmnPanel');
     if(p && p.classList.contains('show') && typeof cmnToggle === 'function') cmnToggle(true);
 });
+})();
+</script>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     v33.0 Phase 4 (enterprise spec §4, Ahmed 2026-11-16): Audition Suite.
+     §4.1 capacity banner + break stopwatch + auto-idle + handoff
+     §4.2 coverage footer + pattern painter + clone-week + iCal + quotas
+     §4.3 attendance KPIs + ghost strip + scrubber HUD + excuse resolver
+     §4.4 queue analytics: compare, funnel, quadrant, drill-down, anomalies
+     Every surface re-checks its v30.0 feature key client-side; the API
+     re-checks server-side. Restricted profiles never see these blocks.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<style id="xa4Style">
+.xa4-cap{margin-top:12px;border-radius:14px;padding:12px 14px;border:1px solid var(--border,rgba(140,160,200,.25));background:rgba(var(--ink-rgb,255,255,255),.03)}
+.xa4-cap.optimal{border-color:rgba(0,230,118,.45)} .xa4-cap.high{border-color:rgba(255,171,0,.5)} .xa4-cap.understaffed{border-color:rgba(255,82,82,.55);animation:xa4Pulse 2.2s infinite}
+@keyframes xa4Pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,82,82,.0)}50%{box-shadow:0 0 14px 0 rgba(255,82,82,.35)}}
+.xa4-cap-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.xa4-cap-band{font-weight:800;font-size:.95rem}
+.xa4-cap.optimal .xa4-cap-band{color:#00e676}.xa4-cap.high .xa4-cap-band{color:#ffab00}.xa4-cap.understaffed .xa4-cap-band{color:#ff5252}
+.xa4-cap-sub{font-size:.76rem;color:var(--text-muted)}
+.xa4-cap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:10px}
+.xa4-cap-agent{background:rgba(var(--ink-rgb,255,255,255),.04);border:1px solid var(--border,rgba(140,160,200,.18));border-radius:10px;padding:8px 10px;font-size:.74rem}
+.xa4-cap-agent b{font-size:.8rem}
+.xa4-cap-agent .row{display:flex;justify-content:space-between;gap:8px;color:var(--text-muted);margin-top:2px}
+.xa4-brk{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.8rem}
+.xa4-brk .big{font-size:1.15rem;font-weight:800;font-variant-numeric:tabular-nums}
+.xa4-brk-bar{flex:1;min-width:140px;height:8px;border-radius:99px;background:rgba(var(--ink-rgb,255,255,255),.08);overflow:hidden}
+.xa4-brk-fill{height:100%;background:#00e676;transition:width .6s}
+.xa4-brk.warn .xa4-brk-fill{background:#ffab00}.xa4-brk.over .xa4-brk-fill{background:#ff5252}
+.xa4-brk.over .big{color:#ff5252;animation:xa4Blink 1s infinite}
+@keyframes xa4Blink{50%{opacity:.45}}
+.xa4-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.xa4-kpi{background:var(--card-bg,rgba(var(--ink-rgb,255,255,255),.03));border:1px solid var(--border,rgba(140,160,200,.22));border-radius:14px;padding:12px 14px}
+.xa4-kpi .v{font-size:1.3rem;font-weight:800;font-variant-numeric:tabular-nums}
+.xa4-kpi .l{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+.xa4-pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:.68rem;font-weight:700;margin-left:6px}
+.xa4-pill.up{background:rgba(0,230,118,.15);color:#00e676}.xa4-pill.down{background:rgba(255,82,82,.15);color:#ff5252}.xa4-pill.flat{background:rgba(144,164,174,.15);color:#90a4ae}
+.xa4-cov{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.xa4-cov-day{border:1px solid var(--border,rgba(140,160,200,.22));border-radius:10px;padding:6px 10px;font-size:.72rem;font-variant-numeric:tabular-nums;background:rgba(var(--ink-rgb,255,255,255),.03)}
+.xa4-cov-day b{display:block;font-size:.7rem;color:var(--text-muted);margin-bottom:2px}
+.xa4-paint{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.xa4-pchip{border:1px solid var(--border,rgba(140,160,200,.3));border-radius:99px;padding:4px 10px;font-size:.72rem;cursor:pointer;background:rgba(var(--ink-rgb,255,255,255),.04);color:inherit}
+.xa4-pchip.on{border-color:var(--accent-cyan,#00d4ff);background:rgba(0,212,255,.15)}
+#schGrid.xa4-painting .sch-cell{cursor:copy}
+.atm-strip-sched{position:relative;height:8px;border-radius:6px;background:rgba(0,212,255,.10);margin-bottom:4px;overflow:hidden}
+.atm-strip-sched .xa4-ghost{position:absolute;top:0;bottom:0;background:rgba(0,212,255,.30);border-radius:6px}
+.atm-strip-sched .xa4-ghostlbl{position:absolute;top:-1px;font-size:.6rem;color:rgba(0,212,255,.85);transform:translateX(-50%)}
+.xa4-flag{cursor:pointer}
+.atm-flag.xa4-excused{opacity:.55;text-decoration:line-through}
+.atm-flag .xa4-exc-badge{text-decoration:none;font-size:.62rem;background:rgba(0,230,118,.18);color:#00e676;border-radius:99px;padding:0 6px;margin-left:5px}
+#xa4Hud{position:fixed;z-index:9999;pointer-events:none;background:rgba(10,14,26,.94);border:1px solid rgba(0,212,255,.4);border-radius:10px;padding:8px 10px;font-size:.72rem;color:#dfe8ff;display:none;max-width:240px}
+#xa4Hud .t{font-weight:800;color:#00d4ff;font-variant-numeric:tabular-nums}
+.xa4-cross{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,212,255,.65);pointer-events:none}
+.xa4-fun{display:flex;flex-direction:column;gap:8px}
+.xa4-fun-row{display:flex;align-items:center;gap:10px;font-size:.78rem}
+.xa4-fun-row .nm{width:86px;flex:none;color:var(--text-muted)}
+.xa4-fun-bar{height:18px;border-radius:6px;background:linear-gradient(90deg,#00d4ff,#00e676);min-width:2px;position:relative}
+.xa4-fun-ghost{position:absolute;top:-4px;bottom:-4px;border:1px dashed rgba(255,171,0,.7);border-radius:8px;pointer-events:none}
+.xa4-fun-row .ct{font-weight:800;font-variant-numeric:tabular-nums}
+.xa4-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,212,255,.5);background:rgba(0,212,255,.12);color:#00d4ff;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:700;cursor:pointer;margin:0 6px 6px 0}
+.xa4-agrow{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--border,rgba(140,160,200,.18));border-radius:10px;margin-bottom:6px;font-size:.78rem;cursor:pointer;background:rgba(var(--ink-rgb,255,255,255),.03)}
+.xa4-agrow:hover{border-color:rgba(0,212,255,.45)}
+.xa4-agrow .nm{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xa4-agrow .num{font-variant-numeric:tabular-nums;color:var(--text-muted)}
+#xa4Drawer{position:fixed;top:0;right:0;bottom:0;width:min(380px,92vw);background:var(--card-bg,#12182b);border-left:1px solid var(--border,rgba(140,160,200,.3));z-index:9998;padding:18px;overflow-y:auto;transform:translateX(105%);transition:transform .25s;box-shadow:-12px 0 40px rgba(0,0,0,.45)}
+#xa4Drawer.open{transform:none}
+#xa4IdleOv{position:fixed;inset:0;background:rgba(4,8,18,.72);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:center;justify-content:center}
+#xa4IdleOv .box{background:var(--card-bg,#12182b);border:1px solid rgba(255,171,0,.5);border-radius:16px;padding:22px 24px;max-width:400px;text-align:center}
+#xa4IdleOv .cd{font-size:2rem;font-weight:800;color:#ffab00;font-variant-numeric:tabular-nums;margin:8px 0}
+.xa4-anom{border:1px solid rgba(255,171,0,.45);background:rgba(255,171,0,.08);border-radius:10px;padding:8px 12px;font-size:.76rem;margin-bottom:6px}
+.xa4-anom.drop{border-color:rgba(255,82,82,.45);background:rgba(255,82,82,.08)}
+select.xa4-sel{background:rgba(var(--ink-rgb,255,255,255),.06);border:1px solid var(--border,rgba(140,160,200,.3));color:inherit;border-radius:8px;padding:5px 8px;font-size:.76rem}
+</style>
+<script id="xa4Module">
+(function(){
+"use strict";
+var XA4 = { settings: null, settingsAt: 0, telemetry: null, telemetryAt: 0,
+            paint: { on: false, pattern: null }, strips: {}, ana: null, anaFilter: null,
+            breakTodayMin: null, breakTodayAt: 0, lastAct: Date.now(), idleModal: false,
+            meStatus: null, meSince: 0 };
+window.XA4 = XA4;
+
+function xa4Can(key){
+    try{
+        if (typeof PermissionGuard !== 'undefined' && PermissionGuard && typeof PermissionGuard.can === 'function')
+            return PermissionGuard.can(key);
+    }catch(e){}
+    return (typeof isAdmin !== 'undefined') && !!isAdmin;
+}
+function xa4Mmss(ms){
+    var s = Math.max(0, Math.floor(ms / 1000));
+    var m = Math.floor(s / 60); s = s % 60;
+    return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+function xa4MinLabel(min){
+    min = Math.round(min || 0);
+    if (min < 60) return min + 'm';
+    return Math.floor(min/60) + 'h ' + String(min%60).padStart(2,'0') + 'm';
+}
+function xa4Hm(min){
+    if (min == null || !isFinite(min)) return '--:--';
+    min = ((Math.round(min) % 1440) + 1440) % 1440;
+    return String(Math.floor(min/60)).padStart(2,'0') + ':' + String(min%60).padStart(2,'0');
+}
+function xa4DayInts(f, t){
+    var out = [], d = new Date(f.getTime());
+    while (d <= t && out.length < 100) { out.push(schDayInt(d)); d.setDate(d.getDate() + 1); }
+    return out;
+}
+
+/* ─────────────────────────── §4.1 STATUS ─────────────────────────── */
+function xa4TelemetryLoad(force){
+    var host = document.getElementById('apCapWrap');
+    if (!host) return;
+    if (!xa4Can('audition.status.capacity')) { host.style.display = 'none'; return; }
+    if (!force && XA4.telemetry && (Date.now() - XA4.telemetryAt) < 60000) { xa4TelemetryRender(); return; }
+    fetch('/api/audition/status/telemetry?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d || !d.success) return;
+            XA4.telemetry = d; XA4.telemetryAt = Date.now();
+            xa4TelemetryRender();
+        }).catch(function(){});
+}
+function xa4TelemetryRender(){
+    var host = document.getElementById('apCapWrap');
+    var d = XA4.telemetry;
+    if (!host || !d) return;
+    var meta = { optimal: ['✅ Optimal Coverage', 'optimal'],
+                 high: ['⚠️ High Load', 'high'],
+                 understaffed: ['🚨 Understaffed Alert', 'understaffed'] }[d.band] || ['—', 'optimal'];
+    var handoffBtn = xa4Can('audition.status.handoff')
+        ? '<button type="button" class="btn btn-secondary" style="flex:none" onclick="xa4HandoffOpen()">⇄ Handoff Tickets</button>' : '';
+    var rows = (d.agents || []).slice(0, 24).map(function(a){
+        return '<div class="xa4-cap-agent"><b>' + escHtml(a.name) + '</b>' +
+            '<div class="row"><span>🎫 Claimed</span><span>' + a.claimed + '</span></div>' +
+            '<div class="row"><span>✅ Resolved today</span><span>' + a.resolved_today + '</span></div>' +
+            '<div class="row"><span>⏱ AHT</span><span>' + (a.aht_min == null ? '—' : xa4MinLabel(a.aht_min)) + '</span></div></div>';
+    }).join('');
+    host.innerHTML = '<div class="xa4-cap ' + meta[1] + '"><div class="xa4-cap-top">' +
+        '<span class="xa4-cap-band">' + meta[0] + '</span>' +
+        '<span class="xa4-cap-sub">' + d.open_queue + ' open ticket(s) · ' + d.online_count + ' online agent(s) · ratio <b>' + d.ratio + '</b>/agent</span>' +
+        handoffBtn + '</div>' +
+        (rows ? '<div class="xa4-cap-grid">' + rows + '</div>' : '') + '</div>';
+    host.style.display = 'block';
+}
+window.xa4HandoffOpen = function(){
+    var d = XA4.telemetry;
+    if (!d || !(d.agents || []).length) { ToastManager.show('Telemetry is still loading — try again in a moment.', 'info', 3000); xa4TelemetryLoad(true); return; }
+    var fromOpts = d.agents.filter(function(a){ return a.claimed > 0; }).map(function(a){
+        return '<option value="' + escHtml(a.name) + '">' + escHtml(a.name) + ' (' + a.claimed + ' claimed)</option>';
+    }).join('');
+    if (!fromOpts) { ToastManager.show('Nobody has In Progress tickets right now.', 'info', 3500); return; }
+    var online = (typeof apBoard !== 'undefined' && apBoard ? (apBoard.agents || []) : [])
+        .filter(function(a){ return ['Online','On Task','Working Ticket'].indexOf(a.status) >= 0; });
+    var toOpts = '<option value="">⇄ Spread evenly across Online agents (' + online.length + ')</option>' +
+        online.map(function(a){ return '<option value="' + escHtml(a.name) + '">→ ' + escHtml(a.name) + '</option>'; }).join('');
+    sam19Form('⇄ Handoff tickets',
+        'Move every In Progress ticket from one agent — spread across the Online team, or to one teammate. Writes the Grand Table directly and lands in the audit ledger.',
+        '<div class="sam19-frow"><label>From agent</label><select id="xa4HoFrom">' + fromOpts + '</select></div>' +
+        '<div class="sam19-frow"><label>To</label><select id="xa4HoTo">' + toOpts + '</select></div>',
+        'Hand off')
+    .then(function(vals){
+        if (!vals) return;
+        return fetch('/api/audition/status/handoff', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail,
+                from_name: vals['xa4HoFrom'], to_name: vals['xa4HoTo'] || '' })
+        }).then(function(r){ return r.json(); }).then(function(res){
+            if (!res || !res.success) throw new Error((res && res.error) || 'Handoff failed');
+            ToastManager.show('⇄ ' + res.moved + ' ticket(s) handed off to ' + (res.targets || []).join(', ') + '.', 'success', 6000);
+            XA4.telemetryAt = 0; xa4TelemetryLoad(true);
+        });
+    }).catch(function(e){ if (e) ToastManager.show('⚠️ ' + e.message, 'error', 8000); });
+};
+
+/* Break stopwatch + daily allowance (spec §4.1: 30:00 allowance, amber 25:00, rose >30:00) */
+function xa4BreakRender(me){
+    var host = document.getElementById('apBreakWrap');
+    if (!host) return;
+    if (!xa4Can('audition.status.timers')) { host.innerHTML = ''; return; }
+    if (!me) { host.innerHTML = ''; return; }
+    XA4.meStatus = me.status; XA4.meSince = me.since_ms || 0;
+    var isBreak = me.status === 'Break';
+    if (isBreak) xa4BreakTodayEnsure();
+    var used = (XA4.breakTodayMin != null ? XA4.breakTodayMin : 0);
+    var cur = isBreak && me.since_ms ? Math.max(0, Date.now() - me.since_ms) : 0;
+    var totalMin = used + (isBreak ? cur / 60000 : 0);
+    var cls = totalMin >= 30 ? 'over' : (totalMin >= 25 ? 'warn' : '');
+    host.innerHTML = '<div class="xa4-brk ' + cls + '">' +
+        '<span>☕ Current Break <span class="big" id="xa4BrkCur">' + (isBreak ? xa4Mmss(cur) : '—') + '</span></span>' +
+        '<span style="flex:1;min-width:150px"><span style="font-size:.72rem;color:var(--text-muted)">Daily used <b id="xa4BrkUsed">' + xa4MinLabel(totalMin) + '</b> / 30m allowance</span>' +
+        '<span class="xa4-brk-bar"><span class="xa4-brk-fill" id="xa4BrkFill" style="width:' + Math.min(100, totalMin / 30 * 100).toFixed(1) + '%"></span></span></span></div>';
+}
+function xa4BreakTick(){
+    var me = (typeof apBoard !== 'undefined' && apBoard ? (apBoard.agents || []) : []).find(function(a){ return a.is_me; });
+    if (!me) return;
+    if (me.status !== 'Break') return;
+    var cur = me.since_ms ? Math.max(0, Date.now() - me.since_ms) : 0;
+    var el = document.getElementById('xa4BrkCur');
+    if (el) el.textContent = xa4Mmss(cur);
+    var used = (XA4.breakTodayMin != null ? XA4.breakTodayMin : 0) + cur / 60000;
+    var u = document.getElementById('xa4BrkUsed');
+    if (u) u.textContent = xa4MinLabel(used);
+    var f = document.getElementById('xa4BrkFill');
+    if (f) f.style.width = Math.min(100, used / 30 * 100).toFixed(1) + '%';
+}
+function xa4BreakTodayEnsure(){
+    if ((Date.now() - XA4.breakTodayAt) < 300000) return;
+    XA4.breakTodayAt = Date.now();
+    var today = schDayInt(new Date());
+    fetch('/api/audition/attendance?' + new URLSearchParams({
+        user: loggedUser || '', email: loggedEmail || '',
+        my_open_id: localStorage.getItem('xenaOpenId') || '',
+        from: String(today), to: String(today) }))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d || !d.success || !(d.agents || []).length) return;
+            var meOid = (localStorage.getItem('xenaOpenId') || '').toLowerCase();
+            var a = d.agents.find(function(x){ return (x.open_id || '').toLowerCase() === meOid; }) || d.agents[0];
+            XA4.breakTodayMin = ((a.summary || {}).break_min) || 0;
+        }).catch(function(){});
+}
+setInterval(function(){
+    try{
+        var pg = document.getElementById('pg-audition-status');
+        if (pg && pg.style.display !== 'none') xa4BreakTick();
+    }catch(e){}
+}, 1000);
+
+/* Auto-idle (spec §4.1): 10 min without input while in an active status →
+   60s "still active?" modal → status flips to Idle with reason=auto_idle
+   (AUTO_IDLE_TIMEOUT audit, Warning). */
+['mousemove','keydown','pointerdown','scroll','touchstart','wheel'].forEach(function(ev){
+    document.addEventListener(ev, function(){ XA4.lastAct = Date.now(); xa4IdleReset(); }, { passive: true, capture: true });
+});
+function xa4IdleReset(){
+    if (!XA4.idleModal) return;
+    var ov = document.getElementById('xa4IdleOv');
+    if (ov) ov.remove();
+    XA4.idleModal = false;
+}
+function xa4IdleCountdown(){
+    if (XA4.idleModal) return;
+    XA4.idleModal = true;
+    var ov = document.createElement('div');
+    ov.id = 'xa4IdleOv';
+    ov.innerHTML = '<div class="box"><div style="font-size:1.6rem">😴</div>' +
+        '<div style="font-weight:800;font-size:1.05rem">Are you still active?</div>' +
+        '<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">No activity for 10 minutes — switching to <b>Idle</b> in</div>' +
+        '<div class="cd" id="xa4IdleCd">60</div>' +
+        '<button type="button" class="btn btn-primary" id="xa4IdleStay">✋ I\'m still here</button></div>';
+    document.body.appendChild(ov);
+    var left = 60;
+    var cd = document.getElementById('xa4IdleCd');
+    document.getElementById('xa4IdleStay').onclick = function(){ XA4.lastAct = Date.now(); xa4IdleReset(); };
+    var iv = setInterval(function(){
+        if (!XA4.idleModal) { clearInterval(iv); return; }
+        left--; if (cd) cd.textContent = left;
+        if (left <= 0) {
+            clearInterval(iv);
+            xa4IdleReset();
+            fetch('/api/presence/set', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+                body: JSON.stringify({ user: loggedUser || '', email: loggedEmail || '',
+                    open_id: localStorage.getItem('xenaOpenId') || '',
+                    status: 'Idle', reason: 'auto_idle' })
+            }).then(function(r){ return r.json(); }).then(function(d){
+                if (d && d.success) {
+                    ToastManager.show('😴 Switched to Idle after 10 minutes of inactivity.', 'warning', 6000);
+                    if (typeof apFetchBoard === 'function') apFetchBoard(true);
+                }
+            }).catch(function(){});
+        }
+    }, 1000);
+}
+setInterval(function(){
+    try{
+        if (previewMode || !loggedEmail || !xa4Can('audition.status.timers')) return;
+        if (Date.now() - XA4.lastAct < 600000 || XA4.idleModal) return;
+        var me = (typeof apBoard !== 'undefined' && apBoard ? (apBoard.agents || []) : []).find(function(a){ return a.is_me; });
+        if (!me) return; // board not loaded yet — only idle-track once presence is known
+        if (['Online','On Task','Working Ticket'].indexOf(me.status) < 0) return;
+        xa4IdleCountdown();
+    }catch(e){}
+}, 15000);
+
+/* ─────────────────────────── §4.2 SCHEDULE ─────────────────────────── */
+function xa4SettingsEnsure(force){
+    if (!force && XA4.settings && (Date.now() - XA4.settingsAt) < 300000) return;
+    XA4.settingsAt = Date.now();
+    fetch('/api/audition/schedule/settings?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d && d.success) XA4.settings = d.settings; })
+        .catch(function(){});
+}
+function xa4Bucket(start){
+    var m = schMinutes(start);
+    if (m == null) return null;
+    if (m >= 480 && m < 960) return 'morning';
+    if (m >= 960 && m < 1440) return 'evening';
+    return 'night';
+}
+function xa4CoverageRender(){
+    var host = document.getElementById('schCoverWrap');
+    if (!host) return;
+    var teamVisible = document.getElementById('schTeamCard');
+    if (!xa4Can('audition.schedule.coverage') || !teamVisible || teamVisible.style.display === 'none') {
+        host.style.display = 'none'; return;
+    }
+    var cov = (XA4.settings && XA4.settings.coverage) || { morning: 4, evening: 3, night: 2 };
+    var bounds = schRangeBounds();
+    var days = xa4DayInts(bounds[0], bounds[1]);
+    var html = days.map(function(di){
+        var cnt = { morning: 0, evening: 0, night: 0 };
+        (schRows || []).forEach(function(r){
+            if (+r.day !== di) return;
+            if (['On Site','Work From Home'].indexOf(r.type) < 0) return;
+            var b = xa4Bucket(r.start);
+            if (b) cnt[b]++;
+        });
+        var cell = function(k, lbl){
+            var t = cov[k] || 0, v = cnt[k];
+            var icon = t === 0 ? '—' : (v >= t ? '✅' : (v >= t - 1 ? '⚠️' : '🔴'));
+            return lbl + ': ' + v + '/' + t + ' ' + icon;
+        };
+        return '<div class="xa4-cov-day"><b>' + schDayLabel(di) + '</b>' +
+            cell('morning','M') + ' | ' + cell('evening','E') + ' | ' + cell('night','N') + '</div>';
+    }).join('');
+    host.innerHTML = '<div style="font-size:.72rem;color:var(--text-muted);margin-top:10px">Coverage vs targets</div>' +
+        '<div class="xa4-cov">' + html + '</div>';
+    host.style.display = 'block';
+}
+
+var XA4_PATTERNS = {
+    morning: { label: '🌅 Morning 08–16', type: 'On Site', start: '08:00', end: '16:00' },
+    evening: { label: '🌇 Evening 16–00', type: 'On Site', start: '16:00', end: '00:00' },
+    night:   { label: '🌙 Night 00–08',  type: 'On Site', start: '00:00', end: '08:00' },
+    wfh:     { label: '🏠 WFH 08–16',    type: 'Work From Home', start: '08:00', end: '16:00' },
+    off:     { label: '⬜ OFF',           type: 'Off', start: '', end: '' }
+};
+window.xa4PaintToggle = function(){
+    XA4.paint.on = !XA4.paint.on;
+    if (XA4.paint.on && !XA4.paint.pattern) XA4.paint.pattern = 'morning';
+    xa4PaintUi();
+};
+window.xa4PaintSet = function(k){
+    XA4.paint.pattern = k; XA4.paint.on = true;
+    xa4PaintUi();
+};
+function xa4PaintUi(){
+    var bar = document.getElementById('xa4PaintBar');
+    if (!bar) return;
+    var chips = Object.keys(XA4_PATTERNS).map(function(k){
+        var on = XA4.paint.on && XA4.paint.pattern === k ? ' on' : '';
+        return '<button type="button" class="xa4-pchip' + on + '" onclick="xa4PaintSet(\'' + k + '\')">' + XA4_PATTERNS[k].label + '</button>';
+    }).join('');
+    bar.innerHTML = '<button type="button" class="btn btn-secondary" onclick="xa4PaintToggle()">' +
+        (XA4.paint.on ? '🖌 Painting… (click to stop)' : '🖌 Pattern painter') + '</button>' +
+        (XA4.paint.on ? chips + '<span style="font-size:.72rem;color:var(--text-muted)">Click grid cells to apply the pattern.</span>' : '');
+    var g = document.getElementById('schGrid');
+    if (g) g.classList.toggle('xa4-painting', XA4.paint.on);
+}
+document.addEventListener('click', function(e){
+    try{
+        if (!XA4.paint.on || !XA4.paint.pattern) return;
+        var cell = e.target.closest && e.target.closest('#schGrid .sch-cell[data-em][data-day]');
+        if (!cell) return;
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        var p = XA4_PATTERNS[XA4.paint.pattern];
+        var em = cell.getAttribute('data-em'), day = +cell.getAttribute('data-day');
+        var a = (schAgents || []).find(function(x){ return (x.email || '') === em; });
+        if (!a || a.no_email) return;
+        var entry = { email: em, name: a.name, day: day, type: p.type, start: p.start, end: p.end, note: '' };
+        schSaveEntries([entry]).then(function(){
+            schApplyLocal([entry], []);
+            schRenderAll();
+        }).catch(function(err){ ToastManager.show('⚠️ ' + err.message, 'error', 7000); });
+    }catch(err){}
+}, true);
+
+window.xa4CloneWeek = function(){
+    if (typeof schWeekStart === 'undefined' || !schWeekStart) { ToastManager.show('Switch to Week view first.', 'info', 3000); return; }
+    var src = new Date(schWeekStart.getTime()); src.setDate(src.getDate() - 7);
+    var ws = schDayInt(src);
+    sam19Confirm('🪄 Clone last week into THIS week?',
+        'Copies the week of ' + src.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
+        ' into the visible week. Cells already holding Off / Annual Leave / Sick Leave are SKIPPED, never overwritten. You get the full conflict report after.',
+        'Clone week')
+    .then(function(ok){
+        if (!ok) return;
+        return fetch('/api/audition/schedule/clone-week', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, week_start: ws })
+        }).then(function(r){ return r.json(); }).then(function(d){
+            if (!d || !d.success) throw new Error((d && d.error) || 'Clone failed');
+            var skip = (d.skipped_leave || []).map(function(s){ return s.name + ' on ' + s.day + ' (' + s.leave + ')'; });
+            ToastManager.show('🪄 Cloned: ' + ((d.created || 0) + (d.updated || 0)) + ' day(s) written · ' +
+                skip.length + ' skipped (leave protected).', 'success', 6000);
+            if (skip.length) sam19Msg('Leave-protected cells (skipped)', null,
+                '<div class="sam19-fnote">' + skip.map(escHtml).join('<br>') + '</div>');
+            schLoad(true);
+        });
+    }).catch(function(e){ if (e) ToastManager.show('⚠️ ' + e.message, 'error', 8000); });
+};
+
+window.xa4SchSettingsOpen = function(){
+    var s = XA4.settings || { coverage: {}, leave_quotas: {}, blackout_days: [] };
+    sam19Form('⚙️ Coverage targets & leave quotas',
+        'Morning / Evening / Night coverage targets drive the footer under the team grid. Leave quotas show in the agent request modal. Blackout days (yyyymmdd, comma-separated) get flagged on leave requests.',
+        '<div class="sam19-frow"><label>Coverage — Morning target</label><input id="xa4SetM" type="number" min="0" max="50" value="' + (s.coverage.morning != null ? s.coverage.morning : 4) + '"></div>' +
+        '<div class="sam19-frow"><label>Coverage — Evening target</label><input id="xa4SetE" type="number" min="0" max="50" value="' + (s.coverage.evening != null ? s.coverage.evening : 3) + '"></div>' +
+        '<div class="sam19-frow"><label>Coverage — Night target</label><input id="xa4SetN" type="number" min="0" max="50" value="' + (s.coverage.night != null ? s.coverage.night : 2) + '"></div>' +
+        '<div class="sam19-frow"><label>Annual leave quota (days)</label><input id="xa4SetQA" type="number" min="0" max="365" value="' + (s.leave_quotas.annual != null ? s.leave_quotas.annual : 21) + '"></div>' +
+        '<div class="sam19-frow"><label>Sick leave quota (days)</label><input id="xa4SetQS" type="number" min="0" max="365" value="' + (s.leave_quotas.sick != null ? s.leave_quotas.sick : 10) + '"></div>' +
+        '<div class="sam19-frow"><label>Blackout days</label><input id="xa4SetBD" type="text" placeholder="20261225,20270101" value="' + (s.blackout_days || []).join(',') + '"></div>',
+        'Save settings')
+    .then(function(vals){
+        if (!vals) return;
+        var bd = String(vals['xa4SetBD'] || '').split(/[^0-9]+/).filter(function(x){ return x.length === 8; }).map(function(x){ return +x; });
+        return fetch('/api/audition/schedule/settings', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail,
+                coverage: { morning: +vals['xa4SetM'], evening: +vals['xa4SetE'], night: +vals['xa4SetN'] },
+                leave_quotas: { annual: +vals['xa4SetQA'], sick: +vals['xa4SetQS'] },
+                blackout_days: bd })
+        }).then(function(r){ return r.json(); }).then(function(d){
+            if (!d || !d.success) throw new Error((d && d.error) || 'Save failed');
+            XA4.settings = d.settings; XA4.settingsAt = Date.now();
+            ToastManager.show('⚙️ Coverage & quotas saved.', 'success', 4000);
+            xa4CoverageRender();
+        });
+    }).catch(function(e){ if (e) ToastManager.show('⚠️ ' + e.message, 'error', 8000); });
+};
+
+window.xa4IcalOpen = function(){
+    fetch('/api/audition/schedule/ical-token?' + new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' }))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d || !d.success) throw new Error((d && d.error) || 'Could not issue a feed token');
+            var url = location.origin + d.url;
+            return sam19Msg('📆 Subscribe to your shifts', null,
+                '<div class="sam19-fnote" style="margin-bottom:8px">Read-only iCal feed of YOUR next 8 weeks of shifts — paste it into Google Calendar / Outlook / Apple Calendar (\"Add by URL\"). Anyone with this link sees your shifts; treat it like a password.</div>' +
+                '<div class="sam19-frow"><input id="xa4IcalUrl" type="text" readonly value="' + escHtml(url) + '" style="width:100%"></div>' +
+                '<div class="sam19-btnrow"><button type="button" class="sam19-btn yes" onclick="xa4CopyIcal()">📋 Copy link</button></div>');
+        })
+        .catch(function(e){ ToastManager.show('⚠️ ' + e.message, 'error', 7000); });
+};
+window.xa4CopyIcal = function(){
+    var el = document.getElementById('xa4IcalUrl');
+    if (!el) return;
+    el.select();
+    var done = function(){ ToastManager.show('📋 Feed link copied.', 'success', 3000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(el.value).then(done, done);
+    else { document.execCommand('copy'); done(); }
+};
+
+function xa4SchToolsInject(){
+    var bar = document.querySelector('#pg-audition-schedule .sch-tools');
+    if (!bar || document.getElementById('xa4ToolsWrap')) { xa4PaintUi(); return; }
+    var wrap = document.createElement('div');
+    wrap.className = 'sam19-toolsbtns'; wrap.id = 'xa4ToolsWrap';
+    wrap.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center';
+    var html = '';
+    if (xa4Can('audition.schedule.painter'))
+        html += '<span class="xa4-paint" id="xa4PaintBar"></span>' +
+                '<button type="button" class="btn btn-secondary" onclick="xa4CloneWeek()">🪄 Clone last week ▸</button>';
+    if ((typeof isAdmin !== 'undefined' && isAdmin) || xa4Can('audition.schedule.coverage'))
+        html += '<button type="button" class="btn btn-secondary" onclick="xa4SchSettingsOpen()">⚙️ Coverage & quotas</button>';
+    if (xa4Can('audition.schedule.ical'))
+        html += '<button type="button" class="btn btn-secondary" onclick="xa4IcalOpen()">📆 Subscribe (iCal)</button>';
+    wrap.innerHTML = html;
+    bar.appendChild(wrap);
+    xa4PaintUi();
+}
+
+/* Leave quota + blackout flags inside the agent request modal */
+function xa4ReqInfoRender(){
+    var seg = document.getElementById('schReqSeg');
+    if (!seg) return;
+    var el = document.getElementById('xa4ReqInfo');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'xa4ReqInfo';
+        el.style.cssText = 'font-size:.72rem;color:var(--text-muted);margin-top:8px';
+        seg.parentNode.insertBefore(el, seg.nextSibling);
+    }
+    var s = XA4.settings;
+    if (!s) { el.textContent = ''; return; }
+    el.textContent = 'Leave quotas — Annual: ' + s.leave_quotas.annual + 'd · Sick: ' + s.leave_quotas.sick + 'd' +
+        ((s.blackout_days || []).length ? ' · 🚫 ' + s.blackout_days.length + ' blackout day(s) configured' : '');
+}
+function xa4BlackoutCheck(){
+    var s = XA4.settings;
+    var sumEl = document.getElementById('schReqSum');
+    if (!s || !(s.blackout_days || []).length || !sumEl) return;
+    var warn = document.getElementById('xa4ReqBlack');
+    if (!warn) {
+        warn = document.createElement('div');
+        warn.id = 'xa4ReqBlack';
+        warn.style.cssText = 'font-size:.74rem;color:#ff5252;margin-top:4px';
+        sumEl.parentNode.insertBefore(warn, sumEl.nextSibling);
+    }
+    var f = schParseDateInput(document.getElementById('schReqFrom').value);
+    var t = schParseDateInput(document.getElementById('schReqTo').value);
+    var hit = [];
+    if (f && t && t >= f) {
+        var set = {};
+        s.blackout_days.forEach(function(d){ set[d] = 1; });
+        xa4DayInts(f, t).forEach(function(di){ if (set[di]) hit.push(di); });
+    }
+    warn.textContent = hit.length ? ('🚫 Includes blackout day(s): ' + hit.join(', ') + ' — the admin will likely reject this range.') : '';
+}
+
+/* ─────────────────────────── §4.3 ATTENDANCE ─────────────────────────── */
+function xa4ExcuseFor(aid, day, kind){
+    var m = (typeof atmData !== 'undefined' && atmData && atmData.excuses) || {};
+    return m[aid + '|' + day + '|' + kind] || null;
+}
+function xa4AtmKpis(){
+    var host = document.getElementById('atmKpis');
+    if (!host) return;
+    if (!xa4Can('audition.attendance.view') || typeof atmData === 'undefined' || !atmData || !atmData.success) {
+        host.style.display = 'none'; return;
+    }
+    var planned = 0, worked = 0, shiftDays = 0, onTime = 0, gap = 0, flags = 0, excused = 0;
+    (atmData.agents || []).forEach(function(a){
+        Object.keys(a.days || {}).forEach(function(ds){
+            var D = a.days[ds];
+            if (!D || D.future) return;
+            var sh = D.shift;
+            var isWork = sh && ['On Site','Work From Home'].indexOf(sh.type) >= 0 && sh.start_min != null && sh.end_min != null;
+            if (isWork) {
+                var plan = Math.max(1, sh.end_min - sh.start_min);
+                planned += plan;
+                worked += Math.min(plan, D.worked_min || 0);
+                shiftDays++;
+                if ((D.late_min || 0) <= 5) onTime++;
+            }
+            gap += D.gap_min || 0;
+            (D.flags || []).forEach(function(fl){
+                flags++;
+                if (xa4ExcuseFor(a.agent_id, ds, fl)) excused++;
+            });
+        });
+    });
+    var adherence = planned ? Math.round(worked / planned * 1000) / 10 : null;
+    var onTimePct = shiftDays ? Math.round(onTime / shiftDays * 1000) / 10 : null;
+    host.innerHTML =
+        '<div class="xa4-kpi"><div class="v">' + (adherence == null ? '—' : adherence + '%') + '</div><div class="l">Adherence (worked vs scheduled)</div></div>' +
+        '<div class="xa4-kpi"><div class="v">' + (onTimePct == null ? '—' : onTimePct + '%') + '</div><div class="l">On-time (5-min grace)</div></div>' +
+        '<div class="xa4-kpi"><div class="v">' + xa4MinLabel(gap) + '</div><div class="l">Unplanned gap minutes</div></div>' +
+        '<div class="xa4-kpi"><div class="v">' + (flags - excused) + '</div><div class="l">Open exceptions (' + excused + ' resolved)</div></div>';
+    host.style.display = 'grid';
+}
+function xa4ExcuseOpen(aid, name, day, kind){
+    if (!xa4Can('audition.attendance.excuse')) return;
+    var labels = { late: '⏰ Late', gap: '🔴 Offline gap', missing: '⚠️ Missing time', early: '↩ Left early', no_show: '🚫 Absent' };
+    sam19Form('Resolve exception — ' + (labels[kind] || kind),
+        name + ' · ' + day + '. Pick a resolution and leave a note — every resolution lands in the audit ledger.',
+        '<div class="sam19-frow"><label>Resolution</label><select id="xa4ExcReason">' +
+        '<option value="approved">✅ Approved Excuse</option>' +
+        '<option value="outage">🌐 Lark·Network Outage</option>' +
+        '<option value="violation">⛔ Unexcused Violation</option></select></div>' +
+        '<div class="sam19-frow"><label>Note (required)</label><textarea id="xa4ExcNote" rows="3" placeholder="Why is this flag excused?"></textarea></div>',
+        'Save resolution')
+    .then(function(vals){
+        if (!vals) return;
+        if (!String(vals['xa4ExcNote'] || '').trim()) { ToastManager.show('A note is required.', 'warning', 3500); return; }
+        return fetch('/api/audition/attendance/excuse', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail,
+                agent_id: aid, agent_name: name, day: +day, kind: kind,
+                reason: vals['xa4ExcReason'], note: String(vals['xa4ExcNote'] || '').trim() })
+        }).then(function(r){ return r.json(); }).then(function(d){
+            if (!d || !d.success) throw new Error((d && d.error) || 'Save failed');
+            ToastManager.show('✅ Exception resolved — ' + d.excuse.reason_label + '.', 'success', 5000);
+            if (typeof atmLoad === 'function') atmLoad(true);
+        });
+    }).catch(function(e){ if (e) ToastManager.show('⚠️ ' + e.message, 'error', 8000); });
+}
+document.addEventListener('click', function(e){
+    try{
+        var chip = e.target.closest && e.target.closest('.atm-flag.xa4-flag');
+        if (!chip) return;
+        xa4ExcuseOpen(chip.getAttribute('data-xa4-aid'), chip.getAttribute('data-xa4-name'),
+                      chip.getAttribute('data-xa4-day'), chip.getAttribute('data-xa4-kind'));
+    }catch(err){}
+});
+
+/* Scrubber HUD (spec §4.3): crosshair over the dual strip → minute, status,
+   block duration. Data comes from the XA4.strips map filled by atmDayRow. */
+function xa4HudEl(){
+    var h = document.getElementById('xa4Hud');
+    if (!h) { h = document.createElement('div'); h.id = 'xa4Hud'; document.body.appendChild(h); }
+    return h;
+}
+document.addEventListener('mousemove', function(e){
+    try{
+        if (!xa4Can('audition.attendance.scrubber')) return;
+        var strip = e.target.closest && e.target.closest('.atm-strip[data-xa4-day]');
+        var hud = xa4HudEl();
+        if (!strip) { hud.style.display = 'none'; return; }
+        var key = (strip.getAttribute('data-xa4-aid') || '') + '|' + strip.getAttribute('data-xa4-day');
+        var rec = XA4.strips[key];
+        if (!rec) { hud.style.display = 'none'; return; }
+        var r = strip.getBoundingClientRect();
+        var minute = Math.max(0, Math.min(rec.axis, (e.clientX - r.left) / r.width * rec.axis));
+        var seg = (rec.segments || []).find(function(s){ return minute >= s.s && minute < s.e; });
+        var gap = (rec.gaps || []).find(function(g){ return minute >= g.s && minute < g.e; });
+        var status = seg ? seg.st : (gap ? 'Offline (gap)' : 'No activity');
+        var lbl = (typeof ATM_ST_LABEL !== 'undefined' && ATM_ST_LABEL[status]) || status;
+        hud.innerHTML = '<div class="t">🕐 ' + xa4Hm(minute) + '</div>' +
+            '<div>' + escHtml(lbl) + '</div>' +
+            (seg ? '<div style="color:var(--text-muted)">Block ' + xa4Hm(seg.s) + ' → ' + xa4Hm(seg.e) + ' · ' + xa4MinLabel(seg.e - seg.s) + '</div>' : '') +
+            (gap ? '<div style="color:#ff8a65">Gap ' + xa4MinLabel(gap.min) + '</div>' : '');
+        hud.style.display = 'block';
+        hud.style.left = Math.min(window.innerWidth - 250, e.clientX + 14) + 'px';
+        hud.style.top = Math.max(8, e.clientY - 10) + 'px';
+    }catch(err){}
+});
+document.addEventListener('mouseout', function(e){
+    try{
+        if (e.target.closest && e.target.closest('.atm-strip[data-xa4-day]')) {
+            var rel = e.relatedTarget;
+            if (!rel || !rel.closest || !rel.closest('.atm-strip[data-xa4-day]'))
+                xa4HudEl().style.display = 'none';
+        }
+    }catch(err){}
+});
+
+/* The exec-page excuse buttons finally get their backend hook (spec §4.3). */
+window.xapResolve = function(i, action){
+    var w = (typeof atmData !== 'undefined' && atmData && atmData.warnings || [])[i];
+    if (!w) return;
+    if (action === 'excuse' && xa4Can('audition.attendance.excuse')) {
+        var a = (atmData.agents || []).find(function(x){ return (x.name || '') === w.agent; });
+        if (a) { xa4ExcuseOpen(a.agent_id, a.name, w.day, w.kind); return; }
+    }
+    var r = xapResolved();
+    r[w.agent + '|' + w.day + '|' + w.kind] = { a: action, ts: Date.now() };
+    xapSaveResolved(r);
+    xapUpgradeWarn();
+    ToastManager.show('Recorded locally.', 'success', 4000);
+};
+
+/* ─────────────────────────── §4.4 ANALYTICS ─────────────────────────── */
+window.xa4AnalyticsLoad = function(force){
+    var host = document.getElementById('xa4Panel');
+    if (!host) return;
+    if (!xa4Can('audition.analytics.view')) { host.style.display = 'none'; return; }
+    var bounds = xeaBounds();
+    var cmp = (document.getElementById('xa4Compare') || {}).value || 'off';
+    fetch('/api/audition/analytics?' + new URLSearchParams({
+        user: loggedUser || '', email: loggedEmail || '',
+        from: String(schDayInt(bounds[0])), to: String(schDayInt(bounds[1])), compare: cmp }))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d || !d.success) { if (d && d.error) host.style.display = 'none'; return; }
+            XA4.ana = d;
+            xa4AnalyticsRender();
+        }).catch(function(){});
+};
+function xa4Delta(cur, prev, invert){
+    if (prev == null || prev === 0 || cur == null) return '';
+    var pct = (cur - prev) / Math.abs(prev) * 100;
+    var good = invert ? pct < 0 : pct > 0;
+    var cls = Math.abs(pct) < 0.05 ? 'flat' : (good ? 'up' : 'down');
+    var arrow = Math.abs(pct) < 0.05 ? '▬' : (pct > 0 ? '▲' : '▼');
+    return '<span class="xa4-pill ' + cls + '">' + (pct > 0 ? '+' : '') + pct.toFixed(1) + '% ' + arrow + '</span>';
+}
+function xa4AnalyticsRender(){
+    var d = XA4.ana;
+    var host = document.getElementById('xa4Panel');
+    if (!d || !host) return;
+    var m = d.metrics || {}, c = (d.comparison || {}).metrics || null;
+    var F = m.funnel || {}, T = m.tat_min || {}, A = m.aht_min || {};
+    var cF = c ? (c.funnel || {}) : null, cT = c ? (c.tat_min || {}) : null, cA = c ? (c.aht_min || {}) : null;
+    var kpis = [
+        ['📥 Submitted', F.submitted, cF ? cF.submitted : null, false, ''],
+        ['✅ Resolved', F.resolved, cF ? cF.resolved : null, false, ''],
+        ['⛔ Rejection rate', m.rejection_rate, c ? c.rejection_rate : null, true, '%'],
+        ['⏱ TAT P50', T.p50, cT ? cT.p50 : null, true, 'm'],
+        ['⏱ TAT P95', T.p95, cT ? cT.p95 : null, true, 'm'],
+        ['🎫 AHT P50', A.p50, cA ? cA.p50 : null, true, 'm']
+    ];
+    document.getElementById('xa4Kpis').innerHTML = kpis.map(function(k){
+        var v = k[1];
+        var txt = v == null ? '—' : (k[4] === 'm' ? xa4MinLabel(v) : v + (k[4] || ''));
+        return '<div class="xa4-kpi"><div class="v">' + txt + (k[2] != null ? xa4Delta(v, k[2], k[3]) : '') + '</div><div class="l">' + k[0] + '</div></div>';
+    }).join('');
+    /* funnel with dashed ghost bars for the comparison period */
+    var maxF = Math.max(1, F.submitted || 0);
+    var ghost = function(v){ return cF && v != null ? 'width:' + Math.max(2, v / maxF * 100) + '%' : ''; };
+    document.getElementById('xa4Funnel').innerHTML = ['submitted','claimed','resolved'].map(function(k){
+        var v = F[k] || 0;
+        return '<div class="xa4-fun-row"><span class="nm">' + k + '</span>' +
+            '<span class="xa4-fun-bar" style="width:' + Math.max(2, v / maxF * 100) + '%">' +
+            (cF ? '<span class="xa4-fun-ghost" style="' + ghost(cF[k]) + '"></span>' : '') + '</span>' +
+            '<span class="ct">' + v + '</span>' +
+            (cF ? '<span class="xa4-cap-sub">was ' + (cF[k] || 0) + '</span>' : '') + '</div>';
+    }).join('') + (c ? '<div class="xa4-cap-sub" style="margin-top:6px">Dashed outline = ' + escHtml(d.comparison.label) + '</div>' : '');
+    /* quadrant scatter: throughput (X) vs done-rate (Y), median crosshairs */
+    var agents = (m.agents || []).slice();
+    var maxX = Math.max(1, Math.max.apply(null, agents.map(function(a){ return a.resolved; }).concat([1])));
+    var xs = agents.map(function(a){ return a.resolved; }).sort(function(a,b){ return a-b; });
+    var ys = agents.map(function(a){ return a.done_rate; }).sort(function(a,b){ return a-b; });
+    var medX = xs.length ? xs[Math.floor((xs.length-1)/2)] : 0;
+    var medY = ys.length ? ys[Math.floor((ys.length-1)/2)] : 0;
+    var W = 320, H = 240, pad = 28;
+    var px = function(v){ return pad + (v / maxX) * (W - pad - 8); };
+    var py = function(v){ return H - pad - (v / 100) * (H - pad - 8); };
+    var dots = agents.map(function(a, i){
+        var init = (a.name || '?').trim().slice(0, 2).toUpperCase();
+        return '<g class="xa4-dot" data-i="' + i + '" style="cursor:pointer">' +
+            '<circle cx="' + px(a.resolved).toFixed(1) + '" cy="' + py(a.done_rate).toFixed(1) + '" r="9" fill="rgba(0,212,255,.25)" stroke="#00d4ff" stroke-width="1.2"/>' +
+            '<text x="' + px(a.resolved).toFixed(1) + '" y="' + (py(a.done_rate)+3).toFixed(1) + '" font-size="8" fill="#dfe8ff" text-anchor="middle">' + escHtml(init) + '</text></g>';
+    }).join('');
+    document.getElementById('xa4Quad').innerHTML =
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:340px">' +
+        '<line x1="' + pad + '" y1="' + (H-pad) + '" x2="' + (W-8) + '" y2="' + (H-pad) + '" stroke="rgba(140,160,200,.4)"/>' +
+        '<line x1="' + pad + '" y1="8" x2="' + pad + '" y2="' + (H-pad) + '" stroke="rgba(140,160,200,.4)"/>' +
+        '<line x1="' + px(medX) + '" y1="8" x2="' + px(medX) + '" y2="' + (H-pad) + '" stroke="rgba(255,171,0,.5)" stroke-dasharray="4 3"/>' +
+        '<line x1="' + pad + '" y1="' + py(medY) + '" x2="' + (W-8) + '" y2="' + py(medY) + '" stroke="rgba(255,171,0,.5)" stroke-dasharray="4 3"/>' +
+        dots +
+        '<text x="' + (W-8) + '" y="' + (H-8) + '" font-size="8" fill="rgba(140,160,200,.8)" text-anchor="end">throughput →</text>' +
+        '<text x="6" y="14" font-size="8" fill="rgba(140,160,200,.8)">done-rate ↑</text></svg>';
+    var qWrap = document.getElementById('xa4Quad');
+    qWrap.querySelectorAll('.xa4-dot').forEach(function(g){
+        g.addEventListener('click', function(){
+            var a = agents[+g.getAttribute('data-i')];
+            XA4.anaFilter = a.name;
+            xa4AnalyticsRenderAgents();
+            xa4DrawerOpen(a.name);
+        });
+    });
+    /* anomaly radar */
+    var an = document.getElementById('xa4AnomWrap');
+    if (an) {
+        if (xa4Can('audition.analytics.anomalies') && (d.anomalies || []).length) {
+            an.innerHTML = '<h5 style="margin:14px 0 8px">📡 Anomaly radar (vs 14-day baseline, &gt;2σ)</h5>' +
+                d.anomalies.map(function(x){
+                    return '<div class="xa4-anom ' + x.kind + '">' + (x.kind === 'spike' ? '📈' : '📉') + ' <b>' + x.day + '</b> — ' +
+                        x.resolved + ' resolved vs baseline ' + x.baseline + ' (z=' + x.z + ')</div>';
+                }).join('');
+        } else an.innerHTML = '';
+    }
+    xa4AnalyticsRenderAgents();
+    host.style.display = 'block';
+}
+function xa4AnalyticsRenderAgents(){
+    var d = XA4.ana;
+    if (!d) return;
+    var m = d.metrics || {};
+    var c = (d.comparison || {}).metrics || null;
+    var agents = (m.agents || []).slice();
+    if (XA4.anaFilter) agents = agents.filter(function(a){ return a.name === XA4.anaFilter; });
+    var chips = document.getElementById('xa4Chips');
+    chips.innerHTML = XA4.anaFilter
+        ? '<span class="xa4-chip" onclick="xa4ChipClear()">👤 ' + escHtml(XA4.anaFilter) + ' ✕</span>' : '';
+    var cmpMap = {};
+    if (c) (c.agents || []).forEach(function(a){ cmpMap[(a.name || '').toLowerCase()] = a; });
+    document.getElementById('xa4Agents').innerHTML = agents.map(function(a){
+        var ca = cmpMap[(a.name || '').toLowerCase()];
+        return '<div class="xa4-agrow" onclick="xa4DrawerOpen(\'' + escHtml(a.name).replace(/'/g, "\\'") + '\')">' +
+            '<span class="nm">' + escHtml(a.name) + '</span>' +
+            '<span class="num">✅ ' + a.resolved + (ca ? ' ' + xa4Delta(a.resolved, ca.resolved, false) : '') + '</span>' +
+            '<span class="num">🎯 ' + a.done_rate + '%' + (ca ? ' ' + xa4Delta(a.done_rate, ca.done_rate, false) : '') + '</span></div>';
+    }).join('') || '<div class="xa4-cap-sub">No resolved tickets in this range.</div>';
+}
+window.xa4ChipClear = function(){ XA4.anaFilter = null; xa4AnalyticsRenderAgents(); };
+window.xa4DrawerOpen = function(name){
+    var d = XA4.ana;
+    if (!d) return;
+    var m = d.metrics || {};
+    var c = (d.comparison || {}).metrics || null;
+    var a = (m.agents || []).find(function(x){ return x.name === name; });
+    if (!a) return;
+    var ca = c ? (c.agents || []).find(function(x){ return (x.name || '').toLowerCase() === name.toLowerCase(); }) : null;
+    var dr = document.getElementById('xa4Drawer');
+    dr.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+        '<h4 style="margin:0">👤 ' + escHtml(a.name) + '</h4>' +
+        '<button type="button" class="btn btn-secondary" onclick="xa4DrawerClose()">✕</button></div>' +
+        '<div class="xa4-kpi"><div class="v">' + a.resolved + '</div><div class="l">Resolved this period' + (ca ? ' ' + xa4Delta(a.resolved, ca.resolved, false) : '') + '</div></div>' +
+        '<div class="xa4-kpi" style="margin-top:8px"><div class="v">' + a.done_rate + '%</div><div class="l">Done rate (Done vs Rejected)' + (ca ? ' ' + xa4Delta(a.done_rate, ca.done_rate, false) : '') + '</div></div>' +
+        (ca ? '<div class="xa4-cap-sub" style="margin-top:10px">Comparison: ' + escHtml(d.comparison.label) + ' — was ' + ca.resolved + ' resolved · ' + ca.done_rate + '% done rate.</div>' : '') +
+        '<div style="margin-top:14px"><button type="button" class="btn btn-primary" onclick="xa4Csv()">⬇ Export filtered CSV</button></div>';
+    dr.classList.add('open');
+};
+window.xa4DrawerClose = function(){
+    var dr = document.getElementById('xa4Drawer');
+    if (dr) dr.classList.remove('open');
+};
+window.xa4Csv = function(){
+    var d = XA4.ana;
+    if (!d) return;
+    var agents = ((d.metrics || {}).agents || []).slice();
+    if (XA4.anaFilter) agents = agents.filter(function(a){ return a.name === XA4.anaFilter; });
+    if (!agents.length) { ToastManager.show('Nothing to export.', 'info', 2500); return; }
+    var q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var lines = ['Agent,Resolved,DoneRate%'];
+    agents.forEach(function(a){ lines.push([q(a.name), a.resolved, a.done_rate].join(',')); });
+    var blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var el = document.createElement('a');
+    el.href = URL.createObjectURL(blob);
+    el.download = 'xena-queue-analytics-' + d.from + '-' + d.to + '.csv';
+    document.body.appendChild(el); el.click(); el.remove();
+    ToastManager.show('⬇ ' + agents.length + ' agent row(s) exported.', 'success', 3500);
+};
+
+/* ─────────────────── swap marketplace: 3-state badges (§4.2) ─────────────────── */
+window.sch19SwapsOpen = async function(){
+    try{
+        var qs = new URLSearchParams({ user: loggedUser || '', email: loggedEmail || '' });
+        var r = await fetch('/api/audition/schedule/swaps?' + qs);
+        var d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        var list = d.swaps || [];
+        var me = (loggedEmail || '').toLowerCase();
+        var adm = (typeof isAdmin !== 'undefined') && isAdmin;
+        var rows = list.map(function(s){
+            var stMap = { pending: '⏳ Awaiting colleague', peer_accepted: '🤝 Colleague accepted — needs lead',
+                          approved: '✅ Approved', declined: '⛔ Declined', expired: '💤 Expired' };
+            var st = stMap[s.status] || s.status;
+            var canAccept = (s.status === 'pending') && (s.to_email || '').toLowerCase() === me;
+            var canLead = (s.status === 'pending' || s.status === 'peer_accepted') && adm;
+            var canDecline = adm || ((s.to_email || '').toLowerCase() === me) || (s.status !== 'approved' && (s.from_email || '').toLowerCase() === me);
+            var sub = 'Day ' + s.day + (s.ts ? ' · ' + new Date(s.ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+            var btns = '';
+            if (canAccept) btns += '<button type="button" onclick="sch19SwapDecide(\'' + escHtml(s.id) + '\',\'approve\')">🤝 Accept</button>';
+            if (canLead) btns += '<button type="button" onclick="sch19SwapDecide(\'' + escHtml(s.id) + '\',\'approve\')">✅ Final approve</button>';
+            if ((canAccept || canLead || (s.status === 'peer_accepted' && canDecline)) && canDecline)
+                btns += '<button type="button" class="no" onclick="sch19SwapDecide(\'' + escHtml(s.id) + '\',\'decline\')">Decline</button>';
+            return '<div class="sam19-swap ' + s.status + '"><div class="sam19-sw-main"><b>' + escHtml(s.from_name || s.from_email || '?') + '</b> ⇄ <b>' + escHtml(s.to_name || s.to_email || '?') + '</b>' +
+                '<div class="sam19-sw-sub">' + escHtml(sub) + '</div></div>' +
+                '<span class="sam19-sw-st ' + s.status + '">' + st + '</span>' +
+                (btns ? '<span class="sam19-sw-btns">' + btns + '</span>' : '') + '</div>';
+        }).join('') || '<div class="sam19-fnote">No swap requests yet.</div>';
+        await sam19Msg('⇄ Swap requests', null, '<div>' + rows + '</div>');
+    }catch(e){ ToastManager.show('⚠️ ' + e.message, 'error', 7000); }
+};
+window.sch19SwapDecide = async function(id, dec){
+    try{
+        var r = await fetch('/api/audition/schedule/swap-decide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: loggedUser, email: loggedEmail, id: id, decision: dec }) });
+        var d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || ('HTTP ' + r.status));
+        ToastManager.show(
+            d.status === 'peer_accepted' ? '🤝 Accepted — a team lead\'s final approval moves the shifts.' :
+            dec === 'approve' ? '✅ Swap approved — the two shifts are exchanged.' :
+            'Swap declined. The requester gets a Feishu alert.', 'success', 5000);
+        document.querySelectorAll('.sam19-sheet-ov').forEach(function(x){ x.remove(); });
+        sch19SwapsOpen(); schLoad(true);
+    }catch(e){ ToastManager.show('⚠️ ' + e.message, 'error', 7000); }
+};
+
+/* ─────────────────── after-hooks into the existing renders ─────────────────── */
+if (typeof apFetchBoard === 'function' && !apFetchBoard._xa4) {
+    var _xa4Pfb = apFetchBoard;
+    var _xa4Wfb = async function(manual){
+        await _xa4Pfb.apply(this, arguments);
+        try{
+            var me = (typeof apBoard !== 'undefined' && apBoard ? (apBoard.agents || []) : []).find(function(a){ return a.is_me; });
+            xa4BreakRender(me);
+            xa4TelemetryLoad(false);
+        }catch(e){}
+    };
+    _xa4Wfb._xa4 = 1;
+    apFetchBoard = _xa4Wfb;
+}
+if (typeof schRenderAll === 'function' && !schRenderAll._xa4) {
+    var _xa4Sra = schRenderAll;
+    var _xa4Wra = function(){
+        _xa4Sra.apply(this, arguments);
+        try{ xa4SettingsEnsure(false); xa4CoverageRender(); xa4SchToolsInject(); }catch(e){}
+    };
+    _xa4Wra._xa4 = 1;
+    schRenderAll = _xa4Wra;
+}
+if (typeof schReqOpen === 'function' && !schReqOpen._xa4) {
+    var _xa4Sro = schReqOpen;
+    var _xa4Wro = function(dayInt){
+        _xa4Sro.apply(this, arguments);
+        try{ xa4SettingsEnsure(false); setTimeout(function(){ xa4ReqInfoRender(); xa4BlackoutCheck(); }, 0); }catch(e){}
+    };
+    _xa4Wro._xa4 = 1;
+    schReqOpen = _xa4Wro;
+}
+if (typeof schReqSumUp === 'function' && !schReqSumUp._xa4) {
+    var _xa4Srs = schReqSumUp;
+    var _xa4Wrs = function(){
+        _xa4Srs.apply(this, arguments);
+        try{ xa4BlackoutCheck(); }catch(e){}
+    };
+    _xa4Wrs._xa4 = 1;
+    schReqSumUp = _xa4Wrs;
+}
+if (typeof atmRender === 'function' && !atmRender._xa4) {
+    var _xa4Atr = atmRender;
+    var _xa4War = function(){
+        _xa4Atr.apply(this, arguments);
+        try{ xa4AtmKpis(); }catch(e){}
+    };
+    _xa4War._xa4 = 1;
+    atmRender = _xa4War;
+}
+if (typeof xeaLoad === 'function' && !xeaLoad._xa4) {
+    var _xa4Xea = xeaLoad;
+    var _xa4Wxa = async function(){
+        await _xa4Xea.apply(this, arguments);
+        try{ xa4AnalyticsLoad(false); }catch(e){}
+    };
+    _xa4Wxa._xa4 = 1;
+    xeaLoad = _xa4Wxa;
+}
+/* telemetry refresh cadence while the status page is visible */
+setInterval(function(){
+    try{
+        var pg = document.getElementById('pg-audition-status');
+        if (pg && pg.style.display !== 'none') xa4TelemetryLoad(false);
+    }catch(e){}
+}, 60000);
+xa4SettingsEnsure(false);
 })();
 </script>
 </body>
