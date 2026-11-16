@@ -30747,7 +30747,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v33.1 special-features-toggles 2026-11-16';
+window.SAM19_BUILD='v34.1 chat-copilot-upgrades 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32332,6 +32332,382 @@ setInterval(function(){
     }catch(e){}
 }, 60000);
 xa4SettingsEnsure(false);
+})();
+</script>
+<!-- ═══════════════ v34.0 (Ahmed, 2026-11-17): Audition Assistance chat widget ═══════════════
+     Floating bubble -> slide-over panel. Talks ONLY to /api/chat (server-side proxy to the
+     Aily agent); no token or app secret ever reaches the browser. Voice: mic via
+     webkitSpeechRecognition (ar-SA/ur-PK/en-US/zh-CN), speaker via speechSynthesis.
+     RTL auto-detected per message for Arabic/Urdu. -->
+<style id="xaChatStyle">
+#xaChatFab{position:fixed;right:18px;bottom:18px;z-index:99999;width:56px;height:56px;border-radius:50%;
+  border:none;cursor:pointer;font-size:26px;background:linear-gradient(135deg,#6d28d9,#2563eb);color:#fff;
+  box-shadow:0 8px 24px rgba(37,99,235,.45);display:flex;align-items:center;justify-content:center;
+  transition:transform .15s ease,box-shadow .15s ease}
+#xaChatFab:hover{transform:scale(1.08);box-shadow:0 10px 28px rgba(109,40,217,.55)}
+#xaChatPanel{position:fixed;right:18px;bottom:84px;z-index:99999;width:min(400px,calc(100vw - 24px));
+  height:min(620px,calc(100vh - 110px));background:#0f172a;border:1px solid rgba(148,163,184,.25);
+  border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;
+  font-family:inherit}
+#xaChatPanel.open{display:flex}
+.xaChatHead{display:flex;align-items:center;gap:8px;padding:10px 12px;background:linear-gradient(135deg,#1e293b,#0f172a);
+  border-bottom:1px solid rgba(148,163,184,.2)}
+.xaChatTitle{font-weight:700;font-size:14px;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xaChatHead select{background:#1e293b;color:#cbd5e1;border:1px solid rgba(148,163,184,.35);border-radius:8px;
+  font-size:12px;padding:3px 6px;max-width:110px}
+.xaChatHead button{background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px}
+.xaChatHead button:hover{background:rgba(148,163,184,.15);color:#e2e8f0}
+#xaChatMsgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.xaMsg{max-width:88%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.55;word-wrap:break-word;white-space:pre-wrap}
+.xaMsg.user{align-self:flex-end;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-bottom-right-radius:4px}
+.xaMsg.bot{align-self:flex-start;background:#1e293b;color:#e2e8f0;border:1px solid rgba(148,163,184,.18);border-bottom-left-radius:4px}
+.xaMsg.bot .xaSpeak{margin-top:6px;background:transparent;border:1px solid rgba(148,163,184,.3);color:#94a3b8;
+  border-radius:8px;font-size:11px;padding:2px 8px;cursor:pointer}
+.xaMsg.bot .xaSpeak:hover{color:#e2e8f0;border-color:#94a3b8}
+.xaMsg.err{background:#450a0a;border:1px solid #7f1d1d;color:#fecaca}
+.xaTyping{display:inline-flex;gap:4px;padding:4px 2px}
+.xaTyping span{width:6px;height:6px;border-radius:50%;background:#94a3b8;animation:xaBlink 1.2s infinite}
+.xaTyping span:nth-child(2){animation-delay:.2s}.xaTyping span:nth-child(3){animation-delay:.4s}
+@keyframes xaBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.xaChatFoot{display:flex;align-items:flex-end;gap:8px;padding:10px;border-top:1px solid rgba(148,163,184,.2);background:#0b1220}
+#xaChatInput{flex:1;resize:none;max-height:110px;min-height:38px;background:#1e293b;color:#e2e8f0;
+  border:1px solid rgba(148,163,184,.3);border-radius:12px;padding:9px 12px;font-size:13.5px;font-family:inherit;outline:none}
+#xaChatInput:focus{border-color:#2563eb}
+.xaChatFoot button{width:40px;height:40px;border-radius:12px;border:none;cursor:pointer;font-size:17px;
+  display:flex;align-items:center;justify-content:center;flex:none}
+#xaChatMic{background:#1e293b;border:1px solid rgba(148,163,184,.3);color:#cbd5e1}
+#xaChatMic.rec{background:#7f1d1d;color:#fff;animation:xaRecPulse 1s infinite}
+@keyframes xaRecPulse{50%{box-shadow:0 0 0 6px rgba(220,38,38,.25)}}
+#xaChatSend{background:linear-gradient(135deg,#6d28d9,#2563eb);color:#fff}
+#xaChatSend:disabled{opacity:.45;cursor:not-allowed}
+.xaChatHint{font-size:11px;color:#64748b;text-align:center;padding:4px 0 6px;background:#0b1220}
+#xaChatPanel.xaWide{width:min(720px,calc(100vw - 24px))}
+.xaPara{margin:0 0 8px}.xaPara:last-child{margin-bottom:0}
+.xaEnt{display:inline-block;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.4);color:#7dd3fc;
+  border-radius:4px;padding:0 5px;font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer}
+.xaEnt:hover{background:rgba(56,189,248,.3)}
+.xaMsg.bot .xaCopyBtn{margin-top:6px;margin-left:6px;background:transparent;border:1px solid rgba(148,163,184,.3);color:#94a3b8;
+  border-radius:8px;font-size:11px;padding:2px 8px;cursor:pointer}
+.xaMsg.bot .xaCopyBtn:hover{color:#e2e8f0;border-color:#94a3b8}
+#xaChatChips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px;background:#0b1220;border-top:1px solid rgba(148,163,184,.12)}
+#xaChatChips:empty{display:none}
+.xaChip{background:#1e293b;border:1px solid rgba(148,163,184,.28);color:#cbd5e1;border-radius:4px;
+  font-size:11.5px;padding:3px 9px;cursor:pointer}
+.xaChip:hover{border-color:#38bdf8;color:#e2e8f0}
+</style>
+<div id="xaChatRoot" style="display:none">
+  <button id="xaChatFab" title="Audition Assistance AI" aria-label="Open Audition Assistance chat">🤺</button>
+  <div id="xaChatPanel" role="dialog" aria-label="Audition Assistance">
+    <div class="xaChatHead">
+      <span class="xaChatTitle">🤺 Audition Assistance</span>
+      <select id="xaChatPersona" title="Personality">
+        <option value="samurai">🗡 Samurai</option>
+        <option value="noora">🌸 Noora</option>
+      </select>
+      <select id="xaChatLang" title="Voice language">
+        <option value="auto">🌐 Auto</option>
+        <option value="ar">العربية</option>
+        <option value="ur">اردو</option>
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+      </select>
+      <button id="xaChatWide" title="Expand / compact">⇔</button>
+      <button id="xaChatNew" title="New chat">↺</button>
+      <button id="xaChatClose" title="Close">✕</button>
+    </div>
+    <div id="xaChatMsgs"></div>
+    <div id="xaChatChips"></div>
+    <div class="xaChatFoot">
+      <textarea id="xaChatInput" rows="1" placeholder="Ask about tickets, rules, cases…"></textarea>
+      <button id="xaChatMic" title="Voice input">🎙</button>
+      <button id="xaChatSend" title="Send">➤</button>
+    </div>
+    <div class="xaChatHint" id="xaChatHint">Answers only from the Xena Support KB · voice supported</div>
+  </div>
+</div>
+<script id="xaChatModule">
+(function(){
+"use strict";
+if(window.XAC && window.XAC._loaded) return;
+var XAC = window.XAC = {_loaded:true};
+var LANG_MAP = {ar:'ar-SA', ur:'ur-PK', en:'en-US', zh:'zh-CN'};
+var RTL_RE = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+var msgsEl, inputEl, sendBtn, micBtn, panel, fab, personaSel, langSel;
+var sessionId = localStorage.getItem('xenaChatSess') || '';
+var busy = false, recog = null, recActive = false;
+
+function prefs(){
+  try{ return JSON.parse(localStorage.getItem('xenaChatPrefs')||'{}'); }catch(e){ return {}; }
+}
+function savePrefs(){
+  var p0 = prefs();
+  p0.persona = personaSel.value; p0.lang = langSel.value;
+  localStorage.setItem('xenaChatPrefs', JSON.stringify(p0));
+}
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function mdLite(s){
+  var h = esc(s);
+  h = h.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  h = h.replace(/`([^`]+)`/g,'<code style="background:rgba(148,163,184,.18);padding:1px 5px;border-radius:5px">$1</code>');
+  h = h.replace(/\n/g,'<br>');
+  return h;
+}
+function dirFor(text){ return RTL_RE.test(text.slice(0,60)) ? 'rtl' : 'ltr'; }
+/* v34.1 (Ahmed): co-pilot upgrades — per-paragraph BiDi, interactive entity
+   chips (ticket / agency / user IDs route straight into the workspace via the
+   existing cpOpen* palette resolvers), copy button, starter chips, theater
+   width, KB freshness hint. All rendering stays escape-first (XSS-safe). */
+function xaSeeEnt(k, id){ if(!XAC.lastEnt || XAC.lastEnt.id !== id){ XAC.lastEnt = {k:k, id:id}; } }
+function xaChipify(h){
+  h = h.replace(/Ticket\s*#(\d{3,7})\b|(?<![#&\w;])#(\d{3,7})\b/gi, function(m, a, b){ var id = a || b; xaSeeEnt('ticket', id);
+    return '<span class="xaEnt" data-k="ticket" data-id="'+id+'" dir="ltr" title="Open in workspace">\u{1F3AB} #'+id+'</span>'; });
+  h = h.replace(/\bAGY[-\s]?(\d{2,7})\b/gi, function(m, id){ xaSeeEnt('agency', id);
+    return '<span class="xaEnt" data-k="agency" data-id="'+id+'" dir="ltr" title="Open agency">\u{1F3E6} AGY-'+id+'</span>'; });
+  h = h.replace(/\bAgency\s+(\d{2,7})\b/g, function(m, id){ xaSeeEnt('agency', id);
+    return '<span class="xaEnt" data-k="agency" data-id="'+id+'" dir="ltr" title="Open agency">\u{1F3E6} '+id+'</span>'; });
+  h = h.replace(/\bUser\s*ID\s*(\d{3,12})\b/gi, function(m, id){ xaSeeEnt('user', id);
+    return '<span class="xaEnt" data-k="user" data-id="'+id+'" dir="ltr" title="Open user">\u{1F464} '+id+'</span>'; });
+  return h;
+}
+function renderBot(text){
+  return String(text).split(/\n{2,}/).map(function(p){
+    var dir = RTL_RE.test(p.slice(0,60)) ? 'rtl' : 'ltr';
+    return '<div class="xaPara" dir="'+dir+'">' + xaChipify(mdLite(p)) + '</div>';
+  }).join('');
+}
+function xaRoute(k, id){
+  try{
+    if(k==='ticket' && typeof cpOpenTicket==='function'){ cpOpenTicket(id); return; }
+    if(k==='agency' && typeof cpOpenAgency==='function'){ cpOpenAgency(id); return; }
+    if(k==='user' && typeof cpOpenUser==='function'){ cpOpenUser(id); return; }
+  }catch(e){}
+}
+function xaCopy(text, btn){
+  var done = function(){ btn.textContent = '\u2713 Copied'; setTimeout(function(){ btn.textContent = '\u{1F4CB} Copy'; }, 1400); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, done); return; }
+  try{
+    var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove(); done();
+  }catch(e){}
+}
+function renderChips(){
+  var row = document.getElementById('xaChatChips');
+  if(!row || typeof inputEl === 'undefined' || !inputEl) return;
+  var chips = [];
+  if(XAC.lastEnt && XAC.lastEnt.k === 'ticket'){ chips.push({label:'\u{1F3AB} Ticket #'+XAC.lastEnt.id+' status', fill:'What is the status of ticket #'+XAC.lastEnt.id+'?'}); }
+  else if(XAC.lastEnt && XAC.lastEnt.k === 'agency'){ chips.push({label:'\u{1F3E6} Agency '+XAC.lastEnt.id+' summary', fill:'Summarize what you know about agency '+XAC.lastEnt.id}); }
+  chips.push({label:'\u{1F4DD} Draft reply in \u0627\u0644\u0639\u0631\u0628\u064A\u0629', fill:'Draft a polite reply in Arabic for this case: '});
+  chips.push({label:'\u{1F4D6} Explain a rule', fill:'Explain the rule about '});
+  row.innerHTML = '';
+  chips.slice(0,3).forEach(function(c){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'xaChip'; b.textContent = c.label;
+    b.onclick = function(){ inputEl.value = c.fill; inputEl.dir = dirFor(inputEl.value); autoGrow(); inputEl.focus(); };
+    row.appendChild(b);
+  });
+}
+function xaFreshness(){
+  fetch('/api/knowledge/freshness', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if(!d) return;
+      var hint = document.getElementById('xaChatHint');
+      if(!hint) return;
+      if(!d.backfill_done){ hint.textContent = 'KB is still being built \u2014 answers may be incomplete \u00B7 voice supported'; return; }
+      var mins = d.last_sync_ms ? Math.max(0, Math.round((Date.now() - d.last_sync_ms) / 60000)) : null;
+      var fresh = mins === null ? 'KB ready' : (mins < 1 ? 'KB updated just now' : (mins < 60 ? 'KB updated ' + mins + ' min ago' : 'KB updated ' + Math.round(mins / 60) + ' h ago'));
+      hint.textContent = fresh + ' \u00B7 voice supported';
+    })
+    .catch(function(){});
+}
+function addMsg(text, who, isErr){
+  var d = document.createElement('div');
+  d.className = 'xaMsg ' + (who==='user' ? 'user' : 'bot') + (isErr ? ' err' : '');
+  d.dir = dirFor(text);
+  if(who==='bot' && !isErr){
+    d.innerHTML = renderBot(text);
+    var sp = document.createElement('button');
+    sp.className = 'xaSpeak'; sp.type = 'button'; sp.textContent = '🔊 Listen';
+    sp.onclick = function(){ speak(text, sp); };
+    var cpBtn = document.createElement('button');
+    cpBtn.className = 'xaCopyBtn'; cpBtn.type = 'button'; cpBtn.textContent = '\u{1F4CB} Copy';
+    cpBtn.onclick = function(){ xaCopy(text, cpBtn); };
+    d.appendChild(document.createElement('br'));
+    d.appendChild(sp);
+    d.appendChild(cpBtn);
+    renderChips();
+  }else{
+    d.textContent = text;
+  }
+  msgsEl.appendChild(d);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+  return d;
+}
+function showTyping(){
+  var d = document.createElement('div');
+  d.className = 'xaMsg bot';
+  d.innerHTML = '<span class="xaTyping"><span></span><span></span><span></span></span>';
+  msgsEl.appendChild(d);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+  return d;
+}
+function voiceLang(){
+  var v = langSel.value;
+  if(v !== 'auto') return LANG_MAP[v];
+  var nav = (navigator.language||'en').toLowerCase();
+  if(nav.indexOf('ar')===0) return 'ar-SA';
+  if(nav.indexOf('ur')===0) return 'ur-PK';
+  if(nav.indexOf('zh')===0) return 'zh-CN';
+  return 'en-US';
+}
+function speak(text, btn){
+  try{
+    if(!('speechSynthesis' in window)){ btn.textContent='🔇 Not supported'; return; }
+    if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); btn.textContent='🔊 Listen'; return; }
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = voiceLang();
+    var vs = window.speechSynthesis.getVoices();
+    for(var i=0;i<vs.length;i++){ if(vs[i].lang && vs[i].lang.toLowerCase().indexOf(u.lang.slice(0,2))===0){ u.voice = vs[i]; break; } }
+    btn.textContent = '⏹ Stop';
+    u.onend = u.onerror = function(){ btn.textContent = '🔊 Listen'; };
+    window.speechSynthesis.speak(u);
+  }catch(e){ btn.textContent = '🔊 Listen'; }
+}
+function toggleMic(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    addMsg('Voice input needs Chrome or Edge. You can still type in any language.', 'bot', true);
+    return;
+  }
+  if(recActive){ try{ recog.stop(); }catch(e){} return; }
+  recog = new SR();
+  recog.lang = voiceLang();
+  recog.interimResults = true;
+  recog.maxAlternatives = 1;
+  var base = inputEl.value;
+  recog.onresult = function(ev){
+    var txt = '';
+    for(var i=0;i<ev.results.length;i++){ txt += ev.results[i][0].transcript; }
+    inputEl.value = base ? base + ' ' + txt : txt;
+    inputEl.dir = dirFor(inputEl.value);
+    autoGrow();
+  };
+  recog.onend = function(){ recActive=false; micBtn.classList.remove('rec'); };
+  recog.onerror = function(){ recActive=false; micBtn.classList.remove('rec'); };
+  try{
+    recog.start();
+    recActive = true; micBtn.classList.add('rec');
+  }catch(e){}
+}
+function autoGrow(){
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 110) + 'px';
+}
+function resetChat(){
+  sessionId = '';
+  localStorage.removeItem('xenaChatSess');
+  msgsEl.innerHTML = '';
+  greet();
+}
+function greet(){
+  var p = personaSel.value;
+  addMsg(p === 'noora'
+    ? 'Hello! I am Noora 🌸 Ask me anything about audition tickets, rules or special cases — Arabic, Urdu, English or 中文, as you like.'
+    : 'Samurai here 🗡 Ask me about any ticket, rule or case. I answer only from the verified Xena knowledge base — Arabic, Urdu, English, 中文.', 'bot');
+}
+async function send(){
+  var text = inputEl.value.trim();
+  if(!text || busy) return;
+  busy = true; sendBtn.disabled = true;
+  addMsg(text, 'user');
+  inputEl.value = ''; autoGrow();
+  var typing = showTyping();
+  try{
+    var res = await fetch('/api/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+      body: JSON.stringify({message:text, session_id:sessionId||undefined, personality:personaSel.value})
+    });
+    var data = await res.json().catch(function(){ return {}; });
+    typing.remove();
+    if(res.ok && data.reply){
+      if(data.session_id){ sessionId = data.session_id; localStorage.setItem('xenaChatSess', sessionId); }
+      addMsg(data.reply, 'bot');
+    }else{
+      addMsg(data.error || ('The assistant did not answer (HTTP ' + res.status + '). Try again.'), 'bot', true);
+    }
+  }catch(e){
+    typing.remove();
+    addMsg('Network error reaching the assistant. Check your connection and retry.', 'bot', true);
+  }
+  busy = false; sendBtn.disabled = false;
+  inputEl.focus();
+}
+function bind(){
+  msgsEl = document.getElementById('xaChatMsgs');
+  inputEl = document.getElementById('xaChatInput');
+  sendBtn = document.getElementById('xaChatSend');
+  micBtn = document.getElementById('xaChatMic');
+  panel = document.getElementById('xaChatPanel');
+  fab = document.getElementById('xaChatFab');
+  personaSel = document.getElementById('xaChatPersona');
+  langSel = document.getElementById('xaChatLang');
+  var p = prefs();
+  if(p.persona) personaSel.value = p.persona;
+  if(p.lang) langSel.value = p.lang;
+  fab.onclick = function(){
+    panel.classList.toggle('open');
+    if(panel.classList.contains('open') && !msgsEl.children.length){ greet(); }
+    if(panel.classList.contains('open')){ xaFreshness(); }
+    if(panel.classList.contains('open')){ inputEl.focus(); }
+  };
+  document.getElementById('xaChatClose').onclick = function(){ panel.classList.remove('open'); };
+  document.getElementById('xaChatNew').onclick = resetChat;
+  personaSel.onchange = function(){ savePrefs(); resetChat(); };
+  langSel.onchange = savePrefs;
+  micBtn.onclick = toggleMic;
+  sendBtn.onclick = send;
+  msgsEl.addEventListener('click', function(ev){
+    var chip = ev.target && ev.target.closest ? ev.target.closest('.xaEnt') : null;
+    if(chip){ xaRoute(chip.getAttribute('data-k'), chip.getAttribute('data-id')); }
+  });
+  var wideBtn = document.getElementById('xaChatWide');
+  panel.classList.toggle('xaWide', !!prefs().wide);
+  wideBtn.onclick = function(){
+    var pr = prefs(); pr.wide = !pr.wide;
+    localStorage.setItem('xenaChatPrefs', JSON.stringify(pr));
+    panel.classList.toggle('xaWide', pr.wide);
+  };
+  renderChips();
+  inputEl.addEventListener('input', function(){ autoGrow(); inputEl.dir = dirFor(inputEl.value); });
+  inputEl.addEventListener('keydown', function(ev){
+    if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); send(); }
+  });
+}
+function loggedIn(){
+  try{
+    return !!(window.loggedEmail && window.loggedEmail.indexOf('@') > 0 &&
+              window.loggedEmail !== 'unknown@example.com');
+  }catch(e){ return false; }
+}
+function boot(){
+  bind();
+  var tries = 0;
+  var t = setInterval(function(){
+    tries++;
+    if(loggedIn()){
+      document.getElementById('xaChatRoot').style.display = 'block';
+      clearInterval(t);
+    }else if(tries > 200){ clearInterval(t); }   // stop after ~10 min
+  }, 3000);
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', boot);
+}else{
+  boot();
+}
 })();
 </script>
 </body>

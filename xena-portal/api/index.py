@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v33.1 special-features-toggles 2026-11-16"
+XENA_BUILD = "v34.1 chat-copilot-upgrades 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -16923,6 +16923,652 @@ def audition_analytics():
     except Exception:
         pass
     return jsonify(out)
+
+
+# ════════════════════════════════════════════════════════════════════
+# v34.0 (Ahmed, 2026-11-17): Aily "Audition Assistance" integration.
+#   PART 1 -- live KB sync: Grand Table tickets -> Aily "Xena Support KB"
+#     knowledge space via the 知识空间管理 API (x-api-token auth), batched
+#     ~200 tickets per .txt asset; asset map + resume cursors live in Redis.
+#     /api/knowledge/backfill (admin-only, resumable) + /api/knowledge/sync
+#     (cron-job.org with Bearer CRON_SECRET, or an admin manually).
+#   PART 2 -- /api/chat: server-side proxy to the Aily custom agent using
+#     the Samurai AI app's tenant_access_token. stream=true SSE is consumed
+#     server-side so the (需审核, not yet enabled) aily:agent_chat:read scope
+#     is NOT needed; if streaming ever fails we fall back to agent_chats
+#     polling and report NEED_CHAT_READ_SCOPE explicitly.
+#   PII contract: phone / NID / contact fields never enter the fetch
+#   projection; free-text values are additionally scrubbed for 11+-digit
+#   runs before any text leaves this server.
+# ════════════════════════════════════════════════════════════════════
+
+AILY_AGENT_ID    = os.environ.get("AILY_AGENT_ID", "agent_4mgtuc1799en93c")
+AILY_KB_API_KEY  = os.environ.get("AILY_KB_API_KEY", "")
+AILY_KB_SPACE_ID = os.environ.get("AILY_KB_SPACE_ID", "knowledge_space_4mgt237p391wx")
+AILY_APP_ID      = os.environ.get("FEISHU_APP_ID", "")
+AILY_APP_SECRET  = os.environ.get("FEISHU_APP_SECRET", "")
+AILY_KB_HOST     = os.environ.get("AILY_KB_HOST", "https://aily.feishu.cn").rstrip("/")
+AILY_KB_BATCH_SIZE   = 200      # tickets per .txt asset (4000-item KB cap -> never 1 asset/ticket)
+AILY_KB_SYNC_OVERLAP = 7 * 86400 * 1000   # sync re-reads tickets submitted in the last 7 days (ms)
+
+# Fetch projection for knowledge text. PII fields (NID / phone / contact) are
+# deliberately ABSENT -- projection is the first line of defense.
+KB_TICKET_FIELDS = [
+    "Numbering", "Submitted on Copy", "Submitted on", "Request Type",
+    "Status", "Request Status", "Region",
+    "Agency Code", "Agency Name", "Agency Type", "Type of Agency",
+    "Otherapp ID", "Otherapp Name", "Other App Name", "User ID",
+    "Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)",
+    "Bd Code", "BD Code",
+    "Reject Reason", "Rejection Reason", "Closing Reason", "Closing Agencies Reason",
+    "Audition note", "Audition Note", "Duplicated Check", "Create Way",
+]
+# Second line of defense: if a future edit ever adds these to the projection,
+# their values are dropped in _kb_ticket_line before formatting.
+KB_NEVER_FIELDS = ("NID Number", "NID", "Contact ID", "Phone", "Phone Number",
+                   "Mobile", "ID Card", "Passport")
+
+KB_REDACT_RE = re.compile(r"(?<!\d)\d{11,}(?!\d)")   # phone / NID-shaped digit runs
+KB_FREE_TEXT_FIELDS = ("Audition note", "Audition Note", "Duplicated Check",
+                       "Reject Reason", "Rejection Reason",
+                       "Closing Reason", "Closing Agencies Reason")
+
+_KB_STATE_KEY  = "xena:kb:state"
+_KB_ASSETS_KEY = "xena:kb:assets"
+_KB_BATCH_KEY  = "xena:kb:batch:"        # + file_name -> {"order":[rid], "lines":{rid:line}}
+_KB_OWNER_KEY  = "xena:kb:owner"         # Redis HASH record_id -> file_name
+
+def _kb_state():
+    st = redis_get_json(_KB_STATE_KEY) or {}
+    return {
+        "backfill_done": bool(st.get("backfill_done")),
+        "page_token": st.get("page_token") or "",
+        "processed": int(st.get("processed") or 0),
+        "open_batch": st.get("open_batch") or "",
+        "next_index": int(st.get("next_index") or 1),
+        "last_sync_ms": int(st.get("last_sync_ms") or 0),
+        "errors": list(st.get("errors") or [])[-20:],
+    }
+
+def _kb_state_save(st):
+    st["errors"] = list(st.get("errors") or [])[-20:]
+    redis_set_json(_KB_STATE_KEY, st, ttl=180 * 86400)
+
+def _kb_assets():
+    return redis_get_json(_KB_ASSETS_KEY) or {}
+
+def _kb_assets_save(m):
+    redis_set_json(_KB_ASSETS_KEY, m, ttl=180 * 86400)
+
+def _kb_batch_load(file_name):
+    return redis_get_json(_KB_BATCH_KEY + file_name) or {"order": [], "lines": {}}
+
+def _kb_batch_save(file_name, batch):
+    redis_set_json(_KB_BATCH_KEY + file_name,
+                   {"order": batch.get("order", []), "lines": batch.get("lines", {})},
+                   ttl=180 * 86400)
+
+def _kb_headers():
+    return {"x-api-token": AILY_KB_API_KEY, "Content-Type": "application/json"}
+
+def _kb_api_url(suffix=""):
+    return "%s/ai/api/v1/cognate/openapi/knowledgeSpaces/%s/knowledgeAssets%s" % (
+        AILY_KB_HOST, AILY_KB_SPACE_ID, suffix)
+
+def _kb_create_asset(title, text):
+    """POST a new .txt knowledge asset. Returns (asset_id|None, error|None)."""
+    import base64 as _b64
+    payload = {"knowledge_space_id": AILY_KB_SPACE_ID, "title": title,
+               "content": _b64.b64encode(text.encode("utf-8")).decode("ascii")}
+    try:
+        r = http_requests.post(_kb_api_url("/content"), headers=_kb_headers(),
+                               json=payload, timeout=60)
+        data = r.json() if r.content else {}
+    except Exception as e:
+        return None, "network: %s" % e
+    ka = (data or {}).get("knowledge_asset") or {}
+    aid = ka.get("knowledge_asset_id")
+    if r.status_code == 200 and aid:
+        return aid, None
+    return None, "status=%s resp=%s" % (r.status_code, str(data)[:400])
+
+def _kb_update_asset(asset_id, title, text):
+    """PUT replacement content for an existing asset. Returns error|None."""
+    import base64 as _b64
+    payload = {"knowledge_space_id": AILY_KB_SPACE_ID,
+               "knowledge_asset_id": asset_id, "title": title,
+               "content": _b64.b64encode(text.encode("utf-8")).decode("ascii")}
+    try:
+        r = http_requests.put(_kb_api_url("/%s/content" % asset_id),
+                              headers=_kb_headers(), json=payload, timeout=60)
+        if r.status_code == 200:
+            return None
+        return "status=%s resp=%s" % (r.status_code, r.text[:400])
+    except Exception as e:
+        return "network: %s" % e
+
+def _kb_file_text(file_name, batch):
+    order = batch.get("order") or sorted((batch.get("lines") or {}).keys())
+    lines = [batch["lines"][rid] for rid in order if rid in (batch.get("lines") or {})]
+    header = ("# Xena Audition Grand Table - tickets batch %s "
+              "(%d tickets). Format per line: Ticket #<numbering> | <submitted> | "
+              "<request type> | <agency> | Status: <status> | By: <respondent> | "
+              "<extra context>. Phone numbers and NIDs are intentionally excluded.\n"
+              % (file_name.replace(".txt", ""), len(lines)))
+    return header + "\n".join(lines) + "\n"
+
+def _kb_ticket_line(fields):
+    """One ticket -> one knowledge line. PII-scrubbed. Example shape:
+    Ticket #8492 | 2026-04-21 14:00 | Agency Creation | Agency 42630 "PK-Ishq" |
+    Status: Closed | By: Noora | Region: PK | Reject: duplicate device"""
+    def val(*aliases):
+        v = extract_field_text(get_field_local(fields, *aliases)).strip()
+        return KB_REDACT_RE.sub("[REDACTED]", v) if v else ""
+    for nf in KB_NEVER_FIELDS:           # second line of defense
+        if nf in fields:
+            fields.pop(nf, None)
+    num   = val("Numbering")
+    sub   = val("Submitted on Copy", "Submitted on", "Created Time")
+    rtype = val("Request Type", "Type")
+    status = val("Status", "Request Status")
+    by    = val("Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)")
+    acode = val("Agency Code")
+    aname = val("Agency Name", "Otherapp Name", "Other App Name")
+    parts = ["Ticket #%s" % (num or "?")]
+    if sub:    parts.append(sub)
+    if rtype:  parts.append(rtype)
+    if acode or aname:
+        parts.append('Agency %s "%s"' % (acode or "?", aname or "?"))
+    if status: parts.append("Status: %s" % status)
+    if by:     parts.append("By: %s" % by)
+    extra = []
+    for label, aliases in (("Region", ("Region",)),
+                           ("User ID", ("User ID",)),
+                           ("Otherapp ID", ("Otherapp ID",)),
+                           ("Agency Type", ("Agency Type", "Type of Agency")),
+                           ("BD", ("Bd Code", "BD Code")),
+                           ("Reject", ("Reject Reason", "Rejection Reason")),
+                           ("Close", ("Closing Reason", "Closing Agencies Reason")),
+                           ("Note", ("Audition note", "Audition Note")),
+                           ("Dup", ("Duplicated Check",)),
+                           ("Via", ("Create Way",))):
+        v = val(*aliases)
+        if v:
+            extra.append("%s: %s" % (label, v))
+    return " | ".join(parts + extra)
+
+def _kb_fetch_page(tat, page_token="", filter_obj=None, sort_desc=False):
+    """ONE records/search page against the Grand Table (500/page, automatic
+    fields so last_modified_time is available). Returns (items, next_token, err)."""
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+           "?automatic_fields=true" % (BASE_ID, REQUESTS_TABLE_ID))
+    payload = {"page_size": 500,
+               "sort": [{"field_name": "Numbering", "desc": sort_desc}]}
+    if page_token: payload["page_token"] = page_token
+    if filter_obj: payload["filter"] = filter_obj
+    try:
+        data = feishu_session.post(
+            url, headers={"Authorization": "Bearer %s" % tat,
+                          "Content-Type": "application/json"},
+            json=payload, timeout=45).json()
+    except Exception as e:
+        return [], "", "network: %s" % e
+    if data.get("code") != 0:
+        return [], "", "feishu %s: %s" % (data.get("code"), str(data.get("msg"))[:200])
+    block = data.get("data") or {}
+    items = block.get("items") or []
+    nxt = (block.get("page_token") or "") if block.get("has_more") else ""
+    return items, nxt, None
+
+def _kb_append_line(st, record_id, line):
+    """Append one ticket line to the open batch; flush (create/update asset)
+    when it reaches AILY_KB_BATCH_SIZE. Returns (flushed_file|None, error|None)."""
+    if not st.get("open_batch"):
+        start = st["next_index"]
+        st["open_batch"] = "tickets-%04d-%04d.txt" % (start, start + AILY_KB_BATCH_SIZE - 1)
+    fn = st["open_batch"]
+    batch = _kb_batch_load(fn)
+    if record_id not in batch["lines"]:
+        batch["order"].append(record_id)
+    batch["lines"][record_id] = line
+    st["next_index"] += 1
+    redis_cmd("HSET", _KB_OWNER_KEY, record_id, fn)
+    if len(batch["order"]) < AILY_KB_BATCH_SIZE:
+        _kb_batch_save(fn, batch)
+        return None, None
+    return _kb_flush(st, fn, batch)
+
+def _kb_flush(st, fn, batch):
+    """Write a full/open batch to the KB (create on first flush, update after)."""
+    text = _kb_file_text(fn, batch)
+    assets = _kb_assets()
+    if fn in assets:
+        err = _kb_update_asset(assets[fn], fn, text)
+        if err:
+            return None, err
+    else:
+        aid, err = _kb_create_asset(fn, text)
+        if err:
+            return None, err
+        assets[fn] = aid
+        _kb_assets_save(assets)
+    _kb_batch_save(fn, batch)
+    flushed = fn
+    st["open_batch"] = ""
+    return flushed, None
+
+@app.route('/api/knowledge/backfill', methods=['POST'])
+@rate_limit(6, 60)
+def knowledge_backfill():
+    """v34.0 PART 1a (admin-only, resumable): walk the whole Grand Table in
+    Numbering order, pack every %d tickets into one .txt KB asset. Safe to
+    re-invoke until the response says done:true -- progress lives in Redis.""" % AILY_KB_BATCH_SIZE
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    if not AILY_KB_API_KEY:
+        return jsonify({"error": "AILY_KB_API_KEY is not configured on the server"}), 503
+    if MOCK_MODE:
+        return jsonify({"done": False, "processed": 200, "files": ["tickets-0001-0200.txt"], "mock": True})
+    pages = min(max(int(request.args.get("pages", 8) or 8), 1), 40)
+    budget = min(float(request.args.get("max_seconds", 240) or 240), 280)
+    t0 = time.time()
+    st = _kb_state()
+    if st["backfill_done"]:
+        return jsonify({"done": True, "processed": st["processed"],
+                        "assets": len(_kb_assets()), "note": "backfill already complete"})
+    tat = get_tenant_access_token()
+    files_flushed, errors = [], []
+    try:
+        for _ in range(pages):
+            if time.time() - t0 > budget:
+                break
+            items, nxt, ferr = _kb_fetch_page(tat, st["page_token"])
+            if ferr:
+                errors.append(ferr)
+                break
+            for item in items:
+                rid = item.get("record_id") or ""
+                line = _kb_ticket_line(item.get("fields") or {})
+                flushed, aerr = _kb_append_line(st, rid, line)
+                st["processed"] += 1
+                if aerr:
+                    errors.append("%s: %s" % (rid, aerr))
+                    break
+                if flushed:
+                    files_flushed.append(flushed)
+            st["page_token"] = nxt
+            if errors or not nxt:
+                break
+            time.sleep(0.15)   # same GIL-yield pause the other big syncs use
+        # Final flush of a partially-filled open batch only when the table is exhausted.
+        if not st["page_token"] and not errors:
+            if st.get("open_batch"):
+                fn = st["open_batch"]
+                flushed, aerr = _kb_flush(st, fn, _kb_batch_load(fn))
+                if aerr:
+                    errors.append(aerr)
+                elif flushed:
+                    files_flushed.append(flushed)
+            st["backfill_done"] = True
+            st["last_sync_ms"] = int(time.time() * 1000)
+    finally:
+        st["errors"] = (st.get("errors") or []) + errors
+        _kb_state_save(st)
+    done = st["backfill_done"] and not errors
+    try:
+        audit.log(admin_name, "KNOWLEDGE_BACKFILL",
+                  "processed=%d files=%d done=%s" % (st["processed"], len(files_flushed), done),
+                  severity="Warning")
+    except Exception:
+        pass
+    return jsonify({"done": done, "processed": st["processed"],
+                    "files_written": files_flushed, "assets_total": len(_kb_assets()),
+                    "errors": errors, "hint": "re-invoke until done:true"})
+
+@app.route('/api/knowledge/sync', methods=['GET', 'POST'])
+@rate_limit(12, 60)
+def knowledge_sync():
+    """v34.0 PART 1b (cron every 5-15 min, or admin manual): re-read tickets
+    submitted inside the overlap window, compare each freshly-built line with
+    the stored one, and UPDATE the affected KB asset(s); brand-new tickets are
+    appended to the open batch. Requires the backfill to have completed once."""
+    is_admin = False
+    admin_name = ""
+    if not is_cron_authorized(request):
+        admin_name, _, aerr = _require_admin_identity()
+        if aerr:
+            return aerr
+        is_admin = True
+    if not AILY_KB_API_KEY:
+        return jsonify({"error": "AILY_KB_API_KEY is not configured on the server"}), 503
+    if MOCK_MODE:
+        return jsonify({"new": 1, "changed": 0, "files_updated": [], "mock": True})
+    st = _kb_state()
+    if not st["backfill_done"]:
+        return jsonify({"error": "backfill not complete yet",
+                        "processed": st["processed"]}), 409
+    now_ms = int(time.time() * 1000)
+    since_ms = max((st["last_sync_ms"] or 0) - AILY_KB_SYNC_OVERLAP,
+                   now_ms - 30 * 86400 * 1000)
+    tat = get_tenant_access_token()
+    # Primary: server-side date filter on Submitted on (epoch ms value).
+    filt = {"conjunction": "and", "conditions": [
+        {"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [str(since_ms)]}]}
+    items, nxt, ferr = _kb_fetch_page(tat, "", filter_obj=filt, sort_desc=True)
+    if ferr:
+        # Fallback: most recent page by Numbering, client-side filter on last_modified.
+        filt = None
+        items, nxt, ferr = _kb_fetch_page(tat, "", sort_desc=True)
+    new_count, changed = 0, 0
+    dirty, errors = {}, []
+    try:
+        pages_left, cutoff = 8, since_ms
+        while True:
+            for item in items:
+                if filt is None:  # fallback mode: honor the time window ourselves
+                    try:
+                        lm = int(str(item.get("last_modified_time") or 0))
+                    except Exception:
+                        lm = 0
+                    if lm and lm < cutoff:
+                        continue
+                rid = item.get("record_id") or ""
+                line = _kb_ticket_line(item.get("fields") or {})
+                owner = redis_cmd("HGET", _KB_OWNER_KEY, rid)
+                if not owner:
+                    flushed, aerr = _kb_append_line(st, rid, line)
+                    st["processed"] += 1
+                    new_count += 1
+                    if aerr:
+                        errors.append("append %s: %s" % (rid, aerr))
+                        break
+                    if flushed:
+                        dirty[flushed] = None   # already flushed inside append
+                    continue
+                batch = dirty.get(owner)
+                if batch is None and owner not in dirty:
+                    batch = _kb_batch_load(owner)
+                    dirty[owner] = batch
+                if batch is not None and batch.get("lines", {}).get(rid) != line:
+                    batch["lines"][rid] = line
+                    changed += 1
+            if errors or not nxt or pages_left <= 0:
+                break
+            pages_left -= 1
+            items, nxt, ferr = _kb_fetch_page(tat, nxt, filter_obj=filt, sort_desc=True)
+            if ferr:
+                errors.append(ferr)
+                break
+            time.sleep(0.15)
+        files_updated = []
+        for fn, batch in list(dirty.items()):
+            if batch is None:
+                files_updated.append(fn)   # flushed at append time
+                continue
+            assets = _kb_assets()
+            if fn not in assets:
+                continue
+            aerr = _kb_update_asset(assets[fn], fn, _kb_file_text(fn, batch))
+            if aerr:
+                errors.append("update %s: %s" % (fn, aerr))
+            else:
+                _kb_batch_save(fn, batch)
+                files_updated.append(fn)
+        # Flush the open batch too if new tickets went into it but it isn't full yet.
+        if new_count and st.get("open_batch"):
+            fn = st["open_batch"]
+            assets = _kb_assets()
+            batch = _kb_batch_load(fn)
+            if fn in assets:
+                aerr = _kb_update_asset(assets[fn], fn, _kb_file_text(fn, batch))
+                if not aerr:
+                    files_updated.append(fn)
+                else:
+                    errors.append("open %s: %s" % (fn, aerr))
+            else:
+                aid, aerr = _kb_create_asset(fn, _kb_file_text(fn, batch))
+                if aerr:
+                    errors.append("open %s: %s" % (fn, aerr))
+                else:
+                    assets[fn] = aid
+                    _kb_assets_save(assets)
+                    files_updated.append(fn)
+        st["last_sync_ms"] = now_ms
+    finally:
+        st["errors"] = (st.get("errors") or []) + errors
+        _kb_state_save(st)
+    try:
+        audit.log(admin_name or "cron", "KNOWLEDGE_SYNC",
+                  "new=%d changed=%d files=%d errors=%d" % (new_count, changed, len(files_updated), len(errors)),
+                  severity="Warning" if errors else "Info")
+    except Exception:
+        pass
+    return jsonify({"new": new_count, "changed": changed,
+                    "files_updated": files_updated, "errors": errors})
+
+@app.route('/api/knowledge/status', methods=['GET'])
+def knowledge_status():
+    """v34.0: admin view of the sync pipeline state (Redis-side only)."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    st = _kb_state()
+    assets = _kb_assets()
+    return jsonify({"backfill_done": st["backfill_done"], "processed": st["processed"],
+                    "assets": len(assets), "open_batch": st["open_batch"],
+                    "last_sync_ms": st["last_sync_ms"], "recent_errors": st["errors"],
+                    "mock": MOCK_MODE})
+
+@app.route('/api/knowledge/freshness', methods=['GET'])
+@rate_limit(30, 60)
+def knowledge_freshness():
+    """v34.1 (Ahmed): lightweight KB freshness for the chat widget hint bar.
+    Any signed-in staff member (NOT admin-only); Redis reads only, no Feishu
+    or KB API calls, safe to poll every few minutes from the browser."""
+    email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    if not email or "@" not in email:
+        return jsonify({"error": "Sign in required."}), 401
+    st = _kb_state()
+    return jsonify({"backfill_done": st["backfill_done"],
+                    "last_sync_ms": st["last_sync_ms"],
+                    "processed": st["processed"], "mock": MOCK_MODE})
+
+# ---------------- v34.0 PART 2: Aily chat proxy ----------------
+
+_AILY_TOKEN_KEY = "xena:aily_tenant_token"
+_aily_token_cache = {"token": None, "expires_at": 0.0, "lock": threading.Lock()}
+
+def _aily_tenant_token():
+    """tenant_access_token for the Samurai AI app (FEISHU_APP_ID/SECRET) --
+    the app holding the aily:agent_chat:* scopes. Memory -> Redis -> Feishu."""
+    if MOCK_MODE:
+        return "mock_aily_token"
+    with _aily_token_cache["lock"]:
+        if _aily_token_cache["token"] and time.time() < _aily_token_cache["expires_at"]:
+            return _aily_token_cache["token"]
+    cached = redis_get_json(_AILY_TOKEN_KEY)
+    if cached and time.time() < cached.get("expires_at", 0):
+        with _aily_token_cache["lock"]:
+            _aily_token_cache["token"] = cached["token"]
+            _aily_token_cache["expires_at"] = cached["expires_at"]
+        return cached["token"]
+    if not AILY_APP_ID or not AILY_APP_SECRET:
+        return None
+    resp = _post_json_retry(
+        "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        headers=None, payload={"app_id": AILY_APP_ID, "app_secret": AILY_APP_SECRET},
+        timeout=8, retry_timeout=12)
+    token = resp.get("tenant_access_token")
+    expire = resp.get("expire", 7200)
+    expires_at = time.time() + max(expire - 300, 60)
+    with _aily_token_cache["lock"]:
+        _aily_token_cache["token"] = token
+        _aily_token_cache["expires_at"] = expires_at
+    if token:
+        redis_set_json(_AILY_TOKEN_KEY, {"token": token, "expires_at": expires_at},
+                       ttl=max(expire - 300, 60))
+    return token
+
+CHAT_PERSONALITIES = {
+    "samurai": '(Personality: answer as "Samurai" -- the Xena audition expert: precise, direct, confident, step-by-step, friendly but efficient. Always reply in the user\'s own language.)',
+    "noora":   '(Personality: answer as "Noora" -- warm, patient, encouraging guardian tone; short kind sentences, emojis sparingly. Always reply in the user\'s own language.)',
+}
+CHAT_SESSION_TTL = 7 * 86400
+
+def _chat_session_key(email):
+    import hashlib
+    return "xena:chat:sess:" + hashlib.sha1(email.strip().lower().encode("utf-8")).hexdigest()
+
+def _sse_collect_text(obj, out):
+    """Recursively collect human-text candidates from one SSE event payload.
+    Tolerant by design: handles delta-style {"text": ...} chunks AND final
+    snapshot payloads with content arrays."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            lk = str(k).lower()
+            if lk in ("text", "answer", "content") and isinstance(v, str) and v.strip():
+                out.append(v)
+            else:
+                _sse_collect_text(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _sse_collect_text(v, out)
+
+def _aily_chat_stream(tat, message, session_id):
+    """POST /agents/{id}/chats with stream=true; consume the SSE feed
+    server-side. Returns (reply, session_id, agent_chat_id) or raises."""
+    url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/chats" % AILY_AGENT_ID
+    body = {"user_message": {"content": [{"type": "text", "text": message}]},
+            "stream": True}
+    if session_id:
+        body["session_id"] = session_id
+    r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
+                                          "Content-Type": "application/json"},
+                            json=body, stream=True, timeout=(10, 100))
+    if r.status_code != 200:
+        raise RuntimeError("stream status=%s body=%s" % (r.status_code, r.text[:300]))
+    candidates, sid, acid = [], session_id or "", ""
+    for raw in r.iter_lines(decode_unicode=True):
+        if not raw or not raw.startswith("data:"):
+            continue
+        payload = raw[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            evt = json.loads(payload)
+        except Exception:
+            continue
+        if isinstance(evt, dict):
+            sid = evt.get("session_id") or (evt.get("data") or {}).get("session_id") or sid
+            acid = evt.get("agent_chat_id") or (evt.get("data") or {}).get("agent_chat_id") or acid
+            if evt.get("session"):
+                sid = (evt["session"] or {}).get("id") or sid
+        _sse_collect_text(evt, candidates)
+    reply = max(candidates, key=len).strip() if candidates else ""
+    if not reply:
+        raise RuntimeError("stream returned no text")
+    return reply, sid, acid
+
+def _aily_chat_poll(tat, message, session_id):
+    """Fallback: async chat + poll agent_chats/{id}. NOTE: the poll leg needs
+    the aily:agent_chat:read scope (需审核) -- if Feishu says permission
+    denied we surface NEED_CHAT_READ_SCOPE so the admin can enable exactly
+    that one scope."""
+    url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/chats" % AILY_AGENT_ID
+    body = {"user_message": {"content": [{"type": "text", "text": message}]}}
+    if session_id:
+        body["session_id"] = session_id
+    resp = _post_json_retry(url, headers={"Authorization": "Bearer %s" % tat,
+                                          "Content-Type": "application/json"},
+                            payload=body, timeout=10, retry_timeout=15)
+    if resp.get("code") != 0:
+        raise RuntimeError("chat create failed: %s" % str(resp)[:300])
+    data = resp.get("data") or {}
+    acid, sid = data.get("agent_chat_id"), data.get("session_id") or session_id or ""
+    if not acid:
+        raise RuntimeError("chat create returned no agent_chat_id")
+    poll_url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/agent_chats/%s" % (AILY_AGENT_ID, acid)
+    deadline = time.time() + 45
+    while time.time() < deadline:
+        time.sleep(2)
+        try:
+            pr = feishu_session.get(poll_url, headers={"Authorization": "Bearer %s" % tat}, timeout=15).json()
+        except Exception:
+            continue
+        if pr.get("code") != 0:
+            msgtxt = str(pr.get("msg") or "")
+            if pr.get("code") in (99991672, 99991663) or "permission" in msgtxt.lower() or "scope" in msgtxt.lower():
+                raise PermissionError("NEED_CHAT_READ_SCOPE: %s" % msgtxt[:200])
+            continue
+        pdata = pr.get("data") or {}
+        status = str(pdata.get("status") or "")
+        if status.lower() in ("completed", "failed", "cancelled"):
+            texts = []
+            _sse_collect_text(pdata, texts)
+            reply = max(texts, key=len).strip() if texts else ""
+            if not reply and status.lower() == "failed":
+                raise RuntimeError("agent run failed: %s" % str(pdata)[:200])
+            return reply, sid, acid
+    raise TimeoutError("agent reply timed out after 45s")
+
+@app.route('/api/chat', methods=['POST'])
+@rate_limit(15, 60)
+def aily_chat():
+    """v34.0 PART 2: staff chat proxy. Body {message, session_id?, personality?,
+    new_session?}. Identity = the same X-User-Email/X-User-Name headers every
+    portal endpoint uses; the global access gate still applies. Tokens never
+    leave the server."""
+    email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    name  = sanitize_text(request.headers.get("X-User-Name", ""), 120)
+    body  = request.get_json(silent=True) or {}
+    email = email or sanitize_text(str(body.get("email", "") or ""), 200)
+    if not email or "@" not in email:
+        return jsonify({"error": "Sign in to use the assistant."}), 401
+    message = str(body.get("message", "") or "").strip()[:4000]
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+    personality = str(body.get("personality", "") or "").strip().lower()
+    new_session = bool(body.get("new_session"))
+    skey = _chat_session_key(email)
+    stored = redis_get_json(skey) or {}
+    session_id = "" if new_session else (body.get("session_id") or stored.get("session_id") or "")
+    if MOCK_MODE:
+        sid = session_id or "mock_session_1"
+        redis_set_json(skey, {"session_id": sid}, ttl=CHAT_SESSION_TTL)
+        return jsonify({"reply": "[mock] %s: %s" % (personality or "samurai", message),
+                        "session_id": sid, "via": "mock"})
+    first_in_session = not session_id
+    if personality in CHAT_PERSONALITIES and first_in_session:
+        message = CHAT_PERSONALITIES[personality] + "\n\n" + message
+    tat = _aily_tenant_token()
+    if not tat:
+        return jsonify({"error": "AILY chat is not configured on the server (FEISHU_APP_ID/SECRET missing)."}), 503
+    via = "stream"
+    try:
+        reply, session_id, acid = _aily_chat_stream(tat, message, session_id)
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 502
+    except Exception as e:
+        logger.warn("aily_chat_stream_failed", error=str(e)[:200])
+        via = "poll"
+        try:
+            reply, session_id, acid = _aily_chat_poll(tat, message, session_id)
+        except PermissionError as e:
+            return jsonify({"error": str(e)}), 502
+        except Exception as e2:
+            logger.error("aily_chat_poll_failed", error=str(e2)[:200])
+            return jsonify({"error": "The assistant is busy right now -- try again in a moment."}), 502
+    if session_id:
+        redis_set_json(skey, {"session_id": session_id,
+                              "personality": personality or stored.get("personality") or ""},
+                       ttl=CHAT_SESSION_TTL)
+    if first_in_session:
+        try:
+            audit.log(name or email, "CHAT_SESSION_NEW", "personality=%s" % (personality or "-"), severity="Info")
+        except Exception:
+            pass
+    return jsonify({"reply": reply, "session_id": session_id, "via": via})
 
 
 if __name__ == '__main__':
