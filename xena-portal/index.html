@@ -30753,7 +30753,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.6 kb-backfill-budget 2026-11-17';
+window.SAM19_BUILD='v34.1.7 kb-backfill-batched 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32585,7 +32585,7 @@ function xaKbBuild(btn){
   };
   var tick = function(){
     iters++;
-    fetch('/api/knowledge/backfill?pages=4&max_seconds=45', {
+    fetch('/api/knowledge/backfill?pages=8&max_seconds=45',   /* v34.1.7: batched writes make one call cheap -- 8 pages (~4000 tickets) per click */ {
       method:'POST',
       headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
     }).then(function(r){

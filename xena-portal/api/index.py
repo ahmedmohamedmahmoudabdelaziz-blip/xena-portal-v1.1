@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.6 kb-backfill-budget 2026-11-17"
+XENA_BUILD = "v34.1.7 kb-backfill-batched 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17143,6 +17143,44 @@ def _kb_append_line(st, record_id, line):
         return None, None
     return _kb_flush(st, fn, batch)
 
+def _kb_append_line_buf(st, buf, record_id, line):
+    """v34.1.7 (Ahmed picked Route B): buffered append for the backfill walk --
+    ZERO Redis I/O per record. The old _kb_append_line cost ~3 round-trips per
+    record (batch load + HSET + batch save), ~1500 per 500-record page = 30-75s
+    per page, which is why one page barely fit Vercel's 60s kill. Here the open
+    batch is loaded ONCE per batch per call and persisted ONCE per page by
+    _kb_buf_persist. Returns the file name when the batch just reached
+    AILY_KB_BATCH_SIZE and must be flushed, else ""."""
+    fn = st.get("open_batch")
+    if not fn:
+        start = st["next_index"]
+        fn = st["open_batch"] = "tickets-%04d-%04d.txt" % (start, start + AILY_KB_BATCH_SIZE - 1)
+    if buf.get("fn") != fn:
+        buf["fn"] = fn
+        buf["batch"] = _kb_batch_load(fn)   # ONE load per batch per call
+    batch = buf["batch"]
+    if record_id not in batch["lines"]:
+        batch["order"].append(record_id)
+        st["next_index"] += 1   # v34.1.7: only NEW records advance the naming counter (re-processed rids dedup)
+    batch["lines"][record_id] = line
+    (buf.setdefault("owners", {}))[record_id] = fn
+    buf["dirty"] = True
+    return fn if len(batch["order"]) >= AILY_KB_BATCH_SIZE else ""
+
+def _kb_buf_persist(buf):
+    """v34.1.7: write the buffered open batch + owner map to Redis ONCE per
+    page (a multi-field HSET is ONE round-trip for the whole page)."""
+    if buf.get("dirty") and buf.get("fn") and buf.get("batch") is not None:
+        _kb_batch_save(buf["fn"], buf["batch"])
+        buf["dirty"] = False
+    owners = buf.get("owners") or {}
+    if owners:
+        args = []
+        for rid, ofn in owners.items():
+            args.extend([rid, ofn])
+        redis_cmd("HSET", _KB_OWNER_KEY, *args)
+        buf["owners"] = {}
+
 def _kb_flush(st, fn, batch):
     """Write a full/open batch to the KB (create on first flush, update after)."""
     text = _kb_file_text(fn, batch)
@@ -17202,6 +17240,7 @@ def knowledge_backfill():
     table_exhausted = False   # v34.1.6: ONLY a completed page with no next
                               # token means exhaustion -- an empty page_token
                               # alone also describes "broke mid-first-page".
+    buf = {"fn": "", "batch": None, "owners": {}, "dirty": False}   # v34.1.7
     try:
         for _ in range(pages):
             if time.time() - t0 > budget:
@@ -17222,16 +17261,26 @@ def knowledge_backfill():
                     break
                 rid = item.get("record_id") or ""
                 line = _kb_ticket_line(item.get("fields") or {})
-                flushed, aerr = _kb_append_line(st, rid, line)
+                full_fn = _kb_append_line_buf(st, buf, rid, line)   # v34.1.7: zero Redis I/O per record
                 st["processed"] += 1
-                if aerr:
-                    errors.append("%s: %s" % (rid, aerr))
-                    break
-                if flushed:
+                if full_fn:
+                    # The open batch just reached AILY_KB_BATCH_SIZE: upload it
+                    # to the KB NOW (create on first flush, update after).
+                    flushed, ferr2 = _kb_flush(st, full_fn, buf["batch"])
+                    if ferr2:
+                        # v34.1.7: keep page_done False so the token does NOT
+                        # advance past a page whose upload failed -- the next
+                        # call re-processes the page and retries the flush.
+                        errors.append("%s: %s" % (full_fn, ferr2))
+                        page_done = False
+                        break
                     files_flushed.append(flushed)
+                    buf["fn"], buf["batch"] = "", None
+                    buf["dirty"] = False   # _kb_flush already saved the batch
             if page_done:
                 st["page_token"] = nxt
                 table_exhausted = not nxt
+            _kb_buf_persist(buf)   # v34.1.7: ONE Redis write set per page
             if errors or not page_done or not nxt:
                 break
             time.sleep(0.15)   # same GIL-yield pause the other big syncs use
@@ -17239,14 +17288,19 @@ def knowledge_backfill():
         if table_exhausted and not errors:
             if st.get("open_batch"):
                 fn = st["open_batch"]
-                flushed, aerr = _kb_flush(st, fn, _kb_batch_load(fn))
+                # v34.1.7: prefer the in-memory buffer (same content, no reload).
+                b = buf["batch"] if (buf.get("fn") == fn and buf.get("batch") is not None) else _kb_batch_load(fn)
+                flushed, aerr = _kb_flush(st, fn, b)
                 if aerr:
                     errors.append(aerr)
                 elif flushed:
                     files_flushed.append(flushed)
+                    buf["fn"], buf["batch"] = "", None
+                    buf["dirty"] = False
             st["backfill_done"] = True
             st["last_sync_ms"] = int(time.time() * 1000)
     finally:
+        _kb_buf_persist(buf)   # v34.1.7: persist buffered lines + owners even on a mid-page budget stop
         st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
     done = st["backfill_done"] and not errors
