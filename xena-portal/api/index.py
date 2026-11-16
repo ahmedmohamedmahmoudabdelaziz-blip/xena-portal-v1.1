@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v33.0 audition-suite 2026-11-16"
+XENA_BUILD = "v33.1 special-features-toggles 2026-11-16"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2099,6 +2099,52 @@ FEATURE_ROLE_NAMES = list(FEATURE_ROLE_LEVELS.keys())
 FEATURE_AUDITOR_BONUS = ["audit.view", "audit.diff_inspect"]
 DEFAULT_FEATURE_ROLE = "Agent"
 
+# v33.1 (Ahmed): "Special Features" master toggles on the normal Access page.
+# One toggle per registry module group — ON grants the whole pack (clearing
+# revokes), OFF revokes the whole pack (even keys the role template gives).
+# The granular matrix stays for per-key fine-tuning. The frontend mirrors this
+# grouping exactly (cross-pinned by the v33.1 suites — keep both in sync).
+def _feature_group_keys():
+    groups = {}
+    for _k, _meta in FEATURE_PERMISSION_REGISTRY.items():
+        groups.setdefault(_meta["module"], []).append(_k)
+    return groups
+
+FEATURE_GROUP_KEYS = _feature_group_keys()
+
+def _clean_feature_groups(v):
+    """Validate an incoming group-name list or {group: bool} dict against
+    FEATURE_GROUP_KEYS; unknown groups are dropped, never invented."""
+    if isinstance(v, dict):
+        return {g: bool(on) for g, on in v.items() if g in FEATURE_GROUP_KEYS}
+    if isinstance(v, str):
+        v = [v]
+    return [g for g in (v or []) if isinstance(g, str) and g in FEATURE_GROUP_KEYS]
+
+def _v331_row_feature_fields(fields, display_email, role_adj):
+    """v33.1: the special-features contract on /api/admin/users rows. Members
+    get their resolved effective/grant/revoke state (the normal Access page
+    renders one master toggle per feature group from it); role-preset rows
+    expose the stored "groups" list (the preset's saved toggle state)."""
+    raw = extract_field_text(get_field_local(fields, "Feature Overrides"))
+    if (display_email or "").startswith("__ROLE__::"):
+        groups = []
+        try:
+            blob = json.loads(raw) if isinstance(raw, str) and raw.strip() else {}
+            if isinstance(blob, dict):
+                groups = _clean_feature_groups(blob.get("groups"))
+        except Exception:
+            groups = []
+        return {"feature_groups": groups}
+    adj = _parse_feature_overrides(raw)
+    role = adj.get("role") or DEFAULT_FEATURE_ROLE
+    modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
+    return {"feature_role": role,
+            "feature_grant": adj.get("grant", []),
+            "feature_revoke": adj.get("revoke", []),
+            "feature_effective": _resolve_feature_perms("admin" in modules, role,
+                                                        (role_adj or {}).get(role, {}), adj)}
+
 def _feature_role_default_keys(role):
     """Registry default key list for one Role Template (before any overrides)."""
     role = (role or DEFAULT_FEATURE_ROLE).strip().title()
@@ -3766,7 +3812,29 @@ def manage_users():
         audit.log(admin_name, "UNAUTHORIZED_ADMIN_ACCESS", "admin_panel", ip=request.headers.get("X-Forwarded-For",""), severity="Critical")
         return jsonify({"error":"Unauthorized"}), 403
 
-    if MOCK_MODE: return jsonify([{"id":"mock","email":"test@example.com","modules":"admin, target, points","acms_raw":"all","regions_raw":"all"}])
+    if MOCK_MODE:
+        # v33.1: mock branches mirror the real toggle semantics so the suites
+        # can pin grant/revoke behavior without Feishu.
+        if request.method == 'GET':
+            return jsonify([{"id":"mock","email":"test@example.com","modules":"admin, target, points","acms_raw":"all","regions_raw":"all","is_role":False,
+                             "feature_role":"Admin","feature_grant":[],"feature_revoke":[],
+                             "feature_effective":_resolve_feature_perms(True, "Admin", {}, {})}])
+        if request.method == 'DELETE':
+            return jsonify({"success": True})
+        if request.method == 'POST':
+            _md = request.get_json(silent=True) or {}
+            _mc = _clean_feature_groups(_md.get("feature_changes")) if isinstance(_md.get("feature_changes"), dict) else {}
+            _mg = _clean_feature_groups(_md.get("feature_groups")) if _md.get("feature_groups") is not None and not isinstance(_md.get("feature_groups"), dict) else []
+            _mgrant, _mrevoke = set(), set()
+            for _g, _on in _mc.items():
+                _keys = FEATURE_GROUP_KEYS.get(_g) or []
+                if _on:
+                    _mgrant |= set(_keys); _mrevoke -= set(_keys)
+                else:
+                    _mgrant -= set(_keys); _mrevoke |= set(_keys)
+            return jsonify({"success": True, "record_id": "mock",
+                            "feature_grant": sorted(_mgrant), "feature_revoke": sorted(_mrevoke),
+                            "feature_groups": _mg})
 
     tat = get_tenant_access_token()
     headers  = {"Authorization":f"Bearer {tat}","Content-Type":"application/json"}
@@ -3776,6 +3844,16 @@ def manage_users():
     if request.method == 'GET':
         res   = http_requests.get(base_url, headers=headers, params={"page_size":500}, timeout=15).json()
         users = []
+        # v33.1: pre-pass — the Role-Template rows' Feature Overrides blobs,
+        # needed to resolve each member's effective special-feature keys inline
+        # (zero extra requests; rides the same records fetch).
+        _role_adj_get = {}
+        for _it in res.get("data",{}).get("items",[]):
+            _de = extract_field_text(_it.get("fields",{}).get("Email",""))
+            if (_de or "").startswith("__ROLE__::"):
+                _rn = _normalize_feature_role(_de.split("::",1)[1])
+                if _rn:
+                    _role_adj_get[_rn] = _parse_feature_overrides(extract_field_text(get_field_local(_it.get("fields",{}), "Feature Overrides")))
         for item in res.get("data",{}).get("items",[]):
             fields = item.get("fields",{})
             person_text = extract_field_text(fields.get("Person",""))
@@ -3792,7 +3870,8 @@ def manage_users():
                           # (CS, ACM, etc.) persist centrally for all admins without
                           # needing a new Feishu table. The frontend splits these out
                           # from real agent rows using this flag.
-                          "is_role": display_email.startswith("__ROLE__::")})
+                          "is_role": display_email.startswith("__ROLE__::"),
+                          **_v331_row_feature_fields(fields, display_email, _role_adj_get)})
         # Phase 10.27 (Ahmed): presence rides INSIDE this same response (zero
         # extra requests) -- one Redis HGETALL for everyone, keyed by the
         # lowercased email/name the before_request hook stamps.
@@ -3836,22 +3915,82 @@ def manage_users():
         
         payload = {"fields": payload_fields}
         existing_record_id = None
+        before_blob_raw = ""  # v33.1: the matched row's Feature Overrides blob (before state)
         res_all = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
-        
+
         for item in res_all.get("data", {}).get("items", []):
             db_email = extract_field_text(item.get("fields", {}).get("Email", "")).lower().strip()
             db_person = extract_field_text(item.get("fields", {}).get("Person", "")).lower().strip()
             target_check = email_to_check.lower().strip()
-            
+
             if target_check and (target_check == db_email or target_check == db_person):
                 existing_record_id = item["record_id"]
+                before_blob_raw = extract_field_text(get_field_local(item.get("fields", {}), "Feature Overrides"))
                 break
 
         if existing_record_id: res = http_requests.put(f"{base_url}/{existing_record_id}", headers=headers, json=payload, timeout=15).json()
         else: res = http_requests.post(base_url, headers=headers, json=payload, timeout=15).json()
 
         if res.get("code") != 0: return jsonify({"success":False,"error":res.get("msg","Unknown error")}), 500
-            
+
+        # v33.1 (Ahmed): the Special Features master toggles ride the SAME save.
+        # feature_changes (member rows): {group: bool} — ON grants the whole
+        # pack (clearing revokes), OFF revokes the whole pack (even keys the
+        # role template gives). feature_groups (role-preset rows): the preset's
+        # saved ON-groups list, merged into the blob without touching the
+        # matrix's role/grant/revoke keys. Only CHANGED groups arrive from the
+        # frontend, so an untouched master toggle never clobbers matrix-made
+        # per-key grants. Every blob write logs ACCESS_CHANGE with before/after.
+        _sf_record_id = existing_record_id or res.get("data", {}).get("record", {}).get("record_id")
+        _is_role_row = email_to_check.strip().lower().startswith("__role__::")
+        _feat_changes_raw = data.get("feature_changes")
+        _feat_changes = _clean_feature_groups(_feat_changes_raw) if isinstance(_feat_changes_raw, dict) else {}
+        _feat_groups_raw = data.get("feature_groups")
+        _feat_groups = _clean_feature_groups(_feat_groups_raw) if _feat_groups_raw is not None and not isinstance(_feat_groups_raw, dict) else None
+        _blob_before, _blob_after = None, None
+        if _is_role_row and _feat_groups is not None:
+            _base = {}
+            try:
+                if before_blob_raw and before_blob_raw.strip():
+                    _parsed = json.loads(before_blob_raw)
+                    if isinstance(_parsed, dict):
+                        _base = _parsed
+            except Exception:
+                _base = {}
+            _blob_before = _base
+            _blob_after = dict(_base)
+            _blob_after["groups"] = _feat_groups
+        elif not _is_role_row and _feat_changes:
+            _before_adj = _parse_feature_overrides(before_blob_raw)
+            _blob_before = _before_adj
+            _grant = set(_before_adj.get("grant") or [])
+            _revoke = set(_before_adj.get("revoke") or [])
+            for _g, _on in _feat_changes.items():
+                _keys = FEATURE_GROUP_KEYS.get(_g) or []
+                if _on:
+                    _grant |= set(_keys)
+                    _revoke -= set(_keys)
+                else:
+                    _grant -= set(_keys)
+                    _revoke |= set(_keys)
+            _blob_after = {"grant": sorted(_grant), "revoke": sorted(_revoke)}
+            if _before_adj.get("role"):
+                _blob_after["role"] = _before_adj["role"]
+        if _blob_after is not None and _sf_record_id:
+            if not _ensure_feature_overrides_field(tat):
+                return jsonify({"success": False,
+                                "error": "Access saved, but the 'Feature Overrides' column could not be created — special features were NOT written."}), 500
+            _wres = http_requests.put(f"{base_url}/{_sf_record_id}", headers=headers,
+                                      json={"fields": {"Feature Overrides": json.dumps(_blob_after, ensure_ascii=False, separators=(",", ":"))}}, timeout=15).json()
+            if _wres.get("code") != 0:
+                return jsonify({"success": False,
+                                "error": "Access saved, but writing special features failed: " + str(_wres.get("msg", ""))}), 500
+            audit.log(admin_name, "ACCESS_CHANGE", f"user:{email_to_check}",
+                      details=("special-features toggles; before="
+                               + json.dumps(_blob_before, ensure_ascii=False, sort_keys=True)
+                               + "; after=" + json.dumps(_blob_after, ensure_ascii=False, sort_keys=True)),
+                      ip=ip, severity="Warning", before=_blob_before, after=_blob_after)
+
         audit.log(admin_name, "UPDATE_USER" if existing_record_id else "ADD_USER", email_to_check, ip=ip, severity="Info")
         cache_invalidate() # FIX: Clear the entire permission cache immediately on updates
         return jsonify({"success":True,"record_id":res.get("data",{}).get("record",{}).get("record_id")})

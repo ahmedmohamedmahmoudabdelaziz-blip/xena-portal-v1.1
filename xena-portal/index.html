@@ -5000,6 +5000,15 @@ html{background:var(--bg);min-height:100%}
                             <label class="switch"><input type="checkbox" id="mod_bind"><span class="slider"></span></label>
                         </div>
                         </div>
+                        <!-- v33.1 (Ahmed): ✨ Special Features — ONE master toggle per feature
+                             group, same switch-card style as 🎭 Audition Access. ON grants the
+                             whole pack at once; OFF removes it completely (even keys the role
+                             template gives). The 🔐 matrix sub-tab stays for per-key fine-tuning. -->
+                        <div id="specialFeaturesWrap" style="margin:2px 0 14px">
+                            <h4 style="margin:0 0 6px">✨ Special Features</h4>
+                            <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 10px">One master switch per feature pack — ON grants the whole pack at once, OFF removes it completely (even features the role template gives). Need to remove just one specific feature from someone? Use the 🔐 Feature Access &amp; Permissions matrix (advanced view).</p>
+                            <div class="admin-toggles-grid" id="specialFeaturesGrid"></div>
+                        </div>
                         <input type="text" id="adminModuleFilter" class="admin-agent-search" placeholder="🔎 Filter modules… (type: query, audit, points…)" oninput="filterAdminModuleCards(this.value)" aria-label="Filter modules">
                         <div class="admin-modules-grid">
                         <div class="module-card">
@@ -11171,6 +11180,93 @@ function parseGranular(str,module) {
     return ['all'];
 }
 
+// ═══ v33.1 (Ahmed): ✨ Special Features — one master toggle per feature group ═══
+// Mirror of the backend FEATURE_GROUP_KEYS contract in index4.py — the v33.1
+// suites cross-pin both files, so keys must stay identical on both sides.
+const SPECIAL_FEATURE_GROUPS = [
+    { group: 'Global UX',          icon: '✨', desc: 'Ctrl+K / ⌘K command palette, instant entity router (ticket / agency / user IDs), route → workspace / audit / radar, J/K hotkeys + ? cheat-sheet, live latency pill & offline queue, 5-second action undo.',
+      keys: ['ux.command_palette','ux.entity_routing','routing.workspace','routing.audit','routing.duplicate_radar','ux.hotkeys','ux.sync_telemetry','ux.optimistic_undo'] },
+    { group: 'Workspace & Queue',  icon: '🗂', desc: 'Live "viewing now" soft-locks on tickets with collision warnings, and SLA aging badges with smart-claim on the queue.',
+      keys: ['queue.presence_lock','queue.sla_timers'] },
+    { group: 'Audit Log',          icon: '📋', desc: 'Forensic audit grid, before/after diff drawer, trace-ID chain grouping, CSV/JSON compliance export, SHA-256 hash-chain integrity verify.',
+      keys: ['audit.view','audit.diff_inspect','audit.trace_group','audit.export','audit.verify_chain'] },
+    { group: 'Audition Status',    icon: '🎧', desc: 'Live status command board, supply-vs-demand coverage banner, break stopwatch + 10-min auto-idle, 1-click agent ticket handoff.',
+      keys: ['audition.status.view','audition.status.capacity','audition.status.timers','audition.status.handoff'] },
+    { group: 'Audition Schedule',  icon: '🗓', desc: 'Workforce roster grid, shift-coverage footer, shift-pattern painter + clone week, peer shift-swap requests, personal iCal calendar sync.',
+      keys: ['audition.schedule.view','audition.schedule.coverage','audition.schedule.painter','audition.schedule.swap','audition.schedule.ical'] },
+    { group: 'Attendance',         icon: '⏱', desc: 'Attendance timeline monitor, interactive scrubber HUD over the timeline, 1-click exception & excuse resolver.',
+      keys: ['audition.attendance.view','audition.attendance.scrubber','audition.attendance.excuse'] },
+    { group: 'Analytics',          icon: '📊', desc: 'Executive analytics cockpit, period-over-period comparison, chart cohort drill-down, statistical anomaly & bottleneck radar.',
+      keys: ['audition.analytics.view','audition.analytics.compare','audition.analytics.drilldown','audition.analytics.anomalies'] },
+];
+const SF = { initial: {}, rendered: false };
+function sfToggleId(group) { return 'sf_' + group.replace(/\W+/g, '_'); }
+function sfRenderToggles() {
+    if (SF.rendered) return;
+    const grid = document.getElementById('specialFeaturesGrid');
+    if (!grid) return;
+    SF.rendered = true;
+    grid.innerHTML = SPECIAL_FEATURE_GROUPS.map(g => `
+        <div class="admin-toggle">
+            <div>
+                <h4>${g.icon} ${escHtml(g.group)} <span style="font-weight:500;font-size:.72rem;color:var(--text-muted)">· ${g.keys.length} features</span></h4>
+                <span style="font-size:.8rem;color:var(--text-muted)">${escHtml(g.desc)}</span>
+            </div>
+            <label class="switch"><input type="checkbox" id="${sfToggleId(g.group)}"><span class="slider"></span></label>
+        </div>`).join('');
+    sfSnapshot(); // fresh form: every master toggle baselines OFF
+}
+function sfGroupOn(group) {
+    const cb = document.getElementById(sfToggleId(group));
+    return !!(cb && cb.checked);
+}
+// Snapshot the current toggle states as the "loaded" baseline — saving sends
+// only the groups the admin actually flipped, so an untouched master toggle
+// never clobbers a fine-grained grant made in the matrix.
+function sfSnapshot() {
+    SPECIAL_FEATURE_GROUPS.forEach(g => { SF.initial[g.group] = sfGroupOn(g.group); });
+}
+// Member context (✏️ Edit / 📋 Copy): a master toggle is ON only when the
+// member has EVERY key of the pack effective (role template + overrides,
+// resolved server-side). Super admins ('*' wildcard) show everything ON.
+// effectiveKeys = null -> all OFF (fresh form).
+function sfSetStateFromEffective(effectiveKeys) {
+    const eff = Array.isArray(effectiveKeys) ? effectiveKeys : [];
+    const wild = eff.indexOf('*') >= 0;
+    SPECIAL_FEATURE_GROUPS.forEach(g => {
+        const cb = document.getElementById(sfToggleId(g.group));
+        if (cb) cb.checked = wild || (!!effectiveKeys && g.keys.every(k => eff.indexOf(k) >= 0));
+    });
+    sfSnapshot();
+}
+// Role-preset context: presets carry only the ON-group list. Applying a preset
+// moves the toggles but NOT the baseline, so saving an edited member after a
+// preset grants the ON packs and revokes the OFF packs he currently holds.
+function sfApplyPreset(featureGroups) {
+    if (!Array.isArray(featureGroups)) return;
+    SPECIAL_FEATURE_GROUPS.forEach(g => {
+        const cb = document.getElementById(sfToggleId(g.group));
+        if (cb) cb.checked = featureGroups.indexOf(g.group) >= 0;
+    });
+}
+function sfReset() {
+    SPECIAL_FEATURE_GROUPS.forEach(g => {
+        const cb = document.getElementById(sfToggleId(g.group));
+        if (cb) cb.checked = false;
+    });
+    sfSnapshot();
+}
+function sfCollectChanges() {
+    const out = {};
+    SPECIAL_FEATURE_GROUPS.forEach(g => {
+        const on = sfGroupOn(g.group);
+        if (on !== !!SF.initial[g.group]) out[g.group] = on;
+    });
+    return out;
+}
+// Render once at startup — the grid lives in the static Access form markup.
+document.addEventListener('DOMContentLoaded', sfRenderToggles);
+
 function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     const m = (modulesStr || '').toLowerCase();
 
@@ -11222,6 +11318,10 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
 function editAgent(email,modulesStr,acmsRaw,regRaw) {
     document.getElementById('newAgentEmail').value=email;
     applyConfigToForm(modulesStr, acmsRaw, regRaw);
+    // v33.1: pre-fill the Special Features master toggles from this member's
+    // resolved feature keys (rides the same /api/admin/users payload).
+    const _sfU = (latestAdminUsers || []).find(u => String(u.email || u.person || '') === String(email));
+    sfSetStateFromEffective(_sfU ? _sfU.feature_effective : null);
     document.getElementById('adminBtnSubmit').innerText='💾 Save Configuration';
     openInTab('admin-agents');
     setTimeout(()=>document.getElementById('newAgentEmail').focus(),120);
@@ -12985,7 +13085,7 @@ async function fetchAdminUsers() {
                             <div class="user-details"><span style="color:var(--text);font-weight:600">Modules:</span> <span>${escHtml(r.modules||'none')}</span></div>
                         </div>
                         <div class="action-btns">
-                            <button class="edit-btn" onclick="applyRoleConfigDirect('${safeModules}','${safeAcms}','${safeRegs}')">Apply</button>
+                            <button class="edit-btn" onclick="applyRoleById('${safeId}')">Apply</button>
                             <button class="del-btn" onclick="deleteAgent('${safeId}')">Delete</button>
                         </div>`;
                     roleListDiv.appendChild(row);
@@ -13092,8 +13192,18 @@ function populateQuickSetupSelects() {
     }
 }
 
-function applyRoleConfigDirect(modulesStr, acmsRaw, regRaw) {
+// v33.1: the role row's Apply now routes through the id so the preset's
+// saved Special Features groups come along (string-interpolating an array
+// into onclick would be fragile).
+function applyRoleById(roleId) {
+    const role = (latestAdminRoles || []).find(r => r.id === roleId);
+    if (!role) return;
+    applyRoleConfigDirect(role.modules, role.acms_raw, role.regions_raw, role.feature_groups);
+}
+
+function applyRoleConfigDirect(modulesStr, acmsRaw, regRaw, featureGroups) {
     applyConfigToForm(modulesStr, acmsRaw, regRaw);
+    sfApplyPreset(featureGroups); // v33.1
     ToastManager.show('Role applied to the form. Set an Agent Identity and save.', 'success');
     document.getElementById('newAgentEmail').focus();
 }
@@ -13102,7 +13212,7 @@ function applyRoleToForm(roleId) {
     if (!roleId) return;
     const role = latestAdminRoles.find(r => r.id === roleId);
     if (!role) return;
-    applyRoleConfigDirect(role.modules, role.acms_raw, role.regions_raw);
+    applyRoleConfigDirect(role.modules, role.acms_raw, role.regions_raw, role.feature_groups);
     document.getElementById('applyRoleSelect').value = '';
 }
 
@@ -13111,6 +13221,7 @@ function copyAccessFromAgent(agentId) {
     const agent = latestAdminUsers.find(u => u.id === agentId);
     if (!agent) return;
     applyConfigToForm(agent.modules, agent.acms_raw, agent.regions_raw);
+    sfSetStateFromEffective(agent.feature_effective); // v33.1
     // Deliberately does NOT copy the email/identity -- this copies the ACCESS, not
     // the person, so the admin can now type in a new agent's identity and save it
     // as a brand-new row rather than overwriting the source agent.
@@ -13181,6 +13292,7 @@ function resetAgentForm() {
     ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
+    sfReset(); // v33.1
     document.getElementById('adminBtnSubmit').innerText = '+ Save Agent Configuration';
     adminRefreshModuleCounts();
 }
@@ -13255,7 +13367,10 @@ async function confirmSaveRole() {
             target:pTargetReg.getValues().join(','), points:pPointsReg.getValues().join(','),
             analytics:pAnalyticsReg.getValues().join(','), query:pQueryReg.getValues().join(','),
             exchange:pExchangeReg.getValues().join(',')
-        }
+        },
+        // v33.1: role presets capture the Special Features master-toggle
+        // state, so applying a role later moves the same packs on the member.
+        feature_groups: SPECIAL_FEATURE_GROUPS.filter(g => sfGroupOn(g.group)).map(g => g.group)
     };
 
     try {
@@ -13370,9 +13485,13 @@ async function addAgent() {
         exchange:pExchangeReg.getValues().join(',')
     };
 
+    // v33.1: only the master toggles the admin actually flipped travel with
+    // the save — untouched groups never touch the Feature Overrides blob.
+    const sfChanges = sfCollectChanges();
     let successCount = 0, failures = [];
     for (const identity of identities) {
         const payload = { email: identity, modules: modules.join(', '), acms: commonAcms, regions: commonRegions };
+        if (Object.keys(sfChanges).length) payload.feature_changes = sfChanges; // v33.1
         try {
             const res=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},body:JSON.stringify(payload)});
             let data;
@@ -13392,6 +13511,7 @@ async function addAgent() {
         document.getElementById('modAdmin').checked=false;
         ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
+        sfReset(); // v33.1: clear the master toggles with the rest of the form
     }
     document.getElementById('adminBtnSubmit').innerText='+ Save Agent Configuration';
     fetchAdminUsers();
@@ -30627,7 +30747,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v33.0 audition-suite 2026-11-16';
+window.SAM19_BUILD='v33.1 special-features-toggles 2026-11-16';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
