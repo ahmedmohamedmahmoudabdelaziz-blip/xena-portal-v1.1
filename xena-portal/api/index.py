@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v29.7 source-protect 2026-11-16"
+XENA_BUILD = "v30.0 rbac-phase1 2026-11-16"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -1712,7 +1712,8 @@ _MIRROR_CACHE = {"ts": 0.0, "map": None}
 
 def _TOGGLED_OFF_PERMS():
     return {"is_super_admin": False, "modules": [],
-            "permissions": {"acms": {}, "regions": {}}, "toggled_off": True}
+            "permissions": {"acms": {}, "regions": {}}, "toggled_off": True,
+            "feature_role": None, "feature_perms": []}
 
 def _sheet_toggles(force=False):
     """Sheet-backed toggle state: {"map": {email/person-lower: enabled_bool},
@@ -1875,6 +1876,157 @@ def _access_gate():
     except Exception:
         return  # never break a request over the gate itself
 
+# ═══════════════════════════════════════════════════════════════════════════
+# v30.0 Phase 1 (enterprise spec §1, Ahmed 2026-11-16): Granular Feature-Flag
+# & RBAC core. 31-key master registry; each member resolves as
+#   Role-Template defaults  ∪  role-row grant  −  role-row revoke
+#   ∪  member-row grant     −  member-row revoke
+# stored as a JSON {"role","grant","revoke"} blob in the auto-provisioned
+# "Feature Overrides" text column of the Access table. Super admins resolve to
+# the '*' wildcard. Every later portal feature gates UI + API on these keys.
+# ═══════════════════════════════════════════════════════════════════════════
+
+FEATURE_PERMISSION_REGISTRY = {
+    "ux.command_palette":        {"module": "Global UX",         "name": "Ctrl+K / ⌘K Command Palette",            "desc": "Open the global command palette with Ctrl+K or ⌘K.",                "levels": ["lead", "admin"]},
+    "ux.entity_routing":         {"module": "Global UX",         "name": "Instant Entity Regex Router",            "desc": "Paste a ticket / agency / user ID to get instant entity action cards.", "levels": ["lead", "admin"]},
+    "routing.workspace":         {"module": "Global UX",         "name": "Route Entity → Workspace",               "desc": "Open a routed entity straight into its workspace.",                 "levels": ["agent", "lead", "admin"]},
+    "routing.audit":             {"module": "Global UX",         "name": "Route Entity → Audit Log",               "desc": "Jump from a routed entity into its audit-log history.",           "levels": ["lead", "admin"]},
+    "routing.duplicate_radar":   {"module": "Global UX",         "name": "Route Entity → Duplicate Radar",         "desc": "Scan a routed entity in the duplicate radar.",                     "levels": ["agent", "lead", "admin"]},
+    "ux.hotkeys":                {"module": "Global UX",         "name": "Keyboard Navigation (J/K, ? HUD)",       "desc": "J/K row navigation and the ? shortcuts cheat-sheet.",               "levels": ["agent", "lead", "admin"]},
+    "ux.sync_telemetry":         {"module": "Global UX",         "name": "Live Latency Pill & Offline Queue",      "desc": "Header sync-status pill and offline draft buffering.",              "levels": ["all"]},
+    "ux.optimistic_undo":        {"module": "Global UX",         "name": "5-Second Action Undo Buffer",            "desc": "Grace-period undo toast on non-financial mutations.",              "levels": ["lead", "admin"]},
+    "queue.presence_lock":       {"module": "Workspace & Queue", "name": "Live Viewing-Now Soft-Locks",            "desc": "See who is viewing a ticket right now; collision warnings.",       "levels": ["agent", "lead", "admin"]},
+    "queue.sla_timers":          {"module": "Workspace & Queue", "name": "Live SLA Aging Badges & Smart Claim",    "desc": "Aging pills on queue cards and the claim-highest-SLA button.",      "levels": ["agent", "lead", "admin"]},
+    "audit.view":                {"module": "Audit Log",         "name": "Access Forensic Audit Log Grid",         "desc": "Open the audit-log grid at all.",                                   "levels": ["lead", "admin"]},
+    "audit.diff_inspect":        {"module": "Audit Log",         "name": "Slide-Over Before/After Diff Drawer",   "desc": "Row-level before/after diff inspector drawer.",                    "levels": ["lead", "admin"]},
+    "audit.trace_group":         {"module": "Audit Log",         "name": "Trace ID (TRC-XXXX) Chain Grouping",      "desc": "Group multi-step workflows under their trace ID.",                 "levels": ["admin"]},
+    "audit.export":              {"module": "Audit Log",         "name": "CSV / JSON Compliance Export",           "desc": "Export the filtered ledger as CSV or JSON.",                        "levels": ["admin"]},
+    "audit.verify_chain":        {"module": "Audit Log",         "name": "SHA-256 Ledger Integrity Verification",  "desc": "Tamper-evident hash-chain verification shield.",                   "levels": ["admin"]},
+    "audition.status.view":      {"module": "Audition Status",  "name": "View Live Status Command Board",         "desc": "See the agent status command board.",                               "levels": ["agent", "lead", "admin"]},
+    "audition.status.capacity":  {"module": "Audition Status",  "name": "Supply-vs-Demand Coverage Banner",       "desc": "Coverage ratio ribbon above the status board.",                    "levels": ["lead", "admin"]},
+    "audition.status.timers":    {"module": "Audition Status",  "name": "Live Break Stopwatch & Auto-Idle",       "desc": "Break stopwatch, daily allowance and 10m auto-idle.",               "levels": ["agent", "lead", "admin"]},
+    "audition.status.handoff":   {"module": "Audition Status",  "name": "1-Click Agent Ticket Handoff",            "desc": "Leads reassign an agent's open tickets in one click.",              "levels": ["lead", "admin"]},
+    "audition.schedule.view":    {"module": "Audition Schedule","name": "View Workforce Roster Grid",              "desc": "See the schedule roster grid.",                                     "levels": ["agent", "lead", "admin"]},
+    "audition.schedule.coverage":{"module": "Audition Schedule","name": "Shift Coverage Deficit Footer Row",        "desc": "Per-day staffing coverage footer row.",                            "levels": ["lead", "admin"]},
+    "audition.schedule.painter": {"module": "Audition Schedule","name": "Shift Pattern Painter & Clone Week",       "desc": "Paint shifts across the grid and clone a week.",                   "levels": ["lead", "admin"]},
+    "audition.schedule.swap":    {"module": "Audition Schedule","name": "Peer-to-Peer Shift Swap Requests",         "desc": "Propose and approve peer shift swaps.",                             "levels": ["agent", "lead", "admin"]},
+    "audition.schedule.ical":    {"module": "Audition Schedule","name": "Personal iCal / Lark Calendar Sync",       "desc": "Personal read-only iCal roster feed URL.",                          "levels": ["agent", "lead", "admin"]},
+    "audition.attendance.view":  {"module": "Attendance",      "name": "View Attendance Timeline Monitor",         "desc": "See the attendance timeline monitor.",                             "levels": ["lead", "admin"]},
+    "audition.attendance.scrubber":{"module": "Attendance",    "name": "Interactive Timeline Scrubber HUD",        "desc": "Crosshair + forensic HUD over the attendance timeline.",            "levels": ["lead", "admin"]},
+    "audition.attendance.excuse":{"module": "Attendance",      "name": "1-Click Exception & Excuse Resolver",      "desc": "Resolve Late/Gap flags with an excuse reason.",                     "levels": ["lead", "admin"]},
+    "audition.analytics.view":    {"module": "Analytics",      "name": "View Executive Analytics Cockpit",         "desc": "Open the analytics cockpit.",                                       "levels": ["lead", "admin"]},
+    "audition.analytics.compare": {"module": "Analytics",       "name": "Period-over-Period Comparison Mode",      "desc": "Compare KPIs against the previous period.",                        "levels": ["lead", "admin"]},
+    "audition.analytics.drilldown":{"module": "Analytics",      "name": "Interactive Chart Cohort Drill-Down",      "desc": "Click charts to cross-filter and drill into cohorts.",              "levels": ["lead", "admin"]},
+    "audition.analytics.anomalies":{"module": "Analytics",     "name": "Statistical Anomaly & Bottleneck Radar",   "desc": "Automated statistical anomaly alert feed.",                          "levels": ["admin"]},
+}
+
+# Spec §1.4 Role Templates → registry level. Admin holds every key; Auditor is
+# an Agent plus read-only audit inspection (no lead powers).
+FEATURE_ROLE_LEVELS = {"Agent": "agent", "Senior Agent": "agent", "Team Lead": "lead", "Auditor": "agent", "Admin": "admin"}
+FEATURE_ROLE_NAMES = list(FEATURE_ROLE_LEVELS.keys())
+FEATURE_AUDITOR_BONUS = ["audit.view", "audit.diff_inspect"]
+DEFAULT_FEATURE_ROLE = "Agent"
+
+def _feature_role_default_keys(role):
+    """Registry default key list for one Role Template (before any overrides)."""
+    role = (role or DEFAULT_FEATURE_ROLE).strip().title()
+    level = FEATURE_ROLE_LEVELS.get(role, "agent")
+    keys = []
+    for k, meta in FEATURE_PERMISSION_REGISTRY.items():
+        if level == "admin" or "all" in meta["levels"] or level in meta["levels"]:
+            keys.append(k)
+    if role == "Auditor":
+        for bk in FEATURE_AUDITOR_BONUS:
+            if bk not in keys:
+                keys.append(bk)
+    return keys
+
+def _normalize_feature_role(raw):
+    """Clamp a stored role name to a known template (title-case match), else None."""
+    if not raw or not isinstance(raw, str):
+        return None
+    t = raw.strip().title()
+    return t if t in FEATURE_ROLE_LEVELS else None
+
+def _parse_feature_overrides(raw):
+    """Parse the Access row's "Feature Overrides" JSON blob ->
+    {"role": <template|None>, "grant": [keys], "revoke": [keys]}. Blank /
+    malformed / partial values all degrade to the no-override default; unknown
+    keys and unknown roles are dropped (never invented)."""
+    out = {"role": None, "grant": [], "revoke": []}
+    try:
+        if isinstance(raw, (list, tuple)):
+            raw = "".join(x.get("text", "") if isinstance(x, dict) else str(x) for x in raw)
+        if not isinstance(raw, str) or not raw.strip():
+            return out
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            return out
+        out["role"] = _normalize_feature_role(parsed.get("role"))
+        for side in ("grant", "revoke"):
+            v = parsed.get(side) or []
+            if isinstance(v, str):
+                v = v.split(",")
+            keep = []
+            for k in v:
+                if isinstance(k, str) and k.strip() in FEATURE_PERMISSION_REGISTRY and k.strip() not in keep:
+                    keep.append(k.strip())
+            out[side] = keep
+    except Exception:
+        return {"role": None, "grant": [], "revoke": []}
+    return out
+
+def _resolve_feature_perms(is_super, role, role_adj, user_adj):
+    """Spec §1.2: Role-Template defaults merged with the role row's own
+    grant/revoke adjustments, then the member's own overrides (member wins).
+    Super admins resolve to the '*' wildcard."""
+    if is_super:
+        return ["*"]
+    user_role = _normalize_feature_role(role) or DEFAULT_FEATURE_ROLE
+    keys = set(_feature_role_default_keys(user_role))
+    if not isinstance(role_adj, dict):
+        role_adj = {}
+    if not isinstance(user_adj, dict):
+        user_adj = {}
+    keys |= set(role_adj.get("grant") or [])
+    keys -= set(role_adj.get("revoke") or [])
+    keys |= set(user_adj.get("grant") or [])
+    keys -= set(user_adj.get("revoke") or [])
+    return sorted(k for k in keys if k in FEATURE_PERMISSION_REGISTRY)
+
+def has_feature_perm(email, name, perm_key):
+    """API-layer gate for the Phases 2-4 feature endpoints (spec §1.1 #3):
+    validate the caller's resolved feature permission server-side. Fail-closed."""
+    try:
+        perms = get_user_permissions(email, name) or {}
+        fp = perms.get("feature_perms") or []
+        return "*" in fp or perm_key in fp
+    except Exception:
+        return False
+
+# One-time lazy check/create of the "Feature Overrides" text column on the
+# ACCESS table (same pattern as the v29.6 audit "Device" column).
+_FEATURE_OVERRIDES_FIELD = {"checked": False, "ok": False}
+def _ensure_feature_overrides_field(tat):
+    if _FEATURE_OVERRIDES_FIELD["checked"]:
+        return _FEATURE_OVERRIDES_FIELD["ok"]
+    _FEATURE_OVERRIDES_FIELD["checked"] = True
+    try:
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/fields"
+        hdrs = {"Authorization": f"Bearer {tat}"}
+        res = http_requests.get(url, headers=hdrs, timeout=8).json()
+        names = [f.get("field_name") for f in res.get("data", {}).get("items", [])]
+        if "Feature Overrides" in names:
+            _FEATURE_OVERRIDES_FIELD["ok"] = True
+            return True
+        created = http_requests.post(url, headers={**hdrs, "Content-Type": "application/json"},
+                                     json={"field_name": "Feature Overrides", "type": 1}, timeout=8).json()
+        _FEATURE_OVERRIDES_FIELD["ok"] = created.get("code") == 0
+    except Exception as e:
+        logger.error("feature_overrides_field_failed", error=str(e))
+        _FEATURE_OVERRIDES_FIELD["ok"] = False
+    return _FEATURE_OVERRIDES_FIELD["ok"]
+
 def _fetch_user_permissions_db(email_clean, name_clean, cache_key):
     """v26e (pull speed for everyone, Ahmed: "make them exactly like me"):
     the Access-table lookup, extracted so the synchronous first-fetch path and
@@ -1888,16 +2040,34 @@ def _fetch_user_permissions_db(email_clean, name_clean, cache_key):
 
     try:
         res = feishu_session.get(url, headers=headers, params={"page_size": 500}, timeout=15).json()  # v24: keep-alive session (was a fresh cross-border handshake per call)
+        _role_adj_map = {}  # v30.0 RBAC: the 5 spec Role-Template rows' adjustments
         for item in res.get("data", {}).get("items", []):
             fields = item.get("fields", {})
             db_email = extract_field_text(fields.get("Email", "")).lower().strip()
             db_person = extract_field_text(fields.get("Person", "")).lower().strip()
 
+            # v30.0 RBAC: while we already iterate the table, capture the spec
+            # Role-Template rows (__ROLE__::<Name>) so the member's resolution
+            # can merge their grant/revoke adjustments in the same single fetch.
+            if db_email.startswith("__role__::"):
+                _rn = _normalize_feature_role(db_email.split("::", 1)[1])
+                if _rn:
+                    _role_adj_map[_rn] = _parse_feature_overrides(extract_field_text(get_field_local(fields, "Feature Overrides")))
+                continue
+
             if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
                 modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
                 parsed_acms = parse_granular_string(extract_field_text(get_field_local(fields, "ACMs")))
                 parsed_regions = parse_granular_string(extract_field_text(get_field_local(fields, "Regions")))
-                result = {"is_super_admin": "admin" in modules, "modules": modules, "permissions": {"acms": parsed_acms, "regions": parsed_regions}}
+                _user_adj = _parse_feature_overrides(extract_field_text(get_field_local(fields, "Feature Overrides")))
+                _user_role = _user_adj.get("role") or DEFAULT_FEATURE_ROLE
+                result = {"is_super_admin": "admin" in modules, "modules": modules,
+                          "permissions": {"acms": parsed_acms, "regions": parsed_regions},
+                          # v30.0 RBAC (spec §1.2): Role-Template defaults merged
+                          # with this row's individual grant[]/revoke[] overrides.
+                          "feature_role": _user_role,
+                          "feature_perms": _resolve_feature_perms("admin" in modules, _user_role,
+                                                                  _role_adj_map.get(_user_role, {}), _user_adj)}
                 cache_set(cache_key, result, ttl=300)
                 if REDIS_ENABLED:
                     try:
@@ -1944,17 +2114,19 @@ def _get_user_permissions_raw(email, name):
         return {
             "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "submit_audit", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"],
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
-                            "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
+                            "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}},
+            "feature_role": "Admin", "feature_perms": ["*"]  # v30.0 RBAC: super admin wildcard
         }
 
     if not email_clean and not name_clean:
-        return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
+        return {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}, "feature_perms": []}
 
     if MOCK_MODE:
         return {
             "is_super_admin": True, "modules": ["target", "points", "analytics", "admin", "query", "submit", "submit_new_request", "submit_my_requests", "submit_audit", "query_requests", "query_agency_list", "export_data", "tickets", "tickets_live_queue"],
             "permissions": {"acms": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]},
-                            "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}}
+                            "regions": {"target": ["all"], "points": ["all"], "analytics": ["all"], "query": ["all"]}},
+            "feature_role": "Admin", "feature_perms": ["*"]
         }
 
     cache_key = cache_make_key("perms", email_clean, name_clean)
@@ -2016,7 +2188,7 @@ def _get_user_permissions_raw(email, name):
             return _TOGGLED_OFF_PERMS()
         return result
 
-    fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}}
+    fallback = {"is_super_admin": False, "modules": [], "permissions": {"acms": {}, "regions": {}}, "feature_perms": []}
     return fallback
 
 def get_user_permissions(email, name):
@@ -3538,6 +3710,151 @@ def _require_admin_identity():
         return admin_name, admin_email, (jsonify({"error": "Unauthorized"}), 403)
     return admin_name, admin_email, None
 
+@app.route('/api/admin/feature-permissions', methods=['GET', 'POST'])
+@rate_limit(20, 300)
+def admin_feature_permissions():
+    """v30.0 Phase 1 (spec §1.4): the Feature Access & Permissions matrix.
+    GET -> {registry, role_names, role_levels, roles, users}: the 31-key
+    registry, per-role resolved defaults (incl. role-row adjustments) and
+    per-member override state, in ONE request for the admin console.
+    POST -> save ONE target's overrides (role template or individual user);
+    every save writes an ACCESS_CHANGE audit entry with the exact before/after
+    permission arrays (spec §1.4 mandatory audit trail) and invalidates the
+    permission cache so the change lands on the next request."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    tat = get_tenant_access_token()
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{ACCESS_TABLE_ID}/records"
+    ip = request.headers.get("X-Forwarded-For", "")
+
+    if request.method == 'GET':
+        registry = [{"key": k, "module": m["module"], "name": m["name"], "desc": m["desc"], "levels": m["levels"]}
+                    for k, m in FEATURE_PERMISSION_REGISTRY.items()]
+        if MOCK_MODE:
+            return jsonify({"registry": registry, "role_names": FEATURE_ROLE_NAMES,
+                            "role_levels": FEATURE_ROLE_LEVELS,
+                            "roles": {r: {"keys": _feature_role_default_keys(r), "grant": [], "revoke": []} for r in FEATURE_ROLE_NAMES},
+                            "users": []})
+        res = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
+        role_adj, users = {}, []
+        for item in res.get("data", {}).get("items", []):
+            fields = item.get("fields", {})
+            display_email = extract_field_text(fields.get("Email", ""))
+            adj = _parse_feature_overrides(extract_field_text(get_field_local(fields, "Feature Overrides")))
+            if (display_email or "").startswith("__ROLE__::"):
+                rname = _normalize_feature_role(display_email.split("::", 1)[1])
+                if rname:
+                    role_adj[rname] = adj
+                continue
+            modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
+            role = adj.get("role") or DEFAULT_FEATURE_ROLE
+            users.append({"id": item.get("record_id"), "email": display_email,
+                          "person": extract_field_text(fields.get("Person", "")),
+                          "role": role, "grant": adj.get("grant", []), "revoke": adj.get("revoke", []),
+                          "super_admin": "admin" in modules,
+                          "override": bool(adj.get("grant") or adj.get("revoke")),
+                          "effective": _resolve_feature_perms("admin" in modules, role, role_adj.get(role, {}), adj)})
+        roles = {}
+        for r in FEATURE_ROLE_NAMES:
+            adj = role_adj.get(r, {"grant": [], "revoke": []})
+            roles[r] = {"keys": _resolve_feature_perms(False, r, adj, {}),
+                        "grant": adj.get("grant", []), "revoke": adj.get("revoke", [])}
+        return jsonify({"registry": registry, "role_names": FEATURE_ROLE_NAMES,
+                        "role_levels": FEATURE_ROLE_LEVELS, "roles": roles, "users": users})
+
+    # POST: save one target's override blob
+    data = request.get_json(silent=True) or {}
+    kind = "user" if str(data.get("kind", "user")).strip().lower() == "user" else "role"
+    target = sanitize_text(str(data.get("target", "")))
+    if not target:
+        return jsonify({"success": False, "error": "target is required"}), 400
+
+    def _clean_keys(v):
+        if isinstance(v, str):
+            v = v.split(",")
+        keep = []
+        for k in (v or []):
+            if isinstance(k, str) and k.strip() in FEATURE_PERMISSION_REGISTRY and k.strip() not in keep:
+                keep.append(k.strip())
+        return keep
+    grant = _clean_keys(data.get("grant"))
+    revoke = _clean_keys(data.get("revoke"))
+
+    if MOCK_MODE:
+        return jsonify({"success": True, "target": target, "mock": True,
+                        "effective": sorted((set(_feature_role_default_keys(DEFAULT_FEATURE_ROLE)) | set(grant)) - set(revoke))})
+
+    role_name = _normalize_feature_role(data.get("role")) if kind == "user" else _normalize_feature_role(target)
+    if kind == "role" and not role_name:
+        return jsonify({"success": False, "error": f"Unknown role template: {target}"}), 400
+
+    res_all = http_requests.get(base_url, headers=headers, params={"page_size": 500}, timeout=15).json()
+    existing_record_id = None
+    before_adj = {"role": None, "grant": [], "revoke": []}
+    role_adj, row_modules = {}, []
+    row_wanted = f"__role__::{target.strip().lower()}" if kind == "role" else target.strip().lower()
+    for item in res_all.get("data", {}).get("items", []):
+        fields = item.get("fields", {})
+        d_email_display = extract_field_text(fields.get("Email", ""))
+        db_email = (d_email_display or "").lower().strip()
+        db_person = extract_field_text(fields.get("Person", "")).lower().strip()
+        if (d_email_display or "").startswith("__ROLE__::"):
+            rname = _normalize_feature_role(d_email_display.split("::", 1)[1])
+            if rname:
+                role_adj[rname] = _parse_feature_overrides(extract_field_text(get_field_local(fields, "Feature Overrides")))
+            if db_email == row_wanted:
+                existing_record_id = item["record_id"]
+                before_adj = role_adj.get(rname, before_adj)
+            continue
+        if kind == "user" and row_wanted and (row_wanted == db_email or row_wanted == db_person):
+            existing_record_id = item["record_id"]
+            before_adj = _parse_feature_overrides(extract_field_text(get_field_local(fields, "Feature Overrides")))
+            row_modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
+            break
+    if kind == "user" and not existing_record_id:
+        return jsonify({"success": False, "error": "Target not found — save the agent in Module Access first."}), 404
+
+    # Build the new blob. Member rows keep their previously assigned role unless
+    # the admin explicitly sent one (spec: role templates merged with overrides).
+    if kind == "role":
+        new_adj = {"grant": grant, "revoke": revoke}
+    else:
+        new_adj = {"grant": grant, "revoke": revoke}
+        keep_role = role_name or before_adj.get("role")
+        if keep_role:
+            new_adj["role"] = keep_role
+
+    if not _ensure_feature_overrides_field(tat):
+        return jsonify({"success": False, "error": "Could not create the 'Feature Overrides' column on the Access table — check the app's edit rights on that Bitable."}), 500
+    payload = {"fields": {"Feature Overrides": json.dumps(new_adj, ensure_ascii=False, separators=(",", ":"))}}
+    if kind == "role" and not existing_record_id:
+        payload["fields"]["Email"] = f"__ROLE__::{role_name}"
+        payload["fields"]["Modules"] = ""
+    if existing_record_id:
+        res = http_requests.put(f"{base_url}/{existing_record_id}", headers=headers, json=payload, timeout=15).json()
+    else:
+        res = http_requests.post(base_url, headers=headers, json=payload, timeout=15).json()
+    if res.get("code") != 0:
+        return jsonify({"success": False, "error": res.get("msg", "Unknown error")}), 500
+
+    # Spec §1.4 mandatory audit trail: ACCESS_CHANGE with the exact before and
+    # after permission arrays, written before anything is reported back.
+    before_json = json.dumps(before_adj, ensure_ascii=False, sort_keys=True)
+    after_json = json.dumps(new_adj, ensure_ascii=False, sort_keys=True)
+    audit.log(admin_name, "ACCESS_CHANGE", f"{kind}:{target}",
+              details=f"before={before_json}; after={after_json}", ip=ip, severity="Warning")
+    cache_invalidate()  # the change must land on every member's next request
+
+    if kind == "role":
+        effective = _resolve_feature_perms(False, role_name, new_adj, {})
+    else:
+        eff_role = new_adj.get("role") or DEFAULT_FEATURE_ROLE
+        effective = _resolve_feature_perms("admin" in row_modules, eff_role,
+                                            role_adj.get(eff_role, {}), new_adj)
+    return jsonify({"success": True, "target": target, "role": new_adj.get("role"), "effective": effective})
+
 @app.route('/api/admin/member-toggle', methods=['POST'])
 @rate_limit(20, 300)
 def admin_member_toggle():
@@ -3812,6 +4129,10 @@ def preview_access_view():
         "modules":        target_perms.get("modules", []),
         "is_super_admin": bool(target_perms.get("is_super_admin")),
         "permissions":    target_perms.get("permissions", {}),
+        # v30.0 RBAC: the previewed member's resolved feature permissions, so
+        # PermissionGuard checks render exactly what the target would see.
+        "feature_role":   target_perms.get("feature_role"),
+        "feature_perms":  target_perms.get("feature_perms", []),
     }})
 
 @app.route('/api/admin/alerts-summary', methods=['GET'])
