@@ -30747,7 +30747,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.3 chat-poll-kbfix 2026-11-17';
+window.SAM19_BUILD='v34.1.4 kb-envelope-chathang 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32532,6 +32532,13 @@ function xaFreshness(){
           if(!kbRunning && d.last_error){ kbBtn.title = String(d.last_error).slice(0, 300); }
           kbBtn.onclick = function(){ xaKbBuild(kbBtn); };
           hint.appendChild(kbBtn);
+          var rsBtn = document.createElement('button');
+          rsBtn.type = 'button'; rsBtn.className = 'xaKbBtn';
+          rsBtn.textContent = '\u21BA Reset';
+          rsBtn.title = 'Clear the build state and rebuild from ticket #1 (use after deleting duplicate tickets files in the Aily console)';
+          rsBtn.disabled = kbRunning;
+          rsBtn.onclick = function(){ xaKbReset(rsBtn, kbBtn); };
+          hint.appendChild(rsBtn);
         } else {
           hint.appendChild(document.createTextNode(' \u00B7 voice supported'));
         }
@@ -32607,6 +32614,31 @@ function xaKbBuild(btn){
   btn.textContent = '⏳ Building KB…';
   kbStatusText = btn.textContent;
   tick();
+}
+function xaKbReset(btn, buildBtn){
+  // v34.1.4: clear the poisoned backfill state (polluted batch + progress
+  // from the duplicate-asset bug), then start a clean rebuild.
+  if(kbRunning) return;
+  kbRunning = true;
+  btn.disabled = true;
+  btn.textContent = '\u21BA Resetting\u2026';
+  fetch('/api/knowledge/backfill?reset=1', {
+    method:'POST',
+    headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
+  }).then(function(r){
+    if(!r.ok){ btn.textContent = '\u21BA Reset failed'; btn.disabled = false; kbRunning = false; return null; }
+    return r.json();
+  }).then(function(d){
+    if(!d) return;
+    kbRunning = false;
+    btn.textContent = '\u21BA Reset';
+    btn.disabled = false;
+    if(buildBtn){ xaKbBuild(buildBtn); }
+  }).catch(function(){
+    btn.textContent = '\u21BA Reset failed';
+    btn.disabled = false;
+    kbRunning = false;
+  });
 }
 function addMsg(text, who, isErr){
   var d = document.createElement('div');
@@ -32710,6 +32742,12 @@ async function send(){
   addMsg(text, 'user');
   inputEl.value = ''; autoGrow();
   var typing = showTyping();
+  var endWait = function(msg, isErr){
+    typing.remove();
+    if(msg){ addMsg(msg, 'bot', !!isErr); }
+    busy = false; sendBtn.disabled = false;
+    inputEl.focus();
+  };
   try{
     var res = await fetch('/api/chat', {
       method:'POST',
@@ -32722,31 +32760,47 @@ async function send(){
       // (Vercel Hobby kills functions at 60s — that was the HTTP 504 on rule
       // questions). The backend handed us the agent_chat_id; poll the result
       // route every ~4s instead of dying.
+      // v34.1.4: hard 8-minute wall clock + per-poll abort timeout + network
+      // miss tolerance — a backgrounded tab froze this loop mid-way and it
+      // looked stuck for HOURS (Ahmed's '4 hours and still going').
       if(data.session_id){ sessionId = data.session_id; localStorage.setItem('xenaChatSess', sessionId); }
       var note = document.createElement('div');
       note.style.cssText = 'font-size:11px;opacity:.65;margin-top:4px';
-      note.textContent = 'Still thinking…';
+      note.textContent = 'Still thinking\u2026';
       typing.appendChild(note);
-      var polls = 0;
-      while(polls < 40){
+      var deadline = Date.now() + 8 * 60 * 1000;
+      var polls = 0, netMiss = 0;
+      while(polls < 100){
+        if(Date.now() > deadline){
+          endWait('The assistant has not finished after several minutes — the knowledge base is still being rebuilt. Please try again shortly.', true);
+          return;
+        }
         polls++;
         await new Promise(function(r2){ setTimeout(r2, 4000); });
-        if(polls === 8){ note.textContent = 'Still working on it…'; }
-        if(polls === 20){ note.textContent = 'Almost there…'; }
-        var rr = await fetch('/api/chat/result?agent_chat_id=' + encodeURIComponent(data.agent_chat_id) + '&session_id=' + encodeURIComponent(sessionId || ''), {
-          headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
-        });
-        var rd = await rr.json().catch(function(){ return {}; });
+        if(polls === 8){ note.textContent = 'Still working on it\u2026'; }
+        if(polls === 20){ note.textContent = 'Almost there\u2026'; }
+        var rr = null, rd = {};
+        try{
+          var ctrl = ('AbortController' in window) ? new AbortController() : null;
+          var killer = ctrl ? setTimeout(function(){ ctrl.abort(); }, 30000) : 0;
+          rr = await fetch('/api/chat/result?agent_chat_id=' + encodeURIComponent(data.agent_chat_id) + '&session_id=' + encodeURIComponent(sessionId || ''), {
+            headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+            signal: ctrl ? ctrl.signal : undefined
+          });
+          if(killer){ clearTimeout(killer); }
+          rd = await rr.json().catch(function(){ return {}; });
+        }catch(ePoll){
+          netMiss++;
+          if(netMiss >= 5){ endWait('Lost contact with the assistant — check your connection and send again.', true); return; }
+          continue;
+        }
+        netMiss = 0;
         if(rr.status === 202 && rd.pending){ continue; }
-        typing.remove();
-        if(rr.ok && rd.reply){ addMsg(rd.reply, 'bot'); }
-        else{ addMsg(rd.error || ('The assistant did not answer (HTTP ' + rr.status + '). Try again.'), 'bot', true); }
-        busy = false; sendBtn.disabled = false;
-        inputEl.focus();
+        if(rr.ok && rd.reply){ endWait(rd.reply); }
+        else{ endWait(rd.error || ('The assistant did not answer (HTTP ' + rr.status + '). Try again.'), true); }
         return;
       }
-      typing.remove();
-      addMsg('The assistant is taking unusually long — please try again in a moment.', 'bot', true);
+      endWait('The assistant is taking unusually long — please try again in a moment.', true);
     } else {
       typing.remove();
       if(res.ok && data.reply){

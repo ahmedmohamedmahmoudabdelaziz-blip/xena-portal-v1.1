@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.3 chat-poll-kbfix 2026-11-17"
+XENA_BUILD = "v34.1.4 kb-envelope-chathang 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17026,7 +17026,12 @@ def _kb_create_asset(title, text):
         data = r.json() if r.content else {}
     except Exception as e:
         return None, "network: %s" % e
-    ka = (data or {}).get("knowledge_asset") or {}
+    # v34.1.4: unwrap the "data" envelope the Aily KB API actually returns
+    # (seen live: {'data': {'knowledge_asset': {...}}, 'status_code': '0'}).
+    body = (data or {}).get("data")
+    if not isinstance(body, dict):
+        body = data or {}
+    ka = body.get("knowledge_asset") or (data or {}).get("knowledge_asset") or {}
     aid = ka.get("knowledge_asset_id")
     if r.status_code == 200 and aid:
         return aid, None
@@ -17166,6 +17171,21 @@ def knowledge_backfill():
     admin_name, admin_email, err = _require_admin_identity()
     if err:
         return err
+    if request.args.get("reset") == "1":
+        # v34.1.4: clear a poisoned build state (polluted batch/progress from
+        # the pre-fix envelope bug) so the next build starts from ticket #1.
+        old = _kb_state()
+        if old.get("open_batch"):
+            redis_cmd("DEL", _KB_BATCH_KEY + old["open_batch"])
+        _kb_state_save({"backfill_done": False, "page_token": "", "processed": 0,
+                        "open_batch": "", "next_index": 1, "last_sync_ms": 0, "errors": []})
+        _kb_assets_save({})
+        try:
+            audit.log(admin_name, "KNOWLEDGE_BACKFILL_RESET", "state cleared", severity="Warning")
+        except Exception:
+            pass
+        return jsonify({"reset": True,
+                        "note": "backfill state cleared - re-invoke (without reset) to rebuild from ticket #1"})
     if not AILY_KB_API_KEY:
         return jsonify({"error": "AILY_KB_API_KEY is not configured on the server"}), 503
     if MOCK_MODE:
@@ -17513,12 +17533,12 @@ def _aily_chat_await(tat, acid, budget):
             continue
         pdata = pr.get("data") or {}
         status = str(pdata.get("status") or "")
-        if status.lower() in ("completed", "failed", "cancelled"):
+        if status.lower() in ("completed", "failed", "cancelled", "error", "exception"):
             texts = []
             _sse_collect_text(pdata, texts)
             reply = max(texts, key=len).strip() if texts else ""
-            if not reply and status.lower() == "failed":
-                raise RuntimeError("agent run failed: %s" % str(pdata)[:200])
+            if not reply and status.lower() != "completed":
+                raise RuntimeError("agent run %s: %s" % (status.lower(), str(pdata)[:200]))
             return reply
     return None
 
