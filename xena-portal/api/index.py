@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v31.0 palette-hotkeys-undo 2026-11-16"
+XENA_BUILD = "v32.0 forensic-ledger-instant-boot 2026-11-16"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -1384,6 +1384,53 @@ def _classify_device(ua):
     parts = [x for x in (os_, br) if x]
     return kind + (" · " + " · ".join(parts) if parts else "")
 
+# ─── v32.0 Phase 3: forensic audit ledger (spec §2) ───────────────────────
+_AUDIT_EPOCH = datetime(1970, 1, 1)
+
+def _audit_ts_canonical(ts_ms):
+    """Deterministic ISO string for a millisecond epoch value. The hash chain
+    signs THIS string, and the verifier rebuilds it from the stored Timestamp
+    field -- utcfromtimestamp-style math without the py3.12 deprecation."""
+    return (_AUDIT_EPOCH + timedelta(milliseconds=int(ts_ms))).isoformat()
+
+_AUDIT_GENESIS_HASH = "0" * 64
+
+def _audit_category(action):
+    """Spec §2.1 category for a free-form action string. Fallback GENERAL."""
+    a = (action or "").upper()
+    if "POINT" in a or "CHARGE" in a or "DEDUCT" in a or "AP_CORRECT" in a:
+        return "POINT_CHARGE"
+    if "STATUS" in a or "OVERRIDE" in a or "REJECT" in a or "BIND_HANDLE" in a:
+        return "STATUS_OVERRIDE"
+    if "ACCESS_CHANGE" in a or "ADD_USER" in a or "UPDATE_USER" in a or "MEMBER_TOGGLE" in a or "PERMISSION" in a:
+        return "ACCESS_CHANGE"
+    if "UNAUTHORIZED" in a or "SESSION_EXPIRED" in a or "ACCESS_REQUEST" in a or "DELETE" in a or "LOGIN" in a:
+        return "SECURITY_ALERT"
+    if "SCHEDULE" in a or "SHIFT" in a:
+        return "SCHEDULE_EDIT"
+    return "GENERAL"
+
+def _audit_build_diff(before, after, diff):
+    """Structured {field: {from, to}} snapshot (spec §2.2). Explicit diff wins;
+    otherwise computed key-by-key from before/after dicts. None when empty."""
+    if isinstance(diff, dict) and diff:
+        return diff
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return None
+    d = {}
+    for k in sorted(set(before) | set(after)):
+        b, a = before.get(k), after.get(k)
+        if b != a:
+            d[k] = {"from": b, "to": a}
+    return d or None
+
+def _audit_diff_json(d):
+    """Canonical serialization -- the EXACT string that is hash-signed and
+    stored, so the verifier can recompute byte-identically."""
+    if not d:
+        return ""
+    return json.dumps(d, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
 # One-time lazy check/create of the "Device" text column on the audit table,
 # so older tables keep writing fine even before the column exists.
 _AUDIT_DEVICE_FIELD = {"checked": False, "ok": False}
@@ -1393,14 +1440,22 @@ class AuditLogger:
         self._queue = []
         self._lock  = threading.Lock()
 
-    def log(self, actor, action, target, details="", ip="", severity="Info", blocking=False):
+    def log(self, actor, action, target, details="", ip="", severity="Info", blocking=False,
+            before=None, after=None, diff=None, trace_id=None):
         full_target = f"{target} | {details}" if details else target
         try:
             from flask import request as _req, has_request_context
             ua = _req.headers.get("User-Agent", "") if has_request_context() else ""
+            hdr_trace = _req.headers.get("X-Trace-Id", "") if has_request_context() else ""
         except Exception:
             ua = ""
+            hdr_trace = ""
         device = _classify_device(ua)
+        # v32.0 Phase 3 (spec §2.3): every user workflow carries a TRC-XXXX id in
+        # the X-Trace-Id header; the ledger groups multi-step workflows by it.
+        trace = (trace_id or hdr_trace or "").strip()[:24]
+        if trace and not re.match(r"^[A-Za-z0-9\-_]+$", trace):
+            trace = ""
         entry = {
             # NOTE: audit entries are only ever readable by admins (see the
             # is_super_admin checks on every /api/admin/* route), so we log full,
@@ -1410,7 +1465,13 @@ class AuditLogger:
             "actor": actor or "Unknown", "action": action, "target": full_target,
             "ip": ip, "severity": severity, "ts": datetime.utcnow().isoformat(),
             "device": device, "ua": ua[:200],
+            # v32.0 Phase 3 forensic fields
+            "category": _audit_category(action),
+            "trace_id": trace,
+            "diff": _audit_build_diff(before, after, diff),
         }
+        if MOCK_MODE:
+            self._seal_mock(entry)
         logger.info("audit", **entry)
         if AUDIT_TABLE_ID and not MOCK_MODE:
             if blocking:
@@ -1451,13 +1512,108 @@ class AuditLogger:
             _AUDIT_DEVICE_FIELD["ok"] = False
         return _AUDIT_DEVICE_FIELD["ok"]
 
+    def _ensure_ledger_fields(self, tat):
+        """v32.0 Phase 3: one-time lazy check/create of the forensic ledger
+        columns (Seq ID number + Trace ID / Entry Hash / Prev Hash / Diff /
+        Category text) on the audit table. Same pattern as the Device column."""
+        if _AUDIT_LEDGER_FIELDS["checked"]:
+            return _AUDIT_LEDGER_FIELDS["ok"]
+        _AUDIT_LEDGER_FIELDS["checked"] = True
+        try:
+            url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/fields"
+            hdrs = {"Authorization": f"Bearer {tat}"}
+            res = http_requests.get(url, headers=hdrs, timeout=8).json()
+            names = [f.get("field_name") for f in res.get("data", {}).get("items", [])]
+            wanted = [("Seq ID", 2), ("Trace ID", 1), ("Entry Hash", 1),
+                      ("Prev Hash", 1), ("Diff", 1), ("Category", 1)]
+            for fname, ftype in wanted:
+                if fname in names:
+                    continue
+                created = http_requests.post(url, headers={**hdrs, "Content-Type": "application/json"},
+                                             json={"field_name": fname, "type": ftype}, timeout=8).json()
+                if created.get("code") != 0:
+                    raise Exception(f"create field {fname}: {created.get('msg')}")
+            _AUDIT_LEDGER_FIELDS["ok"] = True
+        except Exception as e:
+            logger.error("audit_ledger_fields_failed", error=str(e))
+            _AUDIT_LEDGER_FIELDS["ok"] = False
+        return _AUDIT_LEDGER_FIELDS["ok"]
+
+    def _seal_mock(self, entry):
+        """MOCK_MODE chain seal: per-process counter, same hash recipe."""
+        with _AUDIT_CHAIN_LOCK:
+            prev_seq = _AUDIT_CHAIN_STATE["seq"]
+            prev_hash = _AUDIT_CHAIN_STATE["hash"]
+            ts_ms = int(datetime.utcnow().timestamp() * 1000)
+            entry["ts"] = _audit_ts_canonical(ts_ms)
+            entry["ts_ms"] = ts_ms
+            diff_json = _audit_diff_json(entry.get("diff"))
+            seq = prev_seq + 1
+            entry["seq_id"] = seq
+            entry["prev_hash"] = prev_hash
+            entry["diff_json"] = diff_json
+            entry["entry_hash"] = hashlib.sha256(
+                "|".join([prev_hash, str(seq), entry["ts"], entry["actor"], diff_json]).encode("utf-8")
+            ).hexdigest()
+            _AUDIT_CHAIN_STATE["seq"] = seq
+            _AUDIT_CHAIN_STATE["hash"] = entry["entry_hash"]
+
+    def _chain_seal(self, entry, tat):
+        """v32.0 Phase 3 (spec §2.4): assign a strictly monotonic seq_id and
+        SHA-256 chain link anchored on the LATEST sealed Feishu row (the only
+        state shared across serverless instances). Falls back to this process's
+        last seal when the anchor read fails; if no anchor exists at all the
+        entry is written UNSEALED (verify flags the gap) rather than faking a
+        chain link."""
+        ts_ms = int(datetime.utcnow().timestamp() * 1000)
+        entry["ts"] = _audit_ts_canonical(ts_ms)
+        entry["ts_ms"] = ts_ms
+        diff_json = _audit_diff_json(entry.get("diff"))
+        entry["diff_json"] = diff_json
+        prev_seq, prev_hash, anchored = 0, _AUDIT_GENESIS_HASH, False
+        with _AUDIT_CHAIN_LOCK:
+            try:
+                url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+                res = http_requests.post(url,
+                    headers={"Authorization": f"Bearer {tat}", "Content-Type": "application/json"},
+                    json={"page_size": 1, "sort": [{"field_name": "Seq ID", "desc": True}]},
+                    timeout=8).json()
+                items = res.get("data", {}).get("items", []) if res.get("code") == 0 else []
+                if items:
+                    f = items[0].get("fields", {})
+                    pv = f.get("Seq ID")
+                    if isinstance(pv, (int, float)) and pv > 0:
+                        prev_seq = int(pv)
+                        prev_hash = extract_field_text(f.get("Entry Hash", "")) or _AUDIT_GENESIS_HASH
+                        anchored = True
+            except Exception as e:
+                logger.error("audit_chain_anchor_failed", error=str(e))
+            if not anchored and _AUDIT_CHAIN_STATE["seq"] > 0:
+                prev_seq, prev_hash, anchored = _AUDIT_CHAIN_STATE["seq"], _AUDIT_CHAIN_STATE["hash"], True
+            if not anchored:
+                # Cold process AND the anchor read failed: write the entry
+                # UNSEALED (verify flags the gap) rather than forking the
+                # chain from genesis with a duplicate seq 1.
+                return
+            seq = prev_seq + 1
+            entry["seq_id"] = seq
+            entry["prev_hash"] = prev_hash
+            entry["entry_hash"] = hashlib.sha256(
+                "|".join([prev_hash, str(seq), entry["ts"], entry["actor"], diff_json]).encode("utf-8")
+            ).hexdigest()
+            _AUDIT_CHAIN_STATE["seq"] = seq
+            _AUDIT_CHAIN_STATE["hash"] = entry["entry_hash"]
+
     def _write_feishu(self, entry):
         try:
             tat = get_tenant_access_token()
             url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records"
             hdrs = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+            ledger_ok = self._ensure_ledger_fields(tat)
+            if ledger_ok:
+                self._chain_seal(entry, tat)
             payload = {"fields": {
-                "Timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "Timestamp": entry.get("ts_ms") or int(datetime.utcnow().timestamp() * 1000),
                 "Agent": entry["actor"],
                 "Action": entry["action"],
                 "Target": entry["target"],
@@ -1466,12 +1622,26 @@ class AuditLogger:
             }}
             if self._ensure_device_field(tat):
                 payload["fields"]["Device"] = entry.get("device", "")
+            if ledger_ok and entry.get("seq_id"):
+                payload["fields"]["Seq ID"] = entry["seq_id"]
+                payload["fields"]["Trace ID"] = entry.get("trace_id", "")
+                payload["fields"]["Entry Hash"] = entry.get("entry_hash", "")
+                payload["fields"]["Prev Hash"] = entry.get("prev_hash", "")
+                payload["fields"]["Diff"] = entry.get("diff_json", "")[:4000]
+                payload["fields"]["Category"] = entry.get("category", "")
             http_requests.post(url, headers=hdrs, json=payload, timeout=8)
         except Exception as e:
             logger.error("audit_write_failed", error=str(e))
 
     def get_recent(self, limit=100):
         with self._lock: return list(reversed(self._queue[-limit:]))
+
+# v32.0 Phase 3 chain state: per-process cache of the last seal (the
+# authoritative anchor is always the latest sealed Feishu row; this only
+# covers the anchor-read-failure path).
+_AUDIT_CHAIN_LOCK = threading.Lock()
+_AUDIT_CHAIN_STATE = {"seq": 0, "hash": _AUDIT_GENESIS_HASH}
+_AUDIT_LEDGER_FIELDS = {"checked": False, "ok": False}
 
 audit = AuditLogger()
 
@@ -3844,7 +4014,8 @@ def admin_feature_permissions():
     before_json = json.dumps(before_adj, ensure_ascii=False, sort_keys=True)
     after_json = json.dumps(new_adj, ensure_ascii=False, sort_keys=True)
     audit.log(admin_name, "ACCESS_CHANGE", f"{kind}:{target}",
-              details=f"before={before_json}; after={after_json}", ip=ip, severity="Warning")
+              details=f"before={before_json}; after={after_json}", ip=ip, severity="Warning",
+              before=before_adj, after=new_adj)
     cache_invalidate()  # the change must land on every member's next request
 
     if kind == "role":
@@ -3907,7 +4078,8 @@ def admin_member_toggle():
         pass
     audit.log(admin_name, "MEMBER_TOGGLE_ON" if enabled else "MEMBER_TOGGLE_OFF",
               target, ip=request.headers.get("X-Forwarded-For",""),
-              severity="Warning" if not enabled else "Info")
+              severity="Warning" if not enabled else "Info",
+              before={"active": not enabled}, after={"active": enabled})
     return jsonify({"success": True, "email": target, "enabled": enabled})
 
 @app.route('/api/admin/harvest-names', methods=['POST'])
@@ -4219,6 +4391,7 @@ def audit_logs():
     q_search = sanitize_text(request.args.get('search','')).lower()  # free-text over target/action/actor
     q_sev    = sanitize_text(request.args.get('severity','')).lower()
     q_device = sanitize_text(request.args.get('device','')).lower()  # pc / phone / tablet
+    q_cat    = sanitize_text(request.args.get('category','')).lower()  # v32.0: ledger category preset
     q_from   = sanitize_text(request.args.get('from',''))  # ISO date, inclusive
     q_to     = sanitize_text(request.args.get('to',''))    # ISO date, inclusive
 
@@ -4243,14 +4416,26 @@ def audit_logs():
                 if isinstance(ts_val, (int, float)): dt_str = datetime.fromtimestamp(ts_val/1000.0).isoformat()
                 else: dt_str = str(ts_val)
 
+                # v32.0 Phase 3 forensic fields (absent on legacy rows)
+                _act = extract_field_text(f.get("Action", ""))
+                _diff_raw = extract_field_text(f.get("Diff", ""))
+                try: _diff = json.loads(_diff_raw) if _diff_raw else None
+                except Exception: _diff = None
+                _seq = f.get("Seq ID")
                 logs.append({
                     "ts": dt_str,
                     "actor": extract_field_text(f.get("Agent", "")),
-                    "action": extract_field_text(f.get("Action", "")),
+                    "action": _act,
                     "target": extract_field_text(f.get("Target", "")),
                     "ip": extract_field_text(f.get("IP Address", "")),
                     "severity": extract_field_text(f.get("Severity", "Info")),
-                    "device": extract_field_text(f.get("Device", ""))
+                    "device": extract_field_text(f.get("Device", "")),
+                    "seq_id": int(_seq) if isinstance(_seq, (int, float)) and _seq > 0 else None,
+                    "trace_id": extract_field_text(f.get("Trace ID", "")),
+                    "entry_hash": extract_field_text(f.get("Entry Hash", "")),
+                    "prev_hash": extract_field_text(f.get("Prev Hash", "")),
+                    "category": extract_field_text(f.get("Category", "")) or _audit_category(_act),
+                    "diff": _diff if isinstance(_diff, dict) else None,
                 })
             logs.sort(key=lambda x: x["ts"], reverse=True)
         except Exception as e:
@@ -4262,6 +4447,7 @@ def audit_logs():
         if q_action and q_action not in (l.get("action","") or "").lower(): return False
         if q_sev    and q_sev    != (l.get("severity","") or "").lower(): return False
         if q_device and not (l.get("device","") or "").lower().startswith(q_device): return False
+        if q_cat and (l.get("category","") or "GENERAL").lower() != q_cat: return False
         if q_search:
             hay = " ".join([l.get("actor",""), l.get("action",""), l.get("target",""), l.get("ip","")]).lower()
             if q_search not in hay: return False
@@ -4272,6 +4458,200 @@ def audit_logs():
 
     filtered = [l for l in logs if _matches(l)]
     return jsonify(filtered[:limit])
+
+def _audit_verify_rows_fetch(limit):
+    """v32.0 Phase 3: fetch up to `limit` SEALED ledger rows ascending by
+    Seq ID for chain verification (paginated, 500/page)."""
+    rows = []
+    tat = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+    headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+    page_token = None
+    while len(rows) < limit:
+        payload = {"page_size": 500, "sort": [{"field_name": "Seq ID", "desc": False}]}
+        if page_token:
+            payload["page_token"] = page_token
+        res = http_requests.post(url, headers=headers, json=payload, timeout=12).json()
+        if res.get("code") != 0:
+            raise Exception(res.get("msg", "Feishu API Error"))
+        data = res.get("data", {})
+        for item in data.get("items", []):
+            f = item.get("fields", {})
+            seq = f.get("Seq ID")
+            if not (isinstance(seq, (int, float)) and seq > 0):
+                continue  # legacy unsealed row
+            ts_val = f.get("Timestamp")
+            rows.append({
+                "seq_id": int(seq),
+                "ts_canon": _audit_ts_canonical(ts_val) if isinstance(ts_val, (int, float)) else "",
+                "actor": extract_field_text(f.get("Agent", "")),
+                "entry_hash": extract_field_text(f.get("Entry Hash", "")),
+                "prev_hash": extract_field_text(f.get("Prev Hash", "")),
+                "diff_raw": extract_field_text(f.get("Diff", "")),
+            })
+        if not data.get("has_more"):
+            break
+        page_token = data.get("page_token")
+        if not page_token:
+            break
+    rows.sort(key=lambda r: r["seq_id"])
+    return rows[:limit]
+
+def _audit_verify_compute(rows):
+    """Pure chain check over fetched rows: seq contiguity, prev-hash linkage,
+    and a full SHA-256 recompute of every entry from its stored fields."""
+    gaps, broken, mismatched = [], [], []
+    for i in range(1, len(rows)):
+        prev, r = rows[i - 1], rows[i]
+        if r["seq_id"] != prev["seq_id"] + 1:
+            gaps.append({"after_seq": prev["seq_id"], "next_seq": r["seq_id"]})
+        if (r.get("prev_hash") or "") != (prev.get("entry_hash") or ""):
+            broken.append({"seq": r["seq_id"]})
+    for r in rows:
+        signed = "|".join([r.get("prev_hash") or "", str(r["seq_id"]),
+                           r.get("ts_canon") or "", r.get("actor") or "",
+                           r.get("diff_raw") or ""])
+        if hashlib.sha256(signed.encode("utf-8")).hexdigest() != (r.get("entry_hash") or ""):
+            mismatched.append({"seq": r["seq_id"]})
+    return {"ok": not gaps and not broken and not mismatched,
+            "checked": len(rows), "gaps": gaps, "broken_links": broken,
+            "mismatches": mismatched,
+            "first_seq": rows[0]["seq_id"] if rows else None,
+            "last_seq": rows[-1]["seq_id"] if rows else None,
+            "verified_at": datetime.utcnow().isoformat()}
+
+@app.route('/api/admin/audit-logs/verify', methods=['GET'])
+@rate_limit(10, 300)
+def audit_logs_verify():
+    """v32.0 Phase 3 (spec §2.4): on-demand tamper-evidence check over the
+    newest `limit` sealed ledger rows. Gate: admin + audit.verify_chain."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    if not has_feature_perm(admin_email, admin_name, "audit.verify_chain"):
+        return jsonify({"error": "Missing permission: audit.verify_chain"}), 403
+    try:
+        limit = min(int(request.args.get('limit', '300')), 1000)
+    except Exception:
+        limit = 300
+    if MOCK_MODE:
+        rows = [{
+            "seq_id": e.get("seq_id"), "ts_canon": e.get("ts", ""),
+            "actor": e.get("actor", ""), "entry_hash": e.get("entry_hash", ""),
+            "prev_hash": e.get("prev_hash", ""), "diff_raw": e.get("diff_json", ""),
+        } for e in audit.get_recent(1000) if e.get("seq_id")]
+        rows.sort(key=lambda r: r["seq_id"])
+        return jsonify(_audit_verify_compute(rows[:limit]))
+    try:
+        rows = _audit_verify_rows_fetch(limit)
+    except Exception as e:
+        logger.error("audit_verify_fetch_failed", error=str(e))
+        return jsonify({"ok": False, "error": f"Could not read the ledger: {e}"}), 502
+    return jsonify(_audit_verify_compute(rows))
+
+@app.route('/api/admin/audit-logs/export', methods=['GET'])
+@rate_limit(6, 300)
+def audit_logs_export():
+    """v32.0 Phase 3 (spec §2.5): compliance export of the filtered ledger as
+    CSV or JSON. The export itself is logged to the ledger (AUDIT_EXPORT).
+    Gate: admin + audit.export."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    if not has_feature_perm(admin_email, admin_name, "audit.export"):
+        return jsonify({"error": "Missing permission: audit.export"}), 403
+    fmt = sanitize_text(request.args.get('format', 'csv')).lower()
+    if fmt not in ("csv", "json"):
+        fmt = "csv"
+    try:
+        limit = min(int(request.args.get('limit', '1000')), 1000)
+    except Exception:
+        limit = 1000
+    q_actor  = sanitize_text(request.args.get('actor','')).lower()
+    q_action = sanitize_text(request.args.get('action','')).lower()
+    q_search = sanitize_text(request.args.get('search','')).lower()
+    q_sev    = sanitize_text(request.args.get('severity','')).lower()
+    q_device = sanitize_text(request.args.get('device','')).lower()
+    q_cat    = sanitize_text(request.args.get('category','')).lower()
+    q_from   = sanitize_text(request.args.get('from',''))
+    q_to     = sanitize_text(request.args.get('to',''))
+
+    if MOCK_MODE:
+        logs = audit.get_recent(limit)
+    else:
+        try:
+            tat = get_tenant_access_token()
+            url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+            headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
+            res = http_requests.post(url, headers=headers,
+                json={"page_size": min(limit, 500), "sort": [{"field_name": "Timestamp", "desc": True}]},
+                timeout=12).json()
+            if res.get("code") != 0:
+                raise Exception(res.get("msg", "Feishu API Error"))
+            logs = []
+            for item in res.get("data", {}).get("items", []):
+                f = item.get("fields", {})
+                ts_val = f.get("Timestamp")
+                dt_str = datetime.fromtimestamp(ts_val / 1000.0).isoformat() if isinstance(ts_val, (int, float)) else str(ts_val)
+                _act = extract_field_text(f.get("Action", ""))
+                _diff_raw = extract_field_text(f.get("Diff", ""))
+                try: _diff = json.loads(_diff_raw) if _diff_raw else None
+                except Exception: _diff = None
+                _seq = f.get("Seq ID")
+                logs.append({
+                    "ts": dt_str, "actor": extract_field_text(f.get("Agent", "")),
+                    "action": _act, "target": extract_field_text(f.get("Target", "")),
+                    "ip": extract_field_text(f.get("IP Address", "")),
+                    "severity": extract_field_text(f.get("Severity", "Info")),
+                    "device": extract_field_text(f.get("Device", "")),
+                    "seq_id": int(_seq) if isinstance(_seq, (int, float)) and _seq > 0 else None,
+                    "trace_id": extract_field_text(f.get("Trace ID", "")),
+                    "entry_hash": extract_field_text(f.get("Entry Hash", "")),
+                    "category": extract_field_text(f.get("Category", "")) or _audit_category(_act),
+                    "diff": _diff if isinstance(_diff, dict) else None,
+                })
+            logs.sort(key=lambda x: x["ts"], reverse=True)
+        except Exception as e:
+            logger.error("audit_export_fetch_failed", error=str(e))
+            return jsonify({"error": f"Could not read the ledger: {e}"}), 502
+
+    def _xmatches(l):
+        if q_actor  and q_actor  not in (l.get("actor","") or "").lower(): return False
+        if q_action and q_action not in (l.get("action","") or "").lower(): return False
+        if q_sev    and q_sev    != (l.get("severity","") or "").lower(): return False
+        if q_device and not (l.get("device","") or "").lower().startswith(q_device): return False
+        if q_cat    and (l.get("category","") or "GENERAL").lower() != q_cat: return False
+        if q_search:
+            hay = " ".join([l.get("actor",""), l.get("action",""), l.get("target",""), l.get("ip","")]).lower()
+            if q_search not in hay: return False
+        ts = (l.get("ts") or "")[:10]
+        if q_from and ts and ts < q_from: return False
+        if q_to   and ts and ts > q_to:   return False
+        return True
+
+    rows = [l for l in logs if _xmatches(l)][:limit]
+    audit.log(admin_name or admin_email, "AUDIT_EXPORT",
+              f"{fmt.upper()} export | {len(rows)} rows",
+              details=f"filters: actor={q_actor or '-'} action={q_action or '-'} severity={q_sev or '-'} device={q_device or '-'} category={q_cat or '-'} from={q_from or '-'} to={q_to or '-'}",
+              ip=request.headers.get("X-Forwarded-For", ""), severity="Warning")
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    if fmt == "json":
+        return Response(json.dumps(rows, ensure_ascii=False, indent=2),
+                        mimetype="application/json",
+                        headers={"Content-Disposition": f"attachment; filename=audit-ledger-{stamp}.json"})
+    import csv as _csv, io as _io
+    buf = _io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow(["seq_id", "timestamp", "category", "severity", "actor", "action",
+                "target", "ip", "device", "trace_id", "entry_hash", "diff"])
+    for l in rows:
+        w.writerow([l.get("seq_id") or "", l.get("ts", ""), l.get("category", ""),
+                    l.get("severity", ""), l.get("actor", ""), l.get("action", ""),
+                    l.get("target", ""), l.get("ip", ""), l.get("device", ""),
+                    l.get("trace_id", ""), l.get("entry_hash", ""),
+                    _audit_diff_json(l.get("diff"))])
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=audit-ledger-{stamp}.csv"})
 
 def _feishu_get(url, headers=None, params=None, timeout=20, tries=2, stream=False, retry_timeout=None, retry_timeouts=None):
     """GET against open.feishu.cn with one automatic retry on transient
@@ -5872,7 +6252,8 @@ def agency_points_charge():
             logger.error("ap_charge_ticket_write_error", record_id=record_id, error=str(e))
         _t["ticket_put_s"] = round(time.monotonic() - _ttw, 2)
 
-    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else "") + (f" | ticket ACM synced: {acm_name}" if acm_field else ""), ip=ip, severity="Info")
+    audit.log(user, "AP_CHARGE", f"Record: {record_id} | Agency: {agency_code} | Deducted: {total_cost} | Balance after: {charge['remaining']}" + (" | ticket Agency Code corrected" if code_corrected else "") + (f" | ticket ACM synced: {acm_name}" if acm_field else ""), ip=ip, severity="Info",
+              before={"Points": charge["remaining"] + total_cost}, after={"Points": charge["remaining"]})
     result = {"success": True, "duplicate": False,
               "deducted": total_cost, "balance_after": charge["remaining"],
               "receipt": charge["receipt"], "full_receipt": full_receipt,
