@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v32.0 forensic-ledger-instant-boot 2026-11-16"
+XENA_BUILD = "v33.0 audition-suite 2026-11-16"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -1408,6 +1408,8 @@ def _audit_category(action):
         return "SECURITY_ALERT"
     if "SCHEDULE" in a or "SHIFT" in a:
         return "SCHEDULE_EDIT"
+    if "EXCUSE" in a or "HANDOFF" in a or "IDLE" in a:
+        return "STATUS_OVERRIDE"  # v33.0: attendance excuses / ticket handoffs / auto-idle
     return "GENERAL"
 
 def _audit_build_diff(before, after, diff):
@@ -13904,7 +13906,7 @@ def audition_schedule_swaps_list():
     swaps = _sched_swaps_all()
     changed = False
     for x in swaps:
-        if x.get("status") == "pending" and int(x.get("day") or 0) < today:
+        if x.get("status") in ("pending", "peer_accepted") and int(x.get("day") or 0) < today:
             x["status"] = "expired"
             changed = True
     if changed:
@@ -13913,7 +13915,7 @@ def audition_schedule_swaps_list():
     for x in swaps:
         mine = bool(me) and ((x.get("from_email") or "").lower() == me or (x.get("to_email") or "").lower() == me)
         if is_admin:
-            if x.get("status") == "pending" or mine:
+            if x.get("status") in ("pending", "peer_accepted") or mine:
                 out.append(x)
         elif mine:
             out.append(x)
@@ -13942,12 +13944,33 @@ def audition_schedule_swap_decide():
     x = next((y for y in swaps if y.get("id") == sid), None)
     if not x:
         return jsonify({"success": False, "error": "Swap request not found."}), 404
-    if x.get("status") != "pending":
-        return jsonify({"success": False, "error": "This request is already " + str(x.get("status")) + "."}), 400
-    if not is_admin and (x.get("to_email") or "").lower() != me:
-        return jsonify({"success": False, "error": "Only the asked colleague (or an admin) can decide this swap."}), 403
     token = get_tenant_access_token()
     day = int(x.get("day") or 0)
+    fe0, te0 = (x.get("from_email") or "").lower(), (x.get("to_email") or "").lower()
+    # v33.0 Phase 4 (spec §4.2): SWAP_PROPOSED -> PEER_ACCEPTED -> LEAD_APPROVED.
+    # A pending request is first ACCEPTED by the asked colleague (no schedule
+    # write yet); a lead/admin then gives the FINAL approval that executes the
+    # exchange. Admins may still approve a pending request directly (legacy
+    # one-step path kept for back-compat).
+    if x.get("status") == "pending" and decision == "approve" and not is_admin and me == te0:
+        x["status"] = "peer_accepted"
+        x["peer_accepted_ts"] = int(time.time() * 1000)
+        _sched_swaps_put(swaps)
+        _sched_alert(token, [fe0], "🤝 " + (x.get("to_name") or te0) + " accepted your swap on " + str(day) + " — a team lead's final approval is still needed before the shifts move.")
+        try:
+            audit.log(user, "AUDITION_SCHEDULE_SWAP_PEER", "%s <-> %s day %s" % (fe0, te0, day), severity="Info")
+        except Exception:
+            pass
+        return jsonify({"success": True, "status": "peer_accepted"})
+    if x.get("status") == "peer_accepted":
+        if decision == "approve" and not is_admin:
+            return jsonify({"success": False, "error": "The colleague already accepted — a team lead or admin must give the final approval."}), 403
+        if decision == "decline" and not is_admin and me not in (fe0, te0):
+            return jsonify({"success": False, "error": "Only the two colleagues (or an admin) can decline this swap."}), 403
+    elif x.get("status") != "pending":
+        return jsonify({"success": False, "error": "This request is already " + str(x.get("status")) + "."}), 400
+    if x.get("status") == "pending" and not is_admin and (x.get("to_email") or "").lower() != me:
+        return jsonify({"success": False, "error": "Only the asked colleague (or an admin) can decide this swap."}), 403
     if decision == "approve":
         try:
             rows = [_sched_row_out(it) for it in _sched_search_range(day, day, token)]
@@ -14572,6 +14595,8 @@ def audition_attendance():
     try:
         cached = redis_get_json(cache_key)
         if isinstance(cached, dict) and cached.get("success"):
+            cached = dict(cached)
+            cached["excuses"] = _aud_excuses_for_range(fd, td)  # v33.0: fresh, never cached
             return jsonify(cached)
     except Exception:
         pass
@@ -14968,6 +14993,10 @@ def audition_attendance():
            "warnings": sorted(warnings, key=lambda w: (-w["day"], w["agent"]))[:100]}
     try:
         redis_set_json(cache_key, out, ttl=60)
+        out = dict(out)
+        out["excuses"] = _aud_excuses_for_range(fd, td)  # v33.0: fresh, never cached
+    except Exception:
+        out["excuses"] = {}
     except Exception:
         pass
     try:
@@ -15677,7 +15706,7 @@ def admin_scope_check():
 # "Memory" (the previous status) is maintained for parity with what the
 # Loop Closer / dispatcher automations already do on that row.
 # ════════════════════════════════════════════════════════════════════
-PRESENCE_STATUSES = ["Online", "On Task", "Working Ticket", "Meeting", "Break", "Offline"]
+PRESENCE_STATUSES = ["Online", "On Task", "Working Ticket", "Meeting", "Break", "Idle", "Offline"]  # v33.0: +Idle (spec §4.1 auto-idle)
 PRESENCE_BOARD_TTL_S = 10   # read coalescing window (seconds)
 _presence_board_cache = {"ts": 0.0, "data": None}
 _presence_board_lock = threading.Lock()
@@ -15964,6 +15993,7 @@ def presence_set():
     open_id   = sanitize_text(body.get('open_id', ''))
     new_status = sanitize_text(body.get('status', ''))
     target    = sanitize_text(body.get('target', ''))
+    reason    = sanitize_text(body.get('reason', ''))  # v33.0: "auto_idle" -> AUTO_IDLE_TIMEOUT audit
     if new_status not in PRESENCE_STATUSES:
         return jsonify({"success": False, "error": f"Invalid status. Must be one of: {', '.join(PRESENCE_STATUSES)}"}), 400
     perms = _presence_gate(email, user)
@@ -16034,11 +16064,727 @@ def presence_set():
         _presence_board_cache["ts"] = 0.0
         _presence_board_cache["data"] = None
     redis_del_json(PRESENCE_BOARD_RKEY)
+    if reason == "auto_idle":
+        # v33.0 Phase 4 (spec §4.1): inactivity auto-idle is a Warning-grade
+        # security/accountability event with an explicit before/after diff.
+        audit.log(user or email, "AUTO_IDLE_TIMEOUT", f"{nm}: {old_status or '—'} -> Idle",
+                  ip=request.headers.get("X-Forwarded-For", ""), severity="Warning",
+                  before={"status": old_status or ""}, after={"status": "Idle"})
     audit.log(user or email, "PRESENCE_SET", f"{nm}: {old_status or '—'} -> {new_status}",
               ip=request.headers.get("X-Forwarded-For", ""), severity="Info")
     return jsonify({"success": True, "unchanged": False, "status": new_status, "previous": old_status,
                     "changed_at": now_ms,
                     "agent": {"record_id": rid, "name": nm, "open_id": oid}})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# v33.0 Phase 4 (enterprise spec §4, Ahmed 2026-11-16): Audition Suite backend.
+#   §4.1 status telemetry + ticket handoff, §4.2 coverage settings + clone-week
+#   + tokenized iCal feed, §4.3 attendance excuses, §4.4 analytics compare.
+# Every endpoint re-checks its v30.0 feature gate server-side (the UI hides
+# what you cannot use, but the API never trusts the UI).
+# ═══════════════════════════════════════════════════════════════════════════
+AUD_SETTINGS_RKEY = "xena:aud:settings"
+AUD_EXCUSES_RKEY  = "xena:aud:excuses"
+AUD_ICAL_RKEY     = "xena:aud:ical:tokens"
+AUD_SETTINGS_DEFAULT = {"coverage": {"morning": 4, "evening": 3, "night": 2},
+                        "leave_quotas": {"annual": 21, "sick": 10},
+                        "blackout_days": []}
+AUD_EXCUSE_REASONS = {"approved": "Approved Excuse",
+                      "outage": "Lark\u00b7Network Outage",
+                      "violation": "Unexcused Violation"}
+AUD_EXCUSE_KINDS = ("late", "gap", "missing", "early", "no_show")
+AUD_LEAVE_TYPES = ("Off", "Annual Leave", "Sick Leave")
+
+
+def _aud_fp(email, user, key):
+    """v33.0: feature-permission shortcut (fail-closed)."""
+    try:
+        return bool(has_feature_perm((email or "").strip().lower(), (user or "").strip(), key))
+    except Exception:
+        return False
+
+
+def _aud_settings_get():
+    try:
+        s = redis_get_json(AUD_SETTINGS_RKEY)
+    except Exception:
+        s = None
+    if not isinstance(s, dict):
+        s = {}
+    out = json.loads(json.dumps(AUD_SETTINGS_DEFAULT))
+    if isinstance(s.get("coverage"), dict):
+        for k in ("morning", "evening", "night"):
+            try:
+                v = int(s["coverage"].get(k))
+                if 0 <= v <= 50:
+                    out["coverage"][k] = v
+            except Exception:
+                pass
+    if isinstance(s.get("leave_quotas"), dict):
+        for k in ("annual", "sick"):
+            try:
+                v = int(s["leave_quotas"].get(k))
+                if 0 <= v <= 365:
+                    out["leave_quotas"][k] = v
+            except Exception:
+                pass
+    if isinstance(s.get("blackout_days"), list):
+        out["blackout_days"] = sorted({int(d) for d in s["blackout_days"]
+                                       if _sched_day_ok(d)})[-120:]
+    return out
+
+
+def _aud_excuses_all():
+    try:
+        m = redis_get_json(AUD_EXCUSES_RKEY)
+        return m if isinstance(m, dict) else {}
+    except Exception:
+        return {}
+
+
+def _aud_excuses_put(m):
+    try:
+        if len(m) > 3000:  # cap: keep the newest by ts
+            keep = sorted(m.items(), key=lambda kv: -int((kv[1] or {}).get("ts") or 0))[:3000]
+            m = dict(keep)
+        redis_set_json(AUD_EXCUSES_RKEY, m, ttl=86400 * 400)
+    except Exception:
+        pass
+
+
+def _aud_excuses_for_range(fd, td):
+    out = {}
+    for k, v in _aud_excuses_all().items():
+        try:
+            day = int(str(k).split("|")[1])
+        except Exception:
+            continue
+        if fd <= day <= td:
+            out[k] = v
+    return out
+
+
+def _aud_assigned_name(fields):
+    return (extract_field_text(get_field_local(fields, "Assigned Member")) or "").strip()
+
+
+def _aud_agent_name_map():
+    """Roster display-name(lower) -> {name, email, open_id, status}."""
+    out = {}
+    try:
+        token = get_tenant_access_token()
+        amap = _access_name_email_map()
+        for it in _roster_items(token):
+            rid, oid, nm = _presence_row_identity(it)
+            if not nm:
+                continue
+            f = it.get("fields") or {}
+            out[nm.strip().lower()] = {
+                "name": nm, "open_id": oid,
+                "email": amap.get(nm.strip().lower(), ""),
+                "status": extract_field_text(f.get("Current Status", "")) or "Offline"}
+    except Exception:
+        pass
+    return out
+
+
+AUD_ONLINE_STATUSES = ("Online", "On Task", "Working Ticket")
+
+
+def _aud_cairo_day_bounds_ms(day_int):
+    """[start_ms, end_ms) of a Cairo calendar day in true UTC epoch ms."""
+    dt0 = datetime.strptime(str(int(day_int)), "%Y%m%d")
+    dt0 = dt0.replace(tzinfo=timezone.utc) + CAIRO_OFFSET  # same mislabel trick as cairo_now()
+    start = cairo_epoch_ms(dt0)
+    return start, start + 86400000
+
+
+@app.route('/api/audition/status/telemetry', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_status_telemetry():
+    """Phase 4 §4.1: open-queue vs online coverage ratio + per-agent telemetry
+    (claimed / resolved today / AHT from exact Assigned & Completion times).
+    Cached 120s in Redis -- the snapshot itself is already warm."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _presence_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition Status module required."}), 403
+    if not _aud_fp(email, user, "audition.status.view"):
+        return jsonify({"success": False, "error": "Missing permission: audition.status.view"}), 403
+    ck = "xena:aud:telemetry"
+    try:
+        cached = redis_get_json(ck)
+        if isinstance(cached, dict) and cached.get("success"):
+            return jsonify(cached)
+    except Exception:
+        pass
+    items, _mk, _fc, _sr, _cw = get_requests_table_snapshot()
+    name_map = _aud_agent_name_map()
+    online = [a for a in name_map.values() if a["status"] in AUD_ONLINE_STATUSES]
+    today = _sched_cairo_today()
+    d0, d1 = _aud_cairo_day_bounds_ms(today)
+    open_queue = 0
+    per = {}
+    for it in (items or []):
+        f = it.get("fields") or {}
+        st = (extract_field_text(get_field_local(f, "Request Status", "Status")) or "").strip()
+        if st == "Pending":
+            open_queue += 1
+            continue
+        who = _aud_assigned_name(f).lower()
+        if not who or who not in name_map:
+            continue
+        slot = per.setdefault(who, {"name": name_map[who]["name"],
+                                    "email": name_map[who]["email"],
+                                    "claimed": 0, "resolved_today": 0, "_aht": []})
+        if st == "In Progress":
+            slot["claimed"] += 1
+        ct = _extract_epoch_ms(get_field_local(f, "Completion Time"))
+        if ct and d0 <= ct < d1:
+            slot["resolved_today"] += 1
+            at = _extract_epoch_ms(get_field_local(f, "Assigned Time"))
+            if at and ct >= at:
+                slot["_aht"].append((ct - at) / 60000.0)
+    agents_out = []
+    for who, s in per.items():
+        aht = round(sum(s["_aht"]) / len(s["_aht"]), 1) if s["_aht"] else None
+        agents_out.append({"name": s["name"], "email": s["email"],
+                           "claimed": s["claimed"], "resolved_today": s["resolved_today"],
+                           "aht_min": aht})
+    agents_out.sort(key=lambda a: (-a["claimed"], -a["resolved_today"], a["name"].lower()))
+    online_count = len(online)
+    ratio = round(open_queue / max(1, online_count), 1)
+    band = "optimal" if ratio <= 8 else ("high" if ratio <= 15 else "understaffed")
+    out = {"success": True, "open_queue": open_queue, "online_count": online_count,
+           "ratio": ratio, "band": band, "agents": agents_out, "today": today}
+    try:
+        redis_set_json(ck, out, ttl=120)
+    except Exception:
+        pass
+    return jsonify(out)
+
+
+@app.route('/api/audition/status/handoff', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_status_handoff():
+    """Phase 4 §4.1 (lead/admin + audition.status.handoff): move an agent's
+    In Progress tickets to a specific teammate, or spread them evenly across
+    every currently-Online agent. v3 batch_update writes (the v1 batch_update
+    is broken on this tenant -- see the presence_set Phase 11.2 note)."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _presence_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition Status module required."}), 403
+    is_admin = bool(perms.get("is_super_admin") or "admin" in perms.get("modules", []))
+    if not is_admin and not _aud_fp(email, user, "audition.status.handoff"):
+        return jsonify({"success": False, "error": "Missing permission: audition.status.handoff"}), 403
+    from_name = sanitize_text(body.get('from_name', '')).strip()
+    to_name = sanitize_text(body.get('to_name', '')).strip()
+    if not from_name:
+        return jsonify({"success": False, "error": "Need from_name (the agent whose tickets move)."}), 400
+    name_map = _aud_agent_name_map()
+    src = name_map.get(from_name.lower())
+    if not src:
+        return jsonify({"success": False, "error": "Source agent is not on the Agent Roster."}), 404
+    if to_name:
+        tgt = name_map.get(to_name.lower())
+        if not tgt:
+            return jsonify({"success": False, "error": "Target agent is not on the Agent Roster."}), 404
+        if not tgt.get("open_id"):
+            return jsonify({"success": False, "error": "Target agent has no linked Feishu user on the roster."}), 400
+        targets = [tgt]
+    else:
+        targets = [a for a in name_map.values()
+                   if a["status"] in AUD_ONLINE_STATUSES and a.get("open_id")
+                   and a["name"].strip().lower() != from_name.lower()]
+        if not targets:
+            return jsonify({"success": False, "error": "No Online agent available to receive tickets."}), 400
+    items, _mk, _fc, _sr, _cw = get_requests_table_snapshot()
+    moves = []
+    for it in (items or []):
+        f = it.get("fields") or {}
+        st = (extract_field_text(get_field_local(f, "Request Status", "Status")) or "").strip()
+        if st != "In Progress":
+            continue
+        if _aud_assigned_name(f).strip().lower() != from_name.lower():
+            continue
+        moves.append({"record_id": it.get("record_id"),
+                      "numbering": extract_field_text(get_field_local(f, "Numbering")) or it.get("record_id")})
+    if not moves:
+        return jsonify({"success": True, "moved": 0, "note": "No In Progress tickets found for that agent."})
+    if MOCK_MODE:
+        return jsonify({"success": True, "moved": len(moves), "mock": True})
+    token = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/base/v3/bases/{BASE_ID}/tables/{REQUESTS_TABLE_ID}/records/batch_update"
+    upd = {}
+    for i, mv in enumerate(moves):
+        tgt = targets[i % len(targets)]
+        mv["to"] = tgt["name"]
+        upd[mv["record_id"]] = {"Assigned Member": [{"id": tgt["open_id"]}]}
+    try:
+        resp = feishu_session.post(url, headers={"Authorization": f"Bearer {token}",
+                                                 "Content-Type": "application/json"},
+                                   json={"update_records": upd}, timeout=25)
+        data = resp.json()
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Handoff write failed: {e}"}), 502
+    if data.get("code") != 0:
+        return jsonify({"success": False, "error": data.get("msg") or "Feishu rejected the handoff write"}), 502
+    try:
+        _sched_alert(token, sorted({t["email"] for t in targets if t.get("email")}),
+                     "\U0001f4e5 Ticket handoff: " + str(len(moves)) + " ticket(s) from " + src["name"] +
+                     " were reassigned to " + (targets[0]["name"] if len(targets) == 1 else "the online team") +
+                     " by " + (user or email) + ".")
+    except Exception:
+        pass
+    try:
+        audit.log(user or email, "AGENT_HANDOFF",
+                  "%s: %d ticket(s) -> %s" % (src["name"], len(moves),
+                                              targets[0]["name"] if len(targets) == 1 else "%d online agents" % len(targets)),
+                  ip=request.headers.get("X-Forwarded-For", ""), severity="Warning",
+                  before={"assignee": src["name"], "tickets": len(moves)},
+                  after={"assignee": ", ".join(sorted({t["name"] for t in targets})), "tickets": len(moves)})
+    except Exception:
+        pass
+    return jsonify({"success": True, "moved": len(moves),
+                    "targets": sorted({t["name"] for t in targets}),
+                    "tickets": [m["numbering"] for m in moves][:50]})
+
+
+@app.route('/api/audition/schedule/settings', methods=['GET', 'POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_settings():
+    """Phase 4 §4.2: coverage targets (M/E/N), leave quotas and blackout days.
+    GET for everyone on the schedule module; POST restricted to admins and
+    holders of audition.schedule.coverage."""
+    user = sanitize_text(request.values.get('user', ''))
+    email = sanitize_text(request.values.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    if request.method == 'GET':
+        return jsonify({"success": True, "settings": _aud_settings_get()})
+    body = request.get_json(silent=True) or {}
+    is_admin = _sched_is_admin(perms)
+    if not is_admin and not _aud_fp(email, user, "audition.schedule.coverage"):
+        return jsonify({"success": False, "error": "Missing permission: audition.schedule.coverage"}), 403
+    before = _aud_settings_get()
+    after = json.loads(json.dumps(before))
+    cov = body.get("coverage")
+    if isinstance(cov, dict):
+        for k in ("morning", "evening", "night"):
+            if k in cov:
+                try:
+                    v = int(cov[k])
+                    if not 0 <= v <= 50:
+                        raise ValueError()
+                    after["coverage"][k] = v
+                except Exception:
+                    return jsonify({"success": False, "error": f"coverage.{k} must be 0..50."}), 400
+    lq = body.get("leave_quotas")
+    if isinstance(lq, dict):
+        for k in ("annual", "sick"):
+            if k in lq:
+                try:
+                    v = int(lq[k])
+                    if not 0 <= v <= 365:
+                        raise ValueError()
+                    after["leave_quotas"][k] = v
+                except Exception:
+                    return jsonify({"success": False, "error": f"leave_quotas.{k} must be 0..365."}), 400
+    bd = body.get("blackout_days")
+    if isinstance(bd, list):
+        days = []
+        for d in bd[:200]:
+            dd = _sched_day_ok(d)
+            if not dd:
+                return jsonify({"success": False, "error": f"Invalid blackout day: {d} (use yyyymmdd)."}), 400
+            days.append(dd)
+        after["blackout_days"] = sorted(set(days))
+    try:
+        redis_set_json(AUD_SETTINGS_RKEY, after, ttl=86400 * 400)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Could not store settings: {e}"}), 500
+    try:
+        audit.log(user or email, "AUDITION_SCHEDULE_SETTINGS", "coverage/quotas/blackout updated",
+                  severity="Info", before=before, after=after)
+    except Exception:
+        pass
+    return jsonify({"success": True, "settings": after})
+
+
+@app.route('/api/audition/schedule/clone-week', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_clone_week():
+    """Phase 4 §4.2 (admin/lead + audition.schedule.painter): clone the week
+    starting at week_start into the FOLLOWING week -- rows whose target cell
+    is already a leave type (Off / Annual Leave / Sick Leave) are SKIPPED,
+    never overwritten. Returns the skip + overwrite conflict report."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    if not _sched_is_admin(perms) and not _aud_fp(email, user, "audition.schedule.painter"):
+        return jsonify({"success": False, "error": "Missing permission: audition.schedule.painter"}), 403
+    ws = _sched_day_ok(body.get('week_start'))
+    if not ws:
+        return jsonify({"success": False, "error": "Need week_start (yyyymmdd) of the SOURCE week."}), 400
+    src_days = _sched_day_range(ws, _sched_day_add(ws, 6), cap=8)
+    dst_days = [_sched_day_add(d, 7) for d in src_days]
+    token = get_tenant_access_token()
+    try:
+        src_rows = [_sched_row_out(it) for it in _sched_search_range(src_days[0], src_days[-1], token)]
+        dst_rows = [_sched_row_out(it) for it in _sched_search_range(dst_days[0], dst_days[-1], token)]
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    if not src_rows:
+        return jsonify({"success": False, "error": "The source week is empty — nothing to clone."}), 400
+    dst_leave = {}
+    dst_work = 0
+    for r in dst_rows:
+        if r.get("type") in AUD_LEAVE_TYPES:
+            dst_leave[(r.get("email") or "").lower() + "|" + str(r.get("day"))] = r
+        else:
+            dst_work += 1
+    entries, skipped = [], []
+    for r in src_rows:
+        nd = _sched_day_add(r["day"], 7)
+        lk = (r.get("email") or "").lower() + "|" + str(nd)
+        if lk in dst_leave:
+            skipped.append({"name": r.get("name") or r.get("email"), "day": nd,
+                            "leave": dst_leave[lk].get("type")})
+            continue
+        entries.append({"email": r.get("email"), "name": r.get("name"), "day": nd,
+                        "type": r.get("type"), "start": r.get("start"),
+                        "end": r.get("end"), "note": r.get("note") or ""})
+    res = {"created": 0, "updated": 0, "deleted": 0, "errors": []}
+    if entries:
+        res = _sched_write(entries, [], user or email, token)
+    if res["errors"]:
+        return jsonify({"success": False, "error": "; ".join(res["errors"][:3])}), 502
+    try:
+        audit.log(user or email, "AUDITION_SCHEDULE_CLONE",
+                  "week %s -> %s (%d entries, %d skipped on leave)" % (ws, dst_days[0], len(entries), len(skipped)),
+                  severity="Info",
+                  before={"week": ws, "entries": 0},
+                  after={"week": dst_days[0], "entries": len(entries)})
+    except Exception:
+        pass
+    return jsonify({"success": True, "created": res["created"], "updated": res["updated"],
+                    "skipped_leave": skipped, "overwritten": res["updated"],
+                    "dst_week": [dst_days[0], dst_days[-1]]})
+
+
+def _aud_ical_token_for(email_l):
+    """Stateless-but-revocable feed token: HMAC over the email, resolvable via
+    the Redis map written at issue time (delete the map entry to revoke)."""
+    digest = hmac.new((APP_SECRET or "xena-audition").encode("utf-8"),
+                      ("ical:" + email_l).encode("utf-8"), hashlib.sha256).hexdigest()
+    return digest[:32]
+
+
+@app.route('/api/audition/schedule/ical-token', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_ical_token():
+    """Phase 4 §4.2: issue (or re-show) the caller's personal read-only iCal
+    feed URL. The feed is token-authenticated and carries only that member's
+    own shifts."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    if not _aud_fp(email, user, "audition.schedule.ical"):
+        return jsonify({"success": False, "error": "Missing permission: audition.schedule.ical"}), 403
+    em = (email or "").strip().lower()
+    if not em:
+        return jsonify({"success": False, "error": "Your account has no email on file — the feed needs one."}), 400
+    tok = _aud_ical_token_for(em)
+    try:
+        m = redis_get_json(AUD_ICAL_RKEY)
+        m = m if isinstance(m, dict) else {}
+        if m.get(tok) != em:
+            m[tok] = em
+            if len(m) > 500:
+                m = dict(list(m.items())[-500:])
+            redis_set_json(AUD_ICAL_RKEY, m, ttl=86400 * 365)
+    except Exception:
+        pass
+    return jsonify({"success": True, "token": tok,
+                    "url": "/api/audition/schedule/ical/%s.ics" % tok})
+
+
+@app.route('/api/audition/schedule/ical/<token_str>.ics', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_schedule_ical_feed(token_str):
+    """Tokenized read-only iCal feed (spec §4.2): the member's own shifts for
+    the next 8 weeks as all-day VEVENTs. No login -- the token IS the
+    credential (HMAC of the member's email, revocable via the Redis map)."""
+    tok = sanitize_text(token_str, 64).strip().lower()
+    if not tok or len(tok) != 32:
+        return jsonify({"success": False, "error": "Invalid feed token."}), 404
+    em = None
+    try:
+        m = redis_get_json(AUD_ICAL_RKEY)
+        if isinstance(m, dict):
+            em = m.get(tok)
+    except Exception:
+        em = None
+    if not em:
+        # cold Redis (or first call after a flush): the token still validates
+        # cryptographically, but without the map we cannot tell WHOSE feed it
+        # is -- fail closed rather than guess.
+        return jsonify({"success": False, "error": "Feed token unknown — re-open the portal and copy the link again."}), 404
+    if not hmac.compare_digest(tok, _aud_ical_token_for(em)):
+        return jsonify({"success": False, "error": "Invalid feed token."}), 404
+    today = _sched_cairo_today()
+    end = _sched_day_add(today, 56)
+    try:
+        rows = [_sched_row_out(it) for it in
+                _sched_search_range(today, end, get_tenant_access_token(),
+                                    field_names=["Key", "Agent Email", "Agent Name", "Day", "Type", "Start", "End", "Note"])]
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 502
+    mine = [r for r in rows if (r.get("email") or "").strip().lower() == em]
+    name = mine[0].get("name") if mine else em
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0",
+             "PRODID:-//Xena Portal//Audition Schedule//EN",
+             "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+             "X-WR-CALNAME:Xena Shifts — " + (name or em)]
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    for r in mine:
+        d = str(int(r.get("day") or 0))
+        dt = d[0:4] + "-" + d[4:6] + "-" + d[6:8]
+        desc = (r.get("type") or "On Site")
+        if r.get("start") and r.get("end"):
+            desc += " " + r["start"] + "-" + r["end"]
+        if r.get("note"):
+            desc += " | " + r["note"]
+        uid = "xena-" + (r.get("key") or (em + "-" + d)) + "@xena-portal"
+        lines += ["BEGIN:VEVENT",
+                  "UID:" + uid.replace(" ", ""),
+                  "DTSTAMP:" + stamp,
+                  "DTSTART;VALUE=DATE:" + dt.replace("-", ""),
+                  "SUMMARY:" + ((r.get("type") or "Shift") + " " + (r.get("start") or "") + "-" + (r.get("end") or "")).strip(),
+                  "DESCRIPTION:" + desc.replace(",", "\\,").replace(";", "\\;"),
+                  "END:VEVENT"]
+    lines.append("END:VCALENDAR")
+    body = "\r\n".join(lines) + "\r\n"
+    resp = app.response_class(body, mimetype="text/calendar")
+    resp.headers["Content-Disposition"] = "attachment; filename=xena-shifts.ics"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route('/api/audition/attendance/excuse', methods=['POST'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_attendance_excuse():
+    """Phase 4 §4.3 (lead/admin + audition.attendance.excuse): 1-click excuse
+    resolver. Stores one resolution per (agent, day, flag kind) in Redis;
+    every write lands in the audit ledger with its before/after diff."""
+    body = request.get_json(silent=True) or {}
+    user = sanitize_text(body.get('user', ''))
+    email = sanitize_text(body.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    if not _sched_is_admin(perms) and not _aud_fp(email, user, "audition.attendance.excuse"):
+        return jsonify({"success": False, "error": "Missing permission: audition.attendance.excuse"}), 403
+    agent_id = sanitize_text(body.get('agent_id', '')).strip()
+    agent_name = sanitize_text(body.get('agent_name', '')).strip()
+    day = _sched_day_ok(body.get('day'))
+    kind = sanitize_text(body.get('kind', '')).strip()
+    reason = sanitize_text(body.get('reason', '')).strip()
+    note = sanitize_text(body.get('note', '')).strip()
+    if not agent_id or not day or kind not in AUD_EXCUSE_KINDS:
+        return jsonify({"success": False, "error": "Need agent_id, a valid day (yyyymmdd) and a valid kind."}), 400
+    if reason not in AUD_EXCUSE_REASONS:
+        return jsonify({"success": False, "error": "Reason must be one of: approved | outage | violation."}), 400
+    if not note:
+        return jsonify({"success": False, "error": "A note is required — say why this flag is excused."}), 400
+    key = "%s|%s|%s" % (agent_id, day, kind)
+    m = _aud_excuses_all()
+    before = m.get(key)
+    entry = {"agent_id": agent_id, "agent_name": agent_name, "day": day, "kind": kind,
+             "reason": reason, "reason_label": AUD_EXCUSE_REASONS[reason],
+             "note": note, "by": user or email, "ts": int(time.time() * 1000)}
+    m[key] = entry
+    _aud_excuses_put(m)
+    try:
+        audit.log(user or email, "ATTENDANCE_EXCUSE",
+                  "%s %s %s -> %s" % (agent_name or agent_id, day, kind, AUD_EXCUSE_REASONS[reason]),
+                  ip=request.headers.get("X-Forwarded-For", ""), severity="Info",
+                  before={"reason": (before or {}).get("reason_label") or "—"},
+                  after={"reason": AUD_EXCUSE_REASONS[reason], "note": note})
+    except Exception:
+        pass
+    return jsonify({"success": True, "excuse": entry})
+
+
+def _aud_ticket_ms(f, *names):
+    return _extract_epoch_ms(get_field_local(f, *names))
+
+
+def _aud_percentile(vals, p):
+    if not vals:
+        return None
+    vs = sorted(vals)
+    k = (len(vs) - 1) * (p / 100.0)
+    lo = int(k)
+    hi = min(lo + 1, len(vs) - 1)
+    frac = k - lo
+    return round(vs[lo] + (vs[hi] - vs[lo]) * frac, 1)
+
+
+def _aud_metrics_for_range(items, d0, d1):
+    """Ticket metrics inside [d0, d1) epoch-ms (submitted window). Times come
+    straight from the table's own Assigned/Completion fields -- exact AHT/TAT,
+    no approximation."""
+    funnel = {"submitted": 0, "claimed": 0, "resolved": 0}
+    tat, aht = [], []
+    per_agent = {}
+    daily = {}
+    for it in (items or []):
+        f = it.get("fields") or {}
+        sub = _aud_ticket_ms(f, "Submitted on Copy", "Submitted on", "Created Time")
+        if not sub or not (d0 <= sub < d1):
+            continue
+        st = (extract_field_text(get_field_local(f, "Request Status", "Status")) or "").strip()
+        at = _aud_ticket_ms(f, "Assigned Time")
+        ct = _aud_ticket_ms(f, "Completion Time")
+        who = _aud_assigned_name(f)
+        funnel["submitted"] += 1
+        day = datetime.utcfromtimestamp(sub / 1000.0) + CAIRO_OFFSET
+        dk = day.strftime("%Y%m%d")
+        ds = daily.setdefault(dk, {"submitted": 0, "resolved": 0})
+        ds["submitted"] += 1
+        if at or st in ("In Progress", "Done", "Rejected", "Under Investigation"):
+            funnel["claimed"] += 1
+        resolved = bool(ct) or st in ("Done", "Rejected")
+        if resolved:
+            funnel["resolved"] += 1
+        if ct and sub <= ct:
+            tat.append((ct - sub) / 60000.0)
+        if ct and at and at <= ct:
+            aht.append((ct - at) / 60000.0)
+        if who:
+            pa = per_agent.setdefault(who, {"resolved": 0, "done": 0, "rejected": 0})
+            if resolved:
+                pa["resolved"] += 1
+                if st == "Rejected":
+                    pa["rejected"] += 1
+                else:
+                    pa["done"] += 1
+    resolved_per_day = {}
+    for it in (items or []):
+        f = it.get("fields") or {}
+        ct = _aud_ticket_ms(f, "Completion Time")
+        if ct and d0 <= ct < d1:
+            dk = (datetime.utcfromtimestamp(ct / 1000.0) + CAIRO_OFFSET).strftime("%Y%m%d")
+            resolved_per_day[dk] = resolved_per_day.get(dk, 0) + 1
+            if dk in daily:
+                daily[dk]["resolved"] += 1
+    agents = []
+    for who, pa in per_agent.items():
+        if pa["resolved"] <= 0:
+            continue
+        agents.append({"name": who, "resolved": pa["resolved"],
+                       "done_rate": round(100.0 * pa["done"] / max(1, pa["resolved"]), 1)})
+    agents.sort(key=lambda a: (-a["resolved"], a["name"].lower()))
+    rej_total = sum(pa["rejected"] for pa in per_agent.values())
+    return {"funnel": funnel,
+            "tat_min": {"p50": _aud_percentile(tat, 50), "p95": _aud_percentile(tat, 95)},
+            "aht_min": {"p50": _aud_percentile(aht, 50)},
+            "rejection_rate": round(100.0 * rej_total / max(1, funnel["resolved"]), 1),
+            "agents": agents, "daily": daily,
+            "resolved_per_day": resolved_per_day}
+
+
+@app.route('/api/audition/analytics', methods=['GET'])
+@rate_limit(*RATE_LIMIT_RECORDS)
+def audition_analytics():
+    """Phase 4 §4.4 (lead/admin + audition.analytics.view): funnel + TAT
+    P50/P95 + per-agent throughput/done-rate + daily series, with an optional
+    comparison block (prev period | same period last month) and a >2sigma
+    anomaly radar against the trailing 14-day baseline. Cached 300s."""
+    user = sanitize_text(request.args.get('user', ''))
+    email = sanitize_text(request.args.get('email', ''))
+    perms = _audition_sched_gate(email, user)
+    if not perms:
+        return jsonify({"success": False, "error": "Access denied: Audition module required."}), 403
+    if not _sched_is_admin(perms) and not _aud_fp(email, user, "audition.analytics.view"):
+        return jsonify({"success": False, "error": "Missing permission: audition.analytics.view"}), 403
+    today = _sched_cairo_today()
+    fd = _sched_day_ok(request.args.get('from')) or _sched_day_add(today, -6)
+    td = _sched_day_ok(request.args.get('to')) or today
+    if td < fd or len(_sched_day_range(fd, td, cap=100)) > 93:
+        return jsonify({"success": False, "error": "Need a valid from/to range (max 93 days)."}), 400
+    compare = (request.args.get('compare') or "off").strip().lower()
+    if compare not in ("off", "prev", "month"):
+        compare = "off"
+    ck = "xena:aud:analytics:%s:%s:%s" % (fd, td, compare)
+    try:
+        cached = redis_get_json(ck)
+        if isinstance(cached, dict) and cached.get("success"):
+            return jsonify(cached)
+    except Exception:
+        pass
+    items, _mk, _fc, _sr, _cw = get_requests_table_snapshot()
+    d0, _x = _aud_cairo_day_bounds_ms(fd)
+    _y, d1 = _aud_cairo_day_bounds_ms(td)
+    cur = _aud_metrics_for_range(items, d0, d1)
+    span_days = len(_sched_day_range(fd, td, cap=100))
+    cmp_out = None
+    if compare == "prev":
+        c_td = _sched_day_add(fd, -1)
+        c_fd = _sched_day_add(c_td, -(span_days - 1))
+        c0, _x = _aud_cairo_day_bounds_ms(c_fd)
+        _y, c1 = _aud_cairo_day_bounds_ms(c_td)
+        cmp_out = {"label": "Previous period (%s–%s)" % (c_fd, c_td),
+                   "from": c_fd, "to": c_td, "metrics": _aud_metrics_for_range(items, c0, c1)}
+    elif compare == "month":
+        c_fd = _sched_day_add(fd, -28)   # 4 weeks back = same weekdays, closest legal "last month"
+        c_td = _sched_day_add(td, -28)
+        c0, _x = _aud_cairo_day_bounds_ms(c_fd)
+        _y, c1 = _aud_cairo_day_bounds_ms(c_td)
+        cmp_out = {"label": "Same period last month (%s–%s)" % (c_fd, c_td),
+                   "from": c_fd, "to": c_td, "metrics": _aud_metrics_for_range(items, c0, c1)}
+    # anomaly radar: each in-range day's resolved count vs the trailing
+    # 14-day baseline that ENDS the day before (no peeking at the value).
+    anomalies = []
+    base0, _x = _aud_cairo_day_bounds_ms(_sched_day_add(fd, -14))
+    base = _aud_metrics_for_range(items, base0, d0)["resolved_per_day"]
+    base_vals = [base.get(_k, 0) for _k in
+                 [(datetime.strptime(str(_sched_day_add(fd, -14)), "%Y%m%d") + timedelta(days=i)).strftime("%Y%m%d")
+                  for i in range(14)]]
+    if len(base_vals) >= 7:
+        mean = sum(base_vals) / len(base_vals)
+        var = sum((v - mean) ** 2 for v in base_vals) / len(base_vals)
+        sigma = var ** 0.5
+        if sigma > 0:
+            for dk, val in sorted(cur["resolved_per_day"].items()):
+                z = (val - mean) / sigma
+                if abs(z) > 2:
+                    anomalies.append({"day": int(dk), "kind": "spike" if z > 0 else "drop",
+                                      "resolved": val, "baseline": round(mean, 1), "z": round(z, 2)})
+    out = {"success": True, "from": fd, "to": td, "compare": compare,
+           "metrics": cur, "comparison": cmp_out, "anomalies": anomalies}
+    try:
+        redis_set_json(ck, out, ttl=300)
+    except Exception:
+        pass
+    try:
+        audit.log(user, "AUDITION_ANALYTICS_VIEW", "%s->%s compare=%s" % (fd, td, compare), severity="Info")
+    except Exception:
+        pass
+    return jsonify(out)
+
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
