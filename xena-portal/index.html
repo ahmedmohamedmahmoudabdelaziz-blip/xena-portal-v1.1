@@ -30747,7 +30747,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1 chat-copilot-upgrades 2026-11-17';
+window.SAM19_BUILD='v34.1.1 chat-fab-hotfix 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32688,8 +32688,9 @@ function bind(){
 }
 function loggedIn(){
   try{
-    return !!(window.loggedEmail && window.loggedEmail.indexOf('@') > 0 &&
-              window.loggedEmail !== 'unknown@example.com');
+    var em = (typeof loggedEmail !== 'undefined' && loggedEmail) ||
+             window.loggedEmail || localStorage.getItem('xenaEmail') || '';
+    return em.indexOf('@') > 0 && em !== 'unknown@example.com';
   }catch(e){ return false; }
 }
 function boot(){
