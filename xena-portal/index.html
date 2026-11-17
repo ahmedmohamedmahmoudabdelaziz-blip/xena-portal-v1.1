@@ -30829,7 +30829,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.17 sync-owner-pipeline 2026-11-17';
+window.SAM19_BUILD='v34.1.18 kb-fields-instant-sync-think 2026-11-18';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32803,10 +32803,40 @@ function addMsg(text, who, isErr){
 function showTyping(){
   var d = document.createElement('div');
   d.className = 'xaMsg bot';
-  d.innerHTML = '<span class="xaTyping"><span></span><span></span><span></span></span>';
+  d.innerHTML = '<span class="xaTyping"><span></span><span></span><span></span></span>'
+              + '<div class="xaThink" style="font-size:11px;opacity:.65;margin-top:4px;transition:opacity .4s"></div>';
   msgsEl.appendChild(d);
   msgsEl.scrollTop = msgsEl.scrollHeight;
+  // v34.1.18 (Ahmed): "show the thinking while it processes so it's not boring".
+  // Rotate friendly status lines until the answer lands (see tickThink).
+  startThink(d);
   return d;
+}
+var THOUGHTS = [
+  'Reading your request\u2026',
+  'Searching the Xena knowledge base\u2026',
+  'Pulling the matching tickets\u2026',
+  'Checking the rules\u2026',
+  'Putting the answer together\u2026',
+  'Double-checking the details\u2026'
+];
+function startThink(typingEl){
+  stopThink();
+  var thinkEl = typingEl.querySelector('.xaThink');
+  if(!thinkEl) return;
+  var i = 0;
+  var show = function(){
+    thinkEl.style.opacity = '0';
+    setTimeout(function(){ thinkEl.textContent = THOUGHTS[i % THOUGHTS.length]; thinkEl.style.opacity = '.65'; }, 250);
+    i++;
+  };
+  show();
+  __xaThinkTimer = setInterval(show, 3000);
+  typingEl.__thinkEl = thinkEl;
+}
+var __xaThinkTimer = null;
+function stopThink(){
+  if(__xaThinkTimer){ clearInterval(__xaThinkTimer); __xaThinkTimer = null; }
 }
 function voiceLang(){
   var v = langSel.value;
@@ -32880,6 +32910,7 @@ async function send(){
   inputEl.value = ''; autoGrow();
   var typing = showTyping();
   var endWait = function(msg, isErr){
+    stopThink();
     typing.remove();
     if(msg){ addMsg(msg, 'bot', !!isErr); }
     busy = false; sendBtn.disabled = false;
@@ -32901,10 +32932,12 @@ async function send(){
       // miss tolerance — a backgrounded tab froze this loop mid-way and it
       // looked stuck for HOURS (Ahmed's '4 hours and still going').
       if(data.session_id){ sessionId = data.session_id; localStorage.setItem('xenaChatSess', sessionId); }
+      stopThink();   // hand over from the first-message ticker to the poll ticker
       var note = document.createElement('div');
       note.style.cssText = 'font-size:11px;opacity:.65;margin-top:4px';
       note.textContent = 'Still thinking\u2026';
       typing.appendChild(note);
+      startThink(typing);   // keep the live status rotating through the long poll
       var deadline = Date.now() + 8 * 60 * 1000;
       var polls = 0, netMiss = 0;
       while(polls < 100){

@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.17 sync-owner-pipeline 2026-11-17"
+XENA_BUILD = "v34.1.18 kb-fields-instant-sync-think 2026-11-18"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17020,13 +17020,15 @@ AILY_APP_SECRET  = os.environ.get("FEISHU_APP_SECRET", "")
 AILY_KB_HOST     = os.environ.get("AILY_KB_HOST", "https://aily.feishu.cn").rstrip("/")
 AILY_KB_BATCH_SIZE   = 500      # tickets per .txt asset -- v34.1.8: halve the Aily uploads (the slowest step) so more pages fit the budget
 AILY_KB_SYNC_OVERLAP = 7 * 86400 * 1000   # sync re-reads tickets submitted in the last 7 days (ms)
-AILY_KB_SYNC_BUDGET_S = 24                # v34.1.16: cron-job.org's max timeout is 30s -- answer well inside it
+AILY_KB_SYNC_BUDGET_S = 20                # v34.1.18: tighter so a cold start (token+first page) still answers inside cron-job.org's 30s hard cap
 
 # Fetch projection for knowledge text. PII fields (NID / phone / contact) are
 # deliberately ABSENT -- projection is the first line of defense.
 KB_TICKET_FIELDS = [
-    "Numbering", "Submitted on Copy", "Submitted on", "Request Type",
+    "Numbering", "Submitted on Copy", "Submitted on", "Created Time", "Request Type",
     "Status", "Request Status", "Region",
+    "Points", "Agency Points", "Base Points", "Total Points", "Point",
+    "Reward Points", "Points Change",
     "Agency Code", "Agency Name", "Agency Type", "Type of Agency",
     "Otherapp ID", "Otherapp Name", "Other App Name", "User ID",
     "Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)",
@@ -17151,14 +17153,47 @@ def _kb_ticket_line(fields):
     by    = val("Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)")
     acode = val("Agency Code")
     aname = val("Agency Name", "Otherapp Name", "Other App Name")
+    # v34.1.18 (Ahmed): "why no date / Agency Points?" -- the chat could not
+    # answer "how many ACM HUNTING guilds THIS MONTH" or "what points" because
+    # the line had no clean Date, no Month, no Points, and the handler was a
+    # bare "By:". Emit clean, aggregatable fields so retrieval can filter and
+    # count by month / points / ACM.
+    date_s, month_s = "", ""
+    for df in ("Submitted on Copy", "Submitted on", "Created Time"):
+        raw = get_field_local(fields, df)
+        if raw is None:
+            continue
+        dv = raw
+        try:
+            if isinstance(dv, (int, float)) and dv > 1e11:   # epoch ms
+                _dt = datetime.fromtimestamp(dv / 1000.0, tz=timezone.utc)
+                date_s = _dt.strftime("%Y-%m-%d"); month_s = _dt.strftime("%Y-%m"); break
+            ds = str(dv).strip()
+            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", ds)
+            if m:
+                date_s = m.group(0); month_s = "%s-%s" % (m.group(1), m.group(2)); break
+            m2 = re.match(r"(\d{4})/(\d{2})/(\d{2})", ds)
+            if m2:
+                date_s = "%s-%s-%s" % (m2.group(1), m2.group(2), m2.group(3)); month_s = "%s-%s" % (m2.group(1), m2.group(2)); break
+        except Exception:
+            pass
+        if date_s:
+            break
     parts = ["Ticket #%s" % (num or "?")]
-    if sub:    parts.append(sub)
+    if date_s: parts.append("Date: %s" % date_s)
+    if month_s: parts.append("Month: %s" % month_s)
+    if sub and not date_s: parts.append(sub)   # avoid duplicating the date
     if rtype:  parts.append(rtype)
     if acode or aname:
         parts.append('Agency %s "%s"' % (acode or "?", aname or "?"))
     if status: parts.append("Status: %s" % status)
     if by:     parts.append("By: %s" % by)
     extra = []
+    # Points: several possible field spellings across the request types.
+    pts = val("Points", "Agency Points", "Base Points", "Total Points",
+              "Point", "Reward Points", "Points Change")
+    if pts:  extra.append("Points: %s" % pts)
+    if by:   extra.append("ACM: %s" % by)   # explicit, aggregatable handler
     for label, aliases in (("Region", ("Region",)),
                            ("User ID", ("User ID",)),
                            ("Otherapp ID", ("Otherapp ID",)),
