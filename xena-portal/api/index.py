@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.12 kb-reset-batches chat-tabs 2026-11-17"
+XENA_BUILD = "v34.1.13 ai-owner-fix 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -3759,6 +3759,18 @@ def check_auth():
             perms["modules"] = list(perms.get("modules") or []) + ["bind"]
     except Exception:
         pass
+    # v34.1.13 (Ahmed, comment 7709127836103085250): "why the ai shown to
+    # another admin while i didn't activated the toggle to him" -- the
+    # frontend aiAllowed() gate used isAdmin, which is True for ANY 'admin'
+    # module holder (see _fetch_user_permissions_db line 2282). Distinguish
+    # the OWNER (hardcoded ADMIN_USERS) from regular admins: is_owner is
+    # True ONLY for the hardcoded list, and the frontend uses it instead of
+    # isAdmin for the toggle-only AI/Bind gates.
+    try:
+        perms = dict(perms)
+        perms["is_owner"] = any(a == (username or "").strip().lower() for a in ADMIN_USERS)
+    except Exception:
+        perms["is_owner"] = False
     return jsonify(perms)
 
 @app.route('/api/search', methods=['GET', 'POST'])

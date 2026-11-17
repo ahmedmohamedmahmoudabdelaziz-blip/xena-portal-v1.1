@@ -7015,6 +7015,7 @@ html{background:var(--bg);min-height:100%}
 let currentAgencyData=null, latestAnalyticsData=null, charts={};
 let userPermissions=null; 
 let isAdmin=false, userModules=[];
+let isOwner=false;   // v34.1.13: True ONLY for hardcoded ADMIN_USERS (owner), NOT for 'admin' module holders
 let loggedUser=localStorage.getItem('xenaUser') || 'Unknown';
 let loggedEmail=localStorage.getItem('xenaEmail') || 'unknown@example.com';
 let loggedUat=localStorage.getItem('xenaUat');
@@ -16010,11 +16011,12 @@ async function pvStart(email) {
         // that, with a top-level fallback so older backends still work.
         const permsBlock = data.permissions || data;
         const targetMods = Array.isArray(permsBlock.modules) ? permsBlock.modules : String(permsBlock.modules || '').split(',');
-        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, openTabs: openTabs.slice(), activeTab: activeTabId, userPermissions: userPermissions, featurePerms: (APP_STATE.currentUser.permissions || []).slice() };
+        if (!previewMode) previewSaved = { modules: userModules.slice(), isAdmin: isAdmin, isOwner: isOwner, openTabs: openTabs.slice(), activeTab: activeTabId, userPermissions: userPermissions, featurePerms: (APP_STATE.currentUser.permissions || []).slice() };   // v34.1.13: isOwner
         previewMode = true;
         previewTargetEmail = email; // Phase 10.26: the fetch wrapper stamps API calls with this
         userModules = targetMods.map(m => String(m).trim()).filter(m => m && !m.startsWith('__ROLE__::'));
         isAdmin = !!permsBlock.is_super_admin;
+        isOwner = !!permsBlock.is_owner;   // v34.1.13: preview carries the owner flag too
         // Phase 10.26 (Ahmed): full-faithful preview -- swap the region/ACM
         // permission object too, so enforceLocks() narrows the dropdowns
         // exactly as the target's own login would (the backend filters the
@@ -16048,6 +16050,7 @@ function pvExit() {
     if (previewSaved) {
         userModules = previewSaved.modules;
         isAdmin = previewSaved.isAdmin;
+        isOwner = previewSaved.isOwner;   // v34.1.13
         userPermissions = previewSaved.userPermissions || userPermissions; // Phase 10.26: restore own region/ACM scope
         APP_STATE.currentUser.permissions = previewSaved.featurePerms || []; // v30.0 RBAC: restore own feature keys
         savedTabs = previewSaved.openTabs || null;
@@ -16886,7 +16889,9 @@ function configureSidebarAndCards() {
     // v27.1 (Ahmed): Bind group — the OWNER (super-admin) always sees it;
     // everyone else, EVEN OTHER ADMINS, needs the 'bind' toggle. The toggle
     // side reads userModules DIRECTLY (hasExactMod secretly ORs isAdmin).
-    const bindAllowed = (typeof isAdmin !== 'undefined' && isAdmin)
+    // v34.1.13: same fix as aiAllowed -- bind gate must use isOwner (hardcoded
+    // super-admin), not isAdmin (True for any 'admin' module holder).
+    const bindAllowed = (typeof isOwner !== 'undefined' && !!isOwner)
         || (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('bind'));
     const navBindQueue = document.getElementById('nav-bind-queue');
     const navBindQuery = document.getElementById('nav-bind-query');
@@ -24960,6 +24965,7 @@ if (loggedUser&&loggedUat) {
             userPermissions = __acd;
             userModules = __acd.modules || [];
             isAdmin = !!__acd.is_super_admin;
+            isOwner = !!__acd.is_owner;   // v34.1.13
             APP_STATE.currentUser.permissions = Array.isArray(__acd.feature_perms) ? __acd.feature_perms : [];
             APP_STATE.currentUser.featureRole = __acd.feature_role || null;
             // NOTE: no PermissionGuard.applyToDOM() here on purpose -- it REMOVES
@@ -25001,6 +25007,7 @@ if (loggedUser&&loggedUat) {
             try { PermissionGuard.applyToDOM(); } catch (e) {}
             userModules = d.modules || [];
             isAdmin = !!d.is_super_admin;
+            isOwner = !!d.is_owner;   // v34.1.13
 
             // Phase 51: access is real again (re-enabled) -> clear the
             // mid-session cutoff guard so a FUTURE disable can reload us once more.
@@ -25060,6 +25067,7 @@ if (loggedUser&&loggedUat) {
             APP_STATE.currentUser.permissions = []; // v30.0 RBAC: fail-closed - zero feature keys
             userModules = [];
             isAdmin = false;
+            isOwner = false;   // v34.1.13
             enforceExportLocks();
             document.getElementById('sidebar').style.display = 'none';
             document.querySelector('.main-content').style.marginLeft = '0';
@@ -30819,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.12 kb-reset-batches chat-tabs 2026-11-17';
+window.SAM19_BUILD='v34.1.13 ai-owner-fix 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -33003,12 +33011,13 @@ function loggedIn(){
 function aiAllowed(){
   // v34.1.9 (Ahmed): 'for ai make it by toggle access and not appare even
   // for admins unless i give it to them, similar to bind access' -- the
-  // panel is TOGGLE-ONLY, same rule as the Bind tab: the OWNER (super-admin,
-  // isAdmin) always keeps it; everyone else, EVEN ADMINS, needs the 'ai'
-  // module on their Manage Agents row. isAdmin here is the same super-admin
-  // flag the Bind gate uses, NOT the 'admin' module.
+  // panel is TOGGLE-ONLY, same rule as the Bind tab: the OWNER (hardcoded
+  // super-admin) always keeps it; everyone else, EVEN ADMINS, needs the 'ai'
+  // module on their Manage Agents row. v34.1.13: use isOwner (hardcoded
+  // ADMIN_USERS), NOT isAdmin -- isAdmin is True for ANY 'admin' module
+  // holder, which leaked the panel to all admins (comment 7709127836103085250).
   try{
-    return (typeof isAdmin !== 'undefined' && !!isAdmin)
+    return (typeof isOwner !== 'undefined' && !!isOwner)
         || (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('ai'));
   }catch(e){ return false; }
 }
