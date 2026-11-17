@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.10 pagination-query 2026-11-17"
+XENA_BUILD = "v34.1.11 chat-poll-path 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -16956,8 +16956,8 @@ def audition_analytics():
 #   PART 2 -- /api/chat: server-side proxy to the Aily custom agent using
 #     the Samurai AI app's tenant_access_token. stream=true SSE is consumed
 #     server-side so the (需审核, not yet enabled) aily:agent_chat:read scope
-#     is NOT needed; if streaming ever fails we fall back to agent_chats
-#     polling and report NEED_CHAT_READ_SCOPE explicitly.
+#     is NOT needed; if streaming ever fails we fall back to chat-result
+#     polling (GET /agents/{id}/chats/{id}) and report NEED_CHAT_READ_SCOPE explicitly.
 #   PII contract: phone / NID / contact fields never enter the fetch
 #   projection; free-text values are additionally scrubbed for 11+-digit
 #   runs before any text leaves this server.
@@ -17702,31 +17702,53 @@ def _aily_chat_create(tat, message, session_id):
     return acid, sid
 
 def _aily_chat_await(tat, acid, budget):
-    """Poll agent_chats/{id} until the run completes. Returns the reply text
-    (may be "" when the run completed with no text), or None when the agent is
-    STILL RUNNING after `budget` seconds -- callers then hand a 202 to the
-    widget. Raises PermissionError when the aily:agent_chat:read scope
+    """Poll GET /agents/{id}/chats/{agent_chat_id} until the run completes.
+    v34.1.11: the OLD url .../agents/{id}/agent_chats/{id} NEVER EXISTED --
+    Feishu served a plain-text HTTP 404 page for it, .json() threw, and the
+    bare `except: continue` swallowed EVERY poll until the budget expired, so
+    /api/chat always 202'd and the widget spun to its full 8-minute deadline
+    with no answer (Ahmed's 2026-11-17 report). Live-verified 2026-11-17:
+    GET .../chats/{id} answers with a JSON body; .../agent_chats/{id} is 404.
+    Also v34.1.11: 3 CONSECUTIVE failed polls now raise RuntimeError (with
+    the last error) instead of spinning silently to the budget; a failed run
+    with finish_reason "stop" counts as completed. Returns the reply text
+    (may be "" when the run completed with no text), or None when the agent
+    is STILL RUNNING after `budget` seconds -- callers then hand a 202 to
+    the widget. Raises PermissionError when the aily:agent_chat:read scope
     (需审核) is missing, RuntimeError on a failed run."""
-    poll_url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/agent_chats/%s" % (AILY_AGENT_ID, acid)
+    poll_url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/chats/%s" % (AILY_AGENT_ID, acid)
     deadline = time.time() + budget
+    errs = 0
+    last_err = ""
     while time.time() < deadline:
         time.sleep(2)
         try:
             pr = feishu_session.get(poll_url, headers={"Authorization": "Bearer %s" % tat}, timeout=15).json()
-        except Exception:
+        except Exception as e:
+            errs += 1
+            last_err = "poll request failed: %s" % str(e)[:200]
+            if errs >= 3:
+                raise RuntimeError("chat poll failed %d times: %s" % (errs, last_err))
             continue
         if pr.get("code") != 0:
             msgtxt = str(pr.get("msg") or "")
-            if pr.get("code") in (99991672, 99991663) or "permission" in msgtxt.lower() or "scope" in msgtxt.lower():
+            if pr.get("code") in (99991679, 99991672, 99991663) or "permission" in msgtxt.lower() or "scope" in msgtxt.lower():
                 raise PermissionError("NEED_CHAT_READ_SCOPE: %s" % msgtxt[:200])
+            errs += 1
+            last_err = "code=%s msg=%s" % (pr.get("code"), msgtxt[:150])
+            if errs >= 3:
+                raise RuntimeError("chat poll failed %d times: %s" % (errs, last_err))
             continue
+        errs = 0
+        last_err = ""
         pdata = pr.get("data") or {}
         status = str(pdata.get("status") or "")
-        if status.lower() in ("completed", "failed", "cancelled", "error", "exception"):
+        finish = str(pdata.get("finish_reason") or "")
+        if status.lower() in ("completed", "failed", "cancelled", "error", "exception") or finish == "stop":
             texts = []
             _sse_collect_text(pdata, texts)
             reply = max(texts, key=len).strip() if texts else ""
-            if not reply and status.lower() != "completed":
+            if not reply and status.lower() not in ("completed", ""):
                 raise RuntimeError("agent run %s: %s" % (status.lower(), str(pdata)[:200]))
             return reply
     return None
