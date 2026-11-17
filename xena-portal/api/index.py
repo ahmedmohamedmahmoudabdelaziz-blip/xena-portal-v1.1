@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.16 sync-budget 2026-11-17"
+XENA_BUILD = "v34.1.17 sync-owner-pipeline 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -775,6 +775,43 @@ def redis_cmd(*args, timeout=8):
         logger.warn("redis_cmd_failed", cmd=args[0] if args else "?", error=str(e))
         _redis_mark_down(e, now)
         return None
+
+def redis_pipeline(*cmds, timeout=15):
+    """v34.1.17: ONE Upstash round trip carrying many commands. Upstash's REST
+    endpoint accepts a JSON array of command arrays (a pipeline) and returns a
+    list of per-command results. Used to resolve a whole page of ticket->owner
+    lookups in a single cross-border call instead of ~500 blocking HGETs.
+    Returns the list of results, or None when the store is down (callers fall
+    back to the per-ticket path)."""
+    if not REDIS_ENABLED or not cmds:
+        return None
+    now = time.time()
+    with _redis_health["lock"]:
+        down = _redis_health["down_since"]
+        if down and (now - down) < REDIS_RETRY_AFTER:
+            return None
+    try:
+        resp = http_requests.post(
+            UPSTASH_REDIS_REST_URL + "/pipeline",
+            headers={"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"},
+            json=[list(c) for c in cmds], timeout=timeout)
+        data = resp.json()
+        if not isinstance(data, list):
+            raise ValueError("pipeline returned non-list: %s" % str(data)[:120])
+        out = []
+        for ent in data:
+            if isinstance(ent, dict) and ent.get("error"):
+                out.append(None)
+            else:
+                out.append((ent or {}).get("result") if isinstance(ent, dict) else None)
+        with _redis_health["lock"]:
+            _redis_health["down_since"] = 0.0
+        return out
+    except Exception as e:
+        logger.warn("redis_pipeline_failed", n=len(cmds), error=str(e)[:200])
+        _redis_mark_down(e, now)
+        return None
+
 
 def redis_healthy():
     """True while Redis calls are succeeding (a missing key is still a
@@ -17545,6 +17582,13 @@ def knowledge_sync():
             if time.time() > deadline - 3:   # leave headroom for the write phase
                 resume_tok = nxt or "RESTART_WINDOW"   # empty token = re-read the window from page 1 next run
                 break
+            # v34.1.17: resolve EVERY ticket's owner batch in ONE Redis round
+            # trip per page instead of a blocking cross-border HGET per ticket.
+            # ~500 individual HGETs (Egypt->Upstash, 60-120ms each) used to eat
+            # 30-60s before any real work, which is why the cron still showed
+            # Failed(timeout) at exactly 30s even with the 24s budget -- the
+            # budget check sat ABOVE the loop, the network stalls sat INSIDE it.
+            page_rids, page_lines = [], {}
             for item in items:
                 if filt is None:  # fallback mode: honor the time window ourselves
                     try:
@@ -17554,8 +17598,23 @@ def knowledge_sync():
                     if lm and lm < cutoff:
                         continue
                 rid = item.get("record_id") or ""
-                line = _kb_ticket_line(item.get("fields") or {})
-                owner = redis_cmd("HGET", _KB_OWNER_KEY, rid)
+                if not rid:
+                    continue
+                page_rids.append(rid)
+                page_lines[rid] = _kb_ticket_line(item.get("fields") or {})
+            owners = {}
+            if page_rids:
+                try:
+                    res = redis_pipeline(*[("HGET", _KB_OWNER_KEY, r) for r in page_rids])
+                    if isinstance(res, list):
+                        owners = {r: (o if isinstance(o, str) else None) for r, o in zip(page_rids, res)}
+                except Exception:
+                    owners = {}   # fall back to per-ticket HGET below
+            for rid in page_rids:
+                line = page_lines[rid]
+                owner = owners.get(rid)
+                if owner is None and not owners:   # pipeline unavailable -> old path
+                    owner = redis_cmd("HGET", _KB_OWNER_KEY, rid)
                 if not owner:
                     flushed, aerr = _kb_append_line(st, rid, line)
                     st["processed"] += 1
@@ -17706,8 +17765,13 @@ def _aily_tenant_token():
     return token
 
 CHAT_PERSONALITIES = {
-    "samurai": '(You are SAMURAI, the Xena audition expert. ALWAYS introduce yourself as Samurai. Precise, direct, confident, step-by-step, friendly but efficient. Always reply in the user\'s own language. Never say you are an AI assistant or mention any other name.)',
-    "noora":   '(You are NOORA, a warm, patient, encouraging guardian. ALWAYS introduce yourself as Noora. Short kind sentences, emojis sparingly. Always reply in the user\'s own language. Never say you are an AI assistant or mention any other name.)',
+    # v34.1.17 (Ahmed): "it feels like a robot, and in Arabic it does an exact
+    # word-for-word translation from English without the culture". The persona
+    # must now do THREE things: stay in character, be warm/friendly (not a
+    # manual), and write NATIVELY in the user's language -- idiomatic phrasing
+    # and cultural register, never a literal word-for-word translation.
+    "samurai": '(You are SAMURAI, the Xena audition expert and a warm colleague. ALWAYS introduce yourself as Samurai. Be friendly and human: confident and direct, but warm, encouraging and conversational -- never robotic or like a manual. Reply ENTIRELY in the user\'s own language, written NATIVELY and idiomatically: natural phrasing, cultural register and tone, NOT a literal word-for-word translation from English (for Arabic use warm natural spoken-style Modern Standard Arabic, not a rigid literal rendering). Never say you are an AI assistant or mention any other name.)',
+    "noora":   '(You are NOORA, a warm, patient, encouraging friend. ALWAYS introduce yourself as Noora. Be gentle, kind and human: short warm sentences, a few tasteful emojis, genuinely supportive -- never robotic or like a manual. Reply ENTIRELY in the user\'s own language, written NATIVELY and idiomatically: natural phrasing, cultural register and tone, NOT a literal word-for-word translation from English (for Arabic use warm natural spoken-style phrasing, not a rigid literal rendering). Never say you are an AI assistant or mention any other name.)',
 }
 CHAT_SESSION_TTL = 7 * 86400
 
@@ -17740,7 +17804,7 @@ def _aily_chat_stream(tat, message, session_id):
         body["session_id"] = session_id
     r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
                                           "Content-Type": "application/json"},
-                            json=body, stream=True, timeout=(10, 100))
+                            json=body, stream=True, timeout=(10, 50))   # v34.1.17: 100s read always died at Vercel's 60s kill -> 504; 50s lets a slow answer finish inside the cap
     if r.status_code != 200:
         raise RuntimeError("stream status=%s body=%s" % (r.status_code, r.text[:300]))
     candidates, sid, acid = [], session_id or "", ""
@@ -17905,7 +17969,7 @@ def aily_chat():
         # for 10 min and fall back to stream mode (60s cap applies there).
         try:
             acid, session_id = _aily_chat_create(tat, message, session_id)
-            reply = _aily_chat_await(tat, acid, 48)
+            reply = _aily_chat_await(tat, acid, 40)   # v34.1.17: was 48s -- too close to Vercel's 60s kill; 40s leaves headroom, longer runs hand off to the widget's 202 poll
             if reply is None:
                 if session_id:
                     redis_set_json(skey, {"session_id": session_id,
