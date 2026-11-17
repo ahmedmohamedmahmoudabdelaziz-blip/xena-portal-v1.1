@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.15 ai-nav-owner-fix 2026-11-17"
+XENA_BUILD = "v34.1.16 sync-budget 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -16983,6 +16983,7 @@ AILY_APP_SECRET  = os.environ.get("FEISHU_APP_SECRET", "")
 AILY_KB_HOST     = os.environ.get("AILY_KB_HOST", "https://aily.feishu.cn").rstrip("/")
 AILY_KB_BATCH_SIZE   = 500      # tickets per .txt asset -- v34.1.8: halve the Aily uploads (the slowest step) so more pages fit the budget
 AILY_KB_SYNC_OVERLAP = 7 * 86400 * 1000   # sync re-reads tickets submitted in the last 7 days (ms)
+AILY_KB_SYNC_BUDGET_S = 24                # v34.1.16: cron-job.org's max timeout is 30s -- answer well inside it
 
 # Fetch projection for knowledge text. PII fields (NID / phone / contact) are
 # deliberately ABSENT -- projection is the first line of defense.
@@ -17511,16 +17512,39 @@ def knowledge_sync():
     # Primary: server-side date filter on Submitted on (epoch ms value).
     filt = {"conjunction": "and", "conditions": [
         {"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [str(since_ms)]}]}
-    items, nxt, ferr = _kb_fetch_page(tat, "", filter_obj=filt, sort_desc=True)
+    resume_tok = st.get("sync_resume_token") or ""
+    if resume_tok == "RESTART_WINDOW":
+        resume_tok = ""   # previous run died mid-page-1: re-read the window from the top
+    resume_since = st.get("sync_resume_since_ms")
+    if resume_tok and resume_since and resume_since >= since_ms - 1000:
+        # v34.1.16: continue an unfinished pass from where it stopped
+        items, nxt, ferr = _kb_fetch_page(tat, resume_tok, filter_obj=filt, sort_desc=True)
+    else:
+        resume_tok = ""
+        items, nxt, ferr = _kb_fetch_page(tat, "", filter_obj=filt, sort_desc=True)
     if ferr:
         # Fallback: most recent page by Numbering, client-side filter on last_modified.
         filt = None
+        resume_tok = ""
         items, nxt, ferr = _kb_fetch_page(tat, "", sort_desc=True)
     new_count, changed = 0, 0
     dirty, errors = {}, []
+    # v34.1.16: hard time budget. cron-job.org's plan caps the request
+    # timeout at 30s -- when the 7-day overlap holds a lot of fresh tickets
+    # the page loop + per-page writes used to blow straight past it
+    # ("Failed (timeout)" on every 15-min run). Work until the budget is
+    # nearly gone, then SAVE the page cursor and answer; the next cron run
+    # resumes exactly where this one stopped. The overlap window
+    # (last_sync_ms) only advances on a COMPLETE pass, so nothing is skipped.
+    deadline = time.time() + AILY_KB_SYNC_BUDGET_S
+    resume_tok = ""
+    complete = False
     try:
         pages_left, cutoff = 8, since_ms
         while True:
+            if time.time() > deadline - 3:   # leave headroom for the write phase
+                resume_tok = nxt or "RESTART_WINDOW"   # empty token = re-read the window from page 1 next run
+                break
             for item in items:
                 if filt is None:  # fallback mode: honor the time window ourselves
                     try:
@@ -17590,17 +17614,25 @@ def knowledge_sync():
                     assets[fn] = aid
                     _kb_assets_save(assets)
                     files_updated.append(fn)
-        st["last_sync_ms"] = now_ms
+        if resume_tok:
+            st["sync_resume_token"] = resume_tok
+            st["sync_resume_since_ms"] = since_ms
+        else:
+            st.pop("sync_resume_token", None)
+            st.pop("sync_resume_since_ms", None)
+            st["last_sync_ms"] = now_ms
+        complete = not resume_tok
     finally:
         st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
     try:
         audit.log(admin_name or "cron", "KNOWLEDGE_SYNC",
-                  "new=%d changed=%d files=%d errors=%d" % (new_count, changed, len(files_updated), len(errors)),
+                  "new=%d changed=%d files=%d errors=%d complete=%s" % (new_count, changed, len(files_updated), len(errors), complete),
                   severity="Warning" if errors else "Info")
     except Exception:
         pass
-    return jsonify({"new": new_count, "changed": changed,
+    return jsonify({"new": new_count, "changed": changed, "complete": complete,
+                    "resumes_next_run": bool(resume_tok),
                     "files_updated": files_updated, "errors": errors})
 
 @app.route('/api/knowledge/status', methods=['GET'])
