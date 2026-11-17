@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.13 ai-owner-fix 2026-11-17"
+XENA_BUILD = "v34.1.14 persona-switch 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17674,8 +17674,8 @@ def _aily_tenant_token():
     return token
 
 CHAT_PERSONALITIES = {
-    "samurai": '(Personality: answer as "Samurai" -- the Xena audition expert: precise, direct, confident, step-by-step, friendly but efficient. Always reply in the user\'s own language.)',
-    "noora":   '(Personality: answer as "Noora" -- warm, patient, encouraging guardian tone; short kind sentences, emojis sparingly. Always reply in the user\'s own language.)',
+    "samurai": '(You are SAMURAI, the Xena audition expert. ALWAYS introduce yourself as Samurai. Precise, direct, confident, step-by-step, friendly but efficient. Always reply in the user\'s own language. Never say you are an AI assistant or mention any other name.)',
+    "noora":   '(You are NOORA, a warm, patient, encouraging guardian. ALWAYS introduce yourself as Noora. Short kind sentences, emojis sparingly. Always reply in the user\'s own language. Never say you are an AI assistant or mention any other name.)',
 }
 CHAT_SESSION_TTL = 7 * 86400
 
@@ -17841,6 +17841,15 @@ def aily_chat():
     new_session = bool(body.get("new_session"))
     skey = _chat_session_key(email)
     stored = redis_get_json(skey) or {}
+    stored_persona = (stored.get("personality") or "").strip().lower()
+    # v34.1.14: a personality switch must start a fresh Aily session --
+    # otherwise the persona prefix (only prepended to the first message) is
+    # never sent and the model keeps answering as the previous character.
+    persona_changed = (personality in CHAT_PERSONALITIES
+                       and stored_persona
+                       and personality != stored_persona)
+    if persona_changed:
+        new_session = True
     session_id = "" if new_session else (body.get("session_id") or stored.get("session_id") or "")
     if MOCK_MODE:
         sid = session_id or "mock_session_1"
