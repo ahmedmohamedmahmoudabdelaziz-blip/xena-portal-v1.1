@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.19 chat-theme-tabspeed 2026-11-18"
+XENA_BUILD = "v34.1.20 chat-card-cron-groups 2026-11-18"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17676,11 +17676,24 @@ def knowledge_sync():
                 break
             time.sleep(0.15)
         files_updated = []
+        # v34.1.20: the write phase used to run UNGUARDED after the page
+        # loop. On a full 7-day overlap the loop eats the whole 20s budget,
+        # then each dirty-file _kb_update_asset (a cross-border Feishu call)
+        # pushes the request past cron-job.org's 30s kill -> "Failed
+        # (timeout)" on nearly every run. Now every write checks the same
+        # deadline; the FIRST over-budget write is deferred by marking the
+        # pass incomplete (resume cursor -> the window is re-read next run,
+        # lines diff-identical, no data lost) and all further writes are
+        # skipped so the response goes out immediately.
+        writes_deferred = False
+        assets = _kb_assets()
         for fn, batch in list(dirty.items()):
             if batch is None:
                 files_updated.append(fn)   # flushed at append time
                 continue
-            assets = _kb_assets()
+            if writes_deferred or time.time() > deadline - 1:
+                writes_deferred = True
+                continue
             if fn not in assets:
                 continue
             aerr = _kb_update_asset(assets[fn], fn, _kb_file_text(fn, batch))
@@ -17690,9 +17703,8 @@ def knowledge_sync():
                 _kb_batch_save(fn, batch)
                 files_updated.append(fn)
         # Flush the open batch too if new tickets went into it but it isn't full yet.
-        if new_count and st.get("open_batch"):
+        if new_count and st.get("open_batch") and not writes_deferred:
             fn = st["open_batch"]
-            assets = _kb_assets()
             batch = _kb_batch_load(fn)
             if fn in assets:
                 aerr = _kb_update_asset(assets[fn], fn, _kb_file_text(fn, batch))
@@ -17708,6 +17720,12 @@ def knowledge_sync():
                     assets[fn] = aid
                     _kb_assets_save(assets)
                     files_updated.append(fn)
+        if writes_deferred:
+            # pass ends incomplete so the overlap window does NOT advance --
+            # the next cron run re-reads it and retries the skipped writes.
+            if not resume_tok:
+                resume_tok = "RESTART_WINDOW"
+            errors.append("write phase deferred to next run (budget)")
         if resume_tok:
             st["sync_resume_token"] = resume_tok
             st["sync_resume_since_ms"] = since_ms
