@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.9 reset-first ai-toggle 2026-11-17"
+XENA_BUILD = "v34.1.10 pagination-query 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2664,18 +2664,23 @@ QUERY_RECORDS_FIELDS = [
 def _fetch_bitable_shard(table_id, tat, filter_obj=None, field_names=None, timeout=30):
     session = http_requests.Session()
     session.headers.update({"Authorization": f"Bearer {tat}", "Content-Type": "application/json"})
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true"
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{table_id}/records/search?automatic_fields=true&page_size=500"
 
     items, seen, complete, reason = [], set(), True, ""
     page_token, projection = None, field_names
 
     for _ in range(200):
-        payload = {"page_size": 500}
+        payload = {}
         if filter_obj:  payload["filter"] = filter_obj
         if projection:  payload["field_names"] = projection
-        if page_token:  payload["page_token"] = page_token
+        # v34.1.10: page_token is a QUERY param on records/search -- the body
+        # placement was silently ignored, so this walk never got past page 1
+        # (the `seen` dedup hid it as "only 500 records").
+        req_url = base_url
+        if page_token:
+            req_url += "&page_token=" + urllib.parse.quote(str(page_token), safe="")
         try:
-            resp = session.post(url, json=payload, timeout=timeout)
+            resp = session.post(req_url, json=payload, timeout=timeout)
             data = resp.json()
             if data.get("code") == 1254045 and projection:
                 projection, page_token = None, None
@@ -4617,14 +4622,18 @@ def _audit_verify_rows_fetch(limit):
     Seq ID for chain verification (paginated, 500/page)."""
     rows = []
     tat = get_tenant_access_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true"
+    base_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{AUDIT_TABLE_ID}/records/search?automatic_fields=true&page_size=500"
     headers = {"Authorization": f"Bearer {tat}", "Content-Type": "application/json"}
     page_token = None
     while len(rows) < limit:
-        payload = {"page_size": 500, "sort": [{"field_name": "Seq ID", "desc": False}]}
+        # v34.1.10: page_token is a QUERY param on records/search (body
+        # placement was ignored -> verification re-read page 1 with duplicate
+        # rows once limit exceeded 500).
+        req_url = base_url
         if page_token:
-            payload["page_token"] = page_token
-        res = http_requests.post(url, headers=headers, json=payload, timeout=12).json()
+            req_url += "&page_token=" + urllib.parse.quote(str(page_token), safe="")
+        payload = {"sort": [{"field_name": "Seq ID", "desc": False}]}
+        res = http_requests.post(req_url, headers=headers, json=payload, timeout=12).json()
         if res.get("code") != 0:
             raise Exception(res.get("msg", "Feishu API Error"))
         data = res.get("data", {})
@@ -17118,11 +17127,19 @@ def _kb_ticket_line(fields):
 def _kb_fetch_page(tat, page_token="", filter_obj=None, sort_desc=False):
     """ONE records/search page against the Grand Table (500/page, automatic
     fields so last_modified_time is available). Returns (items, next_token, err)."""
-    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
-           "?automatic_fields=true" % (BASE_ID, REQUESTS_TABLE_ID))
-    payload = {"page_size": 500,
-               "sort": [{"field_name": "Numbering", "desc": sort_desc}]}
-    if page_token: payload["page_token"] = page_token
+    # v34.1.10: page_size/page_token are QUERY params on records/search --
+    # Feishu IGNORES them in the JSON body. Live-verified against the Grand
+    # Table 2026-11-17: a body page_token silently re-returns page 1, which
+    # was BOTH bugs -- the 39,677/124-file duplication (same page re-appended
+    # into fresh batches) and the stall-at-500 (owner-skip skips the re-fetched
+    # page, the token never advances). The Phase 17 mirror-table code already
+    # documented this rule; the KB walker never got it.
+    qs = "?automatic_fields=true&page_size=500"
+    if page_token:
+        qs += "&page_token=" + urllib.parse.quote(str(page_token), safe="")
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search%s"
+           % (BASE_ID, REQUESTS_TABLE_ID, qs))
+    payload = {"sort": [{"field_name": "Numbering", "desc": sort_desc}]}
     if filter_obj: payload["filter"] = filter_obj
     try:
         data = feishu_session.post(
@@ -17304,10 +17321,13 @@ def knowledge_backfill():
                               # token means exhaustion -- an empty page_token
                               # alone also describes "broke mid-first-page".
     buf = {"fn": "", "batch": None, "owners": {}, "dirty": False}   # v34.1.7
+    pages_iterated = 0
     try:
         for _ in range(pages):
             if time.time() - t0 > budget:
                 break
+            pages_iterated += 1
+            prev_tok = st["page_token"]
             items, nxt, ferr = _kb_fetch_page(tat, st["page_token"])
             if ferr:
                 errors.append(ferr)
@@ -17358,6 +17378,12 @@ def knowledge_backfill():
                     buf["fn"], buf["batch"] = "", None
                     buf["dirty"] = False   # _kb_flush already saved the batch
             if page_done:
+                if nxt and nxt == prev_tok:
+                    # v34.1.10: pagination refused to advance -- without this
+                    # check the loop would spin forever on a wedged token and
+                    # the widget would just say "stalled" with no reason.
+                    errors.append("pagination stuck: same page_token returned twice (%s)" % str(nxt)[:24])
+                    break
                 st["page_token"] = nxt
                 table_exhausted = not nxt
             _kb_buf_persist(buf)   # v34.1.7: ONE Redis write set per page
@@ -17380,6 +17406,11 @@ def knowledge_backfill():
                     buf["dirty"] = False
             st["backfill_done"] = True
             st["last_sync_ms"] = int(time.time() * 1000)
+    except Exception as e:
+        # v34.1.10: an unexpected crash must come back as JSON the widget can
+        # render ("Error: ..."), not Vercel's HTML 500 page that .json() chokes
+        # on -- that is what "it failed after 500 and took so long" looked like.
+        errors.append("internal error: %s" % (str(e) or e.__class__.__name__))
     finally:
         _kb_buf_persist(buf)   # v34.1.7: persist buffered lines + owners even on a mid-page budget stop
         st["errors"] = ((st.get("errors") or []) + errors)[-5:]
@@ -17396,6 +17427,7 @@ def knowledge_backfill():
     return jsonify({"done": done, "processed": st["processed"],
                     "files_written": files_flushed, "assets_total": len(_kb_assets()),
                     "errors": errors, "last_error": (errors or (st.get("errors") or [""]))[-1],
+                    "pages": pages_iterated, "elapsed_ms": int((time.time() - t0) * 1000),
                     "hint": "re-invoke until done:true"})
 
 @app.route('/api/knowledge/sync', methods=['GET', 'POST'])
