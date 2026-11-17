@@ -30829,7 +30829,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.18 kb-fields-instant-sync-think 2026-11-18';
+window.SAM19_BUILD='v34.1.19 chat-theme-tabspeed 2026-11-18';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32422,68 +32422,82 @@ xa4SettingsEnsure(false);
      webkitSpeechRecognition (ar-SA/ur-PK/en-US/zh-CN), speaker via speechSynthesis.
      RTL auto-detected per message for Arabic/Urdu. -->
 <style id="xaChatStyle">
-/* v34.1.12 (Ahmed): the 🤺 button moved INTO the top bar, right beside the
-   sheet icon -- it is a plain .utility-icon-btn now, no floating FAB. */
+/* v34.1.19 (Ahmed 2026-11-18): the panel now follows the portal's LIGHT/DARK
+   theme (it was hardcoded slate/dark before and looked foreign in light mode
+   and tiny in the chat tab). Colors resolve from the same --bg/--surface/
+   --text/--border tokens the rest of the portal uses, so the toggle flips it. */
+#xaChatRoot{
+  --xa-bg:var(--surface);
+  --xa-bg2:var(--surface-inset);
+  --xa-head:var(--surface);
+  --xa-text:var(--text);
+  --xa-muted:var(--text-muted);
+  --xa-border:var(--border);
+  --xa-shadow:var(--shadow);
+}
 #xaChatFab{font-size:1.15rem}
 #xaChatFab:hover{color:var(--accent-cyan,#38bdf8)}
 #xaChatPanel{position:fixed;left:18px;bottom:18px;z-index:99999;width:min(400px,calc(100vw - 24px));
-  height:min(640px,calc(100vh - 36px));background:#0f172a;border:1px solid rgba(148,163,184,.25);
-  border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;
-  font-family:inherit}
+  height:min(640px,calc(100vh - 36px));background:var(--xa-bg);border:1px solid var(--xa-border);
+  border-radius:16px;box-shadow:var(--xa-shadow);display:none;flex-direction:column;overflow:hidden;
+  font-family:inherit;color:var(--xa-text)}
 #xaChatPanel.open{display:flex}
-.xaChatHead{display:flex;align-items:center;gap:8px;padding:10px 12px;background:linear-gradient(135deg,#1e293b,#0f172a);
-  border-bottom:1px solid rgba(148,163,184,.2)}
-.xaChatTitle{font-weight:700;font-size:14px;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.xaChatHead select{background:#1e293b;color:#cbd5e1;border:1px solid rgba(148,163,184,.35);border-radius:8px;
+.xaChatHead{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--xa-head);
+  border-bottom:1px solid var(--xa-border)}
+.xaChatTitle{font-weight:700;font-size:14px;color:var(--xa-text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xaChatHead select{background:var(--xa-bg2);color:var(--xa-text);border:1px solid var(--xa-border);border-radius:8px;
   font-size:12px;padding:3px 6px;max-width:110px}
-.xaChatHead button{background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px}
-.xaChatHead button:hover{background:rgba(148,163,184,.15);color:#e2e8f0}
+.xaChatHead button{background:transparent;border:none;color:var(--xa-muted);cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px}
+.xaChatHead button:hover{background:var(--surface-hover);color:var(--xa-text)}
 #xaChatMsgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
 .xaMsg{max-width:88%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.55;word-wrap:break-word;white-space:pre-wrap}
 .xaMsg.user{align-self:flex-end;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-bottom-right-radius:4px}
-.xaMsg.bot{align-self:flex-start;background:#1e293b;color:#e2e8f0;border:1px solid rgba(148,163,184,.18);border-bottom-left-radius:4px}
-.xaMsg.bot .xaSpeak{margin-top:6px;background:transparent;border:1px solid rgba(148,163,184,.3);color:#94a3b8;
+.xaMsg.bot{align-self:flex-start;background:var(--xa-bg2);color:var(--xa-text);border:1px solid var(--xa-border);border-bottom-left-radius:4px}
+.xaMsg.bot .xaSpeak{margin-top:6px;background:transparent;border:1px solid var(--xa-border);color:var(--xa-muted);
   border-radius:8px;font-size:11px;padding:2px 8px;cursor:pointer}
-.xaMsg.bot .xaSpeak:hover{color:#e2e8f0;border-color:#94a3b8}
+.xaMsg.bot .xaSpeak:hover{color:var(--xa-text);border-color:var(--border-hover)}
 .xaMsg.err{background:#450a0a;border:1px solid #7f1d1d;color:#fecaca}
+[data-theme="light"] .xaMsg.err{background:#fde8e8;border-color:#e0a0a0;color:#8c2b2b}
 .xaTyping{display:inline-flex;gap:4px;padding:4px 2px}
-.xaTyping span{width:6px;height:6px;border-radius:50%;background:#94a3b8;animation:xaBlink 1.2s infinite}
+.xaTyping span{width:6px;height:6px;border-radius:50%;background:var(--xa-muted);animation:xaBlink 1.2s infinite}
 .xaTyping span:nth-child(2){animation-delay:.2s}.xaTyping span:nth-child(3){animation-delay:.4s}
 @keyframes xaBlink{0%,80%,100%{opacity:.25}40%{opacity:1}}
-.xaChatFoot{display:flex;align-items:flex-end;gap:8px;padding:10px;border-top:1px solid rgba(148,163,184,.2);background:#0b1220}
-#xaChatInput{flex:1;resize:none;max-height:110px;min-height:38px;background:#1e293b;color:#e2e8f0;
-  border:1px solid rgba(148,163,184,.3);border-radius:12px;padding:9px 12px;font-size:13.5px;font-family:inherit;outline:none}
+.xaChatFoot{display:flex;align-items:flex-end;gap:8px;padding:10px;border-top:1px solid var(--xa-border);background:var(--xa-bg2)}
+#xaChatInput{flex:1;resize:none;max-height:110px;min-height:38px;background:var(--xa-bg2);color:var(--xa-text);
+  border:1px solid var(--xa-border);border-radius:12px;padding:9px 12px;font-size:13.5px;font-family:inherit;outline:none}
 #xaChatInput:focus{border-color:#2563eb}
 .xaChatFoot button{width:40px;height:40px;border-radius:12px;border:none;cursor:pointer;font-size:17px;
   display:flex;align-items:center;justify-content:center;flex:none}
-#xaChatMic{background:#1e293b;border:1px solid rgba(148,163,184,.3);color:#cbd5e1}
+#xaChatMic{background:var(--xa-bg2);border:1px solid var(--xa-border);color:var(--xa-text)}
 #xaChatMic.rec{background:#7f1d1d;color:#fff;animation:xaRecPulse 1s infinite}
 @keyframes xaRecPulse{50%{box-shadow:0 0 0 6px rgba(220,38,38,.25)}}
 #xaChatSend{background:linear-gradient(135deg,#6d28d9,#2563eb);color:#fff}
 #xaChatSend:disabled{opacity:.45;cursor:not-allowed}
-.xaChatHint{font-size:11px;color:#64748b;text-align:center;padding:4px 0 6px;background:#0b1220}
+.xaChatHint{font-size:11px;color:var(--xa-muted);text-align:center;padding:4px 0 6px;background:var(--xa-bg2)}
 .xaKbBtn{margin-left:4px;padding:1px 8px;font-size:11px;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.18);color:#c4b5fd;cursor:pointer}
 .xaKbBtn:hover:not(:disabled){background:rgba(124,58,237,.35)}
 .xaKbBtn:disabled{opacity:.75;cursor:default}
 #xaChatPanel.xaWide{width:min(720px,calc(100vw - 24px))}
 /* v34.1.12: the full-page chat tab (#pg-chat) hosts the SAME panel node --
-   .xaPageMode turns the fixed floating panel into a filled page card. */
-#pg-chat{height:calc(100vh - 150px);min-height:440px}
+   .xaPageMode turns the fixed floating panel into a filled page card.
+   v34.1.19: fill the tab edge-to-edge at near-full height (was a small
+   centered box with dead space all around). */
+#pg-chat{height:calc(100vh - 190px);min-height:520px;display:none}
 #xaChatPanel.xaPageMode{position:relative;left:auto;bottom:auto;width:100%;height:100%;
-  max-width:1000px;margin:0 auto;border-radius:14px;box-shadow:none}
+  max-width:100%;margin:0;border-radius:14px;box-shadow:var(--xa-shadow)}
 #xaChatPanel.xaPageMode.xaWide{max-width:100%}
 .xaPara{margin:0 0 8px}.xaPara:last-child{margin-bottom:0}
-.xaEnt{display:inline-block;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.4);color:#7dd3fc;
+.xaEnt{display:inline-block;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.4);color:#38bdf8;
   border-radius:4px;padding:0 5px;font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer}
 .xaEnt:hover{background:rgba(56,189,248,.3)}
-.xaMsg.bot .xaCopyBtn{margin-top:6px;margin-left:6px;background:transparent;border:1px solid rgba(148,163,184,.3);color:#94a3b8;
+.xaMsg.bot .xaCopyBtn{margin-top:6px;margin-left:6px;background:transparent;border:1px solid var(--xa-border);color:var(--xa-muted);
   border-radius:8px;font-size:11px;padding:2px 8px;cursor:pointer}
-.xaMsg.bot .xaCopyBtn:hover{color:#e2e8f0;border-color:#94a3b8}
-#xaChatChips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px;background:#0b1220;border-top:1px solid rgba(148,163,184,.12)}
+.xaMsg.bot .xaCopyBtn:hover{color:var(--xa-text);border-color:var(--border-hover)}
+#xaChatChips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px;background:var(--xa-bg2);border-top:1px solid var(--xa-border)}
 #xaChatChips:empty{display:none}
-.xaChip{background:#1e293b;border:1px solid rgba(148,163,184,.28);color:#cbd5e1;border-radius:4px;
+.xaChip{background:var(--xa-bg2);border:1px solid var(--xa-border);color:var(--xa-text);border-radius:4px;
   font-size:11.5px;padding:3px 9px;cursor:pointer}
-.xaChip:hover{border-color:#38bdf8;color:#e2e8f0}
+.xaChip:hover{border-color:var(--border-hover);color:var(--xa-text)}
 </style>
 <div id="xaChatRoot" style="display:none">
   <!-- v34.1.12: the 🤺 trigger lives in the top bar now; this root hosts the
