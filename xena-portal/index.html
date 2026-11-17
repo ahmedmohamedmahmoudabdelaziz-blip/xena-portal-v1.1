@@ -16902,7 +16902,9 @@ function configureSidebarAndCards() {
 
     // v34.1.12 (Ahmed): the 🤺 chat sidebar tab follows the same toggle-only
     // rule as the Bind group -- the OWNER (super-admin) or the 'ai' module.
-    const aiNavAllowed = (typeof isAdmin !== 'undefined' && isAdmin)
+    // v34.1.14: same owner-gate fix as aiAllowed -- isAdmin is True for ANY
+    // 'admin' module holder; only the hardcoded owner (isOwner) bypasses.
+    const aiNavAllowed = (typeof isOwner !== 'undefined' && !!isOwner)
         || (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('ai'));
     const navChat = document.getElementById('nav-chat');
     if (navChat) navChat.style.display = aiNavAllowed ? '' : 'none';
@@ -30827,7 +30829,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.14 persona-switch 2026-11-17';
+window.SAM19_BUILD='v34.1.15 ai-nav-owner-fix 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
