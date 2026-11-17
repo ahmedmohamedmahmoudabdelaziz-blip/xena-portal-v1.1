@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.7 kb-backfill-batched 2026-11-17"
+XENA_BUILD = "v34.1.8 kb-owner-skip 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -16948,7 +16948,7 @@ AILY_KB_SPACE_ID = os.environ.get("AILY_KB_SPACE_ID", "knowledge_space_4mgt237p3
 AILY_APP_ID      = os.environ.get("FEISHU_APP_ID", "")
 AILY_APP_SECRET  = os.environ.get("FEISHU_APP_SECRET", "")
 AILY_KB_HOST     = os.environ.get("AILY_KB_HOST", "https://aily.feishu.cn").rstrip("/")
-AILY_KB_BATCH_SIZE   = 200      # tickets per .txt asset (4000-item KB cap -> never 1 asset/ticket)
+AILY_KB_BATCH_SIZE   = 500      # tickets per .txt asset -- v34.1.8: halve the Aily uploads (the slowest step) so more pages fit the budget
 AILY_KB_SYNC_OVERLAP = 7 * 86400 * 1000   # sync re-reads tickets submitted in the last 7 days (ms)
 
 # Fetch projection for knowledge text. PII fields (NID / phone / contact) are
@@ -16977,6 +16977,7 @@ _KB_STATE_KEY  = "xena:kb:state"
 _KB_ASSETS_KEY = "xena:kb:assets"
 _KB_BATCH_KEY  = "xena:kb:batch:"        # + file_name -> {"order":[rid], "lines":{rid:line}}
 _KB_OWNER_KEY  = "xena:kb:owner"         # Redis HASH record_id -> file_name
+_KB_BUILD_LOCK = "xena:kb:build_lock"    # v34.1.8: SET NX EX 180 -- one build at a time
 
 def _kb_state():
     st = redis_get_json(_KB_STATE_KEY) or {}
@@ -17022,7 +17023,7 @@ def _kb_create_asset(title, text):
                "content": _b64.b64encode(text.encode("utf-8")).decode("ascii")}
     try:
         r = http_requests.post(_kb_api_url("/content"), headers=_kb_headers(),
-                               json=payload, timeout=60)
+                               json=payload, timeout=25)   # v34.1.8: a hung upload must fail INSIDE the budget, not at the 60s kill
         data = r.json() if r.content else {}
     except Exception as e:
         return None, "network: %s" % e
@@ -17045,7 +17046,7 @@ def _kb_update_asset(asset_id, title, text):
                "content": _b64.b64encode(text.encode("utf-8")).decode("ascii")}
     try:
         r = http_requests.put(_kb_api_url("/%s/content" % asset_id),
-                              headers=_kb_headers(), json=payload, timeout=60)
+                              headers=_kb_headers(), json=payload, timeout=25)   # v34.1.8: fail inside the budget
         if r.status_code == 200:
             return None
         return "status=%s resp=%s" % (r.status_code, r.text[:400])
@@ -17149,8 +17150,10 @@ def _kb_append_line_buf(st, buf, record_id, line):
     record (batch load + HSET + batch save), ~1500 per 500-record page = 30-75s
     per page, which is why one page barely fit Vercel's 60s kill. Here the open
     batch is loaded ONCE per batch per call and persisted ONCE per page by
-    _kb_buf_persist. Returns the file name when the batch just reached
-    AILY_KB_BATCH_SIZE and must be flushed, else ""."""
+    _kb_buf_persist. Returns (file_name_or_"", is_new): the file name
+    when the batch just reached AILY_KB_BATCH_SIZE and must be flushed,
+    plus whether the record was genuinely new (drives the honest processed
+    counter)."""
     fn = st.get("open_batch")
     if not fn:
         start = st["next_index"]
@@ -17159,20 +17162,18 @@ def _kb_append_line_buf(st, buf, record_id, line):
         buf["fn"] = fn
         buf["batch"] = _kb_batch_load(fn)   # ONE load per batch per call
     batch = buf["batch"]
-    if record_id not in batch["lines"]:
+    is_new = record_id not in batch["lines"]   # v34.1.8: computed BEFORE the mutation
+    if is_new:
         batch["order"].append(record_id)
         st["next_index"] += 1   # v34.1.7: only NEW records advance the naming counter (re-processed rids dedup)
     batch["lines"][record_id] = line
     (buf.setdefault("owners", {}))[record_id] = fn
     buf["dirty"] = True
-    return fn if len(batch["order"]) >= AILY_KB_BATCH_SIZE else ""
+    full = fn if len(batch["order"]) >= AILY_KB_BATCH_SIZE else ""
+    return full, is_new
 
-def _kb_buf_persist(buf):
-    """v34.1.7: write the buffered open batch + owner map to Redis ONCE per
-    page (a multi-field HSET is ONE round-trip for the whole page)."""
-    if buf.get("dirty") and buf.get("fn") and buf.get("batch") is not None:
-        _kb_batch_save(buf["fn"], buf["batch"])
-        buf["dirty"] = False
+def _kb_buf_persist_owners(buf):
+    """v34.1.8: ONE multi-field HSET for every buffered owner mapping."""
     owners = buf.get("owners") or {}
     if owners:
         args = []
@@ -17180,6 +17181,14 @@ def _kb_buf_persist(buf):
             args.extend([rid, ofn])
         redis_cmd("HSET", _KB_OWNER_KEY, *args)
         buf["owners"] = {}
+
+def _kb_buf_persist(buf):
+    """v34.1.7: write the buffered open batch + owner map to Redis ONCE per
+    page (a multi-field HSET is ONE round-trip for the whole page)."""
+    if buf.get("dirty") and buf.get("fn") and buf.get("batch") is not None:
+        _kb_batch_save(buf["fn"], buf["batch"])
+        buf["dirty"] = False
+    _kb_buf_persist_owners(buf)
 
 def _kb_flush(st, fn, batch):
     """Write a full/open batch to the KB (create on first flush, update after)."""
@@ -17209,6 +17218,17 @@ def knowledge_backfill():
     admin_name, admin_email, err = _require_admin_identity()
     if err:
         return err
+    # v34.1.8: ONE build at a time -- two overlapping calls (a second tab, or
+    # the console snippet plus the button) read the same state and interleave
+    # batches, duplicating tickets across files. The lock expires on its own
+    # if a call is hard-killed, so a dead build can never wedge the route.
+    lock_held = False
+    if not MOCK_MODE and redis_healthy():
+        res = redis_cmd("SET", _KB_BUILD_LOCK, str(int(time.time())), "NX", "EX", 180)
+        if res != "OK" and redis_healthy():
+            return jsonify({"error": "a KB build is already running - wait ~3 minutes and retry",
+                            "locked": True}), 409
+        lock_held = (res == "OK")
     if request.args.get("reset") == "1":
         # v34.1.4: clear a poisoned build state (polluted batch/progress from
         # the pre-fix envelope bug) so the next build starts from ticket #1.
@@ -17218,13 +17238,18 @@ def knowledge_backfill():
         _kb_state_save({"backfill_done": False, "page_token": "", "processed": 0,
                         "open_batch": "", "next_index": 1, "last_sync_ms": 0, "errors": []})
         _kb_assets_save({})
+        redis_cmd("DEL", _KB_OWNER_KEY)   # v34.1.8: the owner map must go too -- the owner-skip would otherwise skip EVERY ticket on the rebuild
         try:
             audit.log(admin_name, "KNOWLEDGE_BACKFILL_RESET", "state cleared", severity="Warning")
         except Exception:
             pass
+        if lock_held:
+            redis_cmd("DEL", _KB_BUILD_LOCK)
         return jsonify({"reset": True,
                         "note": "backfill state cleared - re-invoke (without reset) to rebuild from ticket #1"})
     if not AILY_KB_API_KEY:
+        if lock_held:
+            redis_cmd("DEL", _KB_BUILD_LOCK)
         return jsonify({"error": "AILY_KB_API_KEY is not configured on the server"}), 503
     if MOCK_MODE:
         return jsonify({"done": False, "processed": 200, "files": ["tickets-0001-0200.txt"], "mock": True})
@@ -17233,6 +17258,8 @@ def knowledge_backfill():
     t0 = time.time()
     st = _kb_state()
     if st["backfill_done"]:
+        if lock_held:
+            redis_cmd("DEL", _KB_BUILD_LOCK)
         return jsonify({"done": True, "processed": st["processed"],
                         "assets": len(_kb_assets()), "note": "backfill already complete"})
     tat = get_tenant_access_token()
@@ -17249,6 +17276,17 @@ def knowledge_backfill():
             if ferr:
                 errors.append(ferr)
                 break
+            # v34.1.8: ONE HMGET for the whole page -- records already flushed
+            # into an earlier batch are SKIPPED. Without this, every mid-page
+            # budget stop re-fetches the page next call and re-appends its
+            # already-flushed prefix into a NEW batch (the lines dedup only
+            # works WITHIN one batch) -- Ahmed's 39,677 processed / 124 files
+            # for a 19,888-record table.
+            owned = set()
+            rids = [(it.get("record_id") or "") for it in items]
+            if rids:
+                vals = redis_cmd("HMGET", _KB_OWNER_KEY, *rids) or []
+                owned = {r for r, v in zip(rids, vals) if v}
             page_done = True
             for item in items:
                 if time.time() - t0 > budget:
@@ -17260,12 +17298,18 @@ def knowledge_backfill():
                     page_done = False
                     break
                 rid = item.get("record_id") or ""
+                if rid in owned:
+                    continue   # v34.1.8: already in a flushed batch -- never duplicate
                 line = _kb_ticket_line(item.get("fields") or {})
-                full_fn = _kb_append_line_buf(st, buf, rid, line)   # v34.1.7: zero Redis I/O per record
-                st["processed"] += 1
+                full_fn, is_new = _kb_append_line_buf(st, buf, rid, line)   # v34.1.7: zero Redis I/O per record
+                if is_new:
+                    st["processed"] += 1   # v34.1.8: honest counter -- re-processed rids don't inflate it
                 if full_fn:
-                    # The open batch just reached AILY_KB_BATCH_SIZE: upload it
-                    # to the KB NOW (create on first flush, update after).
+                    # The open batch just reached AILY_KB_BATCH_SIZE: persist
+                    # batch + owners BEFORE the upload (v34.1.8: a hard kill
+                    # right after the upload can then never orphan them),
+                    # then upload NOW (create on first flush, update after).
+                    _kb_buf_persist(buf)
                     flushed, ferr2 = _kb_flush(st, full_fn, buf["batch"])
                     if ferr2:
                         # v34.1.7: keep page_done False so the token does NOT
@@ -17281,6 +17325,7 @@ def knowledge_backfill():
                 st["page_token"] = nxt
                 table_exhausted = not nxt
             _kb_buf_persist(buf)   # v34.1.7: ONE Redis write set per page
+            _kb_state_save(st)     # v34.1.8: progress durable at page boundaries -- a hard kill now loses < 1 page
             if errors or not page_done or not nxt:
                 break
             time.sleep(0.15)   # same GIL-yield pause the other big syncs use
@@ -17303,6 +17348,8 @@ def knowledge_backfill():
         _kb_buf_persist(buf)   # v34.1.7: persist buffered lines + owners even on a mid-page budget stop
         st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
+        if lock_held:
+            redis_cmd("DEL", _KB_BUILD_LOCK)   # v34.1.8
     done = st["backfill_done"] and not errors
     try:
         audit.log(admin_name, "KNOWLEDGE_BACKFILL",
