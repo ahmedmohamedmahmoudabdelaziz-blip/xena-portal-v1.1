@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.11 chat-poll-path 2026-11-17"
+XENA_BUILD = "v34.1.12 kb-reset-batches chat-tabs 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17184,12 +17184,21 @@ def _kb_append_line_buf(st, buf, record_id, line):
     plus whether the record was genuinely new (drives the honest processed
     counter)."""
     fn = st.get("open_batch")
+    opening = not fn   # v34.1.12: TRUE only when this call OPENS a batch
     if not fn:
         start = st["next_index"]
         fn = st["open_batch"] = "tickets-%04d-%04d.txt" % (start, start + AILY_KB_BATCH_SIZE - 1)
     if buf.get("fn") != fn:
         buf["fn"] = fn
-        buf["batch"] = _kb_batch_load(fn)   # ONE load per batch per call
+        batch = _kb_batch_load(fn)   # ONE load per batch per call
+        if opening and batch.get("order"):
+            # v34.1.12: a batch we just OPENED (st["open_batch"] was empty)
+            # must start EMPTY -- non-empty content here is a stale key that
+            # survived a reset or crash (the "processed stuck at 0, same file
+            # flushed 30x per call" bug). A legitimate mid-batch resume always
+            # has st["open_batch"] set, so ONLY the stale case is dropped.
+            batch = {"order": [], "lines": {}}
+        buf["batch"] = batch
     batch = buf["batch"]
     is_new = record_id not in batch["lines"]   # v34.1.8: computed BEFORE the mutation
     if is_new:
@@ -17240,14 +17249,45 @@ def _kb_flush(st, fn, batch):
 
 def _kb_reset_state(admin_name):
     """v34.1.9: clear the WHOLE KB build state -- state + assets map + open
-    batch + owner map -- and force-release the build lock. Reset is the
+    batch + owner map -- and force-release the build lock. v34.1.12: every
+    xena:kb:batch:* key is deleted too (see the comment below for why).
+    Reset is the
     RECOVERY tool, so it must work while a build is wedged: it now runs
     BEFORE the lock is acquired and releases any stale lock (Ahmed's rec2:
     the panel sat on busy for minutes and every '↺ Reset' came back failed,
     because the lock a killed build left behind blocked the reset itself)."""
     old = _kb_state()
+    # v34.1.12 (Ahmed, comment 7709010106137971956): reset left every OTHER
+    # xena:kb:batch:* key behind -- only the OPEN batch was deleted. The
+    # rebuild then re-opened tickets-0001-0500.txt and _kb_batch_load
+    # resurrected the stale 500-line batch from the PREVIOUS build: every
+    # record read as already-in-batch (is_new=False -> processed stuck at 0,
+    # audit "processed=0 files=30") and the already-full stale batch flushed
+    # the SAME file over and over -- Ahmed's "only 1 file created ... it 500".
+    # A reset must now delete EVERY batch key: the ones in the assets map,
+    # the open batch, and an orphan sweep (a crash between batch save and
+    # assets save leaves a key no other list knows about).
+    fns = set((_kb_assets() or {}).keys())
     if old.get("open_batch"):
-        redis_cmd("DEL", _KB_BATCH_KEY + old["open_batch"])
+        fns.add(old["open_batch"])
+    try:
+        cursor = "0"
+        for _ in range(50):
+            res = redis_cmd("SCAN", cursor, "MATCH", _KB_BATCH_KEY + "*", "COUNT", 300)
+            if not res or not isinstance(res, (list, tuple)) or len(res) < 2:
+                break
+            cursor, keys = str(res[0]), (res[1] or [])
+            for k in keys:
+                if isinstance(k, str) and k.startswith(_KB_BATCH_KEY):
+                    fns.add(k[len(_KB_BATCH_KEY):])
+            if cursor == "0":
+                break
+    except Exception:
+        pass
+    if fns:
+        ks = sorted(fns)
+        for i in range(0, len(ks), 100):
+            redis_cmd("DEL", *[_KB_BATCH_KEY + f for f in ks[i:i + 100]])
     _kb_state_save({"backfill_done": False, "page_token": "", "processed": 0,
                     "open_batch": "", "next_index": 1, "last_sync_ms": 0, "errors": []})
     _kb_assets_save({})

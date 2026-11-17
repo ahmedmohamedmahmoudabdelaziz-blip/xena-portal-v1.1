@@ -3984,6 +3984,10 @@ html{background:var(--bg);min-height:100%}
 
         <nav class="sidebar-nav">
             <div class="nav-item nav-item-top" id="nav-my-work" onclick="openInTab('my-work')"><span>🏠 My Work</span></div>
+            <!-- v34.1.12 (Ahmed): sidebar tab for the AI chat -- opens a FULL
+                 page tab hosting the same chat. Same 'ai' toggle-only gate as
+                 the panel (configureSidebarAndCards + __xaSyncAiVisibility). -->
+            <div class="nav-item nav-item-top" id="nav-chat" onclick="openInTab('chat')" style="display:none"><span>🤺 Audition Assistance</span></div>
             <div class="nav-group" id="navGrpAnalytics">
                 <div class="nav-group-header" onclick="toggleNavGroup('navGrpAnalytics','navBodyAnalytics')">
                     <span>
@@ -4182,6 +4186,10 @@ html{background:var(--bg);min-height:100%}
             </div>
             <div class="top-bar-right">
                 <span id="saveStatePill" class="save-state-pill" style="display:none"></span>
+                <!-- v34.1.12 (Ahmed): 🤺 chat moved from the floating FAB into
+                     the top bar, right beside the sheet icon. Starts hidden;
+                     boot()/__xaSyncAiVisibility show it for AI-allowed users. -->
+                <button type="button" class="utility-icon-btn" id="xaChatFab" title="Audition Assistance AI" aria-label="Open Audition Assistance chat" style="display:none">🤺</button>
                 <a class="utility-icon-btn" href="https://micoworld.feishu.cn/base/C9zFb52m4abhtHsX5LjcBywbnze?from=from_copylink" target="_blank" rel="noopener" title="Open Feishu Sheet" style="text-decoration:none">
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                 </a>
@@ -5714,6 +5722,12 @@ html{background:var(--bg);min-height:100%}
                 </div>
             </div>
 
+            <!-- v34.1.12 (Ahmed): full-page chat tab -- hosts the SAME
+                 #xaChatPanel node (executePageLogic moves it in/out), so the
+                 chat history, persona and voice controls are one instance
+                 wherever it is opened from. -->
+            <div id="pg-chat" style="display:none"></div>
+
             <!-- v27 (Ahmed): Query Bind Requests — same shape as Universal
                  Request Query; request number / User ID / Contact ID. Zero-cost
                  open: nothing is fetched until Search is clicked. -->
@@ -7123,6 +7137,7 @@ function changeLanguage(lang) {
 const pageTitlesMap = {
     'welcome': 'Welcome',
     'my-work': 'My Work',
+    'chat': '🤺 Audition Assistance',
     'analytics': 'Analytics Report',
     'compare': 'Compare Module',
     'exchange': 'Agency Exchange',
@@ -7154,6 +7169,7 @@ const pageTitlesMap = {
 const zhPageTitlesMap = {
     'welcome': '欢迎',
     'my-work': '我的工作',
+    'chat': '🤺 试镜助手',
     'analytics': '分析报告',
     'compare': '比较模块',
     'exchange': '代理交易所',
@@ -7184,7 +7200,7 @@ const zhPageTitlesMap = {
 
 let openTabs = ['welcome'];
 let activeTabId = 'welcome';
-const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-audition-attendance','pg-audition-exec','pg-rewards','pg-bind-queue','pg-bind-query','pg-bind-workspace'];
+const ALL_PAGES=['pg-welcome','pg-my-work','pg-compare','pg-exchange','pg-agency-target-table','pg-agency','pg-allocator','pg-admin-agents','pg-admin-requests','pg-admin-audit','pg-analytics','pg-points-records','pg-points-table','pg-query','pg-agency-list','pg-new-request','pg-audit','pg-my-requests','pg-live-tickets','pg-ticket-workspace','pg-tickets-pending','pg-admin-preview','pg-audition-status','pg-audition-schedule','pg-audition-attendance','pg-audition-exec','pg-rewards','pg-bind-queue','pg-bind-query','pg-bind-workspace','pg-chat'];
 
 function openInTab(page) {
     if (!openTabs.includes(page)) {
@@ -7476,6 +7492,16 @@ function renderTabs() {
 }
 
 function executePageLogic(page) {
+    // v34.1.12: leaving the full-page chat tab returns the chat panel to its
+    // floating home (xaChatRoot) BEFORE pg-chat is hidden -- otherwise the
+    // panel would vanish with the page and the next floating open would be
+    // a detached node inside a display:none container.
+    const xaPnlLeave = document.getElementById('xaChatPanel');
+    if (xaPnlLeave && xaPnlLeave.classList.contains('xaPageMode') && page !== 'chat') {
+        xaPnlLeave.classList.remove('xaPageMode', 'open');
+        const xaRootHome = document.getElementById('xaChatRoot');
+        if (xaRootHome) xaRootHome.appendChild(xaPnlLeave);
+    }
     ALL_PAGES.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
     closeSidebar();
 
@@ -7548,6 +7574,21 @@ function executePageLogic(page) {
     } else if(page==='query'){
         document.getElementById('pg-query').style.display='block';
         _expandNavGroup('navBodyQuery','navArrQuery');
+    } else if(page==='chat'){
+        // v34.1.12 (Ahmed): the sidebar tab opens the chat as a FULL page --
+        // the SAME #xaChatPanel node moves into pg-chat; DOM listeners move
+        // with the node, so history, persona, voice and the KB widgets all
+        // keep working, zero re-initialization.
+        document.getElementById('pg-chat').style.display='block';
+        const chatHost = document.getElementById('pg-chat');
+        const chatPnl = document.getElementById('xaChatPanel');
+        if (chatPnl && chatHost && chatPnl.parentNode !== chatHost) {
+            chatHost.appendChild(chatPnl);
+            chatPnl.classList.add('xaPageMode', 'open');
+            if (window.XAC && typeof window.XAC.greet === 'function' &&
+                !document.getElementById('xaChatMsgs').children.length) window.XAC.greet();
+            if (window.XAC && typeof window.XAC.freshness === 'function') window.XAC.freshness();
+        }
     } else if(page==='bind-queue'){
         document.getElementById('pg-bind-queue').style.display='block';
         _expandNavGroup('navBodyBind','navArrBind');
@@ -16853,6 +16894,13 @@ function configureSidebarAndCards() {
     if (navBindQuery) navBindQuery.style.display = bindAllowed ? '' : 'none';
     const grpBind = document.getElementById('navGrpBind');
     if (grpBind) grpBind.style.display = [navBindQueue, navBindQuery].some(el => el && el.style.display !== 'none') ? '' : 'none';
+
+    // v34.1.12 (Ahmed): the 🤺 chat sidebar tab follows the same toggle-only
+    // rule as the Bind group -- the OWNER (super-admin) or the 'ai' module.
+    const aiNavAllowed = (typeof isAdmin !== 'undefined' && isAdmin)
+        || (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('ai'));
+    const navChat = document.getElementById('nav-chat');
+    if (navChat) navChat.style.display = aiNavAllowed ? '' : 'none';
 
     if (isAdmin) {
         let lastAccessReqCount = -1; // -1 means it hasn't checked yet
@@ -30771,7 +30819,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.11 chat-poll-path 2026-11-17';
+window.SAM19_BUILD='v34.1.12 kb-reset-batches chat-tabs 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32364,13 +32412,12 @@ xa4SettingsEnsure(false);
      webkitSpeechRecognition (ar-SA/ur-PK/en-US/zh-CN), speaker via speechSynthesis.
      RTL auto-detected per message for Arabic/Urdu. -->
 <style id="xaChatStyle">
-#xaChatFab{position:fixed;right:18px;bottom:18px;z-index:99999;width:56px;height:56px;border-radius:50%;
-  border:none;cursor:pointer;font-size:26px;background:linear-gradient(135deg,#6d28d9,#2563eb);color:#fff;
-  box-shadow:0 8px 24px rgba(37,99,235,.45);display:flex;align-items:center;justify-content:center;
-  transition:transform .15s ease,box-shadow .15s ease}
-#xaChatFab:hover{transform:scale(1.08);box-shadow:0 10px 28px rgba(109,40,217,.55)}
-#xaChatPanel{position:fixed;right:18px;bottom:84px;z-index:99999;width:min(400px,calc(100vw - 24px));
-  height:min(620px,calc(100vh - 110px));background:#0f172a;border:1px solid rgba(148,163,184,.25);
+/* v34.1.12 (Ahmed): the 🤺 button moved INTO the top bar, right beside the
+   sheet icon -- it is a plain .utility-icon-btn now, no floating FAB. */
+#xaChatFab{font-size:1.15rem}
+#xaChatFab:hover{color:var(--accent-cyan,#38bdf8)}
+#xaChatPanel{position:fixed;left:18px;bottom:18px;z-index:99999;width:min(400px,calc(100vw - 24px));
+  height:min(640px,calc(100vh - 36px));background:#0f172a;border:1px solid rgba(148,163,184,.25);
   border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;
   font-family:inherit}
 #xaChatPanel.open{display:flex}
@@ -32409,6 +32456,12 @@ xa4SettingsEnsure(false);
 .xaKbBtn:hover:not(:disabled){background:rgba(124,58,237,.35)}
 .xaKbBtn:disabled{opacity:.75;cursor:default}
 #xaChatPanel.xaWide{width:min(720px,calc(100vw - 24px))}
+/* v34.1.12: the full-page chat tab (#pg-chat) hosts the SAME panel node --
+   .xaPageMode turns the fixed floating panel into a filled page card. */
+#pg-chat{height:calc(100vh - 150px);min-height:440px}
+#xaChatPanel.xaPageMode{position:relative;left:auto;bottom:auto;width:100%;height:100%;
+  max-width:1000px;margin:0 auto;border-radius:14px;box-shadow:none}
+#xaChatPanel.xaPageMode.xaWide{max-width:100%}
 .xaPara{margin:0 0 8px}.xaPara:last-child{margin-bottom:0}
 .xaEnt{display:inline-block;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.4);color:#7dd3fc;
   border-radius:4px;padding:0 5px;font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer}
@@ -32423,7 +32476,9 @@ xa4SettingsEnsure(false);
 .xaChip:hover{border-color:#38bdf8;color:#e2e8f0}
 </style>
 <div id="xaChatRoot" style="display:none">
-  <button id="xaChatFab" title="Audition Assistance AI" aria-label="Open Audition Assistance chat">🤺</button>
+  <!-- v34.1.12: the 🤺 trigger lives in the top bar now; this root hosts the
+       floating panel and (when the chat tab is open) hands the panel node to
+       #pg-chat and takes it back when the tab closes. -->
   <div id="xaChatPanel" role="dialog" aria-label="Audition Assistance">
     <div class="xaChatHead">
       <span class="xaChatTitle">🤺 Audition Assistance</span>
@@ -32902,12 +32957,18 @@ function bind(){
   if(p.persona) personaSel.value = p.persona;
   if(p.lang) langSel.value = p.lang;
   fab.onclick = function(){
+    if(panel.classList.contains('xaPageMode')){ inputEl.focus(); return; }   // v34.1.12: the full tab already hosts it
     panel.classList.toggle('open');
     if(panel.classList.contains('open') && !msgsEl.children.length){ greet(); }
     if(panel.classList.contains('open')){ xaFreshness(); }
     if(panel.classList.contains('open')){ inputEl.focus(); }
   };
-  document.getElementById('xaChatClose').onclick = function(){ panel.classList.remove('open'); };
+  document.getElementById('xaChatClose').onclick = function(){
+    if(panel.classList.contains('xaPageMode')){   // v34.1.12: ✕ on the full tab closes the TAB itself
+      if(typeof closeTab === 'function'){ closeTab('chat'); return; }
+    }
+    panel.classList.remove('open');
+  };
   document.getElementById('xaChatNew').onclick = resetChat;
   personaSel.onchange = function(){ savePrefs(); resetChat(); };
   langSel.onchange = savePrefs;
@@ -32929,6 +32990,8 @@ function bind(){
   inputEl.addEventListener('keydown', function(ev){
     if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); send(); }
   });
+  XAC.greet = greet;          // v34.1.12: the full-page chat tab calls these
+  XAC.freshness = xaFreshness;
 }
 function loggedIn(){
   try{
@@ -32952,10 +33015,19 @@ function aiAllowed(){
 function boot(){
   bind();
   var tries = 0;
+  function syncVis(){
+    var ok = loggedIn() && aiAllowed();
+    var r = document.getElementById('xaChatRoot');
+    if (r) r.style.display = ok ? 'block' : 'none';
+    var f = document.getElementById('xaChatFab');   // v34.1.12: the 🤺 button lives in the top bar now
+    if (f) f.style.display = ok ? '' : 'none';
+    var n = document.getElementById('nav-chat');     // ...and the sidebar tab follows the same gate
+    if (n) n.style.display = ok ? '' : 'none';
+  }
   var t = setInterval(function(){
     tries++;
     if(loggedIn() && aiAllowed()){
-      document.getElementById('xaChatRoot').style.display = 'block';
+      syncVis();
       clearInterval(t);
     }else if(tries > 200){ clearInterval(t); }   // stop after ~10 min
   }, 3000);
@@ -32963,9 +33035,7 @@ function boot(){
   // follows the PREVIEWED member's 'ai' toggle (preview shows what the
   // target sees -- same rule as the Bind tab).
   window.__xaSyncAiVisibility = function(){
-    try{
-      document.getElementById('xaChatRoot').style.display = (loggedIn() && aiAllowed()) ? 'block' : 'none';
-    }catch(e){}
+    try{ syncVis(); }catch(e){}
   };
 }
 if(document.readyState === 'loading'){
