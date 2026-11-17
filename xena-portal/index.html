@@ -5005,6 +5005,16 @@ html{background:var(--bg);min-height:100%}
                             </div>
                             <label class="switch"><input type="checkbox" id="mod_bind"><span class="slider"></span></label>
                         </div>
+                        <!-- v34.1.9 (Ahmed): 🤺 AI Assistant — toggle-ONLY gate, same
+                             rule as Bind. Off = hidden even for admins; the owner
+                             always keeps it. -->
+                        <div class="admin-toggle">
+                            <div>
+                                <h4>🤺 AI Assistant</h4>
+                                <span style="font-size:.8rem;color:var(--text-muted)">Shows the Audition Assistance AI chat panel for this member. Off = hidden even for admins; the owner always keeps it.</span>
+                            </div>
+                            <label class="switch"><input type="checkbox" id="mod_ai"><span class="slider"></span></label>
+                        </div>
                         </div>
                         <!-- v33.1 (Ahmed): ✨ Special Features — ONE master toggle per feature
                              group, same switch-card style as 🎭 Audition Access. ON grants the
@@ -11306,6 +11316,10 @@ function applyConfigToForm(modulesStr, acmsRaw, regRaw) {
     const bindCb=document.getElementById('mod_bind');
     if (bindCb) bindCb.checked = m.split(',').map(s=>s.trim()).includes('bind');
 
+    // v34.1.9: AI Assistant is toggle-ONLY too -- NO admin auto-check, same as bind.
+    const aiCb=document.getElementById('mod_ai');
+    if (aiCb) aiCb.checked = m.split(',').map(s=>s.trim()).includes('ai');
+
     document.getElementById('modAdmin').checked=m.includes('admin');
 
     pTargetAcm.setValues(parseGranular(acmsRaw,'target'));
@@ -13295,7 +13309,7 @@ function resetAgentForm() {
     document.getElementById('modAdmin').checked = false;
     // Phase 10.13.1/10.14: these three live in admin-toggle switches now (not
     // inside .sub-opt-lbl), so the generic clear below doesn't reach them.
-    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+    ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind','mod_ai'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
     document.querySelectorAll('#pg-admin-agents .sub-opt-lbl input[type=checkbox]').forEach(cb => cb.checked = false);
     initPills();
     sfReset(); // v33.1
@@ -13358,6 +13372,7 @@ async function confirmSaveRole() {
     if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
     if (document.getElementById('mod_comments')?.checked) modules.push('comments'); // Phase 13
     if (document.getElementById('mod_bind')?.checked) modules.push('bind'); // v27
+    if (document.getElementById('mod_ai')?.checked) modules.push('ai'); // v34.1.9 AI toggle
     // Roles never carry "admin" themselves -- admin is a person-level grant, not a
     // reusable role preset.
 
@@ -13473,6 +13488,7 @@ async function addAgent() {
     if (document.getElementById('mod_audition_status')?.checked) modules.push('audition_status'); // Phase 11
     if (document.getElementById('mod_comments')?.checked) modules.push('comments'); // Phase 13
     if (document.getElementById('mod_bind')?.checked) modules.push('bind'); // v27
+    if (document.getElementById('mod_ai')?.checked) modules.push('ai'); // v34.1.9 AI toggle
     
     document.getElementById('adminBtnSubmit').innerText='Saving...';
 
@@ -13515,7 +13531,7 @@ async function addAgent() {
         ToastManager.show(identities.length > 1 ? `${successCount} agents saved successfully.` : 'Agent saved successfully.', 'success');
         document.getElementById('newAgentEmail').value='';
         document.getElementById('modAdmin').checked=false;
-        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+        ['mod_audition_access','mod_preview_access','mod_export_data','mod_audition_status','mod_comments','mod_bind','mod_ai'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
         initPills();
         sfReset(); // v33.1: clear the master toggles with the rest of the form
     }
@@ -15976,6 +15992,7 @@ async function pvStart(email) {
         // Reset to a single Welcome tab; the admin's tabs return on exit.
         openTabs = ['welcome'];
         openInTab('welcome');
+        if (typeof window.__xaSyncAiVisibility === 'function') window.__xaSyncAiVisibility(); // v34.1.9: AI panel follows the previewed member's 'ai' toggle
         ToastManager.show(`👁 Previewing as ${email} — view only.`, 'success', 5000);
     } catch (e) {
         ToastManager.show('Preview failed: ' + e.message, 'error');
@@ -15997,6 +16014,7 @@ function pvExit() {
         previewSaved = null;
     }
     pvHideBanner();
+    if (typeof window.__xaSyncAiVisibility === 'function') window.__xaSyncAiVisibility(); // v34.1.9: restore the admin's own AI panel visibility
     enforceLocks(); // Phase 10.26: rebuild the dropdowns for the admin's own scope
     configureSidebarAndCards();
     // Phase 10.14: give the admin his own tabs back (validated against the
@@ -30753,7 +30771,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.8 kb-owner-skip 2026-11-17';
+window.SAM19_BUILD='v34.1.9 reset-first ai-toggle 2026-11-17';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32558,6 +32576,15 @@ function xaFreshness(){
 }
 var kbRunning = false;
 var kbStatusText = '';
+var KB_TAB_ID = 'kb' + Math.random().toString(36).slice(2, 9) + String(Date.now());
+function kbBeatOther(){
+  try{
+    var h = JSON.parse(localStorage.getItem('xenaKbBuildHeartbeat') || 'null');
+    return !!(h && h.tab !== KB_TAB_ID && (Date.now() - (h.ts || 0)) < 30000);
+  }catch(e){ return false; }
+}
+function kbBeat(){ try{ localStorage.setItem('xenaKbBuildHeartbeat', JSON.stringify({tab:KB_TAB_ID, ts:Date.now()})); }catch(e){} }
+function kbBeatClear(){ try{ localStorage.removeItem('xenaKbBuildHeartbeat'); }catch(e){} }
 function xaIsAdmin(){
   // isAdmin is a top-level `let` in the main app script: a shared global
   // LEXICAL binding (bare identifier), NOT a window property -- same
@@ -32574,17 +32601,29 @@ function xaKbBuild(btn){
   // AUTO-RESUMES instead of dying on "Build failed"; the server's last_error
   // is surfaced on the button (title + text) so a real failure is readable.
   if(kbRunning) return;
+  /* v34.1.9: cross-tab single-flight -- kbRunning guards only THIS tab; a
+     second window used to stack a second loop into the route's rate limit
+     (the 429 wall Ahmed sat on for ~5 min). A 30s localStorage heartbeat
+     says another tab is mid-build. */
+  if(kbBeatOther()){
+    btn.textContent = '⚙ Building in another tab…';
+    kbStatusText = btn.textContent;
+    btn.disabled = false;
+    return;
+  }
   kbRunning = true;
   btn.disabled = true;
-  var iters = 0, lastN = -1, stall = 0, rateHits = 0;
+  var iters = 0, lastN = -1, stall = 0, rateHits = 0, lockHits = 0;
   var finish = function(txt, retryable){
     btn.textContent = txt;
     kbStatusText = txt;
     kbRunning = false;
     btn.disabled = !retryable;
+    kbBeatClear();
   };
   var tick = function(){
     iters++;
+    kbBeat();
     fetch('/api/knowledge/backfill?pages=8&max_seconds=45',   /* v34.1.7: batched writes make one call cheap -- 8 pages (~4000 tickets) per click */ {
       method:'POST',
       headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
@@ -32596,6 +32635,17 @@ function xaKbBuild(btn){
         btn.textContent = '⏳ Server busy — auto-retry…';
         kbStatusText = btn.textContent;
         setTimeout(tick, 40000);
+        return null;
+      }
+      if(r.status === 409){
+        /* v34.1.9: the server's build lock -- a build is already running
+           (another tab, or a stale lock from a killed call; it self-expires
+           in ~3 min). Wait and re-check instead of dying on 'Build failed'. */
+        lockHits++;
+        if(lockHits >= 4){ finish('⏳ Another build is running — tap to retry', true); return null; }
+        btn.textContent = '⏳ Another build is running — waiting…';
+        kbStatusText = btn.textContent;
+        setTimeout(tick, 60000);
         return null;
       }
       if(!r.ok){ finish('⚙ Build failed — tap to retry', true); return null; }
@@ -32624,22 +32674,38 @@ function xaKbBuild(btn){
 function xaKbReset(btn, buildBtn){
   // v34.1.4: clear the poisoned backfill state (polluted batch + progress
   // from the duplicate-asset bug), then start a clean rebuild.
+  // v34.1.9: POSTs the dedicated /api/knowledge/reset route -- its own rate
+  // bucket and NO build lock, so a running build loop can never starve or
+  // block the reset again ('\u21BA Reset failed' for minutes).
   if(kbRunning) return;
+  if(kbBeatOther()){
+    /* v34.1.9: another tab is mid-build -- resetting NOW would corrupt that
+       live build (the exact duplicate-content poison). Let it finish. */
+    btn.textContent = '\u21BA Building in another tab — reset skipped';
+    btn.disabled = false;
+    setTimeout(function(){ btn.textContent = '\u21BA Reset'; }, 6000);
+    return;
+  }
   kbRunning = true;
   btn.disabled = true;
   btn.textContent = '\u21BA Resetting\u2026';
-  fetch('/api/knowledge/backfill?reset=1', {
+  fetch('/api/knowledge/reset', {
     method:'POST',
     headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}
   }).then(function(r){
-    if(!r.ok){ btn.textContent = '\u21BA Reset failed'; btn.disabled = false; kbRunning = false; return null; }
+    if(!r.ok){
+      btn.textContent = (r.status === 429 || r.status === 409) ? '\u21BA Busy — try again in a minute' : '\u21BA Reset failed';
+      btn.disabled = false;
+      kbRunning = false;
+      return null;
+    }
     return r.json();
   }).then(function(d){
     if(!d) return;
     kbRunning = false;
     btn.textContent = '\u21BA Reset';
     btn.disabled = false;
-    if(buildBtn){ xaKbBuild(buildBtn); }
+    if(buildBtn && !kbBeatOther()){ xaKbBuild(buildBtn); }
   }).catch(function(){
     btn.textContent = '\u21BA Reset failed';
     btn.disabled = false;
@@ -32871,16 +32937,36 @@ function loggedIn(){
     return em.indexOf('@') > 0 && em !== 'unknown@example.com';
   }catch(e){ return false; }
 }
+function aiAllowed(){
+  // v34.1.9 (Ahmed): 'for ai make it by toggle access and not appare even
+  // for admins unless i give it to them, similar to bind access' -- the
+  // panel is TOGGLE-ONLY, same rule as the Bind tab: the OWNER (super-admin,
+  // isAdmin) always keeps it; everyone else, EVEN ADMINS, needs the 'ai'
+  // module on their Manage Agents row. isAdmin here is the same super-admin
+  // flag the Bind gate uses, NOT the 'admin' module.
+  try{
+    return (typeof isAdmin !== 'undefined' && !!isAdmin)
+        || (typeof userModules !== 'undefined' && Array.isArray(userModules) && userModules.includes('ai'));
+  }catch(e){ return false; }
+}
 function boot(){
   bind();
   var tries = 0;
   var t = setInterval(function(){
     tries++;
-    if(loggedIn()){
+    if(loggedIn() && aiAllowed()){
       document.getElementById('xaChatRoot').style.display = 'block';
       clearInterval(t);
     }else if(tries > 200){ clearInterval(t); }   // stop after ~10 min
   }, 3000);
+  // v34.1.9: preview-mode enter/exit calls this so the panel instantly
+  // follows the PREVIEWED member's 'ai' toggle (preview shows what the
+  // target sees -- same rule as the Bind tab).
+  window.__xaSyncAiVisibility = function(){
+    try{
+      document.getElementById('xaChatRoot').style.display = (loggedIn() && aiAllowed()) ? 'block' : 'none';
+    }catch(e){}
+  };
 }
 if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', boot);

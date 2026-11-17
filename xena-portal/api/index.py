@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.8 kb-owner-skip 2026-11-17"
+XENA_BUILD = "v34.1.9 reset-first ai-toggle 2026-11-17"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -2456,16 +2456,18 @@ def _bind_grant_from_access_row(email_clean, name_clean):
             db_person = extract_field_text(fields.get("Person", "")).lower().strip()
             if (email_clean and email_clean == db_email) or (name_clean and name_clean == db_person):
                 modules = [m.strip().lower() for m in extract_field_text(get_field_local(fields, "Modules")).split(",") if m.strip()]
-                return "bind" in modules
+                return module in modules
     except Exception:
         pass
     return False
 
-def has_bind_access(email, name):
-    """True when the member's Access-row Modules carry the 'bind' key -- OR the
-    caller is the OWNER (hardcoded super-admin), v27.1. Fail-closed on any
-    error. The member on/off toggle still wins (a disabled member keeps no
-    access). MOCK_MODE grants it so local dev shows the tab."""
+def has_bind_access(email, name, module="bind"):
+    """True when the member's Access-row Modules carry the `module` key
+    ('bind' by default) -- OR the caller is the OWNER (hardcoded super-admin),
+    v27.1. Fail-closed on any error. The member on/off toggle still wins (a
+    disabled member keeps no access). MOCK_MODE grants it so local dev shows
+    the tab. v34.1.9: the `module` param generalizes the same toggle-only
+    semantics -- has_ai_access reuses this with module='ai'."""
     try:
         if MOCK_MODE:
             return True
@@ -2476,7 +2478,7 @@ def has_bind_access(email, name):
         if not _access_toggle_allows(email_clean) or not _access_toggle_allows(name_clean):
             return False
         perms = get_user_permissions(email, name)   # preview-aware, cached
-        if "bind" in (perms.get("modules") or []):
+        if module in (perms.get("modules") or []):
             return True
         # v27.1 (Ahmed 2026-11-13): "i mean the others, i am the owner" -- the
         # OWNER (hardcoded super-admin in ADMIN_USERS) always sees Bind without
@@ -2500,6 +2502,16 @@ def has_bind_access(email, name):
         return any(a == eff_name for a in ADMIN_USERS)
     except Exception:
         return False
+
+def has_ai_access(email, name):
+    """v34.1.9 (Ahmed, 2026-11-17): 'for ai make it by toggle access and not
+    appare even for admins unless i give it to them, similar to bind access'
+    -- the AI assistant panel is TOGGLE-ONLY, exactly like Bind: the member's
+    Access-row Modules must carry the 'ai' key (Manage Agents switch). NO
+    admin auto-grant. The OWNER (hardcoded super-admin) keeps it always, per
+    the v27.1 precedent. Fail-closed on any error; MOCK_MODE grants it so
+    local dev shows the panel."""
+    return has_bind_access(email, name, module="ai")
 
 def generate_executive_insights(stats, cmp_stats=None):
     insights = []
@@ -17209,6 +17221,40 @@ def _kb_flush(st, fn, batch):
     st["open_batch"] = ""
     return flushed, None
 
+def _kb_reset_state(admin_name):
+    """v34.1.9: clear the WHOLE KB build state -- state + assets map + open
+    batch + owner map -- and force-release the build lock. Reset is the
+    RECOVERY tool, so it must work while a build is wedged: it now runs
+    BEFORE the lock is acquired and releases any stale lock (Ahmed's rec2:
+    the panel sat on busy for minutes and every '↺ Reset' came back failed,
+    because the lock a killed build left behind blocked the reset itself)."""
+    old = _kb_state()
+    if old.get("open_batch"):
+        redis_cmd("DEL", _KB_BATCH_KEY + old["open_batch"])
+    _kb_state_save({"backfill_done": False, "page_token": "", "processed": 0,
+                    "open_batch": "", "next_index": 1, "last_sync_ms": 0, "errors": []})
+    _kb_assets_save({})
+    redis_cmd("DEL", _KB_OWNER_KEY)   # v34.1.8: the owner map must go too -- the owner-skip would otherwise skip EVERY ticket on the rebuild
+    redis_cmd("DEL", _KB_BUILD_LOCK)  # v34.1.9: force-release a wedged/stale lock -- reset outranks the lock
+    try:
+        audit.log(admin_name, "KNOWLEDGE_BACKFILL_RESET", "state cleared", severity="Warning")
+    except Exception:
+        pass
+    return {"reset": True,
+            "note": "backfill state cleared - re-invoke (without reset) to rebuild from ticket #1"}
+
+@app.route('/api/knowledge/reset', methods=['POST'])
+@rate_limit(6, 300)
+def knowledge_reset():
+    """v34.1.9: dedicated reset endpoint for the widget's '↺ Reset' -- its OWN
+    rate bucket (the shared backfill limiter let a running build loop starve
+    the reset into 'Reset failed') and no build lock (reset force-releases
+    it). Admin-only, same audit trail."""
+    admin_name, admin_email, err = _require_admin_identity()
+    if err:
+        return err
+    return jsonify(_kb_reset_state(admin_name))
+
 @app.route('/api/knowledge/backfill', methods=['POST'])
 @rate_limit(6, 60)
 def knowledge_backfill():
@@ -17218,6 +17264,14 @@ def knowledge_backfill():
     admin_name, admin_email, err = _require_admin_identity()
     if err:
         return err
+    # v34.1.9: reset runs BEFORE the build lock -- the reset is the recovery
+    # tool, so a wedged/stale lock (a hard-killed build keeps it up to 180s)
+    # must never block the very call that clears it. The helper also
+    # force-releases the lock.
+    if request.args.get("reset") == "1":
+        # v34.1.4: clear a poisoned build state (polluted batch/progress from
+        # the pre-fix envelope bug) so the next build starts from ticket #1.
+        return jsonify(_kb_reset_state(admin_name))
     # v34.1.8: ONE build at a time -- two overlapping calls (a second tab, or
     # the console snippet plus the button) read the same state and interleave
     # batches, duplicating tickets across files. The lock expires on its own
@@ -17229,24 +17283,6 @@ def knowledge_backfill():
             return jsonify({"error": "a KB build is already running - wait ~3 minutes and retry",
                             "locked": True}), 409
         lock_held = (res == "OK")
-    if request.args.get("reset") == "1":
-        # v34.1.4: clear a poisoned build state (polluted batch/progress from
-        # the pre-fix envelope bug) so the next build starts from ticket #1.
-        old = _kb_state()
-        if old.get("open_batch"):
-            redis_cmd("DEL", _KB_BATCH_KEY + old["open_batch"])
-        _kb_state_save({"backfill_done": False, "page_token": "", "processed": 0,
-                        "open_batch": "", "next_index": 1, "last_sync_ms": 0, "errors": []})
-        _kb_assets_save({})
-        redis_cmd("DEL", _KB_OWNER_KEY)   # v34.1.8: the owner map must go too -- the owner-skip would otherwise skip EVERY ticket on the rebuild
-        try:
-            audit.log(admin_name, "KNOWLEDGE_BACKFILL_RESET", "state cleared", severity="Warning")
-        except Exception:
-            pass
-        if lock_held:
-            redis_cmd("DEL", _KB_BUILD_LOCK)
-        return jsonify({"reset": True,
-                        "note": "backfill state cleared - re-invoke (without reset) to rebuild from ticket #1"})
     if not AILY_KB_API_KEY:
         if lock_held:
             redis_cmd("DEL", _KB_BUILD_LOCK)
@@ -17503,8 +17539,14 @@ def knowledge_freshness():
     Any signed-in staff member (NOT admin-only); Redis reads only, no Feishu
     or KB API calls, safe to poll every few minutes from the browser."""
     email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    name  = sanitize_text(request.headers.get("X-User-Name", ""), 120)
     if not email or "@" not in email:
         return jsonify({"error": "Sign in required."}), 401
+    if not has_ai_access(email, name):
+        # v34.1.9 (Ahmed): AI is toggle-ONLY access, like Bind -- hidden even
+        # for admins without the 'ai' module on their Access row (the owner
+        # always keeps it).
+        return jsonify({"error": "AI assistant is not enabled for this account."}), 403
     st = _kb_state()
     return jsonify({"backfill_done": st["backfill_done"],
                     "last_sync_ms": st["last_sync_ms"],
@@ -17681,6 +17723,11 @@ def aily_chat():
     email = email or sanitize_text(str(body.get("email", "") or ""), 200)
     if not email or "@" not in email:
         return jsonify({"error": "Sign in to use the assistant."}), 401
+    if not has_ai_access(email, name):
+        # v34.1.9 (Ahmed): AI is toggle-ONLY access, like Bind -- hidden even
+        # for admins without the 'ai' module on their Access row (the owner
+        # always keeps it).
+        return jsonify({"error": "AI assistant is not enabled for this account."}), 403
     message = str(body.get("message", "") or "").strip()[:4000]
     if not message:
         return jsonify({"error": "Empty message"}), 400
@@ -17757,8 +17804,14 @@ def aily_chat_result():
     the 48s mark; the widget polls this route every ~4s. Each call awaits at
     most 8s, far inside the Vercel Hobby 60s function cap."""
     email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    name  = sanitize_text(request.headers.get("X-User-Name", ""), 120)
     if not email or "@" not in email:
         return jsonify({"error": "Sign in to use the assistant."}), 401
+    if not has_ai_access(email, name):
+        # v34.1.9 (Ahmed): AI is toggle-ONLY access, like Bind -- hidden even
+        # for admins without the 'ai' module on their Access row (the owner
+        # always keeps it).
+        return jsonify({"error": "AI assistant is not enabled for this account."}), 403
     acid = sanitize_text(request.args.get("agent_chat_id", ""), 120)
     sid  = sanitize_text(request.args.get("session_id", ""), 120)
     if not acid:
