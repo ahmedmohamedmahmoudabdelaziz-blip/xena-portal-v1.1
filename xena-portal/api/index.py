@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.28 phase0-safety 2026-11-19"
+XENA_BUILD = "v34.1.29 phase0-frontend-fastpath 2026-11-19"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -18163,6 +18163,60 @@ def _chat_acid_owner(acid):
     except Exception:
         return None
 
+# --- v34.1.29 (Bulletproof Upgrade Plan, Phase 0 front-end + budget) ---
+def _chat_fast_path(text, personality):
+    """Answer a PLAIN ticket/agency lookup straight from the live Grand Table /
+    Agency Points tables -- no LLM call, no Vercel AI wait, instant. Only fires
+    when the message is exactly one bare ID with no other question words, so
+    anything conversational still goes to the model. None -> needs the LLM."""
+    t = str(text or "").strip().translate(AR_DIGITS)
+    kw = r"(?:agency|balance|points|الرصيد|بيلانس|وكالة|ایجنسی|بیلنس)"
+    m = re.match(r"^(?:ticket\s*)?#?\s*(\d{4,6})\s*\??$", t, re.I)
+    want = "ticket"
+    if not m:
+        # keyword + id, optional keyword again after the id (any order)
+        m = re.match(r"^(?:" + kw + r")?\s*#?\s*(\d{4,6})\s*(?:" + kw + r")?\s*\??$", t, re.I)
+        want = "agency" if (m and re.search(kw, t, re.I)) else None
+        if m and want is None:
+            m = None   # bare number already handled above; a number here had no keyword
+    if not m:
+        return None
+    num = m.group(1)
+    try:
+        tat = _aily_tenant_token()
+    except Exception:
+        tat = None
+    if not tat:
+        return None
+    try:
+        if want == "agency":
+            lines = _chat_live_points_lines(tat, [num])
+            if lines:
+                return "[Agency %s -- live]\n" % num + "\n".join(lines[:3])
+        else:
+            lines = _chat_live_ticket_lines(tat, [num])
+            if lines:
+                return "[Ticket #%s -- live]\n" % num + "\n".join(lines[:3])
+        return None   # no live hit -> let the LLM answer from the KB
+    except Exception:
+        return None
+
+def _chat_log_feedback(email, vote, excerpt, personality):
+    """Thumbs feedback -> Redis list + per-day counters."""
+    if not REDIS_ENABLED:
+        return
+    try:
+        day = datetime.now(timezone.utc).strftime("%Y%m%d")
+        pipe = [("LPUSH", "xena:chat:feedback", json.dumps({
+                    "t": int(time.time()), "email": email.strip().lower(),
+                    "vote": vote, "persona": personality,
+                    "excerpt": excerpt[:300]})),
+                ("LTRIM", "xena:chat:feedback", 0, 999),
+                ("HINCRBY", "xena:chat:feedback:stats", day + ":" + vote, 1)]
+        redis_pipeline(*pipe)
+    except Exception:
+        pass
+
 def _sse_collect_text(obj, out):
     """Recursively collect human-text candidates from one SSE event payload.
     Tolerant by design: handles delta-style {"text": ...} chunks AND final
@@ -18188,7 +18242,7 @@ def _aily_chat_stream(tat, message, session_id):
         body["session_id"] = session_id
     r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
                                           "Content-Type": "application/json"},
-                            json=body, stream=True, timeout=(10, 50))   # v34.1.17: 100s read always died at Vercel's 60s kill -> 504; 50s lets a slow answer finish inside the cap
+                            json=body, stream=True, timeout=(10, 35))   # v34.1.29: 50s -> 35s read window -- a slow answer now hands off to the widget's 202 poll instead of holding a Hobby function open (frees Active CPU)
     if r.status_code != 200:
         raise RuntimeError("stream status=%s body=%s" % (r.status_code, r.text[:300]))
     candidates, sid, acid = [], session_id or "", ""
@@ -18322,6 +18376,16 @@ def aily_chat():
     if not message:
         return jsonify({"error": "Empty message"}), 400
     personality = str(body.get("personality", "") or "").strip().lower()
+    if not MOCK_MODE:
+        # v34.1.29: plain ticket/agency lookups never reach the LLM --
+        # answered live from the tables, instantly and for free.
+        fast = None
+        try:
+            fast = _chat_fast_path(message, personality)
+        except Exception:
+            fast = None
+        if fast:
+            return jsonify({"reply": fast, "session_id": "", "via": "fast"})
     new_session = bool(body.get("new_session"))
     skey = _chat_session_key(email)
     stored = redis_get_json(skey) or {}
@@ -18361,7 +18425,7 @@ def aily_chat():
         # for 10 min and fall back to stream mode (60s cap applies there).
         try:
             acid, session_id = _aily_chat_create(tat, message, session_id)
-            reply = _aily_chat_await(tat, acid, 40)   # v34.1.17: was 48s -- too close to Vercel's 60s kill; 40s leaves headroom, longer runs hand off to the widget's 202 poll
+            reply = _aily_chat_await(tat, acid, 30)   # v34.1.29: 40s -> 30s -- shorter server wait, the widget polls the rest (frees Active CPU) -- too close to Vercel's 60s kill; 40s leaves headroom, longer runs hand off to the widget's 202 poll
             if reply is None:
                 _chat_own_acid(email, acid)   # v34.1.28: bind the pending chat to its owner
                 if session_id:
@@ -18399,6 +18463,26 @@ def aily_chat():
         except Exception:
             pass
     return jsonify({"reply": reply, "session_id": session_id, "via": via})
+
+
+@app.route('/api/chat/feedback', methods=['POST'])
+@rate_limit(30, 60)
+def aily_chat_feedback():
+    """Thumbs up/down on an assistant answer."""
+    email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    name  = sanitize_text(request.headers.get("X-User-Name", ""), 120)
+    body  = request.get_json(silent=True) or {}
+    if not email or "@" not in email:
+        return jsonify({"error": "Sign in required."}), 401
+    if not has_ai_access(email, name):
+        return jsonify({"error": "AI assistant is not enabled for this account."}), 403
+    vote = str(body.get("vote", "") or "").strip().lower()
+    if vote not in ("up", "down"):
+        return jsonify({"error": "vote must be up or down"}), 400
+    excerpt = str(body.get("excerpt", "") or "")
+    personality = str(body.get("personality", "") or "").strip().lower()
+    _chat_log_feedback(email, vote, excerpt, personality)
+    return jsonify({"ok": True})
 
 
 @app.route('/api/chat/result', methods=['GET'])

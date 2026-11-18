@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.28 phase0-safety 2026-11-19';
+window.SAM19_BUILD='v34.1.29 phase0-frontend-fastpath 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32523,6 +32523,9 @@ xa4SettingsEnsure(false);
 .xaEnt{display:inline-block;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.4);color:#38bdf8;
   border-radius:4px;padding:0 5px;font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer}
 .xaEnt:hover{background:rgba(56,189,248,.3)}
+        .xaVote{background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:.78rem;padding:2px 8px;border-radius:999px;cursor:pointer;margin-left:6px;font-family:inherit;transition:transform .12s ease, opacity .2s;}
+        .xaVote:hover{transform:scale(1.12);color:var(--text);}
+        .xaVote:disabled{cursor:default;}
 .xaMsg.bot .xaCopyBtn{margin-top:6px;margin-left:6px;background:transparent;border:1px solid var(--xa-border);color:var(--xa-muted);
   border-radius:8px;font-size:11px;padding:2px 8px;cursor:pointer}
 .xaMsg.bot .xaCopyBtn:hover{color:var(--xa-text);border-color:var(--border-hover)}
@@ -32611,10 +32614,14 @@ function xaChipify(h){
   return h;
 }
 function renderBot(text){
-  return String(text).split(/\n{2,}/).map(function(p){
+  var out = String(text).split(/\n{2,}/).map(function(p){
     var dir = RTL_RE.test(p.slice(0,60)) ? 'rtl' : 'ltr';
     return '<div class="xaPara" dir="'+dir+'">' + xaChipify(mdLite(p)) + '</div>';
   }).join('');
+  // v34.1.29 (plan sec.5): DOMPurify as a final pass -- mdLite already escapes
+  // everything, this is defense-in-depth so a crafted KB line can never inject HTML.
+  if(window.DOMPurify && DOMPurify.sanitize){ return DOMPurify.sanitize(out, {ADD_ATTR:['dir','data-k','data-id','title']}); }
+  return out;
 }
 function xaRoute(k, id){
   try{
@@ -32858,9 +32865,29 @@ function addMsg(text, who, isErr){
     var cpBtn = document.createElement('button');
     cpBtn.className = 'xaCopyBtn'; cpBtn.type = 'button'; cpBtn.textContent = '\u{1F4CB} Copy';
     cpBtn.onclick = function(){ xaCopy(text, cpBtn); };
+    var up = document.createElement('button');
+    up.className = 'xaVote'; up.type = 'button'; up.textContent = '\u{1F44D}';
+    up.title = 'Good answer';
+    var dn = document.createElement('button');
+    dn.className = 'xaVote'; dn.type = 'button'; dn.textContent = '\u{1F44E}';
+    dn.title = 'Bad answer';
+    var sendVote = function(v, btn, other){
+      try{
+        btn.disabled = true; other.disabled = true;
+        btn.style.opacity = '1'; other.style.opacity = '.4';
+        fetch('/api/chat/feedback', {method:'POST',
+          headers:{'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+          body: JSON.stringify({vote:v, excerpt:String(text).slice(0,300), personality:(personaSel?personaSel.value:'')})
+        }).catch(function(){});
+      }catch(e){}
+    };
+    up.onclick = function(){ sendVote('up', up, dn); };
+    dn.onclick = function(){ sendVote('down', dn, up); };
     d.appendChild(document.createElement('br'));
     d.appendChild(sp);
     d.appendChild(cpBtn);
+    d.appendChild(up);
+    d.appendChild(dn);
     renderChips();
   }else{
     d.textContent = text;
@@ -33015,7 +33042,7 @@ async function send(){
           return;
         }
         polls++;
-        await new Promise(function(r2){ setTimeout(r2, 4000); });
+        await new Promise(function(r2){ setTimeout(r2, 6000); });   // v34.1.29: 4s -> 6s poll gap -- fewer function invocations per long answer (frees Active CPU)
         if(polls === 8){ note.textContent = 'Still working on it\u2026'; }
         if(polls === 20){ note.textContent = 'Almost there\u2026'; }
         var rr = null, rd = {};
@@ -33158,5 +33185,6 @@ if(document.readyState === 'loading'){
 }
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
 </body>
 </html>
