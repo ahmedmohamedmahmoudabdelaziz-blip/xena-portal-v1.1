@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.29 phase0-frontend-fastpath 2026-11-19';
+window.SAM19_BUILD='v34.2.0 phase1-accuracy 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32620,7 +32620,7 @@ function renderBot(text){
   }).join('');
   // v34.1.29 (plan sec.5): DOMPurify as a final pass -- mdLite already escapes
   // everything, this is defense-in-depth so a crafted KB line can never inject HTML.
-  if(window.DOMPurify && DOMPurify.sanitize){ return DOMPurify.sanitize(out, {ADD_ATTR:['dir','data-k','data-id','title']}); }
+  if(typeof window!=='undefined' && window.DOMPurify && window.DOMPurify.sanitize){ return window.DOMPurify.sanitize(out, {ADD_ATTR:['dir','data-k','data-id','title']}); }
   return out;
 }
 function xaRoute(k, id){

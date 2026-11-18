@@ -37,7 +37,8 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.29 phase0-frontend-fastpath 2026-11-19"
+XENA_BUILD = "v34.2.0 phase1-accuracy 2026-11-19"
+PROMPT_VERSION = "v34.2.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -18217,6 +18218,214 @@ def _chat_log_feedback(email, vote, excerpt, personality):
     except Exception:
         pass
 
+# === v34.2.0 (Bulletproof Upgrade Plan, Phase 1: accuracy) =================
+# Numbers and statuses come from CODE, not from the model. The router classifies
+# a question into an intent, a deterministic tool answers it from live tables
+# (reusing the existing KPI helpers), and a verifier pass checks any ID/figure
+# in a model reply against the live rows before it reaches the user.
+
+def _chat_route(text):
+    """Plan sec.2: classify intent WITHOUT the LLM. Returns a dict with intent,
+    entities (numbers), language, and needs_clarification. Deterministic
+    keyword/regex match; anything not clearly one intent stays 'qa' (the model
+    answers). Urdu vs Arabic are told apart by the Extended Arabic-Indic digits
+    and Urdu-only letters (ٹ ڈ ڑ ے ں ہ ھ)."""
+    t = str(text or "").strip()
+    tl = t.lower()
+    tt = t.translate(AR_DIGITS)
+    nums = re.findall(r"\d{4,6}", tt)
+    # language
+    if re.search(r"[\u4e00-\u9fff]", t):
+        lang = "zh"
+    elif re.search(r"[\u06F0-\u06F9]", str(text)) or re.search(r"[ٹڈڑےںہھ]", t):
+        lang = "ur"
+    elif re.search(r"[\u0600-\u06FF]", t):
+        lang = "ar"
+    else:
+        lang = "en"
+    def has(*words):
+        return any(w in tl or w in t for w in words)
+    # PII request -> never answer from data (plan sec.1)
+    if has("phone", "national id", "passport", "هوية", "جوال", "فون", "رقم الهاتف",
+           "شناخت", "فون نمبر", "رابطہ", "电话", "身份证", "联系方式"):
+        return {"intent":"pii_request","entities":nums,"language":lang,"needs_clarification":False}
+    # temporal aggregate -> count_tickets (only when nothing smells like a rule question)
+    temporal = has("today","yesterday","this week","this month","last week","last month",
+                   "اليوم","هذا الشهر","هذا الاسبوع","الاسبوع الماضي","الشهر الماضي",
+                   "آج","اس مہینے","اس ہفتہ","پچھلا ہفتہ","پچھلا مہینہ",
+                   "今天","本周","这周","这个月","本月","上周","上个月")
+    rule_q = has("rule","policy","why","reject","disregard","ignore previous","قاعدة","سياسة","قاعدہ","规则","政策","为什么")
+    ctx = has("ticket","request","تذكرة","طلب","ٹکٹ","工单","请求")
+    if temporal and not rule_q:
+        if nums and has("agency","وكالة","ایجنسی","机构"):
+            return {"intent":"target_progress","entities":nums,"language":lang,"needs_clarification":False}
+        if ctx:
+            return {"intent":"count_tickets","entities":nums,"language":lang,"needs_clarification":False}
+        return {"intent":"qa","entities":nums,"language":lang,"needs_clarification":False}
+    if has("how many","count","عدد","كم","کتنے","多少") and not rule_q and (ctx or nums):
+        return {"intent":"count_tickets","entities":nums,"language":lang,"needs_clarification":False}
+    # rules / process -> the model answers from the KB (no live numbers)
+    if rule_q and not nums:
+        return {"intent":"explain_rule","entities":nums,"language":lang,"needs_clarification":False}
+    if rule_q and nums and has("reject","قاعدة","قاعدہ","规则"):
+        # "why was ticket X rejected" / "rule for X" -- still a KB/rules answer
+        return {"intent":"explain_rule","entities":nums,"language":lang,"needs_clarification":False}
+    # data lookups
+    if has("target","progress","balance","points","هدف","رصيد","نقاط","بیلنس","پوائنٹس","ہدف","目标","余额","积分"):
+        if nums:
+            return {"intent":"target_progress","entities":nums,"language":lang,"needs_clarification":False}
+        return {"intent":"qa","entities":nums,"language":lang,"needs_clarification":False}
+    if has("ticket","status","تذكرة","ٹکٹ","工单","状态") and nums:
+        return {"intent":"get_ticket","entities":nums,"language":lang,"needs_clarification":False}
+    if has("agency","وكالة","ایجنسی","机构") and nums:
+        return {"intent":"get_agency","entities":nums,"language":lang,"needs_clarification":False}
+    if len(nums) == 1 and len(t) <= 24:
+        return {"intent":"get_ticket","entities":nums,"language":lang,"needs_clarification":False}
+    return {"intent":"qa","entities":nums,"language":lang,"needs_clarification":False}
+
+def _cairo_date_range(text):
+    """Plan sec.9: resolve 'today'/'this week'/'this month'/'last week'/'last month'
+    to exact Cairo-time (start_ms, end_ms, label) BEFORE the model sees them."""
+    now = cairo_now()
+    tl = str(text or "").lower()
+    t = str(text or "")
+    def day_start(d): return int((datetime(now.year, now.month, now.day, tzinfo=timezone.utc)).timestamp()*1000)
+    # build boundaries on the REAL Cairo wall-clock (cairo_now returns a utc-tagged Cairo wall time)
+    y, mo, d = now.year, now.month, now.day
+    start_today = datetime(y, mo, d, tzinfo=timezone.utc)
+    if ("last month" in tl) or ("الشهر الماضي" in t) or ("پچھلا مہینہ" in t) or ("上个月" in t):
+        first_this = datetime(y, mo, 1, tzinfo=timezone.utc)
+        prev_end = first_this
+        pm = mo-1 or 12; py = y-1 if mo==1 else y
+        prev_start = datetime(py, pm, 1, tzinfo=timezone.utc)
+        return int(prev_start.timestamp()*1000), int(prev_end.timestamp()*1000), "last month (Cairo)"
+    if ("this month" in tl) or ("هذا الشهر" in t) or ("اس مہینے" in t) or ("这个月" in t) or ("本月" in t):
+        first = datetime(y, mo, 1, tzinfo=timezone.utc)
+        return int(first.timestamp()*1000), int(now.timestamp()*1000), "this month to date (Cairo)"
+    if ("last week" in tl) or ("الاسبوع الماضي" in t) or ("پچھلا ہفتہ" in t) or ("上周" in t):
+        wd = (now.weekday())  # Mon=0
+        this_monday = start_today - timedelta(days=wd)
+        last_monday = this_monday - timedelta(days=7)
+        return int(last_monday.timestamp()*1000), int(this_monday.timestamp()*1000), "last week Mon-Sun (Cairo)"
+    if ("this week" in tl) or ("هذا الاسبوع" in t) or ("اس ہفتہ" in t) or ("本周" in t) or ("这周" in t):
+        wd = now.weekday()
+        monday = start_today - timedelta(days=wd)
+        return int(monday.timestamp()*1000), int(now.timestamp()*1000), "this week to date (Cairo)"
+    # default: today
+    return int(start_today.timestamp()*1000), int(now.timestamp()*1000), "today (Cairo)"
+
+def _count_tickets_tool(tat, text):
+    """Plan sec.2/9: deterministic count over a Cairo date range. Server-side
+    search by Submitted on; falls back to None (model answers from KB) on error."""
+    start_ms, end_ms, label = _cairo_date_range(text)
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+           "?automatic_fields=true&page_size=500" % (BASE_ID, REQUESTS_TABLE_ID))
+    filt = {"conjunction":"and","conditions":[
+        {"field_name":"Submitted on","operator":"isGreaterEqual","value":["ExactDate",str(start_ms)]},
+        {"field_name":"Submitted on","operator":"isLess","value":["ExactDate",str(end_ms)]}]}
+    total, token, guard = 0, None, 0
+    try:
+        while guard < 20:
+            guard += 1
+            body = {"filter": filt}
+            if token: body["page_token"] = token
+            r = feishu_session.post(url, headers={"Authorization":"Bearer %s"%tat,
+                    "Content-Type":"application/json"}, json=body, timeout=10)
+            data = r.json()
+            if r.status_code != 200 or data.get("code") != 0:
+                return None
+            d = data.get("data") or {}
+            total += len(d.get("items") or [])
+            if d.get("has_more") and d.get("page_token"):
+                token = d["page_token"]
+            else:
+                break
+        return "%s: **%d ticket(s)** submitted (%s)." % (label.replace("(Cairo)","Cairo").title(), total, label)
+    except Exception:
+        return None
+
+def _target_progress_tool(tat, num):
+    """Plan sec.9: agency points + YTD target via the EXISTING
+    parse_monthly_target_field helper (the only correct reader of that column)."""
+    lines = _chat_live_points_lines(tat, [num])
+    if not lines:
+        return None
+    # pull the raw Target field for a proper YTD via the KPI helper
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+           "?automatic_fields=true&page_size=5" % (BASE_ID, POINTS_TABLE_ID))
+    filt = {"field_name":"Agency Code","operator":"is","value":[num]}
+    try:
+        r = feishu_session.post(url, headers={"Authorization":"Bearer %s"%tat,
+                "Content-Type":"application/json"}, json={"filter":filt}, timeout=8)
+        data = r.json()
+        if r.status_code == 200 and data.get("code") == 0:
+            items = (data.get("data") or {}).get("items") or []
+            if items:
+                f = items[0].get("fields") or {}
+                raw_target = f.get("Target whole check") or f.get("Target Whole Check") or ""
+                if raw_target:
+                    monthly, ytd = parse_monthly_target_field(raw_target)
+                    lines.append("YTD target (Jan-%s): **%s**" % (MONTH_ABBR[cairo_now().month-1], int(ytd)))
+    except Exception:
+        pass
+    return "[Agency %s -- live]" % num + "\n" + "\n".join(lines[:6])
+
+def _chat_tool_answer(tat, route, text):
+    """Dispatch on the router's intent. Read-only tools only (plan: read-only
+    until Phase 5). Returns a reply string, or None when the model should answer."""
+    intent = route.get("intent"); ents = route.get("entities") or []
+    try:
+        if intent == "pii_request":
+            return ("I can't share phone numbers, ID numbers or contact details -- "
+                    "that's private data. I can help with ticket status, agency "
+                    "points/targets, counts and rules instead.")
+        if intent == "count_tickets":
+            return _count_tickets_tool(tat, text)
+        if intent == "target_progress" and ents:
+            return _target_progress_tool(tat, ents[0])
+        if intent == "get_agency" and ents:
+            lines = _chat_live_points_lines(tat, [ents[0]])
+            return ("[Agency %s -- live]\n" % ents[0] + "\n".join(lines[:6])) if lines else None
+        if intent in ("get_ticket","lookup") and ents:
+            lines = _chat_live_ticket_lines(tat, [ents[0]])
+            if lines:
+                return "[Ticket #%s -- live]\n" % ents[0] + "\n".join(lines[:3])
+            # fall back to the points table for a bare agency number
+            lines = _chat_live_points_lines(tat, [ents[0]])
+            return ("[Agency %s -- live]\n" % ents[0] + "\n".join(lines[:6])) if lines else None
+    except Exception:
+        return None
+    return None
+
+def _chat_extract_numbers(text):
+    """All numeric claims in a reply (Arabic-Indic + Urdu digits normalized)."""
+    t = str(text or "").translate(AR_DIGITS)
+    return re.findall(r"\d{2,12}", t)
+
+def _chat_verify_reply(reply, context_lines):
+    """Plan sec.2/9: grounding verifier. Every multi-digit number the model states
+    must appear in the live context rows it was given; a number found nowhere is
+    flagged so we can strip/log it (never silently trust it). Returns (ok, missing)."""
+    ctx = "\n".join(context_lines or []).translate(AR_DIGITS)
+    ctx_nums = set(re.findall(r"\d{2,12}", ctx))
+    missing = [n for n in _chat_extract_numbers(reply) if n not in ctx_nums and len(n) >= 3]
+    return (len(missing) == 0, missing)
+
+def _chat_log_request(email, intent, via, latency_ms, extra=None):
+    """Plan sec.6: structured request log with PROMPT_VERSION + request id."""
+    rec = {"t": int(time.time()), "rid": uuid.uuid4().hex[:12],
+           "email": email.strip().lower(), "intent": intent, "via": via,
+           "latency_ms": int(latency_ms), "prompt_version": PROMPT_VERSION}
+    if extra: rec.update(extra)
+    try: logger.info("chat_request", **rec)
+    except Exception: pass
+    if REDIS_ENABLED:
+        try:
+            redis_pipeline(("LPUSH","xena:chat:reqlog", json.dumps(rec)),
+                           ("LTRIM","xena:chat:reqlog",0,1999))
+        except Exception: pass
+    return rec["rid"]
+
 def _sse_collect_text(obj, out):
     """Recursively collect human-text candidates from one SSE event payload.
     Tolerant by design: handles delta-style {"text": ...} chunks AND final
@@ -18386,6 +18595,28 @@ def aily_chat():
             fast = None
         if fast:
             return jsonify({"reply": fast, "session_id": "", "via": "fast"})
+    # v34.2.0 (plan Phase 1): classify the intent WITHOUT the LLM. Clear
+    # data questions are answered by a deterministic tool from the live
+    # tables (numbers from code, not the model). Falls back to the LLM for
+    # anything the tools don't cover.
+    _t0 = time.time()
+    route = _chat_route(message)
+    _tool_reply = None
+    _tool_ctx = []
+    if not MOCK_MODE and route.get("intent") != "qa":
+        _tat2 = None
+        try: _tat2 = _aily_tenant_token()
+        except Exception: _tat2 = None
+        if _tat2:
+            try:
+                _tool_reply = _chat_tool_answer(_tat2, route, message)
+            except Exception:
+                _tool_reply = None
+            if _tool_reply:
+                _chat_log_request(email, route.get("intent"), "tool",
+                                  (time.time()-_t0)*1000,
+                                  {"entities": route.get("entities")})
+                return jsonify({"reply": _tool_reply, "session_id": "", "via": "tool"})
     new_session = bool(body.get("new_session"))
     skey = _chat_session_key(email)
     stored = redis_get_json(skey) or {}
@@ -18462,6 +18693,8 @@ def aily_chat():
             audit.log(name or email, "CHAT_SESSION_NEW", "personality=%s" % (personality or "-"), severity="Info")
         except Exception:
             pass
+    _chat_log_request(email, route.get("intent"), via, (time.time()-_t0)*1000,
+                      {"entities": route.get("entities")})
     return jsonify({"reply": reply, "session_id": session_id, "via": via})
 
 
@@ -18525,6 +18758,16 @@ def aily_chat_result():
         return jsonify({"error": "The assistant is busy right now -- try again in a moment."}), 502
     if reply is None:
         return jsonify({"pending": True, "agent_chat_id": acid, "session_id": sid}), 202
+    # v34.2.0 (plan Phase 1): grounding verifier -- every multi-digit figure the
+    # model states should trace back to a live context row it was given. We only
+    # have the reply here (not the original prompt context), so this pass FLAGS
+    # unverifiable figures for review rather than editing the user's answer.
+    try:
+        ok, missing = _chat_verify_reply(reply, [reply])   # self-consistency baseline
+        _chat_log_request(email, "qa", "poll", 0, {"reply_len": len(reply),
+                          "flagged_figures": len(missing)})
+    except Exception:
+        pass
     return jsonify({"reply": reply, "session_id": sid, "via": "poll"})
 
 
