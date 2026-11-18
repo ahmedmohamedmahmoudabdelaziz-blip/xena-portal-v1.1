@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.1.26 loginloop-syntaxfix 2026-11-19"
+XENA_BUILD = "v34.1.27 kb-lastmod-target-points 2026-11-19"
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17019,7 +17019,10 @@ AILY_APP_ID      = os.environ.get("FEISHU_APP_ID", "")
 AILY_APP_SECRET  = os.environ.get("FEISHU_APP_SECRET", "")
 AILY_KB_HOST     = os.environ.get("AILY_KB_HOST", "https://aily.feishu.cn").rstrip("/")
 AILY_KB_BATCH_SIZE   = 500      # tickets per .txt asset -- v34.1.8: halve the Aily uploads (the slowest step) so more pages fit the budget
-AILY_KB_SYNC_OVERLAP = 7 * 86400 * 1000   # sync re-reads tickets submitted in the last 7 days (ms)
+AILY_KB_SYNC_OVERLAP = 3600 * 1000   # v34.1.27 (Ahmed): sync now keys on last_modified_time with a
+                                   # 60-min overlap window instead of a 7-day Submitted-on sweep --
+                                   # a 15-min cron only re-reads what actually changed, so it stays
+                                   # fast and untouched tickets are never re-fetched.
 AILY_KB_SYNC_BUDGET_S = 20                # v34.1.18: tighter so a cold start (token+first page) still answers inside cron-job.org's 30s hard cap
 
 # Fetch projection for knowledge text. PII fields (NID / phone / contact) are
@@ -17034,15 +17037,16 @@ KB_TICKET_FIELDS = [
     "Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)",
     "Bd Code", "BD Code",
     "Reject Reason", "Rejection Reason", "Closing Reason", "Closing Agencies Reason",
-    "Audition note", "Audition Note", "Duplicated Check", "Create Way",
+    "Audition note", "Audition Note",
+    "Target", "Target Type", "Agency Point Privilege", "Submitter", "Created By",
 ]
 # Second line of defense: if a future edit ever adds these to the projection,
 # their values are dropped in _kb_ticket_line before formatting.
 KB_NEVER_FIELDS = ("NID Number", "NID", "Contact ID", "Phone", "Phone Number",
-                   "Mobile", "ID Card", "Passport")
+                   "Mobile", "ID Card", "Passport", "raw_text")
 
 KB_REDACT_RE = re.compile(r"(?<!\d)\d{11,}(?!\d)")   # phone / NID-shaped digit runs
-KB_FREE_TEXT_FIELDS = ("Audition note", "Audition Note", "Duplicated Check",
+KB_FREE_TEXT_FIELDS = ("Audition note", "Audition Note",
                        "Reject Reason", "Rejection Reason",
                        "Closing Reason", "Closing Agencies Reason")
 
@@ -17061,6 +17065,8 @@ def _kb_state():
         "open_batch": st.get("open_batch") or "",
         "next_index": int(st.get("next_index") or 1),
         "last_sync_ms": int(st.get("last_sync_ms") or 0),
+        "last_modified_ms": int(st.get("last_modified_ms") or 0),   # v34.1.27: incremental cursor on last_modified_time
+        "points_last_modified_ms": int(st.get("points_last_modified_ms") or 0),
         "errors": list(st.get("errors") or [])[-20:],
     }
 
@@ -17139,7 +17145,7 @@ def _kb_file_text(file_name, batch):
 def _kb_ticket_line(fields):
     """One ticket -> one knowledge line. PII-scrubbed. Example shape:
     Ticket #8492 | 2026-04-21 14:00 | Agency Creation | Agency 42630 "PK-Ishq" |
-    Status: Closed | By: Noora | Region: PK | Reject: duplicate device"""
+    Status: Closed | By: Noora | Region: PK | Target: monthly | Reject: duplicate device"""
     def val(*aliases):
         v = extract_field_text(get_field_local(fields, *aliases)).strip()
         return KB_REDACT_RE.sub("[REDACTED]", v) if v else ""
@@ -17202,12 +17208,41 @@ def _kb_ticket_line(fields):
                            ("Reject", ("Reject Reason", "Rejection Reason")),
                            ("Close", ("Closing Reason", "Closing Agencies Reason")),
                            ("Note", ("Audition note", "Audition Note")),
-                           ("Dup", ("Duplicated Check",)),
-                           ("Via", ("Create Way",))):
+                           ("Target", ("Target",)),
+                           ("Target Type", ("Target Type",)),
+                           ("Privilege", ("Agency Point Privilege",)),
+                           ("Submitter", ("Submitter", "Created By"))):
         v = val(*aliases)
         if v:
             extra.append("%s: %s" % (label, v))
     return " | ".join(parts + extra)
+
+
+def _kb_points_line(fields):
+    """v34.1.27 (Ahmed): one Agency Points table row -> one KB line, so the
+    chat can answer balance / target / bonus questions directly.
+    Example: Agency 42630 "PK-Ishq" | ACM: Holy | Base Points: 100 | Bonus: 20
+    | Total Points: 120 | Balance: 87 | Target whole check: PASS"""
+    def pv(*aliases):
+        v = extract_field_text(get_field_local(fields, *aliases)).strip()
+        return KB_REDACT_RE.sub("[REDACTED]", v) if v else ""
+    acode = pv("Agency Code"); aname = pv("Agency Name")
+    acm   = pv("Acm")
+    parts = []
+    if acode or aname:
+        parts.append('Agency %s "%s"' % (acode or "?", aname or "?"))
+    if acm: parts.append("ACM: %s" % acm)
+    for label, aliases in (("Base Points", ("Base Points",)),
+                           ("Bonus", ("Bonus Points",)),
+                           ("Total Points", ("Total Points",)),
+                           ("Used", ("Used Points",)),
+                           ("Balance", ("Point Balance",)),
+                           ("Target whole check", ("Target whole check",)),
+                           ("Monthly Usage", ("Monthly Usage Tracker",))):
+        v = pv(*aliases)
+        if v:
+            parts.append("%s: %s" % (label, v))
+    return " | ".join(parts)
 
 def _kb_fetch_page(tat, page_token="", filter_obj=None, sort_desc=False):
     """ONE records/search page against the Grand Table (500/page, automatic
@@ -17578,12 +17613,22 @@ def knowledge_sync():
         return jsonify({"error": "backfill not complete yet",
                         "processed": st["processed"]}), 409
     now_ms = int(time.time() * 1000)
-    since_ms = max((st["last_sync_ms"] or 0) - AILY_KB_SYNC_OVERLAP,
-                   now_ms - 30 * 86400 * 1000)
     tat = get_tenant_access_token()
-    # Primary: server-side date filter on Submitted on (epoch ms value).
+    # v34.1.27 (Ahmed): key the window on last_modified_time, not Submitted on.
+    # A 15-min cron with a 7-day Submitted-on sweep re-read hundreds of untouched
+    # tickets every run and kept blowing cron-job.org's 30s cap. Now: incremental
+    # cursor (last_modified_ms) with a 60-min overlap -> each run only touches
+    # tickets that actually changed since the last pass; first run seeds from
+    # last_sync_ms so no un-synced history is skipped.
+    since_ms = st["last_modified_ms"] or st["last_sync_ms"] or 0
+    since_ms = max(0, since_ms - AILY_KB_SYNC_OVERLAP)
+    # Never sweep more than 30 days back even on a cold/long-gap start --
+    # the resume cursor spreads a big backlog across runs inside the budget.
+    since_ms = max(since_ms, now_ms - 30 * 86400 * 1000)
+    max_mod_ms = since_ms   # newest last_modified_time actually seen this pass
+    # Server-side filter on the record's own last-modified timestamp.
     filt = {"conjunction": "and", "conditions": [
-        {"field_name": "Submitted on", "operator": "isGreaterEqual", "value": [str(since_ms)]}]}
+        {"field_name": "last_modified_time", "operator": "isGreaterEqual", "value": [str(since_ms)]}]}
     resume_tok = st.get("sync_resume_token") or ""
     if resume_tok == "RESTART_WINDOW":
         resume_tok = ""   # previous run died mid-page-1: re-read the window from the top
@@ -17625,6 +17670,12 @@ def knowledge_sync():
             # budget check sat ABOVE the loop, the network stalls sat INSIDE it.
             page_rids, page_lines = [], {}
             for item in items:
+                try:
+                    _lm = int(str(item.get("last_modified_time") or 0))
+                    if _lm > max_mod_ms:
+                        max_mod_ms = _lm
+                except Exception:
+                    pass
                 if filt is None:  # fallback mode: honor the time window ourselves
                     try:
                         lm = int(str(item.get("last_modified_time") or 0))
@@ -17733,18 +17784,92 @@ def knowledge_sync():
             st.pop("sync_resume_token", None)
             st.pop("sync_resume_since_ms", None)
             st["last_sync_ms"] = now_ms
+            # v34.1.27: advance the incremental last_modified cursor only on a
+            # COMPLETE pass (window fully re-read), so nothing is ever skipped.
+            if max_mod_ms > st.get("last_modified_ms", 0):
+                st["last_modified_ms"] = max_mod_ms
         complete = not resume_tok
     finally:
         st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
+    # v34.1.27 (Ahmed): also sync the Agency Points table into the KB so the
+    # chat can answer balance / target / bonus questions. Small table (~11
+    # cols); incremental on its own Last Modified Date cursor, budget-guarded
+    # like the ticket pass, whole asset rewritten only when something changed.
+    points_stats = {"touched": 0, "updated": False}
+    try:
+        if time.time() <= deadline - 1:
+            pts_since = max(0, (st.get("points_last_modified_ms") or 0) - AILY_KB_SYNC_OVERLAP)
+            pqs = "?automatic_fields=true&page_size=500"
+            purl = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search%s"
+                    % (BASE_ID, POINTS_TABLE_ID, pqs))
+            pfilt = {"conjunction": "and", "conditions": [
+                {"field_name": "last_modified_time", "operator": "isGreaterEqual", "value": [str(pts_since)]}]}
+            pdata = feishu_session.post(
+                purl, headers={"Authorization": "Bearer %s" % tat,
+                               "Content-Type": "application/json"},
+                json={"filter": pfilt, "sort": [{"field_name": "Agency Code", "desc": False}]},
+                timeout=20).json()
+            pitems = ((pdata.get("data") or {}).get("items") or []) if pdata.get("code") == 0 else []
+            if pdata.get("code") == 0 and (pitems or not st.get("points_last_modified_ms")):
+                pmax = pts_since
+                if not pitems and not st.get("points_last_modified_ms"):
+                    pdata2 = feishu_session.post(  # cold start: full read of the small table
+                        purl, headers={"Authorization": "Bearer %s" % tat,
+                                       "Content-Type": "application/json"},
+                        json={"sort": [{"field_name": "Agency Code", "desc": False}]}, timeout=20).json()
+                    pitems = ((pdata2.get("data") or {}).get("items") or []) if pdata2.get("code") == 0 else []
+                plines = []
+                for it in pitems:
+                    try:
+                        _lm = int(str(it.get("last_modified_time") or 0))
+                        if _lm > pmax: pmax = _lm
+                    except Exception:
+                        pass
+                    pl = _kb_points_line(it.get("fields") or {})
+                    if pl:
+                        pline = pl
+                        try:
+                            _lm2 = int(str(it.get("last_modified_time") or 0))
+                            if _lm2:
+                                pline = pl + " | Last Modified: " + datetime.fromtimestamp(_lm2/1000.0, tz=timezone.utc).strftime("%Y-%m-%d")
+                        except Exception:
+                            pass
+                        plines.append(pline)
+                ptext = ("# Xena Agency Points table snapshot (%d rows). One line per agency: "
+                         "Agency <code> \"<name>\" | ACM | Base Points | Bonus | Total Points | "
+                         "Used | Balance | Target whole check | Monthly Usage | Last Modified.\n"
+                         % len(plines)) + "\n".join(plines) + "\n"
+                paerr = None
+                if "agency-points.txt" in assets:
+                    paerr = _kb_update_asset(assets["agency-points.txt"], "agency-points.txt", ptext)
+                else:
+                    paid, paerr = _kb_create_asset("agency-points.txt", ptext)
+                    if not paerr:
+                        assets["agency-points.txt"] = paid
+                        _kb_assets_save(assets)
+                if paerr:
+                    errors.append("points: %s" % paerr)
+                else:
+                    points_stats["updated"] = True
+                    if pmax > st.get("points_last_modified_ms", 0):
+                        st["points_last_modified_ms"] = pmax
+                        _kb_state_save(st)
+                points_stats["touched"] = len(plines)
+                files_updated.append("agency-points.txt")
+    except Exception as _pe:
+        errors.append("points sync: %s" % _pe)
+
     try:
         audit.log(admin_name or "cron", "KNOWLEDGE_SYNC",
-                  "new=%d changed=%d files=%d errors=%d complete=%s" % (new_count, changed, len(files_updated), len(errors), complete),
+                  "new=%d changed=%d files=%d points=%d errors=%d complete=%s" % (new_count, changed, len(files_updated), points_stats["touched"], len(errors), complete),
                   severity="Warning" if errors else "Info")
     except Exception:
         pass
     return jsonify({"new": new_count, "changed": changed, "complete": complete,
                     "resumes_next_run": bool(resume_tok),
+                    "points_rows": points_stats["touched"],
+                    "points_updated": points_stats["updated"],
                     "files_updated": files_updated, "errors": errors})
 
 @app.route('/api/knowledge/status', methods=['GET'])
