@@ -19151,10 +19151,34 @@ function twMgFastGroups(ticket) {
     // lookup only carries the group(s) the bot already posted to, so Ritu's
     // tickets never offered "IN-Holy&Ritu" and Adnan's never offered
     // "PK-Adnan". Only added when it resolves to a REAL option.
+    // v34.1.22 (Ahmed: sheet row 13 -- Holy&Ritu jointly own
+    // IN-Holy&Ritu-Audition group): the RESOLVER's group rides along too.
+    // The resolver is whoever is WORKING the ticket = Respondents (the
+    // person User field), plus the ACM Name fallback for unassigned
+    // tickets. Ritu Pant resolving an Ansh ticket now surfaces her own
+    // IN-Holy&Ritu group next to the lookup's SA group. Roster hit gated
+    // on a REAL sheet option + deduped, so near-names never cross-match.
     try {
-        const acm = feishuValueToString(ticket.fields['Acm Name (PK)'] || ticket.fields['Acm Name (IN)'] || '').trim().toLowerCase();
-        const own = acm && typeof AUDIT_ACM_ROSTER !== 'undefined' && AUDIT_ACM_ROSTER[acm] && AUDIT_ACM_ROSTER[acm].group;
-        if (own && opts.includes(own) && !out.includes(own)) out.push(own);
+        const resolvers = [];
+        const respRaw = ticket.fields['Respondents'];
+        if (Array.isArray(respRaw)) {
+            respRaw.forEach(u => {
+                const nm = (u && typeof u === 'object') ? u.name : feishuValueToString(u);
+                if (nm) resolvers.push(nm);
+            });
+        } else if (respRaw) {
+            resolvers.push(feishuValueToString(respRaw));
+        }
+        const acmName = feishuValueToString(ticket.fields['Acm Name (PK)'] || ticket.fields['Acm Name (IN)'] || '').trim();
+        if (acmName) resolvers.push(acmName);
+        const seen = {};
+        resolvers.forEach(nm => {
+            const key = String(nm || '').trim().toLowerCase();
+            if (!key || seen[key]) return;
+            seen[key] = 1;
+            const own = typeof AUDIT_ACM_ROSTER !== 'undefined' && AUDIT_ACM_ROSTER[key] && AUDIT_ACM_ROSTER[key].group;
+            if (own && opts.includes(own) && !out.includes(own)) out.push(own);
+        });
     } catch (e) { /* roster unavailable -> lookup groups only */ }
     return out.slice(0, 2);
 }
@@ -30847,7 +30871,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.21 chat-card-v2-kbtools 2026-11-18';
+window.SAM19_BUILD='v34.1.22 mgfast-responder-group 2026-11-18';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
