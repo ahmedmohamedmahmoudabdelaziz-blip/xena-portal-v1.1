@@ -37,8 +37,8 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.2.0 phase1-accuracy 2026-11-19"
-PROMPT_VERSION = "v34.2.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
+XENA_BUILD = "v34.3.0 phase1-complete 2026-11-19"
+PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
 REQUESTS_TABLE_ID = "tblFMYa3dP3Ciu0V"
@@ -17827,6 +17827,25 @@ def _knowledge_sync_body(admin_name):
     finally:
         st["errors"] = ((st.get("errors") or []) + errors)[-5:]
         _kb_state_save(st)
+    # v34.3.0 (plan sec.5 sync hardening): VERIFY what was just written --
+    # fetch each touched asset back and hash-compare (hash-after-write); run
+    # the health checks (freshness >2h alert, small-batch line-count check,
+    # stale-resume-token discard). Findings land in the response + audit log,
+    # so the cron log itself is the alert channel.
+    verify_stats = {"checked": 0, "mismatched": 0}
+    health_problems = []
+    try:
+        verify_stats = _kb_verify_write(files_updated)
+        if verify_stats["mismatched"]:
+            errors.append("VERIFY: %d asset(s) did not hash-match after write (asset content may be stale)"
+                          % verify_stats["mismatched"])
+    except Exception as _ve:
+        errors.append("verify: %s" % _ve)
+    try:
+        health_problems = _sync_health_check()
+    except Exception as _he:
+        health_problems = ["health check error: %s" % _he]
+
     # v34.1.27 (Ahmed): also sync the Agency Points table into the KB so the
     # chat can answer balance / target / bonus questions. Small table (~11
     # cols); incremental on its own Last Modified Date cursor, budget-guarded
@@ -17905,7 +17924,8 @@ def _knowledge_sync_body(admin_name):
                     "resumes_next_run": bool(resume_tok),
                     "points_rows": points_stats["touched"],
                     "points_updated": points_stats["updated"],
-                    "files_updated": files_updated, "errors": errors})
+                    "files_updated": files_updated, "errors": errors,
+                    "verify": verify_stats, "health": health_problems})
 
 @app.route('/api/knowledge/status', methods=['GET'])
 def knowledge_status():
@@ -17940,6 +17960,27 @@ def knowledge_freshness():
                     "last_sync_ms": st["last_sync_ms"],
                     "last_error": (st.get("errors") or [""])[-1],
                     "processed": st["processed"], "mock": MOCK_MODE})
+
+@app.route('/api/knowledge/health', methods=['GET'])
+@rate_limit(12, 60)
+def knowledge_health():
+    """v34.3.0 (plan sec.5 sync hardening): on-demand pipeline health -- the
+    same checks the sync route runs after every pass (freshness >2h alert,
+    error streak, small-batch line-count sanity, stale resume token). Staff
+    with AI access can poll it; cron can hit it too."""
+    if not is_cron_authorized(request):
+        email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+        name  = sanitize_text(request.headers.get("X-User-Name", ""), 120)
+        if not email or "@" not in email:
+            return jsonify({"error": "Sign in required."}), 401
+        if not has_ai_access(email, name):
+            return jsonify({"error": "AI assistant is not enabled for this account."}), 403
+    if MOCK_MODE:
+        return jsonify({"healthy": True, "problems": [], "mock": True})
+    problems = _sync_health_check()
+    st = _kb_state()
+    return jsonify({"healthy": not problems, "problems": problems,
+                    "last_sync_ms": st.get("last_sync_ms")})
 
 # ---------------- v34.0 PART 2: Aily chat proxy ----------------
 
@@ -18249,6 +18290,15 @@ def _chat_route(text):
     if has("phone", "national id", "passport", "هوية", "جوال", "فون", "رقم الهاتف",
            "شناخت", "فون نمبر", "رابطہ", "电话", "身份证", "联系方式"):
         return {"intent":"pii_request","entities":nums,"language":lang,"needs_clarification":False}
+    # v34.3.0: compare / what_if / reject_reasons must win over the temporal and
+    # rule gates below ("compare this week vs last week", "why are tickets
+    # rejected this month" carry both signals). Route them FIRST.
+    if has("compare","vs","versus","مقارنة","قارن","موازنہ","对比","比较"):
+        return {"intent":"compare_periods","entities":nums,"language":lang,"needs_clarification":False}
+    if has("what if","what-if","how many more","how many points to","لو أضاف","لو حصل","اگر","اور پوائنٹس","如果","再加","还差") and nums:
+        return {"intent":"what_if","entities":nums,"language":lang,"needs_clarification":False}
+    if has("reject reason","rejection reason","why rejected","rejected this month","why are tickets rejected","سبب الرفض","أسباب الرفض","رد کی وجہ","拒绝原因") and not nums:
+        return {"intent":"reject_reasons","entities":nums,"language":lang,"needs_clarification":False}
     # temporal aggregate -> count_tickets (only when nothing smells like a rule question)
     temporal = has("today","yesterday","this week","this month","last week","last month",
                    "اليوم","هذا الشهر","هذا الاسبوع","الاسبوع الماضي","الشهر الماضي",
@@ -18270,6 +18320,18 @@ def _chat_route(text):
     if rule_q and nums and has("reject","قاعدة","قاعدہ","规则"):
         # "why was ticket X rejected" / "rule for X" -- still a KB/rules answer
         return {"intent":"explain_rule","entities":nums,"language":lang,"needs_clarification":False}
+    # v34.3.0: daily-work + deterministic tools (route BEFORE the generic
+    # lookups so the specific intent wins). Multi-ticket status list first.
+    if len(nums) >= 2 and has("ticket","status","تذكرة","ٹکٹ","工单","状态"):
+        return {"intent":"bulk_status","entities":nums,"language":lang,"needs_clarification":False}
+    if has("my queue","my tickets","my open","queue","مهامي","طلباتي","تذاكري","میرے ٹکٹ","میرے کام","我的工单","我的任务") and not nums:
+        return {"intent":"my_queue","entities":nums,"language":lang,"needs_clarification":False}
+    if has("stale","old tickets","older than","متأخرة","قديمة","پرانے","زیر التواء","逾期的","过期的工单"):
+        return {"intent":"stale_tickets","entities":nums,"language":lang,"needs_clarification":False}
+    if has("history","trail","timeline","سجل","تاريخ التذكرة","تاریخ","历史","记录") and nums:
+        return {"intent":"ticket_history","entities":nums,"language":lang,"needs_clarification":False}
+    if has("find agency","which agency","search agency","ابحث عن وكالة","ایجنسی تلاش","找机构","查机构"):
+        return {"intent":"find_agency","entities":nums,"language":lang,"needs_clarification":False}
     # data lookups
     if has("target","progress","balance","points","هدف","رصيد","نقاط","بیلنس","پوائنٹس","ہدف","目标","余额","积分"):
         if nums:
@@ -18370,9 +18432,10 @@ def _target_progress_tool(tat, num):
         pass
     return "[Agency %s -- live]" % num + "\n" + "\n".join(lines[:6])
 
-def _chat_tool_answer(tat, route, text):
+def _chat_tool_answer(tat, route, text, staff_name=""):
     """Dispatch on the router's intent. Read-only tools only (plan: read-only
-    until Phase 5). Returns a reply string, or None when the model should answer."""
+    until Phase 5). Returns a reply string, or None when the model should answer.
+    v34.3.0: staff_name scopes the per-agent tools (my_queue / stale_tickets)."""
     intent = route.get("intent"); ents = route.get("entities") or []
     try:
         if intent == "pii_request":
@@ -18393,8 +18456,32 @@ def _chat_tool_answer(tat, route, text):
             # fall back to the points table for a bare agency number
             lines = _chat_live_points_lines(tat, [ents[0]])
             return ("[Agency %s -- live]\n" % ents[0] + "\n".join(lines[:6])) if lines else None
+        # v34.3.0 (Phase 1 leftovers)
+        if intent == "my_queue":
+            return _my_queue_tool(tat, staff_name)
+        if intent == "stale_tickets":
+            return _stale_tickets_tool(tat, staff_name, days=(int(ents[0]) if ents else 3))
+        if intent == "what_if" and ents:
+            return _what_if_tool(tat, ents[0], text)
+        if intent == "compare_periods":
+            return _compare_periods_tool(tat, text)
+        if intent == "reject_reasons":
+            return _reject_reasons_tool(tat, text)
+        if intent == "ticket_history" and ents:
+            return _ticket_history_tool(tat, ents[0])
+        if intent == "find_agency":
+            return _find_agency_tool(tat, text)
+        if intent == "bulk_status" and ents:
+            return _bulk_status_tool(tat, ents)
     except Exception:
         return None
+    # explain_rule / qa fall through: try the deterministic SOP search first so
+    # the substance comes from the KB, not from memory. Empty -> model answers.
+    if intent in ("explain_rule", "qa"):
+        try:
+            return _search_sop_tool(tat, text)
+        except Exception:
+            return None
     return None
 
 def _chat_extract_numbers(text):
@@ -18425,6 +18512,376 @@ def _chat_log_request(email, intent, via, latency_ms, extra=None):
                            ("LTRIM","xena:chat:reqlog",0,1999))
         except Exception: pass
     return rec["rid"]
+
+# === v34.3.0 (Bulletproof Upgrade Plan, Phase 1 leftovers) ===================
+# The remaining Phase 1 items: daily-work tools (my_queue, stale_tickets,
+# what_if, compare_periods, ticket_history, reject_reasons, bulk_status,
+# find_agency), a deterministic search_sop, a bilingual glossary, and the
+# sync-hardening extras. All read-only, all reusing the same live-table
+# helpers; every number below comes from a table, never from the model.
+
+def _chat_agent_identity(email, name):
+    """The staff member's display name + region, used to scope my_queue /
+    stale_tickets to THEIR tickets. Name comes from the portal identity
+    headers (same source the ticket workspace uses to match Assigned Member /
+    Respondents). Region: email prefix suffix after the last '.' if it looks
+    like a 2-letter country code, else ''."""
+    nm = (name or "").strip()
+    if not nm:
+        nm = (email or "").split("@")[0].replace(".", " ").strip().title()
+    return nm
+
+def _search_requests(tat, conditions, page_size=50, sort_field="Numbering", desc=True):
+    """Shared records/search wrapper (read-only). conditions = filter list."""
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+           "?automatic_fields=true&page_size=%d" % (BASE_ID, REQUESTS_TABLE_ID, page_size))
+    filt = conditions[0] if len(conditions) == 1 else {"conjunction": "and", "conditions": conditions}
+    try:
+        r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
+                "Content-Type": "application/json"},
+                json={"filter": filt, "sort": [{"field_name": sort_field, "desc": desc}]}, timeout=10)
+        data = r.json()
+        if r.status_code != 200 or data.get("code") != 0:
+            return None
+        return (data.get("data") or {}).get("items") or []
+    except Exception:
+        return None
+
+def _tcount(s):   # count words for display capping
+    return len(str(s or "").split())
+
+def _my_queue_tool(tat, name):
+    """The caller's open (In Progress) tickets, newest first."""
+    if not name:
+        return None
+    items = _search_requests(tat, [
+        {"field_name": "Request Status", "operator": "contains", "value": ["In Progress"]}], 100)
+    if items is None:
+        items = _search_requests(tat, [
+            {"field_name": "Status", "operator": "contains", "value": ["In Progress"]}], 100)
+    if items is None:
+        return None
+    nm = name.strip().lower()
+    mine = []
+    for it in items:
+        f = it.get("fields") or {}
+        who = (extract_field_text(get_field_local(f, "Assigned Member")) + " " +
+               extract_field_text(get_field_local(f, "Respondents"))).lower()
+        if nm and nm in who:
+            mine.append(f)
+    if not mine:
+        return "You have no open (In Progress) tickets right now."
+    lines = []
+    for f in mine[:10]:
+        num = extract_field_text(get_field_local(f, "Numbering")).strip()
+        rtype = extract_field_text(get_field_local(f, "Request Type", "Type")).strip()
+        acode = extract_field_text(get_field_local(f, "Agency Code")).strip()
+        lines.append("- Ticket #%s | %s%s" % (num or "?", rtype or "-",
+                     (" | Agency " + acode) if acode else ""))
+    return ("Your open queue (%d ticket(s)):\n" % len(mine)) + "\n".join(lines)
+
+def _stale_tickets_tool(tat, name, days=3):
+    """Open tickets older than `days` days, scoped to the caller (or all when
+    the caller asks for the team's -- kept to the caller by default)."""
+    if not name:
+        return None
+    cutoff_ms = int((cairo_now() - timedelta(days=days)).timestamp() * 1000)
+    items = _search_requests(tat, [
+        {"field_name": "Request Status", "operator": "contains", "value": ["In Progress"]},
+        {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", str(cutoff_ms)]}], 100)
+    if items is None:
+        items = _search_requests(tat, [
+            {"field_name": "Status", "operator": "contains", "value": ["In Progress"]},
+            {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", str(cutoff_ms)]}], 100)
+    if items is None:
+        return None
+    nm = name.strip().lower()
+    mine = []
+    for it in items:
+        f = it.get("fields") or {}
+        who = (extract_field_text(get_field_local(f, "Assigned Member")) + " " +
+               extract_field_text(get_field_local(f, "Respondents"))).lower()
+        if nm and nm in who:
+            mine.append(f)
+    if not mine:
+        return "No stale tickets (open > %d days) on you -- clean queue." % days
+    lines = []
+    for f in mine[:10]:
+        num = extract_field_text(get_field_local(f, "Numbering")).strip()
+        sub = extract_field_text(get_field_local(f, "Submitted on Copy", "Submitted on")).strip()
+        lines.append("- Ticket #%s | submitted %s" % (num or "?", sub or "-"))
+    return ("Stale tickets open > %d days on you (%d):\n" % (days, len(mine))) + "\n".join(lines)
+
+def _reject_reasons_tool(tat, text):
+    """This month's rejected tickets, counted by Reject Reason (exact match)."""
+    start_ms, end_ms, _ = _cairo_date_range("this month")
+    items = _search_requests(tat, [
+        {"field_name": "Request Status", "operator": "contains", "value": ["Reject"]},
+        {"field_name": "Submitted on", "operator": "isGreaterEqual", "value": ["ExactDate", str(start_ms)]}], 200)
+    if items is None:
+        return None
+    counts = {}
+    for it in items:
+        f = it.get("fields") or {}
+        rr = extract_field_text(get_field_local(f, "Reject Reason", "Reject reason", "Rejected Reason")).strip() or "(no reason recorded)"
+        counts[rr] = counts.get(rr, 0) + 1
+    if not counts:
+        return "No rejected tickets this month."
+    top = sorted(counts.items(), key=lambda kv: -kv[1])[:8]
+    return ("Rejected tickets this month (%d), by reason:\n" % sum(counts.values())) + \
+           "\n".join("- %s: %d" % (k, v) for k, v in top)
+
+def _ticket_history_tool(tat, num):
+    """One ticket's current line -- the audit trail lives in the sheet's
+    record history (not exposed to read APIs), so this returns the freshest
+    row state with a pointer to the sheet for the full trail."""
+    lines = _chat_live_ticket_lines(tat, [num])
+    if not lines:
+        return None
+    return ("[Ticket #%s -- current state, live]\n%s\n"
+            "(Full edit history lives in the Grand Table row -- open the ticket "
+            "in the sheet for the audit trail.)" % (num, lines[0]))
+
+def _find_agency_tool(tat, text):
+    """Find an agency by a name fragment or exact code."""
+    t = str(text or "").translate(AR_DIGITS)
+    nums = re.findall(r"\d{4,6}", t)
+    if nums:
+        lines = _chat_live_points_lines(tat, [nums[0]])
+        return ("[Agency %s -- live]\n" % nums[0] + "\n".join(lines[:6])) if lines else None
+    # name fragment search on the points table
+    frag = None
+    m = re.search(r"(?:agency|وكالة|ایجنسی|机构)\s+(?:named|called|اسمها|نام|名叫)?\s*[\"'\u201c]?([A-Za-z0-9\-_& ]{2,30})", t, re.I)
+    if m:
+        frag = m.group(1).strip()
+    if not frag:
+        return None
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+           "?automatic_fields=true&page_size=20" % (BASE_ID, POINTS_TABLE_ID))
+    for field in ("Agency Name", "Otherapp Name"):
+        try:
+            r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
+                    "Content-Type": "application/json"},
+                    json={"filter": {"field_name": field, "operator": "contains", "value": [frag]}}, timeout=8)
+            data = r.json()
+            if r.status_code == 200 and data.get("code") == 0:
+                items = (data.get("data") or {}).get("items") or []
+                if items:
+                    out = []
+                    for it in items[:5]:
+                        line = _kb_points_line(dict(it.get("fields") or {}))
+                        if line:
+                            out.append(line)
+                    if out:
+                        return "Agencies matching \"%s\":\n" % frag + "\n".join(out)
+        except Exception:
+            continue
+    return None
+
+def _what_if_tool(tat, num, text):
+    """What-if: how many more points does agency `num` need to clear its YTD
+    target? Uses the existing parse_monthly_target_field reader."""
+    t = str(text or "").translate(AR_DIGITS)
+    extra = re.findall(r"(?:add|gain|earn|if.*get|لو|اگر|如果|再加|增加)\s*#?\s*(\d{1,6})", t, re.I)
+    extra_pts = float(extra[0]) if extra else None
+    lines = _chat_live_points_lines(tat, [num])
+    if not lines:
+        return None
+    # pull the raw target + current total for a real what-if
+    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+           "?automatic_fields=true&page_size=5" % (BASE_ID, POINTS_TABLE_ID))
+    try:
+        r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
+                "Content-Type": "application/json"},
+                json={"filter": {"field_name": "Agency Code", "operator": "is", "value": [num]}}, timeout=8)
+        data = r.json()
+        items = ((data.get("data") or {}).get("items") or []) if (r.status_code == 200 and data.get("code") == 0) else []
+        if not items:
+            return "[Agency %s -- live]\n" % num + "\n".join(lines[:6])
+        f = items[0].get("fields") or {}
+        raw_target = f.get("Target whole check") or f.get("Target Whole Check") or ""
+        monthly, ytd = parse_monthly_target_field(raw_target)
+        total_txt = extract_field_text(get_field_local(f, "Total Points", "Total points")).replace(",", "")
+        try:
+            total = float(total_txt)
+        except Exception:
+            total = None
+        out = ["[Agency %s -- live]" % num] + lines[:4]
+        if total is not None and ytd:
+            gap = ytd - total
+            out.append("YTD target (Jan-%s): **%s** | current total: **%s** | %s"
+                       % (MONTH_ABBR[cairo_now().month - 1], int(ytd), int(total),
+                          ("gap to clear: **%s pts**" % int(gap)) if gap > 0 else "target CLEARED"))
+            if extra_pts is not None:
+                after = total + extra_pts
+                out.append("If it gains %s pts -> %s total, %s"
+                           % (int(extra_pts), int(after),
+                              ("still short by **%s**" % int(ytd - after)) if after < ytd else "target CLEARED"))
+        return "\n".join(out)
+    except Exception:
+        return "[Agency %s -- live]\n" % num + "\n".join(lines[:6])
+
+def _compare_periods_tool(tat, text):
+    """Compare ticket counts: this week vs last week, or this month vs last month."""
+    tl = str(text or "").lower()
+    if "month" in tl or "شهر" in str(text) or "مہین" in str(text) or "月" in str(text):
+        a = _count_tickets_tool(tat, "this month")
+        b = _count_tickets_tool(tat, "last month")
+    else:
+        a = _count_tickets_tool(tat, "this week")
+        b = _count_tickets_tool(tat, "last week")
+    if not a or not b:
+        return None
+    return "Comparison (Cairo):\n- " + a + "\n- " + b
+
+def _bulk_status_tool(tat, nums):
+    """Status of a LIST of tickets (up to 5), one search call."""
+    lines = _chat_live_ticket_lines(tat, nums[:5])
+    if not lines:
+        return None
+    return "Statuses (%d ticket(s), live):\n" % len(lines) + "\n".join(lines)
+
+def _search_sop_tool(tat, text):
+    """Plan Phase 1: deterministic SOP/rule search INSIDE the KB assets.
+    Fetches the KB text assets and returns the lines matching the query's
+    content words -- the model then phrases them, but the substance comes
+    from the KB, not from memory. None -> the model answers unaided."""
+    q = str(text or "").lower().translate(AR_DIGITS)
+    words = [w for w in re.findall(r"[a-z0-9\u0600-\u06FF]{3,}", q)
+             if w not in ("what", "the", "for", "how", "does", "rule", "policy",
+                          "tell", "about", "and", "are", "ماهي", "ما", "هي", "کیا")]
+    if not words:
+        return None
+    try:
+        assets = _kb_assets() or {}
+    except Exception:
+        return None
+    hits = []
+    import base64 as _b64
+    for fn, aid in list(assets.items())[:40]:
+        if len(hits) >= 6:
+            break
+        try:
+            r = http_requests.get(_kb_api_url("/%s/content" % aid), headers=_kb_headers(), timeout=10)
+            if r.status_code != 200:
+                continue
+            data = r.json() if r.content else {}
+            body = (data or {}).get("data") or data or {}
+            raw = (body.get("content") or (body.get("knowledge_asset") or {}).get("content") or "")
+            txt = _b64.b64decode(raw).decode("utf-8", "ignore") if raw else ""
+        except Exception:
+            continue
+        for line in txt.splitlines():
+            ll = line.lower()
+            if any(w in ll for w in words) and len(line.strip()) > 20:
+                hits.append(line.strip()[:220])
+            if len(hits) >= 6:
+                break
+    if not hits:
+        return None
+    return ("From the knowledge base (%d matching line(s)):\n" % len(hits)) + \
+           "\n".join("- " + h for h in hits)
+
+# Bilingual glossary (plan sec.7): the portal's field/term names stay in
+# English in every language; this maps the chat's multilingual phrasings onto
+# the SAME canonical terms so all languages route identically.
+CHAT_GLOSSARY = {
+    "agency": ["agency", "وكالة", "ایجنسی", "机构"],
+    "points": ["points", "نقاط", "پوائنٹس", "积分"],
+    "balance": ["balance", "رصيد", "بیلنس", "余额"],
+    "target": ["target", "هدف", "ہدف", "目标"],
+    "ticket": ["ticket", "تذكرة", "ٹکٹ", "工单"],
+    "status": ["status", "حالة", "اسٹیٹس", "状态"],
+    "monthly usage": ["monthly usage", "الاستخدام الشهري", "ماہانہ استعمال", "月度使用"],
+    "request type": ["request type", "نوع الطلب", "درخواست کی قسم", "请求类型"],
+}
+
+def _kb_verify_write(files_updated):
+    """Hash-after-write (plan sec.5): re-download each asset touched this pass
+    and SHA1-compare its content against the local batch text. A mismatch means
+    the KB write did not land (stale content) -> counted so the sync response /
+    audit log flags it. Budget-safe: only the files THIS pass touched."""
+    import hashlib, base64 as _b64
+    out = {"checked": 0, "mismatched": 0}
+    if not files_updated:
+        return out
+    try:
+        assets = _kb_assets() or {}
+    except Exception:
+        return out
+    for fn in files_updated:
+        aid = assets.get(fn)
+        if not aid:
+            continue
+        try:
+            r = http_requests.get(_kb_api_url("/%s/content" % aid), headers=_kb_headers(), timeout=10)
+            if r.status_code != 200:
+                continue
+            data = r.json() if r.content else {}
+            body = (data or {}).get("data") or data or {}
+            raw = body.get("content") or (body.get("knowledge_asset") or {}).get("content") or ""
+            remote = _b64.b64decode(raw).decode("utf-8", "ignore") if raw else ""
+            if not remote:
+                continue
+            local = _kb_file_text(fn, _kb_batch_load(fn))
+            out["checked"] += 1
+            if hashlib.sha1(remote.encode("utf-8")).hexdigest() != hashlib.sha1(local.encode("utf-8")).hexdigest():
+                out["mismatched"] += 1
+        except Exception:
+            continue
+    return out
+
+def _sync_health_check():
+    """Sync hardening (plan sec.5): returns a list of human-readable problems
+    with the KB sync pipeline -- empty list means healthy. Cheap: Redis + hash
+    reads only, no network. Run by the sync route AFTER a pass (and pollable)."""
+    problems = []
+    try:
+        st = _kb_state()
+    except Exception:
+        return ["kb state unreadable (Redis down?)"]
+    # 1. freshness: last successful sync older than 2h -> alert
+    lsm = int(st.get("last_sync_ms") or 0)
+    if st.get("backfill_done") and lsm:
+        age_h = (time.time() * 1000 - lsm) / 3600000.0
+        if age_h > 2:
+            problems.append("last successful sync was %.1fh ago (> 2h) -- check the cron job" % age_h)
+    elif st.get("backfill_done"):
+        problems.append("backfill done but no successful sync timestamp recorded")
+    # 2. error streak
+    errs = st.get("errors") or []
+    if errs:
+        problems.append("recent sync errors: %s" % ("; ".join(errs[-2:])[:160]))
+    # 3. asset line-count sanity: a batch file holding < 10 lines (and not the
+    #    open batch) suggests a truncated write
+    try:
+        assets = _kb_assets()
+        open_b = st.get("open_batch") or ""
+        small = []
+        for fn in list(assets.keys()):
+            if fn == open_b or fn == "agency-points.txt":
+                continue
+            batch = _kb_batch_load(fn)
+            n = len((batch.get("lines") or {}))
+            if batch.get("lines") is not None and 0 < n < 10:
+                small.append("%s(%d lines)" % (fn, n))
+        if small:
+            problems.append("suspiciously small KB batches: %s" % ", ".join(small[:5]))
+    except Exception:
+        pass
+    # 4. stale resume token: a resume cursor older than 24h means a pass died
+    #    and never recovered -- discard it so the next run restarts clean
+    try:
+        rt = st.get("sync_resume_token") or ""
+        rs = int(st.get("sync_resume_since_ms") or 0)
+        if rt and rs and (time.time() * 1000 - rs) > 24 * 3600 * 1000:
+            st.pop("sync_resume_token", None)
+            st.pop("sync_resume_since_ms", None)
+            _kb_state_save(st)
+            problems.append("discarded a stale resume token (>24h old) -- next run restarts the window clean")
+    except Exception:
+        pass
+    return problems
 
 def _sse_collect_text(obj, out):
     """Recursively collect human-text candidates from one SSE event payload.
@@ -18609,7 +19066,7 @@ def aily_chat():
         except Exception: _tat2 = None
         if _tat2:
             try:
-                _tool_reply = _chat_tool_answer(_tat2, route, message)
+                _tool_reply = _chat_tool_answer(_tat2, route, message, _chat_agent_identity(email, name))
             except Exception:
                 _tool_reply = None
             if _tool_reply:
