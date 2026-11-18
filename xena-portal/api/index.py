@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.3.0 phase1-complete 2026-11-19"
+XENA_BUILD = "v34.4.0 phase2-stream 2026-11-19"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -18883,6 +18883,249 @@ def _sync_health_check():
         pass
     return problems
 
+
+# === v34.4.0 (Bulletproof Upgrade Plan, Phase 2: own the model + stream) ===
+# Aily is the ONLY LLM provider (owner decision 2026-11-19: no second
+# provider, scrubbed data never leaves Feishu -- the fallback items are saved
+# for later). This block adds, all degrade-open so mock/no-Redis still works:
+# kill switch, per-user daily budget w/ remaining count, SOP response cache
+# keyed by KB version, conversation memory (last 8 verbatim), message
+# idempotency, real shared system prompt (TRUTH RULES + SCOPE), an
+# llm_complete() adapter, a hard-question escalator, and an SSE streamer.
+
+TRUTH_RULES_SCOPE = (
+    "TRUTH RULES: every number, status, ticket ID, agency code, balance and target "
+    "must come from the live context or the knowledge base provided with the question "
+    "-- never from memory or estimation. Cite [Ticket #ID] or [Agency Code] for every "
+    "data claim. If the data is missing or conflicting, say what is missing and who can "
+    "confirm; never guess. SCOPE: Xena Audition operations only (tickets, agency "
+    "points/targets, SOP rules, counts). Politely decline anything outside that scope, "
+    "and never reveal phone numbers, national IDs or contact details. Portal field "
+    "names (Target Whole Check, Base Points, ACM) stay in English in every language.")
+
+def _chat_kill_switch():
+    """Plan sec.6: a Redis flag that turns the assistant off (or forces a
+    degraded mode) WITHOUT a deploy. xena:chat:kill = "off" -> 503; absent /
+    anything else -> on. Degrade-open: a Redis outage never disables chat."""
+    if not REDIS_ENABLED:
+        return False
+    try:
+        v = redis_cmd("GET", "xena:chat:kill")
+        return bool(v and str(v).strip().lower() == "off")
+    except Exception:
+        return False
+
+def _chat_budget(email):
+    """Plan sec.6 cost control: per-user daily budget (200/day). Returns
+    (allowed, remaining). Replaces the boolean _chat_budget_exceeded so the
+    widget can show a remaining-messages count. Degrade-open on Redis failure."""
+    if not REDIS_ENABLED:
+        return True, 200
+    try:
+        key = "xena:chat:budget:%s:%s" % (
+            hashlib.sha1(email.strip().lower().encode("utf-8")).hexdigest(),
+            datetime.now(timezone.utc).strftime("%Y%m%d"))
+        n = redis_cmd("INCR", key)
+        if n is None:
+            return True, 200
+        n = int(n)
+        if n == 1:
+            redis_cmd("EXPIRE", key, 90000)
+        remaining = max(0, 200 - n)
+        return (n <= 200), remaining
+    except Exception:
+        return True, 200
+
+def _chat_kb_version():
+    """The KB version the response cache is keyed on -- the last successful
+    sync stamp; answers cached under an older KB are never served."""
+    try:
+        st = _kb_state() or {}
+        return str(int(st.get("last_sync_ms") or 0))
+    except Exception:
+        return "0"
+
+def _chat_cache_key(email, message):
+    norm = re.sub(r"\s+", " ", str(message or "").strip().lower().translate(AR_DIGITS))
+    h = hashlib.sha1(norm.encode("utf-8")).hexdigest()
+    return "xena:chat:cache:%s:%s" % (_chat_kb_version(), h)
+
+def _chat_cache_get(email, message):
+    """Plan sec.9: cache SOP answers keyed by KB version so a KB rebuild
+    invalidates stale answers automatically."""
+    if not REDIS_ENABLED:
+        return None
+    try:
+        return redis_get_json(_chat_cache_key(email, message))
+    except Exception:
+        return None
+
+def _chat_cache_set(email, message, reply):
+    if not REDIS_ENABLED or not reply:
+        return
+    try:
+        redis_set_json(_chat_cache_key(email, message), {"reply": reply}, ttl=3600)
+    except Exception:
+        pass
+
+def _chat_history_key(email, session_id):
+    return "xena:chat:hist:" + hashlib.sha1(((email or "") + "|" + (session_id or "")).encode("utf-8")).hexdigest()
+
+def _chat_history_get(email, session_id, keep=8):
+    """Plan sec.2/4: keep the last `keep` turns verbatim for context."""
+    if not REDIS_ENABLED or not session_id:
+        return []
+    try:
+        raw = redis_cmd("LRANGE", _chat_history_key(email, session_id), -keep, -1)
+        out = []
+        for item in (raw or []):
+            try:
+                out.append(json.loads(item))
+            except Exception:
+                continue
+        return out
+    except Exception:
+        return []
+
+def _chat_history_append(email, session_id, role, text):
+    if not REDIS_ENABLED or not session_id:
+        return
+    try:
+        k = _chat_history_key(email, session_id)
+        redis_pipeline(
+            ("RPUSH", k, json.dumps({"r": role, "t": str(text)[:1200]})),
+            ("LTRIM", k, -40, -1),
+            ("EXPIRE", k, CHAT_SESSION_TTL))
+    except Exception:
+        pass
+
+def _chat_history_block(history):
+    """Render the last turns as an untrusted context block for the prompt."""
+    if not history:
+        return ""
+    lines = []
+    for turn in history:
+        who = "User" if turn.get("r") == "user" else "Assistant"
+        lines.append("%s: %s" % (who, _esc(turn.get("t", ""))))
+    return "<conversation_history>" + chr(10) + chr(10).join(lines) + chr(10) + "</conversation_history>"
+
+def _chat_idem_seen(email, key):
+    """Plan sec.4: idempotency key per message -- a re-POSTed message_id
+    within 120s returns the cached reply instead of double-spending a call."""
+    if not REDIS_ENABLED or not key:
+        return None
+    try:
+        k = "xena:chat:idem:%s" % hashlib.sha1((email + "|" + key).encode("utf-8")).hexdigest()
+        return redis_get_json(k)
+    except Exception:
+        return None
+
+def _chat_idem_store(email, key, payload):
+    if not REDIS_ENABLED or not key:
+        return
+    try:
+        k = "xena:chat:idem:%s" % hashlib.sha1((email + "|" + key).encode("utf-8")).hexdigest()
+        redis_set_json(k, payload, ttl=120)
+    except Exception:
+        pass
+
+def _chat_system_prompt(personality, history=None):
+    """Plan sec.3: one real system prompt -- the shared TRUTH RULES + SCOPE
+    block, the persona directive, and the recent conversation as untrusted
+    context. Prepended ahead of the per-turn grounding message."""
+    parts = ["<system>" + TRUTH_RULES_SCOPE]
+    if personality in CHAT_PERSONALITIES:
+        parts.append(CHAT_PERSONALITIES[personality])
+    parts.append("</system>")
+    hb = _chat_history_block(history or [])
+    if hb:
+        parts.append(hb)
+    return chr(10) + chr(10).join(parts)
+
+def llm_complete(message, session_id="", mode="poll", await_s=30):
+    """Plan sec.2/4: the single LLM entry point. Aily is the only provider
+    (owner decision 2026-11-19); the fallback/circuit-breaker slots are saved
+    for later per Ahmed. Retries the chat-create leg with jitter via
+    _post_json_retry. Returns (reply, session_id, agent_chat_id, via)."""
+    tat = _aily_tenant_token()
+    if not tat:
+        raise RuntimeError("AILY chat is not configured on the server")
+    no_read = bool(redis_get_json("xena:aily_no_read_scope"))
+    if not no_read and mode == "poll":
+        try:
+            acid, sid = _aily_chat_create(tat, message, session_id)
+            reply = _aily_chat_await(tat, acid, await_s)
+            return reply, sid, acid, "poll"     # reply None = still running
+        except PermissionError:
+            redis_set_json("xena:aily_no_read_scope", {"since": int(time.time())}, ttl=600)
+    reply, sid, acid = _aily_chat_stream(tat, message, session_id)
+    return reply, sid, acid, "stream"
+
+def _chat_needs_escalation(route, text):
+    """Plan sec.2: route hard multi-step analysis to the long path. Returns
+    True when the question needs reasoning beyond a single lookup -- the
+    caller then gives the agent a longer await budget."""
+    t = str(text or "").lower()
+    if route.get("intent") in ("compare_periods", "what_if", "reject_reasons"):
+        return True
+    if re.search(r"\b(why|analy|explain|compare|trend|insight|recommend|strategy)\b", t):
+        return True
+    if re.search(r"(لماذا|حلل|اشرح|قارن|تحليل|کیوں|تجزیہ|وضاحت|为什么|分析|解释|对比)", str(text)):
+        return True
+    return len(t) > 240
+
+def _aily_stream_events(tat, message, session_id):
+    """Plan sec.4/8: consume the Aily SSE feed and YIELD normalized events
+    for our own SSE route:
+      {t:"meta", session_id, agent_chat_id}   -- first, so the client can poll
+      {t:"token", text}                        -- a text delta
+      {t:"done", reply, session_id}            -- final assembled reply
+      {t:"error", error}
+    Falls back to a single token+done pair from the whole reply when the feed
+    only sends snapshots (no deltas)."""
+    url = "https://open.feishu.cn/open-apis/aily/v1/agents/%s/chats" % AILY_AGENT_ID
+    body = {"user_message": {"content": [{"type": "text", "text": message}]}, "stream": True}
+    if session_id:
+        body["session_id"] = session_id
+    r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
+                                          "Content-Type": "application/json"},
+                            json=body, stream=True, timeout=(10, 35))
+    if r.status_code != 200:
+        yield {"t": "error", "error": "stream status=%s" % r.status_code}
+        return
+    sid, acid, candidates = session_id or "", "", []
+    prev_len = 0
+    for raw in r.iter_lines(decode_unicode=True):
+        if not raw or not raw.startswith("data:"):
+            continue
+        payload = raw[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            evt = json.loads(payload)
+        except Exception:
+            continue
+        if isinstance(evt, dict):
+            sid = evt.get("session_id") or (evt.get("data") or {}).get("session_id") or sid
+            acid = evt.get("agent_chat_id") or (evt.get("data") or {}).get("agent_chat_id") or acid
+            if evt.get("session"):
+                sid = (evt["session"] or {}).get("id") or sid
+            if acid and prev_len == 0:
+                yield {"t": "meta", "session_id": sid, "agent_chat_id": acid}
+        c2 = []
+        _sse_collect_text(evt, c2)
+        for c in c2:
+            candidates.append(c)
+        best = max(candidates, key=len).strip() if candidates else ""
+        if len(best) > prev_len:
+            yield {"t": "token", "text": best[prev_len:]}
+            prev_len = len(best)
+    final = max(candidates, key=len).strip() if candidates else ""
+    if not final:
+        yield {"t": "error", "error": "stream returned no text"}
+        return
+    yield {"t": "done", "reply": final, "session_id": sid}
+
 def _sse_collect_text(obj, out):
     """Recursively collect human-text candidates from one SSE event payload.
     Tolerant by design: handles delta-style {"text": ...} chunks AND final
@@ -19034,13 +19277,23 @@ def aily_chat():
         # for admins without the 'ai' module on their Access row (the owner
         # always keeps it).
         return jsonify({"error": "AI assistant is not enabled for this account."}), 403
-    if _chat_budget_exceeded(email):
-        # v34.1.28 (upgrade plan sec.2 item 4): daily per-user cap (200/day) on
-        # top of the per-IP rate limit.
+    if _chat_kill_switch():
+        # v34.4.0 (plan Phase 2 sec.6): Redis kill switch -- off without a deploy.
+        return jsonify({"error": "The assistant is temporarily disabled by an admin."}), 503
+    allowed, remaining = _chat_budget(email)
+    if not allowed:
+        # v34.4.0: per-user daily cap (200/day) on top of the per-IP rate limit.
         return jsonify({"error": "Daily assistant limit reached (200 messages) -- back tomorrow, or ask an admin."}), 429
     message = str(body.get("message", "") or "").strip()[:2000]   # v34.1.28: was 4000
     if not message:
         return jsonify({"error": "Empty message"}), 400
+    idem_key = str(body.get("message_id", "") or "").strip()[:80]
+    if idem_key:
+        # v34.4.0 (plan Phase 2 sec.4): idempotency -- a re-sent message_id
+        # returns the cached reply instead of double-spending a call.
+        seen = _chat_idem_seen(email, idem_key)
+        if seen:
+            return jsonify(seen)
     personality = str(body.get("personality", "") or "").strip().lower()
     if not MOCK_MODE:
         # v34.1.29: plain ticket/agency lookups never reach the LLM --
@@ -19074,6 +19327,14 @@ def aily_chat():
                                   (time.time()-_t0)*1000,
                                   {"entities": route.get("entities")})
                 return jsonify({"reply": _tool_reply, "session_id": "", "via": "tool"})
+    # v34.4.0 (plan sec.9): SOP/rule questions served from the response cache
+    # (keyed by the KB version) skip the LLM entirely on a repeat ask.
+    if not MOCK_MODE and route.get("intent") in ("explain_rule", "qa"):
+        cached = _chat_cache_get(email, message)
+        if cached and cached.get("reply"):
+            _chat_log_request(email, route.get("intent"), "cache", (time.time()-_t0)*1000, {})
+            return jsonify({"reply": cached["reply"], "session_id": stored.get("session_id", ""),
+                            "via": "cache", "remaining": remaining})
     new_session = bool(body.get("new_session"))
     skey = _chat_session_key(email)
     stored = redis_get_json(skey) or {}
@@ -19093,12 +19354,13 @@ def aily_chat():
         return jsonify({"reply": "[mock] %s: %s" % (personality or "samurai", message),
                         "session_id": sid, "via": "mock"})
     first_in_session = not session_id
+    history = _chat_history_get(email, session_id)
     if personality in CHAT_PERSONALITIES:
-        # v34.1.28 (upgrade plan sec.3/8): the directive now rides EVERY turn
-        # (short, <=400 chars) so the persona never fades over a long chat, and
-        # every turn carries today's date, a data-as-of stamp, LIVE records for
-        # any mentioned ticket/agency IDs, and the untrusted-data fence rules.
-        message = _chat_ground_message(personality, message, email)
+        # v34.4.0 (plan Phase 2 sec.3/4): the system prompt (TRUTH RULES + SCOPE
+        # + persona) and the last-8-turns conversation history ride ahead of the
+        # per-turn grounding message (date, live records, fence rules).
+        message = (_chat_system_prompt(personality, history) + "\n\n"
+                   + _chat_ground_message(personality, message, email))
     tat = _aily_tenant_token()
     if not tat:
         return jsonify({"error": "AILY chat is not configured on the server (FEISHU_APP_ID/SECRET missing)."}), 503
@@ -19150,9 +19412,18 @@ def aily_chat():
             audit.log(name or email, "CHAT_SESSION_NEW", "personality=%s" % (personality or "-"), severity="Info")
         except Exception:
             pass
+    _chat_history_append(email, session_id, "user", str(body.get("message", "") or ""))
+    _chat_history_append(email, session_id, "assistant", reply)
+    if route.get("intent") in ("explain_rule", "qa") and reply:
+        # v34.4.0 (plan sec.9): cache SOP answers keyed by the KB version so a
+        # rebuild invalidates them automatically.
+        _chat_cache_set(email, str(body.get("message", "") or ""), reply)
     _chat_log_request(email, route.get("intent"), via, (time.time()-_t0)*1000,
-                      {"entities": route.get("entities")})
-    return jsonify({"reply": reply, "session_id": session_id, "via": via})
+                      {"entities": route.get("entities"), "remaining": remaining})
+    resp = {"reply": reply, "session_id": session_id, "via": via, "remaining": remaining}
+    if idem_key:
+        _chat_idem_store(email, idem_key, resp)
+    return jsonify(resp)
 
 
 @app.route('/api/chat/feedback', methods=['POST'])
@@ -19226,6 +19497,76 @@ def aily_chat_result():
     except Exception:
         pass
     return jsonify({"reply": reply, "session_id": sid, "via": "poll"})
+
+
+@app.route('/api/chat/stream', methods=['POST'])
+@rate_limit(15, 60)
+def aily_chat_stream_route():
+    """v34.4.0 (plan Phase 2 sec.4/8): real token streaming. The frontend POSTs
+    {message, session_id?, personality?, new_session?}; we proxy the Aily SSE
+    feed as normalized events (meta / token / done / error). The existing
+    /api/chat poll + 202 path stays as the safety net -- the widget falls back
+    to it automatically if this route errors or the browser lacks streaming."""
+    email = sanitize_text(request.headers.get("X-User-Email", ""), 200)
+    name  = sanitize_text(request.headers.get("X-User-Name", ""), 120)
+    body  = request.get_json(silent=True) or {}
+    email = email or sanitize_text(str(body.get("email", "") or ""), 200)
+    if not email or "@" not in email:
+        return jsonify({"error": "Sign in to use the assistant."}), 401
+    if not has_ai_access(email, name):
+        return jsonify({"error": "AI assistant is not enabled for this account."}), 403
+    if _chat_kill_switch():
+        return jsonify({"error": "The assistant is temporarily disabled by an admin."}), 503
+    allowed, remaining = _chat_budget(email)
+    if not allowed:
+        return jsonify({"error": "Daily assistant limit reached (200 messages) -- back tomorrow, or ask an admin."}), 429
+    message = str(body.get("message", "") or "").strip()[:2000]
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+    if MOCK_MODE:
+        def _mock():
+            yield "data: " + json.dumps({"t": "meta", "session_id": "mock_session_1", "agent_chat_id": ""}) + "\n\n"
+            yield "data: " + json.dumps({"t": "token", "text": "[mock stream] "}) + "\n\n"
+            yield "data: " + json.dumps({"t": "done", "reply": "[mock stream] " + message, "session_id": "mock_session_1"}) + "\n\n"
+        return Response(_mock(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    tat = _aily_tenant_token()
+    if not tat:
+        return jsonify({"error": "AILY chat is not configured on the server."}), 503
+    personality = str(body.get("personality", "") or "").strip().lower()
+    new_session = bool(body.get("new_session"))
+    skey = _chat_session_key(email)
+    stored = redis_get_json(skey) or {}
+    session_id = "" if new_session else (body.get("session_id") or stored.get("session_id") or "")
+    history = _chat_history_get(email, session_id)
+    grounded = _chat_ground_message(personality, message, email) if personality in CHAT_PERSONALITIES else message
+    full_message = _chat_system_prompt(personality, history) + "\n\n" + grounded
+    route = _chat_route(message)
+    _t0 = time.time()
+    _chat_history_append(email, session_id, "user", message)
+
+    def _gen():
+        final = {"reply": "", "session_id": session_id}
+        try:
+            for evt in _aily_stream_events(tat, full_message, session_id):
+                if evt.get("t") == "done":
+                    final["reply"] = evt.get("reply", "")
+                    final["session_id"] = evt.get("session_id", session_id)
+                yield "data: " + json.dumps(evt, ensure_ascii=False) + "\n\n"
+        except Exception as e:
+            yield "data: " + json.dumps({"t": "error", "error": str(e)[:200]}) + "\n\n"
+            return
+        sid2 = final["session_id"]
+        if sid2:
+            redis_set_json(skey, {"session_id": sid2,
+                                  "personality": personality or stored.get("personality") or ""},
+                           ttl=CHAT_SESSION_TTL)
+            if final["reply"]:
+                _chat_history_append(email, sid2, "assistant", final["reply"])
+        _chat_log_request(email, route.get("intent"), "sse",
+                          (time.time()-_t0)*1000, {"entities": route.get("entities")})
+    return Response(_gen(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 if __name__ == '__main__':

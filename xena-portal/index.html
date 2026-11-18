@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.3.0 phase1-complete 2026-11-19';
+window.SAM19_BUILD='v34.4.0 phase2-stream 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32998,6 +32998,65 @@ function greet(){
     ? 'Hello! I am Noora 🌸 Ask me anything about audition tickets, rules or special cases — Arabic, Urdu, English or 中文, as you like.'
     : 'Samurai here 🗡 Ask me about any ticket, rule or case. I answer only from the verified Xena knowledge base — Arabic, Urdu, English, 中文.', 'bot');
 }
+// v34.4.0 (plan Phase 2 sec.4/8): token streaming via /api/chat/stream.
+// We POST and read the body as a stream; each `data:` line is a JSON event
+// (meta / token / done / error). On ANY failure (no ReadableStream, a server
+// error event, a transport error) we return false so send() falls back to the
+// existing poll + 202 path unchanged -- the poll path is the safety net.
+async function sendStream(text, typing){
+  if(!window.ReadableStream || !window.fetch){ return false; }
+  var res;
+  try{
+    res = await fetch('/api/chat/stream', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
+      body: JSON.stringify({message:text, session_id:sessionId||undefined, personality:personaSel.value})
+    });
+  }catch(e){ return false; }
+  if(!res.ok || !res.body){ return false; }
+  var reader = res.body.getReader();
+  var dec = new TextDecoder();
+  var buf = '', answer = '', bubble = null, meta = null;
+  typing.remove();
+  function ensureBubble(){
+    if(!bubble){
+      bubble = document.createElement('div');
+      bubble.className = 'xaMsg bot';
+      bubble.innerHTML = '<div class="xaTxt"></div>';
+      msgsEl.appendChild(bubble);
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+    return bubble.querySelector('.xaTxt');
+  }
+  while(true){
+    var chunk;
+    try{ chunk = await reader_read(); }catch(e){ break; }
+    if(chunk.done){ break; }
+    buf += chunk.text;
+    var idx;
+    while((idx = buf.indexOf('\n\n')) !== -1){
+      var raw = buf.slice(0, idx); buf = buf.slice(idx + 2);
+      var line = raw.split('\n').filter(function(l){ return l.indexOf('data:') === 0; })
+                    .map(function(l){ return l.slice(5).trim(); }).join('');
+      if(!line){ continue; }
+      var evt; try{ evt = JSON.parse(line); }catch(e){ continue; }
+      if(evt.t === 'meta'){ meta = evt; if(evt.session_id){ sessionId = evt.session_id; localStorage.setItem('xenaChatSess', sessionId); } }
+      else if(evt.t === 'token' && evt.text){ answer += evt.text; ensureBubble().textContent = answer; msgsEl.scrollTop = msgsEl.scrollHeight; }
+      else if(evt.t === 'done'){
+        if(evt.session_id){ sessionId = evt.session_id; localStorage.setItem('xenaChatSess', sessionId); }
+        if(bubble){ bubble.remove(); bubble = null; }
+        addMsg(evt.reply || answer, 'bot');
+        return true;
+      }
+      else if(evt.t === 'error'){ if(bubble){ bubble.remove(); } return false; }
+    }
+  }
+  if(bubble){ bubble.remove(); }
+  return false;
+  function reader_read(){
+    return reader.read().then(function(r){ return {done:r.done, text: r.done ? '' : dec.decode(r.value, {stream:true})}; });
+  }
+}
 async function send(){
   var text = inputEl.value.trim();
   if(!text || busy) return;
@@ -33013,6 +33072,11 @@ async function send(){
     inputEl.focus();
   };
   try{
+    // v34.4.0: try token streaming first; fall back to the poll path below.
+    // The typeof guard keeps an isolated send() (no module-scope sendStream)
+    // from throwing a ReferenceError -- it just falls through to the poll path.
+    var streamed = (typeof sendStream === 'function') ? await sendStream(text, typing) : false;
+    if(streamed){ busy = false; sendBtn.disabled = false; inputEl.focus(); return; }
     var res = await fetch('/api/chat', {
       method:'POST',
       headers:{'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
