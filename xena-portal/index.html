@@ -29046,29 +29046,12 @@ function samFocusNext(from) {
         } catch (err) {}
     });
 
-    // ── 6. Mention-group fast buttons: ACM fallback + repaint on show ──
-    // Ahmed: the quick group buttons sometimes never appear. Primary source
-    // is the "Mention this Group" lookup; when it comes back empty, derive a
-    // candidate from the ticket's ACM name and re-use the exact fuzzy
-    // matcher (via a synthetic ticket) so spellings like Hasseb/Haseeb and
-    // Mubeen's "PK-Mubeen Group" still land on real options.
-    if (typeof twRenderMgFast === 'function') {
-        const _samOrigRenderMgFast = twRenderMgFast;
-        twRenderMgFast = function (ticket) {
-            _samOrigRenderMgFast.apply(this, arguments);
-            try {
-                const box = document.getElementById('twMgFast');
-                if (!box || box.querySelector('.tw-mg-fast-btn') || !ticket || !ticket.fields) return;
-                const region = String(feishuValueToString(ticket.fields['Region']) || '').trim().toUpperCase() === 'IN' ? 'IN' : 'PK';
-                const acmRaw = ticket.fields[region === 'IN' ? 'Acm Name (IN)' : 'Acm Name (PK)'];
-                const acm = String(feishuValueToString(acmRaw) || '').trim();
-                if (!acm) return;
-                const fake = { fields: { 'Mention this Group': [region + '-' + acm.replace(/\s+/g, '') + '-Audition group', acm] } };
-                const groups = twMgFastGroups(fake);
-                if (groups.length && typeof twMgFastPaint === 'function') twMgFastPaint(groups);
-            } catch (e) {}
-        };
-    }
+    // ── 6. Mention-group fast buttons: repaint on show ──
+    // v34.1.24 (Ahmed: "check this still not solved" -- a ticket whose lookup
+    // = [IN-Ritu, SA Agency] still showed "IN-Holy&Ritu" derived from the ACM
+    // Name): the old ACM-name fallback is DELETED. Under v34.1.23 the buttons
+    // echo ONLY the ticket's "Mention this Group" lookup; an empty lookup
+    // means NO buttons -- never a group guessed from any other field.
     try {
         const ws = document.getElementById('pg-ticket-workspace');
         if (ws && typeof MutationObserver !== 'undefined') {
@@ -30844,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.1.23 mgfast-lookup-only 2026-11-19';
+window.SAM19_BUILD='v34.1.24 mgfast-no-acm-fallback 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
