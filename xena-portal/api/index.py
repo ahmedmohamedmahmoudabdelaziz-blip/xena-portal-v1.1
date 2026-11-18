@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.4.0 phase2-stream 2026-11-19"
+XENA_BUILD = "v34.5.0 phase3-enterprise-ui 2026-11-19"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -19552,6 +19552,7 @@ def aily_chat_stream_route():
                 if evt.get("t") == "done":
                     final["reply"] = evt.get("reply", "")
                     final["session_id"] = evt.get("session_id", session_id)
+                    evt["remaining"] = remaining   # v34.5.0: widget shows the daily budget left
                 yield "data: " + json.dumps(evt, ensure_ascii=False) + "\n\n"
         except Exception as e:
             yield "data: " + json.dumps({"t": "error", "error": str(e)[:200]}) + "\n\n"
