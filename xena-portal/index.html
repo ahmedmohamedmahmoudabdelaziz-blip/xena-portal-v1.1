@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.6.0 ai-tab-redesign 2026-11-19';
+window.SAM19_BUILD='v34.7.0 ai-quality-hardening 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32495,7 +32495,7 @@ xa4SettingsEnsure(false);
    the JS class .xaOpen (set/removed in executePageLogic), with visible
    frame + accent top-line + gradient header/composer strips in BOTH themes. */
 #xaChatPanel.xaPageMode{position:relative;left:auto;bottom:auto;flex:1;height:100%;
-  width:100%;max-width:1180px;margin:0 auto;border-radius:20px;overflow:hidden;
+  width:100%;max-width:none;margin:0 auto;border-radius:20px;overflow:hidden;
   border:1px solid var(--xa-border);
   background:linear-gradient(180deg,var(--xa-bg) 0%,var(--xa-bg2) 100%);
   box-shadow:0 18px 48px -14px rgba(0,0,0,.5),var(--xa-shadow)}
@@ -32629,8 +32629,9 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
   --xa-ac:#2dd4f0;--xa-acink:#04222a;--xa-ink:#0a0d16;
   font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;
   background:var(--xa-bg);border:1px solid var(--xa-border);border-radius:16px;flex-direction:row}
-#xaChatPanel.xaPageMode{background:var(--xa-bg);max-width:1280px;
-  box-shadow:0 24px 64px -16px rgba(0,0,0,.65)}
+#xaChatPanel.xaPageMode{background:var(--xa-bg);max-width:none;width:100%;margin:0;
+  border-radius:0;border-left:0;border-right:0;min-height:100%;
+  box-shadow:none}  /* v34.7.0: fill the full page, no fixed cap (Ahmed) */
 /* Three-column shell: sidebar | main | evidence */
 #xaSide,#xaEvidence{display:none}
 #xaMain{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;height:100%}
@@ -32668,7 +32669,8 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
 .xaAv{width:32px;height:32px;border-radius:50%;background:var(--xa-ac);color:var(--xa-acink);
   display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
 #xaChatPanel .xaChatTitle{display:flex;flex-direction:column;line-height:1.15;font-size:15px;
-  white-space:nowrap;overflow:visible;text-overflow:clip}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;flex:none}
+  /* v34.7.0: clip the name, never let it run under the controls */
 #xaChatPanel .xaChatTitle #xaChatName{font-weight:700;font-size:15px;color:var(--xa-text)}
 #xaChatPanel .xaChatSub{font-size:11px;color:var(--xa-muted);font-weight:500}
 #xaChatPanel .xaChatHead select{background:transparent;color:var(--xa-text);border:0;border-radius:8px;
@@ -32683,7 +32685,8 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
 .xaSyncPill.warn{background:rgba(245,185,74,.10);border-color:rgba(245,185,74,.35);color:#f5b942}
 .xaSyncPill.warn .xaSyncDot{background:#f5b942}
 .xaPersonaSeg{display:none;gap:2px;align-items:center}
-#xaChatPanel.xaPageMode .xaPersonaSeg{display:inline-flex}
+#xaChatPanel.xaPageMode .xaPersonaSeg{display:inline-flex;margin-left:auto;background:var(--xa-ink);
+  border:1px solid var(--xa-border);border-radius:10px;padding:3px;flex:none}
 #xaChatPanel.xaPageMode #xaChatPersona{display:none}
 .xaPersonaSeg button{height:32px;padding:0 12px;border-radius:8px;border:0;background:transparent;
   color:var(--xa-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;width:auto;min-width:0;min-height:0}
@@ -32692,6 +32695,18 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
 #xaEvBtn{display:none}
 #xaChatPanel.xaPageMode #xaEvBtn{display:grid}
 #xaChatPanel.xaPageMode #xaEvBtn.on{color:var(--xa-ac);background:rgba(45,212,240,.12)}
+/* v34.7.0: rendered markdown blocks (Ahmed: tables/lists must look designed) */
+.xaTableWrap{overflow-x:auto;margin:8px 0;border:1px solid var(--xa-border);border-radius:10px}
+.xaTable{border-collapse:collapse;width:100%;font-size:13.5px;min-width:320px}
+.xaTable th,.xaTable td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--xa-border);vertical-align:top}
+.xaTable thead th{background:var(--xa-bg2);color:var(--xa-text);font-weight:600;white-space:nowrap}
+.xaTable tbody tr:last-child td{border-bottom:0}
+.xaTable tbody tr:nth-child(even){background:rgba(23,29,42,.5)}
+.xaTable .xaEnt{white-space:nowrap}
+h3.xaH,h4.xaH,h5.xaH,h6.xaH{margin:14px 0 6px;color:var(--xa-text);font-weight:700;line-height:1.3}
+h3.xaH{font-size:17px}h4.xaH{font-size:15.5px}h5.xaH,h6.xaH{font-size:14px;color:var(--xa-muted)}
+.xaList{margin:6px 0;padding-left:22px;color:var(--xa-text)}
+.xaList li{margin:4px 0;line-height:1.55}
 /* Messages surface */
 #xaChatPanel #xaChatMsgs{padding:16px;gap:16px;background:var(--xa-bg)}
 #xaChatPanel .xaMsg{max-width:88%;border-radius:16px}
@@ -32927,11 +32942,57 @@ function xaChipify(h){
     return '<span class="xaEnt" data-k="user" data-id="'+id+'" dir="ltr" title="Open user">\u{1F464} '+id+'</span>'; });
   return h;
 }
+/* v34.7.0 (Ahmed): real rendering. Tables / headings / lists become proper HTML
+   instead of literal | --- | and ### so answers read like a designed chat, not a
+   raw markdown dump. Block-aware; inline styling still comes from mdLite; every
+   cell/line is escape-first then chipified. */
+function xaRenderBlocks(text){
+  var lines = String(text).split('\n');
+  var out = [], i = 0, dir;
+  function paraDir(t){ return RTL_RE.test(String(t).slice(0,60)) ? 'rtl' : 'ltr'; }
+  while(i < lines.length){
+    var ln = lines[i];
+    // table block: a header row of pipes followed by a --- separator row
+    if(/^\s*\|.+\|\s*$/.test(ln) && i+1 < lines.length && /^\s*\|[\s:\-|]+\|\s*$/.test(lines[i+1])){
+      var head = ln.replace(/^\s*\||\|\s*$/g,'').split('|');
+      var rows = []; i += 2;
+      while(i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])){
+        rows.push(lines[i].replace(/^\s*\||\|\s*$/g,'').split('|')); i++;
+      }
+      dir = paraDir(head.join(' '));
+      var tb = '<div class="xaTableWrap" dir="'+dir+'"><table class="xaTable"><thead><tr>';
+      head.forEach(function(c){ tb += '<th>' + xaChipify(mdLite(c.trim())) + '</th>'; });
+      tb += '</tr></thead><tbody>';
+      rows.forEach(function(r){ tb += '<tr>'; r.forEach(function(c){ tb += '<td>' + xaChipify(mdLite(c.trim())) + '</td>'; }); tb += '</tr>'; });
+      tb += '</tbody></table></div>';
+      out.push(tb); continue;
+    }
+    // heading
+    var hm = ln.match(/^\s*(#{1,4})\s+(.*)$/);
+    if(hm){ var lvl = Math.min(hm[1].length + 1, 6); out.push('<h'+lvl+' class="xaH" dir="'+paraDir(hm[2])+'">'+xaChipify(mdLite(hm[2]))+'</h'+lvl+'>'); i++; continue; }
+    // unordered list block
+    if(/^\s*[-*]\s+/.test(ln)){
+      dir = paraDir(ln); var ul = '<ul class="xaList" dir="'+dir+'">';
+      while(i < lines.length && /^\s*[-*]\s+/.test(lines[i])){ ul += '<li>' + xaChipify(mdLite(lines[i].replace(/^\s*[-*]\s+/,''))) + '</li>'; i++; }
+      out.push(ul + '</ul>'); continue;
+    }
+    // ordered list block
+    if(/^\s*\d+[.)]\s+/.test(ln)){
+      dir = paraDir(ln); var ol = '<ol class="xaList" dir="'+dir+'">';
+      while(i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])){ ol += '<li>' + xaChipify(mdLite(lines[i].replace(/^\s*\d+[.)]\s+/,''))) + '</li>'; i++; }
+      out.push(ol + '</ol>'); continue;
+    }
+    // blank line -> paragraph break
+    if(/^\s*$/.test(ln)){ i++; continue; }
+    // paragraph: gather until blank or a block start
+    var buf = [ln]; i++;
+    while(i < lines.length && !/^\s*$/.test(lines[i]) && !/^\s*\|.+\|\s*$/.test(lines[i]) && !/^\s*#{1,4}\s+/.test(lines[i]) && !/^\s*[-*]\s+/.test(lines[i]) && !/^\s*\d+[.)]\s+/.test(lines[i])){ buf.push(lines[i]); i++; }
+    var pt = buf.join('\n'); out.push('<div class="xaPara" dir="'+paraDir(pt)+'">' + xaChipify(mdLite(pt)) + '</div>');
+  }
+  return out.join('');
+}
 function renderBot(text){
-  var out = String(text).split(/\n{2,}/).map(function(p){
-    var dir = RTL_RE.test(p.slice(0,60)) ? 'rtl' : 'ltr';
-    return '<div class="xaPara" dir="'+dir+'">' + xaChipify(mdLite(p)) + '</div>';
-  }).join('');
+  var out = xaRenderBlocks(text);
   // v34.1.29 (plan sec.5): DOMPurify as a final pass -- mdLite already escapes
   // everything, this is defense-in-depth so a crafted KB line can never inject HTML.
   if(typeof window!=='undefined' && window.DOMPurify && window.DOMPurify.sanitize){ return window.DOMPurify.sanitize(out, {ADD_ATTR:['dir','data-k','data-id','title']}); }
@@ -33279,14 +33340,69 @@ function voiceLang(){
   if(nav.indexOf('zh')===0) return 'zh-CN';
   return 'en-US';
 }
+/* v34.7.0 (Ahmed): the speaker must not read markdown syntax, emojis or raw
+   digit-runs one by one, and must pick a voice from the ANSWER's language with a
+   male/female per persona (Samurai male, Noora female) -- not a cheap default. */
+function ttsClean(text){
+  var t = String(text||'');
+  t = t.replace(/```[\s\S]*?```/g, ' code block. ');
+  t = t.replace(/\|/g, ' ');
+  t = t.replace(/^\s*\|[\s:\-|]+\|\s*$/gm, ' ');
+  t = t.replace(/#{1,6}\s*/g, '');
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
+  t = t.replace(/`([^`]+)`/g, '$1');
+  t = t.replace(/^\s*[-*]\s+/gm, '');
+  t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}]/gu, '');
+  t = t.replace(/#(\d{2,7})/g, ' number $1');
+  t = t.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+  t = t.replace(/https?:\/\/\S+/g, ' link ');
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  return t;
+}
+function ttsLangFor(text){
+  if(typeof langSel!=='undefined' && langSel && langSel.value && langSel.value !== 'auto'){ return LANG_MAP[langSel.value]; }
+  var t = String(text||'');
+  if(/[\u4e00-\u9fff]/.test(t)) return 'zh-CN';
+  if(/[\u0600-\u06FF]/.test(t)){
+    if(/[\u0679\u0688\u0691\u06BA\u06BE\u06C1\u06C2\u06C3\u06D2\u06D4]/.test(t)) return 'ur-PK';
+    return 'ar-SA';
+  }
+  return 'en-US';
+}
+function ttsPickVoice(lang, persona){
+  var vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  if(!vs || !vs.length) return null;
+  var pref = lang.slice(0,2).toLowerCase();
+  var pool = vs.filter(function(v){ return v.lang && v.lang.toLowerCase().indexOf(pref) === 0; });
+  if(!pool.length) pool = vs;
+  var wantFemale = (persona === 'noora');
+  var femaleRe = /(female|woman|zariyah|zira|samantha|laila|layla|amira|hoda|salma|sara|natasha|aliya|gul|heera|kalpana|ting|mei|xiaoxiao|xiaoyi|huihui)/i;
+  var maleRe = /(male|david|mark|alex|daniel|george|james|naayf|hamed|tarik|omar|ali|ahmed|youssef|asad|qasim|kangkang|yunxi|yunyang|yunjian)/i;
+  function score(v){
+    var n = (v.name||'') + ' ' + (v.voiceURI||'');
+    var sc = 0;
+    if(v.lang && v.lang.toLowerCase() === lang.toLowerCase()) sc += 4;
+    else if(v.lang && v.lang.toLowerCase().indexOf(pref) === 0) sc += 2;
+    if(wantFemale && femaleRe.test(n)) sc += 3;
+    if(!wantFemale && maleRe.test(n)) sc += 3;
+    if(/google|natural|neural|online|premium/i.test(n)) sc += 1;
+    return sc;
+  }
+  pool = pool.slice().sort(function(a,b){ return score(b) - score(a); });
+  return pool[0] || null;
+}
 function speak(text, btn){
   try{
     if(!('speechSynthesis' in window)){ btn.textContent='🔇 Not supported'; return; }
     if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); btn.textContent='🔊 Listen'; return; }
-    var u = new SpeechSynthesisUtterance(text);
-    u.lang = voiceLang();
-    var vs = window.speechSynthesis.getVoices();
-    for(var i=0;i<vs.length;i++){ if(vs[i].lang && vs[i].lang.toLowerCase().indexOf(u.lang.slice(0,2))===0){ u.voice = vs[i]; break; } }
+    var cleaned = ttsClean(text);
+    if(!cleaned){ btn.textContent='🔊 Listen'; return; }
+    var u = new SpeechSynthesisUtterance(cleaned);
+    var persona = (typeof personaSel!=='undefined' && personaSel && personaSel.value) ? personaSel.value : 'samurai';
+    u.lang = ttsLangFor(cleaned);
+    var _v = ttsPickVoice(u.lang, persona);
+    if(_v) u.voice = _v;
+    u.rate = 1; u.pitch = (persona === 'noora') ? 1.05 : 0.95;
     btn.textContent = '⏹ Stop';
     u.onend = u.onerror = function(){ btn.textContent = '🔊 Listen'; };
     window.speechSynthesis.speak(u);
