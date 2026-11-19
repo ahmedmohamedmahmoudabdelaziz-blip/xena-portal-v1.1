@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.8.0 ai-self-learning 2026-11-19"
+XENA_BUILD = "v34.8.1 kb-sync-fix 2026-11-19"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -17661,9 +17661,18 @@ def _knowledge_sync_body(admin_name):
     # the resume cursor spreads a big backlog across runs inside the budget.
     since_ms = max(since_ms, now_ms - 30 * 86400 * 1000)
     max_mod_ms = since_ms   # newest last_modified_time actually seen this pass
-    # Server-side filter on the record's own last-modified timestamp.
+    # v34.8.1 (Ahmed: KB frozen, cron Failed-timeout every run): the old filter
+    # used last_modified_time, which Feishu REJECTS -- 1254018 InvalidFilter on
+    # BOTH isGreaterEqual and isGreater, and 1254016 InvalidSort on sort (the auto
+    # timestamp is not queryable). That made every run fall back to an unfiltered
+    # full-table walk that blew the 30s cron cap. Filter on 'Submitted on' (a real
+    # created-time field that ACCEPTS isGreater, live-proven) instead -- this
+    # catches every NEW ticket in the cursor window, which is the exact gap.
+    # Changed old tickets are re-diffed by line below. isGreater (not the rejected
+    # isGreaterEqual); the bound is nudged -1ms to stay inclusive.
     filt = {"conjunction": "and", "conditions": [
-        {"field_name": "last_modified_time", "operator": "isGreaterEqual", "value": [str(since_ms)]}]}
+        {"field_name": "Submitted on", "operator": "isGreater",
+         "value": ["ExactDate", str(since_ms - 1)]}]}
     resume_tok = st.get("sync_resume_token") or ""
     if resume_tok == "RESTART_WINDOW":
         resume_tok = ""   # previous run died mid-page-1: re-read the window from the top
@@ -17676,9 +17685,16 @@ def _knowledge_sync_body(admin_name):
         items, nxt, ferr = _kb_fetch_page(tat, "", filter_obj=filt, sort_desc=True)
     if ferr:
         # Fallback: most recent page by Numbering, client-side filter on last_modified.
+        # v34.8.1: ONE page only (newest 500 tickets). The old fallback kept paging
+        # through the WHOLE table (20k+ rows, ~40 cross-border pages) whenever the
+        # filter errored -- that is exactly what blew cron-job.org's 30s cap and
+        # froze the KB. 500 newest tickets covers any realistic cron gap (the cron
+        # runs every 15 min); a bigger backlog self-heals across runs via the
+        # overlap window, and a full rebuild uses the backfill, not the sync.
         filt = None
         resume_tok = ""
         items, nxt, ferr = _kb_fetch_page(tat, "", sort_desc=True)
+        nxt = ""   # do not continue into the rest of the table
     new_count, changed = 0, 0
     dirty, errors = {}, []
     # v34.1.16: hard time budget. cron-job.org's plan caps the request
@@ -17857,13 +17873,17 @@ def _knowledge_sync_body(admin_name):
             pqs = "?automatic_fields=true&page_size=500"
             purl = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search%s"
                     % (BASE_ID, POINTS_TABLE_ID, pqs))
-            pfilt = {"conjunction": "and", "conditions": [
-                {"field_name": "last_modified_time", "operator": "isGreaterEqual", "value": [str(pts_since)]}]}
+            # v34.8.1: last_modified_time rejects isGreaterEqual (1254018). The
+            # points table is tiny (~hundreds of rows) -- read it whole and diff
+            # by content instead of a rejected timestamp filter.
+            pfilt = None
+            _pbody = {"sort": [{"field_name": "Agency Code", "desc": False}]}
+            if pfilt:
+                _pbody["filter"] = pfilt
             pdata = feishu_session.post(
                 purl, headers={"Authorization": "Bearer %s" % tat,
                                "Content-Type": "application/json"},
-                json={"filter": pfilt, "sort": [{"field_name": "Agency Code", "desc": False}]},
-                timeout=20).json()
+                json=_pbody, timeout=20).json()
             pitems = ((pdata.get("data") or {}).get("items") or []) if pdata.get("code") == 0 else []
             if pdata.get("code") == 0 and (pitems or not st.get("points_last_modified_ms")):
                 pmax = pts_since
