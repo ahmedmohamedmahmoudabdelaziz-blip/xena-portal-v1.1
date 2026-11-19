@@ -7594,8 +7594,8 @@ function executePageLogic(page) {
         if (chatPnl && chatHost && chatPnl.parentNode !== chatHost) {
             chatHost.appendChild(chatPnl);
             chatPnl.classList.add('xaPageMode', 'open');
-            if (window.XAC && typeof window.XAC.greet === 'function' &&
-                !document.getElementById('xaChatMsgs').children.length) window.XAC.greet();
+            if (window.XAC && typeof window.XAC.emptyState === 'function' &&   // v34.6.0: mockup start screen
+                !document.getElementById('xaChatMsgs').children.length) window.XAC.emptyState();
             if (window.XAC && typeof window.XAC.freshness === 'function') window.XAC.freshness();
         }
     } else if(page==='bind-queue'){
@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.5.0 phase3-enterprise-ui 2026-11-19';
+window.SAM19_BUILD='v34.6.0 ai-tab-redesign 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32615,17 +32615,235 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
 .xaChip{background:var(--xa-bg2);border:1px solid var(--xa-border);color:var(--xa-text);border-radius:4px;
   font-size:11.5px;padding:3px 9px;cursor:pointer}
 .xaChip:hover{border-color:var(--border-hover);color:var(--xa-text)}
+
+/* ===== v34.6.0 (Ahmed's "AI Tab Redesign" mockup, comment 7709684995337555139) =====
+   The mockup's design language: near-black blue surfaces (#0a0d16 / #10151f /
+   #171d2a), #252d3e hairlines, #9aa6ba muted text, ONE cyan accent #2dd4f0,
+   Inter type, JetBrains Mono for IDs, green Live/Synced accents, amber
+   syncing-degrade. The chat becomes a self-contained dark surface in BOTH
+   portal themes (the mockup is dark-only). All earlier chat rules stay --
+   these come later in the sheet, so they win the cascade. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+#xaChatPanel{--xa-bg:#10151f;--xa-bg2:#171d2a;--xa-head:#10151f;--xa-text:#e8edf5;--xa-muted:#9aa6ba;
+  --xa-border:#252d3e;--xa-shadow:0 24px 64px -16px rgba(0,0,0,.65);
+  --xa-ac:#2dd4f0;--xa-acink:#04222a;--xa-ink:#0a0d16;
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;
+  background:var(--xa-bg);border:1px solid var(--xa-border);border-radius:16px;flex-direction:row}
+#xaChatPanel.xaPageMode{background:var(--xa-bg);max-width:1280px;
+  box-shadow:0 24px 64px -16px rgba(0,0,0,.65)}
+/* Three-column shell: sidebar | main | evidence */
+#xaSide,#xaEvidence{display:none}
+#xaMain{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;height:100%}
+#xaChatPanel.xaPageMode #xaSide{display:flex;flex-direction:column;width:264px;flex:none;
+  border-right:1px solid var(--xa-border);background:var(--xa-ink);padding:12px;gap:10px;overflow-y:auto}
+#xaChatPanel.xaPageMode.evOn #xaEvidence{display:flex;flex-direction:column;width:340px;flex:none;
+  border-left:1px solid var(--xa-border);background:var(--xa-ink)}
+/* Sidebar: New chat, search, chats by day, pinned, messages meter */
+.xaSideNew{height:44px;border-radius:10px;border:1px solid var(--xa-ac);background:rgba(45,212,240,.12);
+  color:var(--xa-ac);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;padding:0 14px}
+.xaSideNew:hover{background:rgba(45,212,240,.2)}
+#xaSideSearch{height:36px;border-radius:10px;border:1px solid var(--xa-border);background:var(--xa-bg);
+  color:var(--xa-text);font-size:13px;padding:0 10px;outline:none;font-family:inherit}
+#xaSideSearch:focus{border-color:var(--xa-ac)}
+.xaSessList{display:flex;flex-direction:column;gap:2px;min-height:24px}
+.xaSessDay,.xaSideLbl{font-size:11px;color:var(--xa-muted);padding:8px 10px 2px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.4px}
+.xaSess{display:block;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--xa-muted);
+  font-size:13px;border:0;background:transparent;text-align:start;font-family:inherit;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.xaSess:hover{background:var(--xa-bg2);color:var(--xa-text)}
+.xaSess.on{background:var(--xa-bg2);color:var(--xa-text)}
+.xaPinList{display:flex;flex-direction:column;gap:2px}
+.xaPinIt{display:block;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--xa-muted);
+  font-size:12.5px;border:0;background:transparent;text-align:start;font-family:inherit;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.xaPinIt:hover{background:var(--xa-bg2);color:var(--xa-text)}
+.xaMeter{margin-top:auto;border:1px solid var(--xa-border);border-radius:12px;padding:10px 12px;background:var(--xa-bg)}
+.xaMeterRow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--xa-muted)}
+#xaMeterVal{color:var(--xa-text);font-weight:600}
+.xaMeterBar{height:6px;border-radius:3px;background:var(--xa-bg2);margin-top:8px;overflow:hidden}
+#xaMeterFill{height:100%;border-radius:3px;background:var(--xa-ac);width:0%}
+/* Header: 60px strip, avatar + persona name, sync pill, icon buttons */
+#xaChatPanel .xaChatHead{height:60px;padding:0 14px;gap:10px;background:var(--xa-head);flex-shrink:0}
+.xaAv{width:32px;height:32px;border-radius:50%;background:var(--xa-ac);color:var(--xa-acink);
+  display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
+#xaChatPanel .xaChatTitle{display:flex;flex-direction:column;line-height:1.15;font-size:15px;
+  white-space:nowrap;overflow:visible;text-overflow:clip}
+#xaChatPanel .xaChatTitle #xaChatName{font-weight:700;font-size:15px;color:var(--xa-text)}
+#xaChatPanel .xaChatSub{font-size:11px;color:var(--xa-muted);font-weight:500}
+#xaChatPanel .xaChatHead select{background:transparent;color:var(--xa-text);border:0;border-radius:8px;
+  font-size:14px;font-weight:600;padding:0 6px;height:36px;max-width:120px;outline:none;cursor:pointer}
+#xaChatPanel .xaChatHead select:hover{background:var(--xa-bg2)}
+#xaChatPanel .xaChatHead button{width:40px;height:40px;border-radius:10px;min-width:40px;min-height:40px;
+  font-size:15px;display:grid;place-items:center}
+.xaSyncPill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;
+  background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.35);color:#5ee0ae;
+  font-size:12px;font-weight:500;white-space:nowrap;flex:none}
+.xaSyncDot{width:7px;height:7px;border-radius:50%;background:#34d399;flex:none}
+.xaSyncPill.warn{background:rgba(245,185,74,.10);border-color:rgba(245,185,74,.35);color:#f5b942}
+.xaSyncPill.warn .xaSyncDot{background:#f5b942}
+.xaPersonaSeg{display:none;gap:2px;align-items:center}
+#xaChatPanel.xaPageMode .xaPersonaSeg{display:inline-flex}
+#xaChatPanel.xaPageMode #xaChatPersona{display:none}
+.xaPersonaSeg button{height:32px;padding:0 12px;border-radius:8px;border:0;background:transparent;
+  color:var(--xa-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;width:auto;min-width:0;min-height:0}
+.xaPersonaSeg button:hover{background:var(--xa-bg2)}
+.xaPersonaSeg button.on{background:rgba(45,212,240,.14);color:var(--xa-ac)}
+#xaEvBtn{display:none}
+#xaChatPanel.xaPageMode #xaEvBtn{display:grid}
+#xaChatPanel.xaPageMode #xaEvBtn.on{color:var(--xa-ac);background:rgba(45,212,240,.12)}
+/* Messages surface */
+#xaChatPanel #xaChatMsgs{padding:16px;gap:16px;background:var(--xa-bg)}
+#xaChatPanel .xaMsg{max-width:88%;border-radius:16px}
+#xaChatPanel .xaMsg.user{align-self:flex-end;max-width:320px;padding:10px 14px;font-size:15px;
+  border-bottom-right-radius:4px;background:rgba(45,212,240,.16);border:1px solid rgba(45,212,240,.30);
+  color:var(--xa-text);box-shadow:none}
+@supports (color:color-mix(in srgb,red,blue)){
+  #xaChatPanel .xaMsg.user{background:color-mix(in srgb,var(--xa-ac) 16%,var(--xa-bg));
+    border-color:color-mix(in srgb,var(--xa-ac) 30%,var(--xa-border))}
+}
+#xaChatPanel .xaPageMode .xaMsg.user{max-width:420px}
+#xaChatPanel.xaPageMode .xaMsg.user{max-width:420px}
+/* Bot answers: no bubble -- 28px avatar + plain text on the panel surface */
+#xaChatPanel .xaMsg.bot{align-self:stretch;max-width:100%;background:transparent;border:0;
+  padding:0 0 0 38px;box-shadow:none;position:relative;border-radius:0}
+#xaChatPanel .xaMsg.bot::before{content:var(--xaAvCh,'S');position:absolute;left:0;top:0;width:28px;height:28px;
+  border-radius:50%;background:var(--xa-ac);color:var(--xa-acink);display:grid;place-items:center;
+  font-weight:700;font-size:13px}
+#xaChatPanel .xaPara{font-size:15px;line-height:1.6}
+#xaChatPanel .xaMsg.bot.streaming .xaTxt::after{color:var(--xa-ac)}
+#xaChatPanel .xaEnt{background:rgba(45,212,240,.14);border-color:rgba(45,212,240,.4);color:var(--xa-ac)}
+#xaChatPanel .xaEnt:hover{background:rgba(45,212,240,.3)}
+/* Verification strip + entity card + data-as-of stamp (mockup answer screen) */
+.xaVerif{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;
+  border:1px solid var(--xa-border);background:var(--xa-ink);color:#5ee0ae;font-size:13px;font-weight:500;margin:0 0 10px}
+.xaCard{border:1px solid var(--xa-border);border-radius:12px;background:var(--xa-ink);
+  padding:12px 14px;margin:10px 0 8px;display:flex;flex-direction:column;gap:8px;max-width:520px}
+.xaCardRow{display:flex;align-items:center;gap:8px}
+.xaCardT{font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:500;flex:1;color:var(--xa-text)}
+.xaCardCopy{height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--xa-border);
+  background:transparent;color:var(--xa-muted);font-size:12.5px;cursor:pointer;font-family:inherit}
+.xaCardCopy:hover{color:var(--xa-text);border-color:var(--xa-ac)}
+.xaCardBtns{display:flex;gap:8px}
+.xaCardBtns button{flex:1;height:36px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.xaCardOpen{border:1px solid var(--xa-ac);background:transparent;color:var(--xa-ac)}
+.xaCardOpen:hover{background:rgba(45,212,240,.12)}
+.xaCardDup{border:1px solid var(--xa-border);background:transparent;color:var(--xa-text);font-weight:500}
+.xaCardDup:hover{border-color:var(--xa-ac)}
+.xaStamp{font-size:12.5px;color:var(--xa-muted);margin-top:8px}
+/* Message action bar: quiet icon pills */
+#xaChatPanel .xaMsgActions{margin-top:8px;gap:4px}
+#xaChatPanel .xaMsgActions button{min-height:28px;padding:2px 10px;border-radius:999px;
+  border:1px solid var(--xa-border);background:transparent;color:var(--xa-muted);font-size:12px}
+#xaChatPanel .xaMsgActions button:hover{color:var(--xa-text);border-color:var(--xa-ac)}
+#xaChatPanel .xaPinBtn.pinned{color:var(--xa-ac);border-color:var(--xa-ac)}
+#xaChatPanel .xaMsg.err{background:#2a1215;border:1px solid #7f1d1d;color:#fecaca}
+/* Full-tab message column caps at a 700px reading line (mockup) */
+#xaChatPanel.xaPageMode .xaMsg{max-width:min(700px,100%);box-shadow:none}
+/* Follow-up chips: 32px quiet pills */
+#xaChatPanel #xaChatChips{padding:8px 16px;background:transparent;border-top:0;gap:6px}
+#xaChatPanel .xaChip{height:32px;display:inline-flex;align-items:center;background:transparent;
+  border:1px solid var(--xa-border);color:var(--xa-text);border-radius:16px;font-size:13px;padding:0 12px;cursor:pointer}
+#xaChatPanel .xaChip:hover{border-color:var(--xa-ac);color:var(--xa-ac)}
+/* Context chip above the composer (mockup answer screen) */
+#xaChatPanel .xaCtxBar{display:none;padding:0 16px}
+#xaChatPanel .xaCtxBar.show{display:block}
+.xaCtxPill{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 12px;border-radius:16px;
+  background:rgba(45,212,240,.14);border:1px solid rgba(45,212,240,.35);color:var(--xa-text);
+  font-size:13.5px;font-weight:500;margin-bottom:8px}
+@supports (color:color-mix(in srgb,red,blue)){
+  .xaCtxPill{background:color-mix(in srgb,var(--xa-ac) 14%,var(--xa-bg));
+    border-color:color-mix(in srgb,var(--xa-ac) 35%,var(--xa-border))}
+}
+.xaCtxPill button{width:24px;height:24px;border-radius:12px;border:0;background:transparent;
+  color:var(--xa-muted);display:grid;place-items:center;cursor:pointer;font-size:12px}
+.xaCtxPill button:hover{color:var(--xa-text)}
+/* Composer: rounded container, slash + mic + circular accent send */
+#xaChatPanel .xaChatFoot{border-top:0;background:transparent;padding:8px 12px 4px;gap:4px;align-items:flex-end}
+#xaChatPanel #xaChatInput{background:var(--xa-ink);border:1px solid var(--xa-border);border-radius:16px;
+  padding:10px 14px;font-size:15px;color:var(--xa-text);min-height:44px}
+#xaChatPanel #xaChatInput:focus{border-color:var(--xa-ac)}
+#xaChatPanel .xaChatFoot button{border-radius:50%;background:transparent;border:0;color:var(--xa-muted);font-size:16px}
+#xaChatPanel .xaChatFoot button:hover{color:var(--xa-text);background:var(--xa-bg2)}
+#xaChatPanel #xaChatSend{background:var(--xa-ac);color:var(--xa-acink)}
+#xaChatPanel #xaChatSend:hover{background:#4dddf5;color:var(--xa-acink)}
+#xaChatPanel #xaChatMic.rec{background:#7f1d1d;color:#fff}
+#xaChatPanel .xaChatHint{background:transparent;font-size:11px;padding:2px 0 6px}
+#xaChatPanel #xaChatMeta{background:transparent}
+#xaChatPanel .xaKbBtn{border-color:var(--xa-ac);background:rgba(45,212,240,.18);color:var(--xa-ac)}
+#xaChatPanel .xaKbBtn:hover:not(:disabled){background:rgba(45,212,240,.35)}
+/* History bar + slash palette keep the new tokens */
+#xaChatPanel #xaHistBar{background:var(--xa-ink)}
+#xaChatPanel #xaHistBar input,#xaChatPanel #xaHistBar button{background:var(--xa-bg);border:1px solid var(--xa-border);color:var(--xa-text)}
+#xaChatPanel #xaSlashPop{background:var(--xa-bg);border:1px solid var(--xa-border);border-radius:12px}
+#xaChatPanel .xaSlashItem:hover,#xaChatPanel .xaSlashItem.sel{background:var(--xa-bg2)}
+#xaChatPanel .xaSlashItem .xaSlashCmd{color:var(--xa-ac)}
+/* Banners: offline red, KB-syncing amber (mockup degrade banner) */
+#xaChatPanel #xaOfflineBar{background:rgba(220,38,38,.14);color:#f87171;border-top:1px solid rgba(220,38,38,.35)}
+#xaChatPanel #xaDegradeBar{background:rgba(245,185,74,.12);color:#f5b942;border-top:1px solid rgba(245,185,74,.35)}
+/* Evidence aside (mockup: source cards with Live badges) */
+.xaEvHead{padding:14px 16px;font-weight:600;font-size:14px;border-bottom:1px solid var(--xa-border);
+  display:flex;justify-content:space-between;align-items:baseline;flex:none}
+#xaEvCount{color:var(--xa-muted);font-weight:500;font-size:12.5px}
+.xaEvBody{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.xaEvCard{border:1px solid var(--xa-border);border-radius:12px;padding:10px 12px;
+  display:flex;flex-direction:column;gap:6px;background:var(--xa-bg)}
+.xaEvCardT{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--xa-text)}
+.xaEvLive{font-size:10.5px;padding:2px 8px;border-radius:999px;background:rgba(52,211,153,.12);
+  color:#5ee0ae;border:1px solid rgba(52,211,153,.35);font-weight:600}
+.xaEvRefs{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--xa-muted);word-break:break-word}
+.xaEvTs{font-size:11px;color:var(--xa-muted)}
+.xaEvEmpty{font-size:12.5px;color:var(--xa-muted);padding:8px 4px}
+.xaEvFoot{padding:10px 14px;font-size:11px;color:var(--xa-muted);border-top:1px solid var(--xa-border);flex:none}
+/* Starter screen (mockup start screen): H1 + 4 icon cards + hint row */
+#xaChatPanel .xaEmpty{align-self:center;text-align:start;padding:36px 16px;max-width:560px;margin:auto}
+#xaChatPanel .xaEmptyTitle{display:none}
+.xaEmptyH{font-size:21px;font-weight:700;color:var(--xa-text);margin-bottom:6px;line-height:1.25}
+#xaChatPanel .xaEmptySub{font-size:13.5px;color:var(--xa-muted);margin-bottom:18px;line-height:1.5}
+#xaChatPanel .xaStarterGrid{grid-template-columns:1fr 1fr;gap:10px}
+#xaChatPanel .xaStarter{display:flex;gap:10px;align-items:center;background:var(--xa-bg2);
+  border:1px solid var(--xa-border);border-radius:12px;padding:10px;font-size:13px;cursor:pointer;
+  text-align:start;color:var(--xa-text);font-family:inherit}
+#xaChatPanel .xaStarter:hover{border-color:var(--xa-ac);transform:translateY(-1px)}
+#xaChatPanel .xaStarter .xaStarterIco{width:40px;height:40px;flex:none;border-radius:10px;
+  background:rgba(45,212,240,.12);color:var(--xa-ac);display:grid;place-items:center;font-size:18px;margin:0}
+#xaChatPanel .xaAskMe{margin-top:16px;font-size:12px;color:var(--xa-muted)}
+#xaChatPanel .xaAskMe button{color:var(--xa-ac)}
+/* Drawer keeps 440px; wide drawer unchanged */
+@media (max-width:640px){
+  #xaChatPanel.xaPageMode #xaSide{display:none}
+  #xaChatPanel.xaPageMode.evOn #xaEvidence{display:none}
+}
 </style>
 <div id="xaChatRoot" style="display:none">
   <!-- v34.1.12: the 🤺 trigger lives in the top bar now; this root hosts the
        floating panel and (when the chat tab is open) hands the panel node to
        #pg-chat and takes it back when the tab closes. -->
   <div id="xaChatPanel" role="dialog" aria-label="Audition Assistance">
+    <!-- v34.6.0 (Ahmed's "AI Tab Redesign" mockup, comment 7709684995337555139):
+         three-column shell. #xaSide (264px chats + pinned + messages meter) and
+         #xaEvidence (340px source cards) render ONLY in the full tab
+         (.xaPageMode); the floating drawer keeps the condensed single-column
+         look. #xaMain hosts every pre-existing control, so all v34.5.0
+         listeners survive the node move between hosts untouched. -->
+    <div id="xaSide">
+      <button id="xaSideNew" type="button" class="xaSideNew">＋ New chat</button>
+      <input id="xaSideSearch" type="text" placeholder="Search chats" aria-label="Search chats">
+      <div id="xaSessList" class="xaSessList"></div>
+      <div class="xaSideLbl">Pinned answers</div>
+      <div id="xaPinList" class="xaPinList"></div>
+      <div id="xaMeter" class="xaMeter">
+        <div class="xaMeterRow"><span>Messages today</span><span id="xaMeterVal">—</span></div>
+        <div class="xaMeterBar"><div id="xaMeterFill"></div></div>
+      </div>
+    </div>
+    <div id="xaMain">
     <div class="xaChatHead">
-      <span class="xaChatTitle">🤺 Audition Assistance</span>
+      <span id="xaAv" class="xaAv" aria-hidden="true">S</span><span class="xaChatTitle"><span id="xaChatName">Samurai</span><span class="xaChatSub">Audition expert</span></span>
       <select id="xaChatPersona" title="Personality" data-no-search>
         <option value="samurai">🗡 Samurai</option>
         <option value="noora">🌸 Noora</option>
+        <option value="analyst">📊 Analyst</option>
       </select>
       <select id="xaChatLang" title="Voice language" data-no-search>
         <option value="auto">🌐 Auto</option>
@@ -32634,6 +32852,9 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
         <option value="en">English</option>
         <option value="zh">中文</option>
       </select>
+      <span id="xaSyncPill" class="xaSyncPill"><span class="xaSyncDot"></span><span id="xaSyncTxt">Synced</span></span>
+      <div id="xaPersonaSeg" class="xaPersonaSeg"></div>
+      <button id="xaEvBtn" title="Evidence panel" aria-label="Toggle evidence panel">◧</button>
       <button id="xaChatHist" title="Chat history" aria-label="Chat history">🕘</button>
       <button id="xaChatWide" title="Expand / compact">⇔</button>
       <button id="xaChatNew" title="New chat">↺</button>
@@ -32641,12 +32862,20 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
     </div>
     <div id="xaChatMsgs" role="log" aria-live="polite" aria-label="Conversation" tabindex="0"></div>
     <div id="xaChatChips"></div>
+    <div id="xaCtxBar" class="xaCtxBar"></div>
     <div class="xaChatFoot">
-      <textarea id="xaChatInput" rows="1" placeholder="Ask about tickets, rules, cases…"></textarea>
+      <textarea id="xaChatInput" rows="1" placeholder="Ask, or type / for commands"></textarea>
+      <button id="xaSlashBtn" title="Commands" aria-label="Commands">/</button>
       <button id="xaChatMic" title="Voice input">🎙</button>
       <button id="xaChatSend" title="Send">➤</button>
     </div>
     <div class="xaChatHint" id="xaChatHint">Answers only from the Xena Support KB · voice supported</div>
+    </div>
+    <div id="xaEvidence">
+      <div class="xaEvHead">Evidence <span id="xaEvCount">· 0 sources</span></div>
+      <div id="xaEvBody" class="xaEvBody"><div class="xaEvEmpty">No lookups yet this session.</div></div>
+      <div class="xaEvFoot">Phone, ID and contact fields are never shown or stored.</div>
+    </div>
   </div>
 </div>
 <script id="xaChatModule">
@@ -32738,12 +32967,14 @@ function renderChips(){
     b.onclick = function(){ inputEl.value = c.fill; inputEl.dir = dirFor(inputEl.value); autoGrow(); inputEl.focus(); };
     row.appendChild(b);
   });
+  if(typeof xaCtxUpdate === 'function'){ xaCtxUpdate(); }
 }
 function xaFreshness(){
   fetch('/api/knowledge/freshness', {headers:{'X-User-Name':loggedUser,'X-User-Email':loggedEmail}})
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(d){
       if(!d) return;
+      xaSyncPill(d.backfill_done ? 'Synced' : 'Syncing…', !d.backfill_done);
       var hint = document.getElementById('xaChatHint');
       if(!hint) return;
       if(!d.backfill_done || xaIsAdmin()){
@@ -32774,6 +33005,7 @@ function xaFreshness(){
       }
       var mins = d.last_sync_ms ? Math.max(0, Math.round((Date.now() - d.last_sync_ms) / 60000)) : null;
       var fresh = mins === null ? 'KB ready' : (mins < 1 ? 'KB updated just now' : (mins < 60 ? 'KB updated ' + mins + ' min ago' : 'KB updated ' + Math.round(mins / 60) + ' h ago'));
+      xaSyncPill(mins === null ? 'Synced' : (mins < 1 ? 'Synced just now' : (mins < 60 ? 'Synced ' + mins + ' min ago' : 'Synced ' + Math.round(mins / 60) + ' h ago')), false);
       hint.textContent = fresh + ' \u00B7 voice supported';
     })
     .catch(function(){
@@ -32781,6 +33013,7 @@ function xaFreshness(){
          freshness route is unreachable the old code left the hint untouched,
          so the admin had NO reset/build entry at all. Admins now always get
          the controls -- offline buttons fail loudly, which beats invisible. */
+      xaSyncPill('Status unknown', true);
       var hint = document.getElementById('xaChatHint');
       if(!hint || !xaIsAdmin()) return;
       hint.textContent = 'KB status unknown (freshness route unreachable) \u00B7 voice supported';
@@ -32938,12 +33171,16 @@ function xaKbReset(btn, buildBtn){
     kbRunning = false;
   });
 }
-function addMsg(text, who, isErr){
+function addMsg(text, who, isErr, via){
   var d = document.createElement('div');
   d.className = 'xaMsg ' + (who==='user' ? 'user' : 'bot') + (isErr ? ' err' : '');
   d.dir = dirFor(text);
   if(who==='bot' && !isErr){
-    d.innerHTML = renderBot(text);
+    /* v34.6.0 (mockup answer screen): tool-sourced answers open with a
+       verification strip, cite the first ticket/agency as an entity card
+       with actions, and stamp the data time in Cairo. */
+    d.innerHTML = xaDressPre(text, via) + renderBot(text) + xaDressPost(via);
+    xaEvRecord(text, via);
     var sp = document.createElement('button');
     sp.className = 'xaSpeak'; sp.type = 'button'; sp.textContent = '🔊 Listen';
     sp.onclick = function(){ speak(text, sp); };
@@ -33088,15 +33325,21 @@ function autoGrow(){
 function resetChat(){
   sessionId = '';
   localStorage.removeItem('xenaChatSess');
+  XAC.curSess = null;
   msgsEl.innerHTML = '';
-  greet();
+  XAC.evidence = [];
+  if(typeof xaEvRender === 'function'){ xaEvRender(); }
+  if(typeof xaCtxUpdate === 'function'){ xaCtxUpdate(); }
   if(typeof xaEmptyState === 'function'){ xaEmptyState(); }
+  if(typeof xaSideRender === 'function'){ xaSideRender(); }
 }
 function greet(){
-  var p = personaSel.value;
-  addMsg(p === 'noora'
-    ? 'Hello! I am Noora 🌸 Ask me anything about audition tickets, rules or special cases — Arabic, Urdu, English or 中文, as you like.'
-    : 'Samurai here 🗡 Ask me about any ticket, rule or case. I answer only from the verified Xena knowledge base — Arabic, Urdu, English, 中文.', 'bot');
+  var g = {
+    noora: 'Hello! I am Noora 🌸 Ask me anything about audition tickets, rules or special cases — Arabic, Urdu, English or 中文, as you like.',
+    analyst: 'Analyst here 📊 I dig into ticket trends, reject reasons and period comparisons — Arabic, Urdu, English or 中文, as you like.',
+    samurai: 'Samurai here 🗡 Ask me about any ticket, rule or case. I answer only from the verified Xena knowledge base — Arabic, Urdu, English, 中文.'
+  };
+  addMsg(g[personaSel.value] || g.samurai, 'bot');
 }
 // v34.4.0 (plan Phase 2 sec.4/8): token streaming via /api/chat/stream.
 // We POST and read the body as a stream; each `data:` line is a JSON event
@@ -33145,7 +33388,8 @@ async function sendStream(text, typing){
       else if(evt.t === 'done'){
         if(evt.session_id){ sessionId = evt.session_id; localStorage.setItem('xenaChatSess', sessionId); }
         if(bubble){ bubble.classList.remove('streaming'); bubble.remove(); bubble = null; }
-        addMsg(evt.reply || answer, 'bot');
+        addMsg(evt.reply || answer, 'bot', false, evt.via);
+        xaSessSave('bot', evt.reply || answer);
         if(typeof evt.remaining === 'number'){ xaRemaining(evt.remaining); }
         return true;
       }
@@ -33164,12 +33408,13 @@ async function send(){
   busy = true; sendBtn.disabled = true;
   lastUserText = text;
   addMsg(text, 'user');
+  xaSessSave('user', text);
   inputEl.value = ''; autoGrow();
   var typing = showTyping();
-  var endWait = function(msg, isErr){
+  var endWait = function(msg, isErr, via){
     stopThink();
     typing.remove();
-    if(msg){ addMsg(msg, 'bot', !!isErr); }
+    if(msg){ addMsg(msg, 'bot', !!isErr, via); if(!isErr){ xaSessSave('bot', msg); } }
     busy = false; sendBtn.disabled = false;
     inputEl.focus();
   };
@@ -33228,7 +33473,7 @@ async function send(){
         }
         netMiss = 0;
         if(rr.status === 202 && rd.pending){ continue; }
-        if(rr.ok && rd.reply){ endWait(rd.reply); }
+        if(rr.ok && rd.reply){ endWait(rd.reply, false, rd.via); }
         else{ endWait(rd.error || ('The assistant did not answer (HTTP ' + rr.status + '). Try again.'), true); }
         return;
       }
@@ -33237,7 +33482,8 @@ async function send(){
       typing.remove();
       if(res.ok && data.reply){
         if(data.session_id){ sessionId = data.session_id; localStorage.setItem('xenaChatSess', sessionId); }
-        addMsg(data.reply, 'bot');
+        addMsg(data.reply, 'bot', false, data.via);
+        xaSessSave('bot', data.reply);
         if(typeof data.remaining === 'number'){ xaRemaining(data.remaining); }
       }else{
         addMsg(data.error || ('The assistant did not answer (HTTP ' + res.status + '). Try again.'), 'bot', true);
@@ -33256,6 +33502,12 @@ function xaRemaining(n){
   var m = document.getElementById('xaChatMeta');
   if(!m){ return; }
   m.textContent = (typeof n === 'number') ? (n + ' messages left today') : '';
+  /* v34.6.0 (mockup sidebar): remaining out of the 200/day backend cap as an
+     accent progress bar. */
+  var CAP = 200;
+  var mv = document.getElementById('xaMeterVal'), mf = document.getElementById('xaMeterFill');
+  if(mv){ mv.textContent = (typeof n === 'number') ? (n + ' left') : '—'; }
+  if(mf && typeof n === 'number'){ mf.style.width = Math.max(0, Math.min(100, Math.round(100 * n / CAP))) + '%'; }
 }
 function xaPin(text, btn){
   var i = pinned.indexOf(text);
@@ -33279,9 +33531,13 @@ function xaEmptyState(){
   if(msgsEl.children.length){ return; }
   var e = document.createElement('div');
   e.className = 'xaEmpty';
+  /* v34.6.0: mockup start screen -- H1 greeting, one-line promise, 4 icon
+     starter cards. Shows INSTEAD of a greet bubble on open / new chat. */
+  var nm = 'there';
+  try{ nm = (typeof loggedUser !== 'undefined' && loggedUser) ? String(loggedUser).split(' ')[0] : 'there'; }catch(e3){}
   e.innerHTML =
-    '<div class="xaEmptyTitle">\u{1F94B} Audition Assistance</div>' +
-    '<div class="xaEmptySub">Answers only from the verified Xena knowledge base</div>' +
+    '<div class="xaEmptyH">How can I help with the queue, ' + esc(nm) + '?</div>' +
+    '<div class="xaEmptySub">Answers come from live portal records and the verified Xena knowledge base.</div>' +
     '<div class="xaStarterGrid">' +
       '<button class="xaStarter" data-fill="How many tickets came in today?"><span class="xaStarterIco">\u{1F4CA}</span>Today\u2019s ticket count</button>' +
       '<button class="xaStarter" data-fill="What is the status of ticket #"><span class="xaStarterIco">\u{1F3AB}</span>Check a ticket status</button>' +
@@ -33349,6 +33605,214 @@ function xaOnline(){
 window.addEventListener('online',  function(){ xaOnline(); });
 window.addEventListener('offline', function(){ xaOnline(); });
 
+/* ===== v34.6.0 (AI Tab Redesign): new UI functions ===== */
+var PERSONA_NAMES = {samurai:'Samurai', noora:'Noora', analyst:'Analyst'};
+function xaAvUpdate(){
+  var v = personaSel ? personaSel.value : 'samurai';
+  var ch = (PERSONA_NAMES[v] || 'S').charAt(0);
+  try{ panel.style.setProperty('--xaAvCh', "'" + ch + "'"); }catch(e){}
+  var nm = document.getElementById('xaChatName');
+  if(nm){ nm.textContent = PERSONA_NAMES[v] || 'Samurai'; }
+  var seg = document.getElementById('xaPersonaSeg');
+  if(seg){
+    seg.querySelectorAll('button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-v') === v);
+    });
+  }
+}
+function xaSyncPill(txt, warn){
+  var p = document.getElementById('xaSyncPill'), t = document.getElementById('xaSyncTxt');
+  var db = document.getElementById('xaDegradeBar');
+  if(p){ p.classList.toggle('warn', !!warn); }
+  if(t){ t.textContent = txt; }
+  if(db){ db.classList.toggle('show', !!warn); }
+}
+function xaCairoTime(){
+  try{
+    return new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit'}).format(new Date()) + ' Cairo time';
+  }catch(e){
+    var d = new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ' local time';
+  }
+}
+function xaRefsIn(text){
+  var out = [], seen = {}, m;
+  var re = /Ticket\s*#(\d{3,7})\b|(?<![#&\w;])#(\d{3,7})\b|\bAGY[-\s]?(\d{2,7})\b|\bAgency\s+(\d{2,7})\b/gi;
+  while((m = re.exec(String(text))) !== null){
+    var id = m[1] || m[2] || m[3] || m[4];
+    var k = (m[3] || m[4]) ? 'agency' : 'ticket';
+    var key = k + ':' + id;
+    if(!seen[key]){ seen[key] = 1; out.push({k:k, id:id}); }
+    if(out.length >= 3){ break; }
+  }
+  return out;
+}
+function xaDressPre(text, via){
+  var h = '';
+  if(via === 'tool' || via === 'fast'){ h += '<div class="xaVerif">\u2713 Checked live portal records</div>'; }
+  else if(via === 'cache'){ h += '<div class="xaVerif">\u2713 Verified answer (cached)</div>'; }
+  var refs = xaRefsIn(text);
+  if(refs.length){
+    var r = refs[0];
+    var label = (r.k === 'ticket') ? ('Ticket #' + r.id) : ('Agency ' + r.id);
+    h += '<div class="xaCard"><div class="xaCardRow"><span class="xaCardT"></span>' +
+         '<button type="button" class="xaCardCopy" data-id="' + r.id + '">Copy ID</button></div>' +
+         '<div class="xaCardBtns"><button type="button" class="xaCardOpen" data-k="' + r.k + '" data-id="' + r.id + '">Open in portal</button>' +
+         (r.k === 'ticket' ? '<button type="button" class="xaCardDup" data-id="' + r.id + '">Duplicate check</button>' : '') +
+         '</div></div>';
+    /* the mono title must not go through mdLite -- set via textContent after */
+    h = h.replace('<span class="xaCardT"></span>', '<span class="xaCardT">' + esc(label) + '</span>');
+  }
+  return h;
+}
+function xaDressPost(via){
+  if(via === 'tool' || via === 'fast' || via === 'cache' || via === 'poll' || via === 'agent'){
+    return '<div class="xaStamp">Data as of ' + xaCairoTime() + '</div>';
+  }
+  return '';
+}
+function xaEvRecord(text, via){
+  if(!via){ return; }
+  try{
+    XAC.evidence = XAC.evidence || [];
+    var refs = xaRefsIn(text);
+    XAC.evidence.push({
+      t: (via === 'tool' || via === 'fast') ? 'Live portal lookup' : 'Xena knowledge base',
+      live: (via === 'tool' || via === 'fast'),
+      refs: refs.map(function(r){ return (r.k === 'ticket' ? 'ticket #' : 'agency ') + r.id; }),
+      ts: xaCairoTime()
+    });
+    if(XAC.evidence.length > 30){ XAC.evidence = XAC.evidence.slice(-30); }
+    xaEvRender();
+  }catch(e){}
+}
+function xaEvRender(){
+  var body = document.getElementById('xaEvBody'), cnt = document.getElementById('xaEvCount');
+  if(!body){ return; }
+  var ev = XAC.evidence || [];
+  if(cnt){ cnt.textContent = '\u00b7 ' + ev.length + ' source' + (ev.length === 1 ? '' : 's'); }
+  if(!ev.length){ body.innerHTML = '<div class="xaEvEmpty">No lookups yet this session.</div>'; return; }
+  body.innerHTML = '';
+  ev.slice().reverse().forEach(function(s){
+    var c = document.createElement('div'); c.className = 'xaEvCard';
+    var t = document.createElement('div'); t.className = 'xaEvCardT';
+    var lbl = document.createElement('span'); lbl.textContent = s.t;
+    var lv = document.createElement('span'); lv.className = 'xaEvLive';
+    if(!s.live){ lv.style.background = 'rgba(154,166,186,.12)'; lv.style.color = '#9aa6ba'; lv.style.borderColor = 'rgba(154,166,186,.3)'; lv.textContent = 'KB'; }
+    else{ lv.textContent = 'Live'; }
+    t.appendChild(lbl); t.appendChild(lv); c.appendChild(t);
+    var r = document.createElement('div'); r.className = 'xaEvRefs';
+    r.textContent = (s.refs && s.refs.length) ? s.refs.join(' \u00b7 ') : '\u2014';
+    c.appendChild(r);
+    var tm = document.createElement('div'); tm.className = 'xaEvTs'; tm.textContent = s.ts;
+    c.appendChild(tm);
+    body.appendChild(c);
+  });
+}
+function xaCtxUpdate(){
+  var bar = document.getElementById('xaCtxBar');
+  if(!bar){ return; }
+  var e2 = XAC.lastEnt;
+  if(!e2){ bar.classList.remove('show'); bar.innerHTML = ''; return; }
+  var lbl = (e2.k === 'ticket' ? 'Ticket #' : (e2.k === 'agency' ? 'Agency ' : 'User ID ')) + e2.id;
+  bar.innerHTML = '<span class="xaCtxPill">Context: ' + esc(lbl) +
+    '<button type="button" id="xaCtxX" aria-label="Remove context">\u2715</button></span>';
+  bar.classList.add('show');
+  var x = document.getElementById('xaCtxX');
+  if(x){ x.onclick = function(){ XAC.lastEnt = null; renderChips(); }; }
+}
+function xaSessAll(){ try{ return JSON.parse(localStorage.getItem('xenaChatSessions') || '[]'); }catch(e){ return []; } }
+function xaSessSave(who, text){
+  try{
+    var list = xaSessAll();
+    var sid = sessionId || ('local_' + Date.now().toString(36));
+    var it = null, i;
+    for(i = 0; i < list.length; i++){ if(list[i].id === sid){ it = list[i]; break; } }
+    /* v34.6.0: the server confirms its own session id on the first reply --
+       migrate the local placeholder entry to it so chats never split. */
+    if(!it && XAC.curSess){
+      for(i = 0; i < list.length; i++){ if(list[i].id === XAC.curSess){ it = list[i]; it.id = sid; break; } }
+    }
+    if(!it){
+      it = {id: sid, title: String(text).slice(0, 48), ts: Date.now(), msgs: []};
+      list.unshift(it);
+    } else {
+      it.ts = Date.now();
+      list.splice(list.indexOf(it), 1); list.unshift(it);
+    }
+    it.msgs.push({who: who, text: String(text)});
+    if(it.msgs.length > 40){ it.msgs = it.msgs.slice(-40); }
+    while(list.length > 30){ list.pop(); }
+    try{ localStorage.setItem('xenaChatSessions', JSON.stringify(list)); }catch(e2){}
+    XAC.curSess = sid;
+    xaSideRender();
+  }catch(e){}
+}
+function xaSideRender(){
+  var listEl = document.getElementById('xaSessList');
+  if(!listEl){ return; }
+  var q = '';
+  var si = document.getElementById('xaSideSearch');
+  if(si){ q = si.value.trim().toLowerCase(); }
+  var list = xaSessAll().filter(function(s){ return !q || (s.title || '').toLowerCase().indexOf(q) >= 0; });
+  listEl.innerHTML = '';
+  var day = 86400000, now = Date.now();
+  var groups = {Today: [], Yesterday: [], Earlier: []};
+  list.forEach(function(s){
+    var age = now - (s.ts || 0);
+    (age < day ? groups.Today : (age < 2 * day ? groups.Yesterday : groups.Earlier)).push(s);
+  });
+  ['Today', 'Yesterday', 'Earlier'].forEach(function(g){
+    if(!groups[g].length){ return; }
+    var lbl = document.createElement('div'); lbl.className = 'xaSessDay'; lbl.textContent = g;
+    listEl.appendChild(lbl);
+    groups[g].forEach(function(s){
+      var b = document.createElement('button'); b.type = 'button';
+      b.className = 'xaSess' + (s.id === (XAC.curSess || sessionId) ? ' on' : '');
+      b.textContent = s.title || 'Chat';
+      b.title = s.title || '';
+      b.onclick = function(){ xaSessOpen(s.id); };
+      listEl.appendChild(b);
+    });
+  });
+  if(!list.length){ listEl.innerHTML = '<div class="xaEvEmpty">No chats yet.</div>'; }
+  xaPinRender();
+}
+function xaPinRender(){
+  var el = document.getElementById('xaPinList');
+  if(!el){ return; }
+  el.innerHTML = '';
+  if(!pinned.length){ el.innerHTML = '<div class="xaEvEmpty">Nothing pinned yet \u2014 use \u{1F4CC} on an answer.</div>'; return; }
+  pinned.slice().reverse().forEach(function(t){
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'xaPinIt';
+    var short = '\u{1F4CC} ' + String(t).slice(0, 60);
+    b.textContent = short;
+    b.title = String(t).slice(0, 200);
+    b.onclick = function(){
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(String(t)); }
+      b.textContent = '\u2713 Copied';
+      setTimeout(function(){ b.textContent = short; }, 1200);
+    };
+    el.appendChild(b);
+  });
+}
+function xaSessOpen(id){
+  var s = null;
+  xaSessAll().forEach(function(x){ if(x.id === id){ s = x; } });
+  if(!s){ return; }
+  stopThink();
+  sessionId = s.id;
+  localStorage.setItem('xenaChatSess', sessionId);
+  msgsEl.innerHTML = '';
+  XAC.evidence = [];
+  XAC.curSess = s.id;
+  (s.msgs || []).forEach(function(m){ addMsg(m.text, m.who, false); });
+  if(!msgsEl.children.length){ xaEmptyState(); }
+  xaSideRender();
+  xaEvRender();
+  inputEl.focus();
+}
+
 function bind(){
   msgsEl = document.getElementById('xaChatMsgs');
   inputEl = document.getElementById('xaChatInput');
@@ -33364,7 +33828,7 @@ function bind(){
   fab.onclick = function(){
     if(panel.classList.contains('xaPageMode')){ inputEl.focus(); return; }   // v34.1.12: the full tab already hosts it
     panel.classList.toggle('open');
-    if(panel.classList.contains('open') && !msgsEl.children.length){ greet(); }
+    if(panel.classList.contains('open') && !msgsEl.children.length){ xaEmptyState(); }
     if(panel.classList.contains('open')){ xaFreshness(); }
     if(panel.classList.contains('open')){ inputEl.focus(); }
   };
@@ -33375,26 +33839,57 @@ function bind(){
     panel.classList.remove('open');
   };
   document.getElementById('xaChatNew').onclick = resetChat;
-  personaSel.onchange = function(){ savePrefs(); };   // v34.5.0 (plan sec.5): switching persona must NOT wipe the conversation
+  personaSel.onchange = function(){ savePrefs(); xaAvUpdate(); };   // v34.5.0 (plan sec.5): switching persona must NOT wipe the conversation
+  // v34.6.0 (mockup): segmented persona control in the full tab (Samurai / Noora / Analyst)
+  var seg = document.getElementById('xaPersonaSeg');
+  if(seg){
+    ['samurai','noora','analyst'].forEach(function(v){
+      var sb = document.createElement('button');
+      sb.type = 'button'; sb.setAttribute('data-v', v); sb.textContent = PERSONA_NAMES[v];
+      sb.onclick = function(){ personaSel.value = v; savePrefs(); xaAvUpdate(); };
+      seg.appendChild(sb);
+    });
+  }
   langSel.onchange = savePrefs;
   micBtn.onclick = toggleMic;
   sendBtn.onclick = send;
   msgsEl.addEventListener('click', function(ev){
-    var chip = ev.target && ev.target.closest ? ev.target.closest('.xaEnt') : null;
-    if(chip){ xaRoute(chip.getAttribute('data-k'), chip.getAttribute('data-id')); }
+    var t = ev.target;
+    var chip = t && t.closest ? t.closest('.xaEnt') : null;
+    if(chip){ xaRoute(chip.getAttribute('data-k'), chip.getAttribute('data-id')); return; }
+    /* v34.6.0 (mockup): entity-card actions -- Open in portal / Copy ID / Duplicate check */
+    var ob2 = t && t.closest ? t.closest('.xaCardOpen') : null;
+    if(ob2){ xaRoute(ob2.getAttribute('data-k'), ob2.getAttribute('data-id')); return; }
+    var cb = t && t.closest ? t.closest('.xaCardCopy') : null;
+    if(cb){
+      var cid = cb.getAttribute('data-id') || '';
+      var done2 = function(){ cb.textContent = '\u2713 Copied'; setTimeout(function(){ cb.textContent = 'Copy ID'; }, 1400); };
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(cid).then(done2, done2); }
+      else{ done2(); }
+      return;
+    }
+    var db2 = t && t.closest ? t.closest('.xaCardDup') : null;
+    if(db2){ inputEl.value = 'Run a duplicate check on ticket #' + db2.getAttribute('data-id'); autoGrow(); inputEl.focus(); return; }
   });
   var wideBtn = document.getElementById('xaChatWide');
   panel.classList.toggle('xaWide', !!prefs().wide);
   wideBtn.onclick = function(){
-    var pr = prefs(); pr.wide = !pr.wide;
-    localStorage.setItem('xenaChatPrefs', JSON.stringify(pr));
-    panel.classList.toggle('xaWide', pr.wide);
+    if(panel.classList.contains('xaPageMode')){   // theater width inside the tab, as before
+      var pr = prefs(); pr.wide = !pr.wide;
+      localStorage.setItem('xenaChatPrefs', JSON.stringify(pr));
+      panel.classList.toggle('xaWide', pr.wide);
+      return;
+    }
+    // v34.6.0 (mockup drawer): the expand arrow opens the full chat tab;
+    // the old theater-width toggle is only a fallback without the helper.
+    if(typeof openInTab === 'function'){ try{ openInTab('chat'); }catch(e){} return; }
+    panel.classList.toggle('xaWide');
   };
   renderChips();
   // v34.5.0 scaffolding: meta row, offline/degraded banners, slash palette, history bar
   if(!document.getElementById('xaChatMeta')){
     var meta = document.createElement('div'); meta.id = 'xaChatMeta';
-    panel.insertBefore(meta, msgsEl);
+    msgsEl.parentNode.insertBefore(meta, msgsEl);   // v34.6.0: msgs lives in #xaMain now
   }
   if(!document.getElementById('xaSlashPop')){
     var sp = document.createElement('div'); sp.id = 'xaSlashPop';
@@ -33405,7 +33900,7 @@ function bind(){
     hb.innerHTML = '<input id="xaHistSearch" placeholder="Search this chat\u2026" aria-label="Search this chat">' +
       '<button type="button" id="xaHistClear">Clear</button>' +
       '<button type="button" id="xaExportBtn" title="Export chat">\u2B07 Export</button>';
-    panel.insertBefore(hb, msgsEl);
+    msgsEl.parentNode.insertBefore(hb, msgsEl);   // v34.6.0: msgs lives in #xaMain now
     var hs = document.getElementById('xaHistSearch');
     hs.addEventListener('input', function(){ xaHistSearch(hs.value); });
     document.getElementById('xaHistClear').onclick = function(){ hs.value=''; xaHistSearch(''); };
@@ -33414,12 +33909,12 @@ function bind(){
   if(!document.getElementById('xaOfflineBar')){
     var ob = document.createElement('div'); ob.id = 'xaOfflineBar'; ob.className = 'xaBanner';
     ob.textContent = '\u{1F4F6} You are offline \u2014 messages will send when you reconnect';
-    panel.insertBefore(ob, panel.querySelector('.xaChatFoot'));
+    msgsEl.parentNode.insertBefore(ob, document.querySelector('#xaMain .xaChatFoot'));   // v34.6.0: foot lives in #xaMain now
   }
   if(!document.getElementById('xaDegradeBar')){
     var db = document.createElement('div'); db.id = 'xaDegradeBar'; db.className = 'xaBanner';
-    db.textContent = '\u26A0\uFE0F Assistant is in degraded mode \u2014 answers may be slower';
-    panel.insertBefore(db, panel.querySelector('.xaChatFoot'));
+    db.textContent = 'The knowledge base is still syncing \u2014 answers may be incomplete';   // v34.6.0: mockup wording, driven by xaSyncPill()
+    msgsEl.parentNode.insertBefore(db, document.querySelector('#xaMain .xaChatFoot'));   // v34.6.0: foot lives in #xaMain now
   }
   var histBtn = document.getElementById('xaChatHist');
   if(histBtn){ histBtn.onclick = xaHistToggle; }
@@ -33448,13 +33943,30 @@ function bind(){
       ev.preventDefault();
       if(panel.classList.contains('xaPageMode')){ inputEl.focus(); return; }
       panel.classList.toggle('open');
-      if(panel.classList.contains('open')){ if(!msgsEl.children.length){ greet(); } xaFreshness(); inputEl.focus(); }
+      if(panel.classList.contains('open')){ if(!msgsEl.children.length){ xaEmptyState(); } xaFreshness(); inputEl.focus(); }
     } else if((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')){
       if(panel.classList.contains('open') || panel.classList.contains('xaPageMode')){ ev.preventDefault(); inputEl.focus(); }
     } else if(ev.key === 'Escape' && panel.classList.contains('open') && !panel.classList.contains('xaPageMode')){
       panel.classList.remove('open');
     }
   });
+  // v34.6.0 (mockup): evidence toggle, "/ Commands", sidebar, avatar boot
+  var evBtn = document.getElementById('xaEvBtn');
+  if(evBtn){
+    evBtn.onclick = function(){
+      panel.classList.toggle('evOn');
+      evBtn.classList.toggle('on', panel.classList.contains('evOn'));
+    };
+  }
+  var sBtn = document.getElementById('xaSlashBtn');
+  if(sBtn){ sBtn.onclick = function(){ xaSlash(true); inputEl.focus(); }; }
+  var sNew = document.getElementById('xaSideNew');
+  if(sNew){ sNew.onclick = function(){ resetChat(); }; }
+  var sSearch = document.getElementById('xaSideSearch');
+  if(sSearch){ sSearch.addEventListener('input', xaSideRender); }
+  xaAvUpdate();
+  xaSideRender();
+  xaEvRender();
   XAC.greet = greet;          // v34.1.12: the full-page chat tab calls these
   XAC.freshness = xaFreshness;
   XAC.emptyState = xaEmptyState;

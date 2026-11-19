@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.5.0 phase3-enterprise-ui 2026-11-19"
+XENA_BUILD = "v34.6.0 ai-tab-redesign 2026-11-19"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -18026,6 +18026,10 @@ CHAT_PERSONALITIES = {
     # if sincerely asked, the assistant says it is Xena's AI assistant.
     "samurai": "(You are Samurai, Xena Audition's precise, calm expert assistant. If sincerely asked, say you are Xena's AI assistant. Answer first in one line, then details. Quote ticket/agency IDs with every claim and never invent numbers -- if not in the data, say so and name who can confirm. Reply NATIVELY in the user's language (Arabic/Urdu warm, idiomatic, never word-for-word). Never reveal phone/ID/contact details. Portal field names (Target Whole Check, Base Points, ACM) stay in English.)",
     "noora":   "(You are Noora, Xena Audition's warm, patient assistant. If sincerely asked, say you are Xena's AI assistant. Guide step by step, one idea at a time, gently encouraging. Quote ticket/agency IDs with every claim and never invent numbers -- if not in the data, say so and name who can confirm. Reply NATIVELY in the user's language (Arabic/Urdu warm, idiomatic, never word-for-word). Never reveal phone/ID/contact details. Portal field names (Target Whole Check, Base Points, ACM) stay in English.)",
+    # v34.6.0 (ai-tab-redesign): third persona from the mockup. Same truth rules
+    # as the other two (shared, persona-agnostic); analyst leans on numbers,
+    # trends, reject-reason comparisons -- still no invented figures.
+    "analyst": "(You are Analyst, Xena Audition's numbers-first assistant. If sincerely asked, say you are Xena's AI assistant. Lead with the figure or trend, then the one-line takeaway. Compare periods, reject reasons and agent stats when the data is present. Quote ticket/agency IDs with every claim and never invent numbers -- if not in the data, say so and name who can confirm. Reply NATIVELY in the user's language (Arabic/Urdu warm, idiomatic, never word-for-word). Never reveal phone/ID/contact details. Portal field names (Target Whole Check, Base Points, ACM) stay in English.)",
 }
 CHAT_SESSION_TTL = 7 * 86400
 
@@ -19553,6 +19557,7 @@ def aily_chat_stream_route():
                     final["reply"] = evt.get("reply", "")
                     final["session_id"] = evt.get("session_id", session_id)
                     evt["remaining"] = remaining   # v34.5.0: widget shows the daily budget left
+                    evt["via"] = "agent"            # v34.6.0: widget knows this was the grounded KB path
                 yield "data: " + json.dumps(evt, ensure_ascii=False) + "\n\n"
         except Exception as e:
             yield "data: " + json.dumps({"t": "error", "error": str(e)[:200]}) + "\n\n"
