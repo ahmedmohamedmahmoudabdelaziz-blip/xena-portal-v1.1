@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.8.1 kb-sync-fix 2026-11-19"
+XENA_BUILD = "v34.8.2 chat-detail-design 2026-11-19"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -18551,6 +18551,23 @@ def _chat_tool_answer(tat, route, text, staff_name=""):
                     "points/targets, counts and rules instead.")
         if intent == "acm_hunting":
             return _acm_hunting_tool(tat, text)
+        # v34.8.2 (Ahmed): follow-ups like "where is the details / show me the
+        # table / breakdown / list them" carry no 'acm hunting' keyword, so they
+        # used to fall through to the LLM -- which then HALLUCINATED a wrong table
+        # (11 total, Zohaib 0, Ahmed Samurai as ACM). Route detail/list/breakdown
+        # questions to the SAME deterministic engine; it re-derives the live
+        # window from the message's date/entity context and now prints the table.
+        if intent in ("qa", "explain_rule", "count_tickets", "lookup", "find_agency"):
+            _lt = (text or "").lower()
+            if any(k in _lt for k in ("detail", "details", "table", "list", "breakdown",
+                                      "show me", "show the", "which tickets", "the tickets",
+                                      "and so on", "them all", "each one", "per ticket",
+                                      "break it down", "in a table", "التفاصيل", "جدول",
+                                      "تفاصيل", "تفصيل", "تفصیل", "فہرست", "明细", "详情", "列表", "表格")):
+                _want = ("acm" in _lt and "hunt" in _lt) or ("hunting" in _lt) or ("开拓" in text)
+                _r = _query_tickets(tat, text, want_acm_hunting=_want, want_group="acm")
+                if _r:
+                    return _r
         if intent == "count_tickets":
             return _count_tickets_tool(tat, text)
         if intent == "target_progress" and ents:
@@ -18810,6 +18827,31 @@ def _query_tickets(tat, text, want_acm_hunting=False, want_group="acm", want_lis
     out = [head] + body
     if person_note == "Ahmed Samurai runs the portal -- he is not an ACM, so he has no ACM tickets.":
         out = ["Ahmed Samurai runs the portal and is **not an ACM**, so he has 0 ACM tickets."]
+    # v34.8.2 (Ahmed: "the answer was correct but missing details -- the table and
+    # so on"): append a per-ticket detail table for the matching rows, so the
+    # answer stands alone without a follow-up. Bounded at 30 rows.
+    if rows:
+        out.append("\n**Details:**")
+        out.append("| Ticket | Date | Agency | ACM | Status |")
+        out.append("|---|---|---|---|---|")
+        def _num(rr):
+            v = get_field_local(rr["fields"], "Numbering")
+            return extract_field_text(v).strip() or "?"
+        def _dt(rr):
+            ms = _extract_epoch_ms(get_field_local(rr["fields"], "Submitted on", "Submitted on Copy", "Created Time"))
+            try:
+                return datetime.fromtimestamp(ms/1000.0, tz=timezone.utc).strftime("%m-%d") if ms else "--"
+            except Exception:
+                return "--"
+        def _ag(rr):
+            c = extract_field_text(get_field_local(rr["fields"], "Agency Code")).strip()
+            nm = extract_field_text(get_field_local(rr["fields"], "Agency Name")).strip()
+            return ((c + " " + nm).strip()) or "--"
+        for rr in rows[:30]:
+            out.append("| #%s | %s | %s | %s | %s |" % (
+                _num(rr), _dt(rr), _ag(rr), rr["acm"], rr["status"]))
+        if len(rows) > 30:
+            out.append("_... +%d more (ask to see the rest)._" % (len(rows) - 30))
     return "\n".join(out) + how
 
 def _acm_hunting_tool(tat, text):
