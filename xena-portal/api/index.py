@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.7.0 ai-quality-hardening 2026-11-19"
+XENA_BUILD = "v34.8.0 ai-self-learning 2026-11-19"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -18184,12 +18184,13 @@ def _chat_ground_message(personality, message, email):
     except Exception:
         pass
     try:
-        _downs = _chat_recent_downvotes(email)
-        if _downs:
-            parts.append("<improve>The user recently down-voted these answers -- do NOT "
-                         "repeat that style of mistake (wrong count, wrong person, wrong "
-                         "language, unreadable formatting):\n- " + "\n- ".join(_esc(d) for d in _downs) +
-                         "\nAnswer carefully and cite real ticket/agency IDs.</improve>")
+        # v34.8.0: only ADMIN-APPROVED lessons shape behavior (never raw votes) --
+        # a wrong typed correction must not teach the model the wrong thing.
+        _lessons = _chat_approved_lessons()
+        if _lessons:
+            parts.append("<learned_rules>Approved corrections from past mistakes -- follow "
+                         "these exactly:\n- " + "\n- ".join(_esc(x) for x in _lessons) +
+                         "\n</learned_rules>")
     except Exception:
         pass
     parts.append("<user_query>\n%s\n</user_query>" % _esc(message))
@@ -18302,21 +18303,53 @@ def _chat_recent_downvotes(email, limit=3):
     except Exception:
         return []
 
-def _chat_log_feedback(email, vote, excerpt, personality):
-    """Thumbs feedback -> Redis list + per-day counters."""
+def _chat_log_feedback(email, vote, excerpt, personality, reason="", question="", filters="", answer=""):
+    """v34.8.0 (Ahmed's review): a bare thumbs-down carries no information, and a
+    wrong typed correction would teach the assistant the wrong thing. So feedback
+    is captured WITH a reason + the question/filters/answer + the prompt version,
+    and pushed to a REVIEW queue -- nothing reaches the model until an admin
+    approves it (see _chat_approved_lessons). Up-votes still count for stats."""
     if not REDIS_ENABLED:
         return
     try:
         day = datetime.now(timezone.utc).strftime("%Y%m%d")
-        pipe = [("LPUSH", "xena:chat:feedback", json.dumps({
-                    "t": int(time.time()), "email": email.strip().lower(),
-                    "vote": vote, "persona": personality,
-                    "excerpt": excerpt[:300]})),
+        rec = {"t": int(time.time()), "email": email.strip().lower(),
+               "vote": vote, "persona": personality, "reason": reason[:120],
+               "question": question[:300], "filters": filters[:200],
+               "answer": answer[:400], "excerpt": excerpt[:300],
+               "prompt_version": XENA_BUILD, "status": "pending"}
+        pipe = [("LPUSH", "xena:chat:feedback", json.dumps(rec)),
                 ("LTRIM", "xena:chat:feedback", 0, 999),
                 ("HINCRBY", "xena:chat:feedback:stats", day + ":" + vote, 1)]
+        if vote == "down":
+            # down-votes become candidate lessons in the approval queue
+            lid = "L%d" % int(time.time() * 1000)
+            rec["id"] = lid
+            pipe.append(("HSET", "xena:chat:lessons:pending", lid, json.dumps(rec)))
         redis_pipeline(*pipe)
     except Exception:
         pass
+
+def _chat_approved_lessons(limit=3):
+    """Only APPROVED lessons are ever injected -- the top N most recent. This is
+    the 'document the AI learns from': admin-reviewed wrong->right rules."""
+    if not REDIS_ENABLED:
+        return []
+    try:
+        raw = redis_cmd("HVALS", "xena:chat:lessons:approved") or []
+        out = []
+        for item in raw:
+            try:
+                rec = json.loads(item)
+            except Exception:
+                continue
+            rule = (rec.get("rule") or rec.get("correction") or "").strip()
+            if rule:
+                out.append((rec.get("t", 0), rule[:200]))
+        out.sort(key=lambda x: -x[0])
+        return [r for _, r in out[:limit]]
+    except Exception:
+        return []
 
 # === v34.2.0 (Bulletproof Upgrade Plan, Phase 1: accuracy) =================
 # Numbers and statuses come from CODE, not from the model. The router classifies
@@ -18440,34 +18473,25 @@ def _cairo_date_range(text):
     return int(start_today.timestamp()*1000), int(now.timestamp()*1000), "today (Cairo)"
 
 def _count_tickets_tool(tat, text):
-    """Plan sec.2/9: deterministic count over a Cairo date range. Server-side
-    search by Submitted on; falls back to None (model answers from KB) on error."""
+    """v34.8.0: delegate to the proven _search_requests_all (page_token rides as a
+    URL query param, isGreater not the rejected isGreaterEqual, the exact date
+    boundary re-applied in Python -- the two bugs that made this return None and
+    pushed the question to a guessing model)."""
     start_ms, end_ms, label = _cairo_date_range(text)
-    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
-           "?automatic_fields=true&page_size=500" % (BASE_ID, REQUESTS_TABLE_ID))
-    filt = {"conjunction":"and","conditions":[
-        {"field_name":"Submitted on","operator":"isGreaterEqual","value":["ExactDate",str(start_ms)]},
-        {"field_name":"Submitted on","operator":"isLess","value":["ExactDate",str(end_ms)]}]}
-    total, token, guard = 0, None, 0
-    try:
-        while guard < 20:
-            guard += 1
-            body = {"filter": filt}
-            if token: body["page_token"] = token
-            r = feishu_session.post(url, headers={"Authorization":"Bearer %s"%tat,
-                    "Content-Type":"application/json"}, json=body, timeout=10)
-            data = r.json()
-            if r.status_code != 200 or data.get("code") != 0:
-                return None
-            d = data.get("data") or {}
-            total += len(d.get("items") or [])
-            if d.get("has_more") and d.get("page_token"):
-                token = d["page_token"]
-            else:
-                break
-        return "%s: **%d ticket(s)** submitted (%s)." % (label.replace("(Cairo)","Cairo").title(), total, label)
-    except Exception:
+    PAD = 2 * 24 * 3600 * 1000
+    items = _search_requests_all(tat, [
+        {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", str(start_ms - PAD - 1)]},
+        {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", str(end_ms + PAD)]}])
+    if items is None:
         return None
+    total = 0
+    for it in items:
+        f = it.get("fields") or {}
+        ms = _extract_epoch_ms(get_field_local(f, "Submitted on", "Submitted on Copy", "Created Time"))
+        if ms and not (start_ms <= ms < end_ms):
+            continue
+        total += 1
+    return "%s: **%d ticket(s)** submitted (%s)." % (label.replace("(Cairo)", "Cairo").title(), total, label)
 
 def _target_progress_tool(tat, num):
     """Plan sec.9: agency points + YTD target via the EXISTING
@@ -18627,7 +18651,153 @@ def _ticket_acm_names(fields):
             return v
     return ""
 
+# ─── v34.8.0 (Ahmed's review): generic query engine, not per-question tools ───
+# The single _acm_hunting_tool was whack-a-mole. The root cause of the
+# Respondents-counted-as-ACM bug was that the MODEL didn't know what the fields
+# mean. A field dictionary + a name resolver fixes that for EVERY question.
+TICKET_FIELDS = {
+    # canonical_key -> (field names in the table, meaning the model must respect)
+    "acm":          (("Acm Name (PK)", "Acm Name (IN)", "Acm"),
+                     "the ACM who owns the ticket. NEVER 'Respondents' or 'Created By' -- those are the submitter, not the ACM."),
+    "respondents":  (("Respondents", "Created By", "Submitted By"),
+                     "the person who submitted the ticket -- NOT the ACM. Never count these as ACM."),
+    "request_type": (("Request Type", "Type"), "e.g. Agency Creation / Agency Target Privilege / Agency Point Request"),
+    "agency_type":  (("Agency Type",), "e.g. Acm hunting / Bd Hunting / Walkin"),
+    "status":       (("Status", "Request Status"), "Done / Rejected / Pending / Under Investigation"),
+    "region":       (("Region",), "PK / IN"),
+    "submitted_on": (("Submitted on",), "submission timestamp (ms)"),
+}
+ACM_CANONICAL = {   # resolver: alias (lower) -> canonical Acm Name (from the roster)
+    "nabeel":"Nabeel","enzo":"Enzo","haseeb":"Haseeb Malik","haseeb malik":"Haseeb Malik",
+    "farooq":"Farooq","mubeen":"Mubeen","cruz":"Cruz","ehtisham":"Ehtisham","usama":"Usama",
+    "sehar":"Sehar Choudhry","sehar ch":"Sehar Choudhry","sehar choudhry":"Sehar Choudhry",
+    "hamza":"Hamza Malik","hamza malik":"Hamza Malik","zohaib":"Zohaib Ahmed","zohaib ahmed":"Zohaib Ahmed",
+    "eagle":"Eagle (Adnan)","adnan":"Eagle (Adnan)","holy":"Holy","ritu":"Ritu Pant","ritu pant":"Ritu Pant",
+    "vihan":"Vihan","rudra":"Rudra","ravikant":"Ravikant","ansh":"Ansh",
+}
+# Ahmed Samurai is the PORTAL OWNER / operator -- never an ACM. Hard guard.
+NEVER_ACM = {"ahmed samurai", "ahmed", "samurai", "احمد ساموراي", "احمد", "ساموراي"}
+
+def _resolve_acm(text):
+    """Map a name in the question (any language / typo) to the canonical Acm Name.
+    Returns canonical name or ''. Never resolves to a NEVER_ACM person."""
+    t = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    if any(bad in t for bad in NEVER_ACM):
+        # user asked about the owner -> explicitly NOT an ACM; caller handles.
+        return "__NEVER_ACM__"
+    # longest alias first so 'sehar choudhry' beats 'sehar'
+    for alias in sorted(ACM_CANONICAL, key=len, reverse=True):
+        if re.search(r"(?<![a-z])" + re.escape(alias) + r"(?![a-z])", t):
+            return ACM_CANONICAL[alias]
+    # fuzzy: single-token close match (typos like 'zohaib' vs 'zoheb')
+    toks = re.findall(r"[a-z]{3,}", t)
+    for tok in toks:
+        for alias in ACM_CANONICAL:
+            if len(alias) >= 4 and _lev1(tok, alias):
+                return ACM_CANONICAL[alias]
+    return ""
+
+def _lev1(a, b):
+    """True if a and b differ by at most 1 edit (cheap Levenshtein for short tokens)."""
+    if abs(len(a) - len(b)) > 1: return False
+    if a == b: return True
+    # one substitution / insertion / deletion
+    for i in range(min(len(a), len(b))):
+        if a[:i] + a[i+1:] == b[:i] + b[i+1:]: return True
+        if a[:i] + a[i+1:] == b[:i] + b[i+1:]: return True
+    return False
+
+def _field_text(fields, canonical):
+    names = TICKET_FIELDS.get(canonical, ((), ""))[0]
+    return extract_field_text(get_field_local(fields, *names)).strip()
+
+def _query_tickets(tat, text, want_acm_hunting=False, want_group="acm", want_list=False):
+    """v34.8.0: ONE deterministic tool for every count/list/group question.
+    Builds filters from the field dictionary (never lets the model guess what a
+    field means), pulls the live window, groups, and ALWAYS ends with a
+    'how I counted' line so the user can audit it. Numbers come from the table."""
+    start_ms, end_ms, label = _cairo_date_range(text)
+    # v34.8.0: two live-proven fixes. (1) created_at fields reject
+    # isGreaterEqual (1254018 InvalidFilter) -- isGreater with the bound nudged
+    # -1ms is the inclusive form. (2) Feishu evaluates ExactDate in the BASE's
+    # timezone (Beijing), not the viewer's, so the server-side window is
+    # deliberately padded by 2 days and the EXACT boundary is re-applied in
+    # Python below -- same pattern as the proven my-requests endpoint.
+    PAD = 2 * 24 * 3600 * 1000
+    items = _search_requests_all(tat, [
+        {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", str(start_ms - PAD - 1)]},
+        {"field_name": "Submitted on", "operator": "isLess", "value": ["ExactDate", str(end_ms + PAD)]}])
+    if items is None:
+        return None
+    acm_q = _resolve_acm(text)
+    rows = []
+    for it in items:
+        f = it.get("fields") or {}
+        # exact local date boundary (Python, not Feishu's Beijing-time filter)
+        ms = _extract_epoch_ms(get_field_local(f, "Submitted on", "Submitted on Copy", "Created Time"))
+        if ms and not (start_ms <= ms < end_ms):
+            continue
+        rtype = _field_text(f, "request_type").lower()
+        atype = _field_text(f, "agency_type").lower()
+        if want_acm_hunting:
+            if "creation" not in rtype and "create" not in rtype and rtype != "":
+                continue
+            if "acm" not in atype or "hunt" not in atype:
+                continue
+        acm = _ticket_acm_names(f) or "(no ACM set)"
+        # never let the owner slip in as an ACM (defensive -- data should be clean)
+        if acm.strip().lower() in NEVER_ACM:
+            continue
+        status = (_field_text(f, "status") or "?").strip()
+        rows.append({"acm": acm, "status": status, "fields": f})
+    # optional person filter (AFTER resolving, so typos/languages still match).
+    # v34.8.0: the table may hold a SHORTER form than the canonical resolver
+    # output ("Zohaib" vs canonical "Zohaib Ahmed") -- match either direction
+    # on containment, never exact equality.
+    person_note = ""
+    if acm_q == "__NEVER_ACM__":
+        person_note = "Ahmed Samurai runs the portal -- he is not an ACM, so he has no ACM tickets."
+        rows = []
+    elif acm_q:
+        q = acm_q.strip().lower()
+        def _person_match(a):
+            a = a.strip().lower()
+            return a == q or (len(q) >= 4 and q in a) or (len(a) >= 4 and a in q)
+        rows = [r for r in rows if _person_match(r["acm"])]
+        person_note = " for **%s**" % acm_q
+    period = label.replace("(Cairo)", "Cairo").strip()
+    from collections import Counter
+    total = len(rows)
+    done = sum(1 for r in rows if r["status"].strip().lower() in ("done", "completed", "closed"))
+    rej  = sum(1 for r in rows if "reject" in r["status"].strip().lower())
+    kind = "ACM-hunting agency-creation" if want_acm_hunting else "matching"
+    head = "**%d %s ticket(s)%s** in %s." % (total, kind, person_note, period)
+    body = []
+    if rows and want_group == "acm":
+        by = Counter(r["acm"] for r in rows)
+        for a, n in sorted(by.items(), key=lambda kv: (-kv[1], kv[0])):
+            d = sum(1 for r in rows if r["acm"] == a and r["status"].strip().lower() in ("done", "completed", "closed"))
+            rj = sum(1 for r in rows if r["acm"] == a and "reject" in r["status"].strip().lower())
+            extra = " (%d done, %d rejected)" % (d, rj) if (d or rj) else ""
+            body.append("- **%s** -- %d%s" % (a, n, extra))
+    # how-I-counted line: always show filters + record count + status split.
+    how = ("\n\n_How I counted: filtered the live table on `%s`%s%s in %s; grouped by the "
+           "`Acm Name` field (never `Respondents`). %d record(s): %d done, %d rejected, %d other._"
+           % ("Request Type = Agency Creation" if want_acm_hunting else "all request types",
+              ", Agency Type = ACM Hunting" if want_acm_hunting else "",
+              (", Acm Name = " + acm_q) if (acm_q and acm_q != "__NEVER_ACM__") else "",
+              period, total, done, rej, total - done - rej))
+    out = [head] + body
+    if person_note == "Ahmed Samurai runs the portal -- he is not an ACM, so he has no ACM tickets.":
+        out = ["Ahmed Samurai runs the portal and is **not an ACM**, so he has 0 ACM tickets."]
+    return "\n".join(out) + how
+
 def _acm_hunting_tool(tat, text):
+    """v34.8.0: delegates to the generic _query_tickets engine (was v34.7.0).
+    Kept so the existing route/intent wiring is stable."""
+    return _query_tickets(tat, text, want_acm_hunting=True, want_group="acm")
+
+def _acm_hunting_tool_LEGACY_UNUSED(tat, text):
     """v34.7.0 (Ahmed): deterministic ACM-hunting count. Filters live tickets by
     Acm Name + Request Type = Agency Creation + Agency Type = Acm hunting + a
     Cairo month, then counts and groups by ACM. This is the question the model
@@ -18672,23 +18842,34 @@ def _acm_hunting_tool(tat, text):
     return "\n".join(lines)
 
 def _search_requests_all(tat, conditions, page_size=500):
-    """Like _search_requests but paginates to the full result set (read-only)."""
-    url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
-           "?automatic_fields=true&page_size=%d" % (BASE_ID, REQUESTS_TABLE_ID, page_size))
+    """Like _search_requests but paginates to the full result set (read-only).
+    v34.8.0: page_token MUST ride as a URL query parameter -- Feishu silently
+    ignores it inside the JSON body, so the old body-passing version re-fetched
+    page 1 on every loop and never saw more than the first 500 records (the
+    live 'November ACM hunting = 5' bug; the true count is 32). Also dedups by
+    record_id -- pages can legitimately repeat a record."""
+    base_url = ("https://open.feishu.cn/open-apis/bitable/v1/apps/%s/tables/%s/records/search"
+                "?automatic_fields=true&page_size=%d" % (BASE_ID, REQUESTS_TABLE_ID, page_size))
     filt = conditions[0] if len(conditions) == 1 else {"conjunction": "and", "conditions": conditions}
-    out, token, guard = [], None, 0
+    out, seen, token, guard = [], set(), None, 0
     try:
-        while guard < 20:
+        while guard < 40:
             guard += 1
+            url = base_url + (("&page_token=" + token) if token else "")
             body = {"filter": filt}
-            if token: body["page_token"] = token
             r = feishu_session.post(url, headers={"Authorization": "Bearer %s" % tat,
-                    "Content-Type": "application/json"}, json=body, timeout=10)
+                    "Content-Type": "application/json"}, json=body, timeout=15)
             data = r.json()
             if r.status_code != 200 or data.get("code") != 0:
                 return None
             d = data.get("data") or {}
-            out.extend(d.get("items") or [])
+            for it in (d.get("items") or []):
+                rid = it.get("record_id")
+                if rid and rid in seen:
+                    continue
+                if rid:
+                    seen.add(rid)
+                out.append(it)
             if d.get("has_more") and d.get("page_token"):
                 token = d["page_token"]
             else:
@@ -18764,7 +18945,7 @@ def _reject_reasons_tool(tat, text):
     start_ms, end_ms, _ = _cairo_date_range("this month")
     items = _search_requests(tat, [
         {"field_name": "Request Status", "operator": "contains", "value": ["Reject"]},
-        {"field_name": "Submitted on", "operator": "isGreaterEqual", "value": ["ExactDate", str(start_ms)]}], 200)
+        {"field_name": "Submitted on", "operator": "isGreater", "value": ["ExactDate", str(start_ms - 1)]}], 200)
     if items is None:
         return None
     counts = {}
@@ -19589,7 +19770,120 @@ def aily_chat_feedback():
         return jsonify({"error": "vote must be up or down"}), 400
     excerpt = str(body.get("excerpt", "") or "")
     personality = str(body.get("personality", "") or "").strip().lower()
-    _chat_log_feedback(email, vote, excerpt, personality)
+    reason = str(body.get("reason", "") or "")
+    question = str(body.get("question", "") or "")
+    filters = str(body.get("filters", "") or "")
+    answer = str(body.get("answer", "") or "")
+    _chat_log_feedback(email, vote, excerpt, personality, reason, question, filters, answer)
+    return jsonify({"ok": True})
+
+
+def _chat_lessons_hgetall(key):
+    """v34.8.0: HGETALL tolerant of both Upstash reply shapes (dict or flat
+    [field, value, ...] list) -- same handling presence_map() uses."""
+    try:
+        raw = redis_cmd("HGETALL", key)
+    except Exception:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, (list, tuple)):
+        out = {}
+        for i in range(0, len(raw) - 1, 2):
+            out[str(raw[i])] = raw[i + 1]
+        return out
+    return {}
+
+
+@app.route('/api/chat/lessons', methods=['GET'])
+@rate_limit(30, 60)
+def aily_chat_lessons_list():
+    """v34.8.0 (Ahmed review point 3): owner-only queue of down-vote lessons
+    waiting for approval. The AI never learns from raw feedback -- a human
+    (Ahmed) approves first, and only approved lessons are injected back into
+    the prompt (see _chat_approved_lessons)."""
+    name = sanitize_text(request.headers.get("X-User-Name", ""), 120).strip().lower()
+    if not any(a == name for a in ADMIN_USERS):
+        return jsonify({"error": "Owner only."}), 403
+    raw = _chat_lessons_hgetall("xena:chat:lessons:pending")
+    pending = []
+    for lid, js in raw.items():
+        try:
+            rec = json.loads(js)
+        except Exception:
+            continue
+        rec["id"] = lid
+        pending.append(rec)
+    pending.sort(key=lambda r: r.get("t", 0), reverse=True)
+    raw_a = _chat_lessons_hgetall("xena:chat:lessons:approved")
+    approved = []
+    for lid, js in raw_a.items():
+        try:
+            rec = json.loads(js)
+        except Exception:
+            continue
+        rec["id"] = lid
+        approved.append(rec)
+    approved.sort(key=lambda r: r.get("t", 0), reverse=True)
+    return jsonify({"pending": pending, "approved": approved})
+
+
+@app.route('/api/chat/lessons/approve', methods=['POST'])
+@rate_limit(30, 60)
+def aily_chat_lessons_approve():
+    """v34.8.0: move a pending lesson into the approved set the AI reads.
+    The owner may edit the lesson text first -- the AI follows the EDITED
+    rule, not the raw complaint."""
+    name = sanitize_text(request.headers.get("X-User-Name", ""), 120).strip().lower()
+    if not any(a == name for a in ADMIN_USERS):
+        return jsonify({"error": "Owner only."}), 403
+    body = request.get_json(silent=True) or {}
+    lid = str(body.get("id", "") or "").strip()
+    if not lid:
+        return jsonify({"error": "id is required"}), 400
+    raw = _chat_lessons_hgetall("xena:chat:lessons:pending")
+    js = raw.get(lid)
+    if not js:
+        return jsonify({"error": "lesson not found (already handled?)"}), 404
+    try:
+        rec = json.loads(js)
+    except Exception:
+        return jsonify({"error": "corrupt lesson record"}), 500
+    edited = str(body.get("rule", "") or "").strip()
+    if edited:
+        rec["rule"] = edited[:500]
+    elif not rec.get("rule"):
+        # default rule text from the captured fields if the owner did not edit
+        rec["rule"] = ("When asked %s, do not repeat this mistake (%s)."
+                       % ((rec.get("question") or "this kind of question")[:120],
+                          (rec.get("reason") or "wrong answer")[:120]))[:500]
+    rec["approved_by"] = name
+    rec["approved_t"] = int(time.time())
+    rec["status"] = "approved"
+    out = redis_pipeline(
+        ("HSET", "xena:chat:lessons:approved", lid, json.dumps(rec, ensure_ascii=False)),
+        ("HDEL", "xena:chat:lessons:pending", lid))
+    if out is None:
+        logger.warn("lesson_approve_failed")
+        return jsonify({"error": "store failed"}), 500
+    return jsonify({"ok": True, "lesson": rec})
+
+
+@app.route('/api/chat/lessons/reject', methods=['POST'])
+@rate_limit(30, 60)
+def aily_chat_lessons_reject():
+    """v34.8.0: drop a pending lesson -- the AI never sees it."""
+    name = sanitize_text(request.headers.get("X-User-Name", ""), 120).strip().lower()
+    if not any(a == name for a in ADMIN_USERS):
+        return jsonify({"error": "Owner only."}), 403
+    body = request.get_json(silent=True) or {}
+    lid = str(body.get("id", "") or "").strip()
+    if not lid:
+        return jsonify({"error": "id is required"}), 400
+    out = redis_pipeline(("HDEL", "xena:chat:lessons:pending", lid))
+    if out is None:
+        logger.warn("lesson_reject_failed")
+        return jsonify({"error": "store failed"}), 500
     return jsonify({"ok": True})
 
 
@@ -19690,6 +19984,36 @@ def aily_chat_stream_route():
     full_message = _chat_system_prompt(personality, history) + "\n\n" + grounded
     route = _chat_route(message)
     _t0 = time.time()
+    # v34.8.0 (Ahmed: "he returned 5 fabricated tickets, none Zohaib's"): the
+    # widget streams, and this route NEVER consulted the deterministic tools --
+    # every data question went straight to the model, which guessed from a stale
+    # KB and invented ticket numbers. Run the tool FIRST, exactly like /api/chat.
+    if route.get("intent") not in ("qa", "explain_rule", "pii_request"):
+        _tool_reply = None
+        try:
+            _tool_reply = _chat_tool_answer(tat, route, message, _chat_agent_identity(email, name))
+        except Exception:
+            _tool_reply = None
+        if _tool_reply:
+            _chat_log_request(email, route.get("intent"), "tool",
+                              (time.time() - _t0) * 1000, {"entities": route.get("entities")})
+            def _tool_gen(rep=_tool_reply):
+                yield "data: " + json.dumps({"t": "meta", "session_id": session_id or "", "agent_chat_id": ""}, ensure_ascii=False) + "\n\n"
+                yield "data: " + json.dumps({"t": "token", "text": rep}, ensure_ascii=False) + "\n\n"
+                yield "data: " + json.dumps({"t": "done", "reply": rep, "session_id": session_id or "", "remaining": remaining, "via": "tool"}, ensure_ascii=False) + "\n\n"
+            return Response(_tool_gen(), mimetype="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    # v34.8.0: the tool could not answer (or it's a free-form data question) --
+    # the model must NOT invent numbers/tickets. Hand it the live summary it can
+    # quote, and forbid fabrication.
+    try:
+        _live = _query_tickets(tat, message, want_acm_hunting=False, want_group="acm")
+        if _live:
+            message = (message + "\n\n[LIVE TABLE -- the only numbers you may quote. "
+                       "If a ticket number is not listed here, do NOT mention it. "
+                       "Never invent ticket numbers, counts, or ACM names.]\n" + _live)
+    except Exception:
+        pass
     _chat_history_append(email, session_id, "user", message)
 
     def _gen():

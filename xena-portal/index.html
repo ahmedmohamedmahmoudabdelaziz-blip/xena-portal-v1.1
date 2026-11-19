@@ -29618,7 +29618,7 @@ function samSetReset() {
 .sam19-sw-btns button.no{background:rgba(255,107,129,.14);color:#ff6b81;border:1px solid rgba(255,107,129,.35)}
 
 /* ── Build badge ── */
-#sam19ver{position:fixed;left:10px;bottom:10px;z-index:9000;font-size:.6rem;font-weight:700;color:var(--text-muted,var(--text-muted));background:rgba(var(--ink-rgb),.06);border:1px solid var(--border,var(--border));border-radius:999px;padding:3px 10px;display:flex;align-items:center;gap:5px;cursor:pointer;opacity:.75}
+#sam19ver{position:static;font-size:.6rem;font-weight:700;color:var(--text-muted,var(--text-muted));background:rgba(var(--ink-rgb),.06);border:1px solid var(--border,var(--border));border-radius:999px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;opacity:.75;max-width:230px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:none;margin-right:8px;vertical-align:middle}
 #sam19ver:hover{opacity:1}
 #sam19ver .dot{width:7px;height:7px;border-radius:50%;background:#22d98a;display:inline-block}
 #sam19ver .dot.bad{background:#ff4d6d;animation:sam19Blink 1s ease-in-out infinite}
@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.7.0 ai-quality-hardening 2026-11-19';
+window.SAM19_BUILD='v34.8.0 ai-self-learning 2026-11-19';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -31267,7 +31267,8 @@ window.lightboxRenderExtractResult=function(result){
     chip.title='Portal build check. Click to hide.';
     chip.innerHTML='<span class="dot'+(ok?'':' bad')+'"></span>FE '+window.SAM19_BUILD+' · BE '+escHtml(be);
     chip.onclick=()=>chip.remove();
-    document.body.appendChild(chip);
+    var _host=document.querySelector('.page-top-bar .top-bar-right')||document.querySelector('.page-top-bar');
+    if(_host){ _host.insertBefore(chip,_host.firstChild); } else { chip.style.position='fixed';chip.style.left='10px';chip.style.top='10px';chip.style.zIndex='9000';document.body.appendChild(chip); }
     if(!ok)setTimeout(()=>ToastManager.show('⚠️ Build mismatch: the backend on Vercel is "'+be+'" but this page is "'+window.SAM19_BUILD+'". Redeploy api/index.py (v19) — features will misbehave until they match.','warning',12000),2500);
   }catch(e){}
 })();
@@ -32526,6 +32527,11 @@ xa4SettingsEnsure(false);
         .xaVote{background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:.78rem;padding:2px 8px;border-radius:999px;cursor:pointer;margin-left:6px;font-family:inherit;transition:transform .12s ease, opacity .2s;}
         .xaVote:hover{transform:scale(1.12);color:var(--text);}
         .xaVote:disabled{cursor:default;}
+        .xaVoteWhy{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(245,185,66,.06)}
+        .xaVoteWhyT{font-size:11px;font-weight:600;color:var(--text-muted);margin-right:4px}
+        .xaVoteWhyB{height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:11px;cursor:pointer;font-family:inherit}
+        .xaVoteWhyB:hover{border-color:var(--accent,#2dd4f0);color:var(--accent,#2dd4f0)}
+        .xaVoteWhySkip{opacity:.6}
 .xaMsg.bot .xaCopyBtn{margin-top:6px;margin-left:6px;background:transparent;border:1px solid var(--xa-border);color:var(--xa-muted);
   border-radius:8px;font-size:11px;padding:2px 8px;cursor:pointer}
 .xaMsg.bot .xaCopyBtn:hover{color:var(--xa-text);border-color:var(--border-hover)}
@@ -32665,11 +32671,20 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
 .xaMeterBar{height:6px;border-radius:3px;background:var(--xa-bg2);margin-top:8px;overflow:hidden}
 #xaMeterFill{height:100%;border-radius:3px;background:var(--xa-ac);width:0%}
 /* Header: 60px strip, avatar + persona name, sync pill, icon buttons */
-#xaChatPanel .xaChatHead{height:60px;padding:0 14px;gap:10px;background:var(--xa-head);flex-shrink:0}
+#xaChatPanel .xaChatHead{height:60px;padding:0 14px;gap:10px;background:var(--xa-head);flex-shrink:0;
+  display:flex;align-items:center}
+/* v34.8.0 (Ahmed): the header is no longer one crowded row. Left = avatar+name,
+   right = the control cluster; the persona picker is its own row below, so the
+   name can never run under the buttons (the "SamuraiNooraAnalyst" overlap). */
+.xaHeadL{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto}
+.xaHeadR{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto}
+.xaPersonaRow{display:none;padding:8px 14px;background:var(--xa-head);border-top:1px solid var(--xa-border)}
+#xaChatPanel.xaPageMode .xaPersonaRow{display:block}
 .xaAv{width:32px;height:32px;border-radius:50%;background:var(--xa-ac);color:var(--xa-acink);
   display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
 #xaChatPanel .xaChatTitle{display:flex;flex-direction:column;line-height:1.15;font-size:15px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;flex:none}
+#xaChatPanel.xaPageMode .xaChatTitle{max-width:260px}
   /* v34.7.0: clip the name, never let it run under the controls */
 #xaChatPanel .xaChatTitle #xaChatName{font-weight:700;font-size:15px;color:var(--xa-text)}
 #xaChatPanel .xaChatSub{font-size:11px;color:var(--xa-muted);font-weight:500}
@@ -32684,12 +32699,13 @@ mark.xaHl{background:rgba(250,204,21,.45);color:inherit;border-radius:2px;paddin
 .xaSyncDot{width:7px;height:7px;border-radius:50%;background:#34d399;flex:none}
 .xaSyncPill.warn{background:rgba(245,185,74,.10);border-color:rgba(245,185,74,.35);color:#f5b942}
 .xaSyncPill.warn .xaSyncDot{background:#f5b942}
-.xaPersonaSeg{display:none;gap:2px;align-items:center}
-#xaChatPanel.xaPageMode .xaPersonaSeg{display:inline-flex;margin-left:auto;background:var(--xa-ink);
-  border:1px solid var(--xa-border);border-radius:10px;padding:3px;flex:none}
+.xaPersonaSeg{display:inline-flex;gap:6px;align-items:center}
+#xaChatPanel.xaPageMode .xaPersonaSeg{background:var(--xa-ink);
+  border:1px solid var(--xa-border);border-radius:10px;padding:4px;flex:none;width:max-content}
 #xaChatPanel.xaPageMode #xaChatPersona{display:none}
-.xaPersonaSeg button{height:32px;padding:0 12px;border-radius:8px;border:0;background:transparent;
-  color:var(--xa-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;width:auto;min-width:0;min-height:0}
+.xaPersonaSeg button{height:34px;padding:0 14px;border-radius:8px;border:0;background:transparent;
+  color:var(--xa-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;width:auto;min-width:0;min-height:0;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .xaPersonaSeg button:hover{background:var(--xa-bg2)}
 .xaPersonaSeg button.on{background:rgba(45,212,240,.14);color:var(--xa-ac)}
 #xaEvBtn{display:none}
@@ -32854,7 +32870,9 @@ h3.xaH{font-size:17px}h4.xaH{font-size:15.5px}h5.xaH,h6.xaH{font-size:14px;color
     </div>
     <div id="xaMain">
     <div class="xaChatHead">
-      <span id="xaAv" class="xaAv" aria-hidden="true">S</span><span class="xaChatTitle"><span id="xaChatName">Samurai</span><span class="xaChatSub">Audition expert</span></span>
+      <div class="xaHeadL">
+        <span id="xaAv" class="xaAv" aria-hidden="true">S</span><span class="xaChatTitle"><span id="xaChatName">Samurai</span><span class="xaChatSub">Audition expert</span></span>
+      </div>
       <select id="xaChatPersona" title="Personality" data-no-search>
         <option value="samurai">🗡 Samurai</option>
         <option value="noora">🌸 Noora</option>
@@ -32868,13 +32886,15 @@ h3.xaH{font-size:17px}h4.xaH{font-size:15.5px}h5.xaH,h6.xaH{font-size:14px;color
         <option value="zh">中文</option>
       </select>
       <span id="xaSyncPill" class="xaSyncPill"><span class="xaSyncDot"></span><span id="xaSyncTxt">Synced</span></span>
-      <div id="xaPersonaSeg" class="xaPersonaSeg"></div>
-      <button id="xaEvBtn" title="Evidence panel" aria-label="Toggle evidence panel">◧</button>
+      <div class="xaHeadR">
+        <button id="xaEvBtn" title="Evidence panel" aria-label="Toggle evidence panel">◧</button>
       <button id="xaChatHist" title="Chat history" aria-label="Chat history">🕘</button>
       <button id="xaChatWide" title="Expand / compact">⇔</button>
       <button id="xaChatNew" title="New chat">↺</button>
       <button id="xaChatClose" title="Close">✕</button>
+      </div>
     </div>
+    <div class="xaPersonaRow"><div id="xaPersonaSeg" class="xaPersonaSeg"></div></div>
     <div id="xaChatMsgs" role="log" aria-live="polite" aria-label="Conversation" tabindex="0"></div>
     <div id="xaChatChips"></div>
     <div id="xaCtxBar" class="xaCtxBar"></div>
@@ -33254,15 +33274,51 @@ function addMsg(text, who, isErr, via){
     var dn = document.createElement('button');
     dn.className = 'xaVote'; dn.type = 'button'; dn.textContent = '\u{1F44E}';
     dn.title = 'Bad answer';
-    var sendVote = function(v, btn, other){
+    /* v34.8.0 (Ahmed review point 3): a down-vote is a LESSON CANDIDATE, not a
+       vanity metric -- capture why it was wrong plus the question and the
+       full answer so the owner can approve an edited rule the AI will follow
+       next time. Up-votes stay one click. */
+    var postVote = function(v, btn, other, reason){
       try{
         btn.disabled = true; other.disabled = true;
         btn.style.opacity = '1'; other.style.opacity = '.4';
         fetch('/api/chat/feedback', {method:'POST',
           headers:{'Content-Type':'application/json','X-User-Name':loggedUser,'X-User-Email':loggedEmail},
-          body: JSON.stringify({vote:v, excerpt:String(text).slice(0,300), personality:(personaSel?personaSel.value:'')})
+          body: JSON.stringify({vote:v, excerpt:String(text).slice(0,300), personality:(personaSel?personaSel.value:''),
+            reason: reason || '',
+            question: String(typeof lastUserText!=='undefined' ? lastUserText : '').slice(0,500),
+            filters: '', answer: String(text).slice(0,1500)})
         }).catch(function(){});
       }catch(e){}
+    };
+    var sendVote = function(v, btn, other){
+      if(v === 'up'){ postVote('up', btn, other, ''); return; }
+      /* down-vote: inline reason picker right under this answer */
+      try{
+        var old = d.querySelector('.xaVoteWhy'); if(old){ old.remove(); }
+        var why = document.createElement('div');
+        why.className = 'xaVoteWhy';
+        why.innerHTML = '<span class="xaVoteWhyT">What went wrong?</span>';
+        var REASONS = [
+          ['wrong_number','Wrong number'],
+          ['wrong_language','Wrong language'],
+          ['ignored_question','Ignored my question'],
+          ['bad_format','Hard to read'],
+          ['other','Something else']
+        ];
+        REASONS.forEach(function(r){
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'xaVoteWhyB'; b.textContent = r[1];
+          b.onclick = function(){ why.remove(); postVote('down', btn, other, r[0]); };
+          why.appendChild(b);
+        });
+        var skip = document.createElement('button');
+        skip.type = 'button'; skip.className = 'xaVoteWhyB xaVoteWhySkip'; skip.textContent = 'Skip';
+        skip.onclick = function(){ why.remove(); postVote('down', btn, other, ''); };
+        why.appendChild(skip);
+        d.appendChild(why);
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }catch(e){ postVote('down', btn, other, ''); }
     };
     up.onclick = function(){ sendVote('up', up, dn); };
     dn.onclick = function(){ sendVote('down', dn, up); };
@@ -33391,11 +33447,26 @@ function ttsPickVoice(lang, persona){
   pool = pool.slice().sort(function(a,b){ return score(b) - score(a); });
   return pool[0] || null;
 }
+function ttsSpoken(text){
+  /* v34.8.0 (Ahmed review point 4): the speaker reads a SHORT spoken version --
+     no tables, no ticket-number roll-calls, big counts rounded -- not the raw
+     markdown wall. Tables become 'N rows', number runs collapse, 5+ digit counts
+     are rounded to a friendly magnitude. */
+  var t = String(text||'');
+  t = t.replace(/\|[-: \|]+\|/g, ' ');                 // table separator rows
+  t = t.replace(/(^|\n)\s*\|[^\n]*\|/g, '$1');        // table content rows -> drop
+  t = t.replace(/#\d{4,7}(\s*[,\u060C]\s*#\d{4,7})+/g, 'the listed tickets'); // #1,#2,#3 roll-call
+  t = t.replace(/\b(\d{1,3}(?:,\d{3})+\b)/g, function(m){ var n=parseInt(m.replace(/,/g,''),10); return n>=1000?String(Math.round(n/100)*100):m; });
+  t = t.replace(/\b(\d{5,})\b/g, function(m){ var n=parseInt(m,10); return String(Math.round(n/100)*100); });
+  t = t.replace(/(\n\s*[-\u2022]\s*){3,}/g, '\n');     // long bullet runs -> collapse
+  t = t.replace(/_{1,}([^_]+)_{1,}/g, '$1');               // _how I counted_ italics
+  return t;
+}
 function speak(text, btn){
   try{
     if(!('speechSynthesis' in window)){ btn.textContent='🔇 Not supported'; return; }
     if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); btn.textContent='🔊 Listen'; return; }
-    var cleaned = ttsClean(text);
+    var cleaned = ttsClean(ttsSpoken(text));
     if(!cleaned){ btn.textContent='🔊 Listen'; return; }
     var u = new SpeechSynthesisUtterance(cleaned);
     var persona = (typeof personaSel!=='undefined' && personaSel && personaSel.value) ? personaSel.value : 'samurai';
@@ -33961,7 +34032,9 @@ function bind(){
   if(seg){
     ['samurai','noora','analyst'].forEach(function(v){
       var sb = document.createElement('button');
-      sb.type = 'button'; sb.setAttribute('data-v', v); sb.textContent = PERSONA_NAMES[v];
+      sb.type = 'button'; sb.setAttribute('data-v', v);
+      var icons = {samurai:'\u{1F5E1}', noora:'\u{1F338}', analyst:'\u{1F4CA}'};
+      sb.innerHTML = '<span aria-hidden="true">'+(icons[v]||'')+'</span><span>'+PERSONA_NAMES[v]+'</span>';
       sb.onclick = function(){ personaSel.value = v; savePrefs(); xaAvUpdate(); };
       seg.appendChild(sb);
     });
