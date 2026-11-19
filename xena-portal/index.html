@@ -30827,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.8.2 chat-detail-design 2026-11-19';
+window.SAM19_BUILD='v34.9.0 kb-rebuild-premium 2026-11-20';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -32746,6 +32746,160 @@ h3.xaH{font-size:17px}h4.xaH{font-size:15.5px}h5.xaH,h6.xaH{font-size:14px;color
 #xaChatPanel .xaEnt{background:rgba(45,212,240,.14);border-color:rgba(45,212,240,.4);color:var(--xa-ac)}
 #xaChatPanel .xaEnt:hover{background:rgba(45,212,240,.3)}
 
+
+
+/* ===== v34.9.0 PREMIUM OVERHAUL (Ahmed: "looks shit, my manager will kill me,
+   need something bulletproof - icons, design, shape, structure", comment
+   7709911329498205378 + 7710030591055367196). Additive; overrides the v34.6.0
+   3-column shell with real depth, elevation, refined typography and polished
+   controls. Everything keyed to #xaChatPanel so the rest of the portal is
+   untouched. ===== */
+#xaChatPanel{
+  --xac-bg:#0b101b;
+  --xac-bg2:#101724;
+  --xac-panel:#141c2c;
+  --xac-panel2:#1a2334;
+  --xac-line:rgba(148,163,184,.12);
+  --xac-line2:rgba(148,163,184,.20);
+  --xac-text:#e8eef7;
+  --xac-dim:#93a1b6;
+  --xac-acc:#2dd4f0;
+  --xac-acc2:#6d8dff;
+  --xac-grad:linear-gradient(135deg,#2dd4f0 0%,#6d8dff 100%);
+}
+#xaChatPanel.xaPageMode{
+  background:radial-gradient(1200px 600px at 18% -8%, rgba(45,212,240,.10), transparent 55%),
+             radial-gradient(1000px 560px at 96% 0%, rgba(109,141,255,.10), transparent 52%),
+             var(--xac-bg);
+  border:1px solid var(--xac-line);
+  border-radius:22px;
+  box-shadow:0 30px 90px -24px rgba(2,6,16,.85), 0 0 0 1px rgba(45,212,240,.04) inset;
+  color:var(--xac-text);
+}
+#xaChatPanel.xaPageMode::before{ /* keep the accent top-line but make it glow */
+  background:var(--xac-grad);height:3px;opacity:1;
+  box-shadow:0 0 18px rgba(45,212,240,.55)}
+
+/* ---------- left rail ---------- */
+#xaChatPanel.xaPageMode #xaSide{
+  background:linear-gradient(180deg,var(--xac-bg2),var(--xac-bg));
+  border-right:1px solid var(--xac-line);
+  padding:16px 14px;gap:10px}
+#xaChatPanel.xaPageMode .xaSideNew{
+  background:var(--xac-grad);color:#06121c;border:none;border-radius:12px;
+  padding:11px 14px;font-weight:700;font-size:13.5px;letter-spacing:.2px;cursor:pointer;
+  box-shadow:0 8px 20px -8px rgba(45,212,240,.55);transition:transform .14s,box-shadow .14s}
+#xaChatPanel.xaPageMode .xaSideNew:hover{transform:translateY(-1px);box-shadow:0 12px 26px -8px rgba(45,212,240,.7)}
+#xaChatPanel.xaPageMode #xaSideSearch{
+  background:var(--xac-panel);border:1px solid var(--xac-line);border-radius:10px;
+  color:var(--xac-text);padding:9px 12px;font-size:12.5px;outline:none;transition:border-color .15s,box-shadow .15s}
+#xaChatPanel.xaPageMode #xaSideSearch:focus{border-color:var(--xac-acc);box-shadow:0 0 0 3px rgba(45,212,240,.16)}
+#xaChatPanel.xaPageMode .xaSideLbl{
+  color:var(--xac-dim);font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  margin:14px 4px 6px}
+#xaChatPanel.xaPageMode .xaMeter{
+  margin-top:auto;background:var(--xac-panel);border:1px solid var(--xac-line);
+  border-radius:12px;padding:11px 12px}
+#xaChatPanel.xaPageMode .xaMeterRow{color:var(--xac-dim);font-size:11px}
+#xaChatPanel.xaPageMode .xaMeterBar{background:rgba(148,163,184,.14)}
+#xaChatPanel.xaPageMode #xaMeterFill{background:var(--xac-grad)}
+
+/* ---------- header ---------- */
+#xaChatPanel.xaPageMode .xaChatHead{
+  background:linear-gradient(180deg,rgba(20,28,44,.85),rgba(16,23,36,.6));
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--xac-line);padding:16px 22px;gap:12px}
+#xaChatPanel.xaPageMode .xaAv{
+  width:40px;height:40px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--xac-grad);color:#06121c;font-weight:800;font-size:16px;
+  box-shadow:0 8px 18px -6px rgba(45,212,240,.55);flex:none}
+#xaChatPanel.xaPageMode .xaChatTitle{display:flex;flex-direction:column;line-height:1.15}
+#xaChatPanel.xaPageMode #xaChatName{font-size:16px;font-weight:800;letter-spacing:.2px;color:var(--xac-text)}
+#xaChatPanel.xaPageMode .xaChatSub{font-size:11.5px;color:var(--xac-dim);font-weight:500}
+#xaChatPanel.xaPageMode .xaChatHead select{
+  background:var(--xac-panel);border:1px solid var(--xac-line);color:var(--xac-text);
+  border-radius:10px;padding:7px 10px;font-size:12.5px;outline:none;cursor:pointer}
+#xaChatPanel.xaPageMode .xaChatHead select:focus{border-color:var(--xac-acc)}
+#xaChatPanel.xaPageMode .xaHeadR button{
+  width:36px;height:36px;border-radius:10px;background:transparent;border:1px solid transparent;
+  color:var(--xac-dim);font-size:16px;cursor:pointer;transition:all .14s}
+#xaChatPanel.xaPageMode .xaHeadR button:hover{background:var(--xac-panel);border-color:var(--xac-line);color:var(--xac-text)}
+#xaChatPanel.xaPageMode .xaSyncPill{
+  background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);color:#34d399;
+  border-radius:999px;padding:5px 11px;font-size:11px;font-weight:600}
+
+/* ---------- persona segmented control ---------- */
+#xaChatPanel.xaPageMode .xaPersonaRow{padding:12px 22px 0}
+#xaChatPanel.xaPageMode .xaPersonaSeg{
+  display:inline-flex;background:var(--xac-panel);border:1px solid var(--xac-line);
+  border-radius:12px;padding:4px;gap:4px}
+#xaChatPanel.xaPageMode .xaPersonaSeg button{
+  border:none;background:transparent;color:var(--xac-dim);border-radius:9px;
+  padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .14s}
+#xaChatPanel.xaPageMode .xaPersonaSeg button.on,#xaChatPanel.xaPageMode .xaPersonaSeg button[aria-pressed="true"]{
+  background:var(--xac-grad);color:#06121c;box-shadow:0 6px 14px -6px rgba(45,212,240,.5)}
+
+/* ---------- message area ---------- */
+#xaChatPanel.xaPageMode #xaChatMsgs{padding:26px 30px;gap:16px;background:transparent}
+#xaChatPanel.xaPageMode .xaMsg{
+  border-radius:16px;line-height:1.62;font-size:13.8px;max-width:min(74%,760px)}
+#xaChatPanel.xaPageMode .xaMsg.user{
+  background:var(--xac-grad);color:#06121c;font-weight:500;
+  border-bottom-right-radius:5px;box-shadow:0 10px 24px -10px rgba(45,212,240,.5)}
+#xaChatPanel.xaPageMode .xaMsg.bot{
+  background:var(--xac-panel);border:1px solid var(--xac-line);color:var(--xac-text);
+  border-bottom-left-radius:5px;box-shadow:0 8px 22px -12px rgba(2,6,16,.7)}
+
+/* ---------- start / empty state ---------- */
+#xaChatPanel.xaPageMode .xaStarter{
+  background:var(--xac-panel);border:1px solid var(--xac-line);border-radius:14px;
+  padding:14px 16px;transition:transform .14s,border-color .14s,box-shadow .14s}
+#xaChatPanel.xaPageMode .xaStarter:hover{
+  transform:translateY(-2px);border-color:rgba(45,212,240,.4);
+  box-shadow:0 14px 30px -14px rgba(45,212,240,.35)}
+
+/* ---------- composer ---------- */
+#xaChatPanel.xaPageMode .xaChatFoot{
+  background:linear-gradient(0deg,rgba(20,28,44,.85),rgba(16,23,36,.6));
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-top:1px solid var(--xac-line);padding:16px 22px;gap:10px;align-items:flex-end}
+#xaChatPanel.xaPageMode #xaChatInput{
+  background:var(--xac-panel);border:1px solid var(--xac-line2);color:var(--xac-text);
+  border-radius:14px;padding:12px 15px;font-size:13.8px;outline:none;
+  transition:border-color .15s,box-shadow .15s}
+#xaChatPanel.xaPageMode #xaChatInput:focus{
+  border-color:var(--xac-acc);box-shadow:0 0 0 4px rgba(45,212,240,.14)}
+#xaChatPanel.xaPageMode .xaChatFoot button{
+  width:42px;height:42px;border-radius:12px;flex:none;cursor:pointer;font-size:17px;
+  display:flex;align-items:center;justify-content:center;transition:all .14s;border:1px solid var(--xac-line)}
+#xaChatPanel.xaPageMode #xaSlashBtn,#xaChatPanel.xaPageMode #xaChatMic{
+  background:var(--xac-panel);color:var(--xac-dim)}
+#xaChatPanel.xaPageMode #xaSlashBtn:hover,#xaChatPanel.xaPageMode #xaChatMic:hover{
+  color:var(--xac-text);border-color:var(--xac-line2);transform:translateY(-1px)}
+#xaChatPanel.xaPageMode #xaChatSend{
+  background:var(--xac-grad);color:#06121c;border:none;
+  box-shadow:0 10px 22px -8px rgba(45,212,240,.6)}
+#xaChatPanel.xaPageMode #xaChatSend:hover:not(:disabled){transform:translateY(-1px) scale(1.04)}
+#xaChatPanel.xaPageMode #xaChatSend:disabled{opacity:.4;box-shadow:none}
+
+/* ---------- evidence rail ---------- */
+#xaChatPanel.xaPageMode #xaEvidence{
+  background:linear-gradient(180deg,var(--xac-bg2),var(--xac-bg));
+  border-left:1px solid var(--xac-line)}
+#xaChatPanel.xaPageMode .xaEvHead{
+  color:var(--xac-text);font-weight:700;font-size:13px;padding:16px 18px;
+  border-bottom:1px solid var(--xac-line)}
+#xaChatPanel.xaPageMode .xaEvFoot{color:var(--xac-dim);font-size:11px;padding:12px 16px;border-top:1px solid var(--xac-line)}
+
+/* ---------- scrollbars ---------- */
+#xaChatPanel #xaChatMsgs::-webkit-scrollbar,#xaChatPanel .xaEvBody::-webkit-scrollbar,
+#xaChatPanel .xaSessList::-webkit-scrollbar{width:9px}
+#xaChatPanel #xaChatMsgs::-webkit-scrollbar-thumb,#xaChatPanel .xaEvBody::-webkit-scrollbar-thumb,
+#xaChatPanel .xaSessList::-webkit-scrollbar-thumb{
+  background:rgba(148,163,184,.22);border-radius:99px;border:2px solid transparent;background-clip:padding-box}
+#xaChatPanel #xaChatMsgs::-webkit-scrollbar-thumb:hover{background:rgba(45,212,240,.4);background-clip:padding-box}
+#xaChatPanel #xaChatMsgs::-webkit-scrollbar-track,#xaChatPanel .xaEvBody::-webkit-scrollbar-track,
+#xaChatPanel .xaSessList::-webkit-scrollbar-track{background:transparent}
 
 /* ===== v34.8.2 premium message rendering + layout polish (additive) ===== */
 /* The renderer emits .xaTable / .xaH / .xaList / .xaTableWrap -- style those. */

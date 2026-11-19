@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.8.2 chat-detail-design 2026-11-19"
+XENA_BUILD = "v34.9.0 kb-rebuild-premium 2026-11-20"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -17040,6 +17040,16 @@ KB_TICKET_FIELDS = [
     "Reject Reason", "Rejection Reason", "Closing Reason", "Closing Agencies Reason",
     "Audition note", "Audition Note",
     "Target", "Target Type", "Agency Point Privilege", "Submitter", "Created By",
+    # v34.9.0 (Ahmed, comment 7710030591055367196): the per-request-type fields
+    # the Dynamic Request Section needs. Verified populated per type by sampling
+    # the Grand Table 2026-11-20. PII (NID / phone / contact) still excluded.
+    "Type of Action", "Type of Action 2", "Type of Action Host sign", "Order Action",
+    "Reason", "Applier Note", "Ticket Details",
+    "Match ID", "Vip Level", "Wealth Level",
+    "Privilege", "Point Balance", "Quantities Input",
+    "Otherapp Name", "Otherapp ID", "Applier real name", "Country",
+    "Old ID", "New ID", "Host Number Before close the agency",
+    "Latest Usage Tracker", "Reward",
 ]
 # Second line of defense: if a future edit ever adds these to the projection,
 # their values are dropped in _kb_ticket_line before formatting.
@@ -17137,45 +17147,60 @@ def _kb_file_text(file_name, batch):
     order = batch.get("order") or sorted((batch.get("lines") or {}).keys())
     lines = [batch["lines"][rid] for rid in order if rid in (batch.get("lines") or {})]
     header = ("# Xena Audition Grand Table - tickets batch %s "
-              "(%d tickets). Format per line: Ticket #<numbering> | <submitted> | "
-              "<request type> | <agency> | Status: <status> | By: <respondent> | "
-              "<extra context>. Phone numbers and NIDs are intentionally excluded.\n"
+              "(%d tickets). ONE ticket = up to 3 labelled lines: "
+              "[Basic] shared fields (Ticket, Date, Month, Type, Agency, Status, By/ACM, Region, User); "
+              "[Action] the audition action/result; [Request] that request type's own important fields. "
+              "Phone numbers and NIDs are intentionally excluded.\n"
               % (file_name.replace(".txt", ""), len(lines)))
     return header + "\n".join(lines) + "\n"
 
 def _kb_ticket_line(fields):
-    """One ticket -> one knowledge line. PII-scrubbed. Example shape:
-    Ticket #8492 | 2026-04-21 14:00 | Agency Creation | Agency 42630 "PK-Ishq" |
-    Status: Closed | By: Noora | Region: PK | Target: monthly | Reject: duplicate device"""
+    """v34.9.0 (Ahmed, comment 7710030591055367196): ONE ticket -> ONE knowledge
+    line in THREE labelled sections so the AI can filter / sort / aggregate fast:
+      [Basic]  the fields every request shares (id, date, month, type, agency,
+               status, handler/ACM, region, user)
+      [Action] the Audition action / status -- what was done and how it ended
+      [Request] a DYNAMIC per-request-type section -- only that type's own
+               important fields (action discriminator, game/match, points,
+               target/privilege, reason, details), verified populated per type.
+    PII-scrubbed. Example:
+      [Basic] Ticket #35532 | Date: 2026-11-19 | Month: 2026-11 | Type: Add & Remove games | Agency 42630 "PK-Ishq" | Status: Done | By: Zohaib | Region: PK
+      [Action] Result: Done | Action: ADD Games
+      [Request] Game: 5521 | Details: ..."""
     def val(*aliases):
         v = extract_field_text(get_field_local(fields, *aliases)).strip()
         return KB_REDACT_RE.sub("[REDACTED]", v) if v else ""
+    def anyof(*aliases):
+        for a in aliases:
+            v = val(a)
+            if v:
+                return v
+        return ""
     for nf in KB_NEVER_FIELDS:           # second line of defense
         if nf in fields:
             fields.pop(nf, None)
+
     num   = val("Numbering")
-    sub   = val("Submitted on Copy", "Submitted on", "Created Time")
-    rtype = val("Request Type", "Type")
-    status = val("Status", "Request Status")
-    by    = val("Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)")
+    rtype = anyof("Request Type", "Type") or "Request"
+    rl    = rtype.lower()
+    status = anyof("Status", "Request Status")
+    by    = anyof("Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)")
     acode = val("Agency Code")
-    aname = val("Agency Name", "Otherapp Name", "Other App Name")
-    # v34.1.18 (Ahmed): "why no date / Agency Points?" -- the chat could not
-    # answer "how many ACM HUNTING guilds THIS MONTH" or "what points" because
-    # the line had no clean Date, no Month, no Points, and the handler was a
-    # bare "By:". Emit clean, aggregatable fields so retrieval can filter and
-    # count by month / points / ACM.
+    aname = anyof("Agency Name", "Otherapp Name", "Other App Name")
+    region = val("Region")
+    uid   = val("User ID")
+
+    # ---- date / month (clean, aggregatable) ----
     date_s, month_s = "", ""
     for df in ("Submitted on Copy", "Submitted on", "Created Time"):
         raw = get_field_local(fields, df)
         if raw is None:
             continue
-        dv = raw
         try:
-            if isinstance(dv, (int, float)) and dv > 1e11:   # epoch ms
-                _dt = datetime.fromtimestamp(dv / 1000.0, tz=timezone.utc)
+            if isinstance(raw, (int, float)) and raw > 1e11:   # epoch ms
+                _dt = datetime.fromtimestamp(raw / 1000.0, tz=timezone.utc)
                 date_s = _dt.strftime("%Y-%m-%d"); month_s = _dt.strftime("%Y-%m"); break
-            ds = str(dv).strip()
+            ds = str(raw).strip()
             m = re.match(r"(\d{4})-(\d{2})-(\d{2})", ds)
             if m:
                 date_s = m.group(0); month_s = "%s-%s" % (m.group(1), m.group(2)); break
@@ -17186,37 +17211,123 @@ def _kb_ticket_line(fields):
             pass
         if date_s:
             break
-    parts = ["Ticket #%s" % (num or "?")]
-    if date_s: parts.append("Date: %s" % date_s)
-    if month_s: parts.append("Month: %s" % month_s)
-    if sub and not date_s: parts.append(sub)   # avoid duplicating the date
-    if rtype:  parts.append(rtype)
+
+    # ---------- [Basic] ----------
+    basic = ["Ticket #%s" % (num or "?")]
+    if date_s:  basic.append("Date: %s" % date_s)
+    if month_s: basic.append("Month: %s" % month_s)
+    basic.append("Type: %s" % rtype)
     if acode or aname:
-        parts.append('Agency %s "%s"' % (acode or "?", aname or "?"))
-    if status: parts.append("Status: %s" % status)
-    if by:     parts.append("By: %s" % by)
-    extra = []
-    # Points: several possible field spellings across the request types.
-    pts = val("Points", "Agency Points", "Base Points", "Total Points",
-              "Point", "Reward Points", "Points Change")
-    if pts:  extra.append("Points: %s" % pts)
-    if by:   extra.append("ACM: %s" % by)   # explicit, aggregatable handler
-    for label, aliases in (("Region", ("Region",)),
-                           ("User ID", ("User ID",)),
-                           ("Otherapp ID", ("Otherapp ID",)),
-                           ("Agency Type", ("Agency Type", "Type of Agency")),
-                           ("BD", ("Bd Code", "BD Code")),
-                           ("Reject", ("Reject Reason", "Rejection Reason")),
-                           ("Close", ("Closing Reason", "Closing Agencies Reason")),
-                           ("Note", ("Audition note", "Audition Note")),
-                           ("Target", ("Target",)),
-                           ("Target Type", ("Target Type",)),
-                           ("Privilege", ("Agency Point Privilege",)),
-                           ("Submitter", ("Submitter", "Created By"))):
-        v = val(*aliases)
-        if v:
-            extra.append("%s: %s" % (label, v))
-    return " | ".join(parts + extra)
+        basic.append('Agency %s "%s"' % (acode or "?", aname or "?"))
+    if status: basic.append("Status: %s" % status)
+    if by:     basic.append("By: %s" % by)
+    if region: basic.append("Region: %s" % region)
+    if uid:    basic.append("User: %s" % uid)
+    sec_basic = "[Basic] " + " | ".join(basic)
+
+    # ---------- per-request-type Dynamic section ----------
+    def kv(label, v):
+        return ("%s: %s" % (label, v)) if v else ""
+    req = []
+    action = ""
+    if "game" in rl:
+        action = anyof("Type of Action 2", "Type of Action")
+        for lbl, v in (("Game", anyof("Match ID", "Game", "Game Name")),
+                       ("Details", val("Ticket Details")),
+                       ("Reason", anyof("Reason", "Applier Note")),
+                       ("Qty", val("Quantities Input"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "host sign" in rl:
+        action = anyof("Type of Action Host sign", "Type of Action")
+        for lbl, v in (("Host", anyof("Match ID", "Cleaned User ID", "User ID")),
+                       ("Details", val("Ticket Details")),
+                       ("Reason", anyof("Reason", "Applier Note"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "point request" in rl or ("point" in rl and "target" not in rl):
+        for lbl, v in (("Privilege", anyof("Agency Point Privilege", "Privilege")),
+                       ("Balance", val("Point Balance")),
+                       ("Target", val("Target")),
+                       ("Target Type", val("Target Type")),
+                       ("Order", val("Order Action")),
+                       ("Note", anyof("Applier Note", "Audition note", "Audition Note")),
+                       ("Details", val("Ticket Details"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "target privilege" in rl or "target" in rl:
+        for lbl, v in (("Privilege", anyof("Privilege", "Agency Point Privilege")),
+                       ("Target", val("Target")),
+                       ("Base Points", val("Base Points")),
+                       ("Note", anyof("Applier Note", "Audition note", "Audition Note")),
+                       ("Details", val("Ticket Details"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "closing" in rl or "close" in rl or "merged" in rl:
+        for lbl, v in (("Reason", anyof("Closing Reason", "Closing Agencies Reason", "Reason")),
+                       ("Old ID", val("Old ID")),
+                       ("New ID", val("New ID")),
+                       ("Hosts Before Close", val("Host Number Before close the agency")),
+                       ("Details", val("Ticket Details"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "creation" in rl or "bd creation" in rl:
+        for lbl, v in (("Agency Type", anyof("Agency Type", "Type of Agency")),
+                       ("Otherapp", anyof("Otherapp Name", "Other App Name")),
+                       ("Otherapp ID", val("Otherapp ID")),
+                       ("BD", anyof("Bd Code", "BD Code")),
+                       ("Country", val("Country")),
+                       ("Applier", val("Applier real name")),
+                       ("Details", val("Ticket Details"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "welcome" in rl:
+        for lbl, v in (("Wealth", val("Wealth Level")),
+                       ("VIP", val("Vip Level")),
+                       ("Details", val("Ticket Details")),
+                       ("Note", anyof("Audition note", "Audition Note"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "rating" in rl or "reward" in rl:
+        for lbl, v in (("Reward", val("Reward")),
+                       ("Details", val("Ticket Details")),
+                       ("Note", anyof("Audition note", "Audition Note"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "border" in rl:
+        for lbl, v in (("Border", anyof("Border Type", "Match ID")),
+                       ("Details", val("Ticket Details"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    elif "name" in rl or "ownership" in rl or "manger" in rl or "manager" in rl:
+        for lbl, v in (("New Name", anyof("New agency name", "New agency owner Name")),
+                       ("Old ID", val("Old ID")),
+                       ("New ID", val("New ID")),
+                       ("Details", val("Ticket Details")),
+                       ("Reason", anyof("Reason", "Applier Note"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    else:
+        # generic fallback: status / reject / points / note / details
+        for lbl, v in (("Reject", anyof("Reject Reason", "Rejection Reason")),
+                       ("Points", anyof("Points", "Agency Points", "Base Points", "Total Points", "Reward Points")),
+                       ("Details", val("Ticket Details")),
+                       ("Note", anyof("Audition note", "Audition Note"))):
+            s = kv(lbl, v)
+            if s: req.append(s)
+    # de-dup while preserving order
+    seen = set(); req = [x for x in req if not (x in seen or seen.add(x))]
+    sec_req = ("[Request] " + " | ".join(req)) if req else ""
+
+    # ---------- [Action] ----------
+    act = []
+    if status: act.append("Result: %s" % status)
+    if action: act.append("Action: %s" % action)
+    rej = anyof("Reject Reason", "Rejection Reason")
+    if rej and "reject" not in sec_req.lower(): act.append("Reject: %s" % rej)
+    sec_action = ("[Action] " + " | ".join(act)) if act else ""
+
+    return "\n".join([s for s in (sec_basic, sec_action, sec_req) if s])
 
 
 def _kb_points_line(fields):
