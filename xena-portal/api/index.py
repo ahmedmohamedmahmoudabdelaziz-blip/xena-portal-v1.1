@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.9.0 kb-rebuild-premium 2026-11-20"
+XENA_BUILD = "v34.9.1 kb-acm-doneby-clean 2026-11-20"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -17050,6 +17050,7 @@ KB_TICKET_FIELDS = [
     "Otherapp Name", "Otherapp ID", "Applier real name", "Country",
     "Old ID", "New ID", "Host Number Before close the agency",
     "Latest Usage Tracker", "Reward",
+    "Done by", "Create Way",
 ]
 # Second line of defense: if a future edit ever adds these to the projection,
 # their values are dropped in _kb_ticket_line before formatting.
@@ -17148,7 +17149,7 @@ def _kb_file_text(file_name, batch):
     lines = [batch["lines"][rid] for rid in order if rid in (batch.get("lines") or {})]
     header = ("# Xena Audition Grand Table - tickets batch %s "
               "(%d tickets). ONE ticket = up to 3 labelled lines: "
-              "[Basic] shared fields (Ticket, Date, Month, Type, Agency, Status, By/ACM, Region, User); "
+              "[Basic] shared fields (Ticket, Date, Month, Type, Agency, Status, ACM, By, Done by, Region, User); "
               "[Action] the audition action/result; [Request] that request type's own important fields. "
               "Phone numbers and NIDs are intentionally excluded.\n"
               % (file_name.replace(".txt", ""), len(lines)))
@@ -17167,8 +17168,34 @@ def _kb_ticket_line(fields):
       [Basic] Ticket #35532 | Date: 2026-11-19 | Month: 2026-11 | Type: Add & Remove games | Agency 42630 "PK-Ishq" | Status: Done | By: Zohaib | Region: PK
       [Action] Result: Done | Action: ADD Games
       [Request] Game: 5521 | Details: ..."""
+    def _clean_text(fd):
+        """v34.9.1 (Ahmed, 7710118965242022911): flatten rich-text / link /
+        option segments to PLAIN text. The Grand Table returns Ticket Details
+        and other text fields as [{'text':'...','type':'text'}, ...] and
+        extract_field_text() would dump the raw dict list into the line --
+        the JSON noise Ahmed screenshotted. Walk segments, pull the readable
+        string from each, skip empties."""
+        if fd in (None, "", []):
+            return ""
+        if isinstance(fd, (int, float)):
+            return str(fd)
+        if isinstance(fd, str):
+            return fd
+        if isinstance(fd, dict):
+            for k in ("text", "name", "en_name", "value", "label", "link", "email"):
+                if fd.get(k) not in (None, ""):
+                    return str(fd[k])
+            return ""
+        if isinstance(fd, (list, tuple)):
+            parts = []
+            for it in fd:
+                s = _clean_text(it)
+                if s and s not in ("None", "{}"):
+                    parts.append(s)
+            return " ".join(parts).strip()
+        return str(fd)
     def val(*aliases):
-        v = extract_field_text(get_field_local(fields, *aliases)).strip()
+        v = _clean_text(get_field_local(fields, *aliases)).strip()
         return KB_REDACT_RE.sub("[REDACTED]", v) if v else ""
     def anyof(*aliases):
         for a in aliases:
@@ -17184,11 +17211,26 @@ def _kb_ticket_line(fields):
     rtype = anyof("Request Type", "Type") or "Request"
     rl    = rtype.lower()
     status = anyof("Status", "Request Status")
-    by    = anyof("Respondents", "Assigned Member", "Acm", "Acm Name (PK)", "Acm Name (IN)")
     acode = val("Agency Code")
     aname = anyof("Agency Name", "Otherapp Name", "Other App Name")
     region = val("Region")
     uid   = val("User ID")
+    # v34.9.1 (Ahmed): "where is the acm name ?? ACM name IN and ACM name PK
+    # based on which region ???" -- pick the regional ACM column by Region,
+    # falling back to whichever is populated, and keep the requester separate.
+    acm_pk = val("Acm Name (PK)")
+    acm_in = val("Acm Name (IN)")
+    acm_gen = anyof("Acm", "Assigned Member")
+    rl_region = (region or "").strip().lower()
+    if rl_region in ("in", "india"):
+        acm = acm_in or acm_pk or acm_gen
+    elif rl_region in ("pk", "pakistan"):
+        acm = acm_pk or acm_in or acm_gen
+    else:
+        acm = acm_pk or acm_in or acm_gen
+    by     = val("Respondents")          # who raised it
+    doneby = val("Done by")              # who completed/handled it
+    createway = val("Create Way")        # v34.9.1: how the request was created
 
     # ---- date / month (clean, aggregatable) ----
     date_s, month_s = "", ""
@@ -17220,7 +17262,10 @@ def _kb_ticket_line(fields):
     if acode or aname:
         basic.append('Agency %s "%s"' % (acode or "?", aname or "?"))
     if status: basic.append("Status: %s" % status)
-    if by:     basic.append("By: %s" % by)
+    if acm:    basic.append("ACM: %s" % acm)        # regional Acm Name (PK)/(IN)
+    if by and by != acm: basic.append("By: %s" % by)  # requester, when different
+    if doneby: basic.append("Done by: %s" % doneby)
+    if createway: basic.append("Create Way: %s" % createway)
     if region: basic.append("Region: %s" % region)
     if uid:    basic.append("User: %s" % uid)
     sec_basic = "[Basic] " + " | ".join(basic)
@@ -17278,6 +17323,7 @@ def _kb_ticket_line(fields):
                        ("BD", anyof("Bd Code", "BD Code")),
                        ("Country", val("Country")),
                        ("Applier", val("Applier real name")),
+                       ("Reject Reason", anyof("Reject Reason", "Rejection Reason")),
                        ("Details", val("Ticket Details"))):
             s = kv(lbl, v)
             if s: req.append(s)
@@ -17323,8 +17369,6 @@ def _kb_ticket_line(fields):
     act = []
     if status: act.append("Result: %s" % status)
     if action: act.append("Action: %s" % action)
-    rej = anyof("Reject Reason", "Rejection Reason")
-    if rej and "reject" not in sec_req.lower(): act.append("Reject: %s" % rej)
     sec_action = ("[Action] " + " | ".join(act)) if act else ""
 
     return "\n".join([s for s in (sec_basic, sec_action, sec_req) if s])
