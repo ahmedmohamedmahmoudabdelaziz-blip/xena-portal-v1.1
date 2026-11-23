@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.9.1 kb-acm-doneby-clean 2026-11-20"
+XENA_BUILD = "v34.9.2 cron409-sessionmsg 2026-11-24"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -17776,6 +17776,15 @@ def knowledge_sync():
     try:
         _got = redis_cmd("SET", _lock_key, _lock_tok, "NX", "EX", 150)
         if _got not in ("OK", True):
+            # v34.9.2 (Ahmed, 2026-11-24): cron-job.org flags ANY non-2xx as
+            # FAILED, so a benign overlap (two 15-min runs colliding) showed up
+            # as a scary red "Failed (HTTP error) 409 Conflict" every run.
+            # Answer the CRON with 200 + skipped:true -- an overlap is not an
+            # error, the next tick re-runs. An interactive admin still gets the
+            # 409 so the UI can say "already running".
+            if not is_admin:
+                return jsonify({"ok": True, "skipped": True, "locked": True,
+                                "reason": "sync already running"}), 200
             return jsonify({"error": "A knowledge sync is already running -- try again shortly.",
                             "locked": True}), 409
         _lock_free = False
@@ -17800,8 +17809,20 @@ def _knowledge_sync_body(admin_name):
     can wrap it in the Redis sync lock (owner token + compare-and-delete)."""
     st = _kb_state()
     if not st["backfill_done"]:
-        return jsonify({"error": "backfill not complete yet",
-                        "processed": st["processed"]}), 409
+        # v34.9.2 (Ahmed, 2026-11-24): after a Reset the KB is rebuilding; the
+        # 15-min cron then hit this 409 every run and cron-job.org showed a red
+        # FAILED streak until the rebuild finished. For the CRON this is
+        # routine maintenance, not a failure -- answer 200 + rebuilding:true so
+        # the monitor stays green and the sync auto-resumes once the backfill
+        # is done. The interactive path keeps the 409 so the UI explains why.
+        _payload = {"backfill_done": False, "rebuilding": True,
+                    "processed": st["processed"]}
+        if admin_name:
+            _payload["error"] = "backfill not complete yet"
+            return jsonify(_payload), 409
+        _payload["ok"] = True
+        _payload["skipped"] = True
+        return jsonify(_payload), 200
     now_ms = int(time.time() * 1000)
     tat = get_tenant_access_token()
     # v34.1.27 (Ahmed): key the window on last_modified_time, not Submitted on.
