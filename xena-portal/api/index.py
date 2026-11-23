@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.9.4 ver-reload-nologout 2026-11-24"
+XENA_BUILD = "v34.9.5 submit-quota-failopen 2026-11-24"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -6906,6 +6906,17 @@ def submit_request():
             # infrastructure blip. A genuinely dead token is still caught by
             # Feishu itself in the create call below (99991677 path).
             logger.warn("submit_redis_down_fail_open", user=user)
+            uat = request.form.get('uat', '')
+        elif not uat and _redis_quota_blocked():
+            # v34.9.5 (Ahmed, 2026-11-24): the Upstash MONTHLY request quota is
+            # exhausted (991K/500K), so _get_cached_uat / _refresh_user_token
+            # both return None even though the browser still holds a LIVE uat.
+            # The old code then overwrote uat with None and 401'd ->
+            # SESSION_EXPIRED_ON_SUBMIT mid-submit, "still happen when submit".
+            # A quota blip is not a dead session -- fail open to the browser's
+            # uat (same pre-10.14 trust as the redis-down branch). Feishu still
+            # rejects a truly-dead token itself on the create call.
+            logger.warn("submit_redis_quota_fail_open", user=user)
             uat = request.form.get('uat', '')
     if not uat:
         audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
