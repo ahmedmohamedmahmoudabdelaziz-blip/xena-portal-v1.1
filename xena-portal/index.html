@@ -9298,16 +9298,30 @@ async function checkAppVersion() {
         const res = await fetch('/api/app-version');
         const data = await res.json();
         const storedVersion = localStorage.getItem('xenaAppVersion');
-        if (storedVersion && data.version && storedVersion !== data.version) {
-            // v34.9.4 (Ahmed, 2026-11-24): a deploy mid-session must NOT
-            // hard-log the agent out. Vercel auto-deploys on every GitHub push
-            // and changes APP_VERSION (the commit SHA), and a stale cached page
-            // can never update its stored version, so the old code force-logged
-            // him out every ~1h in a loop -- even after a hard refresh. Instead
-            // of wiping the session and demanding a re-login, ADOPT the new
-            // version and hard-reload so the fresh bundle loads; the session,
-            // drafts and parked workspaces all survive (localStorage is kept).
+        // v34.9.6 (Ahmed, 2026-11-24): the version a session STARTED with and the
+        // version of the bundle THIS page has loaded are two different clocks.
+        // v34.9.4 only watched the session clock, so after it adopted a new
+        // deploy the session matched the server and the checker went silent --
+        // "when new version deployment it not give me notify and when i
+        // refreshed it tell me the new version" (he only found out by refreshing
+        // manually). Now we ALSO track the loaded bundle clock
+        // (xenaLoadedBuild, set from window.SAM19_BUILD on every page load). The
+        // moment the server's XENA_BUILD differs from what this page has loaded,
+        // we notify + hard-reload immediately -- the new build arrives on its
+        // own, with NO logout and no waiting for a manual refresh. Both clocks
+        // are synced on the reload so it fires exactly once per deploy.
+        const loadedBuild = localStorage.getItem('xenaLoadedBuild') || window.SAM19_BUILD;
+        const mismatch = data.version && (
+            (storedVersion && storedVersion !== data.version) ||
+            (loadedBuild && loadedBuild !== data.version)
+        );
+        if (mismatch) {
+            // A deploy mid-session must NOT hard-log the agent out. ADOPT the new
+            // version on both clocks and hard-reload so the fresh bundle loads;
+            // the session, drafts and parked workspaces all survive
+            // (localStorage is kept).
             localStorage.setItem('xenaAppVersion', data.version);
+            localStorage.setItem('xenaLoadedBuild', data.version);
             try { xdCaptureAll(); } catch (e) {}
             ToastManager.show('🔄 A new version of Xena Portal is available — refreshing to load it. Your work and login carry over.', 'info', 6000);
             setTimeout(() => { try { window.location.reload(true); } catch (e) { window.location.reload(); } }, 1500);
@@ -30838,7 +30852,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.9.4 ver-reload-nologout 2026-11-24';
+window.SAM19_BUILD='v34.9.6 ver-notify-autoload 2026-11-24';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
