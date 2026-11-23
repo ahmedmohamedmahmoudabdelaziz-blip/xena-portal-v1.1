@@ -9298,33 +9298,8 @@ async function checkAppVersion() {
         const res = await fetch('/api/app-version');
         const data = await res.json();
         const storedVersion = localStorage.getItem('xenaAppVersion');
-        // v34.9.6 (Ahmed, 2026-11-24): the version a session STARTED with and the
-        // version of the bundle THIS page has loaded are two different clocks.
-        // v34.9.4 only watched the session clock, so after it adopted a new
-        // deploy the session matched the server and the checker went silent --
-        // "when new version deployment it not give me notify and when i
-        // refreshed it tell me the new version" (he only found out by refreshing
-        // manually). Now we ALSO track the loaded bundle clock
-        // (xenaLoadedBuild, set from window.SAM19_BUILD on every page load). The
-        // moment the server's XENA_BUILD differs from what this page has loaded,
-        // we notify + hard-reload immediately -- the new build arrives on its
-        // own, with NO logout and no waiting for a manual refresh. Both clocks
-        // are synced on the reload so it fires exactly once per deploy.
-        const loadedBuild = localStorage.getItem('xenaLoadedBuild') || window.SAM19_BUILD;
-        const mismatch = data.version && (
-            (storedVersion && storedVersion !== data.version) ||
-            (loadedBuild && loadedBuild !== data.version)
-        );
-        if (mismatch) {
-            // A deploy mid-session must NOT hard-log the agent out. ADOPT the new
-            // version on both clocks and hard-reload so the fresh bundle loads;
-            // the session, drafts and parked workspaces all survive
-            // (localStorage is kept).
-            localStorage.setItem('xenaAppVersion', data.version);
-            localStorage.setItem('xenaLoadedBuild', data.version);
-            try { xdCaptureAll(); } catch (e) {}
-            ToastManager.show('🔄 A new version of Xena Portal is available — refreshing to load it. Your work and login carry over.', 'info', 6000);
-            setTimeout(() => { try { window.location.reload(true); } catch (e) { window.location.reload(); } }, 1500);
+        if (storedVersion && data.version && storedVersion !== data.version) {
+            forceSessionExpiredLogout('This app was just updated. Please log in again to load the latest version.');
             return;
         }
         if (data.version) localStorage.setItem('xenaAppVersion', data.version);
@@ -30852,7 +30827,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.9.6 ver-notify-autoload 2026-11-24';
+window.SAM19_BUILD='v34.9.1 kb-acm-doneby-clean 2026-11-20';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
@@ -31294,7 +31269,7 @@ window.lightboxRenderExtractResult=function(result){
     chip.onclick=()=>chip.remove();
     var _host=document.querySelector('.page-top-bar .top-bar-right')||document.querySelector('.page-top-bar');
     if(_host){ _host.insertBefore(chip,_host.firstChild); } else { chip.style.position='fixed';chip.style.left='10px';chip.style.top='10px';chip.style.zIndex='9000';document.body.appendChild(chip); }
-    if(!ok)setTimeout(()=>ToastManager.show('⚠️ Build mismatch: the backend on Vercel is "'+be+'" but this page is "'+window.SAM19_BUILD+'". Hard-refresh this page (Ctrl+Shift+R / Cmd+Shift+R) once to load the current build — features will misbehave until they match.','warning',12000),2500);
+    if(!ok)setTimeout(()=>ToastManager.show('⚠️ Build mismatch: the backend on Vercel is "'+be+'" but this page is "'+window.SAM19_BUILD+'". Redeploy api/index.py (v19) — features will misbehave until they match.','warning',12000),2500);
   }catch(e){}
 })();
 })();

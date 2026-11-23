@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.9.6 ver-notify-autoload 2026-11-24"
+XENA_BUILD = "v34.9.1 kb-acm-doneby-clean 2026-11-20"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -820,21 +820,6 @@ def redis_healthy():
     if not REDIS_ENABLED: return False
     with _redis_health["lock"]:
         return _redis_health["down_since"] == 0.0
-
-def _redis_quota_blocked():
-    """v34.9.3 (Ahmed, 2026-11-24): True while the Upstash DAILY REQUEST QUOTA is
-    exhausted. The logs showed "ERR max requests limit exceeded. Limit: 500000,
-    Usage: 500000" on the session-renewal path -- the KB rebuild + 15-min cron
-    burn the quota, after which EVERY Redis command errors until the daily
-    reset. In that state redis_cmd returns None and the store flaps between
-    'down' and 'up' across probes, so a bare redis_healthy() can read True while
-    reads are actually failing. Session checks use this to fail OPEN (keep the
-    user logged in) instead of force-logging them out over a quota blip. The
-    marker is the recorded last_error containing Upstash's quota text."""
-    if not REDIS_ENABLED: return False
-    with _redis_health["lock"]:
-        err = (_redis_health.get("last_error") or "").lower()
-    return ("max requests limit" in err) or ("max_requests_limit" in err) or ("limit exceeded" in err)
 
 # ─── Phase 17: in-process fallback store (Redis-optional comments) ────────
 # Ahmed's 2026-10-19 production outage (Vercel deployment with Redis
@@ -3737,21 +3722,6 @@ def check_session():
                 # blip -- submits still get the real check when Redis recovers.
                 logger.warn("check_session_redis_down_fail_open", user=user)
                 return jsonify({"valid": True, "degraded": True})
-            # v34.9.3 (Ahmed, 2026-11-24): same fail-open as refresh_session.
-            # A MISSING uat key is a successful Redis round-trip, so
-            # redis_healthy() is True even when the cache silently evicted the
-            # token under KB/cron churn -- which is exactly the "kicked out 15
-            # min after login" Ahmed hit. A vanished cache entry is NOT proof
-            # the session died. Only hard-expire when the whole refresh chain
-            # is verifiably gone; otherwise keep the session alive.
-            if redis_cmd("GET", f"xena:refresh_token:{open_id}"):
-                return jsonify({"valid": True, "degraded": True})
-            # v34.9.3 (Ahmed, 2026-11-24): same quota fail-open as
-            # refresh_session -- an exhausted Upstash daily quota returns None
-            # here while the store flaps up/down, so an empty read is NOT proof
-            # the session died. Never hard-expire over a quota blip.
-            if _redis_quota_blocked():
-                return jsonify({"valid": True, "degraded": True})
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "SESSION_EXPIRED_ON_OPEN", "Detected opening New Request", ip=ip, severity="Warning")
             return jsonify({"error": "Your session has expired. Please log in again — anything you already filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
@@ -3791,13 +3761,6 @@ def refresh_session():
                 return jsonify({"success": True, "degraded": True})
             if redis_cmd("GET", f"xena:refresh_token:{open_id}") or redis_cmd("GET", f"xena:uat:{open_id}"):
                 return jsonify({"success": True, "degraded": True})
-            # v34.9.3 (Ahmed, 2026-11-24): the Upstash daily request quota was
-            # EXHAUSTED (logs: "ERR max requests limit exceeded 500000/500000")
-            # -- in that state redis_cmd can return None here while the store
-            # is technically "up" again between probes, so an empty read is NOT
-            # proof the chain died. Never hard-expire over a quota blip.
-            if _redis_quota_blocked():
-                return jsonify({"success": True, "degraded": True})
             return jsonify({"error": "Your session has expired. Please log in again — anything you already filled in has been saved and will be restored automatically.", "code": "SESSION_EXPIRED"}), 401
         if not email or bound_email.strip().lower() != email.strip().lower():
             # A live binding that the caller can't match = not the owner's
@@ -3808,22 +3771,6 @@ def refresh_session():
         if not uat:
             if not redis_healthy():
                 logger.warn("refresh_session_redis_down_fail_open", user=user)
-                return jsonify({"success": True, "degraded": True})
-            # v34.9.3 (Ahmed, 2026-11-24): "make it work as it worked before KB".
-            # A MISSING key is a successful round-trip, so redis_healthy() stays
-            # True even when the cache silently evicted the uat -- which is the
-            # "logged in, kicked out 15 min later" Ahmed kept hitting while the
-            # KB rebuild + 15-min cron churned Redis. A dropped cache entry is
-            # NOT proof the session died; the browser still holds a live
-            # localStorage token and the binding above already proved the
-            # caller is the owner. So FAIL OPEN: hand back the freshest uat we
-            # have (the browser's own, via degraded) instead of nuking the
-            # session mid-work. We only hard-expire when the WHOLE refresh
-            # chain is verifiably absent AND Redis is healthy -- i.e. the same
-            # condition as the no-binding branch below (a login whose server
-            # side truly never existed / was revoked).
-            if redis_cmd("GET", f"xena:refresh_token:{open_id}"):
-                # Chain alive, just no fresh uat this second -- keep session.
                 return jsonify({"success": True, "degraded": True})
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "")
             audit.log(user, "SESSION_EXPIRED_ON_RENEW", "Silent renewal found a dead chain", ip=ip, severity="Warning")
@@ -6906,17 +6853,6 @@ def submit_request():
             # infrastructure blip. A genuinely dead token is still caught by
             # Feishu itself in the create call below (99991677 path).
             logger.warn("submit_redis_down_fail_open", user=user)
-            uat = request.form.get('uat', '')
-        elif not uat and _redis_quota_blocked():
-            # v34.9.5 (Ahmed, 2026-11-24): the Upstash MONTHLY request quota is
-            # exhausted (991K/500K), so _get_cached_uat / _refresh_user_token
-            # both return None even though the browser still holds a LIVE uat.
-            # The old code then overwrote uat with None and 401'd ->
-            # SESSION_EXPIRED_ON_SUBMIT mid-submit, "still happen when submit".
-            # A quota blip is not a dead session -- fail open to the browser's
-            # uat (same pre-10.14 trust as the redis-down branch). Feishu still
-            # rejects a truly-dead token itself on the create call.
-            logger.warn("submit_redis_quota_fail_open", user=user)
             uat = request.form.get('uat', '')
     if not uat:
         audit.log(user, "SESSION_EXPIRED_ON_SUBMIT", f"Type: {req_type}", ip=request.headers.get("X-Forwarded-For", request.remote_addr or ""), severity="Warning")
@@ -17840,15 +17776,6 @@ def knowledge_sync():
     try:
         _got = redis_cmd("SET", _lock_key, _lock_tok, "NX", "EX", 150)
         if _got not in ("OK", True):
-            # v34.9.2 (Ahmed, 2026-11-24): cron-job.org flags ANY non-2xx as
-            # FAILED, so a benign overlap (two 15-min runs colliding) showed up
-            # as a scary red "Failed (HTTP error) 409 Conflict" every run.
-            # Answer the CRON with 200 + skipped:true -- an overlap is not an
-            # error, the next tick re-runs. An interactive admin still gets the
-            # 409 so the UI can say "already running".
-            if not is_admin:
-                return jsonify({"ok": True, "skipped": True, "locked": True,
-                                "reason": "sync already running"}), 200
             return jsonify({"error": "A knowledge sync is already running -- try again shortly.",
                             "locked": True}), 409
         _lock_free = False
@@ -17873,20 +17800,8 @@ def _knowledge_sync_body(admin_name):
     can wrap it in the Redis sync lock (owner token + compare-and-delete)."""
     st = _kb_state()
     if not st["backfill_done"]:
-        # v34.9.2 (Ahmed, 2026-11-24): after a Reset the KB is rebuilding; the
-        # 15-min cron then hit this 409 every run and cron-job.org showed a red
-        # FAILED streak until the rebuild finished. For the CRON this is
-        # routine maintenance, not a failure -- answer 200 + rebuilding:true so
-        # the monitor stays green and the sync auto-resumes once the backfill
-        # is done. The interactive path keeps the 409 so the UI explains why.
-        _payload = {"backfill_done": False, "rebuilding": True,
-                    "processed": st["processed"]}
-        if admin_name:
-            _payload["error"] = "backfill not complete yet"
-            return jsonify(_payload), 409
-        _payload["ok"] = True
-        _payload["skipped"] = True
-        return jsonify(_payload), 200
+        return jsonify({"error": "backfill not complete yet",
+                        "processed": st["processed"]}), 409
     now_ms = int(time.time() * 1000)
     tat = get_tenant_access_token()
     # v34.1.27 (Ahmed): key the window on last_modified_time, not Submitted on.
