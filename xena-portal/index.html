@@ -9325,8 +9325,7 @@ window.addEventListener('focus', () => { markActivity(); checkSessionExpiry(); c
 // do it again and open the tkt and fill what i was filled before".
 // Two layers, together:
 //  1) renewSessionUat() keeps the browser's uat fresh from the server-side
-//     24h refresh chain (/api/auth/refresh-session) every 45 min, on tab
-//     refocus, and right before every submit -- so a mid-shift session stops
+//     24h refresh chain (/api/auth/refresh-session) every 90 min and right before every submit -- so a mid-shift session stops
 //     dying with Feishu's ~2-3h token lifetime. Cost: one tiny server call
 //     (a Redis read, ZERO Feishu calls while the server cache is warm).
 //  2) The xd* draft store autosaves every open form as the agent types. If a
@@ -9369,9 +9368,11 @@ async function renewSessionUat(force) {
 // Ahmed (Phase 10.44 follow-up): interval set to 45 min to trim Vercel
 // invocations; Feishu's uat lives ~2h, so even one missed tick is safe, and
 // the forced renewal before every submit is the real safety net.
-setInterval(() => { if (!document.hidden) renewSessionUat(true); }, 45 * 60000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) renewSessionUat(false); });
-window.addEventListener('focus', () => renewSessionUat(false));
+// v34.9.8: cadence raised 45->90 min (Feishu uat lives ~2h; the pre-submit
+// forced renewal is the real safety net) and the focus/visibility renewals
+// are dropped -- they were the multiplicative Redis-read driver for people
+// who alt-tab a lot. The 90-min timer alone keeps a working session alive.
+setInterval(() => { if (!document.hidden) renewSessionUat(true); }, 90 * 60000);
 
 // --- Unsent-work drafts (xd*) ---
 // Store shape per agent email: { newRequest: {values, ts}, audit: {...},
@@ -25931,6 +25932,16 @@ function cmnMarkRead(uid) {
 
 async function cmnRefresh(silent, _noReval) {
     if (cmnState.loading) return;
+    // v34.9.8: serve the last successful pull for 5 min instead of hitting
+    // the server (and its per-commenter name cache reads) on every bell
+    // open. The 30-min auto-refresh, the manual ⟳ button and opening the
+    // panel fresh (openFresh) all bypass this cache.
+    if (cmnState.loaded && cmnState.items && cmnState._fetchedAt &&
+        (Date.now() - cmnState._fetchedAt < 5 * 60000)) {
+        cmnUpdateBadge();
+        if (cmnState.open) cmnRender();
+        return;
+    }
     cmnState.loading = true;
     let stale = false;
     try {
@@ -25949,6 +25960,7 @@ async function cmnRefresh(silent, _noReval) {
                 // regardless of which backend path served it.
                 cmnState.items = (d.items || []).slice().sort((a, b) => cmnMs(b.time) - cmnMs(a.time));
                 cmnState.loaded = true; stale = !!d.stale; cmnState.stale = stale;
+                cmnState._fetchedAt = Date.now();
             }
         }
     } catch (e) { /* badge just stays as-is on network errors */ }
@@ -30827,7 +30839,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.9.1 kb-acm-doneby-clean 2026-11-20';
+window.SAM19_BUILD='v34.9.8 quota-trim-polling 2026-11-25';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
