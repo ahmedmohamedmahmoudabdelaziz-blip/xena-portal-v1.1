@@ -682,6 +682,11 @@ window.xenaTrace = function () {
         .twcf-chip span{font-size:.6rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);}
         .twcf-chip b{font-size:.88rem;color:var(--accent-cyan);word-break:break-word;}
         .twcf-text{background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:.82rem;line-height:1.6;white-space:pre-wrap;opacity:.9;}
+        /* v34.10.1 (Ahmed): BD Duplicated Check -- full-text hero chip that wraps
+           every line (no clipping), tinted green/rose by the duplicate verdict. */
+        .twcf-bddup{background:var(--surface-hover);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:.85rem;line-height:1.65;white-space:pre-wrap;word-break:break-word;font-weight:500;}
+        .twcf-bddup.pos{border-color:rgba(0,230,160,.4);background:linear-gradient(135deg,rgba(0,230,160,.08),rgba(0,212,255,.04));color:var(--accent-green);}
+        .twcf-bddup.neg{border-color:rgba(255,80,120,.45);background:linear-gradient(135deg,rgba(255,80,120,.09),rgba(255,179,0,.04));color:var(--accent-rose);}
         /* Compact row mode (many matches): one line per ticket, tap to open
            its full card underneath -- replaces the unreadable micro-card
            grid when a dupe wave returns a dozen+ hits. */
@@ -18287,11 +18292,17 @@ function twRenderRejectReasonCard(ticket) {
 function twSyncPossibleBdIdVisibility() {
     const form = document.getElementById('tw-form');
     if (!form) return;
-    const bdInput = form.querySelector('[name="Possible BD ID"]');
-    if (!bdInput) return;
-    const wrap = bdInput.closest('.control-group');
     const atVal = (form.querySelector('[name="Agency Type"]')?.value || '').trim().toLowerCase();
-    if (wrap) wrap.style.display = (atVal === 'new bd hunting') ? '' : 'none';
+    const show = (atVal === 'new bd hunting');
+    const bdInput = form.querySelector('[name="Possible BD ID"]');
+    const bdWrap = bdInput && bdInput.closest('.control-group');
+    if (bdWrap) bdWrap.style.display = show ? '' : 'none';
+    // v34.10.1 (Ahmed): BD Duplicated Check only appears for New BD Hunting too.
+    // It has no name attr (computed card), so find it by its <label> text.
+    const bdDupLbl = Array.from(form.querySelectorAll('.control-group > label'))
+        .find(l => (l.textContent || '').trim() === 'BD Duplicated Check');
+    const bdDupWrap = bdDupLbl && bdDupLbl.closest('.control-group');
+    if (bdDupWrap) bdDupWrap.style.display = show ? '' : 'none';
 }
 
 // ─── Phase 10.9: Agency Point Charge gate (Agency Point Request tickets) ───
@@ -21140,6 +21151,16 @@ function twClearUserPicker(pickerId) {
 //                    (falls back to a wrapped text block when the value isn't
 //                    parseable into pairs).
 function twComputedFieldHtml(key, valStr) {
+    // v34.10.1 (Ahmed): BD Duplicated Check -- a full-text hero chip, tinted by
+    // verdict (green when it reads "No duplicate", rose otherwise). Falls
+    // through to the generic wrapped-text renderer when empty.
+    if (key === 'BD Duplicated Check') {
+        const t = String(valStr || '').trim();
+        if (!t) return '<div class="twcf-text">—</div>';
+        const clean = /no duplicate|all clear|clear/i.test(t) && !/duplicat(e|ed)(?! check)/i.test(t.replace(/no duplicate/ig, ''));
+        const cls = clean ? 'pos' : 'neg';
+        return '<div class="twcf-bddup ' + cls + '">' + escHtml(t) + '</div>';
+    }
     if (key === 'Point Balance') {
         const n = parseFloat(String(valStr).replace(/[^\d.\-]/g, ''));
         const hasN = Number.isFinite(n);
@@ -21266,6 +21287,14 @@ function createTwControl(key, value) {
     // through as raw "[{...}]" JSON in the UI.
     const readOnly = (meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type)) || key === 'BD Duplicated Check';
     const valStr = feishuValueToString(value);
+    // v34.10.1 (Ahmed): BD Duplicated Check is a long formula output -- a
+    // one-line read-only input clips it. Render the full-width wrapped chip
+    // card (twComputedFieldHtml, like the Formula field) so ALL text shows.
+    if (key === 'BD Duplicated Check') {
+        wrap.style.gridColumn = '1 / -1';
+        wrap.innerHTML = label + twComputedFieldHtml(key, valStr);
+        return wrap;
+    }
 
     // Phase 10.10: computed (Formula) fields get designed, readable renderings
     // instead of a cramped read-only input -- "Point Balance" becomes a 🪙
@@ -30843,7 +30872,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.10.0 bd-dup-check+possible-bd-search 2026-11-26';
+window.SAM19_BUILD='v34.10.1 bd-dup-fulltext+nbdh-gate 2026-11-26';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
