@@ -37,7 +37,7 @@ APP_VERSION = (os.environ.get("VERCEL_GIT_COMMIT_SHA") or os.environ.get("VERCEL
 # 5 seconds WHICH version is actually live ("did the right files get deployed?"
 # needs to never require guessing again). Surfaced by /api/app-version and the
 # frontend version badge; the badge warns when FE and BE tags disagree.
-XENA_BUILD = "v34.9.9 pinup-evidence2 2026-11-25"
+XENA_BUILD = "v34.10.0 bd-dup-check+possible-bd-search 2026-11-26"
 PROMPT_VERSION = "v34.3.0"   # v34.2.0 (plan sec.6): bump on every prompt/tool/model change; logged with each request
 
 BASE_ID           = "C9zFb52m4abhtHsX5LjcBywbnze"
@@ -106,6 +106,8 @@ QUERY_FIELD_ALIASES = {
     # in the frontend) -- it fans out one /api/query call per filled identity
     # field, Agency Code included, so this needs its own alias entry here.
     "agency_code": ["Agency Code"],
+    # v34.10.0 (Ahmed): search the Universal Request Query by Possible BD ID.
+    "possible_bd_id": ["Possible BD ID"],
 }
 
 EXCLUDED_SUBMIT_FIELDS = {

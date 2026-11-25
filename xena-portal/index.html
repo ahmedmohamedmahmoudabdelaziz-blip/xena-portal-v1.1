@@ -5654,6 +5654,7 @@ html{background:var(--bg);min-height:100%}
                                 <option value="nid_number">NID Number</option>
                                 <option value="bd_code">Bd Code</option>
                                 <option value="agency_code">Agency Code</option>
+                                <option value="possible_bd_id">Possible BD ID</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -15404,7 +15405,8 @@ async function loadAgencyForAllocator() {
 
 const QY_FIELD_LABELS = {
     user_id: 'User ID', numbering: 'Numbering', otherapp_id: 'Otherapp ID',
-    nid_number: 'NID Number', bd_code: 'Bd Code', agency_code: 'Agency Code'
+    nid_number: 'NID Number', bd_code: 'Bd Code', agency_code: 'Agency Code',
+    possible_bd_id: 'Possible BD ID'
 };
 
 (function initQyFieldLabel(){
@@ -17038,7 +17040,8 @@ const TICKET_DYNAMIC_FIELDS = {
         "Otherapp Name",
         "Otherapp ID",
         "NID & Otherapp Screen",
-        "Agency Code"
+        "Agency Code",
+        "BD Duplicated Check"
     ],
     "Audit": [
         "raw_text"
@@ -17072,7 +17075,8 @@ const TICKET_DYNAMIC_FIELDS = {
         "NID Number",
         "NID & Otherapp Screen",
         "BD Hunted Agency Code",
-        "Bd Code"
+        "Bd Code",
+        "BD Duplicated Check"
     ],
     "Agency Target Privilege": [
         "Agency Code",
@@ -21260,7 +21264,7 @@ function createTwControl(key, value) {
     // input, but ALWAYS unwrapped via feishuValueToString so Lark's array/object segment
     // shapes (e.g. Lookup/Formula returning [{"type":"text","text":"..."}]) never leak
     // through as raw "[{...}]" JSON in the UI.
-    const readOnly = meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type);
+    const readOnly = (meta && ['Formula','Lookup','AutoNumber','CreatedTime','CreatedUser'].includes(meta.ui_type)) || key === 'BD Duplicated Check';
     const valStr = feishuValueToString(value);
 
     // Phase 10.10: computed (Formula) fields get designed, readable renderings
@@ -22724,10 +22728,10 @@ const REQ_BRANCHES = {
     // Agency Type sits right after User ID (Ahmed 2026-09-30): the agent
     // picks it up front and the rest of the form reacts -- see
     // reqApplyAgencyTypeRules() (Acm hunting / Walkin hide the BD Code).
-    "Agency Creation": ["Region", "User ID", "Agency Type", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Bd Code", "Possible BD ID", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "Agency Creation": ["Region", "User ID", "Agency Type", "Agency Name", "Applier real name", "Otherapp Name", "Otherapp ID", "Country", "Whatsapp Number", "NID Number", "Bd Code", "Possible BD ID", ACM_AUTO, "Applier Note", "NID & Otherapp Screen", "BD Duplicated Check"],
     "Agency applied already by ACM or BD link ( follow-up )": ["Region", "User ID", ACM_AUTO, "Applier Note", "Evidence Screen 2"],
     "Closing Agency": ["Region", "User ID", "Agency Code", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen"],
-    "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen"],
+    "BD Creation": ["Region", "User ID", "Applier real name", "BD Nickname", "Email Adress", "BD Hunted Agency Code", "Country", "Whatsapp Number", "NID Number", ACM_AUTO, "Applier Note", "NID & Otherapp Screen", "BD Duplicated Check"],
     "Remove BD ": ["Region", "User ID", ACM_AUTO, "Closing Reason", "Applier Note", "Evidence Screen 2"],
     "Agency Target Privilege": ["Region", "User ID (Multi)", "Agency Code", "Target", "Privilege", "Applier Note", "Evidence Screen 2"],
     "Agency Point Request": ["Region", "User ID", "Agency Code", "Agency Point Privilege", "Applier Note", "Evidence Screen 2"],
@@ -30839,7 +30843,7 @@ document.addEventListener('keydown', function(e){
     if(drawer&&drawer.classList.contains('open')) drawer.classList.remove('open');
 });
 
-window.SAM19_BUILD='v34.9.9 pinup-evidence2 2026-11-25';
+window.SAM19_BUILD='v34.10.0 bd-dup-check+possible-bd-search 2026-11-26';
 (function(){
 if(window.__sam19)return;window.__sam19=true;
 
